@@ -3033,10 +3033,17 @@ public class PlanAssembler {
 
     private static AbstractPlanNode processComplexAggProjectionNode(
             ParsedSelectStmt selectStmt, AbstractPlanNode root) {
-        if ( ! selectStmt.hasComplexAgg()) {
+        if (! selectStmt.hasComplexAgg()) {
+            return root;
+        } else if (selectStmt.getFinalProjectionSchema().isEmpty()) {
+            // ENG-13840: empty projection node may be generated for an aggregation sub-query
+            // serving a scalar value in some expression. Conceptually, this "projection node"
+            // just forwards the single value, and can be spared.
+            // Calcite has a special type SINGLE-VALUE aggregation function for this case.
+            assert root instanceof AggregatePlanNode;
             return root;
         } else {
-            ProjectionPlanNode proj = new ProjectionPlanNode(selectStmt.getFinalProjectionSchema());
+            final ProjectionPlanNode proj = new ProjectionPlanNode(selectStmt.getFinalProjectionSchema());
             proj.addAndLinkChild(root);
             return proj;
         }
