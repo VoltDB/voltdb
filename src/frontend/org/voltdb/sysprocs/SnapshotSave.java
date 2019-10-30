@@ -132,7 +132,8 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) paramsArray[5];
-            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
+            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[6],
+                    (Long) params.toArray()[7]);
 
             final long timestamp = (Long)paramsArray[8];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
