@@ -52,7 +52,6 @@ import com.google_voltpatches.common.base.Preconditions;
 class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
-    private static final String VALIDATOR_CURSOR = "__validator__";
     private static final int VERSION = 2;
     private static final Random RANDOM = new Random();
 
@@ -839,6 +838,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         return m_extraHeaderCache;
     }
 
+    @Override
+    boolean isActive() {
+        return m_isActive;
+    }
+
     private class SegmentReader implements PBDSegmentReader<M> {
         private final String m_cursorId;
         private long m_readOffset;
@@ -863,6 +867,14 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         @Override
         public boolean anyReadAndDiscarded() {
             return m_discardCount > 0;
+        }
+
+        @Override
+        public void markAllReadAndDiscarded() {
+            // This doesn't set the readOffset and bytesRead nor does it move the file pointer,
+            // but just updates the read and discarded count
+            m_objectReadIndex = m_numOfEntries;
+            m_discardCount = m_numOfEntries;
         }
 
         @Override

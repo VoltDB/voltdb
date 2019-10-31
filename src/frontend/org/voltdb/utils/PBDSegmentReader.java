@@ -103,4 +103,6 @@ interface PBDSegmentReader<M> {
      * Has this reader been closed.
      */
     public boolean isClosed();
+
+    public void markAllReadAndDiscarded();
 }

@@ -124,6 +124,22 @@ public interface BinaryDeque<M> {
 
     public void closeAndDelete() throws IOException;
 
+    /**
+     * Set a retention policy on the PBD data, which is based on the number of bytes of data in the PBD.
+     * Only one retention policy may be set on a PBD.
+     *
+     * @param numBytes at least numBytes of data will be retained in the PBD.
+     */
+    public void setNumBytesRetentionPolicy(int numBytes);
+
+    /**
+     * Set a retention policy on the PBD data, which is based on the time when the PBD data was written.
+     * Only one retention policy may be set on a PBD.
+     *
+     * @param retainMillis the PBD will contain data that is from retainMillis or lower
+     */
+    public void setTimeBasedRetentionPolicy(int retainMillis);
+
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
