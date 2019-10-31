@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -61,7 +62,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
-
+    protected AtomicBoolean m_eligibleForExclusion;
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
@@ -129,6 +130,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_scheduler.m_repairLog = m_repairLog;
+        m_eligibleForExclusion = ((SpScheduler)m_scheduler).getEligibleForExclusion();
     }
 
     @Override

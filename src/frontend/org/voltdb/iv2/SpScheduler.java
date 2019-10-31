@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
@@ -65,6 +66,7 @@ import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.DumpPlanThenExitMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
@@ -187,6 +189,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private final boolean IS_KSAFE_CLUSTER;
 
+    private final AtomicBoolean m_eligibleForExclusion;
+
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor, boolean scoreboardEnabled)
     {
         super(partitionId, taskQueue);
@@ -199,6 +203,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
         IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
+        m_eligibleForExclusion = new AtomicBoolean(false);
     }
 
     public void initializeScoreboard(int siteId) {
@@ -737,7 +742,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //to replica for repair
             Iv2InitiateTaskMessage replmsg =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message, true);
-            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(Longs.toArray(needsRepair), replmsg);
         }
     }
 
@@ -776,7 +781,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(Longs.toArray(needsRepair), replmsg);
         }
     }
 
@@ -844,10 +849,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (counter != null) {
             HashResult result = counter.offer(message);
             if (result.isDone()) {
-                if (counter.isSuccess()) {
+                if (counter.isSuccess() || (!counter.isSuccess() && m_isEnterpriseLicense)) {
                     m_duplicateCounters.remove(dcKey);
                     final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                     setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
+                    if (!counter.isSuccess()) {
+                        m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
+                        tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
+                    }
                     m_mailbox.send(counter.m_destinationId, counter.m_lastResponse);
                 } else {
                     if (m_isLeader && m_sendToHSIds.length > 0) {
@@ -860,7 +869,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     }
                     RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                             counter.getStoredProcedureName(), m_procSet);
-                    VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+                    VoltDB.crashLocalVoltDB("Hash mismatch: replicas produced different results.", true, null);
                 }
             }
         } else {
@@ -1220,7 +1229,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             HashResult result = counter.offer(message);
             if (result.isDone()) {
-                if (counter.isSuccess()) {
+                if (counter.isSuccess() || (!counter.isSuccess() && m_isEnterpriseLicense)) {
                     if (txn != null && txn.isDone()) {
                         setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
                     }
@@ -1230,9 +1239,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     // MPI is tracking deps per partition HSID.  We need to make
                     // sure we write ours into the message getting sent to the MPI
                     resp.setExecutorSiteId(m_mailbox.getHSId());
+                    if (!counter.isSuccess()) {
+                        m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
+                        tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
+                    }
                     m_mailbox.send(counter.m_destinationId, resp);
                 } else {
-                    VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+                    VoltDB.crashGlobalVoltDB("Hash mismatch running multi-part procedure.", true, null);
                 }
             }
             // doing duplicate suppression: all done.
@@ -1528,7 +1541,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                        CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
         RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                 msg.getProcName(), m_procSet);
-        VoltDB.crashLocalVoltDB("HASH MISMATCH", true, null);
+        VoltDB.crashLocalVoltDB("Hash mismatch", true, null);
     }
 
     @Override
@@ -1832,5 +1845,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // flush all RO transactions out of backlog
         m_pendingTasks.removeMPReadTransactions();
+    }
+
+    public void setEligibleForExclusion(boolean eligibleForExclusion) {
+        m_eligibleForExclusion.set(eligibleForExclusion);
+    }
+
+    public AtomicBoolean getEligibleForExclusion() {
+        return m_eligibleForExclusion;
     }
 }

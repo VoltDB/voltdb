@@ -37,6 +37,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -60,7 +61,7 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-
+    protected final boolean m_isEnterpriseLicense;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             S scheduler, String whoamiPrefix, StatsAgent agent, StartAction startAction)
@@ -106,6 +107,8 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
         }
         m_whoami = whoamiPrefix +  " " +
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
+        m_isEnterpriseLicense = MiscUtils.isPro();
+        m_scheduler.m_isEnterpriseLicense = m_isEnterpriseLicense;
     }
 
     protected void configureCommon(BackendTarget backend,
