@@ -94,9 +94,10 @@ interface PBDSegmentReader<M> {
     public void close() throws IOException;
 
     /**
-     * Similar to {@link #close()} but this reader will not be returned from {@link PBDSegment#getReader(String)}
+     * Close this reader and release any resources. Different between this and {@link #close()} is that
+     * this keeps track of the closed reader. This call is used only internally when a reader is polling through segments.
      */
-    public void purge() throws IOException;
+    public void closeAndSaveReaderState() throws IOException;
 
     /**
      * Has this reader been closed.
