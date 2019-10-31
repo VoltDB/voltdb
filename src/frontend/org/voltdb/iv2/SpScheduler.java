@@ -71,6 +71,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MPBacklogFlushMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
@@ -854,8 +855,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                     setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
                     if (!counter.isSuccess()) {
-                        m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
-                        tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
+                        processTasksPostHashMismatch(counter);
                     }
                     m_mailbox.send(counter.m_destinationId, counter.m_lastResponse);
                 } else {
@@ -890,6 +890,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //m_mailbox can be MockMailBox for unit test.
         if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
             ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
+        }
+    }
+
+    private void processTasksPostHashMismatch(DuplicateCounter counter){
+        m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
+        tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
+
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        for (Integer integer : liveHids) {
+            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
         }
     }
 
@@ -1240,8 +1252,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     // sure we write ours into the message getting sent to the MPI
                     resp.setExecutorSiteId(m_mailbox.getHSId());
                     if (!counter.isSuccess()) {
-                        m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
-                        tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
+                        processTasksPostHashMismatch(counter);
                     }
                     m_mailbox.send(counter.m_destinationId, resp);
                 } else {
