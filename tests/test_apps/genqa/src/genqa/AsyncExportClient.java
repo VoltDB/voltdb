@@ -255,10 +255,10 @@ public class AsyncExportClient
         final String procedure;
         final boolean exportGroups;
         final int exportTimeout;
-        final boolean usemigrate;
+        final boolean migrateWithTTL;
         final boolean usetableexport;
-        final boolean usemigrateonly;
-        final long migrateNottlInterval;
+        final boolean migrateWithoutTTL;
+        final long migrateNoTTLInterval;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval      = apph.longValue("displayinterval");
@@ -273,10 +273,10 @@ public class AsyncExportClient
             parsedServers        = servers.split(",");
             exportGroups         = apph.booleanValue("exportgroups");
             exportTimeout        = apph.intValue("timeout");
-            usemigrate           = apph.booleanValue("usemigrate");
+            migrateWithTTL       = apph.booleanValue("migrate-ttl");
             usetableexport       = apph.booleanValue("usetableexport");
-            usemigrateonly       = apph.booleanValue("usemigrateonly");
-            migrateNottlInterval = apph.longValue("nottl-interval");
+            migrateWithoutTTL    = apph.booleanValue("migrate-nottl");
+            migrateNoTTLInterval = apph.longValue("nottl-interval");
 
         }
     }
@@ -340,9 +340,9 @@ public class AsyncExportClient
                 .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
                 .add("exportgroups", "export_groups", "Multiple export connections", "true") // TODO: remove obsolescent exportgroups remnants
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
-                .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
-                .add("usetableexport","usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
-                .add("usemigrateonly","usemigrateonly","use DDL that includes MIGRATE without TTL","false")
+                .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
+                .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
+                .add("migrate-nottl", "false","use DDL that includes MIGRATE without TTL","false")
                 .add("nottl-interval", "milliseconds", "approximate migrate command invocation interval (in milliseconds)", 2500)
                 .setArguments(args)
             ;
@@ -391,7 +391,7 @@ public class AsyncExportClient
             // If migrate without TTL is enabled, set things up so a migrate is triggered
             // roughly every 2.5 seconds, with the first one happening 3 seconds from now
             Random migrateInterval = new Random();
-            if (config.usemigrateonly) {
+            if (config.migrateWithoutTTL) {
                 timer.scheduleAtFixedRate(new TimerTask()
                 {
                     @Override
@@ -401,7 +401,7 @@ public class AsyncExportClient
                     }
                 }
                 , 3000l
-                , config.migrateNottlInterval
+                , config.migrateNoTTLInterval
                 );
             }
 
@@ -467,7 +467,7 @@ public class AsyncExportClient
             // We're done - stop the performance statistics display task
             timer.cancel();
 
-            if (config.usemigrateonly) {
+            if (config.migrateWithoutTTL) {
                 log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
                 log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
                 log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
