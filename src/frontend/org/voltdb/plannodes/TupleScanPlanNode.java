@@ -55,8 +55,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
      * @param
      * @param
      */
-    public TupleScanPlanNode(String subqueryName,
-            List<AbstractExpression> columnExprs) {
+    public TupleScanPlanNode(String subqueryName, List<AbstractExpression> columnExprs) {
         super(subqueryName, subqueryName);
         m_isSubQuery = true;
         m_hasSignificantOutputSchema = true;
@@ -111,14 +110,14 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public String explainPlanForNode(String indent) {
-        String result = "(";
+        StringBuilder result = new StringBuilder("(");
         String connector = "";
         for (AbstractExpression arg : m_columnList) {
-            result += connector + arg.explain(indent);
+            result.append(connector).append(arg.explain(indent));
             connector = ", ";
         }
-        result += ")";
-        return result;
+        result.append(")");
+        return result.toString();
     }
 
     @Override

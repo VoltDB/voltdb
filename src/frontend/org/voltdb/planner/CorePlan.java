@@ -67,6 +67,7 @@ public class CorePlan {
      */
     private int partitioningParamIndex = -1;
     private Object partitioningParamValue = null;
+    private final CompiledPlan m_compiledPlan;
 
     /**
      * Constructor from QueryPlanner output.
@@ -75,6 +76,7 @@ public class CorePlan {
      * @param catalogHash  The sha-1 hash of the catalog this plan was generated against.
      */
     public CorePlan(CompiledPlan plan, byte[] catalogHash) {
+        m_compiledPlan = plan;
         aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph, plan.getIsLargeQuery());
         collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph, plan.getIsLargeQuery());
 
@@ -103,6 +105,21 @@ public class CorePlan {
         readOnly = plan.isReadOnly();
     }
 
+    public void validate() {
+        assert(aggregatorFragment != null);
+
+        // dml => !readonly
+        assert(! isReplicatedTableDML || ! readOnly);
+
+        // repdml => 2partplan
+        assert(! isReplicatedTableDML || collectorFragment != null);
+
+        // zero param types => null extracted params
+        // nonzero param types => param types and extracted params have same size
+        assert parameterTypes != null;
+        assert m_compiledPlan == null || m_compiledPlan.validate();
+    }
+
     /***
      * Constructor, mainly for deserialization (but also testing)
      *
@@ -120,8 +137,8 @@ public class CorePlan {
                     boolean isReplicatedTableDML,
                     boolean isReadOnly,
                     VoltType[] paramTypes,
-                    byte[] catalogHash)
-    {
+                    byte[] catalogHash) {
+        m_compiledPlan = null;      // not reconstructing the CompiledPlan
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.aggregatorHash = aggregatorHash;

@@ -66,13 +66,13 @@ public class VectorValueExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String result = "(";
+        StringBuilder result = new StringBuilder("(");
         String connector = "";
         for (AbstractExpression arg : m_args) {
-            result += connector + arg.explain(impliedTableName);
+            result.append(connector).append(arg.explain(impliedTableName));
             connector = ", ";
         }
-        result += ")";
-        return result;
+        result.append(")");
+        return result.toString();
     }
 }

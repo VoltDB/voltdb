@@ -108,25 +108,16 @@ public class WindowFunctionExpression extends AbstractExpression {
     }
 
     public boolean hasSubqueryArgs() {
-        if (m_args != null) {
-            for (AbstractExpression arg : m_args) {
-                if (arg.hasSubquerySubexpression()) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return m_args != null && m_args.stream().anyMatch(AbstractExpression::hasSubquerySubexpression);
     }
 
     @Override
     public boolean equals(Object obj) {
         if (super.equals(obj) && obj instanceof WindowFunctionExpression) {
             WindowFunctionExpression oWindow = (WindowFunctionExpression)obj;
-            if (m_orderByExpressions.equals(oWindow.getOrderByExpressions())
+            return m_orderByExpressions.equals(oWindow.getOrderByExpressions())
                     && m_orderByDirections.equals(oWindow.getOrderByDirections())
-                    && m_partitionByExpressions.equals(oWindow.getPartitionByExpressions())) {
-                return true;
-            }
+                    && m_partitionByExpressions.equals(oWindow.getPartitionByExpressions());
         }
         return false;
     }
@@ -180,22 +171,9 @@ public class WindowFunctionExpression extends AbstractExpression {
         if (super.hasAnySubexpressionOfClass(aeClass)) {
             return true;
         }
-        for (AbstractExpression pbexpr : m_partitionByExpressions) {
-            if (pbexpr.hasAnySubexpressionOfClass(aeClass)) {
-                return true;
-            }
-        }
-        for (AbstractExpression sortExpr : m_orderByExpressions) {
-            if (sortExpr.hasAnySubexpressionOfClass(aeClass)) {
-                return true;
-            }
-        }
-        for (AbstractExpression aggExpr : m_args) {
-            if (aggExpr.hasAnySubexpressionOfClass(aeClass)) {
-                return true;
-            }
-        }
-        return false;
+        return m_partitionByExpressions.stream().anyMatch(e -> e.hasAnySubexpressionOfClass(aeClass)) ||
+                m_orderByExpressions.stream().anyMatch(e -> e.hasAnySubexpressionOfClass(aeClass)) ||
+                m_args.stream().anyMatch(e -> e.hasAnySubexpressionOfClass(aeClass));
     }
 
     /**

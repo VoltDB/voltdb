@@ -277,7 +277,7 @@ public class PlannerTool {
                 .replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
-        Phase physicalPhase = (canCommuteJoins) ?
+        final Phase physicalPhase = canCommuteJoins ?
                 Phase.PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE : Phase.PHYSICAL_CONVERSION;
         transformed = planner.transform(physicalPhase.ordinal(), requiredPhysicalOutputTraits, transformed);
 

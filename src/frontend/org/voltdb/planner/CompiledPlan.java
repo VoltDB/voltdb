@@ -126,6 +126,16 @@ public class CompiledPlan {
         return nextId;
     }
 
+    public boolean validate() {     // the return type only serves to be used inside assert; failed validation throws.
+        if (rootPlanGraph != null) {
+            rootPlanGraph.validate();
+        }
+        if (subPlanGraph != null) {
+            subPlanGraph.validate();
+        }
+        return true;
+    }
+
     /**
      * Mark the level of result determinism imposed by the statement, which can
      * save us from a difficult determination based on the plan graph.
@@ -163,8 +173,7 @@ public class CompiledPlan {
      * m_statementIsContentDeterministic is false we want to check this. This is
      * the one area in which content and limit-order determinism interact.
      */
-    public boolean hasDeterministicStatement()
-    {
+    public boolean hasDeterministicStatement() {
         return m_statementIsOrderDeterministic && isContentDeterministic();
     }
 
@@ -196,7 +205,7 @@ public class CompiledPlan {
             total += subPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         }
         // add full index scans
-        ArrayList<AbstractPlanNode> indexScanNodes = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        List<AbstractPlanNode> indexScanNodes = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
         if (subPlanGraph != null) {
             indexScanNodes.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
         }
@@ -261,7 +270,7 @@ public class CompiledPlan {
         }
 
         BitSet ints = new BitSet();
-        ArrayList<AbstractPlanNode> ixscans = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        List<AbstractPlanNode> ixscans = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
         if (subPlanGraph != null) {
             ixscans.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
         }
@@ -271,7 +280,7 @@ public class CompiledPlan {
             setParamIndexes(ints, ixs.getBindings());
         }
 
-        ArrayList<AbstractPlanNode> ixcounts = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT);
+        List<AbstractPlanNode> ixcounts = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT);
         if (subPlanGraph != null) {
             ixcounts.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT));
         }
@@ -333,8 +342,7 @@ public class CompiledPlan {
     public String toString() {
         if (rootPlanGraph != null) {
             return "CompiledPlan: \n" + rootPlanGraph.toExplainPlanString();
-        }
-        else {
+        } else {
             return "CompiledPlan: [null plan graph]";
         }
     }
