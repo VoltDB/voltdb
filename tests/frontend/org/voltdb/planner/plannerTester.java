@@ -370,7 +370,7 @@ public class plannerTester {
         }
     }
 
-    public static AbstractPlanNode loadPlanFromFile(String path, ArrayList<String> getsql) {
+    public static AbstractPlanNode loadPlanFromFile(String path, List<String> getsql) {
         BufferedReader reader;
         try {
             reader = new BufferedReader(new FileReader(path));
@@ -427,8 +427,8 @@ public class plannerTester {
         }
     }
 
-    public static ArrayList< AbstractPlanNode > getJoinNodes(ArrayList<AbstractPlanNode> pnlist) {
-        ArrayList< AbstractPlanNode > joinNodeList = new ArrayList<AbstractPlanNode>();
+    public static List< AbstractPlanNode > getJoinNodes(List<AbstractPlanNode> pnlist) {
+        List< AbstractPlanNode > joinNodeList = new ArrayList<AbstractPlanNode>();
 
         for (AbstractPlanNode pn : pnlist) {
             if (pn.getPlanNodeType().equals(PlanNodeType.NESTLOOP) ||
@@ -564,9 +564,9 @@ public class plannerTester {
     public static boolean diffInlineAndJoin(AbstractPlanNode oldpn1, AbstractPlanNode newpn2) {
         m_treeSizeDiff = 0;
         boolean noDiff = true;
-        ArrayList<String> messages = new ArrayList<String>();
-        ArrayList<AbstractPlanNode> list1 = oldpn1.getPlanNodeList();
-        ArrayList<AbstractPlanNode> list2 = newpn2.getPlanNodeList();
+        List<String> messages = new ArrayList<>();
+        List<AbstractPlanNode> list1 = oldpn1.getPlanNodeList();
+        List<AbstractPlanNode> list2 = newpn2.getPlanNodeList();
         int size1 = list1.size();
         int size2 = list2.size();
         m_treeSizeDiff = size1 - size2;
@@ -589,8 +589,8 @@ public class plannerTester {
         inlineNodePositionDiff(inlineNodesPosMap1, inlineNodesPosMap2, messages);
 
         // join nodes diff
-        ArrayList<AbstractPlanNode> joinNodes1 = getJoinNodes(list1);
-        ArrayList<AbstractPlanNode> joinNodes2 = getJoinNodes(list2);
+        List<AbstractPlanNode> joinNodes1 = getJoinNodes(list1);
+        List<AbstractPlanNode> joinNodes2 = getJoinNodes(list2);
         size1 = joinNodes1.size();
         size2 = joinNodes2.size();
         if (size1 != size2) {
@@ -666,7 +666,7 @@ public class plannerTester {
     }
 
     private static void planNodePositionDiff(Map<String,ArrayList<Integer>> planNodesPosMap1,
-            Map<String,ArrayList<Integer>> planNodesPosMap2, ArrayList<String> messages)
+            Map<String,ArrayList<Integer>> planNodesPosMap2, List<String> messages)
     {
         Set<String> typeWholeSet = new HashSet<String>();
         typeWholeSet.addAll(planNodesPosMap1.keySet());
@@ -693,7 +693,7 @@ public class plannerTester {
         }
     }
 
-    private static void inlineNodePositionDiff(Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap1, Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap2, ArrayList<String> messages)
+    private static void inlineNodePositionDiff(Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap1, Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap2, List<String> messages)
     {
         Set<String> typeWholeSet = new HashSet<String>();
         typeWholeSet.addAll(inlineNodesPosMap1.keySet());
@@ -784,8 +784,8 @@ public class plannerTester {
     {
         m_changedSQL = false;
         boolean noDiff = true;
-        ArrayList<AbstractScanPlanNode> list1 = oldpn.getScanNodeList();
-        ArrayList<AbstractScanPlanNode> list2 = newpn.getScanNodeList();
+        List<AbstractScanPlanNode> list1 = oldpn.getScanNodeList();
+        List<AbstractScanPlanNode> list2 = newpn.getScanNodeList();
         int size1 = list1.size();
         int size2 = list2.size();
         int max = Math.max(size1, size2);

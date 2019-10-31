@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.types.ExpressionType;
 
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
@@ -50,17 +51,15 @@ public class HashRangeExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
-        if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A Hash Range expression has child expressions for '" + this + "'");
-
-       if (m_hashColumn == Integer.MIN_VALUE)
-           throw new Exception("ERROR: A Hash Range has no hash column set for '" + this + "'");
-
-       if (m_ranges == null) {
-           throw new Exception("ERROR: A Hash Range has no ranges set for '" + this + "'");
+        if ((m_right != null) || (m_left != null)) {
+            throw new ValidationError("A Hash Range expression has child expressions for '%s'", toString());
+        } else if (m_hashColumn == Integer.MIN_VALUE) {
+            throw new ValidationError("A Hash Range has no hash column set for '%s'", toString());
+        } else if (m_ranges == null) {
+           throw new ValidationError("A Hash Range has no ranges set for '%s'", toString());
        }
     }
 
@@ -94,7 +93,7 @@ public class HashRangeExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof HashRangeExpression == false) {
+        if (! (obj instanceof HashRangeExpression)) {
             return false;
         }
         HashRangeExpression expr = (HashRangeExpression) obj;
@@ -106,14 +105,12 @@ public class HashRangeExpression extends AbstractValueExpression {
             return false;
         }
         if (m_ranges != null) { // Implying both sides non-null
-            if (m_ranges.equals(expr.m_ranges) == false) {
+            if (! m_ranges.equals(expr.m_ranges)) {
                 return false;
             }
         }
         if (m_hashColumn != Integer.MIN_VALUE) { // Implying both sides non-null
-            if (m_hashColumn != expr.m_hashColumn) {
-                return false;
-            }
+            return m_hashColumn == expr.m_hashColumn;
         }
         return true;
     }
@@ -139,8 +136,8 @@ public class HashRangeExpression extends AbstractValueExpression {
         stringer.key(Members.RANGES.name()).array();
         for (Map.Entry<Integer, Integer> e : m_ranges.entrySet()) {
             stringer.object();
-            stringer.keySymbolValuePair(Members.RANGE_START.name(), e.getKey().intValue());
-            stringer.keySymbolValuePair(Members.RANGE_END.name(), e.getValue().intValue());
+            stringer.keySymbolValuePair(Members.RANGE_START.name(), e.getKey());
+            stringer.keySymbolValuePair(Members.RANGE_END.name(), e.getValue());
             stringer.endObject();
         }
         stringer.endArray();

@@ -48,9 +48,7 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead, Collection<String> indexes) {
         // ReceiveNode is a dead end. This method is not intended to cross fragments
         // even within a pre-fragmented plan tree.
     }

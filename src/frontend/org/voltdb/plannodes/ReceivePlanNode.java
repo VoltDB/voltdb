@@ -36,8 +36,7 @@ public class ReceivePlanNode extends AbstractReceivePlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // default behavior: just copy the input schema
         // to the output schema
         super.generateOutputSchema(db);

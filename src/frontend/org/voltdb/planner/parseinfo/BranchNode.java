@@ -102,25 +102,24 @@ public class BranchNode extends JoinNode {
         return null;
     }
 
-    private static void collectTVEs(AbstractExpression expr, Set<TupleValueExpression> acc) {
-        if (expr == null) {
-            return;
-        } else if (expr instanceof TupleValueExpression) {
-            acc.add((TupleValueExpression) expr);
-        } else if (expr instanceof ComparisonExpression || expr instanceof ConjunctionExpression) {
-            collectTVEs(expr.getLeft(), acc);
-            collectTVEs(expr.getRight(), acc);
-        } else if (expr instanceof FunctionExpression) {
-            expr.getArgs().forEach(e -> collectTVEs(e, acc));
+    private static Set<TupleValueExpression> collectTVEs(AbstractExpression expr, Set<TupleValueExpression> acc) {
+        if (expr != null) {
+            if (expr instanceof TupleValueExpression) {
+                acc.add((TupleValueExpression) expr);
+            } else if (expr instanceof ComparisonExpression || expr instanceof ConjunctionExpression) {
+                collectTVEs(expr.getLeft(), acc);
+                collectTVEs(expr.getRight(), acc);
+            } else if (expr instanceof FunctionExpression) {
+                expr.getArgs().forEach(e -> collectTVEs(e, acc));
+            }
         }
+        return acc;
     }
 
     private static boolean validWhere(AbstractExpression where, Set<String> rels) {
-        final Set<TupleValueExpression> tves = new HashSet<>();
-        collectTVEs(where, tves);
-        return tves.stream()
-                .map(tve -> Pair.of(tve.getTableName(), tve.getTableAlias()))
-                .allMatch(pair -> rels.contains(pair.getFirst()) || rels.contains(pair.getSecond()));
+        return collectTVEs(where, new HashSet<>())
+                .stream()
+                .allMatch(tve -> rels.contains(tve.getTableName()) || rels.contains(tve.getTableAlias()));
     }
 
     @Override
@@ -154,10 +153,10 @@ public class BranchNode extends JoinNode {
         final Collection<String> outerTables = leftChild.generateTableJoinOrder();
         final Collection<String> innerTables = rightChild.generateTableJoinOrder();
         if (! whereList.isEmpty()) {        // validate that all TVEs in WHERE clause have corresponding tables from outer or inner relations.
-            final Set<String> rels = ImmutableSet.<String>builder()
-                    .addAll(outerTables)
-                    .addAll(innerTables)
-                    .build();
+            final Set<String> rels = new HashSet<String>() {{
+                    addAll(outerTables);
+                    addAll(innerTables);
+                }};
             if (! whereList.stream().allMatch(expr -> validWhere(expr, rels))) {
                 throw new SubPlanAssembler.SkipCurrentPlanException();
             }

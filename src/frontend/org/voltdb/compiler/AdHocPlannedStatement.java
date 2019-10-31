@@ -71,21 +71,10 @@ public class AdHocPlannedStatement {
 
     private void validate() {
         assert(core != null);
-        assert(core.aggregatorFragment != null);
-
-        // dml => !readonly
-        assert((core.isReplicatedTableDML == false) || (core.readOnly == false));
-
-        // repdml => 2partplan
-        assert((core.isReplicatedTableDML == false) || (core.collectorFragment != null));
-
-        // zero param types => null extracted params
-        // nonzero param types => param types and extracted params have same size
-        assert(core.parameterTypes != null);
         assert(extractedParamValues != null);
         // any extracted params => extracted param size == param type array size
-        assert((extractedParamValues.size() == 0) ||
-                (extractedParamValues.size() == core.parameterTypes.length));
+        assert(extractedParamValues.size() == 0 || extractedParamValues.size() == core.parameterTypes.length);
+        core.validate();
     }
 
     @Override

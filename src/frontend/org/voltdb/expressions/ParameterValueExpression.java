@@ -77,7 +77,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ParameterValueExpression == false) {
+        if (! (obj instanceof ParameterValueExpression)) {
             return false;
         }
         ParameterValueExpression expr = (ParameterValueExpression) obj;
@@ -98,8 +98,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject obj) throws JSONException
-    {
+    public void loadFromJSONObject(JSONObject obj) throws JSONException {
         assert ! obj.isNull(Members.PARAM_IDX.name());
         m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
     }
@@ -125,9 +124,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     @Override
     public void refineOperandType(VoltType columnType) {
         if (columnType == null) {
-            return;
-        }
-        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isBackendIntegerType()) {
+        } else if (columnType == VoltType.FLOAT || columnType == VoltType.DECIMAL || columnType.isBackendIntegerType()) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
         } else if (m_valueType == null) {

@@ -818,6 +818,24 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG13840() throws Exception {
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE R1(i int);\nCREATE TABLE R2(i int);",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            env.m_client.callProcedure("@AdHoc",
+                    "SELECT i FROM R2,\n" +
+                            "   (SELECT MAX(i) FROM R2\n" +
+                            "    WHERE i > (SELECT COUNT(R2.i) FROM R1\n" +
+                            "               WHERE i IS NOT DISTINCT FROM R2.i\n" +
+                            "               GROUP BY i ORDER BY i))\n" +
+                            "    TA2;");
+        } finally {
+            env.tearDown();
+        }
+    }
 
     @Test
     public void testIndexViolationOnView() {

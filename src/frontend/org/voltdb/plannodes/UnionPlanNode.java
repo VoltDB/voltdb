@@ -55,12 +55,10 @@ public class UnionPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Should be at least two children in a union
         assert(m_children.size() > 1);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
     }
@@ -70,8 +68,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // Should be at least two selects in a join
         assert(m_children.size() > 1);
         // The output schema for the union is the output schema from the first expression
@@ -79,8 +76,7 @@ public class UnionPlanNode extends AbstractPlanNode {
         m_outputSchema = m_children.get(0).getOutputSchema();
 
         // Then generate schemas for the remaining ones and make sure that they are identical
-        for (int i = 1; i < m_children.size(); ++i)
-        {
+        for (int i = 1; i < m_children.size(); ++i) {
             AbstractPlanNode child = m_children.get(i);
             child.generateOutputSchema(db);
             NodeSchema schema = child.getOutputSchema();

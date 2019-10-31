@@ -47,10 +47,10 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
         List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
         List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
         List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
-        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
+        List<AbstractExpression> aggregateExpressions = origin.mAggregateExpressions;
         for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
             addAggregate(aggregateTypes.get(i),
-                    aggregateDistinct.get(i) == 1 ? true : false,
+                    aggregateDistinct.get(i) == 1,
                     aggregateOutputColumns.get(i),
                     aggregateExpressions.get(i));
         }

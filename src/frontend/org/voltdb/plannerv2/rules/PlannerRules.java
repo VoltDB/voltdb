@@ -141,7 +141,6 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
-            VoltLAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             // Joins
             VoltLJoinRule.INSTANCE,
 
@@ -187,7 +186,8 @@ public class PlannerRules {
 
     private static final RuleSet HEP_OUTER_JOIN = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
-            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT
+            VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT,
+            VoltLAggregateCalcMergeRule.INSTANCE       // eliminate Calcite's SINGLE_VALUE aggregation
     );
 
 

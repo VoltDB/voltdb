@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -65,16 +66,11 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
-
-        // Limit Amount
-        if (m_limit < 0) {
-            throw new Exception("ERROR: The limit size is negative [" + m_limit + "]");
-        } else if (m_offset < 0) {
-            throw new Exception("ERROR: The offset amount  is negative [" + m_offset + "]");
+        if (m_offset < 0) {
+            throw new ValidationError("The offset amount  is negative [%d]", m_offset);
         }
-
         if (m_limitExpression != null) {
             m_limitExpression.validate();
         }
@@ -106,10 +102,7 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     public boolean hasOffset() {
-        if (m_offsetParameterId == -1 && m_offset == 0) {
-            return false;
-        }
-        return true;
+        return m_offsetParameterId != -1 || m_offset != 0;
     }
 
     public AbstractExpression getLimitExpression() {

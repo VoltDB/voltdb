@@ -26,7 +26,7 @@ package org.voltdb.plannodes;
  */
 public interface IndexSortablePlanNode  {
     // Characterizations of the order provided by the underlying index
-    public IndexUseForOrderBy indexUse();
+    IndexUseForOrderBy indexUse();
     // return "this" index scan or join plan node
-    public AbstractPlanNode planNode();
+    AbstractPlanNode planNode();
 }

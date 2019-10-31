@@ -72,7 +72,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
-    protected List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
+    protected List<Boolean> m_compareNotDistinct = new ArrayList<>();
 
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
@@ -126,8 +126,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             m_endkeyExpressions.addAll(endKeys);
 
             setSkipNullPredicate(false);
-        }
-        else {
+        } else {
             // for reverse scan, swap everything of searchkey and endkey
             // because we added the last < / <= to searchkey but not endExpr
             assert(endType == IndexLookupType.EQ);
@@ -167,8 +166,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
             assert(m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
             nullExprIndex = m_searchkeyExpressions.size();
-        }
-        else {
+        } else {
             // useful for underflow case to eliminate nulls
             if (m_searchkeyExpressions.size() < m_endkeyExpressions.size() ||
                     (m_lookupType != IndexLookupType.GT && m_lookupType != IndexLookupType.GTE)) {
@@ -216,21 +214,18 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // Initially assume it to be an equality filter.
         IndexLookupType endType = IndexLookupType.EQ;
-        List<AbstractExpression> endComparisons =
-                ExpressionUtil.uncombinePredicate(isp.getEndExpression());
+        List<AbstractExpression> endComparisons = ExpressionUtil.uncombinePredicate(isp.getEndExpression());
         for (AbstractExpression ae: endComparisons) {
             // There should be no more end expressions after the
             // LT or LTE expression that resets the end type.
             assert(endType == IndexLookupType.EQ);
 
-            ExpressionType exprType = ae.getExpressionType();
+            final ExpressionType exprType = ae.getExpressionType();
             if (exprType == ExpressionType.COMPARE_LESSTHAN) {
                 endType = IndexLookupType.LT;
-            }
-            else if (exprType == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+            } else if (exprType == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
                 endType = IndexLookupType.LTE;
-            }
-            else {
+            } else {
                 assert(exprType == ExpressionType.COMPARE_EQUAL || exprType == ExpressionType.COMPARE_NOTDISTINCT);
             }
 
@@ -247,13 +242,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (jsonstring.isEmpty()) {
             indexedColRefs = CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index");
             indexSize = indexedColRefs.size();
-        }
-        else {
+        } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTableScan());
                 indexSize = indexedExprs.size();
-            }
-            catch (JSONException e) {
+            } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
@@ -262,7 +255,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         int searchKeySize = isp.getSearchKeyExpressions().size();
         int endKeySize = endKeys.size();
 
-        if ( ! isp.isReverseScan() &&
+        if (! isp.isReverseScan() &&
                 endType != IndexLookupType.LT &&
                 endKeySize > 0 &&
                 endKeySize < indexSize) {
@@ -271,9 +264,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 >[=] ?;
             // Avoid the cases that would cause undercounts for prefix matches.
             // That is, when a prefix-only key exists and does not use LT.
-            if (endType != IndexLookupType.EQ ||
-                    searchKeySize != indexSize ||
-                    endKeySize < indexSize - 1) {
+            if (endType != IndexLookupType.EQ || searchKeySize != indexSize || endKeySize < indexSize - 1) {
                 return null;
             }
 
@@ -297,8 +288,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 }
                 int catalogTypeCode = indexedColRefs.get(endKeySize).getColumn().getType();
                 missingEndKeyType = VoltType.get((byte)catalogTypeCode);
-            }
-            else {
+            } else {
                 AbstractExpression lastIndexedExpr = indexedExprs.get(endKeySize);
                 for (AbstractExpression expr : endComparisons) {
                     if (expr.getLeft().bindingToIndexedExpression(lastIndexedExpr) != null) {
@@ -327,8 +317,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // DESC case
         if (searchKeySize > 0 && searchKeySize < indexSize) {
             return null;
+        } else {
+            return new IndexCountPlanNode(isp, apn, endType, endKeys);
         }
-        return new IndexCountPlanNode(isp, apn, endType, endKeys);
     }
 
     @Override
@@ -347,17 +338,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // There needs to be at least one search key expression
-        if (m_searchkeyExpressions.isEmpty()) {
-            throw new Exception("ERROR: There were no search key expressions defined for " + this);
-        }
-
-        for (AbstractExpression exp : m_searchkeyExpressions) {
-            exp.validate();
-        }
+        // TODO: see for example, TestExplainCommandSuite
+        /*if (m_searchkeyExpressions.isEmpty()) {
+            throw new RuntimeException("ERROR: There were no search key expressions defined for " + this);
+        }*/
+        m_searchkeyExpressions.forEach(AbstractExpression::validate);
     }
 
     /**
@@ -376,7 +365,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // Cost counting index scans as constant, almost negligible work.
         // This might be unfair, as the tree has O(logn) complexity, but we
         // really want to pick this kind of search over others.
@@ -394,8 +384,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if ( m_endkeyExpressions.isEmpty()) {
             stringer.valueNull();
-        }
-        else {
+        } else {
             stringer.array(m_endkeyExpressions);
         }
 
@@ -439,8 +428,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         String scanType = "tree-counter";
 
         String cover = "covering";
-        if (indexSize > keySize)
+        if (indexSize > keySize) {
             cover = String.format("%d/%d cols", keySize, indexSize);
+        }
 
         String usageInfo = String.format("(%s %s)", scanType, cover);
 
@@ -459,8 +449,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 Column col = cref.getColumn();
                 asIndexed[cref.getIndex()] = col.getName();
             }
-        }
-        else {
+        } else {
             try {
                 List<AbstractExpression> indexExpressions =
                     AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
@@ -468,8 +457,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 for (AbstractExpression ae : indexExpressions) {
                     asIndexed[ii++] = ae.explain(m_targetTableName);
                 }
-            }
-            catch (JSONException e) {
+            } catch (JSONException e) {
                 // If something unexpected went wrong,
                 // just fall back on the positional key labels.
             }
@@ -509,28 +497,28 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     private static String explainKeys(String[] asIndexed, List<AbstractExpression> keyExpressions,
             String targetTableName, IndexLookupType lookupType, List<Boolean> compareNotDistinct) {
         String conjunction = "";
-        String result = "(";
+        StringBuilder result = new StringBuilder("(");
         int prefixSize = keyExpressions.size() - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction + asIndexed[ii] +
-                (compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ") +
-                keyExpressions.get(ii).explain(targetTableName);
+            result.append(conjunction)
+                    .append(asIndexed[ii])
+                    .append(compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ")
+                    .append(keyExpressions.get(ii).explain(targetTableName));
             conjunction = ") AND (";
         }
         // last element
-        result += conjunction + asIndexed[prefixSize] + " ";
+        result.append(conjunction).append(asIndexed[prefixSize]).append(" ");
         if (lookupType == IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
-            result += "NOT DISTINCT";
+            result.append("NOT DISTINCT");
+        } else {
+            result.append(lookupType.getSymbol());
         }
-        else {
-            result += lookupType.getSymbol();
-        }
-        result += " " + keyExpressions.get(prefixSize).explain(targetTableName);
+        result.append(" ").append(keyExpressions.get(prefixSize).explain(targetTableName));
         if (lookupType != IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
-            result += ", including NULLs";
+            result.append(", including NULLs");
         }
-        result += ")";
-        return result;
+        result.append(")");
+        return result.toString();
     }
 
     public List<AbstractExpression> getBindings() {

@@ -28,6 +28,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -149,23 +150,19 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
 
     @Override
     public SelectSubqueryExpression clone() {
-        SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
+        final SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {
-            clone.m_allParameterIdxList = new ArrayList<>();
-            for (Integer paramIdx : m_allParameterIdxList) {
-                clone.m_allParameterIdxList.add(new Integer(paramIdx.intValue()));
-            }
+            clone.m_allParameterIdxList = new ArrayList<>(m_allParameterIdxList);
         }
         return clone;
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
-
-        if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A subquery expression has child expressions for '" + this + "'");
-
+        if (m_right != null || m_left != null) {
+            throw new ValidationError("A subquery expression has child expressions for '%s'", toString());
+        }
     }
 
     @Override
@@ -176,8 +173,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         // by this subquery
         if (!m_allParameterIdxList.isEmpty()) {
             // Calculate the difference between two sets of parameters
-            Set<Integer> allParams = new HashSet<>();
-            allParams.addAll(m_allParameterIdxList);
+            final Set<Integer> allParams = new HashSet<>(m_allParameterIdxList);
             allParams.removeAll(getParameterIdxList());
             if (!allParams.isEmpty()) {
                 stringer.key(Members.OTHER_PARAM_IDX.name()).array();
@@ -209,18 +205,18 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            String result = "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString()
-                    + SUBQUERY_TAG + m_subqueryId + "";
+            StringBuilder result = new StringBuilder("(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString()
+                    + SUBQUERY_TAG + m_subqueryId + "");
             if (m_args != null && ! m_args.isEmpty()) {
                 String connector = "\n on arguments (";
                 for (AbstractExpression arg : m_args) {
-                    result += connector + arg.explain(impliedTableName);
+                    result.append(connector).append(arg.explain(impliedTableName));
                     connector = ", ";
                 }
-                result += ")\n";
+                result.append(")\n");
             }
-            result +=")";
-            return result;
+            result.append(")");
+            return result.toString();
         } else {
             return "(Subquery: null)";
         }
@@ -253,17 +249,14 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
                 if (tve.getOrigStmtId() == parentStmt.getStmtId()) {
                     // TVE originates from the statement that this SubqueryExpression belongs to
                     addArgumentParameter(paramIdx, expr);
-                }
-                else {
+                } else {
                     // TVE originates from a statement above this parent. Move it up.
                     parentStmt.m_parameterTveMap.put(paramIdx, expr);
                 }
-            }
-            else if (expr instanceof AggregateExpression) {
+            } else if (expr instanceof AggregateExpression) {
                 // An aggregate expression is always from THIS parent statement.
                 addArgumentParameter(paramIdx, expr);
-            }
-            else {
+            } else {
                 // so far it should be either AggregateExpression or TupleValueExpression types
                 assert(false);
             }

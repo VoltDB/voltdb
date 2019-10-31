@@ -85,8 +85,7 @@ public class ComparisonExpression extends AbstractExpression {
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         if (obj.has(Members.QUANTIFIER)) {
             m_quantifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER));
-        }
-        else {
+        } else {
             m_quantifier = QuantifierType.NONE;
         }
     }
@@ -99,27 +98,25 @@ public class ComparisonExpression extends AbstractExpression {
         }
     }
 
-    public static final Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
-    static {
-        reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
-        reverses.put(ExpressionType.COMPARE_NOTDISTINCT, ExpressionType.COMPARE_NOTDISTINCT);
-        reverses.put(ExpressionType.COMPARE_NOTEQUAL, ExpressionType.COMPARE_NOTEQUAL);
-        reverses.put(ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_GREATERTHAN);
-        reverses.put(ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_LESSTHAN);
-        reverses.put(ExpressionType.COMPARE_LESSTHANOREQUALTO, ExpressionType.COMPARE_GREATERTHANOREQUALTO);
-        reverses.put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
-    }
+    public static final Map<ExpressionType,ExpressionType> reverses =
+            new HashMap<ExpressionType, ExpressionType>() {{
+                put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
+                put(ExpressionType.COMPARE_NOTDISTINCT, ExpressionType.COMPARE_NOTDISTINCT);
+                put(ExpressionType.COMPARE_NOTEQUAL, ExpressionType.COMPARE_NOTEQUAL);
+                put(ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_GREATERTHAN);
+                put(ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_LESSTHAN);
+                put(ExpressionType.COMPARE_LESSTHANOREQUALTO, ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+                put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
+            }};
 
     public ComparisonExpression reverseOperator() {
         ExpressionType reverseType = reverses.get(this.m_type);
         // Left and right exprs are reversed on purpose
-        ComparisonExpression reversed = new ComparisonExpression(reverseType, m_right, m_left);
-        return reversed;
+        return new ComparisonExpression(reverseType, m_right, m_left);
     }
 
     @Override
-    public void finalizeValueTypes()
-    {
+    public void finalizeValueTypes() {
         finalizeChildValueTypes();
         //
         // IMPORTANT:
@@ -141,13 +138,13 @@ public class ComparisonExpression extends AbstractExpression {
      * @param comparand - a string operand value derived from the LIKE operator's rhs pattern
      * A helper for getGteFilterFromPrefixLike/getLtFilterFromPrefixLike
      **/
-    static private ComparisonExpression rangeFilterFromPrefixLike(AbstractExpression leftExpr, ExpressionType rangeComparator, String comparand) {
+    static private ComparisonExpression rangeFilterFromPrefixLike(
+            AbstractExpression leftExpr,ExpressionType rangeComparator, String comparand) {
         ConstantValueExpression cve = new ConstantValueExpression();
         cve.setValueType(VoltType.STRING);
         cve.setValue(comparand);
         cve.setValueSize(comparand.length());
-        ComparisonExpression rangeFilter = new ComparisonExpression(rangeComparator, leftExpr, cve);
-        return rangeFilter;
+        return new ComparisonExpression(rangeComparator, leftExpr, cve);
     }
 
     /**
@@ -162,8 +159,7 @@ public class ComparisonExpression extends AbstractExpression {
         if (m_right instanceof ParameterValueExpression) {
             ParameterValueExpression pve = (ParameterValueExpression)m_right;
             cve = pve.getOriginalValue();
-        }
-        else {
+        } else {
             assert(m_right instanceof ConstantValueExpression);
             cve = (ConstantValueExpression)m_right;
         }
@@ -181,8 +177,7 @@ public class ComparisonExpression extends AbstractExpression {
         String starter = extractLikePatternPrefix();
         // Right or wrong, this mimics what HSQL does for the case of " column LIKE prefix-pattern ".
         // It assumes that this last-sorting JAVA UTF-16 character maps to a suitably last-sorting UTF-8 string.
-        String ender = starter + "\uffff";
-        return ender;
+        return starter + "\uffff";
     }
 
     /// Construct the lower bound comparison filter implied by a prefix LIKE comparison.
@@ -212,7 +207,7 @@ public class ComparisonExpression extends AbstractExpression {
     @Override
     public boolean isValueTypeIndexable(StringBuffer msg) {
         // comparison expression result in boolean result type, which is not indexable
-        msg.append("comparison expression '" + getExpressionType().symbol() +"'");
+        msg.append("comparison expression '").append(getExpressionType().symbol()).append("'");
         return false;
     }
 
