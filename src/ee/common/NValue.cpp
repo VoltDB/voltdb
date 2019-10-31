@@ -16,7 +16,6 @@
  */
 
 #include "common/NValue.hpp"
-#include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
 
@@ -354,7 +353,7 @@ struct NValueList {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
         // This allocation has the advantage of getting freed via NValue::free.
-        return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
+        return (int)(sizeof(NValueList) + length*sizeof(NValue));
     }
 
     void* operator new(size_t size, char* placement) {
@@ -372,12 +371,16 @@ struct NValueList {
         }
     }
 
-    StlFriendlyNValue const* begin() const { return m_values; }
-    StlFriendlyNValue const* end() const { return m_values + m_length; }
+    NValue const* begin() const {
+        return m_values;
+    }
+    NValue const* end() const {
+        return m_values + m_length;
+    }
 
     const size_t m_length;
     const ValueType m_elementType;
-    StlFriendlyNValue m_values[0];
+    NValue m_values[0];
 };
 
 /**
@@ -402,12 +405,11 @@ bool NValue::inList(const NValue& rhs) const {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(rhs.getObjectValue_withoutNull());
-    const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values
     // post-update/pre-lookup, and would likely require some sortable inequality method
-    // (operator<()?) to be defined on StlFriendlyNValue.
-    return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
+    // (operator<()?) to be defined on NValue.
+    return std::find(listOfNValues->begin(), listOfNValues->end(), *this) != listOfNValues->end();
 }
 
 void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool) {
@@ -462,7 +464,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
     int size = arrayLength();
 
     // make a set to eliminate unique values in O(nlogn) time
-    std::set<StlFriendlyNValue> uniques;
+    std::set<NValue> uniques;
 
     // iterate over the array of values and build a sorted set of unique
     // values that don't overflow or violate unique constaints
@@ -471,7 +473,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
         const NValue& value = itemAtIndex(i);
         // cast the value to the right type and catch overflow/cast problems
         try {
-            StlFriendlyNValue stlValue;
+            NValue stlValue;
             stlValue = value.castAs(outputType);
             uniques.insert(stlValue);
         }
@@ -482,7 +484,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
     }
 
     // insert all items in the set in order
-    std::set<StlFriendlyNValue>::const_iterator iter;
+    std::set<NValue>::const_iterator iter;
     for (iter = uniques.begin(); iter != uniques.end(); iter++) {
         outList.push_back(*iter);
     }

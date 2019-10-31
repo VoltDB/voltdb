@@ -124,13 +124,7 @@ void Pool::purge() throw() {
    if (numChunks > m_maxChunkCount) {
       m_chunks.erase(std::next(m_chunks.begin(), m_maxChunkCount), m_chunks.end());
    }
-#ifdef MODERN_CXX
    std::for_each(m_chunks.begin(), m_chunks.end(), [](Chunk& cur) { cur.offset() = 0; });
-#else
-   for(std::vector<Chunk>::iterator iter = m_chunks.begin(); iter != m_chunks.end(); ++iter) {
-      iter->offset() = 0;
-   }
-#endif
 }
 
 #else // for MEMCHECK builds

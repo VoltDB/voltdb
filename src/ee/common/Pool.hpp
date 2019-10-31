@@ -109,9 +109,7 @@ namespace voltdb {
          Chunk& operator=(Chunk&& rhs) {
             m_offset = rhs.m_offset;
             m_size = rhs.m_size;
-#ifdef MODERN_CXX     // error: deleted function ‘void std::unique_ptr<_Tp [], _Tp_Deleter>::reset(_Up) [with _Up = long int, _Tp = char, _Tp_Deleter = std::default_delete<char []>]’
             m_chunkData.reset(NULL);
-#endif
             m_chunkData.swap(rhs.m_chunkData);
             return *this;
          }

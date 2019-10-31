@@ -24,7 +24,6 @@
 #include <list>
 
 #include "common/Pool.hpp"
-#include "common/VoltContainer.hpp"
 #include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "boost/unordered_set.hpp"

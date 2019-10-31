@@ -22,7 +22,6 @@
 #include <iostream>
 #include <common/debuglog.h>
 
-#include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
 
 namespace voltdb

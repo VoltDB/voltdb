@@ -221,6 +221,9 @@ class NValue {
     bool operator!=(NValue const& rhs) const {
         return ! operator==(rhs);
     }
+    bool operator<(NValue const& other) const {
+        return compare(other) < VALUE_COMPARE_EQUAL;
+    }
 
     /* Release memory associated to object type NValues */
     void free() const;
@@ -2663,7 +2666,7 @@ inline int NValue::compare(const NValue& rhs) const {
 }
 
 inline bool NValue::operator==(NValue const& rhs) const {
-    return compare(rhs) == 0;
+    return compare(rhs) == VALUE_COMPARE_EQUAL;
 }
 
 /**
