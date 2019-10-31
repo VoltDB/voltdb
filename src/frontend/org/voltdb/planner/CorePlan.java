@@ -116,10 +116,8 @@ public class CorePlan {
 
         // zero param types => null extracted params
         // nonzero param types => param types and extracted params have same size
-        assert(parameterTypes != null);
-        if (m_compiledPlan != null) {
-            m_compiledPlan.validate();
-        }
+        assert parameterTypes != null;
+        assert m_compiledPlan == null || m_compiledPlan.validate();
     }
 
     /***

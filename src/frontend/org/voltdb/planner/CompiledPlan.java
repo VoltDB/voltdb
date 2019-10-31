@@ -126,13 +126,14 @@ public class CompiledPlan {
         return nextId;
     }
 
-    public void validate() {
+    public boolean validate() {     // the return type only serves to be used inside assert; failed validation throws.
         if (rootPlanGraph != null) {
             rootPlanGraph.validate();
         }
         if (subPlanGraph != null) {
             subPlanGraph.validate();
         }
+        return true;
     }
 
     /**
