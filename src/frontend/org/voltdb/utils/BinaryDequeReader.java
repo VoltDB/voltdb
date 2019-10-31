@@ -70,6 +70,29 @@ public interface BinaryDequeReader<M> {
     public boolean isEmpty() throws IOException;
 
     /**
+     * Used to find out if the current segment that this reader is on, is one that is being actively written to.
+     *
+     * @return Returns true if the current segment that the reader is on is also being written to. False otherwise.
+     */
+    public boolean isCurrentSegmentActive();
+
+    /**
+     * Returns the time the last record in this segment was written.
+     *
+     * @return timestamp in millis of the last record in this segment.
+     */
+    public long getSegmentLastRecordTimestamp();
+
+    /**
+     * Advance the cursor to the next segment if this segment is older than the specified time.
+     *
+     * @param millis time in milliseconds
+     * @return returns true if the reader advanced to the next segment. False otherwise.
+     * @throws IOException if there was an error reading the segments or reading the timestamp
+     */
+    public boolean skipToNextSegmentIfOlder(long millis) throws IOException;
+
+    /**
      * Entry class to hold all metadata and data associated with an entry in a {@link BinaryDeque}
      *
      * @param <M> Type of extra header metadata
