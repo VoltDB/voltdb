@@ -76,7 +76,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         public boolean isNormal() {
             return state == NORMAL.get();
         }
-        public boolean isEligibleForDecommision() {
+        public boolean isEligibleForRemoval() {
             return state == ELIGIBLE_REMOVAL.get();
         }
         public boolean isRemoved() {

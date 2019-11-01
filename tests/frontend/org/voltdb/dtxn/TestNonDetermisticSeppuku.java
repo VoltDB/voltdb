@@ -128,8 +128,9 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Transaction dropped"));
             // make sure every host witnessed the hash mismatch
-            assertTrue(server.verifyLogMessage(expectedLogMessage));
-            // success
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
         } finally {
             shutDown(server);
         }
@@ -150,7 +151,6 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     0,
                     NonDeterministicSPProc.NO_PROBLEM);
             client.callProcedure("NonDeterministic_RO_SP", 0);
-            // success!!
         } catch (ProcCallException e) {
             fail("R/O SP mismatch failed?! " + e.toString());
         } finally {
@@ -201,9 +201,10 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Transaction dropped"));
-            // success!!
             // make sure every host witnessed the hash mismatch
-            assertTrue(server.verifyLogMessage(expectedLogMessage));
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
         } finally {
             shutDown(server);
         }
@@ -237,9 +238,10 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Transaction dropped"));
-            // success!!
             // make sure every host witnessed the hash mismatch
-            assertTrue(server.verifyLogMessage(expectedLogMessage));
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
         } finally {
             shutDown(server);
         }
@@ -273,9 +275,10 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Transaction dropped"));
-            // success!!
             // make sure every host witnessed the hash mismatch
-            assertTrue(server.verifyLogMessage(expectedLogMessage));
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
         } finally {
             shutDown(server);
         }
@@ -299,9 +302,10 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Crash deliberately"));
-            // success!!
             // make sure every host witnessed the hash mismatch
-            assertTrue(server.verifyLogMessage(expectedLogMessage));
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
         } finally {
             shutDown(server);
         }
