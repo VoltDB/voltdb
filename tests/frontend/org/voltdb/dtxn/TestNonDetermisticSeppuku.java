@@ -298,7 +298,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             }
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||
-                    e.getMessage().contains("Transaction dropped"));
+                    e.getMessage().contains("Crash deliberately"));
             // success!!
             // make sure every host witnessed the hash mismatch
             assertTrue(server.verifyLogMessage(expectedLogMessage));
