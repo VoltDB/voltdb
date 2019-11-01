@@ -854,7 +854,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                     setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
                     if (!counter.isSuccess()) {
-                        processTasksPostHashMismatch(counter);
+                        sendServiceStateUpdateRequest(counter);
                     }
                     m_mailbox.send(counter.m_destinationId, counter.m_lastResponse);
                 } else {
@@ -892,7 +892,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private void processTasksPostHashMismatch(DuplicateCounter counter){
+    private void sendServiceStateUpdateRequest(DuplicateCounter counter){
         m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
         tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
 
@@ -1251,7 +1251,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     // sure we write ours into the message getting sent to the MPI
                     resp.setExecutorSiteId(m_mailbox.getHSId());
                     if (!counter.isSuccess()) {
-                        processTasksPostHashMismatch(counter);
+                        sendServiceStateUpdateRequest(counter);
                     }
                     m_mailbox.send(counter.m_destinationId, resp);
                 } else {
