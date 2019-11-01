@@ -213,6 +213,11 @@ function clean-vertica() {
     echo "drop stream export_partitioned_stream" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
 }
 
+function async-export-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient --help
+}
+
 function async-export() {
     srccompile
     rm -rf $CLIENTLOG/*
@@ -401,7 +406,8 @@ function stop-postgres() {
 
 function help() {
     echo "Usage: ./run.sh {clean|jars|server|async-benchmark|async-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
+    echo "       {...|async-export-help|async-export|async-export-geo}"
 }
 
 # Run the target passed as the first arg on the command line
