@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
@@ -55,6 +54,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.iv2.DuplicateCounter.HashResult;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -190,7 +190,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private final boolean IS_KSAFE_CLUSTER;
 
-    private final AtomicBoolean m_eligibleForExclusion;
+    private ServiceState m_serviceState;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor, boolean scoreboardEnabled)
     {
@@ -204,7 +204,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
         IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
-        m_eligibleForExclusion = new AtomicBoolean(false);
     }
 
     public void initializeScoreboard(int siteId) {
@@ -1858,11 +1857,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_pendingTasks.removeMPReadTransactions();
     }
 
-    public void setEligibleForExclusion(boolean eligibleForExclusion) {
-        m_eligibleForExclusion.set(eligibleForExclusion);
+    public ServiceState getServiceState() {
+        return m_serviceState;
     }
 
-    public AtomicBoolean getEligibleForExclusion() {
-        return m_eligibleForExclusion;
+    public void setServiceState(ServiceState serviceState) {
+        m_serviceState = serviceState;
     }
 }

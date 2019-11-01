@@ -39,6 +39,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -365,7 +366,7 @@ public class InitiatorMailbox implements Mailbox
             setLeaderMigrationState((MigratePartitionLeaderMessage)message);
             return;
         } else if (message instanceof HashMismatchMessage) {
-            handleSiteExclusionRequest();
+            updateServiceState();
             return;
         }
 
@@ -547,9 +548,11 @@ public class InitiatorMailbox implements Mailbox
         this.m_hsId = hsId;
     }
 
-    // Mark this site as eligible to be decommissioned
-    private void handleSiteExclusionRequest() {
-        ((SpScheduler)m_scheduler).setEligibleForExclusion(true);
+    // Mark this site as eligible to be removed
+    private void updateServiceState() {
+        final RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
+        init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
     }
 
     /** Produce the repair log. This is idempotent. */

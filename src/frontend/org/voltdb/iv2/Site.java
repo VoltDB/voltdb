@@ -92,6 +92,7 @@ import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
@@ -161,7 +162,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return state == REPLAYING.get();
         }
     }
-
+    private ServiceState m_serviceState;
     private RunningState m_rejoinState;
     private final TaskLog m_rejoinTaskLog;
     private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
@@ -688,7 +689,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinTaskLog = rejoinTaskLog;
         m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
-
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
             agent.registerStatsSource(StatsSelector.TABLE,
@@ -1947,5 +1947,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public long getMaxTotalMpResponseSize() {
         return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
+    }
+
+    public void setServiceState(ServiceState serviceState) {
+        m_serviceState = serviceState;
     }
 }

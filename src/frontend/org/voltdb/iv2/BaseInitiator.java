@@ -158,7 +158,6 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);
-
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.setDaemon(false);
             m_siteThread.start();

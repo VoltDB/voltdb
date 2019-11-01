@@ -22,8 +22,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
@@ -62,8 +60,31 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
-    protected AtomicBoolean m_eligibleForExclusion;
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+
+    public static enum ServiceState {
+        NORMAL(0),
+        ELIGIBLE_REMOVAL(1),
+        REMOVED(2);
+        final int state;
+        ServiceState(int state) {
+            this.state = state;
+        }
+        int get() {
+            return state;
+        }
+        public boolean isNormal() {
+            return state == NORMAL.get();
+        }
+        public boolean isEligibleForDecommision() {
+            return state == ELIGIBLE_REMOVAL.get();
+        }
+        public boolean isRemoved() {
+            return state == REMOVED.get();
+        }
+    }
+
+    ServiceState m_serviceState;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -130,7 +151,8 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_scheduler.m_repairLog = m_repairLog;
-        m_eligibleForExclusion = ((SpScheduler)m_scheduler).getEligibleForExclusion();
+        m_serviceState = ServiceState.NORMAL;
+        m_scheduler.setServiceState(m_serviceState);
     }
 
     @Override
@@ -157,6 +179,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 numberOfPartitions, startAction, agent, memStats, cl,
                 coreBindIds, isLowestSiteId);
 
+        m_executionSite.setServiceState(m_serviceState);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -367,5 +390,11 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
     @Override
     protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
         return new InitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
+    }
+
+    public void updateServiceState(ServiceState state) {
+        m_serviceState = state;
+        m_executionSite.setServiceState(m_serviceState);
+        m_scheduler.setServiceState(m_serviceState);
     }
 }
