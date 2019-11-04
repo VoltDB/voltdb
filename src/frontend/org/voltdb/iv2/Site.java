@@ -92,6 +92,7 @@ import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
@@ -140,11 +141,29 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // What type of EE is controlled
     final BackendTarget m_backend;
 
-    // Is the site in a rejoining mode.
-    private final static int kStateRunning = 0;
-    private final static int kStateRejoining = 1;
-    private final static int kStateReplayingRejoin = 2;
-    private int m_rejoinState;
+    public static enum RunningState{
+        RUNNING(0),
+        REJOINING(1),
+        REPLAYING(2);
+        final int state;
+        RunningState(int state) {
+            this.state = state;
+        }
+        int get() {
+            return state;
+        }
+        public boolean isRunning() {
+            return state == RUNNING.get();
+        }
+        public boolean isRejoining() {
+            return state == REJOINING.get();
+        }
+        public boolean isReplaying() {
+            return state == REPLAYING.get();
+        }
+    }
+    private ServiceState m_serviceState;
+    private RunningState m_rejoinState;
     private final TaskLog m_rejoinTaskLog;
     private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
@@ -658,7 +677,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_pendingSiteTasks = pendingSiteTasks;
         m_backend = backend;
-        m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
+        m_rejoinState = startAction.doesJoin() ? RunningState.REJOINING : RunningState.RUNNING;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_genId);
@@ -670,7 +689,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinTaskLog = rejoinTaskLog;
         m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
-
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
             agent.registerStatsSource(StatsSelector.TABLE,
@@ -849,7 +867,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
-                if (m_rejoinState == kStateRunning) {
+                if (m_rejoinState.isRunning()) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_pendingSiteTasks.take();
                     if (task instanceof TransactionTask) {
@@ -857,7 +875,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
                     task.run(getSiteProcedureConnection());
-                } else if (m_rejoinState == kStateReplayingRejoin) {
+                } else if (m_rejoinState.isReplaying()) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
                     SiteTasker task = m_pendingSiteTasks.peek();
@@ -875,7 +893,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // If m_rejoinState didn't change to kStateRunning because of replayFromTaskLog(),
                         // remove the task from the scheduler and give it to task log.
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
-                        if (m_rejoinState != kStateRunning) {
+                        if (!m_rejoinState.isRunning()) {
                             m_pendingSiteTasks.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
@@ -928,7 +946,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     boolean replayFromTaskLog(MinimumRatioMaintainer mrm) throws IOException
     {
         // not yet time to catch-up.
-        if (m_rejoinState != kStateReplayingRejoin) {
+        if (!m_rejoinState.isReplaying()) {
             return false;
         }
 
@@ -1471,7 +1489,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
-        assert(m_rejoinState == kStateRejoining);
+        assert(m_rejoinState.isRejoining());
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");
@@ -1534,7 +1552,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
             }
         }
-        m_rejoinState = kStateReplayingRejoin;
+        m_rejoinState = RunningState.REPLAYING;
         m_replayCompletionAction = replayComplete;
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("Rejoin Complete. State:" + m_rejoinState + " PartitionId:" +m_partitionId + " Site:" +
@@ -1544,9 +1562,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     private void setReplayRejoinComplete() {
         // transition out of rejoin replay to normal running state.
-        assert(m_rejoinState == kStateReplayingRejoin);
+        assert(m_rejoinState.isReplaying());
         m_replayCompletionAction.run();
-        m_rejoinState = kStateRunning;
+        m_rejoinState = RunningState.RUNNING;
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("Replay Rejoin Complete. State:" + m_rejoinState +  " PartitionId:" +m_partitionId + " Site:" +
                     CoreUtils.hsIdToString(m_siteId));
@@ -1929,5 +1947,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public long getMaxTotalMpResponseSize() {
         return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
+    }
+
+    public void setServiceState(ServiceState serviceState) {
+        m_serviceState = serviceState;
     }
 }

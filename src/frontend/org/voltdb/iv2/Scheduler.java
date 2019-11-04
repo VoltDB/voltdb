@@ -113,6 +113,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
     private static final Object s_threadDumpLock = new Object();
     private static long s_txnIdForSiteThreadDump = 0;
 
+    protected boolean m_isEnterpriseLicense = false;
+
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;

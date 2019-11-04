@@ -39,11 +39,13 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -337,38 +339,34 @@ public class InitiatorMailbox implements Mailbox
                 return;
             }
             initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
-        }
-        else if (message instanceof FragmentTaskMessage) {
+        } else if (message instanceof FragmentTaskMessage) {
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
             }
-        }
-        else if (message instanceof DumpMessage) {
+        } else if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
             try {
                 m_scheduler.dump();
             } catch (Throwable ignore) {
                 hostLog.warn("Failed to dump the content of the scheduler", ignore);
             }
-        }
-        else if (message instanceof Iv2RepairLogRequestMessage) {
+        } else if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;
-        }
-        else if (message instanceof Iv2RepairLogResponseMessage) {
+        } else if (message instanceof Iv2RepairLogResponseMessage) {
             m_algo.deliver(message);
             return;
-        }
-        else if (message instanceof RejoinMessage) {
+        } else if (message instanceof RejoinMessage) {
             m_joinProducer.deliver((RejoinMessage) message);
             return;
-        }
-        else if (message instanceof RepairLogTruncationMessage) {
+        } else if (message instanceof RepairLogTruncationMessage) {
             m_repairLog.deliver(message);
             return;
-        }
-        else if (message instanceof MigratePartitionLeaderMessage) {
+        } else if (message instanceof MigratePartitionLeaderMessage) {
             setLeaderMigrationState((MigratePartitionLeaderMessage)message);
+            return;
+        } else if (message instanceof HashMismatchMessage) {
+            updateServiceState();
             return;
         }
 
@@ -548,6 +546,13 @@ public class InitiatorMailbox implements Mailbox
     public void setHSId(long hsId)
     {
         this.m_hsId = hsId;
+    }
+
+    // Mark this site as eligible to be removed
+    private void updateServiceState() {
+        final RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
+        init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
     }
 
     /** Produce the repair log. This is idempotent. */
