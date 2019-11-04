@@ -154,7 +154,6 @@ private:
     // Just say 0
     size_t allocatedBlockCount() const;
 
-    TBPtr allocateNextBlock();
     virtual void nextFreeTuple(TableTuple *tuple);
 
     voltdb::StreamedTableStats m_stats;

@@ -126,10 +126,6 @@ void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
     throw SerializableEEException("May not delete all tuples of a streamed table.");
 }
 
-TBPtr StreamedTable::allocateNextBlock() {
-    throw SerializableEEException("May not use block alloc interface with streamed tables.");
-}
-
 void StreamedTable::nextFreeTuple(TableTuple *) {
     throw SerializableEEException("May not use nextFreeTuple with streamed tables.");
 }

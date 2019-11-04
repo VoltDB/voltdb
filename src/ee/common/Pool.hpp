@@ -26,12 +26,6 @@
 #include <signal.h>     // for sig_atomic_t typedef
 #include <mutex>
 
-#if defined __GNUC__ && __GNUC__ >= 5
-#define MODERN_CXX
-#else
-#undef MODERN_CXX
-#endif
-
 namespace voltdb {
 
    // The default chunk size for the Pool is 256 KB.
@@ -201,47 +195,8 @@ namespace voltdb {
     * Pool spool;
     * Foo* instanceFromSpool = createInstanceFromPool<Foo>(t1, t2, ...);
     */
-#ifdef MODERN_CXX
    template<typename T, typename... Args> inline T* createInstanceFromPool(Pool& pool, Args... args) {
       return ::new (pool.allocate(sizeof(T))) T(std::forward<Args>(args)...);
    }
-#else       // no variadic template argument support...
-   template<typename T>
-   inline T* createInstanceFromPool(Pool& pool) {
-      return ::new (pool.allocate(sizeof(T))) T();
-   }
-   template<typename T, typename Arg1>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1);
-   }
-   template<typename T, typename Arg1, typename Arg2>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-   }
-   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7, typename Arg8>
-   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7, Arg8 arg8) {
-      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-   }
-#endif
 
 }

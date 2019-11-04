@@ -138,9 +138,12 @@ namespace voltdb {
     /// malloc (initial location) and the proper target address to use
     /// for later updates to the referring pointer (the new location for
     /// the allocation).
-    struct Relocatable {
+    struct Relocatable final {
         char** m_referringPtr;
         char m_data[0];
+        Relocatable() = delete;
+        Relocatable(Relocatable const&) = delete;
+        Relocatable(Relocatable&&) = delete;
 
         static Relocatable* fromAllocation(void* allocation, char** referrer) {
             Relocatable* result = reinterpret_cast<Relocatable*>(allocation);
