@@ -56,8 +56,7 @@ public class PlanNodeTree implements JSONString {
             List<AbstractPlanNode> nodeList = new ArrayList<>();
             m_planNodesListMap.put(0, nodeList);
             constructTree(nodeList, root_node);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -86,8 +85,7 @@ public class PlanNodeTree implements JSONString {
             stringer.object();
             toJSONString(stringer);
             stringer.endObject();
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
@@ -97,8 +95,7 @@ public class PlanNodeTree implements JSONString {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         if (m_planNodesListMap.size() == 1) {
             stringer.key(Members.PLAN_NODES).array(m_planNodesListMap.get(0));
-        }
-        else {
+        } else {
             /*
              * Make PLAN_NODES_LISTS point to an empty array, A.
              */
@@ -139,8 +136,7 @@ public class PlanNodeTree implements JSONString {
                 int stmtId = jplanNodesObj.getInt(Members.STATEMENT_ID);
                 loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
             }
-        }
-        else {
+        } else {
             // There is only one statement in the plan. Its id is set to 0 by default
             int stmtId = 0;
             JSONArray jplanNodes = jobj.getJSONArray(Members.PLAN_NODES);
@@ -279,21 +275,17 @@ public class PlanNodeTree implements JSONString {
                 }
             }
             m_planNodesListMap.put(stmtId,  planNodes);
-        }
-        catch (JSONException | InstantiationException | IllegalAccessException e) {
+        } catch (JSONException | InstantiationException | IllegalAccessException e) {
             System.err.println(e);
             e.printStackTrace();
         }
     }
 
-    private AbstractPlanNode getNodeofId (int id, List<AbstractPlanNode> planNodes) {
-        int size = planNodes.size();
-        for (int i = 0; i < size; i++) {
-            if (planNodes.get(i).getPlanNodeId() == id) {
-                return planNodes.get(i);
-            }
-        }
-        return null;
+    private AbstractPlanNode getNodeofId(int id, List<AbstractPlanNode> planNodes) {
+        return planNodes.stream()
+                .filter(p -> p.getPlanNodeId() == id)
+                .findAny()
+                .orElse(null);
     }
 
     /**
@@ -331,7 +323,7 @@ public class PlanNodeTree implements JSONString {
                 List<AbstractPlanNode> planNodes = new ArrayList<>();
                 CompiledPlan basePlanNode = scan.getBestCostBasePlan();
                 Integer baseStmtId = scan.getBaseStmtId();
-                if ( ! m_planNodesListMap.containsKey(baseStmtId.intValue())) {
+                if ( ! m_planNodesListMap.containsKey(baseStmtId)) {
                     // We may see the same scan several times in the tree.  That's
                     // ok, but only try to put the scan in the lists once.
                     m_planNodesListMap.put(baseStmtId, planNodes);

@@ -148,9 +148,10 @@ public class AggregateExpression extends AbstractExpression {
         ExpressionType type = getExpressionType();
         if (type == ExpressionType.AGGREGATE_COUNT_STAR) {
             return "COUNT(*)";
+        } else {
+            return type.symbol() + (m_distinct ? " DISTINCT(" : "(") +
+                    m_left.explain(impliedTableName) + ")";
         }
-        return type.symbol() + ( m_distinct ? " DISTINCT(" : "(" ) +
-            m_left.explain(impliedTableName) + ")";
     }
 
     public boolean isUserDefined() {

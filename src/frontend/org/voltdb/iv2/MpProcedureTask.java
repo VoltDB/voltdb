@@ -123,15 +123,9 @@ public class MpProcedureTask extends ProcedureTask
         // could be null if not a sysproc
         final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(spName);
 
-        // certain system procs can and can't be restarted
-        // Right now this is adhoc, catalog update, load MP table, and apply binary log MP.
-        //
-        // Note that we don't restart @BalancePartitions transactions, because they do
-        // partition to master HSID lookups in the run() method. When transactions are
-        // restarted, the run() method is not rerun. Let the elastic join coordinator reissue it.
-        if (m_isRestart &&
-                sysproc != null &&
-                !sysproc.isRestartable())
+        // For MP system procs can't be restarted, flush the queue and
+        // return a proper response to client.
+        if (m_isRestart && sysproc != null && !sysproc.isRestartable())
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
@@ -172,7 +166,6 @@ public class MpProcedureTask extends ProcedureTask
             // Update the timestamp to txnState so following restarted fragments could use it
             m_txnState.setTimestamp(ts);
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
                         " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));

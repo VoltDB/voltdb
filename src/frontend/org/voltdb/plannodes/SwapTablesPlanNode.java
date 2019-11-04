@@ -28,15 +28,7 @@ import java.util.stream.Collectors;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.MaterializedViewHandlerInfo;
-import org.voltdb.catalog.MaterializedViewInfo;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
@@ -75,12 +67,16 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 return "";
             }
 
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
 
-            sb.append("Swapping tables " + m_theTable + " and " + m_otherTable + " failed for the following reason(s):");
+            sb.append("Swapping tables ")
+                    .append(m_theTable)
+                    .append(" and ")
+                    .append(m_otherTable)
+                    .append(" failed for the following reason(s):");
 
             for (String reason : m_failureReasons) {
-                sb.append("\n  - " + reason);
+                sb.append("\n  - ").append(reason);
             }
 
             return sb.toString();
@@ -112,8 +108,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         m_otherTargetTableName = jobj.getString(Members.OTHER_TARGET_TABLE_NAME);
         m_theIndexes = loadStringListMemberFromJSON(jobj, "INDEXES");
@@ -137,7 +132,9 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
 
     /** SWAP TABLES has no effect on data ordering. */
     @Override
-    public boolean isOrderDeterministic() { return true; }
+    public boolean isOrderDeterministic() {
+        return true;
+    }
 
     /**
      * Fill out all of the serializable attributes of the node, validating
@@ -224,13 +221,10 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             if (indexesCanBeSwapped(thePrimaryKeyIndex, otherPrimaryKeyIndex)) {
                 m_theIndexes.add(thePrimaryKeyIndex.getTypeName());
                 m_otherIndexes.add(otherPrimaryKeyIndex.getTypeName());
-            }
-            else {
+            } else {
                 failureMessage.addReason("PRIMARY KEY constraints do not match on both tables");
             }
-        }
-        else if ((thePrimaryKeyIndex != null && otherPrimaryKeyIndex == null)
-                || (thePrimaryKeyIndex == null && otherPrimaryKeyIndex != null)) {
+        } else if (thePrimaryKeyIndex != null || otherPrimaryKeyIndex != null) {
             failureMessage.addReason("one table has a PRIMARY KEY constraint and the other does not");
         }
 
@@ -275,7 +269,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         // All of otherTable's indexes should also have been
         // matched along the way.
         if ( ! otherIndexSet.isEmpty()) {
-            List<String> indexNames = otherIndexSet.stream().map(idx -> idx.getTypeName())
+            List<String> indexNames = otherIndexSet.stream().map(CatalogType::getTypeName)
                     .collect(Collectors.toList());
             failureMessage.addReason("the table " + otherName + " contains these index(es) "
                     + "which have no corresponding indexes on " + theName + ": "
@@ -322,8 +316,8 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         // matched along the way.
         if ( ! otherConstraintIndexMap.isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            sb.append("these constraints (or system internal index names) on table " + otherName + " "
-                    + "have no corresponding constraints on the other table: (");
+            sb.append("these constraints (or system internal index names) on table ").append(otherName)
+                    .append(" ").append("have no corresponding constraints on the other table: (");
             String separator = "";
             for (Entry<Index, String> remainder : otherConstraintIndexMap.entrySet()) {
                 String constraintName = remainder.getValue();
@@ -373,8 +367,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             if (otherPredicateJSON != null) {
                 mismatchedAttrs.add("WHERE predicate");
             }
-        }
-        else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
+        } else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
             mismatchedAttrs.add("WHERE predicate");
         }
 
@@ -386,8 +379,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             if (otherExprsJSON != null) {
                 mismatchedAttrs.add("indexed expression");
             }
-        }
-        else if ( ! theExprsJSON.equals(otherExprsJSON)) {
+        } else if ( ! theExprsJSON.equals(otherExprsJSON)) {
             mismatchedAttrs.add("indexed expression");
         }
 
@@ -439,8 +431,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             if (otherPredicateJSON != null) {
                 return false;
             }
-        }
-        else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
+        } else if (! thePredicateJSON.equals(otherPredicateJSON)) {
             return false;
         }
 
@@ -600,8 +591,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             Column matchedByName = theColumns.get(colName);
             if (matchedByName != null) {
                 failureMessage.addReason(colName + " is in a different ordinal position in the two tables");
-            }
-            else {
+            } else {
                 failureMessage.addReason(colName + " appears in " + otherName + " but not in " + theName);
             }
         }

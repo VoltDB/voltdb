@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
@@ -46,18 +47,15 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Make sure our value is not null
-        if (m_value == null && !m_isNull)
-        {
-            throw new Exception("ERROR: The constant value for '" + this +
-                                "' is inconsistently null");
+        if (m_value == null && !m_isNull) {
+            throw new ValidationError("The constant value for '%s' is inconsistently null", toString());
         // Make sure the value type is something we support here
-        } else if (m_valueType == VoltType.NULL ||
-                   m_valueType == VoltType.VOLTTABLE) {
-            throw new Exception("ERROR: Invalid constant value type '" + m_valueType + "' for '" + this + "'");
+        } else if (m_valueType == VoltType.NULL || m_valueType == VoltType.VOLTTABLE) {
+            throw new ValidationError("Invalid constant value type '%s' for '%s'", m_valueType, toString());
         }
     }
 
@@ -73,16 +71,12 @@ public class ConstantValueExpression extends AbstractValueExpression {
      */
     public void setValue(String value) {
         m_value = value;
-        m_isNull = false;
-        if (m_value == null)
-        {
-            m_isNull = true;
-        }
+        m_isNull = m_value == null;
     }
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ConstantValueExpression == false) {
+        if (! (obj instanceof ConstantValueExpression)) {
             return false;
         }
         ConstantValueExpression expr = (ConstantValueExpression) obj;
@@ -118,9 +112,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             stringer.value("NULL");
             return;
         }
-        {
-            switch (m_valueType)
-            {
+        switch (m_valueType) {
             case INVALID:
                 throw new JSONException("ConstantValueExpression.toJSONString(): value_type should never be VoltType.INVALID");
             case NULL:
@@ -158,18 +150,15 @@ public class ConstantValueExpression extends AbstractValueExpression {
                 break;
             default:
                 throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
-            }
         }
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject obj) throws JSONException
-    {
+    public void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_isNull = false;
         if (!obj.isNull(Members.VALUE.name())) {
             m_value = obj.getString(Members.VALUE.name());
-        }
-        else {
+        } else {
             m_isNull = true;
         }
         if (!obj.isNull(Members.ISNULL.name())) {
@@ -227,8 +216,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
      * and in HSQL's ExpressionValue class.
      */
     @Override
-    public void refineValueType(VoltType neededType, int neededSize)
-    {
+    public void refineValueType(VoltType neededType, int neededSize) {
         int size_unit = 1;
         if (neededType == m_valueType) {
 
@@ -238,9 +226,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             // Variably sized types need to fit within the target width.
             if (neededType == VoltType.VARBINARY) {
                 if ( ! Encoder.isHexEncodedString(getValue())) {
-                    throw new PlanningErrorException("Value (" + getValue() +
-                                                     ") has an invalid format for a constant " +
-                                                     neededType.toSQLString() + " value");
+                    throw new PlanningErrorException("Value (" + getValue() + ") has an invalid format for a constant " +
+                            neededType.toSQLString() + " value");
                 }
                 size_unit = 2;
             }
@@ -249,10 +236,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             }
 
             if (getValue().length() > size_unit*neededSize ) {
-                throw new PlanningErrorException("Value (" + getValue() +
-                                                 ") is too wide for a constant " +
-                                                 neededType.toSQLString() +
-                                                 " value of size " + neededSize);
+                throw new PlanningErrorException("Value (" + getValue() + ") is too wide for a constant " +
+                        neededType.toSQLString() + " value of size " + neededSize);
             }
             setValueSize(neededSize);
             return;
@@ -268,16 +253,13 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (neededType == VoltType.VARBINARY &&
                 (m_valueType == VoltType.STRING || m_valueType == null)) {
             if ( ! Encoder.isHexEncodedString(getValue())) {
-                throw new PlanningErrorException("Value (" + getValue() +
-                                                 ") has an invalid format for a constant " +
-                                                 neededType.toSQLString() + " value");
+                throw new PlanningErrorException("Value (" + getValue() + ") has an invalid format for a constant " +
+                        neededType.toSQLString() + " value");
             }
             size_unit = 2;
             if (getValue().length() > size_unit*neededSize ) {
-                throw new PlanningErrorException("Value (" + getValue() +
-                                                 ") is too wide for a constant " +
-                                                 neededType.toSQLString() +
-                                                 " value of size " + neededSize);
+                throw new PlanningErrorException("Value (" + getValue() + ") is too wide for a constant " +
+                        neededType.toSQLString() + " value of size " + neededSize);
             }
             setValueType(neededType);
             setValueSize(neededSize);
@@ -286,10 +268,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
         if (neededType == VoltType.STRING && m_valueType == null) {
             if (getValue().length() > size_unit*neededSize ) {
-                throw new PlanningErrorException("Value (" + getValue() +
-                                                 ") is too wide for a constant " +
-                                                 neededType.toSQLString() +
-                                                 " value of size " + neededSize);
+                throw new PlanningErrorException("Value (" + getValue() + ") is too wide for a constant " +
+                        neededType.toSQLString() + " value of size " + neededSize);
             }
             setValueType(neededType);
             setValueSize(neededSize);
@@ -312,9 +292,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
                     // TimeStampType to a datetime string.
                     TimestampType ts = new TimestampType(m_value);
                     m_value = String.valueOf(ts.getTime());
-                }
-                // It couldn't be converted to timestamp.
-                catch (IllegalArgumentException e) {
+                } catch (IllegalArgumentException e) { // It couldn't be converted to timestamp.
                     throw new PlanningErrorException("Value (" + getValue() +
                                                      ") has an invalid format for a constant " +
                                                      neededType.toSQLString() + " value");
@@ -333,9 +311,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
                 try {
                     Double.parseDouble(getValue());
                 } catch (NumberFormatException nfe) {
-                    throw new PlanningErrorException("Value (" + getValue() +
-                                                     ") has an invalid format for a constant " +
-                                                     neededType.toSQLString() + " value");
+                    throw new PlanningErrorException("Value (" + getValue() + ") has an invalid format for a constant " +
+                            neededType.toSQLString() + " value");
                 }
             }
             setValueType(neededType);
@@ -354,9 +331,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
                     value = Long.parseLong(getValue());
                 }
             } catch (SQLParser.Exception | NumberFormatException exc) {
-                throw new PlanningErrorException("Value (" + getValue() +
-                                                 ") has an invalid format for a constant " +
-                                                 neededType.toSQLString() + " value");
+                throw new PlanningErrorException("Value (" + getValue() + ") has an invalid format for a constant " +
+                        neededType.toSQLString() + " value");
             }
             checkIntegerValueRange(value, neededType);
             m_valueType = neededType;
@@ -365,8 +341,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
 
         // That's it for known type conversions.
-        throw new PlanningErrorException("Value (" + getValue() +
-                ") has an invalid format for a constant " +
+        throw new PlanningErrorException("Value (" + getValue() + ") has an invalid format for a constant " +
                 neededType.toSQLString() + " value");
     }
 
@@ -377,21 +352,14 @@ public class ConstantValueExpression extends AbstractValueExpression {
         // to use the literal NULL. Thus the NULL values for each of the 4 integer types are considered
         // an underflow exception for the type.
 
-        if (integerType == VoltType.BIGINT || integerType == VoltType.TIMESTAMP) {
-            if (value == VoltType.NULL_BIGINT)
-                throw new PlanningErrorException("Constant value underflows BIGINT type.");
-        }
-        if (integerType == VoltType.INTEGER) {
-            if ((value > Integer.MAX_VALUE) || (value <= VoltType.NULL_INTEGER))
-                throw new PlanningErrorException("Constant value overflows/underflows INTEGER type.");
-        }
-        if (integerType == VoltType.SMALLINT) {
-            if ((value > Short.MAX_VALUE) || (value <= VoltType.NULL_SMALLINT))
-                throw new PlanningErrorException("Constant value overflows/underflows SMALLINT type.");
-        }
-        if (integerType == VoltType.TINYINT) {
-            if ((value > Byte.MAX_VALUE) || (value <= VoltType.NULL_TINYINT))
-                throw new PlanningErrorException("Constant value overflows/underflows TINYINT type.");
+        if ((integerType == VoltType.BIGINT || integerType == VoltType.TIMESTAMP) && value == VoltType.NULL_BIGINT) {
+            throw new PlanningErrorException("Constant value underflows BIGINT type.");
+        } else if (integerType == VoltType.INTEGER && (value > Integer.MAX_VALUE || value <= VoltType.NULL_INTEGER)) {
+            throw new PlanningErrorException("Constant value overflows/underflows INTEGER type.");
+        } else if (integerType == VoltType.SMALLINT && (value > Short.MAX_VALUE || value <= VoltType.NULL_SMALLINT)) {
+            throw new PlanningErrorException("Constant value overflows/underflows SMALLINT type.");
+        } else if (integerType == VoltType.TINYINT && (value > Byte.MAX_VALUE || value <= VoltType.NULL_TINYINT)) {
+            throw new PlanningErrorException("Constant value overflows/underflows TINYINT type.");
         }
     }
 
@@ -414,9 +382,10 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
-        }
-        else {
-            throw new NumberFormatException("NUMERIC constant value type must match a FLOAT, DECIMAL, or integral column, not " + columnType.toSQLString());
+        } else {
+            throw new NumberFormatException(
+                    "NUMERIC constant value type must match a FLOAT, DECIMAL, or integral column, not " +
+                            columnType.toSQLString());
         }
     }
 
@@ -449,10 +418,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
         int firstWildcardPos = patternString.  indexOf('%');
         // Indexable filters have only a trailing '%'.
         // NOTE: not bothering to check for silly synonym patterns with multiple trailing '%'s.
-        if (firstWildcardPos != length-1) {
-            return false;
-        }
-        return true;
+        return firstWildcardPos == length - 1;
     }
 
     @Override
@@ -468,7 +434,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
                 // Convert the datetime value in its canonical internal form,
                 // currently a count of epoch microseconds,
                 // through TimeStampType into a timestamp string.
-                long micros = Long.valueOf(m_value);
+                long micros = Long.parseLong(m_value);
                 TimestampType ts = new TimestampType(micros);
                 return "'" + ts.toString() + "'";
             }

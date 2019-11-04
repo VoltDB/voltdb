@@ -53,16 +53,24 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
+    public void finalizeValueTypes() {
+        super.finalizeValueTypes();
+        if (m_args != null) {
+            m_args.forEach(AbstractExpression::finalizeValueTypes);
+        }
+    }
+
+    @Override
     public String explain(String impliedTableName) {
-        String result = "(";
+        StringBuilder result = new StringBuilder("(");
         String connector = "";
         assert (m_args != null);
         for (AbstractExpression arg : m_args) {
-            result += connector + arg.explain(impliedTableName);
+            result.append(connector).append(arg.explain(impliedTableName));
             connector = ", ";
         }
-        result += ")";
-        return result;
+        result.append(")");
+        return result.toString();
     }
 
     // Recursively collect all TVE and aggregate expressions to be replaced with the corresponding

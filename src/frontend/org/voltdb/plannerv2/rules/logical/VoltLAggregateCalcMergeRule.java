@@ -21,9 +21,9 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.sql.SqlKind;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 
 import java.util.List;
 
@@ -35,7 +35,7 @@ public class VoltLAggregateCalcMergeRule extends RelOptRule {
     public static final VoltLAggregateCalcMergeRule INSTANCE = new VoltLAggregateCalcMergeRule();
 
     private VoltLAggregateCalcMergeRule() {
-        super(operand(LogicalAggregate.class, operand(LogicalCalc.class, none())));
+        super(operand(VoltLogicalAggregate.class, operand(VoltLogicalCalc.class, none())));
     }
     @Override
     public void onMatch(RelOptRuleCall call) {

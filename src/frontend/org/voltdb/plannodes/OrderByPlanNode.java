@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -57,24 +58,23 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // Make sure that they have the same # of columns and directions
         if (m_sortExpressions.size() != m_sortDirections.size()) {
-            throw new Exception("ERROR: PlanNode '" + toString() + "' has " +
-                                "'" + m_sortExpressions.size() + "' sort expressions but " +
-                                "'" + m_sortDirections.size() + "' sort directions");
+            throw new ValidationError("PlanNode '%s' has %d sort expressions but %d sort directions" +
+                    toString(), m_sortExpressions.size(), m_sortDirections.size());
         }
 
         // Make sure that none of the items are null
         for (int ctr = 0, cnt = m_sortExpressions.size(); ctr < cnt; ctr++) {
             if (m_sortExpressions.get(ctr) == null) {
-                throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
-                                    "sort expression at position " + ctr);
+                throw new ValidationError("PlanNode '%s' has a null sort expression at position %d",
+                        toString(), ctr);
             } else if (m_sortDirections.get(ctr) == null) {
-                throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
-                                    "sort direction at position " + ctr);
+                throw new ValidationError("PlanNode '%s' has a null sort direction at position %d",
+                        toString(), ctr);
             }
         }
     }
