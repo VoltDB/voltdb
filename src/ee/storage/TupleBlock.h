@@ -70,7 +70,7 @@ public:
         return *this;
     }
 
-    uint32_t unpack() {
+    uint32_t unpack() const {
         char valueBytes[4];
         ::memcpy(valueBytes, m_data, 3);
         valueBytes[3] = 0;
@@ -81,7 +81,7 @@ private:
 };
 
 typedef boost::intrusive_ptr<TupleBlock> TBPtr;
-typedef stx::btree_map< char*, TBPtr > TBMap;
+typedef stx::btree_map<char*, TBPtr > TBMap;
 typedef TBMap::iterator TBMapI;
 typedef stx::btree_set<TBPtr> TBBucket;
 typedef TBBucket::iterator TBBucketI;
@@ -102,36 +102,33 @@ public:
         It's used for compacting persistent tables---a block's bucket
         is determined by how full it is, so that very full blocks can
         be merged with almost empty ones.*/
-    TupleBlock(Table *table, TBBucketPtr bucket);
+    TupleBlock(Table const& table, TBBucketPtr bucket);
 
     /** Overloaded operator new so that we can allocate quickly. This
         uses boost::pool under the hood. */
-    void* operator new(std::size_t sz)
-    {
+    void* operator new(std::size_t sz) {
         vassert(sz == sizeof(TupleBlock));
         return ThreadLocalPool::allocateExactSizedObject(sizeof(TupleBlock));
     }
 
     /** Overloaded operator delete to pair with new. */
-    void operator delete(void* object)
-    { return ThreadLocalPool::freeExactSizedObject(sizeof(TupleBlock), object); }
+    void operator delete(void* object) {
+        return ThreadLocalPool::freeExactSizedObject(sizeof(TupleBlock), object);
+    }
 
     /** This method will be 1.0 for a full block, and 0.0 for an empty one. */
-    double loadFactor() {
+    double loadFactor() const {
         return static_cast <double> (m_activeTuples) / m_tuplesPerBlock;
     }
 
     /** Returns true if more tuples can be inserted into this block. */
-    inline bool hasFreeTuples() {
+    inline bool hasFreeTuples() const {
         return m_activeTuples < m_tuplesPerBlock;
     }
 
     /** Returns true if block is empty */
-    inline bool isEmpty() {
-        if (m_activeTuples == 0) {
-            return true;
-        }
-        return false;
+    inline bool isEmpty() const {
+        return m_activeTuples == 0;
     }
 
     /**
@@ -164,13 +161,13 @@ public:
         return index;
     }
 
-    inline int getBucketIndex() {
+    inline int getBucketIndex() const {
         return m_bucketIndex;
     }
 
     /** Merge this block with the given block. Returns the new bucket
         index for this and the other block. */
-    std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
+    std::pair<int, int> merge(Table& table, TBPtr source, TupleMovementListener& listener);
 
     /**
      * Find next free tuple storage address and its tupleblock's bucket index,
@@ -230,7 +227,7 @@ public:
     }
 
     /** Return the address of the storage for tuples. */
-    inline char * address() {
+    inline char* address() const {
         return m_storage;
     }
 
@@ -247,7 +244,7 @@ public:
         when the block contains 1 tuple, and so on.  Note that this
         isn't just a count of the tuples in the block since there may
         be inactive, empty tuples on the free list. */
-    inline uint32_t unusedTupleBoundary() {
+    inline uint32_t unusedTupleBoundary() const {
         return m_nextFreeTuple;
     }
 
@@ -256,7 +253,7 @@ public:
 
     /** If tuples in this block were merged to another block, this is
         the ordinal position of the last tuple moved. */
-    inline uint32_t lastCompactionOffset() {
+    inline uint32_t lastCompactionOffset() const {
         return m_lastCompactionOffset;
     }
 
@@ -266,13 +263,13 @@ public:
     }
 
     /** A count of active tuples in this block. */
-    inline uint32_t activeTuples() {
+    inline uint32_t activeTuples() const {
         return m_activeTuples;
     }
 
     /** Returns the current bucket for this block, to aid in
         compaction. */
-    inline TBBucketPtr currentBucket() {
+    inline TBBucketPtr currentBucket() const {
         return m_bucket;
     }
 
@@ -281,7 +278,7 @@ public:
      * may actually be used for tuples, i.e., the size of the chunk of
      * memory pointed to by m_storage.
      */
-    inline int64_t getAllocatedMemory() {
+    inline int64_t getAllocatedMemory() const {
         return m_tupleLength * m_tuplesPerBlock;
     }
 private:
@@ -300,7 +297,7 @@ private:
      * and also deleted.
      * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
      **/
-    std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
+    std::deque<TruncatedInt, FastAllocator<TruncatedInt>> m_freeList;
 
     TBBucketPtr m_bucket;
     int m_bucketIndex;
@@ -314,7 +311,7 @@ public:
     virtual ~TupleMovementListener() {}
 
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
+            TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 };
 
 }

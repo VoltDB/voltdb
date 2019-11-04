@@ -368,9 +368,9 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
     TBBucketPtr bucket(new TBBucket());
 
     // these will be used as artificial tuple block addresses
-    TBPtr block1(new TupleBlock(m_table, bucket));
-    TBPtr block2(new TupleBlock(m_table, bucket));
-    TBPtr block3(new TupleBlock(m_table, bucket));
+    TBPtr block1(new TupleBlock(*m_table, bucket));
+    TBPtr block2(new TupleBlock(*m_table, bucket));
+    TBPtr block3(new TupleBlock(*m_table, bucket));
 
     TBMap blocks;
     char *base = block1->address();

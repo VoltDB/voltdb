@@ -2001,7 +2001,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector* bucketVector) 
             return false;
         }
 
-        std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
+        std::pair<int, int> bucketChanges = fullest->merge(*this, lightest, *this);
         int tempFullestBucketChange = bucketChanges.first;
         if (tempFullestBucketChange != NO_NEW_BUCKET_INDEX) {
             fullestBucketChange = tempFullestBucketChange;

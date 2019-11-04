@@ -236,7 +236,7 @@ inline void TempTable::deleteAllTempTuples() {
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    TBPtr block(new TupleBlock(*this, TBBucketPtr()));
     m_data.push_back(block);
 
     if (m_limits) {

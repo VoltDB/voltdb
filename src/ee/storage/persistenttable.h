@@ -1157,13 +1157,13 @@ inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSiz
 }
 
 inline TBPtr PersistentTable::allocateFirstBlock() {
-    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    TBPtr block(new TupleBlock(*this, TBBucketPtr()));
     m_data.insert(block->address(), block);
     return block;
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    TBPtr block(new TupleBlock(*this, m_blocksNotPendingSnapshotLoad[0]));
     m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;
