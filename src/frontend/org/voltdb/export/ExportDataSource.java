@@ -1652,6 +1652,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     @Override
                     public void run() {
                         try {
+                            // Check again in case of multiple export release tasks are queued
+                            // because restarted @ExportControl transaction
+                            if (m_status != StreamStatus.BLOCKED) {
+                                return;
+                            }
                             if (isMaster() && m_pollTask != null) {
                                 long firstUnpolledSeqNo = m_firstUnpolledSeqNo;
                                 Pair<Long, Long> gap = m_gapTracker.getFirstGap(m_firstUnpolledSeqNo);
