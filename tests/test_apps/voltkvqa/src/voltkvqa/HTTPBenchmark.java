@@ -149,6 +149,9 @@ public class HTTPBenchmark {
         @Option(desc = "password.")
         String password = "";
 
+        @Option(desc = "kerberos")
+        boolean kerberos = false;
+
         @Override
         public void validate() {
             if (duration <= 0) {
@@ -206,6 +209,10 @@ public class HTTPBenchmark {
         ClientConfig clientConfig = new ClientConfig(config.username, config.password);
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
+        if (config.kerberos) {
+            clientConfig.enableKerberosAuthentication("VoltDBClient");
+        }
+
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();

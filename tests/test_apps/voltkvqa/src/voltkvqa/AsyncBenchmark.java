@@ -209,6 +209,9 @@ public class AsyncBenchmark {
         @Option(desc = "Ignore client errors.")
         boolean ignoreerrors = false;
 
+        @Option(desc = "use kerberos for authentication.")
+        boolean kerberos = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -331,6 +334,9 @@ public class AsyncBenchmark {
         }
         else {
             clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        }
+        if (config.kerberos) {
+            clientConfig.enableKerberosAuthentication("VoltDBClient");
         }
         client = ClientFactory.createClient(clientConfig);
 

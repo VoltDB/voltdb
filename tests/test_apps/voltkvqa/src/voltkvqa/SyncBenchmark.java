@@ -160,6 +160,9 @@ public class SyncBenchmark {
         @Option(desc = "Enable SSL with configuration file.")
         String sslfile = "";
 
+        @Option(desc = "User kerberos for authentication")
+        boolean kerberos = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -193,6 +196,9 @@ public class SyncBenchmark {
         if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
+        }
+        if (config.kerberos) {
+            clientConfig.enableKerberosAuthentication("VoltDBClient");
         }
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
