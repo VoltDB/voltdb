@@ -22,8 +22,7 @@
  */
 package org.voltdb.dtxn;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +31,7 @@ import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -121,6 +121,15 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MISMATCH_INSERTION);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
+                ClientResponse response = client.callProcedure("@StopReplicas");
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                Thread.sleep(5000);
+                System.out.println("Stopped replicas.");
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        10004,
+                        10004,
+                        NonDeterministicSPProc.NO_PROBLEM);
             } else {
                 fail("Mismatch insertion failed");
             }
@@ -195,6 +204,15 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 NonDeterministicSPProc.MISMATCH_WHITESPACE_IN_SQL);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
+                ClientResponse response = client.callProcedure("@StopReplicas");
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                Thread.sleep(5000);
+                System.out.println("Stopped replicas.");
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        10003,
+                        10003,
+                        NonDeterministicSPProc.NO_PROBLEM);
             } else {
                 fail("Whitespace changes not picked up by determinism CRC");
             }
@@ -232,6 +250,15 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MULTI_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
+                ClientResponse response = client.callProcedure("@StopReplicas");
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                Thread.sleep(5000);
+                System.out.println("Stopped replicas.");
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        10002,
+                        10002,
+                        NonDeterministicSPProc.NO_PROBLEM);
             } else {
                 fail("Multi-statement hash mismatch update failed");
             }
@@ -269,6 +296,15 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.PARTIAL_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
+                ClientResponse response = client.callProcedure("@StopReplicas");
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                Thread.sleep(5000);
+                System.out.println("Stopped replicas.");
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        10000,
+                        10000,
+                        NonDeterministicSPProc.NO_PROBLEM);
             } else {
                 fail("Partial-statement hash mismatch update failed");
             }
@@ -296,6 +332,15 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.TXN_ABORT);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
+                ClientResponse response = client.callProcedure("@StopReplicas");
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                Thread.sleep(5000);
+                System.out.println("Stopped replicas.");
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        10001,
+                        10001,
+                        NonDeterministicSPProc.NO_PROBLEM);
             } else {
                 fail("testBuggyNonDeterministicProc failed");
             }

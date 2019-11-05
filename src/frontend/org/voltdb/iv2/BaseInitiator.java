@@ -229,4 +229,19 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
     }
 
     protected abstract InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer);
+
+    // remove this from service list
+    protected void shutdownService() {
+        try {
+            if (m_term != null) {
+                m_term.shutdown();
+            }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown service.", e );
+        }
+
+        if (m_executionSite != null) {
+            // shutdown EE service
+        }
+    }
 }

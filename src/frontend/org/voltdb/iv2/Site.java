@@ -1952,4 +1952,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setServiceState(ServiceState serviceState) {
         m_serviceState = serviceState;
     }
+
+    public ServiceState getServiceState() {
+        return m_serviceState;
+    }
 }

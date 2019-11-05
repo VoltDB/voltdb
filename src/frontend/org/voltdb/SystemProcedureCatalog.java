@@ -669,9 +669,9 @@ public class SystemProcedureCatalog {
                         .allowedInReplica().build());
         builder.put("@StopReplicas",
                 new Config("org.voltdb.sysprocs.StopReplicas",
-                        false, false, true,  0, VoltType.INVALID,
+                        false, false, false,  0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, true, Restartability.RESTARTABLE));
 
         listing = builder.build();
     }

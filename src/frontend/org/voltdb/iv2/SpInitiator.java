@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -394,6 +395,66 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 
     public void updateServiceState(ServiceState state) {
         m_serviceState = state;
+        m_executionSite.setServiceState(m_serviceState);
+        m_scheduler.setServiceState(m_serviceState);
+    }
+
+    public ServiceState getServiceState() {
+        return m_serviceState;
+    }
+
+    @Override
+    public void shutdownService() {
+        if (!m_serviceState.isEligibleForRemoval()) {
+            return;
+        }
+        String msg = "Shutdown service: %s for partition " + m_partitionId;
+        try {
+            final String partitionPath = LeaderElector.electionDirForPartition(
+                    VoltZK.leaders_initiators, m_partitionId);
+            List<String> children = m_messenger.getZK().getChildren(partitionPath, null);
+            for (String child : children) {
+                if (child.startsWith(Long.toString(getInitiatorHSId()) + "_")) {
+                    final String path = ZKUtil.joinZKPath(partitionPath, child);
+                    m_messenger.getZK().delete(path, -1);
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug(String.format(msg, "leader initiator"));
+                    }
+                    break;
+                }
+            }
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                tmLog.error("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
+            } else {
+                tmLog.info("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
+            }
+        } catch (InterruptedException e) {
+            tmLog.error("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
+        }
+
+        try {
+            m_leaderCache.shutdown();
+        } catch (InterruptedException e) {
+            tmLog.info("Interrupted during shutdown partition " + m_partitionId, e);
+        }
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format(msg, "leader cache"));
+        }
+
+        TransactionTaskQueue.removeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()));
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format(msg, "scoreboard"));
+        }
+
+        super.shutdownService();
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format(msg, "execution engine"));
+        }
+        m_serviceState = ServiceState.REMOVED;
         m_executionSite.setServiceState(m_serviceState);
         m_scheduler.setServiceState(m_serviceState);
     }
