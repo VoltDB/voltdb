@@ -43,7 +43,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 
 import com.google_voltpatches.common.collect.Sets;
@@ -172,11 +171,11 @@ public class TestSnapshotInitiationInfo {
             return;
         }
         assertNull(invalid);
-        assertEquals(expectedTableCount, config.tables.length);
+        assertEquals(expectedTableCount, config.tables.size());
 
         final Set<String> allTables = new HashSet<>();
-        for (Table t : config.tables) {
-            allTables.add(t.getTypeName().toLowerCase());
+        for (SnapshotTableInfo t : config.tables) {
+            allTables.add(t.getName().toLowerCase());
         }
 
         if (include != null) {

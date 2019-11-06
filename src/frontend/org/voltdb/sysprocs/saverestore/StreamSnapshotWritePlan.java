@@ -33,17 +33,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.ExtensibleSnapshotDigestData;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
@@ -59,15 +57,20 @@ import com.google_voltpatches.common.collect.Multimap;
  * key will write all of its tables, partitioned and replicated, to a target
  * per-site.
  */
-public class StreamSnapshotWritePlan extends SnapshotWritePlan
+public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotRequestConfig>
 {
     private int m_siteIndex = 0;
+
+    @Override
+    public void setConfiguration(SystemProcedureExecutionContext context, JSONObject jsData) {
+        m_config = new StreamSnapshotRequestConfig(jsData, context.getDatabase());
+    }
 
     @Override
     public Callable<Boolean> createSetup(
             String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            JSONObject jsData, SystemProcedureExecutionContext context,
+            SystemProcedureExecutionContext context,
             final VoltTable result,
             ExtensibleSnapshotDigestData extraSnapshotData,
             SiteTracker tracker,
@@ -76,11 +79,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
-        final StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(jsData, context.getDatabase());
         final List<StreamSnapshotRequestConfig.Stream> localStreams =
-                filterRemoteStreams(config.streams, tracker.getSitesForHost(context.getHostId()));
-        final Map<Integer, Set<Long>> destsByHostId = collectTargetSitesByHostId(config.streams);
+                filterRemoteStreams(m_config.streams, tracker.getSitesForHost(context.getHostId()));
+        final Map<Integer, Set<Long>> destsByHostId = collectTargetSitesByHostId(m_config.streams);
 
         /*
          * The snapshot (if config.shouldTruncate) will only contain existing partitions. Write the new partition count
@@ -99,25 +100,24 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        Integer newPartitionCount = config.newPartitionCount;
+        Integer newPartitionCount = m_config.newPartitionCount;
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
-        if (config.shouldTruncate) {
+        if (m_config.shouldTruncate) {
             assert newPartitionCount != null;
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                                            context, result,
                                            extraSnapshotData,
                                            tracker,
                                            hashinatorData,
-                                           timestamp,
-                                           newPartitionCount);
+                                           timestamp);
         } else if (newPartitionCount != null) {
             // Create post snapshot update hashinator work
             createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
         // Mark snapshot start in registry
-        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
+        final AtomicInteger numTables = new AtomicInteger(m_config.tables.size());
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -125,17 +125,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.STREAM,
-                    config.tables);
+                    m_config.tables);
 
-        // table schemas for all the tables we'll snapshot on this partition
-        Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<>();
-        for (final Table table : config.tables) {
-            VoltTable schemaTable = HiddenColumnFilter.NONE.createSchema(context.getCluster(), table);
-            schemas.put(table.getRelativeIndex(),
-                        Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
-        }
-
-        List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas);
+        List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, m_config.tables);
 
         // If there's no work to do on this host, just claim success, return an empty plan,
         // and things will sort themselves out properly
@@ -143,9 +135,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // For each table, create tasks where each task has a data target.
         // reset siteId to 0 for placing replicated Task from site 0
         m_siteIndex = 0;
-        for (final Table table : config.tables) {
+        for (final SnapshotTableInfo table : m_config.tables) {
             createTasksForTable(table, sdts, numTables, m_snapshotRecord, tracker.getSitesForHost(context.getHostId()));
-            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
+            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getName(), "SUCCESS", "");
         }
 
         return deferredSetup;
@@ -165,7 +157,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    Map<Integer, Set<Long>> destsByHostId,
                                                    HashinatorSnapshotData hashinatorData,
-                                                   Map<Integer, Pair<Boolean, byte[]>> schemas)
+                                                   List<SnapshotTableInfo> tables)
     {
         byte[] hashinatorConfig = null;
         if (hashinatorData != null) {
@@ -177,7 +169,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
-        if (haveAnyStreamPairs(localStreams) && !schemas.isEmpty()) {
+        if (haveAnyStreamPairs(localStreams) && !tables.isEmpty()) {
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
@@ -201,7 +193,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                new StreamSnapshotDataTarget(destHSId,
                                                                             (destHSId == stream.lowestSiteSinkHSId),
                                                                             destsByHostId.get(CoreUtils.getHostIdFromHSId(destHSId)),
-                                                                            hashinatorConfig, schemas, sender, ackReceiver));
+                                            hashinatorConfig, tables, sender, ackReceiver));
                     sdts.add(nextTarget);
                 }
             }
@@ -233,14 +225,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                              ExtensibleSnapshotDigestData extraSnapshotData,
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
-                                                             long timestamp,
-                                                             int newPartitionCount)
+                                                             long timestamp)
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
-                        new SnapshotRequestConfig(newPartitionCount, context.getDatabase()), context, result,
-                        extraSnapshotData, tracker, hashinatorData, timestamp);
+                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, m_config,
+                        context, result, extraSnapshotData, tracker, hashinatorData, timestamp);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {
@@ -298,12 +288,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         return targetHSIdsByHostId;
     }
 
-    private SnapshotTableTask createSingleTableTask(Table table,
+    private SnapshotTableTask createSingleTableTask(SnapshotTableInfo table,
                                                     DataTargetInfo targetInfo,
                                                     AtomicInteger numTables,
                                                     SnapshotRegistry.Snapshot snapshotRecord) {
         final Runnable onClose = new TargetStatsClosure(targetInfo.dataTarget,
-                table.getTypeName(),
+                table.getName(),
                 numTables,
                 snapshotRecord);
         targetInfo.dataTarget.setOnCloseHandler(onClose);
@@ -321,7 +311,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     /**
      * For each site, generate a task for each target it has for this table.
      */
-    private void createTasksForTable(Table table,
+    private void createTasksForTable(SnapshotTableInfo table,
                                      List<DataTargetInfo> dataTargets,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord,
@@ -330,7 +320,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // srcHSId -> tasks
         Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
         for (DataTargetInfo targetInfo : dataTargets) {
-            if (table.getIsreplicated() && !targetInfo.dataTarget.isReplicatedTableTarget()) {
+            if (table.isReplicated() && !targetInfo.dataTarget.isReplicatedTableTarget()) {
                 // For replicated tables only the lowest site's dataTarget actually does any work.
                 // The other dataTargets just need to be tracked so we send EOF when all streams have finished.
                 m_targets.add(targetInfo.dataTarget);
@@ -345,12 +335,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         placeTasksForTable(table, tasks, hsids);
     }
 
-    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks, List<Long> hsids)
+    private void placeTasksForTable(SnapshotTableInfo table, Multimap<Long, SnapshotTableTask> tasks,
+            List<Long> hsids)
     {
         for (Entry<Long, Collection<SnapshotTableTask>> tasksEntry : tasks.asMap().entrySet()) {
             // Stream snapshots need to write all partitioned tables to all selected partitions
             // and all replicated tables to across all the sites on every host
-            if (table.getIsreplicated()) {
+            if (table.isReplicated()) {
                 placeReplicatedTasks(tasksEntry.getValue(), hsids);
             } else {
                 placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));

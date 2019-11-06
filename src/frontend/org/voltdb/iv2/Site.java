@@ -1143,6 +1143,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 extraSnapshotData);
     }
 
+    @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter filter) {
+        return m_ee.getSnapshotSchema(tableId, filter);
+    }
+
     /*
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.

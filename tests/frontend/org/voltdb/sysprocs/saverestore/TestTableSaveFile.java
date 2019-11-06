@@ -106,7 +106,7 @@ public class TestTableSaveFile extends TestCase {
                 new ColumnInfo("RT_NAME", VoltType.STRING),
                 new ColumnInfo("RT_INTVAL", VoltType.INTEGER),
                 new ColumnInfo("RT_FLOATVAL", VoltType.FLOAT) };
-        VoltTable table = new VoltTable(columnInfo, columnInfo.length);
+        VoltTable table = new VoltTable(columnInfo);
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
         ArrayList<Integer> partIds = new ArrayList<Integer>();
@@ -117,7 +117,7 @@ public class TestTableSaveFile extends TestCase {
         partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, partIds, table,
+                TOTAL_PARTITIONS, false, partIds, PrivateVoltTableFactory.getSchemaBytes(table),
                 TXN_ID, TIMESTAMP, VERSION2);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
@@ -142,9 +142,8 @@ public class TestTableSaveFile extends TestCase {
         System.out.println("Running testHeaderAccessors");
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
-        VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo(
-                "Foo", VoltType.STRING) };
-        VoltTable vt = new VoltTable(columns, 1);
+        VoltTable.ColumnInfo columns[] = { new VoltTable.ColumnInfo("Foo", VoltType.STRING) };
+        byte[] schema = PrivateVoltTableFactory.getSchemaBytes(new VoltTable(columns));
         ArrayList<Integer> partIds = new ArrayList<Integer>();
         partIds.add(0);
         partIds.add(1);
@@ -153,7 +152,7 @@ public class TestTableSaveFile extends TestCase {
         partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, partIds, vt,
+                TOTAL_PARTITIONS, false, partIds, schema,
                 TXN_ID, TIMESTAMP, VERSION1);
         dsdt.close();
 

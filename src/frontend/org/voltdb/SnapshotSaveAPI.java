@@ -505,7 +505,7 @@ public class SnapshotSaveAPI
     {
         // TRAIL [SnapSave:4]  - 3.1 [1 site/host] Create snapshot write plan.
         // Normal @SnapshotSave calls should go with NativeSnapshotWritePlan.
-        SnapshotWritePlan plan;
+        SnapshotWritePlan<?> plan;
         if (format == SnapshotFormat.NATIVE) {
             plan = new NativeSnapshotWritePlan();
         }
@@ -523,9 +523,12 @@ public class SnapshotSaveAPI
         }
         file_path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), file_path);
 
+        plan.setConfiguration(context, jsData);
+
+        context.getSiteSnapshotConnection().populateSnapshotSchemas(plan.getConfiguration());
+
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
-                partitionTransactionIds, jsData, context, result, extraSnapshotData,
-                tracker, hashinatorData, timestamp);
+                partitionTransactionIds, context, result, extraSnapshotData, tracker, hashinatorData, timestamp);
         m_deferredSetupFuture =
                 VoltDB.instance().submitSnapshotIOWork(
                         new DeferredSnapshotSetup(plan, deferredSetup, txnId, partitionTransactionIds));

@@ -30,12 +30,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.catalog.Table;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -142,7 +142,7 @@ public class SnapshotIOAgentImpl extends SnapshotIOAgent {
         // Check if the snapshot file can be created successfully.
         if (format.isFileBased()) {
             // Check snapshot directory no matter table exists or not. If not, try to create the directory.
-            File parent = SnapshotUtil.constructFileForTable(new Table(), file_path, file_nonce, format, m_messenger.getHostId()).getParentFile();
+            File parent = new VoltFile(file_path);
             if (!parent.exists() && !parent.mkdirs()) {
                 result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), "", "FAILURE",
                         "FILE LOCATION UNWRITABLE: failed to create parent directory " + parent.getPath());
@@ -155,13 +155,15 @@ public class SnapshotIOAgentImpl extends SnapshotIOAgent {
             }
 
             boolean sameNonceSnapshotExist = false;
-            Map<Table, String> tableToErrorMsg = new HashMap<>();
-            for (Table table : SnapshotUtil.getTablesToSave(VoltDB.instance().getCatalogContext().database)) {
+            Map<String, String> tableToErrorMsg = new HashMap<>();
+            for (SnapshotTableInfo table : SnapshotUtil
+                    .getTablesToSave(VoltDB.instance().getCatalogContext().database)) {
                 String errMsg = null;
                 File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce, format, m_messenger.getHostId());
+                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce, format,
+                                m_messenger.getHostId());
                 SNAP_LOG.trace("Host ID " + m_messenger.getHostId() +
-                               " table: " + table.getTypeName() +
+                        " table: " + table.getName() +
                                " to path: " + saveFilePath);
                 if (saveFilePath.exists()) {
                     sameNonceSnapshotExist = true;
@@ -183,7 +185,7 @@ public class SnapshotIOAgentImpl extends SnapshotIOAgent {
                                " RESULTED IN IOException: " + CoreUtils.throwableToString(ex);
                 }
                 if (errMsg != null) {
-                    tableToErrorMsg.put(table, errMsg);
+                    tableToErrorMsg.put(table.getName(), errMsg);
                 }
             }
 
@@ -191,11 +193,13 @@ public class SnapshotIOAgentImpl extends SnapshotIOAgent {
             // If there exist any previous snapshot with same nonce, add sameNonceErrorMsg for each table,
             // or add corresponding error message otherwise.
             final String sameNonceErrorMsg = "SNAPSHOT FILE WITH SAME NONCE ALREADY EXISTS";
-            for (Table table : config.tables) {
+            for (SnapshotTableInfo table : config.tables) {
                 if (sameNonceSnapshotExist) {
-                    result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), table.getTypeName(), "FAILURE", sameNonceErrorMsg);
-                } else if (tableToErrorMsg.containsKey(table)) {
-                    result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), table.getTypeName(), "FAILURE", tableToErrorMsg.get(table));
+                    result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), table.getName(), "FAILURE",
+                            sameNonceErrorMsg);
+                } else if (tableToErrorMsg.containsKey(table.getName())) {
+                    result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), table.getName(), "FAILURE",
+                            tableToErrorMsg.get(table.getName()));
                 }
             }
         }

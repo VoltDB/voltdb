@@ -32,10 +32,10 @@ import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
@@ -45,11 +45,16 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 
-public class IndexSnapshotWritePlan extends SnapshotWritePlan {
+public class IndexSnapshotWritePlan extends SnapshotWritePlan<IndexSnapshotRequestConfig> {
+
+    @Override
+    public void setConfiguration(SystemProcedureExecutionContext context, JSONObject jsData) {
+        m_config = new IndexSnapshotRequestConfig(jsData, context.getDatabase());
+    }
+
     @Override
     public Callable<Boolean> createSetup(String file_path, String pathType, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
-                                         JSONObject jsData,
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          ExtensibleSnapshotDigestData extraSnapshotData,
@@ -59,28 +64,26 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     {
         assert SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty();
 
-        final IndexSnapshotRequestConfig config =
-            new IndexSnapshotRequestConfig(jsData, context.getDatabase());
-        final Map<Integer, Long> pidToLocalHSIds = findLocalSources(config.partitionRanges, tracker);
+        final Map<Integer, Long> pidToLocalHSIds = findLocalSources(m_config.partitionRanges, tracker);
 
         // mark snapshot start in registry
-        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
+        final AtomicInteger numTables = new AtomicInteger(m_config.tables.size());
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(txnId,
                                            context.getHostId(),
                                            file_path,
                                            file_nonce,
                                            SnapshotFormat.INDEX,
-                                           config.tables);
+                                           m_config.tables);
 
         // create table tasks
-        for (Table table : config.tables) {
+        for (SnapshotTableInfo table : m_config.tables) {
             createTasksForTable(table,
-                                config.partitionRanges,
+                                m_config.partitionRanges,
                                 pidToLocalHSIds,
                                 numTables,
                                 m_snapshotRecord);
-            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
+            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getName(), "SUCCESS", "");
         }
 
         return null;
@@ -113,11 +116,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
      * @param table     The table to build the elastic index on
      * @param ranges    The hash ranges that the index should include
      */
-    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
+    public static AbstractExpression createIndexExpressionForTable(SnapshotTableInfo table,
+            Map<Integer, Integer> ranges)
     {
         HashRangeExpression predicate = new HashRangeExpression();
         predicate.setRanges(ranges);
-        predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
+        predicate.setHashColumnIndex(table.getPartitionColumn());
 
         return predicate;
     }
@@ -125,7 +129,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     /**
      * For each site, generate a task for each target it has for this table.
      */
-    private void createTasksForTable(Table table,
+    private void createTasksForTable(SnapshotTableInfo table,
                                      Collection<IndexSnapshotRequestConfig.PartitionRanges> partitionRanges,
                                      Map<Integer, Long> pidToLocalHSIDs,
                                      AtomicInteger numTables,
@@ -139,7 +143,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
         // create a null data target
         final DevNullSnapshotTarget dataTarget = new DevNullSnapshotTarget();
         final Runnable onClose = new TargetStatsClosure(dataTarget,
-                                                        table.getTypeName(),
+                table.getName(),
                                                         numTables,
                                                         snapshotRecord);
         dataTarget.setOnCloseHandler(onClose);
