@@ -17,26 +17,20 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import org.json_voltpatches.JSONObject;
+import org.voltdb.catalog.Database;
+
 /**
- * Enum to describe any schema filtering which is to be performed during a snapshot.
- * <p>
- * Must be in sync with EE enum of the same name
+ * Snapshot request configuration which is for CSV snapshots to enforce exclusion of all hidden columns
  */
-public enum HiddenColumnFilter {
-    /** Do not include any hidden columns */
-    ALL(0),
-    /** Perform no filtering */
-    NONE(1),
-    /** Exclude the hidden migrate column from the snapshot */
-    EXCLUDE_MIGRATE(2);
-
-    private final byte m_id;
-
-    private HiddenColumnFilter(int id) {
-        m_id = (byte) id;
+class CsvSnapshotRequestConfig extends SnapshotRequestConfig {
+    CsvSnapshotRequestConfig(JSONObject jsData, Database catalogDatabase) {
+        super(jsData, catalogDatabase);
     }
 
-    public byte getId() {
-        return m_id;
+    @Override
+    public HiddenColumnFilter getHiddenColumnFilter() {
+        // CSV snapshots never include hidden columns
+        return HiddenColumnFilter.ALL;
     }
 }

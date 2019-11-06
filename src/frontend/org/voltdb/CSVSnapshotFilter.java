@@ -35,16 +35,18 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
     private int m_lastNumCharacters = 64 * 1024;
 
     public CSVSnapshotFilter(
-            VoltTable vt,
+            byte[] schemaBytes,
             char delimiter,
             char fullDelimiters[]) {
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromSchemaBytes(schemaBytes);
+
         m_columnTypes = new ArrayList<VoltType>(vt.getColumnCount());
         for (int ii = 0; ii < vt.getColumnCount(); ii++) {
             m_columnTypes.add(vt.getColumnType(ii));
         }
         m_fullDelimiters = fullDelimiters;
         m_delimiter = delimiter;
-        m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
+        m_schemaBytes = schemaBytes;
     }
 
     @Override

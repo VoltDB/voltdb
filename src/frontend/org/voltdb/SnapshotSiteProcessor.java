@@ -499,14 +499,14 @@ public class SnapshotSiteProcessor {
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
 
             // Add the task to the task list for the given table
-            m_snapshotTableTasks.put(task.m_table.getRelativeIndex(), task);
+            m_snapshotTableTasks.put(task.m_tableInfo.getTableId(), task);
 
             // Make sure there is a predicate object for each table, the predicate could contain
             // empty expressions. So activateTableStream() doesn't have to do a null check.
-            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_table.getRelativeIndex());
+            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_tableInfo.getTableId());
             if (predicates == null) {
-                predicates = new SnapshotPredicates(task.m_table.getRelativeIndex());
-                tablesAndPredicates.put(task.m_table.getRelativeIndex(), predicates);
+                predicates = new SnapshotPredicates(task.m_tableInfo.getTableId());
+                tablesAndPredicates.put(task.m_tableInfo.getTableId(), predicates);
             }
 
             predicates.addPredicate(task.m_predicate, task.m_deleteTuples);
@@ -556,7 +556,7 @@ public class SnapshotSiteProcessor {
              * is responsible for closing the data target. Done in a separate
              * thread so the EE can continue working.
              */
-            if (tableTask.m_table.getIsreplicated() &&
+            if (tableTask.m_tableInfo.isReplicated() &&
                 tableTask.m_target.getFormat().canCloseEarly()) {
                 final Thread terminatorThread =
                     new Thread("Replicated SnapshotDataTarget terminator ") {
