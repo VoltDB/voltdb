@@ -187,6 +187,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter) {
+        return Pair.of(new byte[0], -1);
+    }
+
+    @Override
     public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
             long undoQuantumToken, byte[] predicates) {
         return false;

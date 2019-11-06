@@ -20,8 +20,8 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,11 +35,11 @@ import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManagerInterface;
@@ -55,14 +55,18 @@ import com.google_voltpatches.common.collect.Maps;
  * node.  Partitioned tables are written to the same target per table by every
  * site on a node.
  */
-public class NativeSnapshotWritePlan extends SnapshotWritePlan
+public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestConfig>
 {
+    @Override
+    public void setConfiguration(SystemProcedureExecutionContext context, JSONObject jsData) {
+        m_config = new SnapshotRequestConfig(jsData, context.getDatabase());
+    }
+
     @Override
     public Callable<Boolean> createSetup(String file_path, String pathType,
                                             String file_nonce,
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
-                                            JSONObject jsData,
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
                                             ExtensibleSnapshotDigestData extraSnapshotData,
@@ -71,7 +75,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             long timestamp)
     {
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
-                new SnapshotRequestConfig(jsData, context.getDatabase()), context, result, extraSnapshotData, tracker,
+                m_config, context, result, extraSnapshotData, tracker,
                 hashinatorData, timestamp);
     }
 
@@ -93,7 +97,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         // TRAIL [SnapSave:5] - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
-        final Table[] tableArray = config.tables;
+        final List<SnapshotTableInfo> tables = config.tables;
 
         final int newPartitionCount;
         final int partitionCount;
@@ -115,13 +119,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    tableArray);
+                        tables);
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
         final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
-        for (final Table table : tableArray) {
+        for (final SnapshotTableInfo table : tables) {
             final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
@@ -131,7 +135,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
             SNAP_LOG.debug("ADDING TASK for nativeSnapshot: " + task);
 
-            if (table.getIsreplicated()) {
+            context.getSiteSnapshotConnection();
+
+            if (table.isReplicated()) {
                 replicatedSnapshotTasks.add(task);
             } else {
                 partitionedSnapshotTasks.add(task);
@@ -139,12 +145,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
             result.addRow(context.getHostId(),
                     CoreUtils.getHostnameOrAddress(),
-                    table.getTypeName(),
+                    table.getName(),
                     "SUCCESS",
                     "");
         }
 
-        if (tableArray.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (!tables.isEmpty() && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -165,7 +171,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 context, extraSnapshotData, tracker, hashinatorData, timestamp,
-                partitionCount, newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
+                partitionCount, newPartitionCount, tables, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks, isTruncationSnapshot, config);
     }
 
@@ -181,7 +187,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final long timestamp,
                                                   final int partitionCount,
                                                   final int newPartitionCount,
-                                                  final Table[] tables,
+                                                  final List<SnapshotTableInfo> tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
                                                   final ArrayList<SnapshotTableTask> partitionedSnapshotTasks,
                                                   final ArrayList<SnapshotTableTask> replicatedSnapshotTasks,
@@ -195,7 +201,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             public Boolean call() throws Exception
             {
                 // TRAIL [SnapSave:6]  - 3.3 [1 site/host] Create completion tasks
-                final AtomicInteger numTables = new AtomicInteger(tables.length);
+                final AtomicInteger numTables = new AtomicInteger(tables.size());
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
                         txnId, partitionTransactionIds, context, extraSnapshotData,
@@ -240,14 +246,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             private SnapshotDataTarget getSnapshotDataTarget(AtomicInteger numTables, SnapshotTableTask task)
                     throws IOException
             {
-                SnapshotDataTarget target = m_createdTargets.get(task.m_table.getRelativeIndex());
+                SnapshotDataTarget target = m_createdTargets.get(task.m_tableInfo.getTableId());
                 if (target == null) {
-                    target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
+                    target = createDataTargetForTable(file_path, file_nonce, task.m_tableInfo, txnId,
                                                       context.getHostId(), context.getCluster().getTypeName(),
                                                       context.getDatabase().getTypeName(), partitionCount,
                                                       DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()),
                                                       tracker, timestamp, numTables, snapshotRecord, config);
-                    m_createdTargets.put(task.m_table.getRelativeIndex(), target);
+                    m_createdTargets.put(task.m_tableInfo.getTableId(), target);
                 }
                 return target;
             }
@@ -256,7 +262,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
     private SnapshotDataTarget createDataTargetForTable(String file_path,
                                                         String file_nonce,
-                                                        Table table,
+                                                        SnapshotTableInfo table,
                                                         long txnId,
                                                         int hostId,
                                                         String clusterName,
@@ -279,22 +285,20 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotFormat.NATIVE,
                 hostId);
 
-        VoltTable schema = config.hiddenColumnFilter.createSchema(isActiveActiveDRed, table);
-
         SnapshotDataTarget sdt = new DefaultSnapshotDataTarget(saveFilePath,
                 hostId,
                 clusterName,
                 databaseName,
-                table.getTypeName(),
+                table.getName(),
                 partitionCount,
-                table.getIsreplicated(),
+                table.isReplicated(),
                 tracker.getPartitionsForHost(hostId),
-                schema,
+                table.getSchema(),
                 txnId,
                 timestamp);
 
         m_targets.add(sdt);
-        final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
+        final Runnable onClose = new TargetStatsClosure(sdt, table.getName(), numTables, snapshotRecord);
         sdt.setOnCloseHandler(onClose);
 
         return sdt;
@@ -307,7 +311,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             ExtensibleSnapshotDigestData extraSnapshotData,
             HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount,
-            Table[] tables,
+            List<SnapshotTableInfo> tables,
             boolean isTruncationSnapshot) throws IOException
     {
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
@@ -317,7 +321,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 file_path,
                 pathType,
                 file_nonce,
-                Arrays.asList(tables),
+                tables,
                 context.getHostId(),
                 partitionTransactionIds,
                 extraSnapshotData,

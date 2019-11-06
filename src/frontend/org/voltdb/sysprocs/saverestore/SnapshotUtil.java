@@ -48,6 +48,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -70,6 +71,7 @@ import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB;
@@ -77,7 +79,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -162,7 +163,7 @@ public class SnapshotUtil {
         String path,
         String pathType,
         String nonce,
-        List<Table> tables,
+        List<SnapshotTableInfo> tables,
         int hostId,
         Map<Integer, Long> partitionTransactionIds,
         ExtensibleSnapshotDigestData extraSnapshotData,
@@ -194,7 +195,7 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
-                    stringer.value(tables.get(ii).getTypeName());
+                    stringer.value(tables.get(ii).getName());
                 }
                 stringer.endArray();
 
@@ -1205,7 +1206,7 @@ public class SnapshotUtil {
      * @param fileNonce
      * @param hostId
      */
-    public static final String constructFilenameForTable(Table table,
+    public static final String constructFilenameForTable(SnapshotTableInfo table,
                                                          String fileNonce,
                                                          SnapshotFormat format,
                                                          int hostId)
@@ -1217,8 +1218,8 @@ public class SnapshotUtil {
 
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
-        filename_builder.append(table.getTypeName());
-        if (!table.getIsreplicated())
+        filename_builder.append(table.getName());
+        if (!table.isReplicated())
         {
             filename_builder.append("-host_");
             filename_builder.append(hostId);
@@ -1227,7 +1228,7 @@ public class SnapshotUtil {
         return filename_builder.toString();
     }
 
-    public static final File constructFileForTable(Table table,
+    public static final File constructFileForTable(SnapshotTableInfo table,
             String filePath,
             String fileNonce,
             SnapshotFormat format,
@@ -1267,10 +1268,13 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
-    public static final List<Table> getTablesToSave(Database database) {
-        CatalogMap<Table> all_tables = database.getTables();
-        ArrayList<Table> my_tables = new ArrayList<Table>();
-        for (Table table : all_tables) {
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database) {
+        return getTablesToSave(database, t -> true);
+    }
+
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> predicate) {
+        ArrayList<SnapshotTableInfo> tables = new ArrayList<>();
+        for (Table table : database.getTables()) {
             // STREAM tables are not included in the snapshot.
             if (TableType.isStream(table.getTabletype())) {
                 continue;
@@ -1278,12 +1282,14 @@ public class SnapshotUtil {
             // If the table is a view and it shouldn't be included into the snapshot, skip.
             if (table.getMaterializer() != null
                     && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
-                    && ! CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
+                    && !CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
-            my_tables.add(table);
+            if (predicate.test(table)) {
+                tables.add(new SnapshotTableInfo(table));
+            }
         }
-        return my_tables;
+        return tables;
     }
 
     public static File[] retrieveRelevantFiles(String filePath,

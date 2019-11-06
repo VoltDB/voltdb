@@ -18,7 +18,6 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
@@ -26,11 +25,12 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 
 public class SnapshotRequestConfig {
@@ -41,10 +41,10 @@ public class SnapshotRequestConfig {
     public static final String JKEY_SCHEMA_BUILDER = "schemaBuilder";
 
     public final boolean emptyConfig;
-    public final Table[] tables;
+    public final List<SnapshotTableInfo> tables;
     public final Integer newPartitionCount;
     public final String truncationRequestId;
-    public final HiddenColumnFilter hiddenColumnFilter;
+    private final HiddenColumnFilter hiddenColumnFilter;
 
     public static HiddenColumnFilter getHiddenColumnFilter(JSONObject jsonObject) {
         if (jsonObject != null) {
@@ -59,16 +59,16 @@ public class SnapshotRequestConfig {
     /**
      * @param tables    Tables to snapshot, cannot be null.
      */
-    public SnapshotRequestConfig(List<Table> tables) {
+    public SnapshotRequestConfig(List<SnapshotTableInfo> tables) {
         this(Preconditions.checkNotNull(tables), (Integer) null);
     }
 
-    public SnapshotRequestConfig(List<Table> tables, HiddenColumnFilter schemaFilterType) {
+    public SnapshotRequestConfig(List<SnapshotTableInfo> tables, HiddenColumnFilter schemaFilterType) {
         this(Preconditions.checkNotNull(tables), null, schemaFilterType);
     }
 
     public SnapshotRequestConfig(int newPartitionCount) {
-        this((Table[]) null, Integer.valueOf(newPartitionCount), HiddenColumnFilter.NONE);
+        this(null, Integer.valueOf(newPartitionCount), HiddenColumnFilter.NONE);
     }
 
     public SnapshotRequestConfig(int newPartitionCount, Database catalogDatabase) {
@@ -76,16 +76,11 @@ public class SnapshotRequestConfig {
                 HiddenColumnFilter.NONE);
     }
 
-    protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount) {
-        this(tables.toArray(new Table[tables.size()]), newPartitionCount, HiddenColumnFilter.NONE);
+    protected SnapshotRequestConfig(List<SnapshotTableInfo> tables, Integer newPartitionCount) {
+        this(tables, newPartitionCount, HiddenColumnFilter.NONE);
     }
 
-    protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount,
-            HiddenColumnFilter schemaFilterType) {
-        this(tables.toArray(new Table[tables.size()]), newPartitionCount, schemaFilterType);
-    }
-
-    private SnapshotRequestConfig(Table[] tables, Integer newPartitionCount,
+    protected SnapshotRequestConfig(List<SnapshotTableInfo> tables, Integer newPartitionCount,
             HiddenColumnFilter schemaFilterType) {
         emptyConfig = false;
         this.tables = tables;
@@ -110,12 +105,11 @@ public class SnapshotRequestConfig {
         }
     }
 
-    private static Table[] getTablesToInclude(JSONObject jsData,
+    private static List<SnapshotTableInfo> getTablesToInclude(JSONObject jsData,
                                               Database catalogDatabase)
     {
-        final List<Table> tables = SnapshotUtil.getTablesToSave(catalogDatabase);
-        Set<String> tableNamesToInclude = null;
-        Set<String> tableNamesToExclude = null;
+        Set<String> tableNamesToInclude;
+        Set<String> tableNamesToExclude;
 
         if (jsData != null) {
             JSONArray tableNames = jsData.optJSONArray(JKEY_TABLES);
@@ -131,6 +125,8 @@ public class SnapshotRequestConfig {
                         SNAP_LOG.warn("Unable to parse tables to include for snapshot", e);
                     }
                 }
+            } else {
+                tableNamesToInclude = null;
             }
 
             JSONArray excludeTableNames = jsData.optJSONArray("skiptables");
@@ -146,23 +142,24 @@ public class SnapshotRequestConfig {
                         SNAP_LOG.warn("Unable to parse tables to exclude for snapshot", e);
                     }
                 }
+            } else {
+                tableNamesToExclude = null;
             }
+        } else {
+            tableNamesToExclude = null;
+            tableNamesToInclude = null;
         }
 
+        final List<SnapshotTableInfo> tables;
         if (tableNamesToInclude != null && tableNamesToInclude.isEmpty()) {
             // Stream snapshot may specify empty snapshot sometimes.
-            tables.clear();
+            return ImmutableList.of();
         } else if (tableNamesToInclude != null || tableNamesToExclude != null) {
-            ListIterator<Table> iter = tables.listIterator();
-            while (iter.hasNext()) {
-                Table table = iter.next();
-                if ((tableNamesToInclude != null && !tableNamesToInclude.remove(table.getTypeName())) ||
-                    (tableNamesToExclude != null && tableNamesToExclude.remove(table.getTypeName()))) {
-                    // If the table index is not in the list to include or
-                    // is in the list to exclude, remove it
-                    iter.remove();
-                }
-            }
+            tables = SnapshotUtil.getTablesToSave(catalogDatabase,
+                    t -> (tableNamesToInclude == null || tableNamesToInclude.remove(t.getTypeName()))
+                            && (tableNamesToExclude == null || !tableNamesToExclude.remove(t.getTypeName())));
+        } else {
+            tables =  SnapshotUtil.getTablesToSave(catalogDatabase);
         }
 
         if (tableNamesToInclude != null && !tableNamesToInclude.isEmpty()) {
@@ -176,7 +173,7 @@ public class SnapshotRequestConfig {
                     Joiner.on(", ").join(tableNamesToExclude));
         }
 
-        return tables.toArray(new Table[tables.size()]);
+        return tables;
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException
@@ -184,14 +181,18 @@ public class SnapshotRequestConfig {
         if (tables != null) {
             stringer.key(JKEY_TABLES);
             stringer.array();
-            for (Table table : tables) {
-                stringer.value(table.getTypeName());
+            for (SnapshotTableInfo table : tables) {
+                stringer.value(table.getName());
             }
             stringer.endArray();
         }
         if (newPartitionCount != null) {
             stringer.keySymbolValuePair(JKEY_NEW_PARTITION_COUNT, newPartitionCount.longValue());
         }
-        stringer.keySymbolValuePair(JKEY_SCHEMA_BUILDER, hiddenColumnFilter.name());
+        stringer.keySymbolValuePair(JKEY_SCHEMA_BUILDER, getHiddenColumnFilter().name());
+    }
+
+    public HiddenColumnFilter getHiddenColumnFilter() {
+        return hiddenColumnFilter;
     }
 }

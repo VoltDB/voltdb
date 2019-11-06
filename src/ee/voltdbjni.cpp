@@ -951,6 +951,19 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeGetSnapshotSchema
+ * Signature: (JIB)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetSnapshotSchema(
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jbyte schemaFilterType)
+{
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    voltdb::HiddenColumnFilter::Type hiddenColumnFilter = static_cast<voltdb::HiddenColumnFilter::Type>(schemaFilterType);
+    return engine->getSnapshotSchema(tableId, hiddenColumnFilter);
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeActivateTableStream
  * Signature: (JIIIJ[B)Z
  */

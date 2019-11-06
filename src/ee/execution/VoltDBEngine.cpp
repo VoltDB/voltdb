@@ -2487,6 +2487,40 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }
 
+int VoltDBEngine::getSnapshotSchema(const CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType) {
+    PersistentTable *table;
+    if (m_snapshottingTables.empty()) {
+        // Called prior to snapshot being activated
+        Table* found = getTableById(tableId);
+
+         if (!found) {
+             return -1;
+         }
+
+         table = dynamic_cast<PersistentTable*>(found);
+         if (table == NULL) {
+             vassert(table != NULL);
+             return -1;
+         }
+    } else {
+        // Called after snapshot has been activated
+        table = findInMapOrNull(tableId, m_snapshottingTables);
+
+        if (table == NULL) {
+            return -1;
+        }
+    }
+
+    resetReusedResultOutputBuffer();
+
+    size_t sizeOffset = m_resultOutput.reserveBytes(sizeof(int32_t));
+
+    table->serializeColumnHeaderTo(m_resultOutput, hiddenColumnFilterType);
+    m_resultOutput.writeIntAt(sizeOffset, m_resultOutput.position() - (sizeOffset + sizeof(int32_t)));
+    m_resultOutput.writeInt(table->partitionColumn());
+    return 0;
+}
+
 /**
  * Activate a table stream for the specified table
  * Serialized data:

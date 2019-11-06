@@ -608,6 +608,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
+    public abstract Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
@@ -1135,6 +1136,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return true for success false for failure
      */
     protected native boolean nativeSetLogLevels(long pointer, long logLevels);
+
+    /**
+     * @param pointer          Pointer to an engine instance
+     * @param tableId          ID of the table whose schema is being retrieved
+     * @param schemaFilterType Type of filter to apply to schema
+     * @return error code indicating status of execution
+     */
+    protected native int nativeGetSnapshotSchema(long pointer, int tableId, byte schemaFilterType);
 
     /**
      * Active a table stream of the specified type for a table.

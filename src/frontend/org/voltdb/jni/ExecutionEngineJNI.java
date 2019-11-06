@@ -612,6 +612,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter)
+            throws EEException {
+        m_nextDeserializer.clear();
+        checkErrorCode(nativeGetSnapshotSchema(pointer, tableId, hiddenColumnFilter.getId()));
+        try {
+            return Pair.of(m_nextDeserializer.readVarbinary(), m_nextDeserializer.readInt());
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
                                        HiddenColumnFilter hiddenColumnFilter,
                                        long undoQuantumToken,
