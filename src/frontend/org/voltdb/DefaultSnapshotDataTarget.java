@@ -148,7 +148,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int numPartitions,
             final boolean isReplicated,
             final List<Integer> partitionIds,
-            final VoltTable schemaTable,
+            final byte[] schemaBytes,
             final long txnId,
             final long timestamp) throws IOException {
         this(
@@ -160,7 +160,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 numPartitions,
                 isReplicated,
                 partitionIds,
-                schemaTable,
+                schemaBytes,
                 txnId,
                 timestamp,
                 new int[] { 0, 0, 0, 2 });
@@ -175,7 +175,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int numPartitions,
             final boolean isReplicated,
             final List<Integer> partitionIds,
-            final VoltTable schemaTable,
+            final byte[] schemaBytes,
             final long txnId,
             final long timestamp,
             int version[]
@@ -236,9 +236,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b().position(4);
         container.b().putInt(container.b().remaining() - 4);
         container.b().position(0);
-
-        final byte schemaBytes[];
-        schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);

@@ -56,6 +56,7 @@
 #include "storage/TupleBlock.h"
 #include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
+#include "common/HiddenColumnFilter.h"
 
 #include <vector>
 #include <string>
@@ -197,6 +198,8 @@ class Table {
 
     void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
 
+    void serializeColumnHeaderTo(SerializeOutput& serialOutput, HiddenColumnFilter::Type hiddenColumnFilter);
+
     void serializeColumnHeaderTo(SerializeOutput& serialOutput);
 
     /*
@@ -336,6 +339,8 @@ protected:
     virtual void initializeWithColumns(TupleSchema* schema, std::vector<std::string> const& columnNames,
           bool ownsTupleSchema, int32_t compactionThreshold = 95);
     bool checkNulls(TableTuple& tuple) const;
+
+    void serializeColumnHeaderTo(SerializeOutput& serialOutput, HiddenColumnFilter *hiddenColumnFilter);
 
     // ------------------------------------------------------------------
     // DATA

@@ -33,4 +33,19 @@ NValue HiddenColumn::getDefaultValue(HiddenColumn::Type columnType) {
     }
 }
 
+const char *HiddenColumn::getName(HiddenColumn::Type columnType) {
+    switch (columnType) {
+    case HiddenColumn::MIGRATE_TXN:
+        return "migrate_column";
+    case HiddenColumn::XDCR_TIMESTAMP:
+        return "dr_clusterid_timestamp";
+    case HiddenColumn::VIEW_COUNT:
+        return "count_star";
+    default:
+        // Unsupported hidden column type passed in
+        vassert(false);
+        return "UNKNOWN";
+    }
+}
+
 }
