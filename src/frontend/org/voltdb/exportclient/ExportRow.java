@@ -56,6 +56,7 @@ public class ExportRow {
     public String tableName;
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
+    public static final int EXPORT_TIMESTAMP_COLUMN = 1;
     public static final int INTERNAL_OPERATION_COLUMN = 5;
     public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE };
 
@@ -82,6 +83,10 @@ public class ExportRow {
 
     public ROW_OPERATION getOperation() {
         return ROW_OPERATION.values()[(byte)values[INTERNAL_OPERATION_COLUMN]];
+    }
+
+    public Long getTimestamp() {
+        return (Long)values[EXPORT_TIMESTAMP_COLUMN];
     }
 
     // Note: used to decode schemas in encoded rows produced by {@code ExportEncoder.encodeRow}
