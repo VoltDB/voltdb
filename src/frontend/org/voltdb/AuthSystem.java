@@ -696,6 +696,10 @@ public class AuthSystem {
         return user.m_permissions_list;
     }
 
+    public AuthProvider getAuthProvider() {
+        return m_authProvider;
+    }
+
     public class HashAuthenticationRequest extends AuthenticationRequest {
 
         private final String m_user;
