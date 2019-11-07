@@ -1864,4 +1864,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void setServiceState(ServiceState serviceState) {
         m_serviceState = serviceState;
     }
+
+    // Clear up the backlogs
+    @Override
+    public void cleanupTransactionBacklogs() {
+        m_duplicateCounters.clear();
+        m_outstandingTxns.clear();
+        m_pendingTasks.m_taskQueue.clear();
+        m_repairLog.clear();
+    }
 }

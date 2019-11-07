@@ -230,6 +230,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
     //flush out read only transactions upon host failure
     public void cleanupTransactionBacklogOnRepair() {}
 
+    //flush out transactions for the site to be removed
+    public void cleanupTransactionBacklogs() {}
+
     protected static void generateSiteThreadDump(StringBuilder threadDumps) {
         ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
         ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);

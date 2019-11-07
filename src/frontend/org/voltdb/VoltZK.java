@@ -195,6 +195,9 @@ public class VoltZK {
     public static final String mpRepairBlocker = "mp_repair_blocker";
     public static final String mpRepairInProgress = actionBlockers + "/" + mpRepairBlocker;
 
+    public static final String stopReplicas = "stopReplicas_blocker";
+    public static final String stopReplicasInProgress = actionBlockers + "/" + stopReplicas;
+
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
     // Synchronized State Machine
@@ -482,6 +485,8 @@ public class VoltZK {
                     // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
+                } else if (blockers.contains(stopReplicas)){
+                    errorMsg = "while stopping replicas is active. Please retry node rejoin later.";
                 }
                 break;
             case elasticOperationInProgress:
@@ -496,6 +501,8 @@ public class VoltZK {
                             + "DR needs to be reset before elastic operation is allowed again.";
                 } else if ( blockers.contains(migrate_partition_leader)) {
                     errorMsg = "while leader migration is active. Please retry elastic operation later.";
+                } else if (blockers.contains(stopReplicas)){
+                    errorMsg = "while stopping replicas is active. Please retry node rejoin later.";
                 }
                 break;
             case migratePartitionLeaderBlocker:
@@ -517,6 +524,11 @@ public class VoltZK {
                 }
                 break;
             case mpRepairInProgress:
+                break;
+            case stopReplicas:
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = "while a node rejoin is active. Please retry stop replicas operation later.";
+                }
                 break;
             default:
                 // not possible
