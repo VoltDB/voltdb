@@ -56,6 +56,6 @@ public class VoltPJoinRule extends RelOptRule {
         // TODO: we may need to add splitCount attribute when we calculate/reduce the cost of a distribution node for MP query.
         call.transformTo(new VoltPhysicalNestLoopJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
                 join.getCondition(), join.getVariablesSet(), join.getJoinType(),
-                join.isSemiJoinDone(), systemFieldList));
+                join.isSemiJoinDone(), systemFieldList, join.getWhereCondition()));
     }
 }

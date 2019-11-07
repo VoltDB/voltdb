@@ -130,9 +130,8 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         m_tester.sql("select id from a where deleted=? and updated_date <= ? order by id limit ?")
                 .transform("VoltPhysicalLimit(split=[1], limit=[?2])\n" +
-                        "  VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], expr#3=[?0], " +
-                        "expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], " +
-                        "$condition=[$t7], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
+                        "  VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[?0], expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], $condition=[$t7], split=[1])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
                 .pass();
     }
 

@@ -30,11 +30,11 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
 
@@ -44,15 +44,24 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, null, null);
+                semiJoinDone, systemFieldList, null, null, null);
     }
 
     public VoltPhysicalNestLoopJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode whereoCondition) {
+        this(cluster, traitSet, left, right, condition, variablesSet, joinType,
+                semiJoinDone, systemFieldList, whereoCondition, null, null);
+    }
+
+    public VoltPhysicalNestLoopJoin(
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
+            ImmutableList<RelDataTypeField> systemFieldList,
+            RexNode whereoCondition, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, offset, limit);
+                semiJoinDone, systemFieldList, whereoCondition, offset, limit);
     }
 
     @Override
@@ -70,24 +79,35 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
             JoinRelType joinType, boolean semiJoinDone) {
         return new VoltPhysicalNestLoopJoin(getCluster(),
                 traitSet, left, right, conditionExpr,
-                variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()));
+                variablesSet, joinType, semiJoinDone,
+                ImmutableList.copyOf(getSystemFieldList()), whereCondition, m_offset, m_limit);
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
         return new VoltPhysicalNestLoopJoin(
                 getCluster(), traits, left, right, condition, variablesSet, joinType, isSemiJoinDone(),
-                ImmutableList.copyOf(getSystemFieldList()), offset, limit);
+                ImmutableList.copyOf(getSystemFieldList()), whereCondition, offset, limit);
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
         final NestLoopPlanNode nlpn = new NestLoopPlanNode();
-        nlpn.setJoinType(JoinType.INNER);
+        nlpn.setJoinType(RelConverter.convertJointType(joinType));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));
-        // Set join predicate
-        nlpn.setJoinPredicate(RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(), getCondition()));
+        // Set join predicate.
+        AbstractExpression onCondition = RexConverter.convertJoinPred(getInput(0)
+                .getRowType().getFieldCount(),
+                getCondition(), getRowType());
+        nlpn.setJoinPredicate(onCondition);
+
+        // Set where predicate.
+        AbstractExpression whereCondition = RexConverter.convertJoinPred(getInput(0)
+                .getRowType().getFieldCount(),
+                getWhereCondition(), getRowType());
+        nlpn.setWherePredicate(whereCondition);
+
         // Inline LIMIT / OFFSET
         addLimitOffset(nlpn);
         // Set output schema
