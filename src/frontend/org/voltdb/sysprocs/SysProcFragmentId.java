@@ -279,6 +279,8 @@ public class SysProcFragmentId
     // @StopReplicas
     public static final int PF_stopReplicas = 402;
     public static final int PF_stopReplicasAggregate = 403;
+    public static final int PF_stopReplicasCleanBacklogs = 404;
+    public static final int PF_stopReplicasCleanBacklogsAggregate = 405;
 
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);

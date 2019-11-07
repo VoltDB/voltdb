@@ -24,6 +24,7 @@ package org.voltdb.dtxn;
 
 import static org.junit.Assert.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +33,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -125,11 +127,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 assertEquals(ClientResponse.SUCCESS, response.getStatus());
                 Thread.sleep(5000);
                 System.out.println("Stopped replicas.");
-                client.callProcedure(
-                        "NonDeterministicSPProc",
-                        10004,
-                        10004,
-                        NonDeterministicSPProc.NO_PROBLEM);
+                insertMoreNormalData(1000, 1100);
             } else {
                 fail("Mismatch insertion failed");
             }
@@ -154,11 +152,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministic_RO_SP");
         try {
-            client.callProcedure(
-                    "NonDeterministicSPProc",
-                    0,
-                    0,
-                    NonDeterministicSPProc.NO_PROBLEM);
+            insertMoreNormalData(1, 100);
             client.callProcedure("NonDeterministic_RO_SP", 0);
         } catch (ProcCallException e) {
             fail("R/O SP mismatch failed?! " + e.toString());
@@ -175,11 +169,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testDeterministicProc");
         try {
-            client.callProcedure(
-                    "NonDeterministicSPProc",
-                    0,
-                    0,
-                    NonDeterministicSPProc.NO_PROBLEM);
+            insertMoreNormalData(1, 100);
             client.callProcedure("Deterministic_RO_MP", 0);
             fail("Deterministic procedure succeeded for non-deterministic results?");
         } catch (ProcCallException e) {
@@ -208,11 +198,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 assertEquals(ClientResponse.SUCCESS, response.getStatus());
                 Thread.sleep(5000);
                 System.out.println("Stopped replicas.");
-                client.callProcedure(
-                        "NonDeterministicSPProc",
-                        10003,
-                        10003,
-                        NonDeterministicSPProc.NO_PROBLEM);
+                insertMoreNormalData(10001, 10100);
             } else {
                 fail("Whitespace changes not picked up by determinism CRC");
             }
@@ -254,11 +240,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 assertEquals(ClientResponse.SUCCESS, response.getStatus());
                 Thread.sleep(5000);
                 System.out.println("Stopped replicas.");
-                client.callProcedure(
-                        "NonDeterministicSPProc",
-                        10002,
-                        10002,
-                        NonDeterministicSPProc.NO_PROBLEM);
+                insertMoreNormalData(10001, 10100);
             } else {
                 fail("Multi-statement hash mismatch update failed");
             }
@@ -300,11 +282,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 assertEquals(ClientResponse.SUCCESS, response.getStatus());
                 Thread.sleep(5000);
                 System.out.println("Stopped replicas.");
-                client.callProcedure(
-                        "NonDeterministicSPProc",
-                        10000,
-                        10000,
-                        NonDeterministicSPProc.NO_PROBLEM);
+                insertMoreNormalData(10001, 10100);
             } else {
                 fail("Partial-statement hash mismatch update failed");
             }
@@ -336,11 +314,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 assertEquals(ClientResponse.SUCCESS, response.getStatus());
                 Thread.sleep(5000);
                 System.out.println("Stopped replicas.");
-                client.callProcedure(
-                        "NonDeterministicSPProc",
-                        10001,
-                        10001,
-                        NonDeterministicSPProc.NO_PROBLEM);
+                insertMoreNormalData(10001, 10100);
             } else {
                 fail("testBuggyNonDeterministicProc failed");
             }
@@ -353,6 +327,12 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             }
         } finally {
             shutDown(server);
+        }
+    }
+
+    private void insertMoreNormalData(int start, int end) throws NoConnectionsException, IOException, ProcCallException {
+        for (int i = start; i < end; i++) {
+            client.callProcedure("NonDeterministicSPProc", i, i, NonDeterministicSPProc.NO_PROBLEM);
         }
     }
 }

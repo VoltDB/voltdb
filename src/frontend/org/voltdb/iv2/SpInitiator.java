@@ -85,7 +85,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         }
     }
 
-    ServiceState m_serviceState;
+    volatile ServiceState m_serviceState;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -408,7 +408,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         if (!m_serviceState.isEligibleForRemoval()) {
             return;
         }
-        String msg = "Shutdown service: %s for partition " + m_partitionId;
         try {
             final String partitionPath = LeaderElector.electionDirForPartition(
                     VoltZK.leaders_initiators, m_partitionId);
@@ -417,42 +416,27 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 if (child.startsWith(Long.toString(getInitiatorHSId()) + "_")) {
                     final String path = ZKUtil.joinZKPath(partitionPath, child);
                     m_messenger.getZK().delete(path, -1);
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug(String.format(msg, "leader initiator"));
-                    }
                     break;
                 }
             }
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
-                tmLog.error("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
-            } else {
-                tmLog.info("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
+                VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
             }
-        } catch (InterruptedException e) {
-            tmLog.error("Failed to remove leader initiator for partition " + m_partitionId + "\n" + e.getMessage(), e);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
         }
 
         try {
             m_leaderCache.shutdown();
-        } catch (InterruptedException e) {
-            tmLog.info("Interrupted during shutdown partition " + m_partitionId, e);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
         }
-
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(String.format(msg, "leader cache"));
-        }
-
         TransactionTaskQueue.removeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()));
-
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(String.format(msg, "scoreboard"));
-        }
-
         super.shutdownService();
 
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug(String.format(msg, "execution engine"));
+            tmLog.debug(String.format("Shutdown leader initiator, leader cache, update scoreboard, execution engine for partition %d", m_partitionId));
         }
         m_serviceState = ServiceState.REMOVED;
         m_executionSite.setServiceState(m_serviceState);
