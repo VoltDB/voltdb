@@ -62,17 +62,16 @@ class AbstractTempTable;
 class PersistentTable;
 
 class UpdateExecutor : public AbstractExecutor {
-    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
-    bool p_execute(const NValueArray &params);
-
     UpdatePlanNode* m_node = nullptr;
     std::vector<std::pair<int, int>> m_inputTargetMap{};
     int m_inputTargetMapSize = -1;
     AbstractTempTable* m_inputTable = nullptr;
     TableTuple m_inputTuple{};
     int m_partitionColumn = -1;
-    bool m_partitionColumnIsString = false;
     static int64_t s_modifiedTuples;
+
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
+    bool p_execute(const NValueArray &params);
 public:
     UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node) { }

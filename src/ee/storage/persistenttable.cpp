@@ -1201,9 +1201,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // by its unwanted updated values.
     if (revertIndexes || primaryKeyIndex() == NULL) {
         matchable.move(tupleWithUnwantedValues);
-    }
-    // A primary key lookup on a not-yet-updated index will find the tuple by its original/new values.
-    else {
+    } else { // A primary key lookup on a not-yet-updated index will find the tuple by its original/new values.
         matchable.move(sourceTupleDataWithNewValues);
     }
     TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
@@ -1211,10 +1209,10 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        BOOST_FOREACH (auto index, m_indexes) {
+        for (auto index : m_indexes) {
             if (!index->deleteEntry(&targetTupleToUpdate)) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
+                        m_name.c_str(), index->getName().c_str());
             }
         }
     }
@@ -1229,19 +1227,18 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     targetTupleToUpdate.copy(sourceTupleWithNewValues);
     if (dirty) {
         targetTupleToUpdate.setDirtyTrue();
-    }
-    else {
+    } else {
         targetTupleToUpdate.setDirtyFalse();
     }
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         TableTuple conflict(m_schema);
-        BOOST_FOREACH (auto index, m_indexes) {
+        for (auto index : m_indexes) {
             index->addEntry(&targetTupleToUpdate, &conflict);
             if (!conflict.isNullTuple()) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
+                        m_name.c_str(), index->getName().c_str());
             }
         }
     }
@@ -1250,14 +1247,11 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     if (fromMigrate) {
         vassert(m_shadowStream != nullptr);
         vassert(targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex()).isNull());
-        ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
-    } else {
-        if (isTableWithMigrate(m_tableType)) {
-            NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
-            if(!txnId.isNull()){
-                migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
-            }
+        migratingRemove(ExecutorContext::getExecutorContext()->currentSpHandle(), targetTupleToUpdate);
+    } else if (isTableWithMigrate(m_tableType)) {
+        NValue const txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
+        if(!txnId.isNull()){
+            migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
         }
     }
 }
