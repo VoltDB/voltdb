@@ -17,11 +17,22 @@
 
 package org.voltdb.exceptions;
 
+import java.util.Formatter;
+
 public class PlanningErrorException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public PlanningErrorException(String msg) {
         super(msg);
+    }
+
+    /**
+     * Formatted error msg, the same way we use String.format.
+     * @param format format string
+     * @param args args in the format string
+     */
+    public PlanningErrorException(String format, Object... args) {
+        this(new Formatter().format(format, args).toString());
     }
     public PlanningErrorException(Throwable e) {
         super(e);

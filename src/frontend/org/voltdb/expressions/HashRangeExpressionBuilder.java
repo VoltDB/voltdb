@@ -56,5 +56,5 @@ public class HashRangeExpressionBuilder {
     }
 
     /// Builder object that produces immutable maps.
-    private ImmutableSortedMap.Builder<Integer, Integer> m_builder = new ImmutableSortedMap.Builder<Integer, Integer>(Ordering.natural());
+    private ImmutableSortedMap.Builder<Integer, Integer> m_builder = new ImmutableSortedMap.Builder<>(Ordering.natural());
 }

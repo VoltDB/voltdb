@@ -78,16 +78,16 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
 
     @Override
     public String toString() {
-        String ret = "EXECUTE LISTS: " + m_tree.m_planNodesListMap.size() + " lists\n";
+        StringBuilder ret = new StringBuilder("EXECUTE LISTS: " + m_tree.m_planNodesListMap.size() + " lists\n");
         for (Map.Entry<Integer, List<AbstractPlanNode>> entry : m_tree.m_planNodesListMap.entrySet()) {
             List<AbstractPlanNode> nodeList = entry.getValue();
-            ret = "\tEXECUTE LIST id:" + entry.getKey() + " ," + nodeList.size() + " nodes\n";
+            ret = new StringBuilder("\tEXECUTE LIST id:" + entry.getKey() + " ," + nodeList.size() + " nodes\n");
             for (int ctr = 0, cnt = nodeList.size(); ctr < cnt; ctr++) {
-                ret += "   [" + ctr + "] " + nodeList.get(ctr) + "\n";
+                ret.append("   [").append(ctr).append("] ").append(nodeList.get(ctr)).append("\n");
             }
-            ret += nodeList.get(0).toString();
+            ret.append(nodeList.get(0).toString());
         }
-        return ret;
+        return ret.toString();
     }
 
     public List<AbstractPlanNode> constructList(List<AbstractPlanNode> planNodes) throws Exception {
@@ -134,7 +134,8 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
         // Important! Make sure that our list has the same number of entries in our tree
         //
         if (list.size() != planNodes.size()) {
-            throw new Exception("ERROR: The execution list has '" + list.size() + "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
+            throw new Exception("ERROR: The execution list has '" + list.size() +
+                    "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
         }
         return list;
     }
@@ -173,8 +174,7 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
                     stringer.value(node.getPlanNodeId().intValue());
                 }
                 stringer.endArray(); //end execution list
-            }
-            else {
+            } else {
                 stringer.key(EXECUTE_LISTS_MEMBER_NAME).array();
                 for (List<AbstractPlanNode> list : m_executeLists) {
                     stringer.object().key(EXECUTE_LIST_MEMBER_NAME).array();
@@ -190,8 +190,7 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
 
             stringer.endObject(); //end PlanNodeList
             return stringer.toString();
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             // HACK ugly ugly to make the JSON handling
             // in QueryPlanner generate a JSONException for a plan we know
             // here that we can't serialize.  Making this method throw

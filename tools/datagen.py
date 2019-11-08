@@ -2,7 +2,7 @@
 
 # Simple datagen tool that generates INSERT queries given the table schema.
 # Usage:
-# % tools/datagen.py 'CREATE TABLE t(i INTEGER NOT NULL, j FLOAT NOT NULL, k VARCHAR(8), l DECIMAL(8, 3), t TIMESTAMP, primary key (i));' 500
+# % tools/datagen.py 'CREATE TABLE t(i INTEGER NOT NULL, j FLOAT NOT NULL, k VARCHAR(8), l DECIMAL(8,3), t TIMESTAMP, primary key (i));' 500
 # will generate 500 INSERT statements that you can pipe to sqlcmd.
 #
 # Useful for populating quick data into tables for customer issues.

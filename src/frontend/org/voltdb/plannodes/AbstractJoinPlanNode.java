@@ -61,7 +61,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         if (m_preJoinPredicate != null) {

@@ -143,6 +143,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         return null;
     }
 
+    @Override
+    boolean isActive() {
+        return false;
+    }
+
     private static final PBDSegmentReader<Void> READER = new PBDSegmentReader<Void>() {
         @Override
         public int uncompressedBytesToRead() {
@@ -166,9 +171,6 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void purge() {}
-
-        @Override
         public BBContainer poll(OutputContainerFactory factory) {
             return null;
         }
@@ -189,11 +191,20 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void close() {}
-
-        @Override
         public boolean anyReadAndDiscarded() {
             return false;
+        }
+
+        @Override
+        public void close() {
+        }
+
+        @Override
+        public void closeAndSaveReaderState() {
+        }
+
+        @Override
+        public void markAllReadAndDiscarded() {
         }
     };
 }

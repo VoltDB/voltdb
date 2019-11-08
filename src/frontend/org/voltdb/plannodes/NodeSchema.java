@@ -17,15 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
@@ -47,20 +39,17 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     // name but are physically different.  We use the "differentiator" (an attribute
     // of a TVE) to do this.
     private static final Comparator<SchemaColumn> BY_NAME =
-            new Comparator<SchemaColumn>() {
-        @Override
-        public int compare(SchemaColumn col1, SchemaColumn col2) {
-            int nameCompare = col1.compareNames(col2);
-            if (nameCompare != 0) {
-                return nameCompare;
-            }
+            (col1, col2) -> {
+                int nameCompare = col1.compareNames(col2);
+                if (nameCompare != 0) {
+                    return nameCompare;
+                }
 
-            return col1.getDifferentiator() - col2.getDifferentiator();
-        }
-    };
+                return col1.getDifferentiator() - col2.getDifferentiator();
+            };
 
     // The list of columns produced by a plan node, in storage order.
-    private final ArrayList<SchemaColumn> m_columns;
+    private final List<SchemaColumn> m_columns;
 
     // A helpful map that goes from a schema column to the columns index in the list.
     private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
@@ -150,7 +139,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      * @return a list of the columns in this schema.  These columns will be
      * in the order in which they will appear at the output of this node.
      */
-    private ArrayList<SchemaColumn> getColumns() {
+    private List<SchemaColumn> getColumns() {
         return m_columns;
     }
 
@@ -161,6 +150,9 @@ public class NodeSchema implements Iterable<SchemaColumn> {
         return m_columns.size();
     }
 
+    public boolean isEmpty() {
+        return m_columns.isEmpty();
+    }
     /**
      * Retrieve the SchemaColumn that matches the provided arguments.
      * @param tableName The table name of the desired column.
@@ -235,27 +227,23 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     }
 
     private static final Comparator<SchemaColumn> TVE_IDX_COMPARE =
-            new Comparator<SchemaColumn>() {
-        @Override
-        public int compare(SchemaColumn col1, SchemaColumn col2) {
-            TupleValueExpression tve1 =
-                (TupleValueExpression) col1.getExpression();
-            TupleValueExpression tve2 =
-                (TupleValueExpression) col2.getExpression();
+            (col1, col2) -> {
+                TupleValueExpression tve1 =
+                    (TupleValueExpression) col1.getExpression();
+                TupleValueExpression tve2 =
+                    (TupleValueExpression) col2.getExpression();
 
-            int colIndex1 = tve1.getColumnIndex();
-            int colIndex2 = tve2.getColumnIndex();
+                int colIndex1 = tve1.getColumnIndex();
+                int colIndex2 = tve2.getColumnIndex();
 
-            return (colIndex1 < colIndex2) ? -1 :
-                (colIndex1 > colIndex2) ? 1 : 0;
-        }
-    };
+                return Integer.compare(colIndex1, colIndex2);
+            };
 
     /**
      * Sort schema columns by TVE index.  All elements
      * must be TupleValueExpressions.  Modification is made in-place.
      */
-    void sortByTveIndex() { Collections.sort(m_columns, TVE_IDX_COMPARE); }
+    void sortByTveIndex() { m_columns.sort(TVE_IDX_COMPARE); }
 
     /**
      * Sort a sub-range of the schema columns by TVE index.  All elements
@@ -264,7 +252,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      * @param toIndex     upper bound of range to be sorted, exclusive
      */
     void sortByTveIndex(int fromIndex, int toIndex) {
-        Collections.sort(m_columns.subList(fromIndex, toIndex), TVE_IDX_COMPARE);
+        m_columns.subList(fromIndex, toIndex).sort(TVE_IDX_COMPARE);
     }
 
     @Override
@@ -305,7 +293,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
             return true;
         }
 
-        if (obj instanceof NodeSchema == false) {
+        if (! (obj instanceof NodeSchema)) {
             return false;
         }
 
@@ -317,7 +305,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
 
         for (int colIndex = 0; colIndex < size(); colIndex++ ) {
             SchemaColumn col1 = schema.getColumn(colIndex);
-            if ( ! col1.equals(m_columns.get(colIndex))) {
+            if (! col1.equals(m_columns.get(colIndex))) {
                 return false;
             }
         }
@@ -388,7 +376,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
         StringBuilder sb = new StringBuilder();
         sb.append("NodeSchema:\n");
         for (int colIndex = 0; colIndex < m_columns.size(); ++colIndex) {
-            sb.append("Column " + colIndex + ":\n");
+            sb.append("Column ").append(colIndex).append(":\n");
             sb.append(m_columns.get(colIndex).toString()).append("\n");
         }
         return sb.toString();
@@ -449,8 +437,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
             if (! myType.canExactlyRepresentAnyValueOf(otherType)) {
                 if (otherType.canExactlyRepresentAnyValueOf(myType)) {
                     commonType = otherType;
-                }
-                else {
+                } else {
                     throw new PlanningErrorException(
                             "The "
                             + schemaKindName
@@ -476,14 +463,12 @@ public class NodeSchema implements Iterable<SchemaColumn> {
             int commonSize;
             if (! myType.isVariableLength()) {
                 commonSize = myType.getLengthInBytesForFixedTypesWithoutCheck();
-            }
-            else if (myType == VoltType.STRING) {
+            } else if (myType == VoltType.STRING) {
                 boolean myInBytes = myColumn.getInBytes();
                 boolean otherInBytes = otherColumn.getInBytes();
                 if (myInBytes == otherInBytes) {
                     commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
-                }
-                else {
+                } else {
                     // one is in bytes and the other is in characters
                     int mySizeInBytes = (myColumn.getInBytes() ? 1 : 4) * myColumn.getValueSize();
                     int otherSizeInBytes = (otherColumn.getInBytes() ? 1 : 4) * otherColumn.getValueSize();
@@ -497,8 +482,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
                         commonSize = VoltType.MAX_VALUE_LENGTH;
                     }
                 }
-            }
-            else {
+            } else {
                 commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
             }
 

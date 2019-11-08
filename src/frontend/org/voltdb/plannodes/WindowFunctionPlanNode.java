@@ -77,8 +77,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         assert(getAggregateFunctionCount() == 1);
         if (m_outputSchema == null) {
             m_outputSchema = new NodeSchema();
-        }
-        else {
+        } else {
             assert(getOutputSchema().size() == 0);
         }
         assert(m_children.size() == 1);
@@ -108,8 +107,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         m_aggregateTypes.add(winExpr.getExpressionType());
         if (winExpr.getAggregateArguments().size() > 0) {
             m_aggregateExpressions.add(winExpr.getAggregateArguments());
-        }
-        else {
+        } else {
             m_aggregateExpressions.add(null);
         }
         m_partitionByExpressions = winExpr.getPartitionByExpressions();
@@ -131,18 +129,12 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
             stringer.object();
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
-            AbstractExpression.toJSONArray(stringer,
-                                           Members.AGGREGATE_EXPRESSIONS.name(),
-                                           m_aggregateExpressions.get(ii));
+            AbstractExpression.toJSONArray(stringer, Members.AGGREGATE_EXPRESSIONS.name(), m_aggregateExpressions.get(ii));
             stringer.endObject();
         }
         stringer.endArray();
-        AbstractExpression.toJSONArray(stringer,
-                                       Members.PARTITIONBY_EXPRESSIONS.name(),
-                                       m_partitionByExpressions);
-        AbstractExpression.toJSONArrayFromSortList(stringer,
-                                                   m_orderByExpressions,
-                                                       null);
+        AbstractExpression.toJSONArray(stringer, Members.PARTITIONBY_EXPRESSIONS.name(), m_partitionByExpressions);
+        AbstractExpression.toJSONArrayFromSortList(stringer, m_orderByExpressions, null);
     }
 
     /**
@@ -151,8 +143,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
      * can't in general get them here.
      */
     @Override
-    public void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         JSONArray jarray = jobj.getJSONArray( Members.AGGREGATE_COLUMNS.name() );
         int size = jarray.length();
@@ -163,20 +154,13 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
             m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
             m_aggregateExpressions.add(
-                    AbstractExpression.loadFromJSONArrayChild(null,
-                                                              tempObj,
-                                                              Members.AGGREGATE_EXPRESSIONS.name(),
-                                                              null));
+                    AbstractExpression.loadFromJSONArrayChild(null, tempObj,
+                            Members.AGGREGATE_EXPRESSIONS.name(), null));
         }
-        m_partitionByExpressions
-                = AbstractExpression.loadFromJSONArrayChild(null,
-                                                            jobj,
-                                                            Members.PARTITIONBY_EXPRESSIONS.name(),
-                                                            null);
+        m_partitionByExpressions = AbstractExpression.loadFromJSONArrayChild(null, jobj,
+                Members.PARTITIONBY_EXPRESSIONS.name(), null);
         m_orderByExpressions = new ArrayList<>();
-        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions,
-                                                     null,
-                                                     jobj);
+        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, null, jobj);
     }
 
     @Override
@@ -191,7 +175,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     public void resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
         Collection<TupleValueExpression> allTves;
-
         // get all the TVEs in the output columns
         for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();

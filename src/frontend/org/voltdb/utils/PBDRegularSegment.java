@@ -52,7 +52,6 @@ import com.google_voltpatches.common.base.Preconditions;
 class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
-    private static final String VALIDATOR_CURSOR = "__validator__";
     private static final int VERSION = 2;
     private static final Random RANDOM = new Random();
 
@@ -343,7 +342,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         // Zero entry count means the segment is empty or corrupted, in both cases
         // the segment can be deleted.
         if (initialEntryCount == 0) {
-            reader.close();
+            reader.close(false);
             close();
             return Integer.MAX_VALUE;
         }
@@ -403,7 +402,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
         int entriesScanned = reader.readIndex();
-        reader.close();
+        reader.close(false);
 
         if (entriesTruncated == 0) {
             int entriesNotScanned = initialEntryCount - entriesScanned;
@@ -450,7 +449,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
             return entriesTruncated;
         } finally {
-            reader.purge();
+            reader.close();
         }
     }
 
@@ -466,7 +465,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
             return 0;
         } finally {
-            reader.purge();
+            reader.close();
         }
     }
 
@@ -839,6 +838,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         return m_extraHeaderCache;
     }
 
+    @Override
+    boolean isActive() {
+        return m_isActive;
+    }
+
     private class SegmentReader implements PBDSegmentReader<M> {
         private final String m_cursorId;
         private long m_readOffset;
@@ -863,6 +867,14 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         @Override
         public boolean anyReadAndDiscarded() {
             return m_discardCount > 0;
+        }
+
+        @Override
+        public void markAllReadAndDiscarded() {
+            // This doesn't set the readOffset and bytesRead nor does it move the file pointer,
+            // but just updates the read and discarded count
+            m_objectReadIndex = m_numOfEntries;
+            m_discardCount = m_numOfEntries;
         }
 
         @Override
@@ -1076,12 +1088,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         @Override
         public void close() throws IOException {
-            close(true);
+            close(false);
         }
 
         @Override
-        public void purge() throws IOException {
-            close(false);
+        public void closeAndSaveReaderState() throws IOException {
+            close(true);
         }
 
         private void close(boolean keep) throws IOException {
