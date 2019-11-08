@@ -334,6 +334,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     /**
+     * Reset the Engine object.
+     */
+    @Override
+    public void decommission(boolean remove, boolean promote, int newSitePerHost) throws EEException {
+        LOG.trace("Decommissioning Execution Engine... " + pointer);
+        if (pointer != 0L) {
+            final int errorCode = nativeDecommission(pointer,remove,promote,newSitePerHost);
+            // reset
+            pointer = 0L;
+            checkErrorCode(errorCode);
+        }
+        // Don't need reset the buffers, they can be reused after recommission
+        LOG.trace("Decommissioned Execution Engine.");
+    }
+
+    /**
      *  Provide a serialized catalog and initialize version 0 of the engine's
      *  catalog.
      */

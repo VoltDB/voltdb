@@ -141,10 +141,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // What type of EE is controlled
     final BackendTarget m_backend;
 
-    public static enum RunningState{
+    public enum RunningState{
         RUNNING(0),
         REJOINING(1),
-        REPLAYING(2);
+        REPLAYING(2),
+        DECOMMISSIONING(3);
+
         final int state;
         RunningState(int state) {
             this.state = state;
@@ -161,9 +163,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public boolean isReplaying() {
             return state == REPLAYING.get();
         }
+        public boolean isDecommissioning() {
+            return state == DECOMMISSIONING.get();
+        }
     }
     private ServiceState m_serviceState;
-    private RunningState m_rejoinState;
+    private RunningState m_runningState;
     private final TaskLog m_rejoinTaskLog;
     private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
@@ -348,6 +353,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
                 m_isLowestSiteId = m_siteId == lowestSiteId;
                 return m_isLowestSiteId;
+            }
+        }
+
+        // update the lowest site
+        @Override
+        public void decommissionSite(boolean remove, boolean promote, int newSitePerHost) {
+            try {
+                Site.this.decommissionSite(remove, promote, newSitePerHost);
+            } catch (InterruptedException e) {
+                hostLog.warn("Interrupted decommission execution site.", e);
+                e.printStackTrace();
+            }
+            if (remove) {
+                // cancel tick
+                m_tickProducer.cancel();
+                m_runningState = RunningState.DECOMMISSIONING;
+                // normal shutdown
+                startShutdown();
             }
         }
 
@@ -677,7 +700,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_pendingSiteTasks = pendingSiteTasks;
         m_backend = backend;
-        m_rejoinState = startAction.doesJoin() ? RunningState.REJOINING : RunningState.RUNNING;
+        m_runningState = startAction.doesJoin() ? RunningState.REJOINING : RunningState.RUNNING;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_genId);
@@ -867,7 +890,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
-                if (m_rejoinState.isRunning()) {
+                if (m_runningState.isRunning()) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_pendingSiteTasks.take();
                     if (task instanceof TransactionTask) {
@@ -875,7 +898,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
                     task.run(getSiteProcedureConnection());
-                } else if (m_rejoinState.isReplaying()) {
+                } else if (m_runningState.isReplaying()) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
                     SiteTasker task = m_pendingSiteTasks.peek();
@@ -893,7 +916,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // If m_rejoinState didn't change to kStateRunning because of replayFromTaskLog(),
                         // remove the task from the scheduler and give it to task log.
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
-                        if (!m_rejoinState.isRunning()) {
+                        if (!m_runningState.isRunning()) {
                             m_pendingSiteTasks.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
@@ -934,11 +957,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 VoltDB.crashLocalVoltDB(errmsg, true, t);
             }
         }
-
-        try {
-            shutdown();
-        } finally {
-            CompressionService.releaseThreadLocal();
+        if (m_runningState.isDecommissioning()) {
+            decommission();
+        } else {
+            try {
+                shutdown();
+            } finally {
+                CompressionService.releaseThreadLocal();
+            }
         }
     }
 
@@ -946,7 +972,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     boolean replayFromTaskLog(MinimumRatioMaintainer mrm) throws IOException
     {
         // not yet time to catch-up.
-        if (!m_rejoinState.isReplaying()) {
+        if (!m_runningState.isReplaying()) {
             return false;
         }
 
@@ -1033,19 +1059,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return (SystemProcedureCatalog.isAllowableInTaskLog(fragId, msg));
     }
 
-    public static boolean allowInitiateTask(Iv2InitiateTaskMessage msg){
+    public static boolean allowInitiateTask(Iv2InitiateTaskMessage msg) {
         final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(msg.getStoredProcedureName());
         // All durable sysprocs and non-sysprocs should not get filtered.
         return(sysproc == null || sysproc.isDurable());
     }
 
-    public void startShutdown()
-    {
+    public void startShutdown() {
         m_shouldContinue = false;
     }
 
-    void shutdown()
-    {
+    private void shutdown() {
         try {
             if (m_non_voltdb_backend != null) {
                 m_non_voltdb_backend.shutdownInstance();
@@ -1072,6 +1096,38 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
+    // decommission the Site service and reset the ExecutionEngine
+    private void decommission() {
+        try {
+            if (m_non_voltdb_backend != null) {
+                m_non_voltdb_backend.shutdownInstance();
+            }
+            if (m_ee != null) {
+                // m_ee.decommission(true, , );
+            }
+            // TODO: investigate restartability of snapshotter and taskLog
+            if (m_snapshotter != null) {
+                try {
+                    m_snapshotter.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted during shutdown", e);
+                }
+            }
+            if (m_rejoinTaskLog != null) {
+                try {
+                    m_rejoinTaskLog.close();
+                } catch (IOException e) {
+                    hostLog.error("Exception closing rejoin task log", e);
+                }
+            }
+        } catch (Exception e) {
+            hostLog.warn("Interrupted decommission execution site.", e);
+        }
+    }
+
+    void recommission() {
+
+    }
     //
     // SiteSnapshotConnection interface
     //
@@ -1489,7 +1545,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
-        assert(m_rejoinState.isRejoining());
+        assert(m_runningState.isRejoining());
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");
@@ -1552,21 +1608,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
             }
         }
-        m_rejoinState = RunningState.REPLAYING;
+        m_runningState = RunningState.REPLAYING;
         m_replayCompletionAction = replayComplete;
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("Rejoin Complete. State:" + m_rejoinState + " PartitionId:" +m_partitionId + " Site:" +
+            hostLog.debug("Rejoin Complete. State:" + m_runningState + " PartitionId:" +m_partitionId + " Site:" +
                  CoreUtils.hsIdToString(m_siteId));
         }
     }
 
     private void setReplayRejoinComplete() {
         // transition out of rejoin replay to normal running state.
-        assert(m_rejoinState.isReplaying());
+        assert(m_runningState.isReplaying());
         m_replayCompletionAction.run();
-        m_rejoinState = RunningState.RUNNING;
+        m_runningState = RunningState.RUNNING;
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("Replay Rejoin Complete. State:" + m_rejoinState +  " PartitionId:" +m_partitionId + " Site:" +
+            hostLog.debug("Replay Rejoin Complete. State:" + m_runningState +  " PartitionId:" +m_partitionId + " Site:" +
                     CoreUtils.hsIdToString(m_siteId));
         }
     }
@@ -1623,6 +1679,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         return m_loadedProcedures.getNibbleDeleteProc(
                     procedureName, catTable, column, op);
+    }
+
+    public void decommissionSite(boolean remove, boolean promote, int newSitePerHost) throws InterruptedException {
+        if (m_ee != null) {
+            m_ee.decommission(remove, promote, newSitePerHost);
+        }
     }
 
     /**

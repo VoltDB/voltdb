@@ -150,6 +150,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private FragmentContext m_fragmentContext = FragmentContext.UNKNOWN;
 
     // is the execution site dirty
+    // TODO: deprecate the dirty bit?
     protected boolean m_dirty;
 
     /** Error codes exported for JNI methods. */
@@ -630,6 +631,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Releases the Engine object. */
     public abstract void release() throws EEException, InterruptedException;
 
+    /** Reset the Engine object. */
+    public abstract void decommission(boolean remove, boolean promote, int newSitePerHost) throws EEException, InterruptedException;
+
     public static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
@@ -937,6 +941,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return error code
      */
     protected native int nativeDestroy(long pointer);
+
+    /**
+     * Temporarily decommission the execution engine.
+     * @param pointer the VoltDBEngine pointer to be destroyed
+     * @param remove
+     * @param promote
+     * @param newSitePerHost
+     * @return error code
+     */
+    protected native int nativeDecommission(long pointer, boolean remove, boolean promote, int newSitePerHost);
 
     /**
      * Initializes the execution engine with given parameter.

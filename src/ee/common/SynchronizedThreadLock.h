@@ -86,6 +86,7 @@ public:
     static void destroy();
     static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
     static void resetMemory(int32_t partitionId);
+    static void updateSitePerHost(int32_t sitePerHost);
 
     /**
      * Cross-site synchronization functions

@@ -81,7 +81,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             server.setCallingClassName(method);
             assertTrue("Catalog compilation failed", server.compile(builder));
 
-            server.setHasLocalServer(false);
+            server.setHasLocalServer(true);
             List<String> logSearchPatterns = new ArrayList<>(1);
             logSearchPatterns.add(expectedLogMessage);
             logSearchPatterns.add(expectHashDetectionMessage);

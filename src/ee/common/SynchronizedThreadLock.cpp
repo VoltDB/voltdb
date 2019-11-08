@@ -179,6 +179,10 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
     unlockReplicatedResourceForInit();
 }
 
+void SynchronizedThreadLock::updateSitePerHost(int32_t sitePerHost) {
+    VOLT_DEBUG("Update SitePerHost from %d to %d", s_SITES_PER_HOST, sitePerHost);
+}
+
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
     VOLT_DEBUG("Entering countdown latch...");
     vassert(s_globalTxnStartCountdownLatch > 0);

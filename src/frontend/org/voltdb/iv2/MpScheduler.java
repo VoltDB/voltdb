@@ -74,6 +74,7 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final Map<Integer, Long> m_partitionMasters;
+    // Todo: update buddyHSIds
     private final List<Long> m_buddyHSIds;
     // Leader migrated from one site to another
     private final Map<Long, Long> m_leaderMigrationMap;

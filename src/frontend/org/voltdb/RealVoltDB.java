@@ -60,6 +60,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -77,6 +78,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -5264,6 +5266,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
         return -1;
+    }
+
+    public Pair<Long, Integer> getLeaderSites() {
+        Supplier<Stream<Initiator>> leaderSites = () -> m_iv2Initiators.values().stream()
+                .filter(s -> ((SpInitiator) s).isLeader() && s.getPartitionId() != MpInitiator.MP_INIT_PID);
+        return new Pair (leaderSites.get().findFirst().map(Initiator::getInitiatorHSId).orElse(-1L),
+                leaderSites.get().count());
     }
 }
 

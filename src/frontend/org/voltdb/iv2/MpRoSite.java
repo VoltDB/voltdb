@@ -348,6 +348,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         public InitiatorMailbox getInitiatorMailbox() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
+        @Override
+        public void decommissionSite(boolean remove, boolean promote, int newSitePerHost) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
     };
 
     /** Create a new RO MP execution site */
