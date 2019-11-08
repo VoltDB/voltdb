@@ -700,6 +700,10 @@ public class AuthSystem {
         return m_authProvider;
     }
 
+    public boolean enabled() {
+        return m_enabled;
+    }
+
     public class HashAuthenticationRequest extends AuthenticationRequest {
 
         private final String m_user;
@@ -738,33 +742,7 @@ public class AuthSystem {
         }
     }
 
-    public class KiplingPlainAuthenticationRequest extends AuthenticationRequest {
-        private final String m_user;
-        private final byte[] m_password;
-
-        public KiplingPlainAuthenticationRequest(String user, byte[] password) {
-            m_user = user;
-            m_password = password;
-        }
-
-        @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
-            if (!m_enabled) {
-                m_authenticatedUser = m_user;
-                return true;
-            }
-            else if (m_authProvider != AuthProvider.HASH) {
-                return false;
-            }
-            final AuthUser user = m_users.get(m_user);
-            if (user == null) {
-                return false;
-            }
-            return isPasswordMatch(user, scheme, m_password);
-        }
-    }
-
-    private boolean isPasswordMatch(AuthUser user, ClientAuthScheme scheme, byte[] password) {
+    public boolean isPasswordMatch(AuthUser user, ClientAuthScheme scheme, byte[] password) {
         boolean matched = true;
         if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
             MessageDigest md = null;
