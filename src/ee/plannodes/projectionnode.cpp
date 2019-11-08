@@ -53,7 +53,7 @@ namespace voltdb {
 
 ProjectionPlanNode::~ProjectionPlanNode() { }
 
-PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_PROJECTION; }
+PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PlanNodeType::Projection; }
 
 std::string ProjectionPlanNode::debugInfo(const string& spacer) const
 {

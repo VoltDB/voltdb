@@ -97,34 +97,34 @@ map<SortDirectionType, string> const mapOfSortDirectionType {
 map<string, SortDirectionType> const mapToSortDirectionType = revert(mapOfSortDirectionType);
 
 map<PlanNodeType, string> const mapOfPlanNodeType {
-   {PLAN_NODE_TYPE_INVALID, "INVALID"},
-   {PLAN_NODE_TYPE_SEQSCAN, "SEQSCAN"},
-   {PLAN_NODE_TYPE_INDEXSCAN, "INDEXSCAN"},
-   {PLAN_NODE_TYPE_INDEXCOUNT, "INDEXCOUNT"},
-   {PLAN_NODE_TYPE_TABLECOUNT, "TABLECOUNT"},
-   {PLAN_NODE_TYPE_NESTLOOP, "NESTLOOP"},
-   {PLAN_NODE_TYPE_NESTLOOPINDEX, "NESTLOOPINDEX"},
-   {PLAN_NODE_TYPE_MERGEJOIN, "MERGEJOIN"},
-   {PLAN_NODE_TYPE_UPDATE, "UPDATE"},
-   {PLAN_NODE_TYPE_INSERT, "INSERT"},
-   {PLAN_NODE_TYPE_DELETE, "DELETE"},
-   {PLAN_NODE_TYPE_SWAPTABLES, "SWAPTABLES"},
-   {PLAN_NODE_TYPE_MIGRATE, "MIGRATE"},
-   {PLAN_NODE_TYPE_SEND, "SEND"},
-   {PLAN_NODE_TYPE_RECEIVE, "RECEIVE"},
-   {PLAN_NODE_TYPE_MERGERECEIVE, "MERGERECEIVE"},
-   {PLAN_NODE_TYPE_AGGREGATE, "AGGREGATE"},
-   {PLAN_NODE_TYPE_HASHAGGREGATE, "HASHAGGREGATE"},
-   {PLAN_NODE_TYPE_PARTIALAGGREGATE, "PARTIALAGGREGATE"},
-   {PLAN_NODE_TYPE_UNION, "UNION"},
-   {PLAN_NODE_TYPE_ORDERBY, "ORDERBY"},
-   {PLAN_NODE_TYPE_PROJECTION, "PROJECTION"},
-   {PLAN_NODE_TYPE_MATERIALIZE, "MATERIALIZE"},
-   {PLAN_NODE_TYPE_LIMIT, "LIMIT"},
-   {PLAN_NODE_TYPE_MATERIALIZEDSCAN, "MATERIALIZEDSCAN"},
-   {PLAN_NODE_TYPE_TUPLESCAN, "TUPLESCAN"},
-   {PLAN_NODE_TYPE_WINDOWFUNCTION, "WINDOWFUNCTION"},
-   {PLAN_NODE_TYPE_COMMONTABLE, "COMMONTABLE"}
+   {PlanNodeType::Invalid, "INVALID"},
+   {PlanNodeType::SeqScan, "SEQSCAN"},
+   {PlanNodeType::IndexScan, "INDEXSCAN"},
+   {PlanNodeType::IndexCount, "INDEXCOUNT"},
+   {PlanNodeType::TableCount, "TABLECOUNT"},
+   {PlanNodeType::Nestloop, "NESTLOOP"},
+   {PlanNodeType::NestloopIndex, "NESTLOOPINDEX"},
+   {PlanNodeType::MergeJoin, "MERGEJOIN"},
+   {PlanNodeType::Update, "UPDATE"},
+   {PlanNodeType::Insert, "INSERT"},
+   {PlanNodeType::Delete, "DELETE"},
+   {PlanNodeType::SwapTables, "SWAPTABLES"},
+   {PlanNodeType::Migrate, "MIGRATE"},
+   {PlanNodeType::Send, "SEND"},
+   {PlanNodeType::Receive, "RECEIVE"},
+   {PlanNodeType::MergeReceive, "MERGERECEIVE"},
+   {PlanNodeType::Aggregate, "AGGREGATE"},
+   {PlanNodeType::HashAggregate, "HASHAGGREGATE"},
+   {PlanNodeType::PartialAggregate, "PARTIALAGGREGATE"},
+   {PlanNodeType::Union, "UNION"},
+   {PlanNodeType::OrderBy, "ORDERBY"},
+   {PlanNodeType::Projection, "PROJECTION"},
+   {PlanNodeType::Materialize, "MATERIALIZE"},
+   {PlanNodeType::Limit, "LIMIT"},
+   {PlanNodeType::MaterializedScan, "MATERIALIZEDSCAN"},
+   {PlanNodeType::TupleScan, "TUPLESCAN"},
+   {PlanNodeType::WindowFunction, "WINDOWFUNCTION"},
+   {PlanNodeType::CommonTable, "COMMONTABLE"}
 };
 
 map<string, PlanNodeType> const mapToPlanNodeType = revert(mapOfPlanNodeType);
@@ -309,7 +309,7 @@ string planNodeToString(PlanNodeType type) {
 }
 
 PlanNodeType stringToPlanNode(string const& nam) {
-   return lookup(mapToPlanNodeType, nam, PLAN_NODE_TYPE_INVALID);
+   return lookup(mapToPlanNodeType, nam, PlanNodeType::Invalid);
 }
 
 string expressionToString(ExpressionType type) {

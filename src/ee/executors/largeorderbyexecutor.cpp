@@ -75,7 +75,7 @@ LargeOrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     vassert(dynamic_cast<LargeTempTable*>(node->getOutputTable()));
 
     // pick up an inlined limit, if one exists
-    m_limitPlanNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    m_limitPlanNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
 
     return true;
 }

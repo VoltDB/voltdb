@@ -171,7 +171,7 @@ void ExecutorVector::getRidOfSendExecutor(int planId) {
     std::vector<AbstractExecutor*> const executorList = iter->second;
     iter->second.clear();
     for(AbstractExecutor* executor : executorList) {
-        if (executor->getPlanNode()->getPlanNodeType() != PLAN_NODE_TYPE_SEND) {
+        if (executor->getPlanNode()->getPlanNodeType() != PlanNodeType::Send) {
             iter->second.emplace_back(executor);
         }
     }

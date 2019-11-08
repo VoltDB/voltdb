@@ -48,7 +48,7 @@ namespace voltdb {
 
 SwapTablesPlanNode::~SwapTablesPlanNode() { }
 
-PlanNodeType SwapTablesPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SWAPTABLES; }
+PlanNodeType SwapTablesPlanNode::getPlanNodeType() const { return PlanNodeType::SwapTables; }
 
 PersistentTable* SwapTablesPlanNode::getOtherTargetTable() const {
     if (m_otherTcd == NULL) {
