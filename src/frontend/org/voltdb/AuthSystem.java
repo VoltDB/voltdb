@@ -760,7 +760,6 @@ public class AuthSystem {
             if (user == null) {
                 return false;
             }
-            // TODO: log success or failure
             return isPasswordMatch(user, scheme, m_password);
         }
     }
