@@ -696,6 +696,14 @@ public class AuthSystem {
         return user.m_permissions_list;
     }
 
+    public AuthProvider getAuthProvider() {
+        return m_authProvider;
+    }
+
+    public boolean enabled() {
+        return m_enabled;
+    }
+
     public class HashAuthenticationRequest extends AuthenticationRequest {
 
         private final String m_user;
@@ -721,29 +729,7 @@ public class AuthSystem {
                 return false;
             }
 
-            boolean matched = true;
-            if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
-                MessageDigest md = null;
-                try {
-                    md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
-                } catch (NoSuchAlgorithmException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-                byte passwordHash[] = md.digest(m_password);
-
-                /*
-                 * A n00bs attempt at constant time comparison
-                 */
-                byte shaShadowPassword[] = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
-                for (int ii = 0; ii < passwordHash.length; ii++) {
-                    if (passwordHash[ii] != shaShadowPassword[ii]){
-                        matched = false;
-                    }
-                }
-            } else {
-                String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
-                matched = BCrypt.checkpw(Encoder.hexEncode(m_password), pwToCheck);
-            }
+            boolean matched = isPasswordMatch(user, scheme, m_password);
 
             if (matched) {
                 m_authenticatedUser = m_user;
@@ -754,6 +740,33 @@ public class AuthSystem {
             logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
             return false;
         }
+    }
+
+    public boolean isPasswordMatch(AuthUser user, ClientAuthScheme scheme, byte[] password) {
+        boolean matched = true;
+        if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
+            } catch (NoSuchAlgorithmException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+            byte passwordHash[] = md.digest(password);
+
+            /*
+             * A n00bs attempt at constant time comparison
+             */
+            byte shaShadowPassword[] = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
+            for (int ii = 0; ii < passwordHash.length; ii++) {
+                if (passwordHash[ii] != shaShadowPassword[ii]){
+                    matched = false;
+                }
+            }
+        } else {
+            String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+            matched = BCrypt.checkpw(Encoder.hexEncode(password), pwToCheck);
+        }
+        return matched;
     }
 
     private static void logAuthSuccess(String user, String fromAddress) {
