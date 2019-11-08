@@ -68,7 +68,7 @@
             <include name="org/voltdb/importclient/kafka/*.class"/>
             <include name="org/voltdb/importclient/kafka/util/*.class"/>
             <include name="org/voltdb/importclient/ImportBaseException.class"/>
-            <zipfileset src="${base.dir}/lib/scala-library-2.11.5.jar" />
+            <zipfileset src="${base.dir}/lib/scala-library-2.11.12.jar" />
             <zipfileset src="${base.dir}/lib/scala-parser-combinators_2.11-1.0.2.jar" />
             <zipfileset src="${base.dir}/lib/scala-xml_2.11-1.0.2.jar" />
             <zipfileset src="${base.dir}/lib/kafka_2.11-0.8.2.2.jar" />
