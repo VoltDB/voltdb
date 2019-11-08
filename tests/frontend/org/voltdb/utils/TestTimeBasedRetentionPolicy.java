@@ -36,6 +36,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
+
 public class TestTimeBasedRetentionPolicy {
     private static final VoltLogger s_logger = new VoltLogger("TestRetention");
     private static final int s_retainMillis = 2000;
@@ -183,7 +184,8 @@ public class TestTimeBasedRetentionPolicy {
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
-        m_pbd.setTimeBasedRetentionPolicy(s_retainMillis);
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, s_retainMillis);
+        m_pbd.startRetentionPolicyEnforcement();
     }
 
     @After
