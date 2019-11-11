@@ -87,7 +87,7 @@ bool IndexScanExecutor::p_init(
     // INLINE PROJECTION
     //
     m_projectionNode = static_cast<ProjectionPlanNode*>(
-            m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+            m_node->getInlinePlanNode(PlanNodeType::Projection));
     //
     // Optimize the projection if we can.
     //
@@ -171,7 +171,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     // INLINE LIMIT
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(
-            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+            m_abstractNode->getInlinePlanNode(PlanNodeType::Limit));
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limit_node != nullptr) {

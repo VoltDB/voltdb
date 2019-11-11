@@ -44,8 +44,6 @@
  */
 
 #include <common/debuglog.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
 #include <set>
 
 #include "updateexecutor.h"
@@ -80,19 +78,25 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVecto
     setDMLCountOutputTable(executorVector.limits());
 
     AbstractPlanNode *child = m_node->getChildren()[0];
-    ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
         VOLT_ERROR("Attempted to initialize update executor with NULL child");
         return false;
     }
 
-    PlanNodeType pnt = child->getPlanNodeType();
-    if (pnt == PLAN_NODE_TYPE_PROJECTION) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
-            pnt == PLAN_NODE_TYPE_INDEXSCAN) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        vassert(NULL != proj_node);
+    ProjectionPlanNode *proj_node;
+    switch (child->getPlanNodeType()) {
+        case PlanNodeType::Projection:
+            proj_node = dynamic_cast<ProjectionPlanNode*>(child);
+            break;
+        case PlanNodeType::SeqScan:
+        case PlanNodeType::IndexScan:
+            proj_node = dynamic_cast<ProjectionPlanNode*>(
+                    child->getInlinePlanNode(PlanNodeType::Projection));
+            vassert(NULL != proj_node);
+            break;
+        default:
+            VOLT_ERROR("Unrecognized plan node type");
+            return false;
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
@@ -103,16 +107,16 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node, const ExecutorVecto
      * it when generating the map from input columns to the target table columns.
      */
     for (int ii = 1; ii < output_column_names.size(); ii++) {
-        for (int jj=0; jj < targettable_column_names.size(); ++jj) {
+        for (int jj = 0; jj < targettable_column_names.size(); ++jj) {
             if (targettable_column_names[jj].compare(output_column_names[ii]) == 0) {
-                m_inputTargetMap.push_back(pair<int,int>(ii, jj));
+                m_inputTargetMap.emplace_back(ii, jj);
                 break;
             }
         }
     }
 
-    vassert(m_inputTargetMap.size() == (output_column_names.size() - 1));
-    m_inputTargetMapSize = (int)m_inputTargetMap.size();
+    vassert(m_inputTargetMap.size() == output_column_names.size() - 1);
+    m_inputTargetMapSize = m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
 
     // for target table related info.
@@ -170,8 +174,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
                 // tuple to update in the target table.
-                void *target_address = m_inputTuple.getNValue(0).castAsAddress();
-                targetTuple.move(target_address);
+                targetTuple.move(m_inputTuple.getNValue(0).castAsAddress());
 
                 // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
                 // the values that we need to. The key thing to note here is that we
@@ -187,7 +190,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                                         m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
                     } catch (SQLException& ex) {
                         std::string errorMsg = ex.message()
-                                + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].second) + "'";
+                                + " '" + targetTable->getColumnNames().at(m_inputTargetMap[map_ctr].second) + "'";
                         throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
                     }
                 }
@@ -199,15 +202,12 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                     bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
                     // if it doesn't map to this site
                     if (!isLocal) {
-                        throw ConstraintFailureException(
-                                targetTable, tempTuple,
-                                 "An update to a partitioning column triggered a partitioning error. "
-                                 "Updating a partitioning column is not supported. Try delete followed by insert.");
+                        throw ConstraintFailureException(targetTable, tempTuple,
+                                "An update to a partitioning column triggered a partitioning error. "
+                                "Updating a partitioning column is not supported. Try delete followed by insert.");
                     }
                 }
-
-                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                            indexesToUpdate);
+                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple, indexesToUpdate);
             }
             modified_tuples = m_inputTable->tempTableTupleCount();
             if (m_replicatedTableOperation) {

@@ -160,8 +160,8 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy3() {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable. Sort is redundant
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
-                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], " +
-                        "expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], split=[1])\n" +
+                        "  VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
                 .pass();
     }
 
@@ -192,8 +192,8 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy6() {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable applicable. Sort is redundant
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
-                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], " +
-                        "expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], split=[1])\n" +
+                        "  VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
                 .pass();
     }
 
@@ -202,8 +202,8 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable applicable. Sort is redundant
         // Sort Order is DESC
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I DESC, III DESC")
-                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], " +
-                        "expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_DESCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], split=[1])\n" +
+                        "  VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[RI5_IND_I_II_III_DESCEQ0_0])\n")
                 .pass();
     }
 

@@ -46,7 +46,7 @@
 
 namespace voltdb {
 
-PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UPDATE; }
+PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PlanNodeType::Update; }
 
 void UpdatePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {

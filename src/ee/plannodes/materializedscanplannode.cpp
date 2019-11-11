@@ -27,7 +27,7 @@ MaterializedScanPlanNode::~MaterializedScanPlanNode()
 }
 
 PlanNodeType MaterializedScanPlanNode::getPlanNodeType() const
-{ return PLAN_NODE_TYPE_MATERIALIZEDSCAN; }
+{ return PlanNodeType::MaterializedScan; }
 
 std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;

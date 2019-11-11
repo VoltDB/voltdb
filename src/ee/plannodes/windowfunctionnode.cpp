@@ -25,7 +25,7 @@ namespace voltdb {
 WindowFunctionPlanNode::~WindowFunctionPlanNode() { }
 
 PlanNodeType WindowFunctionPlanNode::getPlanNodeType() const {
-    return PLAN_NODE_TYPE_WINDOWFUNCTION;
+    return PlanNodeType::WindowFunction;
 }
 
 void WindowFunctionPlanNode::debugWriteAggregateExpressionList(

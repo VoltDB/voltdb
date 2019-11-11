@@ -49,7 +49,7 @@
 
 namespace voltdb {
 
-PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
+PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PlanNodeType::Receive; }
 
 std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {

@@ -15,34 +15,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+package org.voltdb.plannerv2.converter;
 
-#include "common/UndoReleaseAction.h"
-#include "common/types.h"
-#include "storage/persistenttable.h"
+import org.apache.calcite.rel.core.JoinRelType;
+import org.voltdb.types.JoinType;
 
-namespace voltdb {
-
-class PersistentTableUndoInsertAction: public UndoOnlyAction {
-    char* m_tuple;
-    PersistentTableSurgeon *m_tableSurgeon;
-public:
-    PersistentTableUndoInsertAction(
-          char* insertedTuple, voltdb::PersistentTableSurgeon *tableSurgeon) :
-       m_tuple(insertedTuple), m_tableSurgeon(tableSurgeon) { }
-
-    virtual ~PersistentTableUndoInsertAction() { }
-
-    /*
-     * Undo whatever this undo action was created to undo
+public class RelConverter {
+    /**
+     * Convert Calcite Join type to a corresponding Volt one
+     * @param joinType
+     * @return
      */
-    void undo() override {
-       m_tableSurgeon->deleteTupleForUndo(m_tuple);
+    public static JoinType convertJointType(JoinRelType joinType) {
+        switch (joinType) {
+            case FULL: return JoinType.FULL;
+            case LEFT: return JoinType.LEFT;
+            case RIGHT: return JoinType.RIGHT;
+            case INNER: return JoinType.INNER;
+            // to passify the compiler
+            default: return JoinType.INNER;
+        }
     }
-    char const* getTupleForTest() const {
-       return m_tuple;
-    }
-};
-
 }
-

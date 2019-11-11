@@ -91,7 +91,7 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
                         scan.getTable(), scan.getVoltTable(), scan.getProgram(), scan.getIndex(), accessPath,
                         scan.getOffsetRexNode(), scan.getLimitRexNode(), scan.getAggregateRelNode(),
                         scan.getPreAggregateRowType(), scan.getPreAggregateProgram(), scan.getSplitCount(),
-                        indexCollation);
+                        indexCollation, scan.isInlinedInnerScan());
                 final RelNode result;
                 if (calc == null) {
                     result = newScan;

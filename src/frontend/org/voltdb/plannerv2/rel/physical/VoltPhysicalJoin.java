@@ -43,6 +43,8 @@ import com.google.common.collect.ImmutableList;
 public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     private final boolean semiJoinDone;
     private final ImmutableList<RelDataTypeField> systemFieldList;
+    protected final RexNode whereCondition;
+
     // NOTE: we cannot really cache computation of RelMetadataQuery -> estimateRowCount (double) computation, because
     // RelMetadataQuery is abstract and not hash-able.
 //    private final Cacheable<RelMetadataQuery, Double> ROW_COUNT_CACHE =
@@ -59,15 +61,17 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     protected final RexNode m_offset;
     protected final RexNode m_limit;
 
-    VoltPhysicalJoin(
+    protected VoltPhysicalJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
+            ImmutableList<RelDataTypeField> systemFieldList,
+            RexNode whereCondition, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION,
                 "PhysicalJoin node convention mismatch");
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
+        this.whereCondition = whereCondition;
         m_offset = offset;
         m_limit = limit;
     }
@@ -78,6 +82,7 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone)
+                .itemIf("whereCondition", whereCondition, whereCondition != null)
                 .item("split", 1)
                 .itemIf("offset", m_offset, m_offset != null)
                 .itemIf("limit", m_limit, m_limit != null);
@@ -130,6 +135,10 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
             node.addInlinePlanNode(VoltPhysicalLimit.toPlanNode(m_limit, m_offset));
         }
         return node;
+    }
+
+    public RexNode getWhereCondition() {
+        return whereCondition;
     }
 
     public RexNode getLimit() {

@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -76,6 +78,9 @@ public class MergeJoinPlanNode extends AbstractJoinPlanNode {
     //
     // T1.C1 = T2.C1                   ->  T1.C1 < T2.C1
     // T1.C1 = T2.C1 AND T1.C2 = T2.C2 -> (T1.C1 < T2.C1)  OR (T1.C1 = T2.C1 AND T1.C2 < T2.C2)
+    //
+    // All LESS predicate sub-expressions must have the outer TVE on the left side to
+    // function properly
     private AbstractExpression createLessJoinPredicate(AbstractExpression joinExpr) {
         Collection<AbstractExpression> predicates = ExpressionUtil.uncombineAny(joinExpr);
         List<AbstractExpression> lessExprs = new ArrayList<>();
@@ -85,9 +90,11 @@ public class MergeJoinPlanNode extends AbstractJoinPlanNode {
             if (idx > 0) {
                 List<AbstractExpression> exprs = predicates.stream().limit(idx).collect(Collectors.toList());
                 exprs.add(nextExpr);
+                Collections.reverse(exprs);
                 nextExpr = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, exprs);
             }
-            lessExprs.add(nextExpr);
+            int indextoInsert = lessExprs.isEmpty() ? 0 : lessExprs.size() - 1;
+            lessExprs.add(indextoInsert,  nextExpr);
             ++idx;
         }
 
@@ -97,7 +104,19 @@ public class MergeJoinPlanNode extends AbstractJoinPlanNode {
     private AbstractExpression compareEqualToCompareLess(AbstractExpression expr) {
         assert(expr instanceof ComparisonExpression);
         assert(ExpressionType.COMPARE_EQUAL == expr.getExpressionType());
-        AbstractExpression lessExpr = expr.clone();
+        List<TupleValueExpression> leftTves = expr.getLeft().findAllTupleValueSubexpressions();
+        assert(!leftTves.isEmpty());
+        AbstractExpression outerClone;
+        AbstractExpression innerClone;
+        // Left and right TVEs are guaranteed to be from same table - outer or inner
+        if (leftTves.get(0).getTableIndex() == 0) {
+            outerClone = expr.getLeft().clone();
+            innerClone = expr.getRight().clone();
+        } else {
+            outerClone = expr.getRight().clone();
+            innerClone = expr.getLeft().clone();
+        }
+        AbstractExpression lessExpr = new ComparisonExpression(ExpressionType.COMPARE_LESSTHAN, outerClone, innerClone);
         lessExpr.setExpressionType(ExpressionType.COMPARE_LESSTHAN);
         return lessExpr;
     }

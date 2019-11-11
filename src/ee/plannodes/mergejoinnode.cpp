@@ -47,7 +47,7 @@
 namespace voltdb {
 
 PlanNodeType MergeJoinPlanNode::getPlanNodeType() const {
-   return PLAN_NODE_TYPE_MERGEJOIN;
+   return PlanNodeType::MergeJoin;
 }
 
 void MergeJoinPlanNode::loadFromJSONObject(PlannerDomValue obj) {

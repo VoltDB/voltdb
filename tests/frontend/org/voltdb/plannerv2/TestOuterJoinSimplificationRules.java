@@ -25,7 +25,7 @@ package org.voltdb.plannerv2;
 
 import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 
-public class TestOuterJoinRules extends Plannerv2TestCase {
+public class TestOuterJoinSimplificationRules extends Plannerv2TestCase {
 
     private OuterJoinRulesTester m_tester = new OuterJoinRulesTester();
 
@@ -34,7 +34,7 @@ public class TestOuterJoinRules extends Plannerv2TestCase {
         setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
         init();
-        m_tester.phase(Phase.OUTER_JOIN);
+        m_tester.phase(Phase.LOGICAL_JOIN);
     }
 
     @Override

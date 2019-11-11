@@ -79,7 +79,7 @@ bool NestLoopIndexExecutor::p_init(
     NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
     vassert(node);
     m_indexNode =
-        dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
+        dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PlanNodeType::IndexScan));
     vassert(m_indexNode);
     VOLT_TRACE("<NestLoopIndexPlanNode> %s, <IndexScanPlanNode> %s",
                m_abstractNode->debug().c_str(), m_indexNode->debug().c_str());
@@ -201,7 +201,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
         VOLT_TRACE("Where Expression:\n%s", where_expression->debug(true).c_str());
     }
 
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limit_node) {

@@ -130,9 +130,8 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         m_tester.sql("select id from a where deleted=? and updated_date <= ? order by id limit ?")
                 .transform("VoltPhysicalLimit(split=[1], limit=[?2])\n" +
-                        "  VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], expr#3=[?0], " +
-                        "expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], " +
-                        "$condition=[$t7], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
+                        "  VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[?0], expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], $condition=[$t7], split=[1])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, A]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
                 .pass();
     }
 
@@ -307,12 +306,12 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
 
     public void testPartialIndexComparisonPredicateExactMatch1() {
         // CREATE INDEX partial_idx_or_expr ON c (a) where e > 0 or d < 5; -- expression trees differ Z_FULL_IDX_A
-        // Calcite picks A_PARTIAL_IDX_NOT_NULL_E
+        // Calcite picks A_PARTIAL_IDX_NOT_NULL_D_E
         m_tester.sql("select * from c where a > 0 and e > 0 or d < 5")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[>($t4, $t7)], expr#10=[AND($t8, $t9)], expr#11=[5], " +
                         "expr#12=[<($t3, $t11)], expr#13=[OR($t10, $t12)], proj#0..6=[{exprs}], $condition=[$t13], " +
-                        "index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGTE0_0])\n")
+                        "index=[A_PARTIAL_IDX_NOT_NULL_D_E_INVALIDGTE0_0])\n")
                 .pass();
     }
 
