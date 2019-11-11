@@ -65,9 +65,10 @@ public class InsertExport extends VoltProcedure {
         SampleRecord record = new SampleRecord(rowid, rand);
 
         SQLStmt stmt = null;
+        for (int j = 0; j < targets; j++) {
         for (int i = 0; i < multiply; i++) {
-            int mod = i % targets;
-            switch(mod) {
+            // int mod = (i*j) % targets;
+            switch(j) {
                 case 0 :
                     stmt = export;
                     break;
@@ -136,7 +137,9 @@ public class InsertExport extends VoltProcedure {
         }
 
         // Execute last statement batch
-        voltExecuteSQL(true);
+        // voltExecuteSQL(true);
+        voltExecuteSQL();
+        }
 
         // Retun to caller
         return txid;
