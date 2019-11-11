@@ -1503,4 +1503,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         <M> PBDSegment<M> create(long segmentIndex, long segmentId, File file, VoltLogger logger,
                 BinaryDequeSerializer<M> extraHeaderSerializer);
     }
+
+    @Override
+    public synchronized int countCursors() {
+        return m_readCursors.size();
+    }
 }
