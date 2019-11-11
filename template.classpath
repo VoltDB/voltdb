@@ -90,7 +90,7 @@
 	<classpathentry kind="lib" path="lib/jetty-util-9.3.27.v20190418.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-servlet-9.3.27.v20190418.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-security-9.3.27.v20190418.jar"/>
-	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.20.Final.jar"/>
-	<classpathentry kind="lib" path="lib/netty-all-4.1.32.Final.jar"/>
+	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.27.Final.jar"/>
+	<classpathentry kind="lib" path="lib/netty-all-4.1.43.Final.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
