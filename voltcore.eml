@@ -173,8 +173,8 @@
 	<lib name="commons-io-1.4.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/commons-io-1.4.jar!/"/>
 	</lib>
-	<lib name="httpclient-4.3.4-tests.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.4-tests.jar!/"/>
+	<lib name="httpclient-4.3.6-tests.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.6-tests.jar!/"/>
 	</lib>
 	<lib name="avro-1.7.7.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avro-1.7.7.jar!/"/>
