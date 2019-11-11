@@ -35,12 +35,16 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+
+import com.google_voltpatches.common.base.Charsets;
+
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
@@ -217,6 +221,8 @@ public class VoltZK {
 
     public static final String actionLock = "/db/action_lock";
 
+    public static final String hashMismatchedReplicas = "/db/mismatched";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -237,7 +243,8 @@ public class VoltZK {
             actionBlockers,
             request_truncation_snapshot,
             host_ids_be_stopped,
-            actionLock
+            actionLock,
+            hashMismatchedReplicas
     };
 
     /**
@@ -647,6 +654,43 @@ public class VoltZK {
             return (!nodesSnapshotting.isEmpty());
         } catch (KeeperException | InterruptedException e) {
             VoltDB.crashLocalVoltDB("Unable to read snapshotting hosts.", true, e);
+        }
+        return false;
+    }
+
+    /**
+     * Store hash mismatched replicas
+     */
+    public static void addHashMismatchedSite(ZooKeeper zk, long hsId) {
+        try {
+            int hostId = CoreUtils.getHostIdFromHSId(hsId);
+            String idPath = (hostId > 0 ? String.valueOf(hostId) : "") + CoreUtils.getSiteIdFromHSId(hsId);
+            String id = Long.toString(Long.MAX_VALUE) + "/" + Long.toString(hsId);
+            zk.create(ZKUtil.joinZKPath(hashMismatchedReplicas, idPath),
+                    id.getBytes(Charsets.UTF_8),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (KeeperException.NodeExistsException e) {
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to store hash mismatched replica info", true, e);
+        }
+    }
+
+    public static void removeHashMismatchedSite(ZooKeeper zk, long hsId) {
+        try {
+            int hostId = CoreUtils.getHostIdFromHSId(hsId);
+            String idPath = (hostId > 0 ? String.valueOf(hostId) : "") + CoreUtils.getSiteIdFromHSId(hsId);
+            final String path = ZKUtil.joinZKPath(hashMismatchedReplicas, idPath);
+            zk.delete(path, -1);
+        } catch (Exception e) {
+        }
+    }
+
+    public static boolean hasHashMismatchedSite(ZooKeeper zk) {
+        try {
+            List<String> nodesSnapshotting = zk.getChildren(hashMismatchedReplicas, false);
+            return (!nodesSnapshotting.isEmpty());
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to read hahs mismatched sites.", true, e);
         }
         return false;
     }
