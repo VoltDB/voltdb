@@ -42,7 +42,7 @@
 	it happy.  In the Ant build, it's limited to build-importers.xml (i.e., K10 is not on the product classpath).
 	Putting K10 ahead of K8 will eliminate the red squiggles.
 	-->
-    <classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.2.jar"/>
     <classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
 

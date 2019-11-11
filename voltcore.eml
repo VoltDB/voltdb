@@ -86,8 +86,8 @@
 	<lib name="javaee-api-7.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javaee-api-7.0.jar!/"/>
 	</lib>
-	<lib name="kafka-clients-0.10.2.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/kafka-clients-0.10.2.1.jar!/"/>
+	<lib name="kafka-clients-0.10.2.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/kafka-clients-0.10.2.2.jar!/"/>
 	</lib>
 	<lib name="kafka-clients-0.8.2.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-clients-0.8.2.2.jar!/"/>
