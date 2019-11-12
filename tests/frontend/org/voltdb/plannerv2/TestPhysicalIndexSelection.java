@@ -306,12 +306,17 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
 
     public void testPartialIndexComparisonPredicateExactMatch1() {
         // CREATE INDEX partial_idx_or_expr ON c (a) where e > 0 or d < 5; -- expression trees differ Z_FULL_IDX_A
-        // Calcite picks A_PARTIAL_IDX_NOT_NULL_D_E
+        // NOTE: Calcite picks A_PARTIAL_IDX_NOT_NULL_D_E on calcite_* branch;
+        // but picks A_PARTIAL_IDX_NOT_NULL_E on master branch.
         m_tester.sql("select * from c where a > 0 and e > 0 or d < 5")
                 .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], expr#9=[>($t4, $t7)], expr#10=[AND($t8, $t9)], expr#11=[5], " +
                         "expr#12=[<($t3, $t11)], expr#13=[OR($t10, $t12)], proj#0..6=[{exprs}], $condition=[$t13], " +
                         "index=[A_PARTIAL_IDX_NOT_NULL_D_E_INVALIDGTE0_0])\n")
+                .transform("VoltPhysicalTableIndexScan(table=[[public, C]], split=[1], expr#0..6=[{inputs}], expr#7=[0], " +
+                        "expr#8=[>($t0, $t7)], expr#9=[>($t4, $t7)], expr#10=[AND($t8, $t9)], expr#11=[5], " +
+                        "expr#12=[<($t3, $t11)], expr#13=[OR($t10, $t12)], proj#0..6=[{exprs}], $condition=[$t13], " +
+                        "index=[A_PARTIAL_IDX_NOT_NULL_E_INVALIDGTE0_0])\n")
                 .pass();
     }
 
