@@ -99,6 +99,8 @@ public interface BinaryDeque<M> {
      */
     public void closeCursor(String cursorId);
 
+    public int countCursors();
+
     /**
      * Persist all objects in the queue to the backing store
      * @throws IOException
