@@ -55,6 +55,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.RateLimitedLogger;
 
@@ -64,7 +65,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
  * wire protocol and data model, but has no durability. Agreement is provided
  * by the AgreementSite wrapper which contains a restricted priority queue like an execution site,
- * but also has a transaction id manager and a unique initiator id. The intiator ID and site id are the same
+ * but also has a transaction id manager and a unique initiator id. The initiator ID and site id are the same
  * as the id of the regular txn initiator on this node. The mailbox used has a different ID so messages
  * for agreement are routed here.
  *
@@ -75,6 +76,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
     private static final byte BINARY_PAYLOAD_SNAPSHOT = 0;
     private static final byte BINARY_PAYLOAD_JOIN_REQUEST = 1;
+
+    // Meta data of zk snapshot message, 0 stands for more payloads to come,
+    // 1 stands for the last payload.
+    private static final byte BINARY_PAYLOAD_SNAPSHOT_MORE = 0;
+    private static final byte BINARY_PAYLOAD_SNAPSHOT_FIN = 1;
 
     private static enum RecoveryStage {
         WAITING_FOR_SAFETY,
@@ -105,11 +111,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private static final VoltLogger m_agreementLog = new VoltLogger("AGREEMENT");
     private long m_minTxnIdAfterRecovery = Long.MIN_VALUE;
     private final CountDownLatch m_shutdownComplete = new CountDownLatch(1);
+    private byte m_recoverySnapshotParts[][] = null;
     private byte m_recoverySnapshot[] = null;
+    private int m_recoverySnapshotIndex = 0;
     private Long m_recoverBeforeTxn = null;
     private Long m_siteRequestingRecovery = null;
     private final DisconnectFailedHostsCallback m_failedHostsCallback;
     private final MeshArbiter m_meshArbiter;
+    // Max payload length, leave 1k as meta data headspace.
+    public static final int MAX_PAYLOAD_MESSAGE_LENGTH = VoltPort.MAX_MESSAGE_LENGTH - 1024;
 
 
     public AgreementSite(
@@ -498,6 +508,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Received a recovery snapshot in stage " + m_recoveryStage.toString(), true, null);
                 }
+                final boolean lastPayload = metadata.get() == BINARY_PAYLOAD_SNAPSHOT_FIN ? true : false;
                 long selectedRecoverBeforeTxn = metadata.getLong();
                 if (selectedRecoverBeforeTxn < m_recoverBeforeTxn) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
@@ -506,11 +517,29 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 m_recoverBeforeTxn = selectedRecoverBeforeTxn;
                 m_minTxnIdAfterRecovery = m_recoverBeforeTxn;//anything before this precedes the snapshot
                 try {
-                    m_recoverySnapshot = org.xerial.snappy.Snappy.uncompress(bpm.m_payload);
+                    byte[] uncompressedPayload = org.xerial.snappy.Snappy.uncompress(bpm.m_payload);
+                    m_recoverySnapshotParts[m_recoverySnapshotIndex] = uncompressedPayload;
                 } catch (IOException e) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unable to decompress ZK snapshot", true, e);
                 }
-                m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
+                if (lastPayload) {
+                    int snapshotLength = 0;
+                    for (int i = 0; i < m_recoverySnapshotIndex; i++) {
+                        snapshotLength += m_recoverySnapshotParts[i].length;
+                    }
+                    m_recoverySnapshot = new byte[snapshotLength];
+                    int destPos = 0;
+                    for (int i = 0; i < m_recoverySnapshotIndex; i++) {
+                        System.arraycopy(m_recoverySnapshotParts[i], 0, m_recoverySnapshot, destPos, m_recoverySnapshotParts[i].length);
+                        destPos += m_recoverySnapshotParts[i].length;
+                        m_recoverySnapshotParts[i] = null;
+                    }
+                    m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
+                    m_recoverySnapshotIndex = 0;
+                } else {
+                    m_recoverySnapshotIndex++;
+                    return;
+                }
 
                 /*
                  * Clean out all txns from before the snapshot
@@ -591,10 +620,25 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_server.getZKDatabase().serializeSnapshot(boa);
         dos.flush();
         byte databaseBytes[] = org.xerial.snappy.Snappy.compress(baos.toByteArray());
+        int startPos = 0;
+        // if payload is larger than max payload size, send it by chunks
+        while (databaseBytes.length - startPos > MAX_PAYLOAD_MESSAGE_LENGTH) {
+            ByteBuffer metadata = ByteBuffer.allocate(10);
+            metadata.put(BINARY_PAYLOAD_SNAPSHOT);
+            metadata.put(BINARY_PAYLOAD_SNAPSHOT_MORE);
+            metadata.putLong(txnId);
+            BinaryPayloadMessage bpm =
+                    new BinaryPayloadMessage( metadata.array(), databaseBytes, startPos, MAX_PAYLOAD_MESSAGE_LENGTH);
+            m_mailbox.send( joiningAgreementSite, bpm);
+            startPos += MAX_PAYLOAD_MESSAGE_LENGTH;
+        }
+        // Send last chunk
         ByteBuffer metadata = ByteBuffer.allocate(9);
         metadata.put(BINARY_PAYLOAD_SNAPSHOT);
+        metadata.put(BINARY_PAYLOAD_SNAPSHOT_FIN); // Set flag for last payload
         metadata.putLong(txnId);
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage( metadata.array(), databaseBytes);
+        BinaryPayloadMessage bpm =
+                new BinaryPayloadMessage( metadata.array(), databaseBytes, startPos, databaseBytes.length - startPos);
         m_mailbox.send( joiningAgreementSite, bpm);
         m_siteRequestingRecovery = null;
         m_recoverBeforeTxn = null;
