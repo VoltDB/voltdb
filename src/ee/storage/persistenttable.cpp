@@ -46,7 +46,6 @@
 #include "persistenttable.h"
 
 #include "ConstraintFailureException.h"
-#include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
 #include "MaterializedViewHandler.h"
 #include "MaterializedViewTriggerForWrite.h"
@@ -61,10 +60,11 @@
 
 #include "common/ExecuteWithMpMemory.h"
 #include "common/FailureInjection.h"
+#include "common/ValuePeeker.hpp"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-#include "common/ValuePeeker.hpp"
+#include "storage/TableStreamer.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
