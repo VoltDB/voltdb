@@ -1754,6 +1754,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_migratePartitionLeaderExecutor != null) {
             m_migratePartitionLeaderExecutor.shutdown();
         }
+        if (m_replicaRemovalExecutor != null) {
+            m_replicaRemovalExecutor.shutdown();
+            m_replicaRemovalExecutor = null;
+        }
         m_notifier.shutdown();
     }
 
@@ -2428,11 +2432,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     void processReplicaRemovalTask() {
-        if (!VoltZK.hasHashMismatchedSite(m_zk)) {
-            return;
-        }
         Future<Boolean> result;
         synchronized(m_lock) {
+            // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
+            if (!VoltZK.hasHashMismatchedSite(m_zk)) {
+                return;
+            }
+
             if (m_replicaRemovalExecutor == null) {
                 m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
                         CoreUtils.getThreadFactory("ReplicaRemoval"));
@@ -2467,11 +2473,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             return false;
                         }
                     }
-                    final long timeoutMS = 5 * 60 * 1000;
+                    final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
                     ClientResponse resp = cb.getResponse(timeoutMS);
                     return(resp.getStatus() == ClientResponse.SUCCESS);
                 } catch (Exception e) {
-                    tmLog.error("Replica removal encountered unexpected error", e);
+                    tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
                 } finally {
                     VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
                 }
@@ -2483,9 +2489,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return;
             }
         } catch (InterruptedException | ExecutionException e) {
-            tmLog.warn("Failed to start transaction for @StopReplicas");
+            tmLog.warn(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         }
-        // restart the removal if failed.
+        // For any reason if the transaction fails, reschedule the task.
         processReplicaRemovalTask();
     }
 
