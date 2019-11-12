@@ -30,6 +30,14 @@ import org.voltcore.utils.Pair;
  * @param <M> Type of extra header metadata which can be associated with entries
  */
 public interface BinaryDeque<M> {
+    /**
+     * The different types of retention policies supported by BinaryDeque.
+     */
+    public static enum RetentionPolicyType {
+        TIME_MS,
+        MAX_BYTES;
+    }
+
     /*
      * Allocator for storage coming out of the BinaryDeque. Only
      * used if copying is necessary, otherwise a slice is returned
@@ -99,6 +107,8 @@ public interface BinaryDeque<M> {
      */
     public void closeCursor(String cursorId);
 
+    public int countCursors();
+
     /**
      * Persist all objects in the queue to the backing store
      * @throws IOException
@@ -125,20 +135,21 @@ public interface BinaryDeque<M> {
     public void closeAndDelete() throws IOException;
 
     /**
-     * Set a retention policy on the PBD data, which is based on the number of bytes of data in the PBD.
-     * Only one retention policy may be set on a PBD.
+     * Sets the retention policy to use on the PBD data.
+     * As of the current implementation, only one retention policy may be set on a PBD.
      *
-     * @param numBytes at least numBytes of data will be retained in the PBD.
+     * @param policyType the retention policy type
+     * @param params parameters specific to the retention policy type. For example, for time based
+     *        retention policy, the retain time in the correct unit may be the parameter.
      */
-    public void setNumBytesRetentionPolicy(int numBytes);
+    public void setRetentionPolicy(RetentionPolicyType policyType, Object... params);
 
     /**
-     * Set a retention policy on the PBD data, which is based on the time when the PBD data was written.
-     * Only one retention policy may be set on a PBD.
-     *
-     * @param retainMillis the PBD will contain data that is from retainMillis or lower
+     * Indicates that the BinaryDeque can now start retention policy enforcement.
+     * This will be typically called after the BinaryDeque is setup and required initializations
+     * are completed.
      */
-    public void setTimeBasedRetentionPolicy(int retainMillis);
+    public void startRetentionPolicyEnforcement();
 
     public static class TruncatorResponse {
         public enum Status {

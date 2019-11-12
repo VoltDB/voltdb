@@ -1381,19 +1381,18 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void setNumBytesRetentionPolicy(int numBytes) {
-        // TODO Auto-generated method stub
+    public void setRetentionPolicy(RetentionPolicyType policyType, Object... params) {
+        assert(m_retentionPolicy == null);
+        assert(policyType == RetentionPolicyType.TIME_MS); // Only supports time based for now
+        m_retentionPolicy = TimeBasedRetentionPolicyMgr.getInstance().addTimeBasedRetentionPolicy(this, params);
     }
 
     @Override
-    public void setTimeBasedRetentionPolicy(int millis) {
-        assert(m_retentionPolicy == null);
-        assert(millis > 0);
-        m_retentionPolicy = TimeBasedRetentionPolicyMgr.getInstance().addTimeBasedRetentionPolicy(this, millis);
+    public void startRetentionPolicyEnforcement() {
         try {
-            // TODO: This should probably be done in a step similar to scanEntries
-            // May be add another method at PBD level for this.
-            m_retentionPolicy.startPolicyEnforcement();
+            if (m_retentionPolicy != null) {
+                m_retentionPolicy.startPolicyEnforcement();
+            }
         } catch(IOException e) {
             // Unexpected error. Hence runtime error
             throw new RuntimeException(e);
@@ -1502,5 +1501,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     interface PBDSegmentFactory {
         <M> PBDSegment<M> create(long segmentIndex, long segmentId, File file, VoltLogger logger,
                 BinaryDequeSerializer<M> extraHeaderSerializer);
+    }
+
+    @Override
+    public synchronized int countCursors() {
+        return m_readCursors.size();
     }
 }

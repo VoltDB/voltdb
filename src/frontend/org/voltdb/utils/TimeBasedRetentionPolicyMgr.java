@@ -47,7 +47,11 @@ class TimeBasedRetentionPolicyMgr {
     private TimeBasedRetentionPolicyMgr() {
     }
 
-    public <E> TimeBasedRetentionPolicy<E> addTimeBasedRetentionPolicy(PersistentBinaryDeque<E> pbd, int retainMillis) {
+    public <E> TimeBasedRetentionPolicy<E> addTimeBasedRetentionPolicy(PersistentBinaryDeque<E> pbd, Object... params) {
+        assert(params.length == 1);
+        assert(params[0]!=null && params[0] instanceof Integer);
+        int retainMillis = ((Integer) params[0]).intValue();
+        assert (retainMillis > 0); //TODO: should be enforce a minimum?
         return new TimeBasedRetentionPolicy<E>(pbd, retainMillis);
     }
 
