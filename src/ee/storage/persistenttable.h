@@ -893,6 +893,10 @@ inline TBMap& PersistentTableSurgeon::getData() const {
     return m_table.m_data;
 }
 
+inline TBMap& PersistentTableSurgeon::getData() const {
+    return m_table.m_data;
+}
+
 inline PersistentTable& PersistentTableSurgeon::getTable() {
     return m_table;
 }

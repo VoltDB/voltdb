@@ -139,8 +139,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(getTable(),
-                       getMaxTupleLength(),
+    outputStreams.open(getMaxTupleLength(),
                        getPartitionId(),
                        getPredicates(),
                        getPredicateDeleteFlags());

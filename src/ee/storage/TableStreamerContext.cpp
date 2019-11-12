@@ -20,8 +20,7 @@
 #include "storage/TableStreamerContext.h"
 #include "storage/persistenttable.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 /**
  * Constructor with predicates.
@@ -31,11 +30,9 @@ TableStreamerContext::TableStreamerContext(
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings) :
-    m_surgeon(surgeon),
-    m_table(table),
+    m_surgeon(surgeon), m_table(table),
     m_maxTupleLength(table.schema()->getMaxSerializedTupleSize(true)),
-    m_partitionId(partitionId)
-{
+    m_partitionId(partitionId) {
     TableStreamerContext::updatePredicates(predicateStrings);
 }
 
@@ -46,17 +43,14 @@ TableStreamerContext::TableStreamerContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId) :
-    m_surgeon(surgeon),
-    m_table(table),
+    m_surgeon(surgeon), m_table(table),
     m_maxTupleLength(table.schema()->getMaxSerializedTupleSize(true)),
-    m_partitionId(partitionId)
-{}
+    m_partitionId(partitionId) {}
 
 /**
  * Parse and save predicates.
  */
-void TableStreamerContext::updatePredicates(const std::vector<std::string> &predicateStrings)
-{
+void TableStreamerContext::updatePredicates(const std::vector<std::string> &predicateStrings) {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
     // Throws an exception to be handled by caller on errors.

@@ -15,10 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLE_STREAMER_INTERFACE_H
-#define TABLE_STREAMER_INTERFACE_H
+#pragma once
 
-#include <boost/shared_ptr.hpp>
 #include "common/HiddenColumnFilter.h"
 #include "common/types.h"
 #include "storage/TupleBlock.h"
@@ -33,16 +31,14 @@ class PersistentTableSurgeon;
      */
     class TableStreamerInterface {
     public:
-        virtual ~TableStreamerInterface()
-        {}
+        virtual ~TableStreamerInterface() {}
 
         /**
          * Activate streaming.
          */
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
-                                    TableStreamType streamType,
-                                    const HiddenColumnFilter &filter,
-                                    const std::vector<std::string> &predicateStrings) = 0;
+                TableStreamType streamType, const HiddenColumnFilter &filter,
+                const std::vector<std::string> &predicateStrings) = 0;
 
         /**
          * Perpetuate some kinds of streaming after a TRUNCATE TABLE.
@@ -53,8 +49,7 @@ class PersistentTableSurgeon;
          * Continue streaming.
          */
         virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
-                                   TableStreamType streamType,
-                                   std::vector<int> &retPositions) = 0;
+                TableStreamType streamType, std::vector<int> &retPositions) = 0;
 
         /**
          * Return the partition ID.
@@ -88,7 +83,7 @@ class PersistentTableSurgeon;
          * Called for each tuple moved.
          */
         virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                         TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
+                TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 
         /**
          * Return context or null for specified type.
@@ -96,22 +91,12 @@ class PersistentTableSurgeon;
         virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) = 0;
 
         /**
-         * Return context or null for specified type (const flavor).
-         */
-        TableStreamerContextPtr findStreamContext(TableStreamType streamType) const
-        {
-            return const_cast<TableStreamerInterface*>(this)->findStreamContext(streamType);
-        }
-
-        /**
          * Return true if managing a stream of the specified type.
          */
-        bool hasStreamType(TableStreamType streamType) const
-        {
-            return (findStreamContext(streamType) != NULL);
+        bool hasStreamType(TableStreamType streamType) {
+            return findStreamContext(streamType) != NULL;
         }
     };
 
 } // namespace voltdb
 
-#endif // TABLE_STREAMER_INTERFACE_H

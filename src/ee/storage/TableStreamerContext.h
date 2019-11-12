@@ -15,13 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLE_STREAMER_CONTEXT_H
-#define TABLE_STREAMER_CONTEXT_H
+#pragma once
 
 #include <vector>
 #include <string>
-#include <iostream>
-#include <boost/shared_ptr.hpp>
 #include "common/StreamPredicateList.h"
 #include "common/FatalException.hpp"
 #include "storage/TupleBlock.h"
@@ -79,30 +76,38 @@ public:
      * Mandatory streamMore() handler.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
-                                     std::vector<int> &retPositions) = 0;
+            std::vector<int> &retPositions) = 0;
 
     /**
      * Optional deactivation handler.
      *  Called when the stream is shutting down.
      *  Return true to keep it around and listening to updates. (default=false)
      */
-    virtual bool handleDeactivation(TableStreamType streamType) {return false;}
+    virtual bool handleDeactivation(TableStreamType streamType) {
+        return false;
+    }
 
     /**
      * Optional tuple insert handler.
      */
-    virtual bool notifyTupleInsert(TableTuple &tuple) {return false;}
+    virtual bool notifyTupleInsert(TableTuple &tuple) {
+        return false;
+    }
 
     /**
      * Optional tuple update handler.
      */
-    virtual bool notifyTupleUpdate(TableTuple &tuple) {return false;}
+    virtual bool notifyTupleUpdate(TableTuple &tuple) {
+        return false;
+    }
 
     /**
      * Optional tuple delete handler.
      * returns true meaning that the tuple can be freed
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple) {return true;}
+    virtual bool notifyTupleDelete(TableTuple &tuple) {
+        return true;
+    }
 
     /**
      * Optional block compaction handler.
@@ -113,37 +118,33 @@ public:
      * Optional tuple compaction handler.
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) {}
+            TableTuple &sourceTuple, TableTuple &targetTuple) {}
 
     /**
      * Table accessor.
      */
-    PersistentTable &getTable()
-    {
+    PersistentTable &getTable() {
         return m_table;
     }
 
     /**
      * Predicates accessor.
      */
-    StreamPredicateList &getPredicates()
-    {
+    StreamPredicateList &getPredicates() {
         return m_predicates;
     }
 
     /**
      * Tuple length accessor.
      */
-    size_t getMaxTupleLength() const
-    {
+    size_t getMaxTupleLength() const {
         return m_maxTupleLength;
     }
 
     /**
      * Partition ID accessor.
      */
-    int32_t getPartitionId() const
-    {
+    int32_t getPartitionId() const {
         return m_partitionId;
     }
 
@@ -152,8 +153,7 @@ public:
      */
     virtual void updatePredicates(const std::vector<std::string> &predicateStrings);
 
-    virtual TableStreamerContext* cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
-    {
+    virtual TableStreamerContext* cloneForTruncatedTable(PersistentTableSurgeon &surgeon) {
         // Derived classes that are not related to ongoing elastic rebalance
         // do not need to be applied to the post-truncated copy of the table.
         return NULL;
@@ -165,22 +165,21 @@ protected:
      * Constructor with predicates.
      */
     TableStreamerContext(PersistentTable &table,
-                         PersistentTableSurgeon &surgeon,
-                         int32_t partitionId,
-                         const std::vector<std::string> &predicateStrings);
+            PersistentTableSurgeon &surgeon,
+            int32_t partitionId,
+            const std::vector<std::string> &predicateStrings);
 
     /**
      * Constructor without predicates.
      */
     TableStreamerContext(PersistentTable &table,
-                         PersistentTableSurgeon &surgeon,
-                         int32_t partitionId);
+            PersistentTableSurgeon &surgeon,
+            int32_t partitionId);
 
     /**
      * Predicate delete flags accessor.
      */
-    std::vector<bool> &getPredicateDeleteFlags()
-    {
+    std::vector<bool> const& getPredicateDeleteFlags() const {
         return m_predicateDeleteFlags;
     }
 
@@ -214,8 +213,7 @@ private:
     const int32_t m_partitionId;
 };
 
-typedef boost::shared_ptr<TableStreamerContext> TableStreamerContextPtr;
+using TableStreamerContextPtr = std::shared_ptr<TableStreamerContext>;
 
 } // namespace voltdb
 
-#endif // TABLE_STREAMER_CONTEXT_H

@@ -114,8 +114,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
 
         // More tuples are available - continue streaming and iterating.
         if (remaining != 0) {
-            outputStreams.open(getTable(),
-                               getMaxTupleLength(),
+            outputStreams.open(getMaxTupleLength(),
                                getPartitionId(),
                                getPredicates(),
                                getPredicateDeleteFlags());

@@ -17,11 +17,9 @@
 
 #include <string>
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include "StreamPredicateList.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 /*
  * Produce a list of StreamPredicateHashRange objects by parsing predicate range strings.
@@ -31,16 +29,13 @@ namespace voltdb
 bool StreamPredicateList::parseStrings(
         const std::vector<std::string> &predicateStrings,
         std::ostringstream& errmsg,
-        std::vector<bool> &predicateDeletes)
-{
+        std::vector<bool> &predicateDeletes) {
     bool failed = false;
-    for (std::vector<std::string>::const_iterator iter = predicateStrings.begin();
-         iter != predicateStrings.end(); ++iter) {
+    for (std::string predicateString : predicateStrings) {
         bool predFailed = false;
-        std::string predicateString = *iter;
         if (!predicateString.empty()) {
             try {
-                PlannerDomRoot domRoot((*iter).c_str());
+                PlannerDomRoot domRoot(predicateString.c_str());
                 if (!domRoot.isNull()) {
                     PlannerDomValue predicateObject = domRoot();
 
@@ -53,32 +48,27 @@ bool StreamPredicateList::parseStrings(
                         if (expr != NULL) {
                             // Got ourselves a predicate expression tree!
                             push_back(expr);
-                        }
-                        else {
+                        } else {
                             errmsg << "Predicate JSON generated a NULL expression tree";
                             predFailed = true;
                         }
-                    }
-                    else {
+                    } else {
                         // NULL represents an empty predicate object that should not be evaluated.
                         push_back(NULL);
                     }
-                }
-                else {
+                } else {
                     errmsg << "Stream predicate JSON document is NULL";
                     predFailed = true;
                 }
-            }
-            catch(std::exception &exc) {
+            } catch(std::exception const& exc) {
                 errmsg << "Exception occurred while parsing stream predicate: " << exc.what();
                 predFailed = true;
             }
             if (predFailed) {
-                errmsg << std::endl << (*iter) << std::endl;
+                errmsg << std::endl << predicateString << std::endl;
                 failed = true;
             }
-        }
-        else {
+        } else {
             // NULL predicates are okay.
             push_back(NULL);
         }

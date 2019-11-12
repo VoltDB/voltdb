@@ -15,14 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLE_STREAMER_H
-#define TABLE_STREAMER_H
+#pragma once
 
 #include <string>
 #include <vector>
 #include <list>
-#include <boost/shared_ptr.hpp>
-#include <boost/foreach.hpp>
 #include "common/ids.h"
 #include "common/types.h"
 #include "storage/TableStreamerInterface.h"
@@ -32,15 +29,13 @@
 
 class CopyOnWriteTest;
 
-namespace voltdb
-{
+namespace voltdb {
 
 class PersistentTable;
 class PersistentTableSurgeon;
 class TupleOutputStreamProcessor;
 
-class TableStreamer : public TableStreamerInterface
-{
+class TableStreamer : public TableStreamerInterface {
     friend class ::CopyOnWriteTest;
 
 public:
@@ -78,7 +73,7 @@ public:
     virtual bool notifyTupleInsert(TableTuple &tuple) {
         bool handled = false;
         // If any stream handles the notification, it's "handled".
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        for(StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             handled = streamPtr->m_context->notifyTupleInsert(tuple) || handled;
         }
@@ -92,7 +87,7 @@ public:
     virtual bool notifyTupleUpdate(TableTuple &tuple) {
         bool handled = false;
         // If any context handles the notification, it's "handled".
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        for(StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
         }
@@ -106,7 +101,7 @@ public:
     virtual bool notifyTupleDelete(TableTuple &tuple) {
         bool freeable = true;
         // Any active stream can reject freeing the tuple.
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        for(StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             freeable = streamPtr->m_context->notifyTupleDelete(tuple) && freeable;
         }
@@ -117,7 +112,7 @@ public:
      * Block compaction hook.
      */
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        for(StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             streamPtr->m_context->notifyBlockWasCompactedAway(block);
         }
@@ -128,7 +123,7 @@ public:
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        for (StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
         }
@@ -145,8 +140,8 @@ public:
      * Return context or null for specified type.
      */
     virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) {
-        boost::shared_ptr<TableStreamerContext> context;
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        std::shared_ptr<TableStreamerContext> context;
+        for(StreamPtr &streamPtr : m_streams) {
             vassert(streamPtr != NULL);
             if (streamPtr->m_streamType == streamType) {
                 context = streamPtr->m_context;
@@ -160,18 +155,14 @@ public:
 
 private:
 
-    class Stream
-    {
-    public:
-
-        Stream(TableStreamType streamType,
-               boost::shared_ptr<TableStreamerContext> context);
+    struct Stream {
+        Stream(TableStreamType streamType, std::shared_ptr<TableStreamerContext> context);
 
         /// The type of scan.
         const TableStreamType m_streamType;
 
         /// The stream context.
-        boost::shared_ptr<TableStreamerContext> m_context;
+        std::shared_ptr<TableStreamerContext> m_context;
     };
 
     /// Current partition ID.
@@ -187,11 +178,10 @@ private:
      * Snapshot streams.
      * All streams are notified of inserts, updates, deletes, and compactions.
      */
-    typedef boost::shared_ptr<Stream> StreamPtr;
-    typedef std::vector<StreamPtr> StreamList;
+    using StreamPtr = std::shared_ptr<Stream>;
+    using StreamList = std::vector<StreamPtr>;
     StreamList m_streams;
 };
 
 } // namespace voltdb
 
-#endif // TABLE_STREAMER_H

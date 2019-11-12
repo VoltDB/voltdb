@@ -15,35 +15,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STREAMPREDICATELIST_H_
-#define STREAMPREDICATELIST_H_
+#pragma once
 
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include "SerializableEEException.h"
 #include "expressions/abstractexpression.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 /**
  * A list (vector) of predicates.
  */
-class StreamPredicateList : public boost::ptr_vector< boost::nullable<AbstractExpression> >
-{
+class StreamPredicateList : public boost::ptr_vector<boost::nullable<AbstractExpression>> {
+    using super = boost::ptr_vector<boost::nullable<AbstractExpression>>;
 public:
 
     /** Default vconstructor. */
-    StreamPredicateList() : boost::ptr_vector< boost::nullable<AbstractExpression> >()
-    {}
+    StreamPredicateList() = default;
 
     /** Constructor with reserved size. */
-    StreamPredicateList(std::size_t size) : boost::ptr_vector< boost::nullable<AbstractExpression> >(size)
-    {}
+    StreamPredicateList(std::size_t size) : super(size) {}
 
     /** Destructor. */
-    virtual ~StreamPredicateList()
-    {}
+    virtual ~StreamPredicateList() {}
 
     /** Parse expression strings and add generated predicate objects to list. */
     bool parseStrings(const std::vector<std::string> &predicateStrings,
@@ -53,4 +48,3 @@ public:
 
 } // namespace voltdb
 
-#endif /* defined(STREAMPREDICATELIST_H_) */

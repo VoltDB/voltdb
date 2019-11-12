@@ -16,8 +16,6 @@
  */
 
 #include <map>
-#include <boost/foreach.hpp>
-#include <boost/shared_ptr.hpp>
 #include "common/serializeio.h"
 #include "storage/persistenttable.h"
 #include "storage/CopyOnWriteContext.h"
@@ -32,30 +30,26 @@ namespace voltdb {
 typedef std::pair<CatalogId, Table*> TIDPair;
 
 TableStreamer::Stream::Stream(TableStreamType streamType,
-                              boost::shared_ptr<TableStreamerContext> context) :
-    m_streamType(streamType),
-    m_context(context) {}
+        std::shared_ptr<TableStreamerContext> context) :
+    m_streamType(streamType), m_context(context) {}
 
 /**
  * Constructor.
  */
 TableStreamer::TableStreamer(int32_t partitionId, PersistentTable &table, CatalogId tableId) :
-    m_partitionId(partitionId),
-    m_table(table),
-    m_tableId(tableId) {}
+    m_partitionId(partitionId), m_table(table), m_tableId(tableId) {}
 
 TableStreamer::~TableStreamer() {}
 
 TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSurgeon &surgeon) {
     TableStreamer* the_clone = new TableStreamer(m_partitionId, surgeon.getTable(), m_tableId);
     surgeon.initTableStreamer(the_clone);
-    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+    for(StreamPtr &streamPtr : m_streams) {
         vassert(streamPtr != NULL);
-        boost::shared_ptr<TableStreamerContext> cloned_context;
+        std::shared_ptr<TableStreamerContext> cloned_context;
         cloned_context.reset(streamPtr->m_context->cloneForTruncatedTable(surgeon));
         if (cloned_context != NULL) {
-            the_clone->m_streams.push_back(StreamPtr(new Stream(streamPtr->m_streamType,
-                                                                cloned_context)));
+            the_clone->m_streams.emplace_back(new Stream(streamPtr->m_streamType, cloned_context));
         }
     }
     return the_clone;
@@ -69,7 +63,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon, TableStreamT
         const HiddenColumnFilter &filter, const std::vector<std::string> &predicateStrings) {
     bool failed = false;
     bool found = false;
-    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+    for(StreamPtr &streamPtr : m_streams) {
         vassert(streamPtr != NULL);
         switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
@@ -87,7 +81,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon, TableStreamT
     // Create an appropriate streaming context based on the stream type.
     if (!found && !failed) {
         try {
-            boost::shared_ptr<TableStreamerContext> context;
+            std::shared_ptr<TableStreamerContext> context;
             switch (streamType) {
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
@@ -132,7 +126,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon, TableStreamT
                         break;
                 }
             }
-        } catch(SerializableEEException &e) {
+        } catch(SerializableEEException const&) {
             // The stream will not be added.
             failed = true;
         }
@@ -156,8 +150,7 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
     // Rebuild the stream list as dictated by context semantics.
     StreamList savedStreams(m_streams);
     m_streams.clear();
-    for (StreamList::iterator iter = savedStreams.begin(); iter != savedStreams.end(); ++iter) {
-        StreamPtr streamPtr = *iter;
+    for (auto streamPtr : savedStreams) {
         vassert(streamPtr->m_context != NULL);
         if (streamPtr->m_streamType == streamType) {
             // Assert that we didn't find the stream type twice.

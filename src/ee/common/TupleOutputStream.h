@@ -15,11 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TUPLEOUTPUTSTREAM_H_
-#define TUPLEOUTPUTSTREAM_H_
+#pragma once
 
 #include <cstddef>
-#include <boost/ptr_container/ptr_vector.hpp>
 #include "serializeio.h"
 #include "HiddenColumnFilter.h"
 
@@ -32,7 +30,10 @@ class PersistentTable;
  * filtered COW processing to manage the stream.
  */
 class TupleOutputStream : public ReferenceSerializeOutput {
-
+    int32_t     m_rowCount = 0;
+    std::size_t m_rowCountPosition = 0;
+    /** Keep track of bytes written for throttling to yield control. */
+    std::size_t m_totalBytesSerialized = 0;
 public:
 
     /**
@@ -79,14 +80,7 @@ public:
         return m_rowCount;
     }
 
-private:
-
-    int32_t     m_rowCount;
-    std::size_t m_rowCountPosition;
-    /** Keep track of bytes written for throttling to yield control. */
-    std::size_t m_totalBytesSerialized;
 };
 
 } // namespace voltdb
 
-#endif // TUPLEOUTPUTSTREAM_H_

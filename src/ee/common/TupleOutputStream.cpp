@@ -21,19 +21,11 @@
 namespace voltdb {
 
 TupleOutputStream::TupleOutputStream(void *data, std::size_t length) :
-    ReferenceSerializeOutput(data, length),
-    m_rowCount(0),
-    m_rowCountPosition(0),
-    m_totalBytesSerialized(0)
-{
-}
+    ReferenceSerializeOutput(data, length) { }
 
-TupleOutputStream::~TupleOutputStream()
-{
-}
+TupleOutputStream::~TupleOutputStream() { }
 
-std::size_t TupleOutputStream::startRows(int32_t partitionId)
-{
+std::size_t TupleOutputStream::startRows(int32_t partitionId) {
     writeInt(partitionId);
     m_rowCount = 0;
     m_rowCountPosition = reserveBytes(4);
@@ -41,8 +33,7 @@ std::size_t TupleOutputStream::startRows(int32_t partitionId)
     return m_rowCountPosition;
 }
 
-std::size_t TupleOutputStream::writeRow(const TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter)
-{
+std::size_t TupleOutputStream::writeRow(const TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter) {
     const std::size_t startPos = position();
     tuple.serializeTo(*this, &hiddenColumnFilter);
     const std::size_t endPos = position();
@@ -52,13 +43,11 @@ std::size_t TupleOutputStream::writeRow(const TableTuple &tuple, const HiddenCol
     return bytesSerialized;
 }
 
-bool TupleOutputStream::canFit(std::size_t nbytes) const
-{
-    return (remaining() >= nbytes + sizeof(int32_t));
+bool TupleOutputStream::canFit(std::size_t nbytes) const {
+    return remaining() >= nbytes + sizeof(int32_t);
 }
 
-void TupleOutputStream::endRows()
-{
+void TupleOutputStream::endRows() {
     writeIntAt(m_rowCountPosition, m_rowCount);
 }
 

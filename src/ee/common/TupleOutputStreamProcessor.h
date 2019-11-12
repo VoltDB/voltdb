@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TUPLEOUTPUTSTREAMPROCESSOR_H_
-#define TUPLEOUTPUTSTREAMPROCESSOR_H_
+#pragma once
 
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -31,11 +30,24 @@ class StreamPredicateList;
 
 /** TupleOutputStream processor. Manages and outputs to multiple TupleOutputStream's. */
 class TupleOutputStreamProcessor : public boost::ptr_vector<TupleOutputStream> {
+    using super = boost::ptr_vector<TupleOutputStream>;
 
+    /** Pause serialization after this many bytes per partition. */
+    static constexpr std::size_t BYTES_SERIALIZED_THRESHOLD = 512 * 1024;
+
+    /** The maximum tuple length. */
+    std::size_t m_maxTupleLength = 0;
+
+    /** Table receiving tuples. */
+    bool m_opened = false;
+
+    /** Predicates for filtering. May remain non-NULL after open() if empty. */
+    StreamPredicateList const* m_predicates = nullptr;
+
+    /** Vector of booleans that indicates whether the predicate return true means the row should be deleted */
+    std::vector<bool> const* m_predicateDeletes = nullptr;
 public:
-
-    /** Default constructor. */
-    TupleOutputStreamProcessor();
+    TupleOutputStreamProcessor() = default;
 
     /** Constructor with initial size. */
     TupleOutputStreamProcessor(std::size_t nBuffers);
@@ -47,11 +59,10 @@ public:
     TupleOutputStream &add(void *data, std::size_t length);
 
     /** Start serializing. */
-    void open(PersistentTable &table,
-              std::size_t maxTupleLength,
+    void open(std::size_t maxTupleLength,
               int32_t partitionId,
-              StreamPredicateList &predicates,
-              std::vector<bool> &predicateDeletes);
+              StreamPredicateList const& predicates,
+              std::vector<bool> const& predicateDeletes);
 
     /** Stop serializing. */
     void close();
@@ -66,27 +77,7 @@ public:
                   const HiddenColumnFilter &hiddenColumnFilter,
                   bool *deleteRow = NULL);
 
-private:
-
-    /** The maximum tuple length. */
-    std::size_t m_maxTupleLength;
-
-    /** Pause serialization after this many bytes per partition. */
-    static const std::size_t m_bytesSerializedThreshold = 512 * 1024;
-
-    /** Table receiving tuples. */
-    PersistentTable *m_table;
-
-    /** Predicates for filtering. May remain non-NULL after open() if empty. */
-    StreamPredicateList *m_predicates;
-
-    /** Vector of booleans that indicates whether the predicate return true means the row should be deleted */
-    std::vector<bool> *m_predicateDeletes;
-
-    /** Private method used by constructors, etc. to clear state. */
-    void clearState();
 };
 
 } // namespace voltdb
 
-#endif // TUPLEOUTPUTSTREAMPROCESSOR_H_
