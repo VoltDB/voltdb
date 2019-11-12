@@ -46,6 +46,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltcore.logging.VoltLogger;
 
 import com.deletes.Insert;
 
@@ -85,6 +86,7 @@ public class DeletesClient
     static long m_expectedCounts = 0;
     static ArrayList<Integer> m_snapshotSizes = new ArrayList<Integer>();
     static boolean m_snapshotInProgress = false;
+    static VoltLogger log = new VoltLogger("DeletesClient");
 
     static String randomString(int maxStringSize)
     {
@@ -160,8 +162,8 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            System.out.println("failed insert");
-                            System.out.println(response.getStatusString());
+                            log.warn("failed insert");
+                            log.warn(response.getStatusString());
                         }
                         m_expectedInserts--; //we don't care if tx fail, but don't get stuck in yield
                     }
@@ -193,7 +195,7 @@ public class DeletesClient
                 }
             }
         } catch (NoConnectionsException e) {
-            System.err.println("Lost connection to database, terminating");
+            log.warn("Lost connection to database, terminating");
             System.exit(-1);
         } catch (IOException e) {
             e.printStackTrace();
@@ -203,13 +205,13 @@ public class DeletesClient
     static void insertBatch(Client client, boolean max_batch)
     {
         Date date = new Date();
-        System.out.println(date.toString() + "\n\tTotal rows currently: " + m_totalRows);
+        log.info("Total rows currently: " + m_totalRows);
         int to_insert = m_rand.nextInt(m_averageBatchSize * 2) + 1;
         if (max_batch)
         {
             to_insert = m_averageBatchSize * 2;
         }
-        System.out.println("\tInserting: " + to_insert + " rows");
+        log.info("\tInserting: " + to_insert + " rows");
         m_expectedInserts = to_insert;
         long start_time = System.currentTimeMillis();
         for (int j = 0; j < to_insert; j++)
@@ -225,10 +227,10 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalInserts += to_insert;
         m_totalInsertTime += elapsed;
-        System.out.println("\tBatch: " + to_insert + " took " +
+        log.info("\tBatch: " + to_insert + " took " +
                            elapsed + " millis");
-        System.out.println("\t\t (" + ((to_insert * 1000)/elapsed) + " tps)");
-        System.out.println("\tTotal insert TPS: " + (m_totalInserts * 1000)/m_totalInsertTime);
+        log.info("\t\t (" + ((to_insert * 1000)/elapsed) + " tps)");
+        log.info("\tTotal insert TPS: " + (m_totalInserts * 1000)/m_totalInsertTime);
     }
 
 
@@ -263,14 +265,14 @@ public class DeletesClient
             m_highUsedMem = used_mem;
             m_highUsedMemTime = System.currentTimeMillis();
         }
-        System.out.println("CURRENT MEMORY TOTALS (USED, ALLOCATED, RSS):");
-        System.out.println("CURRENT," + used_mem * 1000 + "," + alloc_mem * 1000 + "," + rss * 1000);
+        log.info("CURRENT MEMORY TOTALS (USED, ALLOCATED, RSS):");
+        log.info("CURRENT," + used_mem * 1000 + "," + alloc_mem * 1000 + "," + rss * 1000);
         Date blah = new Date(m_highUsedMemTime);
-        System.out.println("LARGEST MEMORY USED: " + m_highUsedMem * 1000 + " at " + blah.toString());
+        log.info("LARGEST MEMORY USED: " + m_highUsedMem * 1000 + " at " + blah.toString());
         blah = new Date(m_highAllocMemTime);
-        System.out.println("LARGEST MEMORY ALLOCATED: " + m_highAllocMem * 1000 + " at " + blah.toString());
+        log.info("LARGEST MEMORY ALLOCATED: " + m_highAllocMem * 1000 + " at " + blah.toString());
         blah = new Date(m_highRssTime);
-        System.out.println("LARGEST RSS: " + m_highRss * 1000 + " at " + blah.toString());
+        log.info("LARGEST RSS: " + m_highRss * 1000 + " at " + blah.toString());
     }
 
     static void collectStats(Client client)
@@ -279,7 +281,7 @@ public class DeletesClient
             ClientResponse resp = client.callProcedure("@Statistics", "management", 0);
             parseStats(resp);
         } catch (NoConnectionsException e) {
-            System.err.println("Lost connection to database, terminating");
+            log.error("Lost connection to database, terminating");
             System.exit(-1);
         } catch (IOException e) {
             e.printStackTrace();
@@ -295,7 +297,7 @@ public class DeletesClient
     {
         long prune_ts = m_batchNumber - batchesToKeep;
         Date date = new Date();
-        System.out.println(date.toString() + "\n\tPruning batches older than batch: " + prune_ts);
+        log.info("Pruning batches older than batch: " + prune_ts);
         m_expectedDeletes = NUM_NAMES;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < NUM_NAMES; i++)
@@ -307,7 +309,7 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            System.out.println("failed delete batch");
+                            log.error("failed delete batch");
                             System.out.println(response.getStatusString());
                         }
                         else
@@ -348,18 +350,18 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalDeletes += NUM_NAMES;
         m_totalDeleteTime += elapsed;
-        System.out.println("\tAfter delete, total rows: " + m_totalRows);
-        System.out.println("\tDeleting batch: " + NUM_NAMES + " took " +
+        log.info("\tAfter delete, total rows: " + m_totalRows);
+        log.info("\tDeleting batch: " + NUM_NAMES + " took " +
                            elapsed + " millis");
-        System.out.println("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
-        System.out.println("\tTotal delete TPS: " + (m_totalDeletes * 1000)/m_totalDeleteTime);
-        System.out.println("\tTotal delete RPS: " + (m_totalDeletedRows * 1000)/m_totalDeleteTime);
+        log.info("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
+        log.info("\tTotal delete TPS: " + (m_totalDeletes * 1000)/m_totalDeleteTime);
+        log.info("\tTotal delete RPS: " + (m_totalDeletedRows * 1000)/m_totalDeleteTime);
     }
 
     static void deleteDeceased(Client client)
     {
         Date date = new Date();
-        System.out.println(date.toString() + "\n\tDeleting deceased records...");
+        log.info("Deleting deceased records...");
         m_expectedDeadDeletes = NUM_NAMES;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < NUM_NAMES; i++)
@@ -371,8 +373,8 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            System.out.println("failed delete deceased");
-                            System.out.println(response.getStatusString());
+                            log.error("failed delete deceased");
+                            log.error(response.getStatusString());
                         }
                         else
                         {
@@ -410,17 +412,17 @@ public class DeletesClient
         long elapsed = System.currentTimeMillis() - start_time;
         m_totalDeadDeletes += NUM_NAMES;
         m_totalDeadDeleteTime += elapsed;
-        System.out.println("\tAfter dead deletes, total rows: " + m_totalRows);
-        System.out.println("\tDeleting deceased: " + NUM_NAMES + " took " +
+        log.info("\tAfter dead deletes, total rows: " + m_totalRows);
+        log.info("\tDeleting deceased: " + NUM_NAMES + " took " +
                            elapsed + " millis");
-        System.out.println("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
-        System.out.println("\tTotal delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
+        log.info("\t\t (" + ((NUM_NAMES * 1000)/elapsed) + " tps)");
+        log.info("\tTotal delete TPS: " + (m_totalDeadDeletes * 1000)/m_totalDeadDeleteTime);
     }
 
     static void countBatch(Client client, long batch)
     {
         Date date = new Date();
-        System.out.println(date.toString() + "\n\tCounting batch: " + batch);
+        log.info("Counting batch: " + batch);
         m_expectedCounts = 1;
         long start_time = System.currentTimeMillis();
         for (int i = 0; i < 1; i++)
@@ -432,12 +434,12 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            System.out.println("failed count batch");
-                            System.out.println(response.getStatusString());
+                            log.error("failed count batch");
+                            log.error(response.getStatusString());
                         }
                         else
                         {
-                            System.out.println("\tBatch has " +
+                            log.info("\tBatch has " +
                                                response.getResults()[0].asScalarLong() +
                                                " items");
                         }
@@ -492,7 +494,7 @@ public class DeletesClient
             String reportString = baos.toString("UTF-8");
             if (reportString.startsWith("Snapshot corrupted"))
             {
-                System.err.println(reportString);
+                log.error(reportString);
                 System.exit(-1);
             }
         } catch (UnsupportedEncodingException e) {}
@@ -508,7 +510,6 @@ public class DeletesClient
         try
         {
             results = client.callProcedure("@SnapshotStatus").getResults();
-            //System.out.println(results[0]);
         }
         catch (NoConnectionsException e1)
         {
@@ -546,7 +547,7 @@ public class DeletesClient
         checkSnapshotComplete(client);
         if (m_snapshotInProgress)
         {
-            System.out.println("Snapshot still in progress, bailing");
+            log.info("Snapshot still in progress, bailing");
             return;
         }
         try
@@ -571,15 +572,15 @@ public class DeletesClient
         }
         // m_totalRows should be accurate at this point
         m_snapshotSizes.add(m_totalRows);
-        System.out.println("Performing Snapshot with total rows: " + m_totalRows);
+        log.info("Performing Snapshot with total rows: " + m_totalRows);
         try
         {
             if (m_blockingSnapshots) {
                 ClientResponse response = client.callProcedure("@SnapshotSave", m_snapshotDir, m_snapshotId, 1);
                 if (response.getStatus() != ClientResponse.SUCCESS)
                 {
-                    System.out.println("failed snapshot");
-                    System.out.println(response.getStatusString());
+                    log.error("failed snapshot");
+                    log.error(response.getStatusString());
                 }
             }
             else {
@@ -590,8 +591,8 @@ public class DeletesClient
                                          public void clientCallback(ClientResponse response) {
                                              if (response.getStatus() != ClientResponse.SUCCESS)
                                              {
-                                                 System.out.println("failed snapshot");
-                                                 System.out.println(response.getStatusString());
+                                                 log.error("failed snapshot");
+                                                 log.error(response.getStatusString());
                                              }
                                          }
                                      },
@@ -647,11 +648,11 @@ public class DeletesClient
 
         apph.printActualUsage();
 
-        System.out.println("Starting Deletes app with:");
-        System.out.printf("\tAverage batch size of %d\n", m_averageBatchSize);
-        System.out.printf("\tKeeping %d batches\n", m_batchesToKeep);
-        System.out.printf("\tCleaning up deceased every %d batches\n", m_deceasedCleanupFreq);
-        System.out.printf("\tSnapshotting every %d batches\n", m_snapshotFreq);
+        log.info("Starting Deletes app with:");
+        log.info("Average batch size of "+ m_averageBatchSize);
+        log.info("Keeping batches:"+ m_batchesToKeep);
+        log.info("Cleaning up deceased every batches:"+ m_deceasedCleanupFreq);
+        log.info("Snapshotting every batches:"+ m_snapshotFreq);
 
         // parse the server list
         List<String> servers = new LinkedList<String>();
@@ -677,10 +678,13 @@ public class DeletesClient
                 e.printStackTrace();
                 System.exit(-1);
             } catch (IOException e) {
-                System.err.println("Could not connect to database, terminating: (" + server + ")");
+                log.error("Could not connect to database, terminating: (" + server + ")");
                 System.exit(-1);
             }
         }
+
+        final long endTime = System.currentTimeMillis() + (1000l * duration);
+        final long startTime = System.currentTimeMillis();
 
         // Start with the maximum data set we could possibly fill
         for (int i = 0; i < m_batchesToKeep; i++)
@@ -695,8 +699,6 @@ public class DeletesClient
         boolean fill_max = false;
         long max_batch_remaining = 0;
 
-        final long endTime = System.currentTimeMillis() + (1000l * duration);
-        final long startTime = System.currentTimeMillis();
         while (endTime > System.currentTimeMillis())
         {
             // if (max_batch_counter == m_maxBatchFreq)
@@ -741,6 +743,6 @@ public class DeletesClient
 
             deleteBatch(client, m_batchesToKeep);
         }
-        System.out.printf("\tTotal runtime: %d seconds\n", (System.currentTimeMillis() - startTime) / 1000l);
+        log.info("Total runtime seconds:" + (System.currentTimeMillis() - startTime) / 1000l);
     }
 }
