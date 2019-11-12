@@ -200,10 +200,6 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void closeAndSaveReaderState() {
-        }
-
-        @Override
         public void markAllReadAndDiscarded() {
         }
     };

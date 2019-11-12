@@ -119,7 +119,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         return null;
                     }
 
-                    segmentReader.closeAndSaveReaderState();
+                    segmentReader.close();
                     m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
                     // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
@@ -1102,12 +1102,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     private boolean canDeleteSegmentsBefore(PBDSegment<M> segment) {
         String retentionCursor = (m_retentionPolicy == null) ? null : m_retentionPolicy.getCursorId();
+        long segmentIndex = segment.segmentIndex();
         for (ReadCursor cursor : m_readCursors.values()) {
             if (cursor.m_segment == null) {
                 return false;
             }
 
-            long segmentIndex = segment.segmentIndex();
             long cursorSegmentIndex = cursor.m_segment.segmentIndex();
             if (cursorSegmentIndex < segmentIndex) {
                 return false;
@@ -1118,7 +1118,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 continue;                                             // It just moves to the segment and stays till the policy expires.
             }                                                         // So, just the segmentIndex check above is sufficient.
             if (segmentReader == null) {
-                return false;
+                // If cursor is on this segment and reader is null, it hasn't started reading.
+                // If cursorIndex > segmentIndex, it has moved past this segment (less than check already above)
+                if (cursorSegmentIndex == segmentIndex) {
+                    return false;
+                }
             } else if (!segmentReader.anyReadAndDiscarded()) {
                 return false;
             }
@@ -1274,7 +1278,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 for (PBDSegment<M> segment : m_segments.values()) {
                     PBDSegmentReader<M> reader = segment.getReader(cursor.m_cursorId);
                     if (reader == null) {
-                        numObjects += segment.getNumEntries();
+                        if (cursor.m_segment == null || segment.segmentIndex() >= cursor.m_segment.m_index) { // cursor has not passed this segment
+                            numObjects += segment.getNumEntries();
+                        }
                     } else {
                         numObjects += segment.getNumEntries() - reader.readIndex();
                     }

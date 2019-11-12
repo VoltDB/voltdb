@@ -88,16 +88,9 @@ interface PBDSegmentReader<M> {
     public void reopen() throws IOException;
 
     /**
-     * Close this reader and release any resources. {@link PBDSegment#getReader(String)} will still return this reader
-     * until the segment is closed.
+     * Close this reader and release any resources.
      */
     public void close() throws IOException;
-
-    /**
-     * Close this reader and release any resources. Different between this and {@link #close()} is that
-     * this keeps track of the closed reader. This call is used only internally when a reader is polling through segments.
-     */
-    public void closeAndSaveReaderState() throws IOException;
 
     /**
      * Has this reader been closed.
