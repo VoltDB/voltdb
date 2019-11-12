@@ -22,14 +22,32 @@ public class BinaryPayloadMessage extends VoltMessage {
 
     public byte m_payload[];
     public byte m_metadata[];
+    private int m_startPos;
+    private int m_length;
 
     public BinaryPayloadMessage() {}
     public BinaryPayloadMessage( byte metadata[], byte payload[]) {
-        m_payload = payload;
-        m_metadata = metadata;
         if (metadata == null || metadata.length > Short.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
+        m_payload = payload;
+        m_metadata = metadata;
+        m_startPos = 0;
+        m_length = m_payload.length;
+    }
+
+    // Zero copy constructor to encapsulate part of input data into payload
+    public BinaryPayloadMessage( byte metadata[], byte payload[], int startPos, int length) {
+        if (metadata == null || metadata.length > Short.MAX_VALUE) {
+            throw new IllegalArgumentException();
+        }
+        if (payload != null && length > m_payload.length) {
+            throw new IllegalArgumentException();
+        }
+        m_payload = payload;
+        m_metadata = metadata;
+        m_startPos = startPos;
+        m_length = length;
     }
 
     @Override
@@ -48,7 +66,7 @@ public class BinaryPayloadMessage extends VoltMessage {
     public int getSerializedSize() {
         int msgsize = m_metadata.length + 6 + super.getSerializedSize();
         if (m_payload != null) {
-            msgsize += m_payload.length;
+            msgsize += m_length;
         }
         return msgsize;
     }
@@ -61,8 +79,8 @@ public class BinaryPayloadMessage extends VoltMessage {
         if (m_payload == null) {
             buf.putInt(-1);
         } else {
-            buf.putInt(m_payload.length);
-            buf.put(m_payload);
+            buf.putInt(m_length);
+            buf.put(m_payload, m_startPos, m_length);
         }
 
         assert(buf.capacity() == buf.position());
