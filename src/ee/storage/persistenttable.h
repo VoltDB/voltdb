@@ -174,7 +174,7 @@ private:
     /**
      * Set to true after handleStreamMore() was called once after building the index.
      */
-    bool m_indexingComplete;
+    bool m_indexingComplete = false;
 };
 
 /**
@@ -268,8 +268,7 @@ public:
 
     void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
 
-    void swapTable
-           (PersistentTable* otherTable,
+    void swapTable(PersistentTable* otherTable,
             std::vector<std::string> const& theIndexes,
             std::vector<std::string> const& otherIndexes,
             bool fallible = true,
@@ -885,13 +884,7 @@ private:
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
-    m_table(table),
-    m_indexingComplete(false)
-{ }
-
-inline TBMap& PersistentTableSurgeon::getData() const {
-    return m_table.m_data;
-}
+    m_table(table) {}
 
 inline TBMap& PersistentTableSurgeon::getData() const {
     return m_table.m_data;
