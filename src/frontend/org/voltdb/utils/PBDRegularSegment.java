@@ -56,7 +56,6 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final Random RANDOM = new Random();
 
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
-    private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
     private final VoltLogger m_usageSpecificLog;
 
     private boolean m_closed = true;
@@ -129,7 +128,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     SegmentReader openForRead(String cursorId) throws IOException
     {
         Preconditions.checkNotNull(cursorId, "Reader id must be non-null");
-        if (m_readCursors.containsKey(cursorId) || m_closedCursors.containsKey(cursorId)) {
+        if (m_readCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }
 
@@ -143,8 +142,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     @Override
     PBDSegmentReader<M> getReader(String cursorId) {
-        PBDSegmentReader<M> reader = m_closedCursors.get(cursorId);
-        return (reader == null) ? m_readCursors.get(cursorId) : reader;
+        return m_readCursors.get(cursorId);
     }
 
     @Override
@@ -342,7 +340,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         // Zero entry count means the segment is empty or corrupted, in both cases
         // the segment can be deleted.
         if (initialEntryCount == 0) {
-            reader.close(false);
+            reader.close();
             close();
             return Integer.MAX_VALUE;
         }
@@ -402,7 +400,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
         int entriesScanned = reader.readIndex();
-        reader.close(false);
+        reader.close();
 
         if (entriesTruncated == 0) {
             int entriesNotScanned = initialEntryCount - entriesScanned;
@@ -590,7 +588,6 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         if (m_usageSpecificLog.isDebugEnabled()) {
             m_usageSpecificLog.debug("Close PBD Segment " + m_file.getName());
         }
-        m_closedCursors.clear();
         closeReadersAndFile();
     }
 
@@ -1088,20 +1085,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         @Override
         public void close() throws IOException {
-            close(false);
-        }
-
-        @Override
-        public void closeAndSaveReaderState() throws IOException {
-            close(true);
-        }
-
-        private void close(boolean keep) throws IOException {
             m_readerClosed = true;
             m_readCursors.remove(m_cursorId);
-            if (keep) {
-                m_closedCursors.put(m_cursorId, this);
-            }
             if (m_readCursors.isEmpty() && !m_isActive) {
                 closeReadersAndFile();
             }
@@ -1119,7 +1104,6 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_readerClosed = false;
             }
             if (m_cursorId != null) {
-                m_closedCursors.remove(m_cursorId);
                 m_readCursors.put(m_cursorId, this);
             }
         }
