@@ -595,14 +595,19 @@ public class AsyncExportClient
 
     private static void log_migrating_counts(String table) {
         try {
-            VoltTable[] results = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING").getResults();
+            VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING; " +
+                                                                "SELECT COUNT(*) FROM " + table
+                                                                ).getResults();
             long migrating = results[0].asScalarLong();
             long not_migrating = results[1].asScalarLong();
+            long total = results[2].asScalarLong();
 
             log.info("row counts for " + table +
-                     ": migrating: " + migrating +
-                     ", not migrating: " + not_migrating +
-                     ", total: " + (migrating + not_migrating));
+                     ": total: " + total +
+                     ", migrating: " + migrating +
+                     ", not migrating: " + not_migrating);
         }
         catch (Exception e) {
             // log it and otherwise ignore it.  it's not fatal to fail if the
@@ -614,13 +619,23 @@ public class AsyncExportClient
 
     private static void trigger_migrate(int time_window) {
         try {
-            long result = 0;
+            VoltTable[] results;
             if (config.procedure.equals("JiggleExportGroupSinglePartition")) {
-                result = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults()[0].asScalarLong();
-                log.info("Partitioned Migrate - window: " + time_window + ", count: " + result);
+                results = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults();
+                log.info("Partitioned Migrate - window: " + time_window + " seconds" +
+                         ", kafka: " + results[0].asScalarLong() +
+                         ", rabbit: " + results[1].asScalarLong() +
+                         ", file: " + results[2].asScalarLong() +
+                         ", jdbc: " + results[3].asScalarLong()
+                         );
             } else {
-                result = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults()[0].asScalarLong();
-                log.info("Replicated Migrate - window: " + time_window + ", count: " + result);
+                results = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults();
+                log.info("Replicated Migrate - window: " + time_window + " seconds" +
+                         ", kafka: " + results[0].asScalarLong() +
+                         ", rabbit: " + results[1].asScalarLong() +
+                         ", file: " + results[2].asScalarLong() +
+                         ", jdbc: " + results[3].asScalarLong()
+                         );
             }
         }
         catch (Exception e) {
