@@ -27,15 +27,17 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
@@ -60,6 +62,10 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     static String expectHashDetectionMessage = "Hash mismatch is detected";
 
     LocalCluster createCluster(String method) {
+        return createCluster(method, kfactor, hostCount, sitesPerHost);
+    }
+
+    LocalCluster createCluster(String method, int k, int hostcount, int sph) {
         LocalCluster server = null;
         try {
             VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -68,7 +74,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             builder.addProcedure(NonDeterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(Deterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(NonDeterministic_RO_MP.class);
-            server = new LocalCluster("det1.jar", sitesPerHost, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
+            server = new LocalCluster("det1.jar", sph, hostcount, k, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
             server.setCallingClassName(method);
             assertTrue("Catalog compilation failed", server.compile(builder));
@@ -123,9 +129,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MISMATCH_INSERTION);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                ClientResponse response = client.callProcedure("@StopReplicas");
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                Thread.sleep(5000);
+                verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(1000, 1100);
             } else {
@@ -194,9 +198,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                 NonDeterministicSPProc.MISMATCH_WHITESPACE_IN_SQL);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                ClientResponse response = client.callProcedure("@StopReplicas");
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                Thread.sleep(5000);
+                verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -236,9 +238,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MULTI_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                ClientResponse response = client.callProcedure("@StopReplicas");
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                Thread.sleep(5000);
+                verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -278,9 +278,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.PARTIAL_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                ClientResponse response = client.callProcedure("@StopReplicas");
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                Thread.sleep(5000);
+                verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -310,9 +308,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.TXN_ABORT);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                ClientResponse response = client.callProcedure("@StopReplicas");
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                Thread.sleep(5000);
+                verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -330,9 +326,79 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
+    //@Test
+    public void testOnLargeCluster() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster("testOnLargeCluster", 2, 3, 18);
+        VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+        System.out.println(vt.toFormattedString());
+        try {
+            for (int i = 5000; i < 5100; i++) {
+            client.callProcedure(
+                    "NonDeterministicSPProc",
+                    i,
+                    i,
+                    NonDeterministicSPProc.MISMATCH_INSERTION);
+            }
+            if (MiscUtils.isPro()) {
+                verifyTopologyAfterHashMismatch(server);
+                System.out.println("Stopped replicas.");
+                insertMoreNormalData(10001, 10100);
+            } else {
+                fail("testOnLargeCluster failed");
+            }
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("Connection to database") ||
+                    e.getMessage().contains("Crash deliberately"));
+            // make sure every host witnessed the hash mismatch
+            if (!MiscUtils.isPro()) {
+                assertTrue(server.verifyLogMessage(expectedLogMessage));
+            }
+        } finally {
+            shutDown(server);
+        }
+    }
+
     private void insertMoreNormalData(int start, int end) throws NoConnectionsException, IOException, ProcCallException {
         for (int i = start; i < end; i++) {
             client.callProcedure("NonDeterministicSPProc", i, i, NonDeterministicSPProc.NO_PROBLEM);
         }
+    }
+
+    private void verifyTopologyAfterHashMismatch(LocalCluster server) {
+        //allow time to get the stats
+        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+        boolean done = false;
+        long start = System.currentTimeMillis();
+        while (!done) {
+            boolean inprogress = false;
+            try {
+                VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+                System.out.println(vt.toFormattedString());
+                vt.resetRowPosition();
+                while (vt.advanceRow()) {
+                    long pid = vt.getLong(0);
+                    if (pid != MpInitiator.MP_INIT_PID) {
+                        String replicasStr = vt.getString(1);
+                        String[] replicas = replicasStr.split(",");
+                        if (replicas.length != 1) {
+                            inprogress = true;
+                            break;
+                        }
+                    }
+                }
+                if (inprogress) {
+                    if (maxSleep < (System.currentTimeMillis() - start)) {
+                        break;
+                    }
+                    try { Thread.sleep(1000); } catch (Exception ignored) { }
+                } else {
+                    done = true;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        assert(done);
     }
 }
