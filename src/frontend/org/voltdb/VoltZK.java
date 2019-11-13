@@ -532,7 +532,7 @@ public class VoltZK {
                 break;
             case mpRepairInProgress:
                 break;
-            case stopReplicas:
+            case stopReplicasInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry stop replicas operation later.";
                 }

@@ -2432,70 +2432,63 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     void processReplicaRemovalTask() {
-        Future<Boolean> result;
         synchronized(m_lock) {
-            // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
-            if (!VoltZK.hasHashMismatchedSite(m_zk)) {
-                return;
-            }
-
             if (m_replicaRemovalExecutor == null) {
                 m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
                         CoreUtils.getThreadFactory("ReplicaRemoval"));
             }
-            result = m_replicaRemovalExecutor.submit(() -> {
-                try {
-                    String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.stopReplicasInProgress,
-                            CreateMode.EPHEMERAL, tmLog, "remove replicas");
-                    if (errorMessage != null) {
-                        tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
-                        return false;
-                    }
-                    SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
-                    final String procedureName = "@StopReplicas";
-                    Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-                    StoredProcedureInvocation spi = new StoredProcedureInvocation();
-                    spi.setProcName(procedureName);
-                    spi.setClientHandle(getExecuteTaskAdpater().registerCallback(cb));
-                    if (spi.getSerializedParams() == null) {
-                        spi = MiscUtils.roundTripForCL(spi);
-                    }
-                    synchronized (getExecuteTaskAdpater()) {
-                        if (createTransaction(getExecuteTaskAdpater().connectionId(),
-                                spi,
-                                procedureConfig.getReadonly(),
-                                procedureConfig.getSinglepartition(),
-                                procedureConfig.getEverysite(),
-                                MpInitiator.MP_INIT_PID,
-                                spi.getSerializedSize(),
-                                System.nanoTime()) != CreateTransactionResult.SUCCESS) {
-                            tmLog.warn("Failed to start transaction for @StopReplicas");
-                            return false;
-                        }
-                    }
-                    final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
-                    ClientResponse resp = cb.getResponse(timeoutMS);
-                    return(resp.getStatus() == ClientResponse.SUCCESS);
-                } catch (Exception e) {
-                    tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
-                } finally {
-                    VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
+            m_replicaRemovalExecutor.submit(() -> {
+                if(!startRemoveReplicas()) {
+                    // TODO: properly reschedule the work
+                    m_mailbox.deliver(new HashMismatchMessage());
                 }
-                return false;}
-            );
+            });
         }
-        try {
-            if (result != null && result.get()) {
-                return;
-            }
-        } catch (InterruptedException | ExecutionException e) {
-            tmLog.warn(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
-        }
-        // For any reason if the transaction fails, reschedule the task.
-        processReplicaRemovalTask();
     }
 
-    public SimpleClientResponseAdapter getExecuteTaskAdpater() {
-        return m_executeTaskAdpater;
+    private boolean startRemoveReplicas() {
+        try {
+            // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
+            if (!VoltZK.hasHashMismatchedSite(m_zk)) {
+                return true;
+            }
+            String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.stopReplicasInProgress,
+                    CreateMode.EPHEMERAL, tmLog, "remove replicas");
+            if (errorMessage != null) {
+                tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+                return false;
+            }
+            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+            final String procedureName = "@StopReplicas";
+            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(procedureName);
+            spi.setParams();
+            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            if (spi.getSerializedParams() == null) {
+                spi = MiscUtils.roundTripForCL(spi);
+            }
+            synchronized (m_executeTaskAdpater) {
+                if (createTransaction(m_executeTaskAdpater.connectionId(),
+                        spi,
+                        procedureConfig.getReadonly(),
+                        procedureConfig.getSinglepartition(),
+                        procedureConfig.getEverysite(),
+                        MpInitiator.MP_INIT_PID,
+                        spi.getSerializedSize(),
+                        System.nanoTime()) != CreateTransactionResult.SUCCESS) {
+                    tmLog.warn("Failed to start transaction for @StopReplicas");
+                    return false;
+                }
+            }
+            final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
+            ClientResponse resp = cb.getResponse(timeoutMS);
+            return(resp.getStatus() == ClientResponse.SUCCESS);
+        } catch (Exception e) {
+            tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
+        } finally {
+            VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
+        }
+        return false;
     }
 }
