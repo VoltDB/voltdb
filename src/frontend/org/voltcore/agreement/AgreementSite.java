@@ -77,11 +77,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private static final byte BINARY_PAYLOAD_SNAPSHOT = 0;
     private static final byte BINARY_PAYLOAD_JOIN_REQUEST = 1;
 
-    // Meta data of zk snapshot message, 0 stands for more payloads to come,
-    // 1 stands for the last payload.
-    private static final byte BINARY_PAYLOAD_SNAPSHOT_MORE = 0;
-    private static final byte BINARY_PAYLOAD_SNAPSHOT_FIN = 1;
-
     private static enum RecoveryStage {
         WAITING_FOR_SAFETY,
         SENT_PROPOSAL,
@@ -111,15 +106,55 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private static final VoltLogger m_agreementLog = new VoltLogger("AGREEMENT");
     private long m_minTxnIdAfterRecovery = Long.MIN_VALUE;
     private final CountDownLatch m_shutdownComplete = new CountDownLatch(1);
-    private byte m_recoverySnapshotParts[][] = null;
+    private Map<Long, ZkSnapshot> m_zkSnapshotByTxnId = new HashMap<>();
     private byte m_recoverySnapshot[] = null;
-    private int m_recoverySnapshotIndex = 0;
     private Long m_recoverBeforeTxn = null;
     private Long m_siteRequestingRecovery = null;
     private final DisconnectFailedHostsCallback m_failedHostsCallback;
     private final MeshArbiter m_meshArbiter;
+
     // Max payload length, leave 1k as meta data headspace.
     public static final int MAX_PAYLOAD_MESSAGE_LENGTH = VoltPort.MAX_MESSAGE_LENGTH - 1024;
+
+    private static class ZkSnapshot {
+        private byte m_zkSnapshotFrags[][];
+        private int m_total = 0;
+        private int m_count = 0;
+        private int m_compressedSize = 0;
+
+        public ZkSnapshot(int totalFragments) {
+            m_total = totalFragments;
+            m_zkSnapshotFrags = new byte[totalFragments][];
+        }
+
+        public void addFragment(byte[] fragment, int fragmentIndex) {
+            m_zkSnapshotFrags[fragmentIndex] = fragment;
+            m_compressedSize += fragment.length;
+            m_count++;
+        }
+
+        public boolean isCompleted() {
+            return m_count == m_total;
+        }
+
+        public byte[] assemble() {
+            // some special cases
+            if (m_compressedSize == 0) {
+                return null;
+            }
+            if (m_total == 1) {
+                return m_zkSnapshotFrags[0];
+            }
+            // copy fragments into one big compressed snapshot
+            byte[] compressedBytes = new byte[m_compressedSize];
+            int destPos = 0;
+            for (int i = 0; i < m_total; i++) {
+                System.arraycopy(m_zkSnapshotFrags[i], 0, compressedBytes, destPos, m_zkSnapshotFrags[i].length);
+                destPos += m_zkSnapshotFrags[i].length;
+            }
+            return compressedBytes;
+        }
+    }
 
 
     public AgreementSite(
@@ -508,38 +543,41 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Received a recovery snapshot in stage " + m_recoveryStage.toString(), true, null);
                 }
-                final boolean lastPayload = metadata.get() == BINARY_PAYLOAD_SNAPSHOT_FIN ? true : false;
+                final int payloadIndex = metadata.getInt();
+                final int totalPayloads = metadata.getInt();
                 long selectedRecoverBeforeTxn = metadata.getLong();
                 if (selectedRecoverBeforeTxn < m_recoverBeforeTxn) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Selected recover before txn was earlier than the  proposed recover before txn", true, null);
                 }
                 m_recoverBeforeTxn = selectedRecoverBeforeTxn;
-                m_minTxnIdAfterRecovery = m_recoverBeforeTxn;//anything before this precedes the snapshot
+                // Anything before this precedes the snapshot
+                m_minTxnIdAfterRecovery = m_recoverBeforeTxn;
+                // Though map is used here I only expect at most one entry in the map.
+                // Because zk snapshot is one at a time.
+                // If I am proved to be wrong, I may need to revisit the whole path. -ylu
+                assert(m_zkSnapshotByTxnId.size() <= 1);
+                ZkSnapshot snapshot = m_zkSnapshotByTxnId.get(selectedRecoverBeforeTxn);
+                if (snapshot == null) {
+                    snapshot = new ZkSnapshot(totalPayloads);
+                    m_zkSnapshotByTxnId.put(selectedRecoverBeforeTxn, snapshot);
+                }
+                snapshot.addFragment(bpm.m_payload, payloadIndex);
+
+                if (!snapshot.isCompleted()) {
+                    return;
+                }
+                // Copy all parts into one big array
+                byte[] compressedRecoverySnapshot = snapshot.assemble();
+                // snapshot data transfer to m_recoverySnapshot, no longer need this
+                snapshot = null;
+                m_zkSnapshotByTxnId.clear();
                 try {
-                    byte[] uncompressedPayload = org.xerial.snappy.Snappy.uncompress(bpm.m_payload);
-                    m_recoverySnapshotParts[m_recoverySnapshotIndex] = uncompressedPayload;
+                    m_recoverySnapshot = org.xerial.snappy.Snappy.uncompress(compressedRecoverySnapshot);
                 } catch (IOException e) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unable to decompress ZK snapshot", true, e);
                 }
-                if (lastPayload) {
-                    int snapshotLength = 0;
-                    for (int i = 0; i < m_recoverySnapshotIndex; i++) {
-                        snapshotLength += m_recoverySnapshotParts[i].length;
-                    }
-                    m_recoverySnapshot = new byte[snapshotLength];
-                    int destPos = 0;
-                    for (int i = 0; i < m_recoverySnapshotIndex; i++) {
-                        System.arraycopy(m_recoverySnapshotParts[i], 0, m_recoverySnapshot, destPos, m_recoverySnapshotParts[i].length);
-                        destPos += m_recoverySnapshotParts[i].length;
-                        m_recoverySnapshotParts[i] = null;
-                    }
-                    m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
-                    m_recoverySnapshotIndex = 0;
-                } else {
-                    m_recoverySnapshotIndex++;
-                    return;
-                }
+                m_recoveryStage = RecoveryStage.RECEIVED_SNAPSHOT;
 
                 /*
                  * Clean out all txns from before the snapshot
@@ -620,26 +658,27 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_server.getZKDatabase().serializeSnapshot(boa);
         dos.flush();
         byte databaseBytes[] = org.xerial.snappy.Snappy.compress(baos.toByteArray());
+
         int startPos = 0;
+        int snapshotFragmentIndex = 0;
+        int remaining;
         // if payload is larger than max payload size, send it by chunks
-        while (databaseBytes.length - startPos > MAX_PAYLOAD_MESSAGE_LENGTH) {
-            ByteBuffer metadata = ByteBuffer.allocate(10);
+        while ((remaining = databaseBytes.length - startPos) > 0) {
+            ByteBuffer metadata = ByteBuffer.allocate(17);
             metadata.put(BINARY_PAYLOAD_SNAPSHOT);
-            metadata.put(BINARY_PAYLOAD_SNAPSHOT_MORE);
+            metadata.putInt(snapshotFragmentIndex++);
+            metadata.putInt(databaseBytes.length / MAX_PAYLOAD_MESSAGE_LENGTH + 1);
             metadata.putLong(txnId);
             BinaryPayloadMessage bpm =
-                    new BinaryPayloadMessage( metadata.array(), databaseBytes, startPos, MAX_PAYLOAD_MESSAGE_LENGTH);
+                    new BinaryPayloadMessage( metadata.array(), databaseBytes, startPos,
+                            Math.min(remaining, MAX_PAYLOAD_MESSAGE_LENGTH));
             m_mailbox.send( joiningAgreementSite, bpm);
-            startPos += MAX_PAYLOAD_MESSAGE_LENGTH;
+            if (remaining > MAX_PAYLOAD_MESSAGE_LENGTH) {
+                startPos += MAX_PAYLOAD_MESSAGE_LENGTH;
+            } else {
+                startPos += remaining;
+            }
         }
-        // Send last chunk
-        ByteBuffer metadata = ByteBuffer.allocate(9);
-        metadata.put(BINARY_PAYLOAD_SNAPSHOT);
-        metadata.put(BINARY_PAYLOAD_SNAPSHOT_FIN); // Set flag for last payload
-        metadata.putLong(txnId);
-        BinaryPayloadMessage bpm =
-                new BinaryPayloadMessage( metadata.array(), databaseBytes, startPos, databaseBytes.length - startPos);
-        m_mailbox.send( joiningAgreementSite, bpm);
         m_siteRequestingRecovery = null;
         m_recoverBeforeTxn = null;
     }
