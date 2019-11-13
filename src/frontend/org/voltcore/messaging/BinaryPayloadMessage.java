@@ -41,7 +41,7 @@ public class BinaryPayloadMessage extends VoltMessage {
         if (metadata == null || metadata.length > Short.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
-        if (payload != null && length > m_payload.length) {
+        if (payload != null && length > payload.length) {
             throw new IllegalArgumentException();
         }
         m_payload = payload;
