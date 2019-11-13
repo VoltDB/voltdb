@@ -34,9 +34,9 @@ import java.util.Collection;
  *
  * <pre>
  * public void initialize(int interval, String timeUnit)
- * public void initialize(SchedulerHelper helper, int interval, String timeUnit)
+ * public void initialize(TaskHelper helper, int interval, String timeUnit)
  * public void initialize(int interval, String timeUnit, String procedureName, Object... procedureParameters)
- * public void initialize(SchedulerHelper helper, int interval, String timeUnit, String procedureName, Object... procedureParameters)
+ * public void initialize(TaskHelper helper, int interval, String timeUnit, String procedureName, Object... procedureParameters)
  * </pre>
  * <p>
  * Optionally an implementation can implement a {@code validateParameters} method which will be invoked during the DDL
@@ -46,9 +46,9 @@ import java.util.Collection;
  */
 public interface Initializable {
     /**
-     * If this method is implemented then the scheduler will only be restarted when it or any classes marked as a
-     * dependency are modified. However if this method is not implemented then the Scheduler instance will be restarted
-     * any time any class is modified.
+     * If this method is implemented then the task will only be restarted when it or any classes marked as a dependency
+     * are modified. However if this method is not implemented then the task instance will be restarted any time any
+     * class is modified.
      * <p>
      * Default return is {@code null}
      *
