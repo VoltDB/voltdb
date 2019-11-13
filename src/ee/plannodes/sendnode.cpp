@@ -51,7 +51,7 @@ namespace voltdb {
 
 SendPlanNode::~SendPlanNode() { }
 
-PlanNodeType SendPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SEND; }
+PlanNodeType SendPlanNode::getPlanNodeType() const { return PlanNodeType::Send; }
 
 std::string SendPlanNode::debugInfo(const std::string &spacer) const
 {

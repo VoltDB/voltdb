@@ -23,7 +23,7 @@ namespace voltdb {
 
 TableCountPlanNode::~TableCountPlanNode() { }
 
-PlanNodeType TableCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_TABLECOUNT; }
+PlanNodeType TableCountPlanNode::getPlanNodeType() const { return PlanNodeType::TableCount; }
 
 std::string TableCountPlanNode::debugInfo(const std::string &spacer) const
 {

@@ -23,7 +23,7 @@
 namespace voltdb {
 
 PlanNodeType IndexCountPlanNode::getPlanNodeType() const {
-    return PLAN_NODE_TYPE_INDEXCOUNT;
+    return PlanNodeType::IndexCount;
 }
 
 IndexCountPlanNode::~IndexCountPlanNode() { }

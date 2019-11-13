@@ -51,7 +51,7 @@ namespace voltdb {
 IndexScanPlanNode::~IndexScanPlanNode() { }
 
 PlanNodeType IndexScanPlanNode::getPlanNodeType() const {
-    return PLAN_NODE_TYPE_INDEXSCAN;
+    return PlanNodeType::IndexScan;
 }
 
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {

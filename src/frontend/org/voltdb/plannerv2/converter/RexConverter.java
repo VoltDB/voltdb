@@ -43,6 +43,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.IntervalSqlType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlUserDefinedFunction;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
@@ -395,11 +396,15 @@ public class RexConverter {
 
         final private RexProgram m_outerProgram;
         final private RexProgram m_innerProgram;
-        JoinRefExpressionConvertingVisitor(int numOuterFieldsForJoin, RexProgram outerProgram,
-                 RexProgram innerProgram) {
+        final private RelDataType m_joinRowType;
+        JoinRefExpressionConvertingVisitor(int numOuterFieldsForJoin,
+                RexProgram outerProgram,
+                RexProgram innerProgram,
+                RelDataType joinRowType) {
             super(numOuterFieldsForJoin);
             m_outerProgram = outerProgram;
             m_innerProgram = innerProgram;
+            m_joinRowType = joinRowType;
         }
 
         @Override
@@ -426,9 +431,22 @@ public class RexConverter {
                         tve -> tve.setTableIndex(tableIdx));
                 Preconditions.checkNotNull(ae);
                 return ae;
-            } else {
-                return super.visitInputRef(inputRef);
+            } else if (m_joinRowType != null){
+                Preconditions.checkArgument(inputRef.getIndex() < m_joinRowType.getFieldCount());
+                RelDataTypeField inputField = m_joinRowType.getFieldList().get(inputRef.getIndex());
+                if (SqlTypeName.BOOLEAN == inputField.getType().getSqlTypeName()) {
+                    // Since VoltDB does not support BOOLEAN column type, RexConverter.convertToVoltDBNodeSchema
+                    // replaces all boolean fields with TINYINT "1" or "0"
+                    // To recover the original boolean value the Comparison expression VALUE == 1 needs to be constructed
+                    AbstractExpression tve = super.visitInputRef(inputRef);
+                    tve.setValueType(VoltType.TINYINT);
+                    AbstractExpression one = ConstantValueExpression.makeExpression(VoltType.TINYINT, "1");
+                    AbstractExpression compare = new ComparisonExpression(ExpressionType.COMPARE_EQUAL, tve, one);
+                    return compare;
+                }
             }
+            // Default -TVE
+            return super.visitInputRef(inputRef);
         }
     }
 
@@ -640,18 +658,22 @@ public class RexConverter {
         return ae;
     }
 
-    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond) {
-        return convertJoinPred(numOuterFields, cond, null, null);
-    }
-
-    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond, RexProgram innerProgram) {
-        return convertJoinPred(numOuterFields, cond, null, innerProgram);
+    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond, RelDataType joinRowType) {
+        return convertJoinPred(numOuterFields, cond, null, null, joinRowType);
     }
 
     public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond, RexProgram outerProgram, RexProgram innerProgram) {
+        return convertJoinPred(numOuterFields, cond, outerProgram, innerProgram, null);
+    }
+
+    public static AbstractExpression convertJoinPred(int numOuterFields,
+            RexNode cond,
+            RexProgram outerProgram,
+            RexProgram innerProgram,
+            RelDataType joinRowType) {
         if (cond != null) {
             final AbstractExpression expr = cond.accept(
-                    new JoinRefExpressionConvertingVisitor(numOuterFields, outerProgram, innerProgram));
+                    new JoinRefExpressionConvertingVisitor(numOuterFields, outerProgram, innerProgram, joinRowType));
             Preconditions.checkNotNull(expr, "RexNode converted to null expression");
             return expr;
         } else {
@@ -669,7 +691,14 @@ public class RexConverter {
             TupleValueExpression tve = new TupleValueExpression("", "", "",
                     names.get(i), i, i);
             tve.setTableIndex(tableIdx);
-            RexConverter.setType(tve, item.getType());
+            if (SqlTypeName.BOOLEAN == item.getType().getSqlTypeName()) {
+                // VoltDB does not support BOOLEAN column type. This field must be created by Calcite
+                // to propagate BOOLEAN expression value from a scan node up to a parent (join, for example)
+                // During the conversion, all BOOLEAN fields are converted to TINYINT (TRUE => 1, FALSE => 0)
+                tve.setValueType(VoltType.TINYINT);
+            } else {
+                RexConverter.setType(tve, item.getType());
+            }
             nodeSchema.addColumn(new SchemaColumn("", "", "", names.get(i), tve, i));
             ++i;
         }
@@ -680,9 +709,29 @@ public class RexConverter {
         final NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
         for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
-            final AbstractExpression ae = program.expandLocalRef(item.left).accept(ConvertingVisitor.INSTANCE);
+            AbstractExpression ae = program.expandLocalRef(item.left).accept(ConvertingVisitor.INSTANCE);
             ae.findAllTupleValueSubexpressions().stream().forEach(
                     tve -> tve.setTableIndex(tableIdx));
+            if (ae instanceof ComparisonExpression) {
+                // VoltDB does not support BOOLEAN column type
+                // Replace TRUE => 1, FALSE => 0 replacing the ComparisonExpression
+                // with the CASE WHEN ae THEN 1 ELSE 0 END
+                AbstractExpression one = ConstantValueExpression.makeExpression(VoltType.TINYINT, "1");
+                AbstractExpression zero = ConstantValueExpression.makeExpression(VoltType.TINYINT, "0");
+                AbstractExpression alternative = new OperatorExpression(
+                        ExpressionType.OPERATOR_ALTERNATIVE,
+                        one,
+                        zero
+                        );
+                alternative.setValueType(VoltType.TINYINT);
+                setType(alternative, VoltType.TINYINT, PRECISION_NOT_SPECIFIED);
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_CASE_WHEN,
+                        ae,
+                        alternative
+                        );
+                setType(ae, VoltType.TINYINT, PRECISION_NOT_SPECIFIED);
+            }
             Preconditions.checkNotNull(ae);
             newNodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
             ++i;

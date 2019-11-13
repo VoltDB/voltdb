@@ -653,6 +653,8 @@ public class ExportToFileClient extends ExportClientBase {
                     throw new RestartBlockException("Fail to start the block", e.getCause(),true);
                 }
                 else {
+                    // Make sure to unlock
+                    m_batchLock.readLock().unlock();
                     throw new RuntimeException(e);
                 }
             }

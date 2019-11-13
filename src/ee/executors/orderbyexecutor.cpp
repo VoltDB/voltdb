@@ -77,10 +77,10 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         // pickup an inlined limit, if one exists
         limit_node =
             dynamic_cast<LimitPlanNode*>(node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+                                     getInlinePlanNode(PlanNodeType::Limit));
     } else {
         vassert(node->getChildren().empty());
-        vassert(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) == NULL);
+        vassert(node->getInlinePlanNode(PlanNodeType::Limit) == NULL);
     }
 
 #if defined(VOLT_LOG_LEVEL)

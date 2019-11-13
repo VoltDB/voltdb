@@ -239,7 +239,7 @@ std::unordered_map<TableTuple, AggregateRow*, TableTupleHasher, TableTupleEquali
 
 
 /**
- * The concrete executor class for PLAN_NODE_TYPE_HASHAGGREGATE
+ * The concrete executor class for PlanNodeType::HashAggregate
  * in which the input does not need to be sorted and execution will hash the group by key to aggregate the tuples.
  */
 class AggregateHashExecutor : public AggregateExecutorBase {
@@ -260,7 +260,7 @@ public:
 };
 
 /**
- * The concrete executor class for PLAN_NODE_TYPE_AGGREGATE
+ * The concrete executor class for PlanNodeType::Aggregate
  * a constant space aggregation that expects the input table to be sorted on the group by key
  * at least to the extent that rows with equal keys arrive sequentially (not interspersed with other key values).
  */
@@ -308,15 +308,15 @@ public:
 inline AggregateExecutorBase* getInlineAggregateExecutor(const AbstractPlanNode* node) {
     AbstractPlanNode* aggNode = nullptr;
     AggregateExecutorBase* aggExec = nullptr;
-    if (nullptr != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_PARTIALAGGREGATE)) ) {
+    if (nullptr != (aggNode = node->getInlinePlanNode(PlanNodeType::PartialAggregate)) ) {
         VOLT_TRACE("init inline partial aggregation stuff...");
         aggExec = dynamic_cast<AggregatePartialExecutor*>(aggNode->getExecutor());
         vassert(aggExec != nullptr);
-    } else if (nullptr != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE)) ) {
+    } else if (nullptr != (aggNode = node->getInlinePlanNode(PlanNodeType::Aggregate)) ) {
         VOLT_TRACE("init inline serial aggregation stuff...");
         aggExec = dynamic_cast<AggregateSerialExecutor*>(aggNode->getExecutor());
         vassert(aggExec != nullptr);
-    } else if (nullptr != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE)) ) {
+    } else if (nullptr != (aggNode = node->getInlinePlanNode(PlanNodeType::HashAggregate)) ) {
         VOLT_TRACE("init inline hash aggregation stuff...");
         aggExec = dynamic_cast<AggregateHashExecutor*>(aggNode->getExecutor());
         vassert(aggExec != nullptr);

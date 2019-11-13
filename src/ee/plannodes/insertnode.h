@@ -79,7 +79,7 @@ public:
     bool isMultiRowInsert() const {
         // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
         // Otherwise this may be a multi-row insert via INSERT INTO ... SELECT.
-        return m_children[0]->getPlanNodeType() != PLAN_NODE_TYPE_MATERIALIZE;
+        return m_children[0]->getPlanNodeType() != PlanNodeType::Materialize;
     }
 
     void initTupleWithDefaultValues(VoltDBEngine* engine,

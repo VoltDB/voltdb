@@ -70,7 +70,7 @@ public:
         delete limitExpression;
     }
     PlanNodeType getPlanNodeType() const {
-        return PLAN_NODE_TYPE_LIMIT;
+        return PlanNodeType::Limit;
     }
 
     // evaluate possibly parameterized limit and offsets.

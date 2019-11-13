@@ -510,7 +510,7 @@ TEST_F(ExecutorVectorTest, Large) {
     auto ev = ExecutorVector::fromJsonPlan(engine.get(), jsonPlan, 0);
     BOOST_FOREACH(auto executor, ev->getExecutorList()) {
         auto nodeType = executor->getPlanNode()->getPlanNodeType();
-        if (nodeType == PLAN_NODE_TYPE_SEND) {
+        if (nodeType == PlanNodeType::Send) {
             // send nodes do not have output temp tables
             ASSERT_EQ(NULL, executor->getTempOutputTable());
         }
