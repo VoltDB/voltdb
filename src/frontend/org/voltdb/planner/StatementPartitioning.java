@@ -405,7 +405,7 @@ public class StatementPartitioning implements Cloneable {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
                 CompiledPlan subqueryPlan = subScan.getBestCostPlan();
-                if (! subScan.canRunInOneFragment() ||
+                if (! subScan.canRunInOneFragment() ||  // NOTE: the receive-plan node check applies to multi-fragment only
                         subqueryPlan != null && subqueryPlan.rootPlanGraph.hasAnyNodeOfClass(AbstractReceivePlanNode.class)) {
                     if (subqueryHasReceiveNode) {
                         // Has found another subquery with receive node on the same level

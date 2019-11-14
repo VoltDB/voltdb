@@ -43,8 +43,7 @@ import org.voltdb.types.PlanNodeType;
 public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode, AbstractParsedStmt parsedStmt)
-    {
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode, AbstractParsedStmt parsedStmt) {
         assert(planNode != null);
 
         // This optimization was interfering with some UPSERT ... FROM
@@ -125,7 +124,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         child = onode.getChild(0);
         // The order by node needs a RECEIVE node child
         // for this optimization to work.
-        if ( ! ( child instanceof ReceivePlanNode)) {
+        if (! ( child instanceof ReceivePlanNode)) {
             return plan;
         }
         ReceivePlanNode receiveNode = (ReceivePlanNode)child;
@@ -180,7 +179,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
     AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode) {
         // Find all child RECEIVE nodes. We are not interested in the MERGERECEIVE nodes there
         // because they could only come from subqueries.
-        List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
+        final List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.isEmpty()) {
             return orderbyNode;
         }
@@ -228,13 +227,13 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         }
 
         assert(receive.getChildCount() == 1);
-        AbstractPlanNode partitionRoot = receive.getChild(0);
-        if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
+        final AbstractPlanNode partitionRoot = receive.getChild(0);
+        if (! partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
             // Partition results are not ordered. The MERGE RECEIVE optimization is still possible if
             //  - the coordinator's plan below the ORDER BY node is trivial. At the moment only RECEIVE node is allowed.
             //    A future enhancement may allow PROJECTION/RECEIVE
             //  - Coordinator's ORDER BY node does not have inline LIMIT/OFFSET node. If a plan has an ORDER BY and
-            // LIMIT/OFFSET nodes, PlanAssembeler tries to push both of them to a partition fragment
+            // LIMIT/OFFSET nodes, PlanAssembler tries to push both of them to a partition fragment
             // as LIMIT pushed down optimization during the regular planning phase (PlanAssembler.handleSelectLimitOperator).
             // If it succeeds, the partition's output would be ordered and we wouldn't get there.
             // If we get there and ODER BY node does have inline LIMIT it means that the PlanAssembler
@@ -259,44 +258,48 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 return orderbyNode;
             }
         }
-
-        // At this point we confirmed that the optimization is applicable.
-        // Short circuit the current ORDER BY parent (if such exists) and
-        // the new MERGERECIEVE node.. All in-between nodes will be inlined
-        assert (orderbyNode.getParentCount() <= 1);
-        AbstractPlanNode rootNode = (orderbyNode.getParentCount() == 1) ? orderbyNode.getParent(0) : null;
-        MergeReceivePlanNode mergeReceive = new MergeReceivePlanNode();
-        assert(receive.getChildCount() == 1);
-        mergeReceive.addAndLinkChild(receive.getChild(0));
-        receive.removeFromGraph();
-        if (rootNode == null) {
-            rootNode = mergeReceive;
+        if (orderbyNode.allChild(AbstractPlanNode::hasReplicatedResult)) {
+            // ENG-18533 - don't combine order-by into merge-receive node for any partitioned plan node, since
+            // this would prevent joins of subquery on partitioned table with appropriate join condition, into
+            // falsely thinking that it is cross-partitioned query
+            return orderbyNode;
         } else {
-            rootNode.clearChildren();
-            rootNode.addAndLinkChild(mergeReceive);
-        }
-
-        // Add inline ORDER BY node and remove inline LIMIT node if any
-        mergeReceive.addInlinePlanNode(orderbyNode);
-        if (limitNode != null) {
-            orderbyNode.removeInlinePlanNode(PlanNodeType.LIMIT);
-        }
-
-        // Add inline aggregate
-        if (aggregateNode != null) {
-            if (limitNode != null) {
-                // Inline LIMIT with aggregate
-                aggregateNode.addInlinePlanNode(limitNode);
+            // At this point we confirmed that the optimization is applicable.
+            // Short circuit the current ORDER BY parent (if such exists) and
+            // the new MERGERECIEVE node.. All in-between nodes will be inlined
+            assert (orderbyNode.getParentCount() <= 1);
+            AbstractPlanNode rootNode = orderbyNode.getParentCount() == 1 ? orderbyNode.getParent(0) : null;
+            MergeReceivePlanNode mergeReceive = new MergeReceivePlanNode();
+            assert (receive.getChildCount() == 1);
+            mergeReceive.addAndLinkChild(receive.getChild(0));
+            receive.removeFromGraph();
+            if (rootNode == null) {
+                rootNode = mergeReceive;
+            } else {
+                rootNode.clearChildren();
+                rootNode.addAndLinkChild(mergeReceive);
             }
-            mergeReceive.addInlinePlanNode(aggregateNode);
-        }
-        // Add LIMIT if it is exist and wasn't inline with aggregate node
-        if (limitNode != null && aggregateNode == null) {
-            mergeReceive.addInlinePlanNode(limitNode);
-        }
 
-        // return the new root
-        return rootNode;
+            // Add inline ORDER BY node and remove inline LIMIT node if any
+            mergeReceive.addInlinePlanNode(orderbyNode);
+            if (limitNode != null) {
+                orderbyNode.removeInlinePlanNode(PlanNodeType.LIMIT);
+            }
+            // Add inline aggregate
+            if (aggregateNode != null) {
+                if (limitNode != null) {
+                    // Inline LIMIT with aggregate
+                    aggregateNode.addInlinePlanNode(limitNode);
+                }
+                mergeReceive.addInlinePlanNode(aggregateNode);
+            }
+            // Add LIMIT if it is exist and wasn't inline with aggregate node
+            if (limitNode != null && aggregateNode == null) {
+                mergeReceive.addInlinePlanNode(limitNode);
+            }
+            // return the new root
+            return rootNode;
+        }
     }
 
     /**
@@ -310,14 +313,14 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
      */
     AbstractPlanNode convertToSerialAggregation(AbstractPlanNode aggregateNode, OrderByPlanNode orderbyNode) {
         assert(aggregateNode instanceof HashAggregatePlanNode);
-        HashAggregatePlanNode hashAggr = (HashAggregatePlanNode) aggregateNode;
+        final HashAggregatePlanNode hashAggr = (HashAggregatePlanNode) aggregateNode;
         List<AbstractExpression> groupbys = new ArrayList<>(hashAggr.getGroupByExpressions());
         List<AbstractExpression> orderbys = new ArrayList<>(orderbyNode.getSortExpressions());
         Set<Integer> coveredGroupByColumns = new HashSet<>();
 
-        Iterator<AbstractExpression> orderbyIt = orderbys.iterator();
+        final Iterator<AbstractExpression> orderbyIt = orderbys.iterator();
         while (orderbyIt.hasNext()) {
-            AbstractExpression orderby = orderbyIt.next();
+            final AbstractExpression orderby = orderbyIt.next();
             int idx = 0;
             for (AbstractExpression groupby : groupbys) {
                 if (!coveredGroupByColumns.contains(idx)) {
@@ -333,14 +336,11 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         if (orderbys.isEmpty() && groupbys.size() == coveredGroupByColumns.size()) {
             // All GROUP BY expressions are also ORDER BY - Serial aggregation
             return AggregatePlanNode.convertToSerialAggregatePlanNode(hashAggr);
+        } else if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) { // Partial aggregation
+            return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, new ArrayList<>(coveredGroupByColumns));
+        } else {
+            return aggregateNode;
         }
-        if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
-            // Partial aggregation
-            List<Integer> coveredGroupByColumnList = new ArrayList<>();
-            coveredGroupByColumnList.addAll(coveredGroupByColumns);
-            return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumnList);
-        }
-        return aggregateNode;
     }
 
     private boolean isOptimizationPossible(OrderByPlanNode orderPlanNode) {

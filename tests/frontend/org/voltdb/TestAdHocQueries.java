@@ -374,6 +374,115 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    private static Long[] getNthColumnAsLong(int colIndex, VoltTable tbl) {
+        final int colCount = tbl.getColumnCount();
+        assertTrue("Asking for" + colIndex + "-th column from a " + colCount + "-column table",
+                colCount > colIndex);
+        final int rowCount = tbl.getRowCount();
+        final Long[] result = new Long[rowCount];
+        for(int i = 0; i < rowCount; ++i) {
+            result[i] = tbl.getLong(colIndex);
+            tbl.advanceRow();
+        }
+        return result;
+    }
+
+    @Test
+    public void testENG18533() {        // presence of order-by in 2nd sub-query used to make planner think it's cross-partition
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE RPT_PERF_BREAKDOWN (\n" +
+                        "    CUSTOM2 varchar(30),\n" +
+                        "    CLIENT_ID integer NOT NULL,\n" +
+                        "    IMPRESSIONS integer\n" +
+                        ");\n" +
+                        "PARTITION TABLE RPT_PERF_BREAKDOWN ON COLUMN CLIENT_ID;",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            // populate table
+            Stream.of("INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 0, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 0, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 5);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 1, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 2, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 5);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 3, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 5);\n")
+                    .forEach(query -> {
+                        try {
+                            assertEquals("Insertion \"" + query + "\" Should have worked",
+                                    ClientResponse.SUCCESS,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have inserted a row: \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+            Stream.of(Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown\n" +
+                            "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                            "LEFT OUTER JOIN (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown\n" +
+                            "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                            "    ORDER BY metric) t2\n" +
+                            "ON t1.CLIENT_ID = t2.CLIENT_ID AND t1.CUSTOM2=t2.CUSTOM2\n" +
+                            "ORDER BY t1.IMPRESSIONS;",
+                    new Object[][] {{0}, {1}, {2}, {4}, {9}, {11}, {13}, {14}}),
+                    Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID > 0\n" +
+                                    "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                                    "LEFT OUTER JOIN (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID < 5\n" +
+                                    "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                                    "    ORDER BY metric) t2\n" +
+                                    "ON t1.CLIENT_ID = t2.CLIENT_ID AND t1.CUSTOM2=t2.CUSTOM2\n" +
+                                    "ORDER BY t1.IMPRESSIONS;",
+                            new Object[][] {{0}, {1}, {2}, {9}, {13}, {14}}),
+                    Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                                    "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                                    "LEFT OUTER JOIN (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                                    "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                                    "    ORDER BY metric) t2\n" +
+                                    "ON t1.CUSTOM2=t2.CUSTOM2\n" +
+                                    "ORDER BY t1.IMPRESSIONS;",
+                            new Object[][] {{1}, {9}}))
+                    .forEach(queryAndResult -> {
+                        final String query = queryAndResult.getFirst();
+                        final Object[][] expected = queryAndResult.getSecond();
+                        try {
+                            final ClientResponse response = env.m_client.callProcedure("@AdHoc", query);
+                            assertEquals("Query \"" + query + "\" Should have passed",
+                                    ClientResponse.SUCCESS, response.getStatus());
+                            assertContentOfTable(expected, response.getResults()[0]);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+
     @Test
     public void testENG16982() {
         final TestEnv env = new TestEnv(
@@ -655,9 +764,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // ENG-14210 more than 1025 parameters
             Object[] params = new Object[1201];
             // The first parameter is the query text.
-            params[0] = new StringBuilder("SELECT * FROM BLAH WHERE IVAL IN (")
-                    .append(String.join(",", Collections.nCopies(1200, "?")))
-                    .append(");").toString();
+            params[0] = "SELECT * FROM BLAH WHERE IVAL IN (" +
+                    String.join(",", Collections.nCopies(1200, "?")) +
+                    ");";
             for (int i = 1; i <= 1200; i++) {
                 params[i] = i;
             }
