@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDODELETEACTION_H_
-#define PERSISTENTTABLEUNDODELETEACTION_H_
+#pragma once
 
 #include "common/UndoReleaseAction.h"
 #include "common/types.h"
@@ -26,12 +25,9 @@ namespace voltdb {
 
 
 class PersistentTableUndoDeleteAction: public UndoReleaseAction {
-public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
-        : m_tuple(deletedTuple), m_table(table)
-    {}
+    char *m_tuple;
+    PersistentTableSurgeon *m_table;
 
-private:
     virtual ~PersistentTableUndoDeleteAction() { }
 
     /*
@@ -46,12 +42,10 @@ private:
      * In this case free the strings associated with the tuple.
      */
     virtual void release() { m_table->deleteTupleRelease(m_tuple); }
-
-private:
-    char *m_tuple;
-    PersistentTableSurgeon *m_table;
+public:
+    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
+        : m_tuple(deletedTuple), m_table(table) {}
 };
 
 }
 
-#endif /* PERSISTENTTABLEUNDODELETEACTION_H_ */

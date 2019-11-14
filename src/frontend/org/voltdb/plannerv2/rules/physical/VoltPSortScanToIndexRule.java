@@ -44,9 +44,9 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
 
     public static final VoltPSortScanToIndexRule INSTANCE_SORT_SCAN =
             new VoltPSortScanToIndexRule(operand(VoltPhysicalSort.class,
-                operand(VoltPhysicalTableScan.class, none())), "SortScanToIndexRule");
+                operand(VoltPhysicalTableSequentialScan.class, none())), "SortScanToIndexRule");
 
-    public static final VoltPSortScanToIndexRule INSTANCE_SORT_CALC_SEQSCAN =
+    public static final VoltPSortScanToIndexRule INSTANCE_SORT_CALC_SCAN =
             new VoltPSortScanToIndexRule(operand(VoltPhysicalSort.class,
                     operand(VoltPhysicalCalc.class, operand(VoltPhysicalTableSequentialScan.class, none()))),
                     "SortCalcScanToIndexRule");
@@ -122,7 +122,7 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
                             scan.getTable(), scan.getVoltTable(), scan.getProgram(),
                             index, accessPath, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                             scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                            scan.getSplitCount(), indexCollation);
+                            scan.getSplitCount(), indexCollation, false);
 
                     final RelNode result;
                     if (calc == null) {

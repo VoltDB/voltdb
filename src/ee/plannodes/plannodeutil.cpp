@@ -77,159 +77,159 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
     VOLT_TRACE("Creating an empty PlanNode of type '%s'", planNodeToString(type).c_str());
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
-        case (voltdb::PLAN_NODE_TYPE_INVALID):
+        case (voltdb::PlanNodeType::Invalid):
             throwSerializableEEException("INVALID plan node type");
             break;
         // ------------------------------------------------------------------
         // SeqScan
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_SEQSCAN):
+        case (voltdb::PlanNodeType::SeqScan):
             ret = new voltdb::SeqScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // IndexScan
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_INDEXSCAN):
+        case (voltdb::PlanNodeType::IndexScan):
             ret = new voltdb::IndexScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // IndexCount
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_INDEXCOUNT):
+        case (voltdb::PlanNodeType::IndexCount):
             ret = new voltdb::IndexCountPlanNode();
             break;
         // ------------------------------------------------------------------
         // TableCount
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_TABLECOUNT):
+        case (voltdb::PlanNodeType::TableCount):
             ret = new voltdb::TableCountPlanNode();
             break;
         // ------------------------------------------------------------------
         // MaterializedScanPlanNode
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MATERIALIZEDSCAN):
+        case (voltdb::PlanNodeType::MaterializedScan):
             ret = new voltdb::MaterializedScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // TupleScanPlanNode
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_TUPLESCAN):
+        case (voltdb::PlanNodeType::TupleScan):
             ret = new voltdb::TupleScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // NestLoop
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_NESTLOOP):
+        case (voltdb::PlanNodeType::Nestloop):
             ret = new voltdb::NestLoopPlanNode();
             break;
         // ------------------------------------------------------------------
         // NestLoopIndex
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_NESTLOOPINDEX):
+        case (voltdb::PlanNodeType::NestloopIndex):
             ret = new voltdb::NestLoopIndexPlanNode();
             break;
         // ------------------------------------------------------------------
         // MergeJoin
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MERGEJOIN):
+        case (voltdb::PlanNodeType::MergeJoin):
             ret = new voltdb::MergeJoinPlanNode();
             break;
         // ------------------------------------------------------------------
         // Update
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UPDATE):
+        case (voltdb::PlanNodeType::Update):
             ret = new voltdb::UpdatePlanNode();
             break;
         // ------------------------------------------------------------------
         // Insert
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_INSERT):
+        case (voltdb::PlanNodeType::Insert):
             ret = new voltdb::InsertPlanNode();
             break;
         // ------------------------------------------------------------------
         // Delete
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DELETE):
+        case (voltdb::PlanNodeType::Delete):
             ret = new voltdb::DeletePlanNode();
             break;
         // ------------------------------------------------------------------
         // Migrate
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MIGRATE):
+        case (voltdb::PlanNodeType::Migrate):
             ret = new voltdb::MigratePlanNode();
             break;
         // ------------------------------------------------------------------
         // SwapTables
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_SWAPTABLES):
+        case (voltdb::PlanNodeType::SwapTables):
             ret = new voltdb::SwapTablesPlanNode();
             break;
         // ------------------------------------------------------------------
         // Aggregate
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
-        case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
-        case (voltdb::PLAN_NODE_TYPE_PARTIALAGGREGATE):
+        case (voltdb::PlanNodeType::HashAggregate):
+        case (voltdb::PlanNodeType::Aggregate):
+        case (voltdb::PlanNodeType::PartialAggregate):
             ret = new voltdb::AggregatePlanNode(type);
             break;
         // ------------------------------------------------------------------
         // Union
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UNION):
+        case (voltdb::PlanNodeType::Union):
             ret = new voltdb::UnionPlanNode();
             break;
         // ------------------------------------------------------------------
         // OrderBy
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_ORDERBY):
+        case (voltdb::PlanNodeType::OrderBy):
             ret = new voltdb::OrderByPlanNode();
             break;
         // ------------------------------------------------------------------
         // Projection
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_PROJECTION):
+        case (voltdb::PlanNodeType::Projection):
             ret = new voltdb::ProjectionPlanNode();
             break;
         // ------------------------------------------------------------------
         // Materialize
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MATERIALIZE):
+        case (voltdb::PlanNodeType::Materialize):
             ret = new voltdb::MaterializePlanNode();
             break;
         // ------------------------------------------------------------------
         // Send
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_SEND):
+        case (voltdb::PlanNodeType::Send):
             ret = new voltdb::SendPlanNode();
             break;
         // ------------------------------------------------------------------
         // Limit
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_LIMIT):
+        case (voltdb::PlanNodeType::Limit):
             ret = new voltdb::LimitPlanNode();
             break;
         // ------------------------------------------------------------------
         // Receive
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_RECEIVE):
+        case (voltdb::PlanNodeType::Receive):
             ret = new voltdb::ReceivePlanNode();
             break;
         // ------------------------------------------------------------------
         // Merge Receive
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
+        case (voltdb::PlanNodeType::MergeReceive):
             ret = new voltdb::MergeReceivePlanNode();
             break;
         // ------------------------------------------------------------------
         // Window Function
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_WINDOWFUNCTION):
+        case (voltdb::PlanNodeType::WindowFunction):
             ret = new voltdb::WindowFunctionPlanNode();
             break;
         // ------------------------------------------------------------------
         // Common Table
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_COMMONTABLE):
+        case (voltdb::PlanNodeType::CommonTable):
             ret = new voltdb::CommonTablePlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.

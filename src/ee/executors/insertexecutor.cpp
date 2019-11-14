@@ -214,7 +214,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
             m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
             m_node->isInline() ? "inline"
-            : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+            : (m_node->getChildren()[0]->getPlanNodeType() == PlanNodeType::Materialize ?
                 "single-row" : "multi-row"),
             m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
@@ -441,7 +441,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
 InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node) {
     InsertExecutor *answer = NULL;
-    InsertPlanNode *insertNode = dynamic_cast<InsertPlanNode *>(node->getInlinePlanNode(PLAN_NODE_TYPE_INSERT));
+    InsertPlanNode *insertNode = dynamic_cast<InsertPlanNode *>(node->getInlinePlanNode(PlanNodeType::Insert));
     if (insertNode) {
         answer = dynamic_cast<InsertExecutor *>(insertNode->getExecutor());
     }

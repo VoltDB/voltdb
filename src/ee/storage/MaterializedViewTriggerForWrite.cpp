@@ -133,7 +133,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
         vector<AbstractExecutor*> executorList = execVec->getExecutorList();
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
         bool usePlanForAgg = false;
-        if (apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
+        if (apn->getPlanNodeType() == PlanNodeType::IndexScan) {
             TableIndex* hardCodedIndex = m_indexForMinMax[idx];
             if (hardCodedIndex) {
 #ifdef VOLT_TRACE_ENABLED

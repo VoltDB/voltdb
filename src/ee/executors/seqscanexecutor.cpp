@@ -161,7 +161,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // projection operations in execute
     //
     int num_of_columns = -1;
-    ProjectionPlanNode* projectionNode = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    ProjectionPlanNode* projectionNode = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PlanNodeType::Projection));
     if (projectionNode != NULL) {
         num_of_columns = static_cast<int> (projectionNode->getOutputColumnExpressions().size());
     }
@@ -169,7 +169,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // OPTIMIZATION: NESTED LIMIT
     // How nice! We can also cut off our scanning with a nested limit!
     //
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
 
     //
     // OPTIMIZATION:

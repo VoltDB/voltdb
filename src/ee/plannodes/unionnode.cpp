@@ -50,7 +50,7 @@ namespace voltdb {
 
 UnionPlanNode::~UnionPlanNode() { }
 
-PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
+PlanNodeType UnionPlanNode::getPlanNodeType() const { return PlanNodeType::Union; }
 
 std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;

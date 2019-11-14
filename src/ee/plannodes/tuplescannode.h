@@ -67,7 +67,7 @@ public:
 
     PlanNodeType getPlanNodeType() const
     {
-        return PLAN_NODE_TYPE_TUPLESCAN;
+        return PlanNodeType::TupleScan;
     }
 
     const std::vector<int>& getParamIdxs() const

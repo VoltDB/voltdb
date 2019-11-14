@@ -47,8 +47,34 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitJoinMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
-import org.voltdb.plannerv2.rules.logical.*;
-import org.voltdb.plannerv2.rules.physical.*;
+import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateCalcMergeRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcJoinMergeRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinCommuteRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
+import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPNestLoopIndexToMergeJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPNestLoopToIndexJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortIndexScanRemoveRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortScanToIndexRule;
+import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
 
 import com.google.common.collect.ImmutableList;
 
@@ -75,9 +101,9 @@ public class PlannerRules {
                 return PlannerRules.MP_FALLBACK;
             }
         },
-        OUTER_JOIN {
+        LOGICAL_JOIN {
             @Override public RuleSet getRules() {
-                return PlannerRules.HEP_OUTER_JOIN;
+                return PlannerRules.HEP_LOGICAL_JOIN;
             }
         },
         PHYSICAL_CONVERSION {
@@ -184,12 +210,12 @@ public class PlannerRules {
             MPSetOpsQueryFallBackRule.INSTANCE
     );
 
-    private static final RuleSet HEP_OUTER_JOIN = RuleSets.ofList(
+    private static final RuleSet HEP_LOGICAL_JOIN = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
             VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT,
-            VoltLAggregateCalcMergeRule.INSTANCE       // eliminate Calcite's SINGLE_VALUE aggregation
+            VoltLAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
+            VoltLCalcJoinMergeRule.INSTANCE
     );
-
 
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
@@ -214,7 +240,7 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
 
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
-            VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SEQSCAN,
+            VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,
             VoltPCalcScanToIndexRule.INSTANCE,
             VoltPSortIndexScanRemoveRule.INSTANCE_SORT_INDEXSCAN,
             VoltPSortIndexScanRemoveRule.INSTANCE_SORT_CALC_INDEXSCAN,
@@ -252,7 +278,7 @@ public class PlannerRules {
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(LOGICAL,
                     MP_FALLBACK,
-                    HEP_OUTER_JOIN,
+                    HEP_LOGICAL_JOIN,
                     PHYSICAL_CONVERSION,
                     PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
                     INLINE)

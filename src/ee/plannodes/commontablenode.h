@@ -94,7 +94,7 @@ namespace voltdb {
 class CommonTablePlanNode : public AbstractPlanNode {
 public:
     virtual PlanNodeType getPlanNodeType() const {
-        return PLAN_NODE_TYPE_COMMONTABLE;
+        return PlanNodeType::CommonTable;
     }
 
     virtual void loadFromJSONObject(PlannerDomValue obj);

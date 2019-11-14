@@ -33,6 +33,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannerv2.VoltTable;
@@ -51,19 +52,12 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     private final AccessPath m_accessPath;
     private final RelCollation m_indexCollation;
 
-    // This is only required during the VoltPhysicalTableIndexScan conversion to
-    // its Volt counterpart {@code org.voltdb.plannode.IndexScanPlanNode} to
-    // setSkipNullPredicate table index.
-    // Volt Planner resolves it using scan's persistent table schema but
-    // it's unavailable during the Calcite build. The table index must be explicitly
-    // passed in as a parameter.
-    // Since it's used after all the Calcite rules are applied, it doesn't need to be copied around
-    // and be part of the digest
-    private int m_tableIdx = 0;
-
-    void setTableIdx(int tableIdx) {
-        m_tableIdx = tableIdx;
-    }
+    // TRUE if this index scan is an inline inner scan of a NLIJ or a MJ
+    // It is required to properly set a corresponding table index in all TVEs from
+    // the index access's path. TVEs are evaluated in a parent join context during runtime
+    // and must have their table index set to 1 in this case
+    // Since this is only for Volt TVE resolution, it shouldn't be part of the Calcite's digest
+    private final boolean m_isInlinedInnerScan;
 
     /**
      *
@@ -79,12 +73,13 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
      * @param aggregate
      * @param preAggregateRowType
      * @param preAggregateProgram
+     * @param indexCollation
      */
     public VoltPhysicalTableIndexScan(
             RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltDBTable, RexProgram program,
             Index index, AccessPath accessPath, RexNode offset, RexNode limit, RelNode aggregate,
             RelDataType preAggregateRowType, RexProgram preAggregateProgram, int splitCount,
-            RelCollation indexCollation) {
+            RelCollation indexCollation, boolean isInlinedInnerScan) {
         super(cluster, traitSet, table, voltDBTable, updateProgram(program, accessPath),
               offset, limit, aggregate, preAggregateRowType, preAggregateProgram, splitCount);
         Preconditions.checkNotNull(index, "index is null");
@@ -93,6 +88,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         m_index = index;
         m_accessPath = accessPath;
         m_indexCollation = indexCollation;
+        m_isInlinedInnerScan = isInlinedInnerScan;
     }
 
     private String explain() {
@@ -140,7 +136,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         addAggregate(ispn);
 
         // At the moment this will override the predicate set by the addPredicate call
-        return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath, m_tableIdx);
+        return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath, m_isInlinedInnerScan? 1 : 0);
     }
 
     public Index getIndex() {
@@ -183,7 +179,8 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         return new VoltPhysicalTableIndexScan(
                 getCluster(), traitSet, getTable(), getVoltTable(), getProgram(),
                 getIndex(), getAccessPath(), offset, limit, getAggregateRelNode(),
-                getPreAggregateRowType(), getPreAggregateProgram(), getSplitCount(), m_indexCollation);
+                getPreAggregateRowType(), getPreAggregateProgram(), getSplitCount(),
+                m_indexCollation, m_isInlinedInnerScan);
     }
 
     @Override
@@ -196,14 +193,17 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         // as an OTHER expression to contribute to the Index Scan predicate.
         final RexNode newCondition = newProgram.getCondition();
         if (newCondition != null) {
-            m_accessPath.getOtherExprs().add(RexConverter.convertRefExpression(newCondition, newProgram));
+            AbstractExpression programExpr = RexConverter.convertRefExpression(newCondition, newProgram);
+            programExpr.findAllTupleValueSubexpressions().forEach(tve -> tve.setTableIndex(m_isInlinedInnerScan? 1 : 0));
+            m_accessPath.getOtherExprs().add(programExpr);
         }
 
         // Adjust the collation for a new program
         return new VoltPhysicalTableIndexScan(getCluster(), traitSet, getTable(), getVoltTable(), mergedProgram,
                 getIndex(), getAccessPath(), getOffsetRexNode(), getLimitRexNode(), getAggregateRelNode(),
                 getPreAggregateRowType(), getPreAggregateProgram(), getSplitCount(),
-                VoltRexUtil.adjustCollationForProgram(rexBuilder, mergedProgram, m_indexCollation));
+                VoltRexUtil.adjustCollationForProgram(rexBuilder, mergedProgram,m_indexCollation),
+                m_isInlinedInnerScan);
     }
 
     @Override
@@ -214,7 +214,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         return new VoltPhysicalTableIndexScan(getCluster(), traitSet, getTable(), getVoltTable(),
                 RexProgram.createIdentity(aggregate.getRowType()),
                 getIndex(), getAccessPath(), getOffsetRexNode(), getLimitRexNode(), aggregate, getRowType(),
-                getProgram(), getSplitCount(), m_indexCollation);
+                getProgram(), getSplitCount(), m_indexCollation, m_isInlinedInnerScan);
     }
 
     @Override
@@ -224,5 +224,9 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
 
     public RelCollation getIndexCollation() {
         return m_indexCollation;
+    }
+
+    public boolean isInlinedInnerScan() {
+        return m_isInlinedInnerScan;
     }
 }
