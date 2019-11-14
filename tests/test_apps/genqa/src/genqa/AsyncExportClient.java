@@ -390,9 +390,11 @@ public class AsyncExportClient
 
             // If migrate without TTL is enabled, set things up so a migrate is triggered
             // roughly every 2.5 seconds, with the first one happening 3 seconds from now
+            // Use a separate Timer object to get a dedicated manual migration thread
+            Timer migrateTimer = new Timer(true);
             Random migrateInterval = new Random();
             if (config.migrateWithoutTTL) {
-                timer.scheduleAtFixedRate(new TimerTask()
+                migrateTimer.scheduleAtFixedRate(new TimerTask()
                 {
                     @Override
                     public void run()
@@ -466,7 +468,8 @@ public class AsyncExportClient
 
             // We're done - stop the performance statistics display task
             timer.cancel();
-
+            // likewise for the migrate task
+            migrateTimer.cancel();
             if (config.migrateWithoutTTL) {
                 log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
                 log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
