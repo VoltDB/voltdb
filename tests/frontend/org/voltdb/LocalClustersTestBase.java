@@ -124,6 +124,9 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     private final Set<Long> m_generatedKeys = new HashSet<>();
 
+    protected String m_username = "";
+    protected String m_password = "";
+
     @AfterClass
     public static void cleanUp() {
         shutdownAllClustersAndClients();
@@ -255,7 +258,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     protected ClientConfig createClientConfig() {
-        ClientConfig cc = new ClientConfig();
+        ClientConfig cc = new ClientConfig(m_username, m_password);
         cc.setProcedureCallTimeout(10 * 60 * 1000); // 10 min
         return cc;
     }
