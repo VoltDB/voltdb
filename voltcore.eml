@@ -110,8 +110,8 @@
 	<lib name="metrics-core-2.2.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/metrics-core-2.2.0.jar!/"/>
 	</lib>
-	<lib name="scala-library-2.11.5.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.5.jar!/"/>
+	<lib name="scala-library-2.11.12.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.12.jar!/"/>
 	</lib>
 	<lib name="felix-framework-5.6.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/felix-framework-5.6.12.jar!/"/>

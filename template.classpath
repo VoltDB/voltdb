@@ -43,7 +43,6 @@
 	<classpathentry kind="lib" path="lib/kafka-clients-2.3.0.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
-	<classpathentry kind="lib" path="lib/scala-library-2.11.5.jar"/>
 	<classpathentry kind="lib" path="lib/felix-framework-5.6.12.jar"/>
 	<classpathentry kind="lib" path="lib/httpclient-4.3.6.jar"/>
 	<classpathentry kind="lib" path="lib/httpcore-4.3.3.jar"/>
@@ -62,6 +61,7 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="lib/tomcat-juli-7.0.96.jar"/>
+	<classpathentry kind="lib" path="lib/scala-library-2.11.12.jar"/>
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
