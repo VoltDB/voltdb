@@ -37,10 +37,16 @@ namespace voltdb {
         Update, Insertion, Deletion
     };
 
+    struct std_allocator {                    // wrapper of std::allocator
+        static void* alloc(size_t);
+        static void dealloc(void*);
+    };
+
+    template<typename Alloc>
     class ChangeHistory final {
     public:
         class Change {                             // a single change, deep-copy non-inlined tuple
-            unique_ptr<char[]> m_tuple;
+            unique_ptr<char[], decltype(Alloc::dealloc)> m_tuple;
         public:
             Change(void const* c, size_t len);
             Change(Change const&) = delete;
@@ -76,6 +82,7 @@ namespace voltdb {
         void const* reverted(void const*) const;     // revert history at this place!
     };
 
+    template<typename Alloc>
     class TableTupleChunk final {                  // self-compacting chunk (with help from TableTupleChunks to compact across a list)
         constexpr static size_t ALLOCS_PER_CHUNK = 512;        // number of rows each block can hold
         size_t const m_tupleSize;                  // size of a table tuple per allocation
@@ -98,8 +105,9 @@ namespace voltdb {
         bool full() const noexcept;
     };
 
+    template<typename Alloc>
     class TableTupleChunks final {
-        using list_type = std::list<TableTupleChunk>;
+        using list_type = std::list<TableTupleChunk<Alloc>>;
         size_t const m_tupleSize;
         list_type m_list{};
     public:
@@ -127,10 +135,10 @@ namespace voltdb {
                 conditional<Const, TableTupleChunks const&, TableTupleChunks&>::type;
 
             size_t const m_offset;
-            typename
-                conditional<Const, add_const<list_type>::type, list_type>::type& m_list;
-            typename
-                conditional<Const, list_type::const_iterator, list_type::iterator>::type m_iter;
+            typename conditional<Const, typename add_const<list_type>::type, list_type>::type&
+                m_list;
+            typename conditional<Const, typename list_type::const_iterator,
+                     typename list_type::iterator>::type m_iter;
             value_type m_cursor;
             void advance();
         public:
@@ -182,34 +190,48 @@ namespace voltdb {
             using super = iterator_cb_type<Const>;
         public:
             using container_type = typename super::container_type;
-            time_traveling_iterator_type(container_type, ChangeHistory const&);
+            time_traveling_iterator_type(container_type, ChangeHistory<Alloc> const&);
         };
         using iterator_cb = time_traveling_iterator_type<false>;
         using const_iterator_cb = time_traveling_iterator_type<true>;
 
-        iterator_cb begin(ChangeHistory const&);
-        iterator_cb end(ChangeHistory const&);
-        const_iterator_cb cbegin(ChangeHistory const&) const;
-        const_iterator_cb cend(ChangeHistory const&) const;
-        const_iterator_cb begin(ChangeHistory const&) const;
-        const_iterator_cb end(ChangeHistory const&) const;
+        iterator_cb begin(ChangeHistory<Alloc> const&);
+        iterator_cb end(ChangeHistory<Alloc> const&);
+        const_iterator_cb cbegin(ChangeHistory<Alloc> const&) const;
+        const_iterator_cb cend(ChangeHistory<Alloc> const&) const;
+        const_iterator_cb begin(ChangeHistory<Alloc> const&) const;
+        const_iterator_cb end(ChangeHistory<Alloc> const&) const;
     };
 
-    TableTupleChunks::iterator begin(TableTupleChunks&);
-    TableTupleChunks::iterator end(TableTupleChunks&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::iterator
+        begin(TableTupleChunks<Alloc>&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::iterator
+        end(TableTupleChunks<Alloc>&);
 
-    TableTupleChunks::const_iterator cbegin(TableTupleChunks const&);
-    TableTupleChunks::const_iterator cend(TableTupleChunks const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator
+        cbegin(TableTupleChunks<Alloc> const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator
+        cend(TableTupleChunks<Alloc> const&);
 
-    TableTupleChunks::const_iterator begin(TableTupleChunks const&);
-    TableTupleChunks::const_iterator end(TableTupleChunks const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator
+        begin(TableTupleChunks<Alloc> const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator
+        end(TableTupleChunks<Alloc> const&);
 
-    TableTupleChunks::iterator_cb begin(TableTupleChunks&, ChangeHistory const&);
-    TableTupleChunks::iterator_cb end(TableTupleChunks&, ChangeHistory const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::iterator_cb
+        begin(TableTupleChunks<Alloc>&, ChangeHistory<Alloc> const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::iterator_cb
+        end(TableTupleChunks<Alloc>&, ChangeHistory<Alloc> const&);
 
-    TableTupleChunks::const_iterator_cb cbegin(TableTupleChunks const&, ChangeHistory const&);
-    TableTupleChunks::const_iterator_cb cend(TableTupleChunks const&, ChangeHistory const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator_cb
+        cbegin(TableTupleChunks<Alloc> const&, ChangeHistory<Alloc> const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator_cb
+        cend(TableTupleChunks<Alloc> const&, ChangeHistory<Alloc> const&);
 
-    TableTupleChunks::const_iterator_cb begin(TableTupleChunks const&, ChangeHistory const&);
-    TableTupleChunks::const_iterator_cb end(TableTupleChunks const&, ChangeHistory const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator_cb
+        begin(TableTupleChunks<Alloc> const&, ChangeHistory<Alloc> const&);
+    template<typename Alloc> typename TableTupleChunks<Alloc>::const_iterator_cb
+        end(TableTupleChunks<Alloc> const&, ChangeHistory<Alloc> const&);
+
+    class TableTupleChunks<std_allocator>;
 }
