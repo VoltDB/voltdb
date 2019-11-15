@@ -25,14 +25,14 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Table;
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.primitives.Longs;
@@ -67,9 +67,9 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             final VoltTable results = constructPartitioningResultsTable();
             List<Integer> tableIds = new ArrayList<Integer>();
             List<String> tableNames = new ArrayList<String>();
-            for (Table t : CatalogUtil.getSnapshotableTables(context.getDatabase(), false).getFirst()) {
-                tableIds.add(t.getRelativeIndex());
-                tableNames.add(t.getTypeName());
+            for (SnapshotTableInfo t : SnapshotUtil.getTablesToSave(context.getDatabase(), t -> !t.getIsreplicated())) {
+                tableIds.add(t.getTableId());
+                tableNames.add(t.getName());
             }
             long mispartitionedCounts[] = context.getSiteProcedureConnection().validatePartitioning(
                     Longs.toArray(tableIds), (byte[])params.toArray()[0]);
