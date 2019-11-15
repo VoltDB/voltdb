@@ -60,6 +60,7 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
@@ -1070,8 +1071,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter filter) {
-        return m_ee.getSnapshotSchema(tableId, filter);
+    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter) {
+        Pair<byte[], Integer> result = m_ee.getSnapshotSchema(table.getTableId(), filter);
+        table.setSchema(result.getFirst(), result.getSecond());
     }
 
     /*
