@@ -371,18 +371,20 @@ public class ExportBenchmark {
             now = System.currentTimeMillis();
             rowId = new AtomicLong(0);
             while (benchmarkWarmupEndTS > now) {
+                for (int t = 1; t <= config.targets; t++) {
                 try {
                     client.callProcedure(
                             new NullCallback(),
-                            "InsertExport",
+                            "InsertExport"+t,
                             rowId.getAndIncrement(),
                             config.multiply,
-                            config.targets);
+                            1);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
                     }
                 } catch (Exception ignore) {}
+                }
             }
             System.out.println("Warmup complete");
             rowId.set(0);
@@ -405,10 +407,12 @@ public class ExportBenchmark {
             if ( (config.count > 0) && (totalInserts > config.count) ) {
                 break;
             }
+
+            for (int t = 1; t <= config.targets; t++) {
             try {
                 client.callProcedure(
                         new ExportCallback(),
-                        "InsertExport",
+                        "InsertExport"+t,
                         rowId.getAndIncrement(),
                         config.multiply,
                         config.targets);
@@ -420,6 +424,7 @@ public class ExportBenchmark {
                 System.err.println("Couldn't insert into VoltDB\n");
                 e.printStackTrace();
                 System.exit(1);
+            }
             }
         }
 

@@ -35,6 +35,12 @@ public class InsertExport extends VoltProcedure {
             + "type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, "
             + "type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+    String front = "INSERT INTO ALL_VALUES";
+    String back = " (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, "
+            + "type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, "
+            + "type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, "
+            + "type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
     public final SQLStmt export = new SQLStmt(template);
     public final SQLStmt export1 = new SQLStmt(template.replace("ALL_VALUES", "ALL_VALUES1"));
     public final SQLStmt export2 = new SQLStmt(template.replace("ALL_VALUES", "ALL_VALUES2"));
@@ -65,10 +71,10 @@ public class InsertExport extends VoltProcedure {
         SampleRecord record = new SampleRecord(rowid, rand);
 
         SQLStmt stmt = null;
-        for (int j = 0; j < targets; j++) {
-        for (int i = 0; i < multiply; i++) {
-            // int mod = (i*j) % targets;
-            switch(j) {
+        for (int j = 0; j < targets; j++)
+            for (int i = 0; i < multiply; i++) {
+                // int mod = (i*j) % targets;
+                switch(j) {
                 case 0 :
                     stmt = export;
                     break;
@@ -106,40 +112,41 @@ public class InsertExport extends VoltProcedure {
                     stmt = export;
 
 
-            }
+                }
 
-            voltQueueSQL(
-                    stmt
-                    , txid
-                    , rowid
-                    , record.rowid_group
-                    , record.type_null_tinyint
-                    , record.type_not_null_tinyint
-                    , record.type_null_smallint
-                    , record.type_not_null_smallint
-                    , record.type_null_integer
-                    , record.type_not_null_integer
-                    , record.type_null_bigint
-                    , record.type_not_null_bigint
-                    , record.type_null_timestamp
-                    , record.type_not_null_timestamp
-                    , record.type_null_float
-                    , record.type_not_null_float
-                    , record.type_null_decimal
-                    , record.type_not_null_decimal
-                    , record.type_null_varchar25
-                    , record.type_not_null_varchar25
-                    , record.type_null_varchar128
-                    , record.type_not_null_varchar128
-                    , record.type_null_varchar1024
-                    , record.type_not_null_varchar1024
-                    );
-        }
+                // voltQueueSQL(
+                //        stmt
+                SQLStmt s = new SQLStmt(front + j + back);
+                voltQueueSQL(s
+                        , txid
+                        , rowid
+                        , record.rowid_group
+                        , record.type_null_tinyint
+                        , record.type_not_null_tinyint
+                        , record.type_null_smallint
+                        , record.type_not_null_smallint
+                        , record.type_null_integer
+                        , record.type_not_null_integer
+                        , record.type_null_bigint
+                        , record.type_not_null_bigint
+                        , record.type_null_timestamp
+                        , record.type_not_null_timestamp
+                        , record.type_null_float
+                        , record.type_not_null_float
+                        , record.type_null_decimal
+                        , record.type_not_null_decimal
+                        , record.type_null_varchar25
+                        , record.type_not_null_varchar25
+                        , record.type_null_varchar128
+                        , record.type_not_null_varchar128
+                        , record.type_null_varchar1024
+                        , record.type_not_null_varchar1024
+                        );
+            }
 
         // Execute last statement batch
         // voltExecuteSQL(true);
         voltExecuteSQL();
-        }
 
         // Retun to caller
         return txid;
