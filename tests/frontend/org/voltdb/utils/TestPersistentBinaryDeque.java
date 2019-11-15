@@ -22,12 +22,12 @@
  */
 package org.voltdb.utils;
 
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.fail;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -131,7 +131,7 @@ public class TestPersistentBinaryDeque {
         return buf;
     }
 
-    private static ByteBuffer getFilledSmallBuffer(long fillValue) {
+    static ByteBuffer getFilledSmallBuffer(long fillValue) {
         ByteBuffer buf = ByteBuffer.allocateDirect(1024);
         while (buf.remaining() > 15) {
             buf.putLong(fillValue);
@@ -232,6 +232,25 @@ public class TestPersistentBinaryDeque {
             sorted.addLast(lastEntry);
         }
         return sorted;
+    }
+
+    @Test
+    public void testFileSizeDiff() throws Exception {
+        List<File> files = getSortedDirectoryListing();
+        assert(files.size() == 1);
+        long size = files.get(0).length();
+        Random random = new Random(System.currentTimeMillis());
+        for (int i=0; i<5; i++) {
+            int offered = 0;
+            if (random.nextBoolean()) {
+                offered = m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(i)) );
+            } else {
+                offered = m_pbd.offer( DBBPool.wrapBB(getFilledSmallBuffer(i)));
+            }
+            long newSize = files.get(0).length();
+            assertEquals(offered + PBDSegment.ENTRY_HEADER_BYTES, newSize - size);
+            size = newSize;
+        }
     }
 
     @Test

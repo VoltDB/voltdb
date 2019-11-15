@@ -74,6 +74,8 @@ public abstract class PBDSegment<M> {
     // Persistent ID of this segment, based on managing a monotonic counter
     final long m_id;
 
+    private long m_fileSize = -1;
+
     PBDSegment(File file, long index, long id) {
         super();
         m_file = file;
@@ -91,6 +93,14 @@ public abstract class PBDSegment<M> {
 
     File file() {
         return m_file;
+    }
+
+    public void saveFileSize() {
+        m_fileSize = m_file.length();
+    }
+
+    public long getFileSize() {
+        return (m_fileSize > 0) ? m_fileSize : m_file.length();
     }
 
     abstract int getNumEntries() throws IOException;
@@ -132,7 +142,15 @@ public abstract class PBDSegment<M> {
 
     abstract boolean hasAllFinishedReading() throws IOException;
 
-    abstract boolean offer(DBBPool.BBContainer cont) throws IOException;
+    /**
+     * Writes passed in bytes to this segment as next entry in the PBD.
+     * @param cont BBContainer with the bytes to be written
+     * @return the number of bytes written. If compression is enables, bytes written will be
+     *         differnt from the number passed in. -1 will be returned if the bytes cannot
+     *         fit into this segment.
+     * @throws IOException if any IO error occurs trying to write to the pbd segment file.
+     */
+    abstract int offer(DBBPool.BBContainer cont) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
