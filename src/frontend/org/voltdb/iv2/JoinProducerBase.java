@@ -33,8 +33,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CachedByteBufferAllocator;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.ProClass;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -146,7 +146,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     }
 
     protected boolean shouldAddToViewsToPause(Database db, Table table) {
-        return CatalogUtil.isSnapshotablePersistentTableView(db, table);
+        return SnapshotUtil.isSnapshotablePersistentTableView(db, table);
     }
 
     protected void initListOfViewsToPause() {

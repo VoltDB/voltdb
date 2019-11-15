@@ -1900,12 +1900,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
-                if (CatalogUtil.isSnapshotablePersistentTableView(m_database, table)) {
+                if (SnapshotUtil.isSnapshotablePersistentTableView(m_database, table)) {
                     // If the table is a snapshotted persistent table view, we will try to
                     // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
                 } else if (table.getMaterializer() != null
-                        && !CatalogUtil.isSnapshotableStreamedTableView(m_database, table)) {
+                        && !SnapshotUtil.isSnapshotableStreamedTableView(m_database, table)) {
                     SNAP_LOG.info("Skipping restore of " + table.getTypeName()
                             + " which normally would not be in a snapshot for the current schema");
                     /*

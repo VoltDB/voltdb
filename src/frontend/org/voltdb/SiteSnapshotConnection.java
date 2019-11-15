@@ -21,7 +21,6 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 
@@ -44,10 +43,9 @@ public interface SiteSnapshotConnection
 
     public default void populateSnapshotSchemas(SnapshotRequestConfig config) {
         for (SnapshotTableInfo table : config.tables) {
-            Pair<byte[], Integer> schema = getSnapshotSchema(table.getTableId(), config.getHiddenColumnFilter());
-            table.setSchema(schema.getFirst(), schema.getSecond());
+            populateSnapshotSchema(table, config.getHiddenColumnFilter());
         }
     }
 
-    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter filter);
+    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter);
 }
