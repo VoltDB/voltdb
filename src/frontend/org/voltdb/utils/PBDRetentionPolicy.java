@@ -43,6 +43,12 @@ interface PBDRetentionPolicy {
     public void newSegmentAdded();
 
     /**
+     * Callback from BinaryDeque saying bytes were added to the PBD and how many bytes.
+     * @param numBytes
+     */
+    public void bytesAdded(long numBytes);
+
+    /**
      * The id of the cursor that this retention policy implementation uses to read data from the {@link BinaryDeque}.
      *
      * @return cursor id used to read data from the {@link BinaryDeque}

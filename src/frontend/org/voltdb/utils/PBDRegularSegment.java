@@ -644,7 +644,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     // Used by Export path
     @Override
-    boolean offer(DBBPool.BBContainer cont) throws IOException
+    int offer(DBBPool.BBContainer cont) throws IOException
     {
         if (m_closed) {
             throw new IOException("Segment closed");
@@ -655,11 +655,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + ENTRY_HEADER_BYTES;
         if (remaining() < maxCompressedSize) {
-            return false;
+            return -1;
         }
 
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = cont;
+        int written = 0;
         try {
             m_entryHeaderBuf.b().clear();
 
@@ -680,6 +681,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
             // Write entry
             destBuf.b().flip();
+            written = destBuf.b().remaining();
             while (destBuf.b().hasRemaining()) {
                 m_fc.write(destBuf.b());
             }
@@ -692,7 +694,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
 
-        return true;
+        return written;
     }
 
     // Used by DR path

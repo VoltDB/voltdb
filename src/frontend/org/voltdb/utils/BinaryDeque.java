@@ -56,13 +56,15 @@ public interface BinaryDeque<M> {
     void updateExtraHeader(M extraHeader) throws IOException;
 
     /**
-     * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
-     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
+     * Store a buffer chain as a single object in the deque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
-     * @param object
-     * @throws IOException
+     * @param BBContainer with the bytes to store
+     * @return the number of bytes written. If compression is enabled, the number of compressed bytes
+     *         written is returned, which will be different from the number of bytes passed in.
+     * @throws IOException if the object is larger then the implementation defined max,
+     *         64 megabytes in the case of PersistentBinaryDeque.
      */
-    void offer(BBContainer object) throws IOException;
+    int offer(BBContainer object) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 

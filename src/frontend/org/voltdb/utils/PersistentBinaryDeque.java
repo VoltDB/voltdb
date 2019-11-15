@@ -84,7 +84,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
      * Used to read entries from the PBD. Multiple readers may be active at the same time,
      * but only one read or write may happen concurrently.
      */
-    private class ReadCursor implements BinaryDequeReader<M> {
+    class ReadCursor implements BinaryDequeReader<M> {
         private final String m_cursorId;
         private PBDSegment<M> m_segment;
         // Number of objects out of the total
@@ -173,11 +173,19 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        @Override
-        public boolean skipToNextSegmentIfOlder(long millis) throws IOException {
+        /**
+         * Advance the cursor to the next segment if this segment is older than the specified time.
+         * This is a method implemented specifically to make it easier to implement retention policy
+         * on PBDs and hence not exposed outside the package.
+         *
+         * @param millis time in milliseconds
+         * @return returns true if the reader advanced to the next segment. False otherwise.
+         * @throws IOException if there was an error reading the segments or reading the timestamp
+         */
+        boolean skipToNextSegmentIfOlder(long millis) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_cursorClosed) {
-                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
+                    throw new IOException("PBD.ReadCursor.skipToNextSegmentIfOlder(): " + m_cursorId + " - Reader has been closed");
                 }
 
                 long recordTime = getSegmentLastRecordTimestamp();
@@ -194,16 +202,66 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return false;
                 }
 
-                PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
-                if (segmentReader == null) {
-                    segmentReader = m_segment.openForRead(m_cursorId);
-                }
-                m_numRead += m_segment.getNumEntries();
-                segmentReader.markAllReadAndDiscarded();
-                m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-                deleteSegmentsBefore(m_segment, 1);
+                skipToNextSegment();
                 return true;
             }
+        }
+
+        private void skipToNextSegment() throws IOException {
+            PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
+            if (segmentReader == null) {
+                segmentReader = m_segment.openForRead(m_cursorId);
+            }
+            m_numRead += m_segment.getNumEntries();
+            segmentReader.markAllReadAndDiscarded();
+            m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
+            deleteSegmentsBefore(m_segment, 1);
+        }
+
+        /**
+         * Advance the cursor to the next segment if this reader has >= bytes than the specified number
+         * of bytes after advancing to the next segment.
+         * This is a method implemented specifically to make it easier to implement retention policy
+         * on PBDs and hence not exposed outside the package.
+         *
+         * @param maxBytes the minimum number of bytes this reader should have after advancing to next segment.
+         * @return returns returns 0 if the reader can successfully advance to the next segment.
+         *         Otherwise it returns the number of bytes that must be added to the segment before it can advance.
+         * @throws IOException if the reader was closed or on other error opening the segment files.
+         */
+        long skipToNextSegmentIfBigger(long maxBytes) throws IOException {
+            synchronized (PersistentBinaryDeque.this) {
+                if (m_cursorClosed) {
+                    throw new IOException("PBD.ReadCursor.skipToNextSegmentIfBigger(): " + m_cursorId + " - Reader has been closed");
+                }
+
+                moveToValidSegment();
+                long segmentSize = m_segment.getFileSize();
+
+                long lastSegmentId = peekLastSegment().segmentIndex();
+                if (m_segment.segmentIndex() == lastSegmentId) { // last segment, cannot skip
+                    long needed = maxBytes - segmentSize;
+                    return (needed == 0) ? 1 : needed; // To fix: 0 is a special value indicating we skipped.
+                }
+
+                long readerSize = readerFizeSize();
+                long diff = readerSize - segmentSize;
+                if (diff < maxBytes) {
+                    return maxBytes - diff;
+                }
+
+                skipToNextSegment();
+                return 0;
+            }
+        }
+
+        private long readerFizeSize() {
+            long size = 0;
+            for (PBDSegment<M> segment: m_segments.tailMap(m_segment.segmentIndex()).values()) {
+                size += segment.getFileSize();
+            }
+
+            return size;
         }
 
         void rewindTo(PBDSegment<M> segment) {
@@ -365,14 +423,27 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         @Override
-        public boolean isCurrentSegmentActive() {
+        public boolean isOpen() {
+            return !m_cursorClosed;
+        }
+
+        /**
+         * Used to find out if the current segment that this reader is on, is one that is being actively written to.
+         *
+         * @return Returns true if the current segment that the reader is on is also being written to. False otherwise.
+         */
+        boolean isCurrentSegmentActive() {
             synchronized(PersistentBinaryDeque.this) {
                 moveToValidSegment();
                 return m_segment.isActive();
             }
         }
 
-        @Override
+        /**
+         * Returns the time the last record in this segment was written.
+         *
+         * @return timestamp in millis of the last record in this segment.
+         */
         public long getSegmentLastRecordTimestamp() {
             synchronized(PersistentBinaryDeque.this) {
                 moveToValidSegment();
@@ -460,6 +531,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         m_numObjects = countNumObjects();
         assertions();
+    }
+
+    TreeMap<Long, PBDSegment<M>> getSegments() {
+        return m_segments;
     }
 
     String getNonce() {
@@ -709,6 +784,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         } else {
             segment = m_pbdSegmentFactory.create(segmentIndex, segmentId, segmentName.m_file, m_usageSpecificLog,
                     m_extraHeaderSerializer);
+            segment.saveFileSize();
 
             try {
                 // Delete preceding empty segment
@@ -905,22 +981,25 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public synchronized void offer(BBContainer object) throws IOException {
+    public synchronized int offer(BBContainer object) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
         }
 
         PBDSegment<M> tail = peekLastSegment();
-        if (!tail.offer(object)) {
+        int written = tail.offer(object);
+        if (written < 0) {
             tail = addSegment(tail);
-            final boolean success = tail.offer(object);
-            if (!success) {
+            written = tail.offer(object);
+            if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
             }
         }
         m_numObjects++;
         assertions();
+        callBytesAdded(written);
+        return written;
     }
 
     @Override
@@ -941,12 +1020,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
         m_numObjects++;
         assertions();
+        callBytesAdded(written);
         return written;
     }
 
+    private void callBytesAdded(int dataBytes) {
+        if (m_retentionPolicy != null) {
+            m_retentionPolicy.bytesAdded(dataBytes + PBDSegment.ENTRY_HEADER_BYTES);
+        }
+    }
+
     private PBDSegment<M> addSegment(PBDSegment<M> tail) throws IOException {
-        //Check to see if the tail is completely consumed so we can close and delete it
+        //Check to see if the tail is completely consumed so we can close it
         tail.finalize(!tail.isBeingPolled());
+        tail.saveFileSize();
 
         if (m_usageSpecificLog.isDebugEnabled()) {
             m_usageSpecificLog.debug(
@@ -1070,7 +1157,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public synchronized BinaryDequeReader<M> openForRead(String cursorId) throws IOException {
+    public synchronized ReadCursor openForRead(String cursorId) throws IOException {
         if (m_closed) {
             throw new IOException("Cannot openForRead(): PBD has been Closed");
         }
@@ -1412,8 +1499,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     @Override
     public void setRetentionPolicy(RetentionPolicyType policyType, Object... params) {
         assert(m_retentionPolicy == null);
-        assert(policyType == RetentionPolicyType.TIME_MS); // Only supports time based for now
-        m_retentionPolicy = TimeBasedRetentionPolicyMgr.getInstance().addTimeBasedRetentionPolicy(this, params);
+        m_retentionPolicy = RetentionPolicyMgr.getInstance().addRetentionPolicy(policyType, this, params);
     }
 
     @Override
