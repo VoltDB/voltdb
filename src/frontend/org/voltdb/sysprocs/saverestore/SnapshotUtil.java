@@ -49,6 +49,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -80,12 +81,14 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -195,8 +198,8 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
-                for (int ii = 0; ii < tables.size(); ii++) {
-                    stringer.value(tables.get(ii).getName());
+                for (SnapshotTableInfo table : tables) {
+                    stringer.value(table.getName());
                 }
                 stringer.endArray();
 
@@ -1034,8 +1037,8 @@ public class SnapshotUtil {
              * Summarize what was inconsistent/consistent
              */
             if (!inconsistent) {
-                for (int ii = 0; ii < snapshot.m_digests.size(); ii++) {
-                    pw.println(indentString + snapshot.m_digests.get(ii).getPath());
+                for (File element : snapshot.m_digests) {
+                    pw.println(indentString + element.getPath());
                 }
             } else {
                 pw.println(indentString + "Not all digests are consistent");
@@ -1059,8 +1062,8 @@ public class SnapshotUtil {
             pw.print(indentString + "Tables: ");
             int ii = 0;
 
-            for (int jj = 0; jj < snapshot.m_digestTables.size(); jj++) {
-                for (String table : snapshot.m_digestTables.get(jj)) {
+            for (Set<String> element : snapshot.m_digestTables) {
+                for (String table : element) {
                     digestTablesSeen.add(table);
                 }
             }
@@ -1297,6 +1300,92 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
+    /**
+     * Test if a table is a persistent table view and should be included in the snapshot.
+     *
+     * @param db    The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a persistent table view that should be snapshotted.
+     */
+    public static boolean isSnapshotablePersistentTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (CatalogUtil.isStream(db, materializer)) {
+            // The view source table should not be a streamed table.
+            return false;
+        }
+        if (!table.getIsreplicated() && table.getPartitioncolumn() == null) {
+            // If the view table is implicitly partitioned (maybe was not in snapshot),
+            // its maintenance is not turned off during the snapshot restore process.
+            // Let it take care of its own data by itself.
+            // Do not attempt to restore data for it.
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a streamed table view and should be included in the snapshot.
+     *
+     * @param db    The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a streamed table view that should be snapshotted.
+     */
+    public static boolean isSnapshotableStreamedTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (!CatalogUtil.isStream(db, materializer)) {
+            // Test if the view source table is a streamed table.
+            return false;
+        }
+        // Non-partitioned export table are not allowed so it should not get here.
+        Column sourcePartitionColumn = materializer.getPartitioncolumn();
+        if (sourcePartitionColumn == null) {
+            return false;
+        }
+        // Make sure the partition column is present in the view.
+        // Export table views are special, we use column names to match..
+        Column pc = table.getColumns().get(sourcePartitionColumn.getName());
+        if (pc == null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Get all required snapshotable tables from an in-memory catalog jar file.
+     *
+     * @param jarFile a in-memory catalog jar file
+     * @return {@link Set} of table names which must be included in a snapshot for it to be valid
+     */
+    public static Set<String> getRequiredSnapshotableTableNames(InMemoryJarfile jarFile) {
+        Database database = CatalogUtil.getDatabaseFrom(jarFile);
+        // Snapshotable persistent table views are considered optional. ENG-11578, ENG-14145
+        return getTablesToSave(database, t -> !isSnapshotablePersistentTableView(database, t)).stream()
+                .map(SnapshotTableInfo::getName)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get all normal tables from the catalog. A normal table is one that's NOT a materialized view, nor an export
+     * table. For the lack of a better name, I call it normal.
+     *
+     * @param catalog      Catalog database
+     * @param isReplicated true to return only replicated tables, false to return all partitioned tables
+     * @return A list of tables
+     */
+    public static final List<SnapshotTableInfo> getPartitionedNormalTablesToSave(Database database) {
+        return getTablesToSave(database,
+                t -> !t.getIsreplicated()
+                        && (t.getMaterializer() == null || TableType.isStream(t.getMaterializer().getTabletype())));
+    }
+
     public static final List<SnapshotTableInfo> getTablesToSave(Database database) {
         return getTablesToSave(database, t -> true);
     }
@@ -1310,8 +1399,8 @@ public class SnapshotUtil {
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.
             if (table.getMaterializer() != null
-                    && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
-                    && !CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
+                    && !isSnapshotableStreamedTableView(database, table)
+                    && !isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
             if (predicate.test(table)) {
