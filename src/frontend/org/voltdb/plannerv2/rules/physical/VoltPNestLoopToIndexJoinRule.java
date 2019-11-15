@@ -27,8 +27,11 @@ import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.util.Pair;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -44,7 +47,6 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 import org.voltdb.plannerv2.utils.IndexUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.SortDirectionType;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;
@@ -62,7 +64,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
 
     public static final RelOptRule INSTANCE_CALC_SSCAN = new VoltPNestLoopToIndexJoinRule(
             operand(VoltPhysicalNestLoopJoin.class,
-                    some(operand(/*RelNode*/VoltPhysicalCalc.class, any()),
+                    some(operand(RelNode.class, any()),
                             operand(VoltPhysicalCalc.class, operand(VoltPhysicalTableSequentialScan.class, none())))),
             "VoltPNestLoopToIndexJoin_Calc_SScan");
 
@@ -143,19 +145,12 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         }
     }
 
-    private static Optional<AccessPath> getAccessPathFromInnerRel(
-            Table table, VoltPhysicalJoin join, RexProgram program, Index index, int numOuterFieldsForJoin) {
-        return Optional.ofNullable(IndexUtil.getCalciteRelevantAccessPathForIndex(
-                table, CatalogUtil.getSortedCatalogItems(table.getColumns(), "index"),
-                join.getCondition(), program, index, SortDirectionType.INVALID,
-                numOuterFieldsForJoin, true));
-    }
-
-    private static RelNode toIndexJoin(VoltPhysicalJoin join, RelNode outerScan, RelNode innerChild, Index index, AccessPath accessPath) {
+    private RelNode toIndexJoin(VoltPhysicalJoin join, RexNode preJoinPredicate, RelNode outerScan, RelNode innerChild, Index index, AccessPath accessPath) {
         return new VoltPhysicalNestLoopIndexJoin(
                 join.getCluster(), join.getTraitSet(), outerScan, innerChild, join.getCondition(),
                 join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-                ImmutableList.copyOf(join.getSystemFieldList()), index, accessPath);
+                ImmutableList.copyOf(join.getSystemFieldList()),
+                join.getWhereCondition(), index, accessPath, preJoinPredicate);
     }
 
     @Override
@@ -173,32 +168,46 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
 
         final Table innerTable = innerScan.getVoltTable().getCatalogTable();
         final Map<RelNode, RelNode> equiv = new HashMap<>();
-        innerTable.getIndexes().forEach(index -> // need to pass the join outer child columns count to the visitor
-                getAccessPathFromInnerRel(innerTable, join, program, index, outerScan.getRowType().getFieldCount())
-                        .ifPresent(accessPath -> {
-                            // Index's collation needs to be based on its own program only - the Calc sits above the scan
-                            final RelCollation indexCollation;
-                            try {
-                                indexCollation = VoltRexUtil.createIndexCollation(
-                                        index, innerTable, innerScan.getCluster().getRexBuilder(), innerScan.getProgram());
-                            } catch (JSONException e) {
-                                throw new CalcitePlanningException(e.getMessage());
-                            }
+        innerTable.getIndexes().forEach(index -> {
+            // need to pass the join outer child columns count to the visitor
+            Optional<Pair<AccessPath, RexNode>> accessPathPairOpt =
+                    IndexUtil.getCalciteRelevantAccessPathForIndex(
+                    join.getCluster().getRexBuilder(),
+                    innerTable,
+                    join.getCondition(),
+                    program,
+                    index,
+                    SortDirectionType.INVALID,
+                    outerScan.getRowType().getFieldCount(),
+                    true,
+                    join.getJoinType() != JoinRelType.INNER);
 
-                            final TableScan indexScan = new VoltPhysicalTableIndexScan(
-                                    innerScan.getCluster(), innerScan.getTraitSet(), innerScan.getTable(),
-                                    innerScan.getVoltTable(), innerScan.getProgram(), index, accessPath,
-                                    innerScan.getLimitRexNode(), innerScan.getOffsetRexNode(), null,
-                                    null, null, innerScan.getSplitCount(),
-                                    indexCollation);
-                            final RelNode innerChild;
-                            if (call.rels.length == 3) {
-                                innerChild = indexScan;
-                            } else {
-                                innerChild = innerCalc.copy(innerCalc.getTraitSet(), indexScan, innerCalc.getProgram());
-                            }
-                            equiv.put(toIndexJoin(join, outerScan, innerChild, index, accessPath), join);
-                        }));
+            accessPathPairOpt.ifPresent(accessPathPair -> {
+                // Index's collation needs to be based on its own program only - the Calc sits above the scan
+                final RelCollation indexCollation;
+                try {
+                    indexCollation = VoltRexUtil.createIndexCollation(
+                            index, innerTable, innerScan.getCluster().getRexBuilder(), innerScan.getProgram());
+                } catch (JSONException e) {
+                    throw new CalcitePlanningException(e.getMessage());
+                }
+                AccessPath accessPath = accessPathPair.left;
+                RexNode preJoinPredicate = accessPathPair.right;
+                final TableScan indexScan = new VoltPhysicalTableIndexScan(
+                        innerScan.getCluster(), innerScan.getTraitSet(), innerScan.getTable(),
+                        innerScan.getVoltTable(), innerScan.getProgram(), index, accessPath,
+                        innerScan.getLimitRexNode(), innerScan.getOffsetRexNode(), null,
+                        null, null, innerScan.getSplitCount(),
+                        indexCollation, true);
+                final RelNode innerChild;
+                if (call.rels.length == 3) {
+                    innerChild = indexScan;
+                } else {
+                    innerChild = innerCalc.copy(innerCalc.getTraitSet(), indexScan, innerCalc.getProgram());
+                }
+                equiv.put(toIndexJoin(join, preJoinPredicate, outerScan, innerChild, index, accessPath), join);
+            });
+        });
         if (! equiv.isEmpty()) {
             call.transformTo(equiv.keySet().iterator().next(), equiv);
         }

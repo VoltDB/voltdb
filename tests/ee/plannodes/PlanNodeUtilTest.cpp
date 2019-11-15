@@ -47,47 +47,47 @@ class PlanNodeUtilTest : public Test
 TEST_F(PlanNodeUtilTest, getEmptyPlanNode) {
 
     std::vector<PlanNodeType> nodeTypes{
-            PLAN_NODE_TYPE_INVALID,
+            PlanNodeType::Invalid,
 
-            PLAN_NODE_TYPE_SEQSCAN,
-            PLAN_NODE_TYPE_INDEXSCAN,
-            PLAN_NODE_TYPE_INDEXCOUNT,
-            PLAN_NODE_TYPE_TABLECOUNT,
-            PLAN_NODE_TYPE_MATERIALIZEDSCAN,
-            PLAN_NODE_TYPE_TUPLESCAN,
+            PlanNodeType::SeqScan,
+            PlanNodeType::IndexScan,
+            PlanNodeType::IndexCount,
+            PlanNodeType::TableCount,
+            PlanNodeType::MaterializedScan,
+            PlanNodeType::TupleScan,
 
-            PLAN_NODE_TYPE_NESTLOOP,
-            PLAN_NODE_TYPE_NESTLOOPINDEX,
+            PlanNodeType::Nestloop,
+            PlanNodeType::NestloopIndex,
 
-            PLAN_NODE_TYPE_UPDATE,
-            PLAN_NODE_TYPE_INSERT,
-            PLAN_NODE_TYPE_DELETE,
-            PLAN_NODE_TYPE_SWAPTABLES,
+            PlanNodeType::Update,
+            PlanNodeType::Insert,
+            PlanNodeType::Delete,
+            PlanNodeType::SwapTables,
 
-            PLAN_NODE_TYPE_SEND,
-            PLAN_NODE_TYPE_RECEIVE,
-            PLAN_NODE_TYPE_MERGERECEIVE,
+            PlanNodeType::Send,
+            PlanNodeType::Receive,
+            PlanNodeType::MergeReceive,
 
-            PLAN_NODE_TYPE_AGGREGATE,
-            PLAN_NODE_TYPE_HASHAGGREGATE,
-            PLAN_NODE_TYPE_UNION,
-            PLAN_NODE_TYPE_ORDERBY,
-            PLAN_NODE_TYPE_PROJECTION,
-            PLAN_NODE_TYPE_MATERIALIZE,
-            PLAN_NODE_TYPE_LIMIT,
-            PLAN_NODE_TYPE_PARTIALAGGREGATE,
-            PLAN_NODE_TYPE_WINDOWFUNCTION,
-            PLAN_NODE_TYPE_COMMONTABLE
+            PlanNodeType::Aggregate,
+            PlanNodeType::HashAggregate,
+            PlanNodeType::Union,
+            PlanNodeType::OrderBy,
+            PlanNodeType::Projection,
+            PlanNodeType::Materialize,
+            PlanNodeType::Limit,
+            PlanNodeType::PartialAggregate,
+            PlanNodeType::WindowFunction,
+            PlanNodeType::CommonTable
     };
 
     BOOST_FOREACH(PlanNodeType pnt, nodeTypes) {
         try {
             std::unique_ptr<AbstractPlanNode> node(plannodeutil::getEmptyPlanNode(pnt));
-            ASSERT_NE(PLAN_NODE_TYPE_INVALID, pnt);
+            ASSERT_NE(PlanNodeType::Invalid, pnt);
             ASSERT_NE(NULL, node.get());
         }
         catch (const voltdb::SerializableEEException& se) {
-            ASSERT_EQ(PLAN_NODE_TYPE_INVALID, pnt);
+            ASSERT_EQ(PlanNodeType::Invalid, pnt);
         }
     }
 }

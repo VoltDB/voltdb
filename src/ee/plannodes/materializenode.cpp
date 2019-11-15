@@ -50,7 +50,7 @@ namespace voltdb {
 
 MaterializePlanNode::~MaterializePlanNode() { }
 
-PlanNodeType MaterializePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZE; }
+PlanNodeType MaterializePlanNode::getPlanNodeType() const { return PlanNodeType::Materialize; }
 
 std::string MaterializePlanNode::debugInfo(const std::string &spacer) const
 {

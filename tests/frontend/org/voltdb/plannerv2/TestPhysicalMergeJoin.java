@@ -23,7 +23,6 @@
 
 package org.voltdb.plannerv2;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
 public class TestPhysicalMergeJoin extends Plannerv2TestCase {

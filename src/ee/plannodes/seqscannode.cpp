@@ -59,7 +59,7 @@ SeqScanPlanNode::~SeqScanPlanNode()
     }
 }
 
-PlanNodeType SeqScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SEQSCAN; }
+PlanNodeType SeqScanPlanNode::getPlanNodeType() const { return PlanNodeType::SeqScan; }
 
 std::string SeqScanPlanNode::debugInfo(const std::string &spacer) const
 {

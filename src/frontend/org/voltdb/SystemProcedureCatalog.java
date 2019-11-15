@@ -435,9 +435,9 @@ public class SystemProcedureCatalog {
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ValidatePartitioning",
                 new Config("org.voltdb.sysprocs.ValidatePartitioning",
-                        false, true, false, 0, VoltType.INVALID,
+                        false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, true, Restartability.RESTARTABLE));
         builder.put("@GetHashinatorConfig",
                 new Config("org.voltdb.sysprocs.GetHashinatorConfig",
                         false, true,  false, 0, VoltType.INVALID,
@@ -630,7 +630,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.ExportControl",
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
-                        false, true, Restartability.NOT_RESTARTABLE));
+                        false, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsAcked_SP",
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",
                         true, false, false, 0, VoltType.INVALID,

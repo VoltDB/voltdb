@@ -578,7 +578,7 @@ inline void AggregateExecutorBase::initCountingPredicate(const NValueArray& para
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     auto* inlineLimitNode = dynamic_cast<LimitPlanNode*>(
-            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+            m_abstractNode->getInlinePlanNode(PlanNodeType::Limit));
     if (inlineLimitNode) {
         std::tie(limit, offset) = inlineLimitNode->getLimitAndOffset(params);
     }

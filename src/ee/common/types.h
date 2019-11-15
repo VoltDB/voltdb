@@ -167,58 +167,58 @@ enum UnionType {
 // ------------------------------------------------------------------
 // PlanNode Type
 // ------------------------------------------------------------------
-enum PlanNodeType {
-    PLAN_NODE_TYPE_INVALID          = 0, // for parsing...
+enum class PlanNodeType {
+    Invalid          = 0, // for parsing...
 
     //
     // Scan Nodes
     //
-    PLAN_NODE_TYPE_SEQSCAN          = 10,
-    PLAN_NODE_TYPE_INDEXSCAN        = 11,
+    SeqScan          = 10,
+    IndexScan        = 11,
     // special counting index
-    PLAN_NODE_TYPE_INDEXCOUNT       = 12,
-    PLAN_NODE_TYPE_TABLECOUNT       = 13,
+    IndexCount       = 12,
+    TableCount       = 13,
     // for sql-in using indexes
-    PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
+    MaterializedScan = 14,
     // for sql-expression-select
-    PLAN_NODE_TYPE_TUPLESCAN        = 15,
+    TupleScan        = 15,
     //
     // Join Nodes
     //
-    PLAN_NODE_TYPE_NESTLOOP         = 20,
-    PLAN_NODE_TYPE_NESTLOOPINDEX    = 21,
-    PLAN_NODE_TYPE_MERGEJOIN        = 22,
+    Nestloop         = 20,
+    NestloopIndex    = 21,
+    MergeJoin        = 22,
 
     //
     // Operator Nodes
     //
-    PLAN_NODE_TYPE_UPDATE           = 30,
-    PLAN_NODE_TYPE_INSERT           = 31,
-    PLAN_NODE_TYPE_DELETE           = 32,
-    // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
-    PLAN_NODE_TYPE_SWAPTABLES       = 34,
-    PLAN_NODE_TYPE_MIGRATE          = 35,
+    Update           = 30,
+    Insert           = 31,
+    Delete           = 32,
+    // UPSERT           = 33, // RESERVED, but not used in the EE
+    SwapTables       = 34,
+    Migrate          = 35,
 
     //
     // Communication Nodes
     //
-    PLAN_NODE_TYPE_SEND             = 40,
-    PLAN_NODE_TYPE_RECEIVE          = 41,
-    PLAN_NODE_TYPE_MERGERECEIVE     = 42,
+    Send             = 40,
+    Receive          = 41,
+    MergeReceive     = 42,
 
     //
     // Misc Nodes
     //
-    PLAN_NODE_TYPE_AGGREGATE        = 50,
-    PLAN_NODE_TYPE_HASHAGGREGATE    = 51,
-    PLAN_NODE_TYPE_UNION            = 52,
-    PLAN_NODE_TYPE_ORDERBY          = 53,
-    PLAN_NODE_TYPE_PROJECTION       = 54,
-    PLAN_NODE_TYPE_MATERIALIZE      = 55,
-    PLAN_NODE_TYPE_LIMIT            = 56,
-    PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
-    PLAN_NODE_TYPE_WINDOWFUNCTION   = 58,
-    PLAN_NODE_TYPE_COMMONTABLE      = 59
+    Aggregate        = 50,
+    HashAggregate    = 51,
+    Union            = 52,
+    OrderBy          = 53,
+    Projection       = 54,
+    Materialize      = 55,
+    Limit            = 56,
+    PartialAggregate = 57,
+    WindowFunction   = 58,
+    CommonTable      = 59
 };
 
 // ------------------------------------------------------------------

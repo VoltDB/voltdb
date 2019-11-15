@@ -155,7 +155,7 @@ bool PlanNodeFragment::hasDelete() const {
     auto const& planNodes = m_stmtExecutionListMap.find(0)->second;
     return planNodes.cend() != std::find_if(planNodes.cbegin(), planNodes.cend(),
             [](AbstractPlanNode* node) {
-                return node->getPlanNodeType() == PLAN_NODE_TYPE_DELETE || node->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != nullptr;
+                return node->getPlanNodeType() == PlanNodeType::Delete || node->getInlinePlanNode(PlanNodeType::Delete) != nullptr;
             });
 }
 

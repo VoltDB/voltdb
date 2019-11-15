@@ -18,20 +18,20 @@
 package org.voltdb.plannerv2.rules.physical;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
+import org.apache.calcite.util.Pair;
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
@@ -44,7 +44,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 import org.voltdb.plannerv2.utils.IndexUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.SortDirectionType;
-import org.voltdb.utils.CatalogUtil;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class VoltPCalcScanToIndexRule extends RelOptRule {
 
@@ -77,18 +78,17 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
         final RexProgram mergedProgram = RexProgramBuilder.mergePrograms(calcProgram, scanProgram, rexBuilder);
 
         final Table catTable = scan.getVoltTable().getCatalogTable();
-        final List<Column> columns = CatalogUtil.getSortedCatalogItems(catTable.getColumns(), "index");
 
-        final RexNode filterCondition = calc.getProgram().getCondition();
-        RelNode indexScan = null;
+        final RexLocalRef filterCondition = calc.getProgram().getCondition();
         final Map<RelNode, RelNode> equiv = new HashMap<>();
 
         for (Index index : catTable.getIndexes()) {
-            final AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTable, columns, filterCondition, mergedProgram, index, SortDirectionType.INVALID,
-                    -1, false);
+            final Optional<Pair<AccessPath, RexNode>> accsessPathDataOpt =
+                    IndexUtil.getCalciteRelevantAccessPathForIndex(
+                            rexBuilder, catTable, filterCondition, mergedProgram, index,
+                            SortDirectionType.INVALID, -1, false, true);
 
-            if (accessPath != null) {
+            accsessPathDataOpt.ifPresent(accessPathData -> {
                 // if accessPath.other is not null, need to create a new Filter
                 // @TODO Adjust Calc program Condition based on the access path "other" filters
                 RelCollation indexCollation;
@@ -100,18 +100,16 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
                 Preconditions.checkNotNull(indexCollation);
                 final RelNode nextIndexScan = new VoltPhysicalTableIndexScan(
                         scan.getCluster(), scan.getTraitSet(), scan.getTable(), scan.getVoltTable(),
-                        mergedProgram, index, accessPath, scan.getLimitRexNode(), scan.getOffsetRexNode(),
+                        mergedProgram, index, accessPathData.left, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                         scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                        scan.getSplitCount(), indexCollation);
-                if (indexScan == null) {
-                    indexScan = nextIndexScan;
-                } else {
-                    equiv.put(nextIndexScan, calc);
-                }
-            }
+                        scan.getSplitCount(), indexCollation, false);
+                equiv.put(nextIndexScan, calc);
+            });
         }
-        if (indexScan != null) {
-            call.transformTo(indexScan, equiv);
-        }
+        equiv.keySet().stream().findFirst().ifPresent(
+                indexScan -> {
+                    equiv.remove(indexScan);
+                    call.transformTo(indexScan, equiv);
+                });
     }
 }

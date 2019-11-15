@@ -46,7 +46,7 @@
 
 namespace voltdb {
 
-PlanNodeType DeletePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DELETE; }
+PlanNodeType DeletePlanNode::getPlanNodeType() const { return PlanNodeType::Delete; }
 
 void DeletePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {

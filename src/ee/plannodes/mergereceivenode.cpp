@@ -62,7 +62,7 @@ MergeReceivePlanNode::~MergeReceivePlanNode()
     }
 }
 
-PlanNodeType MergeReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MERGERECEIVE; }
+PlanNodeType MergeReceivePlanNode::getPlanNodeType() const { return PlanNodeType::MergeReceive; }
 
 void MergeReceivePlanNode::setScratchTable(AbstractTempTable* table) {
     m_scratchTable.setTable(table);
