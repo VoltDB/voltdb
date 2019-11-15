@@ -853,11 +853,8 @@ SnapshotCompletionInterest, Promotable
             // you will not be able to find those snapshotted views in the snapshot.
             // Here, we will make an exception for those "optional tables" which are the view tables
             // that can be snapshotted in V8.2 or later. If they are not in the snapshot it's OK.
-            Pair<Set<String>, Set<String>> ret = CatalogUtil.getSnapshotableTableNamesFromInMemoryJar(jarfile);
-            Set<String> fullTableNames = ret.getFirst();
-            Set<String> optionalTableNames = ret.getSecond();
-            digestTableNames.forEach(tableName -> fullTableNames.remove(tableName));
-            optionalTableNames.forEach(tableName -> fullTableNames.remove(tableName));
+            Set<String> fullTableNames = SnapshotUtil.getRequiredSnapshotableTableNames(jarfile);
+            fullTableNames.removeAll(digestTableNames);
             // If there are still "normal" tables apart from the snapshotted tables and
             // optionally snapshotted views, we have no choice but fail the restore.
             if (! fullTableNames.isEmpty()) {
