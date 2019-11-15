@@ -63,7 +63,7 @@
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
     <fileset dir='${vendor.lib.dir}'>
-        <include name='kafka-clients-0.10.2.1.jar' />
+        <include name='kafka-clients-2.3.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>

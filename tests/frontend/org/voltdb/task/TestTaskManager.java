@@ -475,6 +475,26 @@ public class TestTaskManager {
             assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
                     previousCount * 3 / 2 > currentCount);
         }
+
+        Thread.sleep(5);
+
+        // Update implicit sub class dep so all should restart
+        vc = new VoltCompiler(false);
+        jarFile = new InMemoryJarfile();
+        vc.addClassToJar(jarFile, TestTaskManager.class);
+        jarFile.removeClassFromJar(TestActionSchedulerParams.class.getName());
+        jarFile.removeClassFromJar(TestActionScheduler.Dummy.class.getName());
+        processUpdateSync(jarFile.getLoader(), true, task1, task2);
+        Thread.sleep(5);
+
+        table = getScheduleStats();
+        while (table.advanceRow()) {
+            String scheduleName = table.getString("TASK_NAME");
+            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
+            long previousCount = invocationCounts.put(scheduleName, currentCount);
+            assertTrue("Count increased for " + scheduleName + " from " + previousCount + " to " + currentCount,
+                    previousCount * 3 / 2 > currentCount);
+        }
     }
 
     /*
@@ -974,6 +994,8 @@ public class TestTaskManager {
         public Collection<String> getDependencies() {
             return Collections.singleton(TestActionSchedulerParams.class.getName());
         }
+
+        static class Dummy {};
     }
 
     public static class TestActionSchedulerParams implements ActionScheduler {

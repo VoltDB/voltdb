@@ -881,7 +881,7 @@ public final class TaskManager {
             Object[] validatorParameters = parameters.clone();
 
             if (takesHelper) {
-                validatorParameters[0] = new TaskHelper(log, b -> generateLogMessage(definition.getName(), b),
+                validatorParameters[0] = new TaskHelperImpl(log, b -> generateLogMessage(definition.getName(), b),
                         definition.getName(), scope, database);
             }
 
@@ -1321,7 +1321,7 @@ public final class TaskManager {
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
-                        new TaskHelper(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
+                        new TaskHelperImpl(log, this::generateLogMessage, m_handler.m_definition.getName(), getScope(),
                                 getScopeId(), m_clientInterface));
 
                 if (m_managerState == ManagerState.READONLY && !m_scheduler.isReadOnly()) {
