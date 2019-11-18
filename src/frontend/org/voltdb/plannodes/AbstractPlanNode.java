@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -127,6 +128,24 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     protected AbstractPlanNode() {
         m_id = NEXT_PLAN_NODE_ID++;
+    }
+
+    /**
+     * Test if current node, or any children node, has the given property recursively
+     * @param pred predicate on a plan node
+     * @return if current node or any children node has the given property
+     */
+    public boolean anyChild(Predicate<AbstractPlanNode> pred) {
+        return pred.test(this) || m_children.stream().anyMatch(child -> child.anyChild(pred));
+    }
+
+    /**
+     * Test if current node as well as all children nodes, have the given property recursively
+     * @param pred predicate on a plan node
+     * @return if current node and all children nodes has the given property
+     */
+    public boolean allChild(Predicate<AbstractPlanNode> pred) {
+        return anyChild(pred.negate());
     }
 
     public int resetPlanNodeIds(int nextId) {
@@ -696,6 +715,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     public AbstractPlanNode getChild(int index) {
         return m_children.get(index);
+    }
+
+    public List<AbstractPlanNode> getChildren() {
+        return m_children;
     }
 
     public void clearChildren() {
