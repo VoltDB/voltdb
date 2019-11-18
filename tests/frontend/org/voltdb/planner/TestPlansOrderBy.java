@@ -495,16 +495,13 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals("P", ((IndexScanPlanNode) partitionPn).getTargetTableAlias());
         }
         {
-            // The subquery SEND/MERGERECEIVE is preserved during the subquery post-processing
-            // resulting in the multi-partitioned join that gets rejected.
-            // In this case, the subquery MERGERECEIVE node is technically redundant but at the moment,
-            // the subquery post-processing still keeps it.
-            // The subquery LIMIT clause is required to suppress the
-            // optimization that replaces the subquery with a simple select.
-            failToCompile(
-                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1 limit 10) P_T, P where P.P_D0 = P_T.PT_D0;",
-                    "This query is not plannable.  It has a subquery which needs cross-partition access.");
-
+            // P is partitioned on P_D0
+            compileToFragments(
+                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1 limit 10) P_T, P where P.P_D0 = P_T.PT_D0;");
+            compileToFragments(
+                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;");
+            failToCompile("select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D1;",
+                    "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition");
         }
         {
             // The subquery with partition column (P_D0) in the GROUP BY columns.

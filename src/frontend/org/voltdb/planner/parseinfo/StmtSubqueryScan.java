@@ -190,7 +190,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             String colNameForParentQuery;
             if (matchedCol != null) {
                 colNameForParentQuery = matchedCol.getColumnAlias();
-            } else if ( ! getScanPartitioning().requiresTwoFragments()) {
+            } else if (! getScanPartitioning().requiresTwoFragments()) {
                 // single partition sub-query case can be single partition without
                 // including partition column in its display column list
                 colNameForParentQuery = partitionCol.getColumnName();
@@ -250,7 +250,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * send/receive pair to the subquery plan that is actually only suitable to
      * a stand-alone plan. This function distinguishes subqueries that should NOT
      * have a send/receive pair.
-     * @param root
      * @return true if there is no aspect to the plan that requires execution on the coordinator.
      */
     @Override
@@ -284,7 +283,9 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
         // we should get rid of the receive node. I (--paul) don't know what this means.
-        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinctWithGroupBy()) {
+        // This is reckless check whether a query needs to run on multiple fragments. It is too conservative/restrictive,
+        // and LIMIT/OFFSET condition does not make any sense.
+        if (selectStmt.hasDistinctWithGroupBy()) {
             return false;
         }
 

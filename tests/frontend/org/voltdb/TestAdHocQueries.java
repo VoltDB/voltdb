@@ -465,7 +465,18 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                     "    ORDER BY metric) t2\n" +
                                     "ON t1.CUSTOM2=t2.CUSTOM2\n" +
                                     "ORDER BY t1.IMPRESSIONS;",
-                            new Object[][] {{1}, {9}}))
+                            new Object[][] {{1}, {9}}),
+                    Pair.of("SELECT t1.CUSTOM2, t1.IMPRESSIONS FROM (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                            "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                            "LEFT OUTER JOIN (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                            "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                            "    ORDER BY metric ASC LIMIT 3) t2\n" +
+                            "ON t1.CUSTOM2=t2.CUSTOM2\n" +
+                            "ORDER BY t1.IMPRESSIONS;", new Object[][] {{"foox", 1}, {"foo", 9}}))
                     .forEach(queryAndResult -> {
                         final String query = queryAndResult.getFirst();
                         final Object[][] expected = queryAndResult.getSecond();
