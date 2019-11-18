@@ -139,10 +139,11 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
         IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8")
           MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-          VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=class-memaccess -Wno-parentheses)
+          VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=class-memaccess)
 
-          IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9")
-            VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=deprecated-copy)
+          # Only need to ignore deprecated-copy in a debug build
+          IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9" AND VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
+             VOLTDB_ADD_COMPILE_OPTIONS(-Wno-deprecated-copy)
           ENDIF()
         ENDIF()
       ENDIF()
