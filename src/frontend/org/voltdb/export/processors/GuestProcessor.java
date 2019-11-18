@@ -267,6 +267,10 @@ public class GuestProcessor implements ExportDataProcessor {
                             }
                         } catch(InterruptedException e) {
                             resubmitSelf();
+                        } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
+                            if (EXPORTLOG.isDebugEnabled()) {
+                                EXPORTLOG.debug("Got rejected execution exception while starting polling");
+                            }
                         } catch (Exception e) {
                             VoltDB.crashLocalVoltDB("Failed to initiate export binary deque poll", true, e);
                         }
