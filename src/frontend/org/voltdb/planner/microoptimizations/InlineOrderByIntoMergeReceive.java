@@ -71,13 +71,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             }
             if (PlanNodeType.ORDERBY == nodeType) {
                 assert(plan instanceof OrderByPlanNode);
-                final AbstractPlanNode newPlan = applyOptimization(
-                        (OrderByPlanNode)plan,
-                        parsedStmt.anyAncester(stmt -> {    // any parent statement containing a sub-query join? ENG-18533
-                            final JoinNode joinNode = stmt.m_joinTree;
-                            return joinNode instanceof BranchNode &&
-                                    ((BranchNode) joinNode).hasChild(c -> c instanceof SubqueryLeafNode);
-                        }));
+                final AbstractPlanNode newPlan = applyOrderByOptimization((OrderByPlanNode)plan, parsedStmt);
                 // (*) If we have changed plan to newPlan, then the
                 //     new nodes are inside the tree unless plan is the top.
                 //     So, return the original argument, planNode, unless
@@ -93,7 +87,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 }
             } else if (PlanNodeType.WINDOWFUNCTION == nodeType) {
                 assert(plan instanceof WindowFunctionPlanNode);
-                AbstractPlanNode newPlan = applyOptimization((WindowFunctionPlanNode)plan);
+                AbstractPlanNode newPlan = applyWindowOptimization((WindowFunctionPlanNode)plan);
                 // See above for why this is the way it is.
                 if (newPlan != plan) {
                     return newPlan;
@@ -115,7 +109,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
      * @param plan
      * @return
      */
-    private AbstractPlanNode applyOptimization(WindowFunctionPlanNode plan) {
+    private AbstractPlanNode applyWindowOptimization(WindowFunctionPlanNode plan) {
         assert(plan.getChildCount() == 1);
         assert(plan.getChild(0) != null);
         AbstractPlanNode child = plan.getChild(0);
@@ -180,10 +174,10 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
      * in the order matching the ORDER BY order
      *
      * @param orderbyNode - ORDER BY node to optimize
-     * @param hasSubQueryJoin - does the query contains a sub-query join?
+     * @param parsed - parsed statement, possibly a sub-statement
      * @return optimized plan
      */
-    AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode, boolean hasSubQueryJoin) {
+    AbstractPlanNode applyOrderByOptimization(OrderByPlanNode orderbyNode, AbstractParsedStmt parsed) {
         // Find all child RECEIVE nodes. We are not interested in the MERGERECEIVE nodes there
         // because they could only come from subqueries.
         final List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -265,7 +259,12 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 return orderbyNode;
             }
         }
-        if (hasSubQueryJoin && orderbyNode.allChild(AbstractPlanNode::hasReplicatedResult)) {
+
+        //  ENG-18533: any parent statement containing a sub-query join, and order-by a partitioned table?
+        if (parsed.anyAncester(
+                stmt -> stmt.m_joinTree instanceof BranchNode &&
+                        ((BranchNode) stmt.m_joinTree).hasChild(c -> c instanceof SubqueryLeafNode)) &&
+                orderbyNode.allChild(AbstractPlanNode::hasReplicatedResult)) {
             // ENG-18533 - don't combine order-by into merge-receive node for any partitioned plan node, since
             // this would prevent joins of subquery on partitioned table with appropriate join condition, into
             // falsely thinking that it is cross-partitioned query
