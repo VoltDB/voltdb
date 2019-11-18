@@ -204,11 +204,6 @@ public:
     ElasticIndexHashRange();
 
     /**
-     * Copy constructor.
-     */
-    ElasticIndexHashRange(const ElasticIndexHashRange &other);
-
-    /**
      * From hash accessor.
      */
     ElasticHash getLowerBound() const;
@@ -506,13 +501,6 @@ inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHas
 inline ElasticIndexHashRange::ElasticIndexHashRange() :
     // min->min covers all possible values, min->max would not.
     m_from(std::numeric_limits<int32_t>::min()), m_to(std::numeric_limits<int32_t>::max())
-{}
-
-/**
- * Copy constructor.
- */
-inline ElasticIndexHashRange::ElasticIndexHashRange(const ElasticIndexHashRange &other) :
-    m_from(other.m_from), m_to(other.m_to)
 {}
 
 /**

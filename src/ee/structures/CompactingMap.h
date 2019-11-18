@@ -177,7 +177,6 @@ public:
         const KeyValuePair &pair() { return m_node->kv; }
     public:
         iterator() : m_map(NULL), m_node(NULL) {}
-        iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
         const Key &key() const { return m_node->key(); }
         const Data &value() const { return m_node->value(); }
         void setValue(const Data &value) { m_node->kv.setValue(value); }
