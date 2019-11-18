@@ -552,8 +552,10 @@ public class InitiatorMailbox implements Mailbox
     private void updateServiceState() {
         final RealVoltDB db = (RealVoltDB) VoltDB.instance();
         final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
-        init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
-        VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
+        if (init.getServiceState().isNormal()) {
+            init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
+            VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
+        }
     }
 
     /** Produce the repair log. This is idempotent. */

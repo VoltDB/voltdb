@@ -34,6 +34,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -46,11 +47,11 @@ import org.voltdb.utils.VoltFile;
 public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
 
     static final String SCHEMA =
-            "CREATE TABLE kv migrate to target foo (" +
+            "CREATE TABLE kv (" +
                     "key bigint not null, " +
                     "nondetval bigint not null, " +  // non-deterministic value (host ID)
                     "PRIMARY KEY(key)" +
-             ") USING TTL 30 seconds ON COLUMN nondetval; " +
+             "); " +
             "PARTITION TABLE kv ON COLUMN key;" +
             "CREATE INDEX idx_kv ON kv(nondetval);";
 
@@ -117,7 +118,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Do a non-deterministic insertion
      */
-    @Test
+    //@Test
     public void testNonDeterministicInsert() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministicInsert");
@@ -151,7 +152,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
      * Do a non-deterministic insertion followed by a single partition read-only operation.
      * ENG-3288 - Expect non-deterministic read-only queries to succeed.
      */
-    @Test
+    //@Test
     public void testNonDeterministic_RO_SP() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministic_RO_SP");
@@ -168,7 +169,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
-    @Test
+    //@Test
     public void testDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testDeterministicProc");
@@ -186,7 +187,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Test that different whitespace fails the determinism CRC check on SQL
      */
-    @Test
+    //@Test
     public void testWhitespaceChanges() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testWhitespaceChanges");
@@ -216,7 +217,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    //@Test
     public void testMultistatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testMultistatementNonDeterministicProc");
@@ -256,7 +257,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    //@Test
     public void testPartialstatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testPartialstatementNonDeterministicProc");
@@ -296,7 +297,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    //@Test
     public void testBuggyNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testBuggyNonDeterministicProc");
@@ -326,7 +327,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
+    @Test
     public void testOnLargeCluster() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testOnLargeCluster", 2, 3, 18);
@@ -343,11 +344,12 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             if (MiscUtils.isPro()) {
                 verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
-                insertMoreNormalData(10001, 10100);
+                insertMoreNormalData(10001, 101000);
             } else {
                 fail("testOnLargeCluster failed");
             }
         } catch (ProcCallException e) {
+            e.printStackTrace();
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Crash deliberately"));
             // make sure every host witnessed the hash mismatch
@@ -367,7 +369,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
 
     private void verifyTopologyAfterHashMismatch(LocalCluster server) {
         //allow time to get the stats
-        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+        final long maxSleep = TimeUnit.MINUTES.toMillis(20);
         boolean done = false;
         long start = System.currentTimeMillis();
         while (!done) {
