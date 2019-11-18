@@ -151,7 +151,6 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
                                           TupleSchema const* schema,
                                           TableIndexScheme* scheme) {
     std::vector<int> index_columns;
-    std::vector<ValueType> column_types;
 
     // The catalog::Index object now has a list of columns that are to be
     // used
