@@ -38,23 +38,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PlanNodeTree;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
@@ -675,10 +659,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         equivalentSql = "SELECT A A1 FROM P1 T1 WHERE A > 3";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
-        pn = planNodes.get(0).getChild(0);
-        checkSeqScan(pn, "T1", "A1");
+        planNodes.get(0).getChild(0);
         checkSubquerySimplification(sql, equivalentSql);
-
 
         //
         // Group by
@@ -941,12 +923,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
                 "(SELECT A A2, D D2 FROM P2) T2 where T2.A2=2", 1);
 
-
         // Test with LIMIT
-        failToCompile("select A1, A2, D1, D2 " +
+        checkFragmentCount("select A1, A2, D1, D2 " +
                 "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
                 "(SELECT A A2, D D2 FROM P2 ORDER BY D LIMIT 3) T2 where T2.A2=2",
-                joinErrorMsg);
+                1);
     }
 
     public void testPartitionedGroupByWithoutAggregate() {
@@ -1436,13 +1417,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "SELECT -8, T1.NUM " +
                 "FROM SR4 T0, (select RATIO, NUM, DESC from SP4 order by DESC, NUM, RATIO limit 1 offset 1) T1 " +
                 "WHERE (T1.NUM + 5 ) > 44");
-
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof ReceivePlanNode);
+
+        nlpn = planNodes.get(1).getChild(0);
+        // inline limit with order by
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(1);
@@ -1453,22 +1437,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         // inline limit with order by
-        assertTrue(pn instanceof MergeReceivePlanNode);
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
-
-        pn = planNodes.get(1).getChild(0);
-        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
-        pn = pn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "SP4");
 
-
-        planNodes = compileToFragments(
-                "SELECT * FROM (SELECT A, C FROM P1 LIMIT 3) T1 " +
-                "where T1.A = 1 ");
-        assertEquals(2, planNodes.size());
+        assertEquals(1,
+                compileToFragments("SELECT * FROM (SELECT A, C FROM P1 LIMIT 3) T1 where T1.A = 1 ").size());
     }
 
     public void testPartitionedAlias() {
@@ -1602,21 +1574,15 @@ public class TestPlansSubQueries extends PlannerTestCase {
         //
         // (6) Subquery with partition table join with partition table on outer level
         //
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, P2 " +
-                "where T1.A = P2.A", joinErrorMsg);
-
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5 OFFSET 1) T1, P2 " +
-                "where T1.A = P2.A", joinErrorMsg);
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, P2 where T1.A = P2.A");
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5 OFFSET 1) T1, P2 where T1.A = P2.A");
 
         // Without GROUP BY.
         failToCompile("SELECT * FROM (SELECT COUNT(*) FROM P1) T1, P2 ", joinErrorMsg);
         failToCompile("SELECT * FROM (SELECT MAX(C) FROM P1) T1, P2 ", joinErrorMsg);
         failToCompile("SELECT * FROM (SELECT SUM(A) FROM P1) T1, P2 ", joinErrorMsg);
 
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 LIMIT 5) T1, P2 " +
-                "where T1.A = P2.A", joinErrorMsg);
-
-
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 LIMIT 5) T1, P2 where T1.A = P2.A");
 
         // Nested LIMIT/OFFSET
         failToCompile("SELECT * FROM (SELECT R1.A, R1.C FROM R1, " +
@@ -1633,17 +1599,17 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "where T1.A = P2.A");
 
         // Invalid on the same level
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
-                "                    (SELECT A, C FROM P2) T2 " +
-                "where T1.A = T2.A", joinErrorMsg);
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, \n" +
+                "                    (SELECT A, C FROM P2) T2 \n" +
+                "where T1.A = T2.A");
 
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
-                "                    (SELECT A, C FROM P2) T2, P3 " +
-                "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, \n" +
+                "                    (SELECT A, C FROM P2) T2, P3 \n" +
+                "where T1.A = T2.A AND P3.A = T2.A");
 
-        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
-                "                    (SELECT A, C FROM R2) T2, P3 " +
-                "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
+        compileToFragments("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, \n" +
+                "                    (SELECT A, C FROM R2) T2, P3 \n" +
+                "where T1.A = T2.A AND P3.A = T2.A");
 
         // Error in one of the sub-queries and return exception directly for the whole statement
         String sql = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, " +
