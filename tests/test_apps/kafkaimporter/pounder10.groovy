@@ -83,7 +83,7 @@ def kconf = [
     (VALUE_SERIALIZER_CLASS_CONFIG):StringSerializer.class.name,
     (BOOTSTRAP_SERVERS_CONFIG):opts.b,
     (COMPRESSION_TYPE_CONFIG):opts.c,
-    (BLOCK_ON_BUFFER_FULL_CONFIG):true,
+    (MAX_BLOCK_MS_CONFIG):60000,
     (ACKS_CONFIG):'all',
     (RETRIES_CONFIG):4
 ]
