@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 import com.google_voltpatches.common.base.Preconditions;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -116,7 +117,7 @@ public abstract class AbstractParsedStmt {
     public final Database m_db;
 
     // Parent statement if any
-    public AbstractParsedStmt m_parentStmt = null;
+    public AbstractParsedStmt m_parentStmt;
     boolean m_isUpsert = false;
 
     // mark whether the statement's parent is UNION clause or not
@@ -141,6 +142,14 @@ public abstract class AbstractParsedStmt {
         m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
+    }
+
+    /**
+     * Test if any parent statement satisfies the predicate.
+     * @return whether any parent statement satisfies the predicate
+     */
+    public boolean anyAncester(Predicate<AbstractParsedStmt> pred) {
+        return m_parentStmt != null && (pred.test(m_parentStmt) || m_parentStmt.anyAncester(pred));
     }
 
     public void setDDLIndexedTable(Table tbl) {

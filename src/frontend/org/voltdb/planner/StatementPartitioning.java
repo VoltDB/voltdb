@@ -77,7 +77,7 @@ import org.voltdb.plannodes.SchemaColumn;
  *
  * See the comment in SelectSubPlanAssembler.getSelectSubPlanForJoin
  */
-public class StatementPartitioning implements Cloneable{
+public class StatementPartitioning implements Cloneable {
     /**
      * This value is only meaningful if m_inferPartitioning is false.
      * It can be set true to force single-partition statement planning and
@@ -210,14 +210,7 @@ public class StatementPartitioning implements Cloneable{
      * @return      true or false
      */
     private static boolean isUsefulPartitioningExpression(AbstractExpression expr) {
-        if (expr instanceof ParameterValueExpression) {
-            return true;
-        }
-        if (expr instanceof ConstantValueExpression) {
-            return true;
-        }
-
-        return false;
+        return expr instanceof ParameterValueExpression || expr instanceof ConstantValueExpression;
     }
 
     /**
@@ -280,8 +273,8 @@ public class StatementPartitioning implements Cloneable{
      */
     public boolean isInferredSingle() {
         return m_inferPartitioning &&
-                (((m_countOfIndependentlyPartitionedTables == 0) && ! m_isDML)  ||
-                        (singlePartitioningExpression() != null));
+                ((m_countOfIndependentlyPartitionedTables == 0 && ! m_isDML)  ||
+                        singlePartitioningExpression() != null);
     }
 
     /**
@@ -289,15 +282,10 @@ public class StatementPartitioning implements Cloneable{
      */
     public boolean requiresTwoFragments() {
         if (m_inferPartitioning) {
-            if (isInferredSingle()) {
-                return false;
-            }
+            return !isInferredSingle();
         } else {
-            if (m_forceSP || (m_countOfPartitionedTables == 0)) {
-                return false;
-            }
+            return !m_forceSP && (m_countOfPartitionedTables != 0);
         }
-        return true;
     }
 
     /**
@@ -319,8 +307,9 @@ public class StatementPartitioning implements Cloneable{
     public AbstractExpression singlePartitioningExpressionForReport() {
         if (m_inferredExpression.size() == 1) {
             return m_inferredExpression.iterator().next();
+        } else {
+            return null;
         }
-        return null;
     }
 
     /**
@@ -416,15 +405,14 @@ public class StatementPartitioning implements Cloneable{
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
                 CompiledPlan subqueryPlan = subScan.getBestCostPlan();
-                if (( ! subScan.canRunInOneFragment()) ||
-                        ((subqueryPlan != null) &&
-                         subqueryPlan.rootPlanGraph.hasAnyNodeOfClass(AbstractReceivePlanNode.class))) {
+                if (! subScan.canRunInOneFragment() ||  // NOTE: the receive-plan node check applies to multi-fragment only
+                        subqueryPlan != null && subqueryPlan.rootPlanGraph.hasAnyNodeOfClass(AbstractReceivePlanNode.class)) {
                     if (subqueryHasReceiveNode) {
                         // Has found another subquery with receive node on the same level
                         // Not going to support this kind of subquery join with 2 fragment plan.
                         setJoinValid(false);
                         setJoinInvalidReason("This multipartition query is not plannable.  "
-                                             + "It has a subquery which cannot be single partition.");
+                                + "It has a subquery which cannot be single partition.");
                         // Still needs to count the independent partition tables
                         break;
                     }
@@ -438,18 +426,16 @@ public class StatementPartitioning implements Cloneable{
                         // Any process based on this subquery should require 1 fragment only.
                         continue;
                     }
-                } else {
-                    // this subquery partition table without receive node
+                } else { // this subquery partition table without receive node
                     hasPartitionedTableJoin = true;
                 }
-            } else {
-                // This table is a partition table
+            } else { // This table is a partition table
                 hasPartitionedTableJoin = true;
             }
 
             boolean unfiltered = true;
             for (AbstractExpression candidateColumn : valueEquivalence.keySet()) {
-                if ( ! (candidateColumn instanceof TupleValueExpression)) {
+                if (! (candidateColumn instanceof TupleValueExpression)) {
                     continue;
                 }
                 TupleValueExpression candidatePartitionKey = (TupleValueExpression) candidateColumn;
@@ -472,8 +458,9 @@ public class StatementPartitioning implements Cloneable{
         //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess found: " + m_countOfIndependentlyPartitionedTables + " = " + eqSets.size() + " + " + unfilteredPartitionKeyCount);
         if (m_countOfIndependentlyPartitionedTables > 1) {
             setJoinValid(false);
-            setJoinInvalidReason("This query is not plannable.  "
-                                 + "The planner cannot guarantee that all rows would be in a single partition.");
+            setJoinInvalidReason(
+                    "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+
         }
 
         // This is the case that subquery with receive node join with another partition table
@@ -483,7 +470,7 @@ public class StatementPartitioning implements Cloneable{
             setJoinInvalidReason("This query is not plannable.  It has a subquery which needs cross-partition access.");
         }
 
-        if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
+        if (unfilteredPartitionKeyCount == 0 && eqSets.size() == 1) {
             for (Set<AbstractExpression> partitioningValues : eqSets) {
                 for (AbstractExpression constExpr : partitioningValues) {
                     if (constExpr instanceof TupleValueExpression) {
@@ -527,27 +514,14 @@ public class StatementPartitioning implements Cloneable{
 
     private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,
             List<SchemaColumn> columnsNeedingCoverage) {
-        if (columnsNeedingCoverage == null)
+        if (columnsNeedingCoverage == null) {
             return false;
-
-        for (SchemaColumn col: columnsNeedingCoverage) {
-            String partitionedTableAlias = col.getTableAlias();
-            String columnNeedingCoverage = col.getColumnAlias();
-
-            assert(candidatePartitionKey.getTableAlias() != null);
-            if ( ! candidatePartitionKey.getTableAlias().equals(partitionedTableAlias)) {
-                continue;
-            }
-            String candidateColumnName = candidatePartitionKey.getColumnName();
-            if ( ! candidateColumnName.equals(columnNeedingCoverage)) {
-                continue;
-            }
-
-            // Maybe need more checkings
-            return true;
+        } else {
+            assert (candidatePartitionKey.getTableAlias() != null);
+            return columnsNeedingCoverage.stream()
+                    .anyMatch(col -> candidatePartitionKey.getTableAlias().equals(col.getTableAlias()) &&
+                            candidatePartitionKey.getColumnName().equals(col.getColumnAlias()));
         }
-
-        return false;
     }
 
     /**
@@ -557,9 +531,7 @@ public class StatementPartitioning implements Cloneable{
      * @param tableCacheList
      * @throws PlanningErrorException
      */
-    void analyzeTablePartitioning(Collection<StmtTableScan> collection)
-            throws PlanningErrorException
-    {
+    void analyzeTablePartitioning(Collection<StmtTableScan> collection) throws PlanningErrorException {
         m_countOfPartitionedTables = 0;
         // Do we have a need for a distributed scan at all?
         // Iterate over the tables to collect partition columns.
