@@ -700,6 +700,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_children.get(index);
     }
 
+    public List<AbstractPlanNode> getChildren() {
+        return m_children;
+    }
+
     public void clearChildren() {
         m_children.clear();
     }

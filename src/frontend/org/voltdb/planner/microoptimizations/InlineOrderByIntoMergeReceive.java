@@ -28,6 +28,9 @@ import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -68,7 +71,13 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             }
             if (PlanNodeType.ORDERBY == nodeType) {
                 assert(plan instanceof OrderByPlanNode);
-                AbstractPlanNode newPlan = applyOptimization((OrderByPlanNode)plan);
+                final AbstractPlanNode newPlan = applyOptimization(
+                        (OrderByPlanNode)plan,
+                        parsedStmt.anyAncester(stmt -> {    // any parent statement containing a sub-query join? ENG-18533
+                            final JoinNode joinNode = stmt.m_joinTree;
+                            return joinNode instanceof BranchNode &&
+                                    ((BranchNode) joinNode).hasChild(c -> c instanceof SubqueryLeafNode);
+                        }));
                 // (*) If we have changed plan to newPlan, then the
                 //     new nodes are inside the tree unless plan is the top.
                 //     So, return the original argument, planNode, unless
@@ -92,10 +101,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                     return planNode;
                 }
             }
-
-            for (int i = 0; i < plan.getChildCount(); i++) {
-                children.add(plan.getChild(i));
-            }
+            children.addAll(plan.getChildren());
         }
         return planNode; // Do not apply the optimization.
     }
@@ -117,7 +123,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // SP Plans which have an index which can provide
         // the window function ordering don't create
         // an order by node.
-        if ( ! ( child instanceof OrderByPlanNode ) ) {
+        if (! (child instanceof OrderByPlanNode)) {
             return plan;
         }
         OrderByPlanNode onode = (OrderByPlanNode)child;
@@ -147,7 +153,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // to record a number in the plan node and
         // then check that child.getWindowFunctionUsesIndex()
         // returns the number in the plan node.
-        if ( ! ( child instanceof IndexSortablePlanNode)) {
+        if (! (child instanceof IndexSortablePlanNode)) {
             return plan;
         }
         IndexSortablePlanNode indexed = (IndexSortablePlanNode)child;
@@ -174,9 +180,10 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
      * in the order matching the ORDER BY order
      *
      * @param orderbyNode - ORDER BY node to optimize
+     * @param hasSubQueryJoin - does the query contains a sub-query join?
      * @return optimized plan
      */
-    AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode) {
+    AbstractPlanNode applyOptimization(OrderByPlanNode orderbyNode, boolean hasSubQueryJoin) {
         // Find all child RECEIVE nodes. We are not interested in the MERGERECEIVE nodes there
         // because they could only come from subqueries.
         final List<AbstractPlanNode> receives = orderbyNode.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -258,7 +265,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 return orderbyNode;
             }
         }
-        if (orderbyNode.allChild(AbstractPlanNode::hasReplicatedResult)) {
+        if (hasSubQueryJoin && orderbyNode.allChild(AbstractPlanNode::hasReplicatedResult)) {
             // ENG-18533 - don't combine order-by into merge-receive node for any partitioned plan node, since
             // this would prevent joins of subquery on partitioned table with appropriate join condition, into
             // falsely thinking that it is cross-partitioned query
