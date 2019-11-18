@@ -68,11 +68,11 @@ public class ExportRabbitMQVerifier {
         final Channel channel = connection.createChannel();
 
         try {
-            channel.addShutdownListener(new ShutdownListener() {		
-		@Override
-		public void shutdownCompleted(ShutdownSignalException cause) {
+            channel.addShutdownListener(new ShutdownListener() {
+                @Override
+                public void shutdownCompleted(ShutdownSignalException cause) {
                     log.info("shutdownCompleted, cause: " + cause.toString());
-		}
+                }
             });
             channel.exchangeDeclare(m_exchangeName, "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
