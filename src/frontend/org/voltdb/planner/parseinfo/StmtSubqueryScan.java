@@ -369,9 +369,8 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         // so we can return anything.
         if (plan != null) {
             return orderIsDeterministic && plan.isOrderDeterministic();
-        } else {
-            return orderIsDeterministic;
         }
+        return orderIsDeterministic;
     }
 
     @Override
@@ -400,9 +399,8 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         CompiledPlan scanBestPlan = getBestCostPlan();
         if (scanBestPlan != null) {
             return hasSignificantOffsetOrLimit || (! scanBestPlan.isOrderDeterministic() && scanBestPlan.hasLimitOrOffset());
-        } else {
-            return hasSignificantOffsetOrLimit;
         }
+        return hasSignificantOffsetOrLimit;
     }
     public final CompiledPlan getBestCostPlan() {
         return m_bestCostPlan;
