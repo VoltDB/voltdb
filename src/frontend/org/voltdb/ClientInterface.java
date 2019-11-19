@@ -2442,16 +2442,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Many replicas could trigger hash mismatch, do not over schedule the task
-            // Let the ongoing @StopReplicas to remove them as many as possible.
+            // Let's delay for 5s to remove them as many mismatched replicas as possible in one @StopReplicas transaction
             if (!m_hashMismatchProcessInProgress.get()) {
                 m_hashMismatchProcessInProgress.set(true);
                 m_replicaRemovalExecutor.schedule(() -> {
                     startRemoveReplicas();
                     if (VoltZK.hasHashMismatchedSite(m_zk)) {
                         if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Replica removal has been rescheduled.");
+                            tmLog.debug("More mismacthed replicas, @StopReplicas has been rescheduled.");
                         }
-                       // m_mailbox.deliver(new HashMismatchMessage());
+                        m_mailbox.deliver(new HashMismatchMessage());
                     }
                 }, 5, TimeUnit.SECONDS);
             }
