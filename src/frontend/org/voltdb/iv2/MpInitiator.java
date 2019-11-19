@@ -17,7 +17,10 @@
 
 package org.voltdb.iv2;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -45,6 +48,7 @@ import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -58,15 +62,48 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
     LeaderCache.Callback m_replicaRemovalHandler = new LeaderCache.Callback() {
         @Override
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
-            if (!cache.isEmpty()) {
-                m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
-                        m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
-                        new HashMismatchMessage());
+            if (cache == null || cache.isEmpty()) {
+                return;
+            }
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(" [MpInitiator] hash mismatched replicas: " + Arrays.toString(cache.values().toArray()));
+            }
+            Set<Long> replicas = Sets.newHashSet();
+            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                replicas.add(entry.getValue().m_HSId);
+            }
+            synchronized(m_replicasRemovedSet) {
+                if (m_replicasRemovedSet.isEmpty()) {
+                    m_replicasRemovedSet.addAll(replicas);
+                    m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
+                            m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
+                            new HashMismatchMessage());
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug(" [MpInitiator] replica removal request with: " + Arrays.toString(cache.values().toArray()));
+                    }
+                    return;
+                }
+                // Compare with previous set and determine if there are any newly added replicas
+                for (Long r : replicas) {
+                    // New replica
+                    if (!m_replicasRemovedSet.remove(r)) {
+                        m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
+                                m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
+                                new HashMismatchMessage());
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug(" [MpInitiator] replica removal request with: " + Arrays.toString(cache.values().toArray()));
+                        }
+                        break;
+                    }
+                }
+                m_replicasRemovedSet.clear();
+                m_replicasRemovedSet.addAll(replicas);
             }
         }
     };
 
     LeaderCache m_replicaRemovalCache;
+    Set<Long> m_replicasRemovedSet = Sets.newHashSet();
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
     {
         super(VoltZK.iv2mpi,

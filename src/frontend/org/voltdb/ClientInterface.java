@@ -262,6 +262,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final AtomicBoolean m_isAcceptingConnections = new AtomicBoolean(false);
 
+    // The hash mismatch @StopReplicas request is being processed.
+    private final AtomicBoolean m_hashMismatchProcessInProgress = new AtomicBoolean(false);
+
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
         private final int m_port;
@@ -1264,7 +1267,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;
                     m_messenger.notifyOfHostDown(CoreUtils.getHostIdFromHSId(msg.m_reportingHSId));
                 } else if (message instanceof HashMismatchMessage) {
-                    processReplicaRemovalTask();
+                    processReplicaRemovalTask((HashMismatchMessage)message);
                 } else {
                     // m_d is for test only
                     m_d.offer(message);
@@ -2431,18 +2434,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    void processReplicaRemovalTask() {
+    void processReplicaRemovalTask(HashMismatchMessage message) {
         synchronized(m_lock) {
             if (m_replicaRemovalExecutor == null) {
                 m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
                         CoreUtils.getThreadFactory("ReplicaRemoval"));
             }
-            m_replicaRemovalExecutor.submit(() -> {
-                if(!startRemoveReplicas()) {
-                    // TODO: properly reschedule the work
-                    m_mailbox.deliver(new HashMismatchMessage());
-                }
-            });
+
+            // Many replicas could trigger hash mismatch, do not over schedule the task
+            // Let the ongoing @StopReplicas to remove them as many as possible.
+            if (!m_hashMismatchProcessInProgress.get()) {
+                m_hashMismatchProcessInProgress.set(true);
+                m_replicaRemovalExecutor.schedule(() -> {
+                    startRemoveReplicas();
+                    if (VoltZK.hasHashMismatchedSite(m_zk)) {
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Replica removal has been rescheduled.");
+                        }
+                       // m_mailbox.deliver(new HashMismatchMessage());
+                    }
+                }, 5, TimeUnit.SECONDS);
+            }
         }
     }
 
@@ -2483,10 +2495,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
             ClientResponse resp = cb.getResponse(timeoutMS);
-            return(resp.getStatus() == ClientResponse.SUCCESS);
+            return (resp.getStatus() == ClientResponse.SUCCESS);
         } catch (Exception e) {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
+            m_hashMismatchProcessInProgress.set(false);
             VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
         }
         return false;
