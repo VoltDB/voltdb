@@ -79,6 +79,7 @@
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/streamedtable.h"
+#include "storage/SystemTableFactory.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
@@ -261,6 +262,11 @@ VoltDBEngine::~VoltDBEngine() {
 
             m_catalogDelegates.erase(eraseThis->first);
         }
+
+        for (auto entry : m_systemTables) {
+            entry.second->decrementRefcount();
+        }
+        m_systemTables.clear();
 
         if (m_isLowestSite) {
             SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
@@ -938,6 +944,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
+    createSystemTables();
+
     //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
     std::map<std::string, ExportTupleStream*> purgedStreams;
     if (processCatalogAdditions(timestamp, false, true, purgedStreams) == false) {
@@ -1187,6 +1195,17 @@ static bool haveDifferentSchema(
     }
 
     return false;
+}
+
+void VoltDBEngine::createSystemTables() {
+    SystemTableFactory factory(m_compactionThreshold);
+    for (SystemTableId id : SystemTableFactory::getAllSystemTableIds()) {
+        int32_t intId = static_cast<int32_t>(id);
+        vassert(m_systemTables.find(intId) == m_systemTables.end());
+        PersistentTable *table = factory.create(id);
+        table->incrementRefcount();
+        m_systemTables[intId] = table;
+    }
 }
 
 /*
@@ -1879,6 +1898,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         // need to re-map all the table ids / indexes
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
+
+        m_tables.insert(m_systemTables.begin(), m_systemTables.end());
     }
 
     // Walk through table delegates and update local table collections
@@ -1989,6 +2010,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             }
         }
     }
+
     resetDRConflictStreamedTables();
 }
 
