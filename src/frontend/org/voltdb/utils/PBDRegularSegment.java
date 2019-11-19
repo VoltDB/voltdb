@@ -870,6 +870,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean allReadAndDiscarded() {
+            return m_discardCount == m_numOfEntries;
+        }
+
+        @Override
         public void markAllReadAndDiscarded() {
             // This doesn't set the readOffset and bytesRead nor does it move the file pointer,
             // but just updates the read and discarded count
@@ -1101,6 +1106,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             m_readCursors.remove(m_cursorId);
             if (keep) {
                 m_closedCursors.put(m_cursorId, this);
+            } else { // if this was already closed, remove it for good
+                m_closedCursors.remove(m_cursorId);
             }
             if (m_readCursors.isEmpty() && !m_isActive) {
                 closeReadersAndFile();
