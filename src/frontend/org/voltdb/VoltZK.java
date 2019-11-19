@@ -664,7 +664,8 @@ public class VoltZK {
     public static void addHashMismatchedSite(ZooKeeper zk, long hsId) {
         try {
             int hostId = CoreUtils.getHostIdFromHSId(hsId);
-            String idPath = (hostId > 0 ? String.valueOf(hostId) : "") + CoreUtils.getSiteIdFromHSId(hsId);
+            // With 10000x - site id, no sites would have the same idPath in reality.
+            String idPath = String.valueOf(hostId * 10000) + CoreUtils.getSiteIdFromHSId(hsId);
             String id = Long.toString(Long.MAX_VALUE) + "/" + Long.toString(hsId);
             zk.create(ZKUtil.joinZKPath(hashMismatchedReplicas, idPath),
                     id.getBytes(Charsets.UTF_8),
@@ -678,19 +679,21 @@ public class VoltZK {
     public static void removeHashMismatchedSite(ZooKeeper zk, long hsId) {
         try {
             int hostId = CoreUtils.getHostIdFromHSId(hsId);
-            String idPath = (hostId > 0 ? String.valueOf(hostId) : "") + CoreUtils.getSiteIdFromHSId(hsId);
+            String idPath = String.valueOf(hostId * 10000) + CoreUtils.getSiteIdFromHSId(hsId);
             final String path = ZKUtil.joinZKPath(hashMismatchedReplicas, idPath);
             zk.delete(path, -1);
+        } catch (KeeperException.NoNodeException e) {
         } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to delete hash mismatched replica info", true, e);
         }
     }
 
     public static boolean hasHashMismatchedSite(ZooKeeper zk) {
         try {
-            List<String> nodesSnapshotting = zk.getChildren(hashMismatchedReplicas, false);
-            return (!nodesSnapshotting.isEmpty());
+            List<String> mismatchedReplicas = zk.getChildren(hashMismatchedReplicas, false);
+            return (!mismatchedReplicas.isEmpty());
         } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to read hahs mismatched sites.", true, e);
+            VoltDB.crashLocalVoltDB("Unable to read hash mismatched sites.", true, e);
         }
         return false;
     }

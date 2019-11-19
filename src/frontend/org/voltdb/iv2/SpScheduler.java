@@ -966,7 +966,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        tmLog.debug(message);
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
