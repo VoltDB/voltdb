@@ -118,7 +118,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         return null;
                     }
 
-                    segmentReader.closeAndSaveReaderState();
+                    // Save closed readers until everything in the segment is acked.
+                    if (segmentReader.allReadAndDiscarded()) {
+                        segmentReader.close();
+                    } else {
+                        segmentReader.closeAndSaveReaderState();
+                    }
                     m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
                     // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
@@ -258,35 +263,56 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         retcont.discard();
                         assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
 
-                        // Only continue if open there is another segment and this is the first entry of a segment
-                        if (m_cursorClosed || m_segments.size() == 1
-                                || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
-                                || !canDeleteSegmentsBefore(segment)) {
+                        if (m_cursorClosed) {
                             return;
                         }
 
-                        if (m_rewoundFromId == segment.m_id) {
-                            m_rewoundFromId = -1;
+                        //Close and remove segment readers that were all acked and before current PBD reader segment.
+                        PBDSegmentReader<M> segmentReader = segment.getReader(m_cursorId);
+                        assert(segmentReader != null); // segment reader is only closed and removed after all are acked
+                        assert(m_segment != null);
+                        // If the reader has moved past this and all have been acked close this segment reader.
+                        if (segmentReader.allReadAndDiscarded() && segment.segmentIndex() < m_segment.m_index) {
+                            try {
+                                segmentReader.close();
+                            } catch(IOException e) {
+                                m_usageSpecificLog.warn("Unexpected error closing PBD file " + m_segment.m_file, e);
+                            }
                         }
 
-                        try {
-                            Iterator<PBDSegment<M>> iter = m_segments.headMap(segment.segmentIndex(), false).values()
-                                    .iterator();
-                            while (iter.hasNext()) {
-                                PBDSegment<M> earlierSegment = iter.next();
-                                iter.remove();
-                                if (m_usageSpecificLog.isDebugEnabled()) {
-                                    m_usageSpecificLog.debug("Segment " + earlierSegment.file()
-                                            + " has been closed and deleted after discarding last buffer");
-                                }
-                                closeAndDeleteSegment(earlierSegment);
-                            }
-                        } catch (IOException e) {
-                            m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
-                        }
+                        deleteSegmentsBefore(segment, entryNumber);
                     }
                 }
             };
+        }
+
+        private void deleteSegmentsBefore(PBDSegment<M> segment, int entryNumber) {
+            // Only continue if open and there is another segment and this is the first entry of a segment
+            if (m_cursorClosed || m_segments.size() == 1
+                    || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
+                    || !canDeleteSegmentsBefore(segment)) {
+                return;
+            }
+
+             if (m_rewoundFromId == segment.m_id) {
+                m_rewoundFromId = -1;
+            }
+
+             try {
+                Iterator<PBDSegment<M>> iter = m_segments.headMap(segment.segmentIndex(), false).values()
+                        .iterator();
+                while (iter.hasNext()) {
+                    PBDSegment<M> earlierSegment = iter.next();
+                    iter.remove();
+                    if (m_usageSpecificLog.isDebugEnabled()) {
+                        m_usageSpecificLog.debug("Segment " + earlierSegment.file()
+                        + " has been closed and deleted after discarding last buffer");
+                    }
+                    closeAndDeleteSegment(earlierSegment);
+                }
+            } catch (IOException e) {
+                m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
+            }
         }
 
         void close() {
@@ -1053,7 +1079,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
             PBDSegmentReader<M> segmentReader = segment.getReader(cursor.m_cursorId);
             if (segmentReader == null) {
-                return false;
+                // segmentReader is null, if the PBD reader hasn't reached this segment OR
+                // if PBD reader has moved past this and all buffers were acked.
+                if (segment.segmentIndex() > cursorSegmentIndex) {
+                    return false;
+                }
             } else if (!segmentReader.anyReadAndDiscarded()) {
                 return false;
             }
@@ -1209,7 +1239,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 for (PBDSegment<M> segment : m_segments.values()) {
                     PBDSegmentReader<M> reader = segment.getReader(cursor.m_cursorId);
                     if (reader == null) {
-                        numObjects += segment.getNumEntries();
+                        // reader will be null if the pbd reader has not reached this segment or has passed this and all were acked.
+                        if (cursor.m_segment == null || cursor.m_segment.segmentIndex() <= segment.m_index) {
+                            numObjects += segment.getNumEntries();
+                        }
                     } else {
                         numObjects += segment.getNumEntries() - reader.readIndex();
                     }

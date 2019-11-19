@@ -866,6 +866,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean allReadAndDiscarded() {
+            return m_discardCount == m_numOfEntries;
+        }
+
+        @Override
         public DBBPool.BBContainer poll(OutputContainerFactory factory) throws IOException {
             return poll(factory, false, false);
         }
@@ -1089,6 +1094,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             m_readCursors.remove(m_cursorId);
             if (keep) {
                 m_closedCursors.put(m_cursorId, this);
+            } else { // if this was already closed, remove it for good
+                m_closedCursors.remove(m_cursorId);
             }
             if (m_readCursors.isEmpty() && !m_isActive) {
                 closeReadersAndFile();
