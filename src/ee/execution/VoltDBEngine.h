@@ -672,6 +672,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         NValue udfResultHelper(int32_t returnCode, bool partition_table, ValueType type);
 
+        void createSystemTables();
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
@@ -708,6 +710,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;
+
+        // map system table id to table pointers
+        std::map<CatalogId, PersistentTable *> m_systemTables;
 
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
