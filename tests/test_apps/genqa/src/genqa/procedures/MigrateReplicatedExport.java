@@ -38,14 +38,13 @@ public class MigrateReplicatedExport extends VoltProcedure {
     public final SQLStmt migrate_jdbc = new SQLStmt("MIGRATE FROM export_replicated_table_jdbc WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
     // public final SQLStmt migrate = new SQLStmt("MIGRATE FROM export_replicated_table WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
 
-    public long run(int seconds)
+    public VoltTable[] run(int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_replicated_table where <records older than "seconds" ago>
         voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
-        voltQueueSQL(migrate_rabbit, -seconds);
-        voltQueueSQL(migrate_file, -seconds);
-        voltQueueSQL(migrate_jdbc, -seconds);
-        VoltTable[] results = voltExecuteSQL();
-        return results[0].asScalarLong();
+        voltQueueSQL(migrate_rabbit, EXPECT_SCALAR_LONG, -seconds);
+        voltQueueSQL(migrate_file, EXPECT_SCALAR_LONG, -seconds);
+        voltQueueSQL(migrate_jdbc, EXPECT_SCALAR_LONG, -seconds);
+        return voltExecuteSQL();
     }
 }

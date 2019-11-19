@@ -32,6 +32,8 @@ import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.QueueingConsumer;
+import com.rabbitmq.client.ShutdownListener;
+import com.rabbitmq.client.ShutdownSignalException;
 
 import org.voltcore.logging.VoltLogger;
 
@@ -66,6 +68,12 @@ public class ExportRabbitMQVerifier {
         final Channel channel = connection.createChannel();
 
         try {
+            channel.addShutdownListener(new ShutdownListener() {
+                @Override
+                public void shutdownCompleted(ShutdownSignalException cause) {
+                    log.info("shutdownCompleted, cause: " + cause.toString());
+                }
+            });
             channel.exchangeDeclare(m_exchangeName, "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
             channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_RABBIT.#");
@@ -101,6 +109,7 @@ public class ExportRabbitMQVerifier {
                     success = false;
             }
         } finally {
+            log.info("tear down and close channel");
             tearDown(channel);
             channel.close();
             connection.close();

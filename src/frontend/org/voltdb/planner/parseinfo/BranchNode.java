@@ -18,11 +18,8 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.function.Predicate;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
-import org.voltcore.utils.Pair;
 import org.voltdb.expressions.*;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.StmtEphemeralTableScan;
@@ -75,6 +72,14 @@ public class BranchNode extends JoinNode {
             newNode.m_whereExpr = m_whereExpr.clone();
         }
         return newNode;
+    }
+
+    public boolean hasChild(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) || pred.test(getRightNode());
+    }
+
+    public boolean allChildren(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) && pred.test(getRightNode());
     }
 
     public void setJoinType(JoinType joinType) {
