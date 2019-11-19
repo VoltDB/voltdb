@@ -174,205 +174,13 @@ inline void* TableTupleChunk::free(void* dst) {                            // wi
     return m_next;
 }
 
-template<bool Const>
-inline TableTupleChunks::iterator_type<Const>::iterator_type(
-        typename TableTupleChunks::iterator_type<Const>::container_type src):
-    m_offset(src.m_tupleSize), m_list(src.m_list),
-    m_iter(m_list.begin()),
-    m_cursor(const_cast<value_type>(m_iter->begin())) {
-    static_assert(is_reference<container_type>::value,
-            "TableTupleChunks::iterator_type::container_type is not a reference");
-    static_assert(is_pointer<value_type>::value,
-            "TableTupleChunks::value_type is not a pointer");
-}
-
-template<bool Const>
-inline bool TableTupleChunks::iterator_type<Const>::operator==(
-        iterator_type const& o) const noexcept {
-    return m_cursor == o.m_cursor;
-}
-
-template<bool Const>
-void TableTupleChunks::iterator_type<Const>::advance() {
-    // Need to maintain invariant that m_cursor is nullptr iff
-    // iterator points to end().
-    if (m_iter != m_list.end()) {
-        if (m_cursor >= m_iter->begin() && m_cursor < m_iter->end()) {     // within chunk
-            m_cursor += m_offset;
-        } else {                           // cross chunk
-            ++m_iter;
-            if (m_iter != m_list.end()) {
-                m_cursor = m_iter->begin();
-            } else {
-                m_cursor = nullptr;
-            }
-        }
-    } else {
-        m_cursor = nullptr;
-    }
-}
-
-template<bool Const>
-inline TableTupleChunks::iterator_type<Const>&
-TableTupleChunks::iterator_type<Const>::operator++() {
-    advance();
-    return *this;
-}
-
-template<bool Const>
-inline TableTupleChunks::iterator_type<Const>
-TableTupleChunks::iterator_type<Const>::operator++(int) {
-    typename TableTupleChunks::iterator_type<Const> copy(*this);
-    advance();
-    return copy;
-}
-
-template<bool Const>
-inline typename TableTupleChunks::template iterator_type<Const>::reference
-TableTupleChunks::iterator_type<Const>::operator*() noexcept {
-    return m_cursor;
-}
-
-inline typename TableTupleChunks::iterator TableTupleChunks::begin() {
-    return iterator(*this);
-}
-
-inline typename TableTupleChunks::iterator TableTupleChunks::end() {
-    iterator iter(*this);
-    iter.m_cursor = nullptr;               // see iterator::operator== and iterator::advance()
-    return iter;
-}
-
-inline typename TableTupleChunks::const_iterator TableTupleChunks::cbegin() const {
-    return const_iterator(*this);
-}
-
-inline typename TableTupleChunks::const_iterator TableTupleChunks::cend() const {
-    const_iterator iter(*this);
-    const_cast<typename remove_const<decltype(iter.m_cursor)>::type&>(iter.m_cursor) = nullptr;
-    return iter;
-}
-
-inline typename TableTupleChunks::const_iterator TableTupleChunks::begin() const {
-    return cbegin();
-}
-
-inline typename TableTupleChunks::const_iterator TableTupleChunks::end() const {
-    return cend();
-}
-
-template<bool Const>
-inline TableTupleChunks::iterator_cb_type<Const>::iterator_cb_type(
-        container_type c, cb_type cb): super(c), m_cb(cb) {}
-
-template<bool Const>
-inline typename TableTupleChunks::template iterator_cb_type<Const>::value_type
-TableTupleChunks::iterator_cb_type<Const>::operator*() {
-    return m_cb(super::operator*());
-}
-
-template<typename Alloc, bool Const>
-inline TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type(
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::container_type c,
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::history_type h) :
-    super(c, [&h](typename super::value_type c){
-                return c;
-                // using type = typename super::value_type;
-                //return const_cast<type>(h.reverted(const_cast<type>(c)));
-            }) {}
+inline TableTupleChunks::TableTupleChunks(size_t tupleSize) : m_tupleSize(tupleSize) {}
 
 void* TableTupleChunks::allocate() noexcept {
     if (m_list.empty() || m_list.back().full()) {
         m_list.emplace_back(m_tupleSize);
     }
     return m_list.back().allocate();
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::iterator_cb<Alloc> TableTupleChunks::begin(
-        typename TableTupleChunks::iterator_cb<Alloc>::history_type h) {
-    return iterator_cb<Alloc>(*this, h);
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::iterator_cb<Alloc> TableTupleChunks::end(
-        typename TableTupleChunks::iterator_cb<Alloc>::history_type h) {
-    iterator_cb<Alloc> iter(*this, h);
-    iter.m_cursor = nullptr;
-    return iter;
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> TableTupleChunks::cbegin(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    return const_iterator_cb<Alloc>(*this, h);
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> TableTupleChunks::cend(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    const_iterator_cb<Alloc> iter(*this, h);
-    iter.m_cursor = nullptr;
-    return iter;
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> TableTupleChunks::begin(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    return cbegin(h);
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> TableTupleChunks::end(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    return cend(h);
-}
-
-inline typename TableTupleChunks::iterator begin(TableTupleChunks& c) {
-    return c.begin();
-}
-inline typename TableTupleChunks::iterator end(TableTupleChunks& c) {
-    return c.end();
-}
-
-inline typename TableTupleChunks::const_iterator cbegin(TableTupleChunks const& c) {
-    return c.cbegin();
-}
-inline typename TableTupleChunks::const_iterator cend(TableTupleChunks const& c) {
-    return c.cend();
-}
-
-inline typename TableTupleChunks::const_iterator begin(TableTupleChunks const& c) {
-    return c.cbegin();
-}
-inline typename TableTupleChunks::const_iterator end(TableTupleChunks const& c) {
-    return c.cend();
-}
-
-template<typename Alloc, bool Const>
-inline typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const> begin(
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
-    return c.begin(h);
-}
-template<typename Alloc, bool Const>
-inline typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const> end(
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
-        typename TableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
-    return c.end(h);
-}
-
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> cbegin(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::container_type c,
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
-    return c.cbegin(h);
-}
-template<typename Alloc>
-inline typename TableTupleChunks::const_iterator_cb<Alloc> cend(
-        typename TableTupleChunks::const_iterator_cb<Alloc>::container_type c,
-        typename TableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
-    return c.cend(h);
 }
 
 void* TableTupleChunks::free(void* dst) {
@@ -412,4 +220,199 @@ bool TableTupleChunks::less(void const* lhs, void const* rhs) const {
         }
     }
 }
+
+template<bool Const>
+inline IterableTableTupleChunks::iterator_type<Const>::iterator_type(
+        typename IterableTableTupleChunks::iterator_type<Const>::container_type src):
+    m_offset(src.m_tupleSize), m_list(src.m_list),
+    m_iter(m_list.begin()),
+    m_cursor(const_cast<value_type>(m_iter->begin())) {
+    static_assert(is_reference<container_type>::value,
+            "IterableTableTupleChunks::iterator_type::container_type is not a reference");
+    static_assert(is_pointer<value_type>::value,
+            "IterableTableTupleChunks::value_type is not a pointer");
+}
+
+template<bool Const>
+inline bool IterableTableTupleChunks::iterator_type<Const>::operator==(
+        iterator_type const& o) const noexcept {
+    return m_cursor == o.m_cursor;
+}
+
+template<bool Const>
+void IterableTableTupleChunks::iterator_type<Const>::advance() {
+    // Need to maintain invariant that m_cursor is nullptr iff
+    // iterator points to end().
+    if (m_iter != m_list.end()) {
+        if (m_cursor >= m_iter->begin() && m_cursor < m_iter->end()) {     // within chunk
+            m_cursor += m_offset;
+        } else {                           // cross chunk
+            ++m_iter;
+            if (m_iter != m_list.end()) {
+                m_cursor = m_iter->begin();
+            } else {
+                m_cursor = nullptr;
+            }
+        }
+    } else {
+        m_cursor = nullptr;
+    }
+}
+
+template<bool Const>
+inline IterableTableTupleChunks::iterator_type<Const>&
+IterableTableTupleChunks::iterator_type<Const>::operator++() {
+    advance();
+    return *this;
+}
+
+template<bool Const>
+inline IterableTableTupleChunks::iterator_type<Const>
+IterableTableTupleChunks::iterator_type<Const>::operator++(int) {
+    typename IterableTableTupleChunks::iterator_type<Const> copy(*this);
+    advance();
+    return copy;
+}
+
+template<bool Const>
+inline typename IterableTableTupleChunks::template iterator_type<Const>::reference
+IterableTableTupleChunks::iterator_type<Const>::operator*() noexcept {
+    return m_cursor;
+}
+
+inline typename IterableTableTupleChunks::iterator IterableTableTupleChunks::begin() {
+    return iterator(*this);
+}
+
+inline typename IterableTableTupleChunks::iterator IterableTableTupleChunks::end() {
+    iterator iter(*this);
+    iter.m_cursor = nullptr;               // see iterator::operator== and iterator::advance()
+    return iter;
+}
+
+inline typename IterableTableTupleChunks::const_iterator IterableTableTupleChunks::cbegin() const {
+    return const_iterator(*this);
+}
+
+inline typename IterableTableTupleChunks::const_iterator IterableTableTupleChunks::cend() const {
+    const_iterator iter(*this);
+    const_cast<typename remove_const<decltype(iter.m_cursor)>::type&>(iter.m_cursor) = nullptr;
+    return iter;
+}
+
+inline typename IterableTableTupleChunks::const_iterator IterableTableTupleChunks::begin() const {
+    return cbegin();
+}
+
+inline typename IterableTableTupleChunks::const_iterator IterableTableTupleChunks::end() const {
+    return cend();
+}
+
+template<bool Const>
+inline IterableTableTupleChunks::iterator_cb_type<Const>::iterator_cb_type(
+        container_type c, cb_type cb): super(c), m_cb(cb) {}
+
+template<bool Const>
+inline typename IterableTableTupleChunks::template iterator_cb_type<Const>::value_type
+IterableTableTupleChunks::iterator_cb_type<Const>::operator*() {
+    return m_cb(super::operator*());
+}
+
+template<typename Alloc, bool Const>
+inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::history_type h) :
+    super(c, [&h](typename super::value_type c){
+                return c;
+                // using type = typename super::value_type;
+                //return const_cast<type>(h.reverted(const_cast<type>(c)));
+            }) {}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type h) {
+    return iterator_cb<Alloc>(*this, h);
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type h) {
+    iterator_cb<Alloc> iter(*this, h);
+    iter.m_cursor = nullptr;
+    return iter;
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::cbegin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+    return const_iterator_cb<Alloc>(*this, h);
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::cend(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+    const_iterator_cb<Alloc> iter(*this, h);
+    iter.m_cursor = nullptr;
+    return iter;
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+    return cbegin(h);
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+    return cend(h);
+}
+
+inline typename IterableTableTupleChunks::iterator begin(IterableTableTupleChunks& c) {
+    return c.begin();
+}
+inline typename IterableTableTupleChunks::iterator end(IterableTableTupleChunks& c) {
+    return c.end();
+}
+
+inline typename IterableTableTupleChunks::const_iterator cbegin(IterableTableTupleChunks const& c) {
+    return c.cbegin();
+}
+inline typename IterableTableTupleChunks::const_iterator cend(IterableTableTupleChunks const& c) {
+    return c.cend();
+}
+
+inline typename IterableTableTupleChunks::const_iterator begin(IterableTableTupleChunks const& c) {
+    return c.cbegin();
+}
+inline typename IterableTableTupleChunks::const_iterator end(IterableTableTupleChunks const& c) {
+    return c.cend();
+}
+
+template<typename Alloc, bool Const>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> begin(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
+    return c.begin(h);
+}
+template<typename Alloc, bool Const>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> end(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
+    return c.end(h);
+}
+
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> cbegin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
+    return c.cbegin(h);
+}
+template<typename Alloc>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> cend(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
+    return c.cend(h);
+}
+
 
