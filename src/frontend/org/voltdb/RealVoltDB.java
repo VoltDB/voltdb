@@ -384,7 +384,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-
+    private volatile boolean m_isRunningOnMasterOnly = false;
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
@@ -1825,6 +1825,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (failedHosts.isEmpty()) {
                     return;
                 }
+
+                if (isRunningOnMasterOnlyMode()) {
+                    VoltDB.crashLocalVoltDB("Cluster is running on master only mode. Cluster has become unviable.");
+                }
+
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
@@ -5239,6 +5244,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
         }
+    }
+
+    public void setRunningOnMasterOnlyMode(boolean masteronly) {
+        m_isRunningOnMasterOnly = masteronly;
+    }
+
+    public boolean isRunningOnMasterOnlyMode() {
+        return m_isRunningOnMasterOnly;
     }
 }
 

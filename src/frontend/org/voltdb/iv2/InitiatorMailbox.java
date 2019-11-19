@@ -554,7 +554,9 @@ public class InitiatorMailbox implements Mailbox
         final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
         if (init.getServiceState().isNormal()) {
             init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
-            VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
+            if (!db.isRunningOnMasterOnlyMode()) {
+                VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
+            }
         }
     }
 
