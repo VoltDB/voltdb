@@ -118,7 +118,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Do a non-deterministic insertion
      */
-    //@Test
+   @Test
     public void testNonDeterministicInsert() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministicInsert");
@@ -152,7 +152,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
      * Do a non-deterministic insertion followed by a single partition read-only operation.
      * ENG-3288 - Expect non-deterministic read-only queries to succeed.
      */
-    //@Test
+   @Test
     public void testNonDeterministic_RO_SP() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministic_RO_SP");
@@ -169,7 +169,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
-    //@Test
+   @Test
     public void testDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testDeterministicProc");
@@ -187,7 +187,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
     /**
      * Test that different whitespace fails the determinism CRC check on SQL
      */
-    //@Test
+   @Test
     public void testWhitespaceChanges() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testWhitespaceChanges");
@@ -217,7 +217,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
+   @Test
     public void testMultistatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testMultistatementNonDeterministicProc");
@@ -257,7 +257,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
+   @Test
     public void testPartialstatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testPartialstatementNonDeterministicProc");
@@ -297,7 +297,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
+   @Test
     public void testBuggyNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testBuggyNonDeterministicProc");
