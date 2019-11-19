@@ -2211,9 +2211,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (m_migratePartitionLeaderExecutor != null ) {
                 m_migratePartitionLeaderExecutor.shutdown();
                 m_migratePartitionLeaderExecutor = null;
+                hostLog.info("MigratePartitionLeader task is stopped.");
             }
         }
-        hostLog.info("MigratePartitionLeader task is stopped.");
     }
 
     /**Move partition leader from one host to another.
@@ -2447,7 +2447,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_hashMismatchProcessInProgress.set(true);
                 m_replicaRemovalExecutor.schedule(() -> {
                     startRemoveReplicas();
-                    if (VoltZK.hasHashMismatchedSite(m_zk)) {
+                    RealVoltDB db = (RealVoltDB) VoltDB.instance();
+                    if (!db.isRunningOnMasterOnlyMode()) {
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug("More mismacthed replicas, @StopReplicas has been rescheduled.");
                         }
