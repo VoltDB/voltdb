@@ -275,6 +275,7 @@ SET (VOLTDB_SRC
   storage/TupleBlock.cpp
   storage/constraintutil.cpp
   storage/persistenttable.cpp
+  storage/SystemTableFactory.cpp
   storage/streamedtable.cpp
   storage/table.cpp
   storage/tablefactory.cpp

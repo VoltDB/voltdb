@@ -141,7 +141,11 @@ PersistentTable::PersistentTable(int partitionColumn,
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
 
-    ::memcpy(&m_signature, signature, 20);
+    if (signature) {
+        ::memcpy(&m_signature, signature, 20);
+    } else {
+        ::memset(&m_signature, 0, sizeof(m_signature));
+    }
 }
 
 void PersistentTable::initializeWithColumns(TupleSchema* schema,
