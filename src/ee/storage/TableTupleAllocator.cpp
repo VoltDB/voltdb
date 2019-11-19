@@ -113,16 +113,30 @@ inline void const* ChangeHistory<Alloc>::reverted(void const* src) const {
     }
 }
 
+inline size_t TableTupleChunk::chunkSize(size_t tupleSize) noexcept {
+    // preferred list of chunk sizes ranging from 4KB to 1MB
+    static constexpr array<size_t, 9> const preferred{
+        4 * 1024, 8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024,
+          128 * 1024, 256 * 1024, 512 * 1024, 1024 * 1024
+    };
+    // we always pick smallest preferred chunk size to calculate
+    // how many tuples a chunk fits
+    return *find_if(preferred.cbegin(), preferred.cend(),
+            [tupleSize](size_t s) { return tupleSize <= s; }) / tupleSize * tupleSize;
+}
+
 inline TableTupleChunk::TableTupleChunk(size_t tupleSize):
-    m_tupleSize(tupleSize),
-    m_resource(new char[tupleSize * ALLOCS_PER_CHUNK]),
+    m_tupleSize(tupleSize), m_chunkSize(chunkSize(tupleSize)),
+    m_resource(new char[m_chunkSize]),
     m_begin(m_resource.get()),
-    m_end(reinterpret_cast<char*const>(m_begin) + tupleSize * ALLOCS_PER_CHUNK),
-    m_next(m_begin) {}
+    m_end(reinterpret_cast<char*const>(m_begin) + m_chunkSize),
+    m_next(m_begin) {
+    vassert(tupleSize <= 1024 * 1024);
+}
 
 inline TableTupleChunk::TableTupleChunk(TableTupleChunk&& rhs):
-    m_tupleSize(rhs.m_tupleSize), m_begin(rhs.m_begin),
-    m_end(rhs.m_end), m_next(rhs.m_next) {
+    m_tupleSize(rhs.m_tupleSize), m_chunkSize(rhs.m_chunkSize), m_resource(move(rhs.m_resource)),
+    m_begin(rhs.m_begin), m_end(rhs.m_end), m_next(rhs.m_next) {
     const_cast<void*&>(rhs.m_begin) = nullptr;
 }
 
@@ -174,44 +188,136 @@ inline void* TableTupleChunk::free(void* dst) {                            // wi
     return m_next;
 }
 
-inline TableTupleChunks::TableTupleChunks(size_t tupleSize) : m_tupleSize(tupleSize) {}
+/**
+ * No-op when compacting from tail, since whether or not we are
+ * in compacting does not alter the behavior of free() operation,
+ * in particular, no need to delay releasing memory back to OS.
+ */
+inline void CompactingStorageTrait<ShrinkDirection::tail>::snapshot(bool) noexcept {}
+/**
+ * Immediately free to OS when the tail is unused
+ */
+inline void CompactingStorageTrait<ShrinkDirection::tail>::released(
+        typename CompactingStorageTrait<ShrinkDirection::tail>::list_type& l,
+        typename CompactingStorageTrait<ShrinkDirection::tail>::iterator_type iter) {
+    if (iter->begin() == iter->end()) {
+        l.erase(iter);
+    }
+}
 
-void* TableTupleChunks::allocate() noexcept {
+inline boost::optional<typename CompactingStorageTrait<ShrinkDirection::tail>::iterator_type>
+CompactingStorageTrait<ShrinkDirection::tail>::lastReleased() const {
+    return {};
+}
+
+inline void CompactingStorageTrait<ShrinkDirection::head>::snapshot(bool snapshot) {
+    if (! snapshot && m_inSnapshot) {      // snapshot finishes: releases all front chunks that were free.
+        // This is the forcing of lazy-release
+        if (m_last) {
+            // invariant: if free() has ever been called, then we know from first free() invocation
+            // on which chunk it was requested.
+            vassert(m_list);
+            m_list->erase(m_list->begin(),
+                    (**m_last).begin() == (**m_last).end() ?              // is the tail of lazily-freed chunk empty?
+                    *m_last : prev(*m_last));                             // if not, then we free up to (exclusively) m_last
+            m_last = m_list->begin();
+        }
+    }
+    m_inSnapshot = snapshot;
+}
+
+inline void CompactingStorageTrait<ShrinkDirection::head>::released(
+        typename CompactingStorageTrait<ShrinkDirection::head>::list_type& l,
+        typename CompactingStorageTrait<ShrinkDirection::head>::iterator_type iter) {
+    // invariant: release() can only be called on the same list
+    vassert(m_list == nullptr || m_list == &l);
+    if (m_inSnapshot) {                    // Update iterator only when snapshot in progress
+        m_last = iter;
+        if (m_list == nullptr) {
+            m_list = &l;
+        }
+    }
+    // not in snapshot: eagerly release chunk memory if applicable
+    if (! m_inSnapshot && iter->begin() == iter->end()) {
+        l.erase(iter);
+    }
+}
+
+inline boost::optional<typename CompactingStorageTrait<ShrinkDirection::head>::iterator_type>
+CompactingStorageTrait<ShrinkDirection::head>::lastReleased() const {
+    return m_last;
+}
+
+template<ShrinkDirection dir> inline TableTupleChunks<dir>::TableTupleChunks(size_t tupleSize) :
+    m_tupleSize(tupleSize) {}
+
+template<ShrinkDirection dir> inline void TableTupleChunks<dir>::snapshot(bool s) {
+    m_trait.snapshot(s);
+}
+
+template<ShrinkDirection dir>
+inline void* TableTupleChunks<dir>::allocate() noexcept {                  // always allocates from tail
     if (m_list.empty() || m_list.back().full()) {
         m_list.emplace_back(m_tupleSize);
     }
     return m_list.back().allocate();
 }
 
-void* TableTupleChunks::free(void* dst) {
-    auto which = find_if(m_list.begin(), m_list.end(),
-            [dst](TableTupleChunk const& c) { return c.contains(dst); });
-    if (which == m_list.cend()) {
-        throw std::runtime_error("Address not found");
-    } else if (&*which == &m_list.back()) {     // from last chunk => no cross-chunk movement needed
-        return m_list.back().free(dst);
-    } else {
-        auto& last = m_list.back();
-        void* src = last.free(
-                reinterpret_cast<char*>(const_cast<void*>(last.end())) - m_tupleSize);
-        which->free(dst, src);
-        return src;
-    }
+template<> inline typename TableTupleChunks<ShrinkDirection::head>::list_type::iterator
+TableTupleChunks<ShrinkDirection::head>::compactFrom() {
+    auto lastReleased = m_trait.lastReleased();
+    return lastReleased ? *lastReleased : m_list.begin();
 }
 
-bool TableTupleChunks::less(void const* lhs, void const* rhs) const {
+template<> inline typename TableTupleChunks<ShrinkDirection::tail>::list_type::iterator
+TableTupleChunks<ShrinkDirection::tail>::compactFrom() {
+    return prev(m_list.end());
+}
+
+template<ShrinkDirection dir>
+void* TableTupleChunks<dir>::free(void* dst) {
+    auto dst_iter = find_if(m_list.begin(), m_list.end(),
+            [dst](TableTupleChunk const& c) { return c.contains(dst); });
+    if (dst_iter == m_list.cend()) {
+        throw std::runtime_error("Address not found");
+    }
+    auto& from = compactFrom();       // the tuple from which to memmove
+    void* src;
+    if (dst_iter == from) {       // no cross-chunk movement needed
+        src = dst_iter->free(dst);
+    } else {
+        void* src = from.free(
+                reinterpret_cast<char*>(const_cast<void*>(from.end())) - m_tupleSize);
+        dst_iter->free(dst, src);
+    }
+    m_trait.released(dst_iter);
+    return src;
+}
+
+template<> inline typename TableTupleChunks<ShrinkDirection::tail>::list_type::iterator
+TableTupleChunks<ShrinkDirection::tail>::chunkBegin() {
+    return m_list.begin();
+}
+
+template<> inline typename TableTupleChunks<ShrinkDirection::head>::list_type::iterator
+TableTupleChunks<ShrinkDirection::head>::chunkBegin() {
+    return compactFrom();
+}
+
+template<ShrinkDirection dir>
+bool TableTupleChunks<dir>::less(void const* lhs, void const* rhs) const {
     if (lhs == rhs) {
         return false;
     } else {
         // linear search in chunks
         bool found1 = false, found2 = false;
-        auto const pos = find_if(m_list.cbegin(), m_list.cend(),
+        auto const pos = find_if(chunkBegin(), m_list.end(),
                 [&found1, &found2, lhs, rhs](TableTupleChunk const& c) {
                     found1 |= c.contains(lhs);
                     found2 |= c.contains(rhs);
                     return found1 || found2;
                 });
-        vassert(pos != m_list.cend());     // neither address is found anywhere
+        vassert(pos != m_list.end());     // neither address is found anywhere
         if (found1 && !found2) {
             return true;
         } else {
@@ -323,9 +429,8 @@ inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::tim
         typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::container_type c,
         typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::history_type h) :
     super(c, [&h](typename super::value_type c){
-                return c;
-                // using type = typename super::value_type;
-                //return const_cast<type>(h.reverted(const_cast<type>(c)));
+                using type = typename super::value_type;
+                return const_cast<type>(h.reverted(const_cast<type>(c)));
             }) {}
 
 template<typename Alloc>

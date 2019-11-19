@@ -16,6 +16,7 @@
  */
 
 #pragma once
+#include <boost/optional.hpp>
 #include <functional>
 #include <iterator>
 #include <list>
@@ -33,7 +34,7 @@ namespace std {
 namespace voltdb {
     using namespace std;
 
-    enum class ChangeType {
+    enum class ChangeType : char {
         Update, Insertion, Deletion
     };
 
@@ -45,6 +46,23 @@ namespace voltdb {
     template<typename Alloc>
     class ChangeHistory final {
     public:
+        /**
+         * Meta-data specifying when and how often to release
+         * from map when a ptr has been reverted.
+         */
+        struct RetainTrait {
+            /**
+             * never: ChangeHistory::reverted() never deletes map * entry
+             * always: it always delets map entry
+             * batched: it deletes in a batch style when fixed
+             * number of entries had been reverted
+             */
+            enum class Policy : char {
+                never, always, batched
+            } const m_policy;
+            size_t const m_batchSize;
+//            RetainTrait()
+        };
         class Change {                             // a single change, deep-copy non-inlined tuple
             unique_ptr<char[], decltype(Alloc::dealloc)> m_tuple;
         public:
@@ -83,12 +101,15 @@ namespace voltdb {
     };
 
     class TableTupleChunk final {                  // self-compacting chunk (with help from TableTupleChunks to compact across a list)
-        constexpr static size_t ALLOCS_PER_CHUNK = 512;        // number of rows each block can hold
         size_t const m_tupleSize;                  // size of a table tuple per allocation
+        size_t const m_chunkSize;                  // #bytes per chunk
         unique_ptr<char> m_resource;
         void*const m_begin;                        // the chunk of memory allocated at instance construction
         void*const m_end;                          // m_begin + tupleSize * TableTupleAllocator::ALLOCS_PER_CHUNK
         void* m_next;                              // tail of allocation
+        constexpr static size_t MAX_BYTES_PER_CHUNK =          // each chunk cannot exceed 5MB
+            5 * 1024 * 1024;
+        static size_t chunkSize(size_t tupleSize) noexcept;
     public:
         TableTupleChunk(size_t tupleSize);
         ~TableTupleChunk() = default;
@@ -105,16 +126,64 @@ namespace voltdb {
     };
 
     /**
+     * When compacting on a list of chunks, move the head or the
+     * tail of the list to fill in the hole
+     */
+    enum class ShrinkDirection: char {
+        head, tail
+    };
+
+    /**
+     * Shrink-directional-dependent book-keeping
+     */
+    template<ShrinkDirection shrink> class CompactingStorageTrait;
+
+    template<> class CompactingStorageTrait<ShrinkDirection::tail> {
+        using list_type = std::list<TableTupleChunk>;
+        using iterator_type = list<TableTupleChunk>::iterator;
+    public:
+        void snapshot(bool) noexcept;
+        /**
+         * post-action when free() is called, only useful when shrinking
+         * in head direction.
+         * Called after in-chunk operation completes, since this
+         * operates on the level of list iterator, not void*.
+         */
+        void released(list_type&, iterator_type);
+        /**
+         * List iterator when last free() was called. No-op if
+         * shrinking in tail, since whether the table is in
+         * snapshot process or not does not affect transactional
+         * view of the storage.
+         */
+        boost::optional<iterator_type> lastReleased() const;
+    };
+
+    template<> class CompactingStorageTrait<ShrinkDirection::head> {
+        using list_type = std::list<TableTupleChunk>;
+        using iterator_type = list<TableTupleChunk>::iterator;
+        bool m_inSnapshot = false;
+        list_type* m_list = nullptr;
+        boost::optional<iterator_type> m_last{};
+    public:
+        void snapshot(bool);
+        void released(list_type&, iterator_type);
+        boost::optional<iterator_type> lastReleased() const;
+    };
+
+    /**
      * A linked list of self-compacting chunks:
      * All allocation operations are appended to the last chunk
      * (creates new chunk if necessary); all free operations move
      * the non-empty allocation from the head to freed space.
      */
+    template<ShrinkDirection dir>
     class TableTupleChunks {
     protected:
         using list_type = std::list<TableTupleChunk>;
         size_t const m_tupleSize;
         list_type m_list{};
+        CompactingStorageTrait<dir> m_trait{};
     public:
         TableTupleChunks(size_t tupleSize);
         TableTupleChunks(TableTupleChunks const&) = delete;    // non-copyable, non-assignable, moveable
@@ -122,13 +191,28 @@ namespace voltdb {
         TableTupleChunks(TableTupleChunks&&) = default;
         void* allocate() noexcept;
         void* free(void*);
+        void snapshot(bool);
         bool less(void const*, void const*) const; // natural order of two tuples.
+    private:
+        /**
+         * The chunk from whom table tuple need to be moved. This
+         * means list tail if compacting from tail, or tail of
+         * freed chunks from front of the list.
+         */
+        typename list_type::iterator compactFrom();
+        /**
+         * Transaction view of the first chunk. When deleting
+         * from head, the begin() will skip chunks that are empty
+         * as a result of free(void*) operations.
+         */
+        typename list_type::iterator chunkBegin();
     };
 
     /**
-     * A iterable, self-compacting list of chunks.
+     * A iterable, self-compacting list of chunks, which deletes
+     * from head of the list of chunks.
      */
-    struct IterableTableTupleChunks final : public TableTupleChunks {
+    struct IterableTableTupleChunks final : public TableTupleChunks<ShrinkDirection::head> {
         template<bool Const>                   // RO or RW
         class iterator_type : public std::iterator<forward_iterator_tag,
                 typename conditional<Const, void const*, void*>::type> {
@@ -221,18 +305,18 @@ namespace voltdb {
     typename IterableTableTupleChunks::const_iterator begin(IterableTableTupleChunks const&);
     typename IterableTableTupleChunks::const_iterator end(IterableTableTupleChunks const&);
 
-    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> begin(
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
-    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> end(
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
+    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>
+        begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
+                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
+    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>
+        end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
+                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
 
-    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc> cbegin(
-            typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
-            typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
-    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc> cend(
-            typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
-            typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
+    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc>
+        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
+    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc>
+        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
 
 }
