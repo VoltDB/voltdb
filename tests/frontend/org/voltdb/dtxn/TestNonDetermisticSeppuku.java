@@ -45,6 +45,8 @@ import org.voltdb.utils.VoltFile;
 
 public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
 
+    protected static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
+    protected static final String TESTNONCE = "testnonce";
     static final String SCHEMA =
             "CREATE TABLE kv (" +
                     "key bigint not null, " +
@@ -333,7 +335,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
-            for (int i = 5000; i < 5100; i++) {
+            for (int i = 5000; i < 5091; i++) {
                 client.callProcedure(
                         "NonDeterministicSPProc",
                         i,
@@ -343,7 +345,27 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             if (MiscUtils.isPro()) {
                 verifyTopologyAfterHashMismatch(server);
                 System.out.println("Stopped replicas.");
-                insertMoreNormalData(10001, 10100);
+                insertMoreNormalData(10001, 10092);
+                client.drain();
+
+//                System.out.println("Saving snapshot...");
+//                VoltTable results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults()[0];
+//                while (results.advanceRow()) {
+//                    assertTrue(results.getString("RESULT").equals("SUCCESS"));
+//                }
+//
+//                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+//                long rows = results.asScalarLong();
+//                System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
+//                results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+//                while (results.advanceRow()) {
+//                    if (results.getString("RESULT").equals("FAILURE")) {
+//                        fail(results.getString("ERR_MSG"));
+//                    }
+//                }
+//                System.out.println("snapshot reloaded");
+//                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+//                assert(rows == results.asScalarLong());
             } else {
                 fail("testOnLargeCluster failed");
             }
@@ -368,12 +390,13 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
 
     private void verifyTopologyAfterHashMismatch(LocalCluster server) {
         //allow time to get the stats
-        final long maxSleep = TimeUnit.MINUTES.toMillis(20);
+        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
         boolean done = false;
         long start = System.currentTimeMillis();
         while (!done) {
             boolean inprogress = false;
             try {
+                Thread.sleep(5000);
                 VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
                 System.out.println(vt.toFormattedString());
                 vt.resetRowPosition();
@@ -388,13 +411,12 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
                         }
                     }
                 }
-                if (inprogress) {
-                    if (maxSleep < (System.currentTimeMillis() - start)) {
-                        break;
-                    }
-                    try { Thread.sleep(1000); } catch (Exception ignored) { }
-                } else {
-                    done = true;
+                if (!inprogress) {
+                   return;
+                }
+
+                if (maxSleep < (System.currentTimeMillis() - start)) {
+                    break;
                 }
             } catch (Exception e) {
                 e.printStackTrace();

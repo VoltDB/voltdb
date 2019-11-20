@@ -405,7 +405,8 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 
     @Override
     public void shutdownService() {
-        if (!m_serviceState.isEligibleForRemoval()) {
+        // do not shutdown leader
+        if (isLeader()) {
             return;
         }
         try {

@@ -1283,7 +1283,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             traceLog.add(() -> VoltTrace.endAsync("recvfragment", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
                                                   "status", message.getStatusCode()));
         }
-        m_mailbox.send(message.getDestinationSiteId(), message);
+
+        // Message arrives after duplicate counter is cleaned/removed, do not send to itself
+        if (message.m_sourceHSId != message.getDestinationSiteId()) {
+            m_mailbox.send(message.getDestinationSiteId(), message);
+        }
     }
 
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)

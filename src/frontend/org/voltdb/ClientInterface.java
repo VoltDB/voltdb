@@ -263,7 +263,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicBoolean m_isAcceptingConnections = new AtomicBoolean(false);
 
     // The hash mismatch @StopReplicas request is being processed.
-    private final AtomicBoolean m_hashMismatchProcessInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean m_decommissionInProgress = new AtomicBoolean(false);
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -2442,15 +2442,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Many replicas could trigger hash mismatch, do not over schedule the task
-            // Let's delay for 5s to remove them as many mismatched replicas as possible in one @StopReplicas transaction
-            if (!m_hashMismatchProcessInProgress.get()) {
-                m_hashMismatchProcessInProgress.set(true);
+            // Let's delay for 5s, reschedule it if it is blocked.
+            if (!m_decommissionInProgress.get()) {
+                m_decommissionInProgress.set(true);
                 m_replicaRemovalExecutor.schedule(() -> {
-                    startRemoveReplicas();
-                    RealVoltDB db = (RealVoltDB) VoltDB.instance();
-                    if (!db.isRunningOnMasterOnlyMode()) {
+                    if (!decommissionReplicas()) {
                         if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("More mismacthed replicas, @StopReplicas has been rescheduled.");
+                            tmLog.debug("@StopReplicas is blocked, reshchedule it.");
                         }
                         m_mailbox.deliver(new HashMismatchMessage());
                     }
@@ -2459,7 +2457,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    private boolean startRemoveReplicas() {
+    private boolean decommissionReplicas() {
         try {
             // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
             if (!VoltZK.hasHashMismatchedSite(m_zk)) {
@@ -2500,7 +2498,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (Exception e) {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
-            m_hashMismatchProcessInProgress.set(false);
+            m_decommissionInProgress.set(false);
             VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
         }
         return false;

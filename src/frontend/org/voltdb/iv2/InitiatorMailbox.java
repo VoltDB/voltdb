@@ -228,6 +228,11 @@ public class InitiatorMailbox implements Mailbox
     public static boolean lockingVows() {
         List<InitiatorMailbox> lockedMailboxes = new ArrayList<InitiatorMailbox>();
         for (InitiatorMailbox im : m_allInitiatorMailboxes) {
+            if (im.m_scheduler != null && im.m_scheduler instanceof SpScheduler) {
+                if (((SpScheduler)im.m_scheduler).getServiceState().isRemoved()) {
+                    continue;
+                }
+            }
             if (Thread.holdsLock(im)) {
                 lockedMailboxes.add(im);
             }
@@ -320,7 +325,7 @@ public class InitiatorMailbox implements Mailbox
                 }
             };
             if (hostLog.isDebugEnabled()) {
-                task.taskInfo = message.getMessageInfo();
+                task.taskInfo = message.getMessageInfo() + " Source:" + CoreUtils.hsIdToString(message.m_sourceHSId);
             }
             m_scheduler.getQueue().offer(task);
         } else {
@@ -554,9 +559,7 @@ public class InitiatorMailbox implements Mailbox
         final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
         if (init.getServiceState().isNormal()) {
             init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
-            if (!db.isRunningOnMasterOnlyMode()) {
-                VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
-            }
+            VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
         }
     }
 
