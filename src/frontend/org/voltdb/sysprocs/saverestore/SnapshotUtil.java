@@ -1367,7 +1367,7 @@ public class SnapshotUtil {
     public static Set<String> getRequiredSnapshotableTableNames(InMemoryJarfile jarFile) {
         Database database = CatalogUtil.getDatabaseFrom(jarFile);
         // Snapshotable persistent table views are considered optional. ENG-11578, ENG-14145
-        return getTablesToSave(database, t -> !isSnapshotablePersistentTableView(database, t)).stream()
+        return getTablesToSave(database, t -> !isSnapshotablePersistentTableView(database, t), false).stream()
                 .map(SnapshotTableInfo::getName)
                 .collect(Collectors.toSet());
     }
@@ -1383,14 +1383,33 @@ public class SnapshotUtil {
     public static final List<SnapshotTableInfo> getPartitionedNormalTablesToSave(Database database) {
         return getTablesToSave(database,
                 t -> !t.getIsreplicated()
-                        && (t.getMaterializer() == null || TableType.isStream(t.getMaterializer().getTabletype())));
+                        && (t.getMaterializer() == null || TableType.isStream(t.getMaterializer().getTabletype())),
+                true);
     }
 
+    /**
+     * @param database from which to retrieve tables
+     * @return All tables and system tables which are eligible to be snapshotted
+     */
     public static final List<SnapshotTableInfo> getTablesToSave(Database database) {
-        return getTablesToSave(database, t -> true);
+        return getTablesToSave(database, t -> true, st -> true);
     }
 
-    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> predicate) {
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> predicate,
+            boolean includeSystemTables) {
+        return getTablesToSave(database, predicate, t -> includeSystemTables);
+    }
+
+    /**
+     * Create a list of {@link SnapshotTableInfo} that have been selected for a snapshot
+     *
+     * @param database             from which to retrieve tables
+     * @param tablePredicate       Predicate to apply to all tables from {@code database}
+     * @param systemTablePredicate Predicate to apply to {@link SystemTable}s
+     * @return List of tables selected for a snapshot
+     */
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> tablePredicate,
+            Predicate<SystemTable> systemTablePredicate) {
         ArrayList<SnapshotTableInfo> tables = new ArrayList<>();
         for (Table table : database.getTables()) {
             // STREAM tables are not included in the snapshot.
@@ -1403,10 +1422,17 @@ public class SnapshotUtil {
                     && !isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
-            if (predicate.test(table)) {
+            if (tablePredicate.test(table)) {
                 tables.add(new SnapshotTableInfo(table));
             }
         }
+
+        for (SystemTable table : SystemTable.values()) {
+            if (systemTablePredicate.test(table)) {
+                tables.add(table.getTableInfo());
+            }
+        }
+
         return tables;
     }
 

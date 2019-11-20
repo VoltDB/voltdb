@@ -31,6 +31,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 
 import junit.framework.Test;
 
@@ -55,8 +56,8 @@ public class TestSnapshotStatus extends SaveRestoreBase {
         assertEquals(4, results[0].getRowCount());
         results = client.callProcedure("@SnapshotStatus").getResults();
         System.out.println(results[0]);
-        // better be four rows, one for each table at each node, in the status results:
-        assertEquals(6, results[0].getRowCount());
+        // better be six rows, one for each table at each node, in the status results:
+        assertEquals(6 + countSnapshotingSystemTables(), results[0].getRowCount());
         // better not be any zeros in the completion time
         while (results[0].advanceRow()) {
             long completed = results[0].getLong("END_TIME");
@@ -90,12 +91,16 @@ public class TestSnapshotStatus extends SaveRestoreBase {
         }
         System.out.println(results[0]);
         // better be five rows, one for the replicated table, and one for each partition of the partitioned table
-        assertEquals(5, results[0].getRowCount());
+        assertEquals(5 + countSnapshotingSystemTables(), results[0].getRowCount());
         // better not be any zeros in the completion time
         while (results[0].advanceRow()) {
             long completed = results[0].getLong("END_TIME");
             assertTrue("END_TIME was not filled", completed != 0);
         }
+    }
+
+    private static int countSnapshotingSystemTables() {
+        return SystemTable.values().length * 2;
     }
 
     //
