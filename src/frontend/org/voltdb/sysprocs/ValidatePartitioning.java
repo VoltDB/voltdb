@@ -67,7 +67,8 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             final VoltTable results = constructPartitioningResultsTable();
             List<Integer> tableIds = new ArrayList<Integer>();
             List<String> tableNames = new ArrayList<String>();
-            for (SnapshotTableInfo t : SnapshotUtil.getTablesToSave(context.getDatabase(), t -> !t.getIsreplicated())) {
+            for (SnapshotTableInfo t : SnapshotUtil.getTablesToSave(context.getDatabase(), t -> !t.getIsreplicated(),
+                    true)) {
                 tableIds.add(t.getTableId());
                 tableNames.add(t.getName());
             }
