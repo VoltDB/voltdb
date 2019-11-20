@@ -43,7 +43,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
-public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
+public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     protected static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
     protected static final String TESTNONCE = "testnonce";
@@ -76,7 +76,7 @@ public class TestNonDetermisticSeppuku extends JUnit4LocalClusterTest {
             builder.addProcedure(NonDeterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(Deterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(NonDeterministic_RO_MP.class);
-            server = new LocalCluster("det1.jar", sph, hostcount, k, BackendTarget.NATIVE_EE_JNI);
+            server = new LocalCluster(method + ".jar", sph, hostcount, k, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
             server.setCallingClassName(method);
             assertTrue("Catalog compilation failed", server.compile(builder));
