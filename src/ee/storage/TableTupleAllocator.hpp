@@ -17,11 +17,13 @@
 
 #pragma once
 #include <boost/optional.hpp>
+#include <forward_list>
 #include <functional>
 #include <iterator>
 #include <list>
 #include <map>
 #include <memory>
+#include <stack>
 
 namespace std {
     template<> struct less<void*> {                // for std::map<void*, T>
@@ -100,29 +102,78 @@ namespace voltdb {
         void const* reverted(void const*) const;     // revert history at this place!
     };
 
-    class TableTupleChunk final {                  // self-compacting chunk (with help from TableTupleChunks to compact across a list)
+    /**
+     * Holder for a chunk, whether it is self-compacting or not.
+     */
+    struct ChunkHolder {
         size_t const m_tupleSize;                  // size of a table tuple per allocation
+    protected:
         size_t const m_chunkSize;                  // #bytes per chunk
         unique_ptr<char> m_resource;
         void*const m_begin;                        // the chunk of memory allocated at instance construction
         void*const m_end;                          // m_begin + tupleSize * TableTupleAllocator::ALLOCS_PER_CHUNK
         void* m_next;                              // tail of allocation
-        constexpr static size_t MAX_BYTES_PER_CHUNK =          // each chunk cannot exceed 5MB
-            5 * 1024 * 1024;
         static size_t chunkSize(size_t tupleSize) noexcept;
     public:
-        TableTupleChunk(size_t tupleSize);
-        ~TableTupleChunk() = default;
-        TableTupleChunk(TableTupleChunk const&) = delete;       // non-copyable, non-assignable, moveable
-        TableTupleChunk operator=(TableTupleChunk const&) = delete;
-        TableTupleChunk(TableTupleChunk&&);
-        void* allocate() noexcept;              // returns NULL if current chunk is full
+        ChunkHolder(size_t tupleSize);
+        ChunkHolder(ChunkHolder const&) = delete;       // non-copyable, non-assignable, moveable
+        ChunkHolder operator=(ChunkHolder const&) = delete;
+        ChunkHolder(ChunkHolder&&);
+        ~ChunkHolder() = default;
+        void* allocate() noexcept;                 // returns NULL if current chunk is full.
+        bool contains(void const*) const;          // query if a table tuple is stored in current chunk
+        bool full() const noexcept;
+    };
+
+    /**
+     * Non-compacting fixed-size chunk, that claims itself full only if it
+     * is really full. We need to keep track of all the freed
+     * locations for future allocations.
+     * Since we are keeping a free list of hole spaces, it is
+     * only economic to use when tupleSize is large.
+     */
+    class NonCompactingChunk final: public ChunkHolder {
+        stack<void*> m_freed{};
+    public:
+        NonCompactingChunk(size_t tupleSize);
+        NonCompactingChunk(NonCompactingChunk const&) = delete;
+        NonCompactingChunk operator=(NonCompactingChunk const&) = delete;
+        NonCompactingChunk(NonCompactingChunk&&);
+        ~NonCompactingChunk() = default;
+        void* allocate() noexcept;
+        void free(void*);
+        bool full() const noexcept;
+    };
+
+    class NonCompactingChunks final {
+        size_t const m_tupleSize;
+        forward_list<NonCompactingChunk> m_storage{};
+    public:
+        NonCompactingChunks(size_t);
+        ~NonCompactingChunks() = default;
+        NonCompactingChunks(NonCompactingChunk const&) = delete;
+        NonCompactingChunks(NonCompactingChunks&&) = default;
+        NonCompactingChunks operator=(NonCompactingChunks const&) = delete;
+        void* allocate() noexcept;
+        void free(void*);
+    };
+
+    /**
+     * self-compacting chunk (with help from SelfCompactingChunks to compact across a list)
+     */
+    struct SelfCompactingChunk final: public ChunkHolder {
+        SelfCompactingChunk(size_t tupleSize);
+        SelfCompactingChunk(SelfCompactingChunk&&) = default;
+        SelfCompactingChunk(SelfCompactingChunk const&) = delete;
+        SelfCompactingChunk operator=(SelfCompactingChunk const&) = delete;
+        ~SelfCompactingChunk() = default;
         void free(void* dst, void const* src);  // releases tuple at dst, and move tuple at src to dst. Used for cross-chunk movement
         void* free(void*);                      // release tuple from the last chunk of the list, return the moved tuple
-        bool contains(void const*) const;       // query if a table tuple is stored in current chunk
         void const* begin() const noexcept;     // chunk base ptr
         void const* end() const noexcept;       // next alloc, <= m_end
-        bool full() const noexcept;
+        // void* allocate() noexcept,
+        // bool contains(void const*) const and
+        // bool full() const noexcept, have same implementation as base
     };
 
     /**
@@ -139,8 +190,8 @@ namespace voltdb {
     template<ShrinkDirection shrink> class CompactingStorageTrait;
 
     template<> class CompactingStorageTrait<ShrinkDirection::tail> {
-        using list_type = std::list<TableTupleChunk>;
-        using iterator_type = list<TableTupleChunk>::iterator;
+        using list_type = std::list<SelfCompactingChunk>;
+        using iterator_type = list<SelfCompactingChunk>::iterator;
     public:
         void snapshot(bool) noexcept;
         /**
@@ -160,8 +211,8 @@ namespace voltdb {
     };
 
     template<> class CompactingStorageTrait<ShrinkDirection::head> {
-        using list_type = std::list<TableTupleChunk>;
-        using iterator_type = list<TableTupleChunk>::iterator;
+        using list_type = std::list<SelfCompactingChunk>;
+        using iterator_type = list<SelfCompactingChunk>::iterator;
         bool m_inSnapshot = false;
         list_type* m_list = nullptr;
         boost::optional<iterator_type> m_last{};
@@ -178,17 +229,17 @@ namespace voltdb {
      * the non-empty allocation from the head to freed space.
      */
     template<ShrinkDirection dir>
-    class TableTupleChunks {
+    class SelfCompactingChunks {
     protected:
-        using list_type = std::list<TableTupleChunk>;
+        using list_type = std::list<SelfCompactingChunk>;
         size_t const m_tupleSize;
         list_type m_list{};
         CompactingStorageTrait<dir> m_trait{};
     public:
-        TableTupleChunks(size_t tupleSize);
-        TableTupleChunks(TableTupleChunks const&) = delete;    // non-copyable, non-assignable, moveable
-        TableTupleChunks operator=(TableTupleChunks const&) = delete;
-        TableTupleChunks(TableTupleChunks&&) = default;
+        SelfCompactingChunks(size_t tupleSize);
+        SelfCompactingChunks(SelfCompactingChunks const&) = delete;    // non-copyable, non-assignable, moveable
+        SelfCompactingChunks operator=(SelfCompactingChunks const&) = delete;
+        SelfCompactingChunks(SelfCompactingChunks&&) = default;
         void* allocate() noexcept;
         void* free(void*);
         void snapshot(bool);
@@ -212,7 +263,7 @@ namespace voltdb {
      * A iterable, self-compacting list of chunks, which deletes
      * from head of the list of chunks.
      */
-    struct IterableTableTupleChunks final : public TableTupleChunks<ShrinkDirection::head> {
+    struct IterableTableTupleChunks final : public SelfCompactingChunks<ShrinkDirection::head> {
         template<bool Const>                   // RO or RW
         class iterator_type : public std::iterator<forward_iterator_tag,
                 typename conditional<Const, void const*, void*>::type> {

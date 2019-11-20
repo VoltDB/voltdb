@@ -113,7 +113,7 @@ inline void const* ChangeHistory<Alloc>::reverted(void const* src) const {
     }
 }
 
-inline size_t TableTupleChunk::chunkSize(size_t tupleSize) noexcept {
+inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
     // preferred list of chunk sizes ranging from 4KB to 1MB
     static constexpr array<size_t, 9> const preferred{
         4 * 1024, 8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024,
@@ -125,7 +125,7 @@ inline size_t TableTupleChunk::chunkSize(size_t tupleSize) noexcept {
             [tupleSize](size_t s) { return tupleSize <= s; }) / tupleSize * tupleSize;
 }
 
-inline TableTupleChunk::TableTupleChunk(size_t tupleSize):
+inline ChunkHolder::ChunkHolder(size_t tupleSize):
     m_tupleSize(tupleSize), m_chunkSize(chunkSize(tupleSize)),
     m_resource(new char[m_chunkSize]),
     m_begin(m_resource.get()),
@@ -134,14 +134,14 @@ inline TableTupleChunk::TableTupleChunk(size_t tupleSize):
     vassert(tupleSize <= 1024 * 1024);
 }
 
-inline TableTupleChunk::TableTupleChunk(TableTupleChunk&& rhs):
+inline ChunkHolder::ChunkHolder(ChunkHolder&& rhs):
     m_tupleSize(rhs.m_tupleSize), m_chunkSize(rhs.m_chunkSize), m_resource(move(rhs.m_resource)),
     m_begin(rhs.m_begin), m_end(rhs.m_end), m_next(rhs.m_next) {
     const_cast<void*&>(rhs.m_begin) = nullptr;
 }
 
-inline void* TableTupleChunk::allocate() noexcept {
-    if (m_next >= m_end) {                 // current block full
+inline void* ChunkHolder::allocate() noexcept {
+    if (m_next >= m_end) {                 // chunk is full
         return nullptr;
     } else {
         void* res = m_next;
@@ -150,26 +150,79 @@ inline void* TableTupleChunk::allocate() noexcept {
     }
 }
 
-inline bool TableTupleChunk::contains(void const* which) const {
+inline bool ChunkHolder::contains(void const* addr) const {
     // check alignment
-    vassert(which < m_begin || which >= m_end || 0 ==
-            (reinterpret_cast<char const*>(which) - reinterpret_cast<char*const>(m_begin)) % m_tupleSize);
-    return which >= m_begin && which < m_next;
+    vassert(addr < m_begin || addr >= m_end || 0 ==
+            (reinterpret_cast<char const*>(addr) - reinterpret_cast<char*const>(m_begin)) % m_tupleSize);
+    return addr >= m_begin && addr < m_next;
 }
 
-inline void const* TableTupleChunk::begin() const noexcept {
-    return m_begin;
-}
-
-inline void const* TableTupleChunk::end() const noexcept {
-    return m_next;
-}
-
-inline bool TableTupleChunk::full() const noexcept {
+inline bool ChunkHolder::full() const noexcept {
     return m_next == m_end;
 }
 
-inline void TableTupleChunk::free(void* dst, void const* src) {
+inline NonCompactingChunk::NonCompactingChunk(NonCompactingChunk&& o):
+    ChunkHolder(move(o)), m_freed(move(o.m_freed)) {}
+
+inline void* NonCompactingChunk::allocate() noexcept {
+    if (! m_freed.empty()) {               // allocate from free list first, in LIFO order
+        void* r = m_freed.top();
+        vassert(r < m_next && r >= m_begin);
+        m_freed.pop();
+        return r;
+    } else {
+        return ChunkHolder::allocate();
+    }
+}
+
+inline void NonCompactingChunk::free(void* src) {
+    if (reinterpret_cast<char*>(src) + m_tupleSize == m_next) {     // last element: decrement boundary ptr
+        m_next = src;
+    } else {                               // hole in the middle: keep track of it
+        m_freed.push(src);
+    }
+}
+
+inline bool NonCompactingChunk::full() const noexcept {
+    return ChunkHolder::full() && m_freed.empty();
+}
+
+inline NonCompactingChunks::NonCompactingChunks(size_t tupleSize): m_tupleSize(tupleSize) {}
+
+inline void* NonCompactingChunks::allocate() noexcept {
+    // linear search for non-full chunk
+    auto iter = find_if(m_storage.begin(), m_storage.end(),
+            [](NonCompactingChunk const& c) { return ! c.full(); });
+    void* r;
+    if (iter == m_storage.cend()) {        // all chunks are full
+        m_storage.emplace_front(m_tupleSize);
+        r = m_storage.front().allocate();
+    } else {
+        r = iter->allocate();
+    }
+    vassert(r != nullptr);
+    return r;
+}
+
+inline void NonCompactingChunks::free(void* src) {
+    // linear search for containing chunk
+    auto iter = find_if(m_storage.begin(), m_storage.end(),
+            [&src](NonCompactingChunk const& c) { return c.contains(src); });
+    vassert(iter != m_storage.end());
+    iter->free(src);
+}
+
+inline SelfCompactingChunk::SelfCompactingChunk(size_t s) : ChunkHolder(s) {}
+
+inline void const* SelfCompactingChunk::begin() const noexcept {
+    return m_begin;
+}
+
+inline void const* SelfCompactingChunk::end() const noexcept {
+    return m_next;
+}
+
+inline void SelfCompactingChunk::free(void* dst, void const* src) {
     vassert(contains(dst));
     vassert(! contains(src));
     memcpy(dst, src, m_tupleSize);
@@ -178,7 +231,7 @@ inline void TableTupleChunk::free(void* dst, void const* src) {
     vassert(m_next >= m_begin);
 }
 
-inline void* TableTupleChunk::free(void* dst) {                            // witin-chunk free
+inline void* SelfCompactingChunk::free(void* dst) {                            // witin-chunk free
     vassert(contains(dst));
     vassert(m_next > m_begin);
     reinterpret_cast<char*&>(m_next) -= m_tupleSize;
@@ -248,36 +301,36 @@ CompactingStorageTrait<ShrinkDirection::head>::lastReleased() const {
     return m_last;
 }
 
-template<ShrinkDirection dir> inline TableTupleChunks<dir>::TableTupleChunks(size_t tupleSize) :
+template<ShrinkDirection dir> inline SelfCompactingChunks<dir>::SelfCompactingChunks(size_t tupleSize) :
     m_tupleSize(tupleSize) {}
 
-template<ShrinkDirection dir> inline void TableTupleChunks<dir>::snapshot(bool s) {
+template<ShrinkDirection dir> inline void SelfCompactingChunks<dir>::snapshot(bool s) {
     m_trait.snapshot(s);
 }
 
 template<ShrinkDirection dir>
-inline void* TableTupleChunks<dir>::allocate() noexcept {                  // always allocates from tail
+inline void* SelfCompactingChunks<dir>::allocate() noexcept {                  // always allocates from tail
     if (m_list.empty() || m_list.back().full()) {
         m_list.emplace_back(m_tupleSize);
     }
     return m_list.back().allocate();
 }
 
-template<> inline typename TableTupleChunks<ShrinkDirection::head>::list_type::iterator
-TableTupleChunks<ShrinkDirection::head>::compactFrom() {
+template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::head>::compactFrom() {
     auto lastReleased = m_trait.lastReleased();
     return lastReleased ? *lastReleased : m_list.begin();
 }
 
-template<> inline typename TableTupleChunks<ShrinkDirection::tail>::list_type::iterator
-TableTupleChunks<ShrinkDirection::tail>::compactFrom() {
+template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::tail>::compactFrom() {
     return prev(m_list.end());
 }
 
 template<ShrinkDirection dir>
-void* TableTupleChunks<dir>::free(void* dst) {
+void* SelfCompactingChunks<dir>::free(void* dst) {
     auto dst_iter = find_if(m_list.begin(), m_list.end(),
-            [dst](TableTupleChunk const& c) { return c.contains(dst); });
+            [dst](SelfCompactingChunk const& c) { return c.contains(dst); });
     if (dst_iter == m_list.cend()) {
         throw std::runtime_error("Address not found");
     }
@@ -294,25 +347,25 @@ void* TableTupleChunks<dir>::free(void* dst) {
     return src;
 }
 
-template<> inline typename TableTupleChunks<ShrinkDirection::tail>::list_type::iterator
-TableTupleChunks<ShrinkDirection::tail>::chunkBegin() {
+template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::tail>::chunkBegin() {
     return m_list.begin();
 }
 
-template<> inline typename TableTupleChunks<ShrinkDirection::head>::list_type::iterator
-TableTupleChunks<ShrinkDirection::head>::chunkBegin() {
+template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::head>::chunkBegin() {
     return compactFrom();
 }
 
 template<ShrinkDirection dir>
-bool TableTupleChunks<dir>::less(void const* lhs, void const* rhs) const {
+bool SelfCompactingChunks<dir>::less(void const* lhs, void const* rhs) const {
     if (lhs == rhs) {
         return false;
     } else {
         // linear search in chunks
         bool found1 = false, found2 = false;
         auto const pos = find_if(chunkBegin(), m_list.end(),
-                [&found1, &found2, lhs, rhs](TableTupleChunk const& c) {
+                [&found1, &found2, lhs, rhs](SelfCompactingChunk const& c) {
                     found1 |= c.contains(lhs);
                     found2 |= c.contains(rhs);
                     return found1 || found2;
