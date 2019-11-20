@@ -29,11 +29,6 @@
 namespace voltdb {
     using namespace std;
 
-    struct std_allocator {                    // wrapper of std::allocator
-        static void* alloc(size_t);
-        static void dealloc(void*);
-    };
-
     /**
      * Holder for a chunk, whether it is self-compacting or not.
      */
@@ -52,7 +47,7 @@ namespace voltdb {
         ChunkHolder operator=(ChunkHolder const&) = delete;
         ChunkHolder(ChunkHolder&&);
         ~ChunkHolder() = default;
-        void* allocate() noexcept;                 // returns NULL if current chunk is full.
+        void* allocate() noexcept;                 // returns NULL if this chunk is full.
         bool contains(void const*) const;          // query if a table tuple is stored in current chunk
         bool full() const noexcept;
     };
@@ -104,9 +99,8 @@ namespace voltdb {
         void* free(void*);                      // release tuple from the last chunk of the list, return the moved tuple
         void const* begin() const noexcept;     // chunk base ptr
         void const* end() const noexcept;       // next alloc, <= m_end
-        // void* allocate() noexcept,
-        // bool contains(void const*) const and
-        // bool full() const noexcept, have same implementation as base
+        // void* allocate() noexcept, bool contains(void const*) const, bool full() const noexcept
+        // all have same implementation as base
     };
 
     /**
@@ -168,15 +162,21 @@ namespace voltdb {
         size_t const m_tupleSize;
         list_type m_list{};
         CompactingStorageTrait<dir> m_trait{};
+        /**
+         * Transaction view of the first chunk. When deleting
+         * from head, the begin() will skip chunks that are empty
+         * as a result of free(void*) operations.
+         */
+        typename list_type::iterator chunkBegin();
+        typename list_type::const_iterator chunkBegin() const;
     public:
         SelfCompactingChunks(size_t tupleSize);
-        SelfCompactingChunks(SelfCompactingChunks const&) = delete;    // non-copyable, non-assignable, moveable
+        SelfCompactingChunks(SelfCompactingChunks const&) = delete;
         SelfCompactingChunks operator=(SelfCompactingChunks const&) = delete;
         SelfCompactingChunks(SelfCompactingChunks&&) = default;
         void* allocate() noexcept;
         void* free(void*);
         void snapshot(bool);
-        bool less(void const*, void const*) const; // natural order of two tuples.
     private:
         /**
          * The chunk from whom table tuple need to be moved. This
@@ -184,12 +184,7 @@ namespace voltdb {
          * freed chunks from front of the list.
          */
         typename list_type::iterator compactFrom();
-        /**
-         * Transaction view of the first chunk. When deleting
-         * from head, the begin() will skip chunks that are empty
-         * as a result of free(void*) operations.
-         */
-        typename list_type::iterator chunkBegin();
+        typename list_type::const_iterator compactFrom() const;
     };
 
     /**
@@ -237,33 +232,19 @@ namespace voltdb {
         void remove(void const*);
     };
 
-    template<typename Alloc, typename Retainer,
+    template<typename Alloc, RetainPolicy policy, typename Collections,       // set/map typedefs
         // Alloc must be either NonCompactingChunks or SelfCompactingChunks
         typename = enable_if<is_same<Alloc, NonCompactingChunks>::value ||
             is_same<Alloc, SelfCompactingChunks<ShrinkDirection::head>>::value ||
-            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>,
-        typename = typename enable_if<is_base_of<BaseHistoryRetainTrait, Retainer>::value>::type>
+            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>>
     class TxnPreHook final {
-    public:
-        enum class ChangeType : char {
-            Update, Insertion, Deletion
-        };
-    private:
-        /**
-         * Meta-data specifying when and how often to release
-         * from map when a ptr has been reverted.
-         */
-        struct RetainTrait {
-            enum class Policy : char {
-                never, always, batched
-            } const m_policy;
-            size_t const m_batchSize;
-//            RetainTrait()
-        };
-        map<void const*, void const*> m_changes{};   // addr in persistent storage under change => addr storing before-change content
-        set<void const*> m_copied{};                 // addr in persistent storage that we keep a local copy
+        using set = typename Collections::set;
+        using map = typename Collections::map;
+        map m_changes{};   // addr in persistent storage under change => addr storing before-change content
+        set m_copied{};                 // addr in persistent storage that we keep a local copy
         bool m_recording = false;                    // in snapshot process?
         Alloc m_storage;
+        HistoryRetainTrait<policy> m_retainer;
         /**
          * Creates a deep copy of the tuple stored in local
          * storage, and keep track of it.
@@ -285,6 +266,7 @@ namespace voltdb {
         void insert(void const* src, void const* dst);         // same
         void remove(void const* src, void const* dst);         // src tuple is deleted, and tuple at dst gets moved to src
     public:
+        enum class ChangeType : char {Update, Insertion, Deletion};
         TxnPreHook(size_t);
         TxnPreHook(TxnPreHook const&) = delete;
         TxnPreHook(TxnPreHook&&) = default;
@@ -297,12 +279,19 @@ namespace voltdb {
         void postReverted(void const*);            // local memory clean-up
     };
 
+    template<typename Key, typename Value> struct stdCollections {
+        using set = std::set<Key>;
+        using map = std::map<Key, Value>;
+    };
+
     /**
      * A iterable, self-compacting list of chunks, which deletes
      * from head of the list of chunks.
      */
     struct IterableTableTupleChunks final : public SelfCompactingChunks<ShrinkDirection::head> {
-        template<bool Const>                   // RO or RW
+        IterableTableTupleChunks() = delete;       // only iterator types can be created/used
+        template<bool Const,                       // RO or RW
+            bool TxnView>                          // From which chunk do we start to iterate
         class iterator_type : public std::iterator<forward_iterator_tag,
                 typename conditional<Const, void const*, void*>::type> {
             friend class IterableTableTupleChunks;
@@ -335,8 +324,8 @@ namespace voltdb {
         /**
          * Iterators used by transaction
          */
-        using iterator = iterator_type<false>;
-        using const_iterator = iterator_type<true>;
+        using iterator = iterator_type<false, true>;
+        using const_iterator = iterator_type<true, true>;
 
         iterator begin();
         iterator end();
@@ -348,10 +337,12 @@ namespace voltdb {
         /**
          * Iterators with callback, applied when
          * accessing iterated value.
+         * When iterating with call back, the beginning chunk
+         * wouldn't always be the first chunk in the list.
          */
         template<bool Const>
-        class iterator_cb_type : public iterator_type<Const> {
-            using super = iterator_type<Const>;
+        class iterator_cb_type : public iterator_type<Const, false> {
+            using super = iterator_type<Const, false>;
         public:
             using value_type = typename super::value_type;
             // call-back type
@@ -363,33 +354,33 @@ namespace voltdb {
             cb_type m_cb;
         };
 
-        template<typename Alloc, typename Retainer, bool Const>
+        template<typename Alloc, RetainPolicy policy, bool Const,
+            typename C = stdCollections<void const*, void const*>>
         class time_traveling_iterator_type : public iterator_cb_type<Const> {
             using super = iterator_cb_type<Const>;
         public:
             using container_type = typename super::container_type;
             using history_type = typename conditional<Const,
-                  TxnPreHook<Alloc, Retainer> const,
-                  TxnPreHook<Alloc, Retainer>>::type&;
+                  TxnPreHook<Alloc, policy, C> const, TxnPreHook<Alloc, policy, C>>::type&;
             time_traveling_iterator_type(container_type, history_type);
         };
-        template<typename Alloc, typename Retainer>
-        using iterator_cb = time_traveling_iterator_type<Alloc, Retainer, false>;
-        template<typename Alloc, typename Retainer>
-        using const_iterator_cb = time_traveling_iterator_type<Alloc, Retainer, true>;
+        template<typename Alloc, RetainPolicy policy>
+        using iterator_cb = time_traveling_iterator_type<Alloc, policy, false>;
+        template<typename Alloc, RetainPolicy policy>
+        using const_iterator_cb = time_traveling_iterator_type<Alloc, policy, true>;
 
-        template<typename Alloc, typename Retainer> iterator_cb<Alloc, Retainer>
-            begin(typename iterator_cb<Alloc, Retainer>::history_type);
-        template<typename Alloc, typename Retainer> iterator_cb<Alloc, Retainer>
-            end(typename iterator_cb<Alloc, Retainer>::history_type);
-        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
-            cbegin(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
-        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
-            cend(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
-        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
-            begin(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
-        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
-            end(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
+        template<typename Alloc, RetainPolicy policy> iterator_cb<Alloc, policy>
+            begin(typename iterator_cb<Alloc, policy>::history_type);
+        template<typename Alloc, RetainPolicy policy> iterator_cb<Alloc, policy>
+            end(typename iterator_cb<Alloc, policy>::history_type);
+        template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
+            cbegin(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
+            cend(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
+            begin(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
+            end(typename const_iterator_cb<Alloc, policy>::history_type) const;
     };
 
     typename IterableTableTupleChunks::iterator begin(IterableTableTupleChunks&);
@@ -401,18 +392,20 @@ namespace voltdb {
     typename IterableTableTupleChunks::const_iterator begin(IterableTableTupleChunks const&);
     typename IterableTableTupleChunks::const_iterator end(IterableTableTupleChunks const&);
 
-    template<typename Alloc, typename Retainer, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
-        begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type,
-                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type);
-    template<typename Alloc, typename Retainer, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
-        end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type,
-                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type);
+    template<typename Alloc, RetainPolicy policy, bool Const, typename C>
+    typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> begin(
+            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type,
+            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type);
+    template<typename Alloc, RetainPolicy policy, bool Const, typename C> typename
+    IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> end(
+            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type,
+            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type);
 
-    template<typename Alloc, typename Retainer> typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
-        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type);
-    template<typename Alloc, typename Retainer> typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
-        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type);
+    template<typename Alloc, RetainPolicy policy> typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
+        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type);
+    template<typename Alloc, RetainPolicy policy> typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
+        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type);
 
 }

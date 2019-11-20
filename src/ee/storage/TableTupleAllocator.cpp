@@ -20,19 +20,12 @@
 
 using namespace voltdb;
 
-inline void* std_allocator::alloc(size_t len) {
-    return new char[len];
-}
-
-inline void std_allocator::dealloc(void* addr) {
-    delete[] reinterpret_cast<char*>(addr);
-}
-
 inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
-    // preferred list of chunk sizes ranging from 4KB to 1MB
-    static constexpr array<size_t, 9> const preferred{
-        4 * 1024, 8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024,
-          128 * 1024, 256 * 1024, 512 * 1024, 1024 * 1024
+    // preferred list of chunk sizes ranging from 4KB to 4MB
+    static constexpr array<size_t, 11> const preferred{                 // 0x400 == 1024
+        4 * 0x400, 8 * 0x400, 16 * 0x400, 32 * 0x400, 64 * 0x400,       // 0x100_000 == 1024 * 1024
+          128 * 0x400, 256 * 0x400, 512 * 0x400, 0x100000, 2 * 0x100000,
+          4 * 0x100000
     };
     // we always pick smallest preferred chunk size to calculate
     // how many tuples a chunk fits
@@ -46,7 +39,7 @@ inline ChunkHolder::ChunkHolder(size_t tupleSize):
     m_begin(m_resource.get()),
     m_end(reinterpret_cast<char*const>(m_begin) + m_chunkSize),
     m_next(m_begin) {
-    vassert(tupleSize <= 1024 * 1024);
+    vassert(tupleSize <= 4 * 0x100000);
 }
 
 inline ChunkHolder::ChunkHolder(ChunkHolder&& rhs):
@@ -235,17 +228,6 @@ inline void* SelfCompactingChunks<dir>::allocate() noexcept {                  /
     return m_list.back().allocate();
 }
 
-template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::iterator
-SelfCompactingChunks<ShrinkDirection::head>::compactFrom() {
-    auto lastReleased = m_trait.lastReleased();
-    return lastReleased ? *lastReleased : m_list.begin();
-}
-
-template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::iterator
-SelfCompactingChunks<ShrinkDirection::tail>::compactFrom() {
-    return prev(m_list.end());
-}
-
 template<ShrinkDirection dir>
 void* SelfCompactingChunks<dir>::free(void* dst) {
     auto dst_iter = find_if(m_list.begin(), m_list.end(),
@@ -266,6 +248,28 @@ void* SelfCompactingChunks<dir>::free(void* dst) {
     return src;
 }
 
+template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::head>::compactFrom() {
+    auto lastReleased = m_trait.lastReleased();
+    return lastReleased ? *lastReleased : m_list.begin();
+}
+
+template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::iterator
+SelfCompactingChunks<ShrinkDirection::tail>::compactFrom() {
+    return prev(m_list.end());
+}
+
+template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::const_iterator
+SelfCompactingChunks<ShrinkDirection::head>::compactFrom() const {
+    auto lastReleased = m_trait.lastReleased();
+    return lastReleased ? *lastReleased : m_list.begin();
+}
+
+template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::const_iterator
+SelfCompactingChunks<ShrinkDirection::tail>::compactFrom() const {
+    return prev(m_list.cend());
+}
+
 template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::iterator
 SelfCompactingChunks<ShrinkDirection::tail>::chunkBegin() {
     return m_list.begin();
@@ -276,49 +280,43 @@ SelfCompactingChunks<ShrinkDirection::head>::chunkBegin() {
     return compactFrom();
 }
 
-template<ShrinkDirection dir>
-bool SelfCompactingChunks<dir>::less(void const* lhs, void const* rhs) const {
-    if (lhs == rhs) {
-        return false;
-    } else {
-        // linear search in chunks
-        bool found1 = false, found2 = false;
-        auto const pos = find_if(chunkBegin(), m_list.end(),
-                [&found1, &found2, lhs, rhs](SelfCompactingChunk const& c) {
-                    found1 |= c.contains(lhs);
-                    found2 |= c.contains(rhs);
-                    return found1 || found2;
-                });
-        vassert(pos != m_list.end());     // neither address is found anywhere
-        if (found1 && !found2) {
-            return true;
-        } else {
-            return found1 && found2 &&     // in the same chunk
-                lhs < rhs;
-        }
-    }
+template<> inline typename SelfCompactingChunks<ShrinkDirection::tail>::list_type::const_iterator
+SelfCompactingChunks<ShrinkDirection::tail>::chunkBegin() const {
+    return m_list.cbegin();
 }
 
-template<bool Const>
-inline IterableTableTupleChunks::iterator_type<Const>::iterator_type(
-        typename IterableTableTupleChunks::iterator_type<Const>::container_type src):
-    m_offset(src.m_tupleSize), m_list(src.m_list),
-    m_iter(m_list.begin()),
+template<> inline typename SelfCompactingChunks<ShrinkDirection::head>::list_type::const_iterator
+SelfCompactingChunks<ShrinkDirection::head>::chunkBegin() const {
+    return compactFrom();
+}
+
+template<bool Const, bool TxnView>
+inline IterableTableTupleChunks::iterator_type<Const, TxnView>::iterator_type(
+        typename IterableTableTupleChunks::iterator_type<Const, TxnView>::container_type src):
+    super(), m_offset(src.m_tupleSize), m_list(src.m_list),
+    m_iter(TxnView ? src.chunkBegin() : m_list.begin()),                       // TODO
     m_cursor(const_cast<value_type>(m_iter->begin())) {
     static_assert(is_reference<container_type>::value,
             "IterableTableTupleChunks::iterator_type::container_type is not a reference");
     static_assert(is_pointer<value_type>::value,
             "IterableTableTupleChunks::value_type is not a pointer");
+    // iterator initial value (first chunk) should have been
+    // allocated. This check is in case snapshot is in progress
+    // and we are using head compaction scheme. In that case,
+    // some leading chunks may be empty (all allocations are
+    // freed as a result of hole-filling delete), and we don't
+    // want the initial iterator to point to any empty chunk.
+    vassert(m_iter->begin() != m_iter->end());
 }
 
-template<bool Const>
-inline bool IterableTableTupleChunks::iterator_type<Const>::operator==(
-        iterator_type const& o) const noexcept {
+template<bool Const, bool TxnView>
+inline bool IterableTableTupleChunks::iterator_type<Const, TxnView>::operator==(
+        iterator_type<Const, TxnView> const& o) const noexcept {
     return m_cursor == o.m_cursor;
 }
 
-template<bool Const>
-void IterableTableTupleChunks::iterator_type<Const>::advance() {
+template<bool Const, bool TxnView>
+void IterableTableTupleChunks::iterator_type<Const, TxnView>::advance() {
     // Need to maintain invariant that m_cursor is nullptr iff
     // iterator points to end().
     if (m_iter != m_list.end()) {
@@ -337,24 +335,24 @@ void IterableTableTupleChunks::iterator_type<Const>::advance() {
     }
 }
 
-template<bool Const>
-inline IterableTableTupleChunks::iterator_type<Const>&
-IterableTableTupleChunks::iterator_type<Const>::operator++() {
+template<bool Const, bool TxnView>
+inline IterableTableTupleChunks::iterator_type<Const, TxnView>&
+IterableTableTupleChunks::iterator_type<Const, TxnView>::operator++() {
     advance();
     return *this;
 }
 
-template<bool Const>
-inline IterableTableTupleChunks::iterator_type<Const>
-IterableTableTupleChunks::iterator_type<Const>::operator++(int) {
-    typename IterableTableTupleChunks::iterator_type<Const> copy(*this);
+template<bool Const, bool TxnView>
+inline IterableTableTupleChunks::iterator_type<Const, TxnView>
+IterableTableTupleChunks::iterator_type<Const, TxnView>::operator++(int) {
+    typename IterableTableTupleChunks::iterator_type<Const, TxnView> copy(*this);
     advance();
     return copy;
 }
 
-template<bool Const>
-inline typename IterableTableTupleChunks::template iterator_type<Const>::reference
-IterableTableTupleChunks::iterator_type<Const>::operator*() noexcept {
+template<bool Const, bool TxnView>
+inline typename IterableTableTupleChunks::template iterator_type<Const, TxnView>::reference
+IterableTableTupleChunks::iterator_type<Const, TxnView>::operator*() noexcept {
     return m_cursor;
 }
 
@@ -388,7 +386,7 @@ inline typename IterableTableTupleChunks::const_iterator IterableTableTupleChunk
 
 template<bool Const>
 inline IterableTableTupleChunks::iterator_cb_type<Const>::iterator_cb_type(
-        container_type c, cb_type cb): super(c), m_cb(cb) {}
+        container_type c, cb_type cb): super(c, false), m_cb(cb) {}            // using snapshot view to set list iterator begin
 
 template<bool Const>
 inline typename IterableTableTupleChunks::template iterator_cb_type<Const>::value_type
@@ -396,52 +394,52 @@ IterableTableTupleChunks::iterator_cb_type<Const>::operator*() {
     return m_cb(super::operator*());
 }
 
-template<typename Alloc, typename Retainer, bool Const>
-inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type(
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type::history_type h) :
+template<typename Alloc, RetainPolicy policy, bool Const, typename C>
+inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::time_traveling_iterator_type(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::time_traveling_iterator_type::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::time_traveling_iterator_type::history_type h) :
     super(c, [&h](typename super::value_type c){
                 using type = typename super::value_type;
                 return const_cast<type>(h.reverted(const_cast<type>(c)));
             }) {}
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer> IterableTableTupleChunks::begin(
-        typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type h) {
-    return iterator_cb<Alloc, Retainer>(*this, h);
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc, policy> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type h) {
+    return iterator_cb<Alloc, policy>(*this, h);
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer> IterableTableTupleChunks::end(
-        typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type h) {
-    iterator_cb<Alloc, Retainer> iter(*this, h);
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc, policy> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type h) {
+    iterator_cb<Alloc, policy> iter(*this, h);
     iter.m_cursor = nullptr;
     return iter;
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::cbegin(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
-    return const_iterator_cb<Alloc, Retainer>(*this, h);
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy> IterableTableTupleChunks::cbegin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) const {
+    return const_iterator_cb<Alloc, policy>(*this, h);
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::cend(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
-    const_iterator_cb<Alloc, Retainer> iter(*this, h);
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy> IterableTableTupleChunks::cend(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) const {
+    const_iterator_cb<Alloc, policy> iter(*this, h);
     iter.m_cursor = nullptr;
     return iter;
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::begin(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) const {
     return cbegin(h);
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::end(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) const {
     return cend(h);
 }
 
@@ -466,29 +464,29 @@ inline typename IterableTableTupleChunks::const_iterator end(IterableTableTupleC
     return c.cend();
 }
 
-template<typename Alloc, typename Retainer, bool Const>
-inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
-begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type h) {
+template<typename Alloc, RetainPolicy policy, bool Const, typename C>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> begin(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type h) {
     return c.begin(h);
 }
-template<typename Alloc, typename Retainer, bool Const>
-inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
-end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type h) {
+template<typename Alloc, RetainPolicy policy, bool Const, typename C>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> end(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type h) {
     return c.end(h);
 }
 
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
-cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type c,
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) {
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
+cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) {
     return c.cbegin(h);
 }
-template<typename Alloc, typename Retainer>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
-cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type c,
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) {
+template<typename Alloc, RetainPolicy policy>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
+cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::history_type h) {
     return c.cend(h);
 }
 
@@ -521,12 +519,17 @@ inline void HistoryRetainTrait<RetainPolicy::batched>::remove(void const* addr) 
     }
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline TxnPreHook<Alloc, Retainer, E1, E2>::TxnPreHook(size_t tupleSize): m_storage(tupleSize) {}
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline TxnPreHook<Alloc, policy, C, E>::TxnPreHook(size_t tupleSize):
+    m_storage(tupleSize),
+    m_retainer([this](void const* addr) {
+                vassert(this->m_changes.count(addr) && this->m_copied.count(addr));
+                this->m_changes.erase(addr);
+                this->m_copied.erase(addr);
+            }) {}
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::add(
-        typename TxnPreHook<Alloc, Retainer, E1, E2>::ChangeType type,
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::add(typename TxnPreHook<Alloc, policy, C, E>::ChangeType type,
         void const* src, void const* dst) {
     if (m_recording) {
         switch (type) {
@@ -543,20 +546,20 @@ inline void TxnPreHook<Alloc, Retainer, E1, E2>::add(
     }
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::start() noexcept {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::start() noexcept {
     m_recording = true;
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::stop() {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::stop() {
     m_recording = false;
     m_changes.clear();
     m_copied.clear();
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void* TxnPreHook<Alloc, Retainer, E1, E2>::copy(void const* src) {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void* TxnPreHook<Alloc, policy, C, E>::copy(void const* src) {
     void* dst = m_storage.allocate();
     vassert(dst != nullptr);
     memcpy(dst, src, m_storage.tupleSize());
@@ -564,16 +567,16 @@ inline void* TxnPreHook<Alloc, Retainer, E1, E2>::copy(void const* src) {
     return dst;
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::update(void const* src, void const* dst) {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::update(void const* src, void const* dst) {
     // src tuple from temp table written to dst in persistent storage
     if (m_recording && ! m_changes.count(dst)) {
         m_changes.emplace(dst, copy(dst));
     }
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::insert(void const* src, void const* dst) {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::insert(void const* src, void const* dst) {
     if (m_recording && ! m_changes.count(dst)) {
         // for insertions, since previous memory is unused, there
         // is nothing to keep track of. Just mark the position as
@@ -582,8 +585,8 @@ inline void TxnPreHook<Alloc, Retainer, E1, E2>::insert(void const* src, void co
     }
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::remove(void const* src, void const* dst) {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::remove(void const* src, void const* dst) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording) {
         if (! m_changes.count(src)) {
@@ -598,13 +601,13 @@ inline void TxnPreHook<Alloc, Retainer, E1, E2>::remove(void const* src, void co
     }
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void const* TxnPreHook<Alloc, Retainer, E1, E2>::reverted(void const* src) const {
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void const* TxnPreHook<Alloc, policy, C, E>::reverted(void const* src) const {
     auto const pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }
 
-template<typename Alloc, typename Retainer, typename E1, typename E2>
-inline void TxnPreHook<Alloc, Retainer, E1, E2>::postReverted(void const* src) {
-    // TODO
+template<typename Alloc, RetainPolicy policy, typename C, typename E>
+inline void TxnPreHook<Alloc, policy, C, E>::postReverted(void const* src) {
+    m_retainer.remove(src);
 }
