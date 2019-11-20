@@ -153,3 +153,11 @@ SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype
 SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant@plus10)
 SELECT __[#numone]            Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate
+
+-- Test simple sub-queries, with and without LIMIT (see ENG-18533)
+{_maybelimit |= ""}
+{_maybelimit |= "LIMIT 10"}
+SELECT SUB.COL1 FROM \
+    (SELECT _variable[@columntype] COL1, @idcol PARTCOL FROM @fromtables ORDER BY COL1, PARTCOL _maybelimit) SUB, \
+    @fromtables Q42 \
+    WHERE Q42.@idcol = SUB.PARTCOL ORDER BY PARTCOL
