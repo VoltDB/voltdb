@@ -198,6 +198,7 @@ import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.CatalogUtil.CatalogInChunks;
 import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
@@ -2643,12 +2644,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             DeploymentType deployment = null;
             try {
                 if (deploymentBytes != null) {
-                    CatalogUtil.writeCatalogToZK(zk,
+                    CatalogUtil.updateCatalogToZK(zk,
+                            0, // use default version 0 as start
                             0L,
-                            new byte[] {},  // spin loop in Inits.LoadCatalog.run() needs
-                                            // this to be of zero length until we have a real catalog.
-                            null,
-                            deploymentBytes);
+                            CatalogInChunks.createStarterCatalog(deploymentBytes));
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {
                     CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);

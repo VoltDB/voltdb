@@ -53,6 +53,13 @@ import com.google_voltpatches.common.base.Throwables;
 
 public class ZKUtil {
 
+    // At create time the zk catalog version node status is pending,
+    // once the whole catalog is uploaded, mark the version node as complete.
+    public enum ZKCatalogStatus {
+        PENDING,
+        COMPLETE,
+    }
+
      /** Prevents class from being inherited or instantiated **/
      private ZKUtil() {}
 
