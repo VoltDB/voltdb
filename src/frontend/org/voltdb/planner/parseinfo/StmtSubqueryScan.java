@@ -90,13 +90,11 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      */
     public void promoteSinglePartitionInfo(
             Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
-            Set< Set<AbstractExpression> > eqSets) {
+            Set<Set<AbstractExpression>> eqSets) {
         if (getScanPartitioning() == null) {
             throw new PlanningErrorException("Unsupported statement, subquery expressions are only supported for " +
                     "single partition procedures and AdHoc replicated tables.");
-        }
-        if (getScanPartitioning().getCountOfPartitionedTables() == 0 ||
-                getScanPartitioning().requiresTwoFragments()) {
+        } else if (getScanPartitioning().getCountOfPartitionedTables() == 0 || getScanPartitioning().requiresTwoFragments()) {
             return;
         }
 
@@ -110,11 +108,9 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             Set<AbstractExpression> values = null;
             if (valueEquivalence.containsKey(tveKey)) {
                 values = valueEquivalence.get(tveKey);
-            }
-            else if (valueEquivalence.containsKey(spExpr)) {
+            } else if (valueEquivalence.containsKey(spExpr)) {
                 values = valueEquivalence.get(spExpr);
-            }
-            else {
+            } else {
                 for (SchemaColumn otherCol: m_partitioningColumns) {
                     if (col != otherCol &&
                         valueEquivalence.containsKey(otherCol.getExpression())) {
@@ -135,7 +131,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     // Because HashSet stored a legacy hashcode for the non-final object.
     private void updateEqualSets(Set<AbstractExpression> values,
             Map<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
-            Set< Set<AbstractExpression> > eqSets,
+            Set<Set<AbstractExpression> > eqSets,
             AbstractExpression tveKey, AbstractExpression spExpr) {
         boolean hasLegacyValues = false;
         if (eqSets.contains(values)) {
@@ -179,7 +175,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             // Find whether the partition column is in output column list
             for (SchemaColumn outputCol: getOutputSchema()) {
                 AbstractExpression outputExpr = outputCol.getExpression();
-                if ( ! (outputExpr instanceof TupleValueExpression)) {
+                if (! (outputExpr instanceof TupleValueExpression)) {
                     continue;
                 }
 
@@ -194,13 +190,11 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             String colNameForParentQuery;
             if (matchedCol != null) {
                 colNameForParentQuery = matchedCol.getColumnAlias();
-            }
-            // single partition sub-query case can be single partition without
-            // including partition column in its display column list
-            else if ( ! getScanPartitioning().requiresTwoFragments()) {
+            } else if ( ! getScanPartitioning().requiresTwoFragments()) {
+                // single partition sub-query case can be single partition without
+                // including partition column in its display column list
                 colNameForParentQuery = partitionCol.getColumnName();
-            }
-            else {
+            } else {
                 continue;
             }
             partitionCol.reset(m_tableAlias, m_tableAlias,
@@ -216,12 +210,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      */
     @Override
     public boolean getIsReplicated() {
-        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
-            if ( ! tableScan.getIsReplicated()) {
-                return false;
-            }
-        }
-        return true;
+        return m_subqueryStmt.allScans().stream().allMatch(StmtTableScan::getIsReplicated);
     }
 
     public List<StmtTargetTableScan> getAllTargetTables() {
@@ -229,8 +218,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
-            }
-            else {
+            } else {
                 assert(tableScan instanceof StmtSubqueryScan);
                 StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
                 stmtTables.addAll(subScan.getAllTargetTables());
@@ -287,9 +275,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         if (m_subqueryStmt instanceof ParsedUnionStmt) {
             // Union are just returned
             return false;
-        }
-
-        if ( ! (m_subqueryStmt instanceof ParsedSelectStmt)) {
+        } if (! (m_subqueryStmt instanceof ParsedSelectStmt)) {
             throw new PlanningErrorException("Unsupported subquery found in FROM clause:" +
                     m_subqueryStmt);
         }
@@ -322,11 +308,11 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             // If joined with a partitioned table in the parent query, it will
             // violate the partitioned table join criteria.
             // Detect case (1) to mark receive node.
-            if ( ! selectStmt.hasPartitionColumnInGroupby()) {
+            if (! selectStmt.hasPartitionColumnInGroupby()) {
                 return false;
             }
         }
-        if ( ! selectStmt.hasPartitionColumnInWindowFunctionExpression()) {
+        if (! selectStmt.hasPartitionColumnInWindowFunctionExpression()) {
             return false;
         }
 
@@ -361,9 +347,8 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     /** Produce a tuple value expression for a column produced by this subquery */
     public TupleValueExpression getOutputExpression(int index) {
         SchemaColumn schemaCol = getSchemaColumn(index);
-        TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
+        return new TupleValueExpression(getTableAlias(), getTableAlias(),
                 schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
-        return tve;
     }
 
     public String calculateContentDeterminismMessage() {
@@ -413,7 +398,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         // null there is some error, so this computation is irrelevant.
         CompiledPlan scanBestPlan = getBestCostPlan();
         if (scanBestPlan != null) {
-            return hasSignificantOffsetOrLimit || ( ! scanBestPlan.isOrderDeterministic() && scanBestPlan.hasLimitOrOffset());
+            return hasSignificantOffsetOrLimit || (! scanBestPlan.isOrderDeterministic() && scanBestPlan.hasLimitOrOffset());
         }
         return hasSignificantOffsetOrLimit;
     }

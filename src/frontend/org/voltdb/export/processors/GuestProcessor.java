@@ -251,8 +251,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         try {
                             if (m_startPolling) { // Wait for command log replay to be done.
                                 if (EXPORTLOG.isDebugEnabled()) {
-                                    EXPORTLOG.debug("Beginning export processing for export source " + m_source.getTableName()
-                                    + " partition " + m_source.getPartitionId());
+                                    EXPORTLOG.debug("Beginning export processing for " + m_source);
                                 }
                                 m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
@@ -270,6 +269,10 @@ public class GuestProcessor implements ExportDataProcessor {
                             }
                         } catch(InterruptedException e) {
                             resubmitSelf();
+                        }  catch (RejectedExecutionException whenExportDataSourceIsClosed) {
+                            if (EXPORTLOG.isDebugEnabled()) {
+                                EXPORTLOG.debug("Source " + m_source + " closed before being started");
+                            }
                         } catch (Exception e) {
                             VoltDB.crashLocalVoltDB("Failed to initiate export binary deque poll", true, e);
                         }
@@ -292,12 +295,8 @@ public class GuestProcessor implements ExportDataProcessor {
                             try {
                                 m_source.getExecutorService().submit(this);
                             } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
-                                // it is truncated so we no longer need to wait
-
-                                // TODO: When truncation is finished, generation roll-over does not happen.
-                                // Log a message to and revisit the error handling for this case
                                 if (EXPORTLOG.isDebugEnabled()) {
-                                    EXPORTLOG.debug("Got rejected execution exception while waiting for truncation to finish");
+                                    EXPORTLOG.debug("Source " + m_source + " closed before being started");
                                 }
                             }
                         }
@@ -311,19 +310,15 @@ public class GuestProcessor implements ExportDataProcessor {
                 }
                 if (m_source.getExecutorService().isShutdown()) {
                     if (EXPORTLOG.isDebugEnabled()) {
-                        EXPORTLOG.debug("Data source shutdown while starting.");
+                        EXPORTLOG.debug("Source " + m_source + " closed before being started");
                     }
                     return;
                 }
                 try {
                     m_source.getExecutorService().submit(waitForBarrierRelease);
                 } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
-                    // it is truncated so we no longer need to wait
-
-                    // TODO: When truncation is finished, generation roll-over does not happen.
-                    // Log a message to and revisit the error handling for this case
                     if (EXPORTLOG.isDebugEnabled()) {
-                        EXPORTLOG.debug("Got rejected execution exception while trying to start");
+                        EXPORTLOG.debug("Source " + m_source + " closed before being started");
                     }
                 }
             }
