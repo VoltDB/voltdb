@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 import static org.voltdb.utils.TestPersistentBinaryDeque.SEGMENT_FILL_COUNT;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import org.junit.After;
 import org.junit.Before;
@@ -102,6 +103,55 @@ public class TestPBDMultipleReaders {
                 currNumSegments--;
             }
             assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        }
+    }
+
+    @Test
+    public void testNoDeleteUntilAllAcked() throws Exception {
+        int numReaders = 3;
+        BinaryDequeReader<?>[] readers = new BinaryDequeReader[numReaders];
+        for (int i=0; i<numReaders; i++) {
+            readers[i] = m_pbd.openForRead("reader" + i);
+        }
+
+        int numSegments = 5;
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)));
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)));
+        }
+
+        @SuppressWarnings("unchecked")
+        ArrayList<BBContainer>[] pollResults = new ArrayList[readers.length-1];
+        // all readers read, but only the last one ack
+        for (int i=0; i<readers.length; i++) {
+            BBContainer bbc = null;
+            while ((bbc = readers[i].poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+                if (i==readers.length-1) {
+                    bbc.discard();
+                } else {
+                    ArrayList<BBContainer> bbcs = pollResults[i];
+                    if (bbcs == null) {
+                        bbcs = new ArrayList<>();
+                        pollResults[i] = bbcs;
+                    }
+                    bbcs.add(bbc);
+                }
+            }
+            // nothing should be deleted
+            assertEquals(numSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        }
+
+        // ack from readers one by one
+        for (int i=0; i<pollResults.length; i++) {
+            ArrayList<BBContainer> bbcs = pollResults[i];
+            for (BBContainer bbc : bbcs) {
+                bbc.discard();
+            }
+            assertEquals((i==pollResults.length-1) ? 1 : numSegments,
+                    TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         }
     }
 
