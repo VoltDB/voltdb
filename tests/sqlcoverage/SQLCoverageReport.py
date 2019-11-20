@@ -96,7 +96,7 @@ AllExceptionTypes.extend(NonfatalExceptionTypes)
 def highlight(s, flag):
     if not isinstance(s, basestring):
         s = str(s)
-    return flag and "<span style=\"color: red\">%s</span>" % (s) or s
+    return flag and '<span style="color: red">%s*</span>' % (s) or s
 
 def as_html_unicode_string(s):
     if isinstance(s, list):
