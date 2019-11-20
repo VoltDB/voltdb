@@ -29,6 +29,7 @@ public class SnapshotTableInfo {
     private final String m_name;
     private final int m_tableId;
     private final boolean m_replicated;
+    private final boolean m_systemTable;
     private byte[] m_schema;
     private int m_partitionColumn;
 
@@ -38,13 +39,24 @@ public class SnapshotTableInfo {
      * @param table Catalog table
      */
     public SnapshotTableInfo(Table table) {
-        this(table.getTypeName(), table.getRelativeIndex(), table.getIsreplicated());
+        this(table.getTypeName(), table.getRelativeIndex(), table.getIsreplicated(), false);
     }
 
-    public SnapshotTableInfo(String name, int tableId, boolean replicated) {
+    /**
+     * Construct an instance for a system table
+     *
+     * @param name    of table
+     * @param tableId ID of the table
+     */
+    public SnapshotTableInfo(String name, int tableId) {
+        this(name, tableId, false, true);
+    }
+
+    private SnapshotTableInfo(String name, int tableId, boolean replicated, boolean systemTable) {
         m_name = name;
         m_tableId = tableId;
         m_replicated = replicated;
+        m_systemTable = systemTable;
     }
 
     /**
@@ -83,6 +95,13 @@ public class SnapshotTableInfo {
      */
     public boolean isReplicated() {
         return m_replicated;
+    }
+
+    /**
+     * @return {@code true} if this is a system table
+     */
+    public boolean isSystemTable() {
+        return m_systemTable;
     }
 
     /**

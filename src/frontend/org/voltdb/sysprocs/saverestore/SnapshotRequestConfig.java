@@ -19,6 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -72,7 +73,7 @@ public class SnapshotRequestConfig {
     }
 
     public SnapshotRequestConfig(int newPartitionCount, Database catalogDatabase) {
-        this(getTablesToInclude(null, catalogDatabase), Integer.valueOf(newPartitionCount),
+        this(getTablesToInclude(null, catalogDatabase, true), Integer.valueOf(newPartitionCount),
                 HiddenColumnFilter.NONE);
     }
 
@@ -91,7 +92,7 @@ public class SnapshotRequestConfig {
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
     {
-        tables = getTablesToInclude(jsData, catalogDatabase);
+        tables = getTablesToInclude(jsData, catalogDatabase, includeSystemTables());
         if (jsData == null) {
             emptyConfig = true;
             newPartitionCount = null;
@@ -105,8 +106,8 @@ public class SnapshotRequestConfig {
         }
     }
 
-    private static List<SnapshotTableInfo> getTablesToInclude(JSONObject jsData,
-                                              Database catalogDatabase)
+    private static List<SnapshotTableInfo> getTablesToInclude(JSONObject jsData, Database catalogDatabase,
+            boolean includeSystemTables)
     {
         Set<String> tableNamesToInclude;
         Set<String> tableNamesToExclude;
@@ -155,11 +156,13 @@ public class SnapshotRequestConfig {
             // Stream snapshot may specify empty snapshot sometimes.
             return ImmutableList.of();
         } else if (tableNamesToInclude != null || tableNamesToExclude != null) {
-            tables = SnapshotUtil.getTablesToSave(catalogDatabase,
-                    t -> (tableNamesToInclude == null || tableNamesToInclude.remove(t.getTypeName()))
-                            && (tableNamesToExclude == null || !tableNamesToExclude.remove(t.getTypeName())));
+            Predicate<String> predicate = name -> (tableNamesToInclude == null || tableNamesToInclude.remove(name))
+                    && (tableNamesToExclude == null || !tableNamesToExclude.remove(name));
+
+            tables = SnapshotUtil.getTablesToSave(catalogDatabase, t -> predicate.test(t.getTypeName()),
+                    st -> predicate.test(st.getName()));
         } else {
-            tables =  SnapshotUtil.getTablesToSave(catalogDatabase);
+            tables = SnapshotUtil.getTablesToSave(catalogDatabase, t -> true, includeSystemTables);
         }
 
         if (tableNamesToInclude != null && !tableNamesToInclude.isEmpty()) {
@@ -194,5 +197,9 @@ public class SnapshotRequestConfig {
 
     public HiddenColumnFilter getHiddenColumnFilter() {
         return hiddenColumnFilter;
+    }
+
+    protected boolean includeSystemTables() {
+        return true;
     }
 }
