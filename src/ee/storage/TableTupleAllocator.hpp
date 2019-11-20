@@ -23,83 +23,15 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <set>
 #include <stack>
-
-namespace std {
-    template<> struct less<void*> {                // for std::map<void*, T>
-        bool operator()(void* l, void* r) const noexcept {
-            return reinterpret_cast<char*>(l) < reinterpret_cast<char*>(r);
-        }
-    };
-}
 
 namespace voltdb {
     using namespace std;
 
-    enum class ChangeType : char {
-        Update, Insertion, Deletion
-    };
-
     struct std_allocator {                    // wrapper of std::allocator
         static void* alloc(size_t);
         static void dealloc(void*);
-    };
-
-    template<typename Alloc>
-    class ChangeHistory final {
-    public:
-        /**
-         * Meta-data specifying when and how often to release
-         * from map when a ptr has been reverted.
-         */
-        struct RetainTrait {
-            /**
-             * never: ChangeHistory::reverted() never deletes map * entry
-             * always: it always delets map entry
-             * batched: it deletes in a batch style when fixed
-             * number of entries had been reverted
-             */
-            enum class Policy : char {
-                never, always, batched
-            } const m_policy;
-            size_t const m_batchSize;
-//            RetainTrait()
-        };
-        class Change {                             // a single change, deep-copy non-inlined tuple
-            unique_ptr<char[], decltype(Alloc::dealloc)> m_tuple;
-        public:
-            Change(void const* c, size_t len);
-            Change(Change const&) = delete;
-            Change operator=(Change const&) = delete;
-            Change(Change&&) = default;
-            ~Change() = default;
-            void const* get() const;
-        };
-    private:
-        size_t const m_tupleSize;
-        bool m_recording = false;
-        map<void const*, Change> m_changes;
-        /**
-         * - Update always changes the value of an existing table
-         *   tuple; it tracks the address and the old tuple.
-         * - Insertion always inserts to the tail of allocation
-         *   chunks; it tracks the address and the new tuple.
-         * - Deletion creates a hole at the tuple to be deleted, and
-         *   moves the last table tuple to the hole. Two entries are
-         *   added: the first tracks the address of the hole,
-         *   and tuple to be deleted; the second tracks address of
-         *   the tuple that gets moved to the hole by deletion, and
-         *   its content.
-         */
-        void update(void const* src, void const* dst);         // src tuple from temp table written to dst in persistent storage
-        void insert(void const* src, void const* dst);         // same
-        void remove(void const* src, void const* dst);         // src tuple is deleted, and tuple at dst gets moved to src
-    public:
-        ChangeHistory(size_t);
-        void start();                              // start history recording
-        void stop();                               // stop history recording
-        void add(ChangeType, void const* src, void const* dst);
-        void const* reverted(void const*) const;     // revert history at this place!
     };
 
     /**
@@ -154,6 +86,7 @@ namespace voltdb {
         NonCompactingChunks(NonCompactingChunk const&) = delete;
         NonCompactingChunks(NonCompactingChunks&&) = default;
         NonCompactingChunks operator=(NonCompactingChunks const&) = delete;
+        size_t tupleSize() const noexcept;
         void* allocate() noexcept;
         void free(void*);
     };
@@ -259,6 +192,69 @@ namespace voltdb {
         typename list_type::iterator chunkBegin();
     };
 
+    template<typename Alloc,                       // Alloc must be either NonCompactingChunks or SelfCompactingChunks
+        typename = enable_if<is_same<Alloc, NonCompactingChunks>::value ||
+            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::head>>::value ||
+            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>>
+    class TxnPreHook final {
+    public:
+        enum class ChangeType : char {
+            Update, Insertion, Deletion
+        };
+    private:
+        /**
+         * Meta-data specifying when and how often to release
+         * from map when a ptr has been reverted.
+         */
+        struct RetainTrait {
+            /**
+             * never: TxnPreHook::reverted() never deletes map * entry
+             * always: it always delets map entry
+             * batched: it deletes in a batch style when fixed
+             * number of entries had been reverted
+             */
+            enum class Policy : char {
+                never, always, batched
+            } const m_policy;
+            size_t const m_batchSize;
+//            RetainTrait()
+        };
+        map<void const*, void const*> m_changes{};   // addr in persistent storage under change => addr storing before-change content
+        set<void const*> m_copied{};                 // addr in persistent storage that we keep a local copy
+        bool m_recording = false;                    // in snapshot process?
+        Alloc m_storage;
+        /**
+         * Creates a deep copy of the tuple stored in local
+         * storage, and keep track of it.
+         */
+        void* copy(void const* src);
+        /**
+         * - Update always changes the value of an existing table
+         *   tuple; it tracks the address and the old tuple.
+         * - Insertion always inserts to the tail of allocation
+         *   chunks; it tracks the address and the new tuple.
+         * - Deletion creates a hole at the tuple to be deleted, and
+         *   moves the last table tuple to the hole. Two entries are
+         *   added: the first tracks the address of the hole,
+         *   and tuple to be deleted; the second tracks address of
+         *   the tuple that gets moved to the hole by deletion, and
+         *   its content.
+         */
+        void update(void const* src, void const* dst);         // src tuple from temp table written to dst in persistent storage
+        void insert(void const* src, void const* dst);         // same
+        void remove(void const* src, void const* dst);         // src tuple is deleted, and tuple at dst gets moved to src
+    public:
+        TxnPreHook(size_t);
+        TxnPreHook(TxnPreHook const&) = delete;
+        TxnPreHook(TxnPreHook&&) = default;
+        TxnPreHook operator=(TxnPreHook const&) = default;
+        ~TxnPreHook() = default;
+        void start();                              // start history recording
+        void stop();                               // stop history recording
+        void add(ChangeType, void const* src, void const* dst);
+        void const* reverted(void const*) const;   // revert history at this place!
+    };
+
     /**
      * A iterable, self-compacting list of chunks, which deletes
      * from head of the list of chunks.
@@ -331,7 +327,7 @@ namespace voltdb {
         public:
             using container_type = typename super::container_type;
             using history_type =
-                typename conditional<Const, ChangeHistory<Alloc> const, ChangeHistory<Alloc>>::type&;
+                typename conditional<Const, TxnPreHook<Alloc> const, TxnPreHook<Alloc>>::type&;
             time_traveling_iterator_type(container_type, history_type);
         };
         template<typename Alloc>

@@ -28,91 +28,6 @@ inline void std_allocator::dealloc(void* addr) {
     delete[] reinterpret_cast<char*>(addr);
 }
 
-template<typename Alloc>
-inline ChangeHistory<Alloc>::Change::Change(void const* c, size_t len):
-    m_tuple(c == nullptr ? nullptr : Alloc::alloc(len), Alloc::dealloc) {
-    if (c != nullptr) {
-        memcpy(m_tuple.get(), c, len);
-    }
-}
-
-template<typename Alloc>
-inline void const* ChangeHistory<Alloc>::Change::get() const {
-    return m_tuple.get();
-}
-
-template<typename Alloc>
-inline ChangeHistory<Alloc>::ChangeHistory(size_t tupleSize): m_tupleSize(tupleSize) {}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::add(ChangeType type, void const* src, void const* dst) {
-    if (m_recording) {
-        switch (type) {
-            case ChangeType::Update:
-                update(src, dst);
-                break;
-            case ChangeType::Insertion:
-                insert(src, dst);
-                break;
-            case ChangeType::Deletion:
-            default:
-                remove(src, dst);
-        }
-    }
-}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::start() {
-    m_recording = true;
-}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::stop() {
-    m_recording = false;
-    m_changes.clear();
-}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::update(void const* src, void const* dst) {
-    // src tuple from temp table written to dst in persistent storage
-    if (m_recording && ! m_changes.count(dst)) {
-        m_changes.emplace(dst, Change{dst, m_tupleSize});
-    }
-}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::insert(void const* src, void const* dst) {
-    if (m_recording && ! m_changes.count(dst)) {
-        // for insertions, since previous memory is unused, there
-        // is nothing to keep track of
-        m_changes.emplace(dst, Change{nullptr, m_tupleSize});
-    }
-}
-
-template<typename Alloc>
-inline void ChangeHistory<Alloc>::remove(void const* src, void const* dst) {
-    // src tuple is deleted, and tuple at dst gets moved to src
-    if (m_recording) {
-        if (! m_changes.count(src)) {
-            m_changes.emplace(src, Change{src, m_tupleSize});
-        }
-        if (! m_changes.count(dst)) {
-            m_changes.emplace(dst, Change{dst, m_tupleSize});
-        }
-    }
-}
-
-template<typename Alloc>
-inline void const* ChangeHistory<Alloc>::reverted(void const* src) const {
-    auto pos = m_changes.find(src);
-    if (pos == m_changes.cend()) {         // not dirty
-        return src;
-    } else {                               // dirty, but original tuple was empty in INSERT
-        auto const* substitution = pos->second.get();
-        return substitution == nullptr ? src : substitution;
-    }
-}
-
 inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
     // preferred list of chunk sizes ranging from 4KB to 1MB
     static constexpr array<size_t, 9> const preferred{
@@ -188,6 +103,10 @@ inline bool NonCompactingChunk::full() const noexcept {
 }
 
 inline NonCompactingChunks::NonCompactingChunks(size_t tupleSize): m_tupleSize(tupleSize) {}
+
+inline size_t NonCompactingChunks::tupleSize() const noexcept {
+    return m_tupleSize;
+}
 
 inline void* NonCompactingChunks::allocate() noexcept {
     // linear search for non-full chunk
@@ -571,6 +490,88 @@ inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> cend(
         typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type c,
         typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
     return c.cend(h);
+}
+
+template<typename Alloc, typename E>
+inline TxnPreHook<Alloc, E>::TxnPreHook(size_t tupleSize): m_storage(tupleSize) {}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::add(typename TxnPreHook<Alloc, E>::ChangeType type,
+        void const* src, void const* dst) {
+    if (m_recording) {
+        switch (type) {
+            case ChangeType::Update:
+                update(src, dst);
+                break;
+            case ChangeType::Insertion:
+                insert(src, dst);
+                break;
+            case ChangeType::Deletion:
+            default:
+                remove(src, dst);
+        }
+    }
+}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::start() noexcept {
+    m_recording = true;
+}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::stop() {
+    m_recording = false;
+    m_changes.clear();
+    m_copied.clear();
+}
+
+template<typename Alloc, typename E>
+inline void* TxnPreHook<Alloc, E>::copy(void const* src) {
+    void* dst = m_storage.allocate();
+    vassert(dst != nullptr);
+    memcpy(dst, src, m_storage.tupleSize());
+    m_copied.emplace(src);
+    return dst;
+}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::update(void const* src, void const* dst) {
+    // src tuple from temp table written to dst in persistent storage
+    if (m_recording && ! m_changes.count(dst)) {
+        m_changes.emplace(dst, copy(dst));
+    }
+}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::insert(void const* src, void const* dst) {
+    if (m_recording && ! m_changes.count(dst)) {
+        // for insertions, since previous memory is unused, there
+        // is nothing to keep track of. Just mark the position as
+        // previously unused.
+        m_changes.emplace(dst, nullptr);
+    }
+}
+
+template<typename Alloc, typename E>
+inline void TxnPreHook<Alloc, E>::remove(void const* src, void const* dst) {
+    // src tuple is deleted, and tuple at dst gets moved to src
+    if (m_recording) {
+        if (! m_changes.count(src)) {
+            // Need to copy the original value that gets deleted
+            m_changes.emplace(src, copy(src));
+        }
+        if (! m_changes.count(dst)) {
+            // Only need to point to front place that holds the
+            // value getting moved to the place that was deleted.
+            m_changes.emplace(dst, dst);
+        }
+    }
+}
+
+template<typename Alloc, typename E>
+inline void const* TxnPreHook<Alloc, E>::reverted(void const* src) const {
+    auto const pos = m_changes.find(src);
+    return pos == m_changes.cend() ? src : pos->second;
 }
 
 
