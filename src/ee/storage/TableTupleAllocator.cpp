@@ -396,52 +396,52 @@ IterableTableTupleChunks::iterator_cb_type<Const>::operator*() {
     return m_cb(super::operator*());
 }
 
-template<typename Alloc, bool Const>
-inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type(
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::time_traveling_iterator_type::history_type h) :
+template<typename Alloc, typename Retainer, bool Const>
+inline IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type(
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::time_traveling_iterator_type::history_type h) :
     super(c, [&h](typename super::value_type c){
                 using type = typename super::value_type;
                 return const_cast<type>(h.reverted(const_cast<type>(c)));
             }) {}
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::iterator_cb<Alloc> IterableTableTupleChunks::begin(
-        typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type h) {
-    return iterator_cb<Alloc>(*this, h);
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type h) {
+    return iterator_cb<Alloc, Retainer>(*this, h);
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::iterator_cb<Alloc> IterableTableTupleChunks::end(
-        typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type h) {
-    iterator_cb<Alloc> iter(*this, h);
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type h) {
+    iterator_cb<Alloc, Retainer> iter(*this, h);
     iter.m_cursor = nullptr;
     return iter;
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::cbegin(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    return const_iterator_cb<Alloc>(*this, h);
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::cbegin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
+    return const_iterator_cb<Alloc, Retainer>(*this, h);
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::cend(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
-    const_iterator_cb<Alloc> iter(*this, h);
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::cend(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
+    const_iterator_cb<Alloc, Retainer> iter(*this, h);
     iter.m_cursor = nullptr;
     return iter;
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::begin(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::begin(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
     return cbegin(h);
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> IterableTableTupleChunks::end(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) const {
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer> IterableTableTupleChunks::end(
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) const {
     return cend(h);
 }
 
@@ -466,37 +466,67 @@ inline typename IterableTableTupleChunks::const_iterator end(IterableTableTupleC
     return c.cend();
 }
 
-template<typename Alloc, bool Const>
-inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> begin(
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
+template<typename Alloc, typename Retainer, bool Const>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
+begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type h) {
     return c.begin(h);
 }
-template<typename Alloc, bool Const>
-inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const> end(
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type c,
-        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type h) {
+template<typename Alloc, typename Retainer, bool Const>
+inline typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
+end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type c,
+        typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type h) {
     return c.end(h);
 }
 
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> cbegin(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type c,
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
+cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) {
     return c.cbegin(h);
 }
-template<typename Alloc>
-inline typename IterableTableTupleChunks::const_iterator_cb<Alloc> cend(
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type c,
-        typename IterableTableTupleChunks::const_iterator_cb<Alloc>::history_type h) {
+template<typename Alloc, typename Retainer>
+inline typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
+cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type c,
+        typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::history_type h) {
     return c.cend(h);
 }
 
-template<typename Alloc, typename E>
-inline TxnPreHook<Alloc, E>::TxnPreHook(size_t tupleSize): m_storage(tupleSize) {}
+inline BaseHistoryRetainTrait::BaseHistoryRetainTrait(
+        typename BaseHistoryRetainTrait::cb_type const& cb): m_cb(cb) {}
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::add(typename TxnPreHook<Alloc, E>::ChangeType type,
+inline HistoryRetainTrait<RetainPolicy::never>::HistoryRetainTrait(
+        typename BaseHistoryRetainTrait::cb_type const& cb): BaseHistoryRetainTrait(cb) {}
+
+inline void HistoryRetainTrait<RetainPolicy::never>::remove(void const*) noexcept {}
+
+inline HistoryRetainTrait<RetainPolicy::always>::HistoryRetainTrait(
+        typename BaseHistoryRetainTrait::cb_type const& cb): BaseHistoryRetainTrait(cb) {}
+
+inline void HistoryRetainTrait<RetainPolicy::always>::remove(void const* addr) {
+    m_cb(addr);
+}
+
+inline HistoryRetainTrait<RetainPolicy::batched>::HistoryRetainTrait(
+        HistoryRetainTrait::cb_type const& cb, size_t batchSize):
+    BaseHistoryRetainTrait(cb), m_batchSize(batchSize) {}
+
+inline void HistoryRetainTrait<RetainPolicy::batched>::remove(void const* addr) {
+    if (++m_size == m_batchSize) {
+        for_each(m_batched.begin(), m_batched.end(), m_cb);
+        m_batched.clear();
+        m_size = 0;
+    } else {
+        m_batched.emplace_front(addr);
+    }
+}
+
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline TxnPreHook<Alloc, Retainer, E1, E2>::TxnPreHook(size_t tupleSize): m_storage(tupleSize) {}
+
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::add(
+        typename TxnPreHook<Alloc, Retainer, E1, E2>::ChangeType type,
         void const* src, void const* dst) {
     if (m_recording) {
         switch (type) {
@@ -513,20 +543,20 @@ inline void TxnPreHook<Alloc, E>::add(typename TxnPreHook<Alloc, E>::ChangeType 
     }
 }
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::start() noexcept {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::start() noexcept {
     m_recording = true;
 }
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::stop() {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::stop() {
     m_recording = false;
     m_changes.clear();
     m_copied.clear();
 }
 
-template<typename Alloc, typename E>
-inline void* TxnPreHook<Alloc, E>::copy(void const* src) {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void* TxnPreHook<Alloc, Retainer, E1, E2>::copy(void const* src) {
     void* dst = m_storage.allocate();
     vassert(dst != nullptr);
     memcpy(dst, src, m_storage.tupleSize());
@@ -534,16 +564,16 @@ inline void* TxnPreHook<Alloc, E>::copy(void const* src) {
     return dst;
 }
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::update(void const* src, void const* dst) {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::update(void const* src, void const* dst) {
     // src tuple from temp table written to dst in persistent storage
     if (m_recording && ! m_changes.count(dst)) {
         m_changes.emplace(dst, copy(dst));
     }
 }
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::insert(void const* src, void const* dst) {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::insert(void const* src, void const* dst) {
     if (m_recording && ! m_changes.count(dst)) {
         // for insertions, since previous memory is unused, there
         // is nothing to keep track of. Just mark the position as
@@ -552,8 +582,8 @@ inline void TxnPreHook<Alloc, E>::insert(void const* src, void const* dst) {
     }
 }
 
-template<typename Alloc, typename E>
-inline void TxnPreHook<Alloc, E>::remove(void const* src, void const* dst) {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::remove(void const* src, void const* dst) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording) {
         if (! m_changes.count(src)) {
@@ -568,10 +598,13 @@ inline void TxnPreHook<Alloc, E>::remove(void const* src, void const* dst) {
     }
 }
 
-template<typename Alloc, typename E>
-inline void const* TxnPreHook<Alloc, E>::reverted(void const* src) const {
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void const* TxnPreHook<Alloc, Retainer, E1, E2>::reverted(void const* src) const {
     auto const pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }
 
-
+template<typename Alloc, typename Retainer, typename E1, typename E2>
+inline void TxnPreHook<Alloc, Retainer, E1, E2>::postReverted(void const* src) {
+    // TODO
+}

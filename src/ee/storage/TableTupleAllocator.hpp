@@ -192,10 +192,57 @@ namespace voltdb {
         typename list_type::iterator chunkBegin();
     };
 
-    template<typename Alloc,                       // Alloc must be either NonCompactingChunks or SelfCompactingChunks
+    /**
+     * never: TxnPreHook::reverted() NEVER deletes map entries.
+     *       The clean up is delayed until snapshot completes
+     * always: it always delets map entry, in most eager fashion.
+     * batched: it deletes in a batch style when fixed
+     *       number of entries had been reverted. Kind-of lazy.
+     */
+    enum class RetainPolicy: char {
+        never, always, batched
+    };
+
+    struct BaseHistoryRetainTrait {
+        /**
+         * Auxillary for the history retain policy on local storage
+         * clean up. Called by HistoryRetainTrait templates on memory
+         * location(s) that is deemed reclaimable.
+         */
+        using cb_type = function<void(void const*)>;
+        cb_type const m_cb;
+        BaseHistoryRetainTrait(cb_type const& cb);
+    };
+
+    /**
+     * Helper to clean up memory upon application of history
+     * changes.
+     */
+    template<RetainPolicy> struct HistoryRetainTrait;
+    template<> struct HistoryRetainTrait<RetainPolicy::never>: public BaseHistoryRetainTrait {
+        HistoryRetainTrait(cb_type const&);
+        static void remove(void const*) noexcept;
+    };
+
+    template<> struct HistoryRetainTrait<RetainPolicy::always>: public BaseHistoryRetainTrait {
+        HistoryRetainTrait(cb_type const&);
+        void remove(void const*);
+    };
+
+    template<> struct HistoryRetainTrait<RetainPolicy::batched>: public BaseHistoryRetainTrait {
+        size_t const m_batchSize;
+        size_t m_size = 0;
+        forward_list<void const*> m_batched{};
+        HistoryRetainTrait(cb_type const&, size_t batchSize);
+        void remove(void const*);
+    };
+
+    template<typename Alloc, typename Retainer,
+        // Alloc must be either NonCompactingChunks or SelfCompactingChunks
         typename = enable_if<is_same<Alloc, NonCompactingChunks>::value ||
             is_same<Alloc, SelfCompactingChunks<ShrinkDirection::head>>::value ||
-            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>>
+            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>,
+        typename = typename enable_if<is_base_of<BaseHistoryRetainTrait, Retainer>::value>::type>
     class TxnPreHook final {
     public:
         enum class ChangeType : char {
@@ -207,12 +254,6 @@ namespace voltdb {
          * from map when a ptr has been reverted.
          */
         struct RetainTrait {
-            /**
-             * never: TxnPreHook::reverted() never deletes map * entry
-             * always: it always delets map entry
-             * batched: it deletes in a batch style when fixed
-             * number of entries had been reverted
-             */
             enum class Policy : char {
                 never, always, batched
             } const m_policy;
@@ -249,10 +290,11 @@ namespace voltdb {
         TxnPreHook(TxnPreHook&&) = default;
         TxnPreHook operator=(TxnPreHook const&) = default;
         ~TxnPreHook() = default;
-        void start();                              // start history recording
+        void start() noexcept;                     // start history recording
         void stop();                               // stop history recording
         void add(ChangeType, void const* src, void const* dst);
         void const* reverted(void const*) const;   // revert history at this place!
+        void postReverted(void const*);            // local memory clean-up
     };
 
     /**
@@ -321,26 +363,33 @@ namespace voltdb {
             cb_type m_cb;
         };
 
-        template<typename Alloc, bool Const>
+        template<typename Alloc, typename Retainer, bool Const>
         class time_traveling_iterator_type : public iterator_cb_type<Const> {
             using super = iterator_cb_type<Const>;
         public:
             using container_type = typename super::container_type;
-            using history_type =
-                typename conditional<Const, TxnPreHook<Alloc> const, TxnPreHook<Alloc>>::type&;
+            using history_type = typename conditional<Const,
+                  TxnPreHook<Alloc, Retainer> const,
+                  TxnPreHook<Alloc, Retainer>>::type&;
             time_traveling_iterator_type(container_type, history_type);
         };
-        template<typename Alloc>
-        using iterator_cb = time_traveling_iterator_type<Alloc, false>;
-        template<typename Alloc>
-        using const_iterator_cb = time_traveling_iterator_type<Alloc, true>;
+        template<typename Alloc, typename Retainer>
+        using iterator_cb = time_traveling_iterator_type<Alloc, Retainer, false>;
+        template<typename Alloc, typename Retainer>
+        using const_iterator_cb = time_traveling_iterator_type<Alloc, Retainer, true>;
 
-        template<typename Alloc> iterator_cb<Alloc> begin(typename iterator_cb<Alloc>::history_type);
-        template<typename Alloc> iterator_cb<Alloc> end(typename iterator_cb<Alloc>::history_type);
-        template<typename Alloc> const_iterator_cb<Alloc> cbegin(typename const_iterator_cb<Alloc>::history_type) const;
-        template<typename Alloc> const_iterator_cb<Alloc> cend(typename const_iterator_cb<Alloc>::history_type) const;
-        template<typename Alloc> const_iterator_cb<Alloc> begin(typename const_iterator_cb<Alloc>::history_type) const;
-        template<typename Alloc> const_iterator_cb<Alloc> end(typename const_iterator_cb<Alloc>::history_type) const;
+        template<typename Alloc, typename Retainer> iterator_cb<Alloc, Retainer>
+            begin(typename iterator_cb<Alloc, Retainer>::history_type);
+        template<typename Alloc, typename Retainer> iterator_cb<Alloc, Retainer>
+            end(typename iterator_cb<Alloc, Retainer>::history_type);
+        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
+            cbegin(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
+        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
+            cend(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
+        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
+            begin(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
+        template<typename Alloc, typename Retainer> const_iterator_cb<Alloc, Retainer>
+            end(typename const_iterator_cb<Alloc, Retainer>::history_type) const;
     };
 
     typename IterableTableTupleChunks::iterator begin(IterableTableTupleChunks&);
@@ -352,18 +401,18 @@ namespace voltdb {
     typename IterableTableTupleChunks::const_iterator begin(IterableTableTupleChunks const&);
     typename IterableTableTupleChunks::const_iterator end(IterableTableTupleChunks const&);
 
-    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>
-        begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
-                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
-    template<typename Alloc, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>
-        end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::container_type,
-                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Const>::history_type);
+    template<typename Alloc, typename Retainer, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
+        begin(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type,
+                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type);
+    template<typename Alloc, typename Retainer, bool Const> typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>
+        end(typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::container_type,
+                typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, Retainer, Const>::history_type);
 
-    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc>
-        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
-    template<typename Alloc> typename IterableTableTupleChunks::const_iterator_cb<Alloc>
-        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc>::history_type);
+    template<typename Alloc, typename Retainer> typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
+        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type);
+    template<typename Alloc, typename Retainer> typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>
+        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, Retainer>::container_type,
+                typename IterableTableTupleChunks::iterator_cb<Alloc, Retainer>::history_type);
 
 }
