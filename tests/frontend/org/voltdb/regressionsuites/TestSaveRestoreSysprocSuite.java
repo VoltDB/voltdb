@@ -71,10 +71,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -86,6 +82,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet.RestoreResultValue;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.MiscUtils;
@@ -104,7 +101,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 11;  // Must match schema used.
+    private final static int TABLE_COUNT = 11 + SystemTable.values().length; // Must match schema used
 
     protected int getTableCount() {
         return TABLE_COUNT;
@@ -539,7 +536,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 tableSet.add(results[0].getString("TABLE"));
             }
         }
-        return tableSet.equals(new HashSet<>(Arrays.asList(tables)));
+        return tableSet.containsAll(Arrays.asList(tables));
     }
 
     private void generateAndValidateTextFile(Set<String> expectedText, boolean csv) throws Exception {
@@ -1822,27 +1819,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         // Instead of something exhaustive, let's just make sure that we get
         // the number of result rows corresponding to the number of ExecutionSites
         // that did save work
-        Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
-        Database database = cluster.getDatabases().get("database");
-        CatalogMap<Table> tables = database.getTables();
-        int num_hosts = 1;
-        int replicated = 0;
-        int total_tables = 0;
         int expected_entries = 3;
 
-        for (Table table : tables)
-        {
-            if (table.getMaterializer() != null
-                    && ! table.getIsreplicated()
-                    && table.getPartitioncolumn() == null) {
-                continue;
-            }
-            total_tables++;
-            if (table.getIsreplicated())
-            {
-                replicated++;
-            }
-        }
         //Make this failing test debuggable, why do we get the wrong number sometimes?
         if (results[0].getRowCount() != expected_entries) {
             System.out.println(results[0]);
@@ -1857,10 +1835,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         // Now, try the save again and verify that we fail (since all the save
         // files will still exist. This will return one entry per table
         // per host
-        expected_entries =
-            ((total_tables - replicated) * num_hosts) + replicated;
         results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults();
-        assertEquals(expected_entries, results[0].getRowCount());
+        assertEquals(getTableCount(), results[0].getRowCount());
         while (results[0].advanceRow())
         {
             if (!tmp_files[0].getName().contains(results[0].getString("TABLE"))) {
