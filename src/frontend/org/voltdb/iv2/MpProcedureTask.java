@@ -30,6 +30,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -127,6 +128,10 @@ public class MpProcedureTask extends ProcedureTask
         // return a proper response to client.
         if (m_isRestart && sysproc != null && !sysproc.isRestartable())
         {
+            if ("@StopReplicas".equalsIgnoreCase(spName)) {
+                VoltDB.crashGlobalVoltDB("Cluster is running on master only mode. Cluster has become unviable.", false, null);
+                return;
+            }
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                         new VoltTable[] {},
