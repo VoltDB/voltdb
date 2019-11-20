@@ -33,4 +33,10 @@ class CsvSnapshotRequestConfig extends SnapshotRequestConfig {
         // CSV snapshots never include hidden columns
         return HiddenColumnFilter.ALL;
     }
+
+    @Override
+    protected boolean includeSystemTables() {
+        // CSV snapshots never include system tables
+        return false;
+    }
 }

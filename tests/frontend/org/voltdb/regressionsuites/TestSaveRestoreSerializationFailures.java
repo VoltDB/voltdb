@@ -23,9 +23,9 @@
 
 package org.voltdb.regressionsuites;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyListOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyListOf;
 import static org.mockito.Mockito.doAnswer;
 
 import java.io.ByteArrayOutputStream;
@@ -58,6 +58,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SnapshotVerifier;
@@ -67,7 +68,7 @@ import org.voltdb.utils.SnapshotVerifier;
  */
 public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 11;  // Must match schema used.
+    private final static int TABLE_COUNT = 11 + SystemTable.values().length; // Must match schema used.
 
     public TestSaveRestoreSerializationFailures(String name) {
         super(name);
@@ -359,7 +360,9 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3

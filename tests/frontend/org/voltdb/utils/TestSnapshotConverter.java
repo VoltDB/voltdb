@@ -39,6 +39,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.SaveRestoreBase;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 
 import junit.framework.Test;
 
@@ -52,7 +53,9 @@ public class TestSnapshotConverter extends SaveRestoreBase
     // Regression test for ENG-8609
     public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
     {
-        if (isValgrind()) return;
+        if (isValgrind()) {
+            return;
+        }
 
         Client client = getClient();
         int expectedLines = 10;
@@ -64,43 +67,25 @@ public class TestSnapshotConverter extends SaveRestoreBase
         }
 
         VoltTable[] results = null;
-        try {
-            results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
-        } catch(Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
 
         System.out.println(results[0]);
-        try {
-            results = client.callProcedure("@SnapshotStatus").getResults();
-        } catch (NoConnectionsException e) {
-            e.printStackTrace();
-        } catch (Exception ex) {
-            fail();
-        }
+        results = client.callProcedure("@SnapshotStatus").getResults();
+
         System.out.println(results[0]);
         // better be two rows
-        assertEquals(2, results[0].getRowCount());
+        assertEquals(2 + SystemTable.values().length, results[0].getRowCount());
 
         // start convert to MP snapshot to csv
         String[] argsMP = {"--table", "T_MP", "--type", "CSV", "--dir", TMPDIR, "--outdir",TMPDIR, TESTNONCE};
-        try  {
-            SnapshotConverter.main(argsMP);
-        } catch (Exception ex) {
-            fail();
-        }
+        SnapshotConverter.main(argsMP);
         File mpFile = new File(TMPDIR+"/T_MP.csv");
         assertEquals(expectedLines,countLines(mpFile));
         mpFile.deleteOnExit();
 
         // start convert to SP snapshot to csv
         String[] argsSP = {"--table", "T_SP", "--type", "CSV", "--dir", TMPDIR, "--outdir",TMPDIR, TESTNONCE};
-        try  {
-            SnapshotConverter.main(argsSP);
-        } catch (Exception ex) {
-            fail();
-        }
+        SnapshotConverter.main(argsSP);
         File spFile = new File(TMPDIR+"/T_SP.csv");
         // this test will fail frequently with different lines before ENG-8609
         assertEquals(expectedLines,countLines(spFile));
@@ -132,17 +117,14 @@ public class TestSnapshotConverter extends SaveRestoreBase
         return builder;
     }
 
-    public static int countLines(File aFile) throws IOException {
-        LineNumberReader reader = null;
-        try {
-            reader = new LineNumberReader(new FileReader(aFile));
-            while ((reader.readLine()) != null);
+    public static int countLines(File aFile) {
+        try (LineNumberReader reader = new LineNumberReader(new FileReader(aFile))) {
+            while ((reader.readLine()) != null) {
+                ;
+            }
             return reader.getLineNumber();
         } catch (Exception ex) {
             return -1;
-        } finally {
-            if(reader != null)
-                reader.close();
         }
     }
 }
