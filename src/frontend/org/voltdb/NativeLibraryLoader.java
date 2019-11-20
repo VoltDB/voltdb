@@ -57,7 +57,7 @@ public class NativeLibraryLoader {
     }
 
     public synchronized static boolean loadCatalogAPIs() {
-        return load("catalog", true, true);
+        return load("catalog", true, false);
     }
 
     /**
@@ -109,6 +109,7 @@ public class NativeLibraryLoader {
             if (s_hostLog.isDebugEnabled()) {
                 s_hostLog.debug("Error loading VoltDB JNI shared library", e);
             }
+            s_hostLog.error("Error loading VoltDB JNI shared library", e);
             if (useJavaLib) {
                 s_hostLog.info("Retry loading from file.");
                 return load(name, mustSucceed, false);
