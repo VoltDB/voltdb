@@ -27,7 +27,7 @@
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),
-    @Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
+    @Grab('org.apache.kafka:kafka-clients:0.10.2.2'),
 ])
 
 import groovy.json.JsonSlurper

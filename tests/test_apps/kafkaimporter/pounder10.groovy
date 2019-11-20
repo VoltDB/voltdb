@@ -25,7 +25,7 @@
 
 // this is a copy of pounder.groovy file with difference being it uses
 // kafka client 10.2.1 api instead of 8.2.2.
-@Grab('org.apache.kafka:kafka-clients:0.10.2.1')
+@Grab('org.apache.kafka:kafka-clients:0.10.2.2')
 
 
 import org.voltdb.client.*
