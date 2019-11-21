@@ -158,6 +158,7 @@ namespace voltdb {
     template<ShrinkDirection dir>
     class SelfCompactingChunks {
     protected:
+    public:
         using list_type = std::list<SelfCompactingChunk>;
         size_t const m_tupleSize;
         list_type m_list{};
@@ -169,7 +170,7 @@ namespace voltdb {
          */
         typename list_type::iterator chunkBegin();
         typename list_type::const_iterator chunkBegin() const;
-    public:
+
         SelfCompactingChunks(size_t tupleSize);
         SelfCompactingChunks(SelfCompactingChunks const&) = delete;
         SelfCompactingChunks operator=(SelfCompactingChunks const&) = delete;
@@ -287,25 +288,36 @@ namespace voltdb {
     /**
      * A iterable, self-compacting list of chunks, which deletes
      * from head of the list of chunks.
+     * \param Tag - callable on iterated value that tells if current iterating value is
+     * considered worthy of handling to the client. If not, then
+     * it is skipped. It is used to identify whether a tuple is
+     * dirty, and depending on the view of iterator, different
+     * decisions incur.
      */
-    struct IterableTableTupleChunks final : public SelfCompactingChunks<ShrinkDirection::head> {
+    template<typename Tag, typename = typename enable_if<is_class<Tag>::value>::type>
+    struct IterableTableTupleChunks final {
+        using iterator_value_type = void*;         // constness-independent type being iterated over
+        using cont_type = SelfCompactingChunks<ShrinkDirection::head>;
+        static Tag s_tagger;
         IterableTableTupleChunks() = delete;       // only iterator types can be created/used
         template<bool Const,                       // RO or RW
             bool TxnView>                          // From which chunk do we start to iterate
-        class iterator_type : public std::iterator<forward_iterator_tag,
-                typename conditional<Const, void const*, void*>::type> {
-            friend class IterableTableTupleChunks;
+        class iterator_type :
+            public std::iterator<forward_iterator_tag, typename
+                    conditional<Const, add_const<iterator_value_type>::type, iterator_value_type>::type> {
+
             using super = iterator<forward_iterator_tag,
-                  typename conditional<Const, void const*, void*>::type>;
+                  typename conditional<Const, add_const<iterator_value_type>::type, iterator_value_type>::type>;
             using value_type = typename super::value_type;
             using reference = typename super::reference;
-            using container_type = typename        // ctor arg type
-                conditional<Const, IterableTableTupleChunks const, IterableTableTupleChunks>::type&;
+            // ctor arg type
+            using container_type = typename
+                add_lvalue_reference<typename conditional<Const, add_const<cont_type>::type, cont_type>::type>::type;
 
-            size_t const m_offset;
-            typename conditional<Const, typename add_const<list_type>::type, list_type>::type&
+            ptrdiff_t const m_offset;
+            typename conditional<Const, typename add_const<typename cont_type::list_type>::type, typename cont_type::list_type>::type&
                 m_list;
-            typename conditional<Const, typename list_type::const_iterator, typename list_type::iterator>::type
+            typename conditional<Const, typename cont_type::list_type::const_iterator, typename cont_type::list_type::iterator>::type
                 m_iter;
             value_type m_cursor;
             void advance();
@@ -313,6 +325,7 @@ namespace voltdb {
             iterator_type(container_type);
             iterator_type(iterator_type const&) = default;
             iterator_type(iterator_type&&) = default;
+            static iterator_type end(container_type);
             bool operator==(iterator_type const&) const noexcept;
             inline bool operator!=(iterator_type const& o) const noexcept {
                 return ! operator==(o);
@@ -327,12 +340,12 @@ namespace voltdb {
         using iterator = iterator_type<false, true>;
         using const_iterator = iterator_type<true, true>;
 
-        iterator begin();
-        iterator end();
-        const_iterator cbegin() const;
-        const_iterator cend() const;
-        const_iterator begin() const;
-        const_iterator end() const;
+        static iterator begin(cont_type&);
+        static iterator end(cont_type&);
+        static const_iterator cbegin(cont_type const&);
+        static const_iterator cend(cont_type const&);
+        static const_iterator begin(cont_type const&);
+        static const_iterator end(cont_type const&);
 
         /**
          * Iterators with callback, applied when
@@ -345,9 +358,10 @@ namespace voltdb {
             using super = iterator_type<Const, false>;
         public:
             using value_type = typename super::value_type;
-            // call-back type
+            // call-back type: must be std::function since it's
+            // determined at run-time via history_type object
             using cb_type = function<value_type(value_type)> const;
-            using container_type = typename super::container_type;
+            using container_type = typename super::super2;
             iterator_cb_type(container_type, cb_type);
             value_type operator*();                // looses noexcept guarantee
         private:
@@ -355,13 +369,14 @@ namespace voltdb {
         };
 
         template<typename Alloc, RetainPolicy policy, bool Const,
-            typename C = stdCollections<void const*, void const*>>
+            typename Collections = stdCollections<void const*, void const*>>
         class time_traveling_iterator_type : public iterator_cb_type<Const> {
             using super = iterator_cb_type<Const>;
+            using hook_type = TxnPreHook<Alloc, policy, Collections>;
         public:
             using container_type = typename super::container_type;
-            using history_type = typename conditional<Const,
-                  TxnPreHook<Alloc, policy, C> const, TxnPreHook<Alloc, policy, C>>::type&;
+            using history_type = typename
+                add_lvalue_reference<typename conditional<Const, hook_type const, hook_type>::type>::type;
             time_traveling_iterator_type(container_type, history_type);
         };
         template<typename Alloc, RetainPolicy policy>
@@ -370,42 +385,23 @@ namespace voltdb {
         using const_iterator_cb = time_traveling_iterator_type<Alloc, policy, true>;
 
         template<typename Alloc, RetainPolicy policy> iterator_cb<Alloc, policy>
-            begin(typename iterator_cb<Alloc, policy>::history_type);
+        static begin(cont_type&, typename iterator_cb<Alloc, policy>::history_type);
         template<typename Alloc, RetainPolicy policy> iterator_cb<Alloc, policy>
-            end(typename iterator_cb<Alloc, policy>::history_type);
+        static end(cont_type&, typename iterator_cb<Alloc, policy>::history_type);
         template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
-            cbegin(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        static cbegin(cont_type const&, typename const_iterator_cb<Alloc, policy>::history_type);
         template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
-            cend(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        static cend(cont_type const&, typename const_iterator_cb<Alloc, policy>::history_type);
         template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
-            begin(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        static begin(cont_type const&, typename const_iterator_cb<Alloc, policy>::history_type);
         template<typename Alloc, RetainPolicy policy> const_iterator_cb<Alloc, policy>
-            end(typename const_iterator_cb<Alloc, policy>::history_type) const;
+        static end(cont_type const&, typename const_iterator_cb<Alloc, policy>::history_type);
     };
 
-    typename IterableTableTupleChunks::iterator begin(IterableTableTupleChunks&);
-    typename IterableTableTupleChunks::iterator end(IterableTableTupleChunks&);
-
-    typename IterableTableTupleChunks::const_iterator cbegin(IterableTableTupleChunks const&);
-    typename IterableTableTupleChunks::const_iterator cend(IterableTableTupleChunks const&);
-
-    typename IterableTableTupleChunks::const_iterator begin(IterableTableTupleChunks const&);
-    typename IterableTableTupleChunks::const_iterator end(IterableTableTupleChunks const&);
-
-    template<typename Alloc, RetainPolicy policy, bool Const, typename C>
-    typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> begin(
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type,
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type);
-    template<typename Alloc, RetainPolicy policy, bool Const, typename C> typename
-    IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C> end(
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::container_type,
-            typename IterableTableTupleChunks::time_traveling_iterator_type<Alloc, policy, Const, C>::history_type);
-
-    template<typename Alloc, RetainPolicy policy> typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
-        cbegin(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type);
-    template<typename Alloc, RetainPolicy policy> typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>
-        cend(typename IterableTableTupleChunks::const_iterator_cb<Alloc, policy>::container_type,
-                typename IterableTableTupleChunks::iterator_cb<Alloc, policy>::history_type);
-
+    /**
+     * Auxillary iterator over all resouces allocated
+     */
+    void for_each(SelfCompactingChunks<ShrinkDirection::head>&, function<void(void*)>&);
+    void for_each(SelfCompactingChunks<ShrinkDirection::head> const&, function<void(void const*)>&);
 }
+
