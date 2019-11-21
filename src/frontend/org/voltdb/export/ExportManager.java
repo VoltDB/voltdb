@@ -55,6 +55,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.HashMultimap;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -120,6 +121,9 @@ public class ExportManager implements ExportManagerInterface
     private boolean m_startPolling = false;
     private SimpleClientResponseAdapter m_adapter;
     private ClientInterface m_ci;
+
+    // Track the data sources being closed
+    private HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
 
     @Override
     public ExportManagerInterface.ExportMode getExportMode() {
@@ -466,7 +470,7 @@ public class ExportManager implements ExportManagerInterface
     public void shutdown() {
         ExportGeneration generation = m_generation.getAndSet(null);
         if (generation != null) {
-            generation.close();
+            generation.shutdown();
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
@@ -556,6 +560,7 @@ public class ExportManager implements ExportManagerInterface
         }
     }
 
+    @Override
     public void updateDanglingExportStates(StreamStartAction action,
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
         ExportGeneration generation = m_generation.get();
@@ -610,5 +615,63 @@ public class ExportManager implements ExportManagerInterface
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb) {
         m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
+    }
+
+    /**
+     * @return {@code <Boolean.TRUE, null>} if catalog update is possible, or
+     *          {@code <Boolean.FALSE, String>} if catalog update is not possible, with
+     *           an error message in the {@code String}
+     */
+    @Override
+    public synchronized Pair<Boolean, String> canUpdateCatalog() {
+        if (m_dataSourcesClosing.isEmpty()) {
+            return new Pair<>(Boolean.TRUE, null);
+        }
+        else {
+            String msg = "Unable to update catalog, these tables are still closing: "
+                    + m_dataSourcesClosing.keySet();
+            return new Pair<>(Boolean.FALSE,  msg);
+        }
+    }
+
+    /**
+     * Notification that a data source was drained
+     *
+     * @param tableName
+     * @param partition
+     */
+    @Override
+    public synchronized void onDrainedSource(String tableName, int partition) {
+        // No-op: handled by {@code ExportGeneration}
+    }
+
+    /**
+     * Notification that a data source is closing (or being shut down)
+     *
+     * @param tableName
+     * @param partition
+     */
+    @Override
+    public synchronized void onClosingSource(String tableName, int partition) {
+        m_dataSourcesClosing.put(tableName, partition);
+    }
+
+    /**
+     * Notification that a data source has been closed (or shut down)
+     *
+     * @param tableName
+     * @param partition
+     */
+    @Override
+    public synchronized void onClosedSource(String tableName, int partition) {
+        boolean removed = m_dataSourcesClosing.remove(tableName, partition);
+        if (exportLog.isDebugEnabled()) {
+            if (removed) {
+                exportLog.debug("Closed " + tableName + ", partition " + partition);
+            }
+            else {
+                exportLog.info("Closed untracked " + tableName + ", partition " + partition + " (ok on shutdown)");
+            }
+        }
     }
 }

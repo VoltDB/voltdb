@@ -113,7 +113,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void close() {
+        public void shutdown() {
         }
 
         @Override
@@ -262,7 +262,7 @@ public class TestExportDataSource extends TestCase {
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
             } finally {
-                s.close();
+                s.shutdown();
             }
         }
     }
@@ -353,7 +353,7 @@ public class TestExportDataSource extends TestCase {
             }
             catch( TimeoutException ignoreIt) {}
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -423,7 +423,7 @@ public class TestExportDataSource extends TestCase {
             System.gc(); System.runFinalization(); Thread.sleep(200);
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -469,7 +469,7 @@ public class TestExportDataSource extends TestCase {
             cont0.discard();
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -538,7 +538,7 @@ public class TestExportDataSource extends TestCase {
             cont4.discard();
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -636,7 +636,7 @@ public class TestExportDataSource extends TestCase {
         cont.discard();
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -711,7 +711,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -789,7 +789,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 
@@ -854,7 +854,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
 
         } finally {
-            s.close();
+            s.shutdown();
         }
     }
 

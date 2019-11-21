@@ -28,6 +28,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -44,6 +45,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -237,6 +239,12 @@ public class UpdateCore extends VoltSystemProcedure {
                          ", cleaning up temp catalog jar file");
                 VoltDB.instance().cleanUpTempCatalogJar();
                 throw ex;
+            }
+
+            Pair<Boolean, String> canUpdate = ExportManagerInterface.instance().canUpdateCatalog();
+            if (Boolean.FALSE.equals(canUpdate.getFirst())) {
+                assert canUpdate.getSecond() != null : " missing error message";
+                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, canUpdate.getSecond());
             }
 
             // Send out fragments to do the initial round-trip to synchronize
