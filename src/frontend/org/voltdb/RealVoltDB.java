@@ -5240,5 +5240,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
     }
+
+    public void cleanupBackLogsOnDecommisionedResplicas(int executorPartition) {
+        // Trigger on the lowest master site
+        if (executorPartition == getLowestMasterPartitionId()) {
+            m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
+                    ((SpInitiator)p).getServiceState().isRemoved())
+            .forEach(s -> ((SpInitiator)s).getScheduler().cleanupTransactionBacklogs());
+        }
+    }
+
+    public int getLowestMasterPartitionId(){
+        for(Initiator init : m_iv2Initiators.values()) {
+            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                if (((SpInitiator)init).isLeader()) {
+                    return init.getPartitionId();
+                }
+            }
+        }
+        return -1;
+    }
 }
 

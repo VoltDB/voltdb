@@ -126,27 +126,29 @@ public class MpProcedureTask extends ProcedureTask
 
         // For MP system procs can't be restarted, flush the queue and
         // return a proper response to client.
-        if (m_isRestart && sysproc != null && !sysproc.isRestartable())
-        {
-            if ("@StopReplicas".equalsIgnoreCase(spName)) {
-                VoltDB.crashGlobalVoltDB("Cluster is running on master only mode. Cluster has become unviable.", false, null);
-                return;
-            }
-            InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
-            errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+        if (m_isRestart && sysproc != null) {
+            if (sysproc.isRestartable()) {
+                if ("@StopReplicas".equalsIgnoreCase(spName)) {
+                    VoltDB.crashGlobalVoltDB("Cluster is running on master only mode. Cluster has become unviable.", false, null);
+                    return;
+                }
+            } else {
+                InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
+                errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                         new VoltTable[] {},
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
-            errorResp.m_isFromNonRestartableSysproc = true;
-            errorResp.m_sourceHSId = m_initiator.getHSId();
-            m_txnState.setDone();
-            m_queue.flush(getTxnId());
-            m_initiator.deliver(errorResp);
+                errorResp.m_isFromNonRestartableSysproc = true;
+                errorResp.m_sourceHSId = m_initiator.getHSId();
+                m_txnState.setDone();
+                m_queue.flush(getTxnId());
+                m_initiator.deliver(errorResp);
 
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("SYSPROCFAIL: " + this);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("SYSPROCFAIL: " + this);
+                }
+                return;
             }
-            return;
         }
 
         // Let's ensure that we flush any previous attempts of this transaction

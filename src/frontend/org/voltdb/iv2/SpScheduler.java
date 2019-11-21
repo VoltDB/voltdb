@@ -1869,12 +1869,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_serviceState = serviceState;
     }
 
-    // Clear up the backlogs
     @Override
     public void cleanupTransactionBacklogs() {
-        m_duplicateCounters.clear();
-        m_outstandingTxns.clear();
-        m_pendingTasks.m_taskQueue.clear();
-        m_repairLog.clear();
+        if (m_serviceState.isRemoved()) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Clean up transaction backlogs");
+            }
+            m_duplicateCounters.clear();
+            m_outstandingTxns.clear();
+            m_pendingTasks.m_taskQueue.clear();
+            m_repairLog.clear();
+        }
     }
 }
