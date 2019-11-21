@@ -370,12 +370,11 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 fail("testOnLargeCluster failed");
             }
         } catch (ProcCallException e) {
-            e.printStackTrace();
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Crash deliberately"));
             // make sure every host witnessed the hash mismatch
             if (!MiscUtils.isPro()) {
-                assertTrue(server.verifyLogMessage(expectedLogMessage));
+                assertTrue(server.anyHostHasLogMessage(expectedLogMessage));
             }
         } finally {
             shutDown(server);
