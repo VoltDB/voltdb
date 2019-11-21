@@ -177,6 +177,9 @@ public class Benchmark {
         @Option(desc = "File with SSL properties")
         String sslfile = "";
 
+        @Option(desc = "Enable Hashmismatch generation")
+        boolean enablehashmismatchgen = false;
+
 
         @Override
         public void validate() {
@@ -591,16 +594,17 @@ public class Benchmark {
         connect();
 
         // get partition count
-        int partitionCount = 0;
+        int pcount = 0;
         int trycount = 12;
         while (trycount-- > 0) {
             try {
-                partitionCount = getUniquePartitionCount();
+                pcount = getUniquePartitionCount();
                 break;
             } catch (Exception e) {
             }
             Thread.sleep(10000);
         }
+        final int partitionCount = pcount;
 
         // get stats
         try {
@@ -788,6 +792,46 @@ public class Benchmark {
         if (!config.disabledThreads.contains("updateclasses")) {
             updcls = new UpdateClassesThread(client, config.duration);
             updcls.start();
+        }
+
+        if (config.enablehashmismatchgen) {
+            log.info("Hashmismatch will fire in " + String.valueOf(config.duration/2) + " seconds");
+            Thread hashmismatchthread = new Thread() {
+
+                public void run() {
+                    try {
+                        // run once halfway through .
+                        Thread.sleep((config.duration/2) * 1000);
+                    } catch(InterruptedException e) {
+                        return;
+                    }
+
+                    // same formula used in BigTableLoader.java
+                    Random r = new Random(0);
+                    long p = Math.abs((long)(r.nextGaussian() * partitionCount-1));
+                    try {
+                        ClientResponse clientResponse = client.callProcedure("GenHashMismatchOnBigP", p);
+
+                        byte status = clientResponse.getStatus();
+                        if (status == ClientResponse.GRACEFUL_FAILURE ||
+                            status == ClientResponse.USER_ABORT) {
+                            hardStop("GenHashMismatchOnBigP gracefully failed to insert into BigP and this shouldn't happen. Exiting.");
+                        }
+                        if (status != ClientResponse.SUCCESS) {
+                            log.warn("GenHashMismatchOnBigP ungracefully failed to insert into BigP");
+                            log.warn(((ClientResponseImpl) clientResponse).toJSONString());
+                        } else {
+                            log.info("GenHashMismatchOnBigP executed successfully");
+                        }
+                    } catch (IOException | ProcCallException e) {
+                        hardStop("GenHashMismatchOnBigP ungracefully failed to insert into BigP. IOException:"+e.getMessage());
+                    } catch (Exception e) {
+                        hardStop("Unexpected exception with generating hashmismatch:" + e.getMessage());
+                    }
+                }
+            };
+
+            hashmismatchthread.start();
         }
 
 
