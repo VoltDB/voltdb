@@ -617,11 +617,6 @@ public class ExportManager implements ExportManagerInterface
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
     }
 
-    /**
-     * @return {@code <Boolean.TRUE, null>} if catalog update is possible, or
-     *          {@code <Boolean.FALSE, String>} if catalog update is not possible, with
-     *           an error message in the {@code String}
-     */
     @Override
     public synchronized Pair<Boolean, String> canUpdateCatalog() {
         if (m_dataSourcesClosing.isEmpty()) {
@@ -634,34 +629,16 @@ public class ExportManager implements ExportManagerInterface
         }
     }
 
-    /**
-     * Notification that a data source was drained
-     *
-     * @param tableName
-     * @param partition
-     */
     @Override
     public synchronized void onDrainedSource(String tableName, int partition) {
         // No-op: handled by {@code ExportGeneration}
     }
 
-    /**
-     * Notification that a data source is closing (or being shut down)
-     *
-     * @param tableName
-     * @param partition
-     */
     @Override
     public synchronized void onClosingSource(String tableName, int partition) {
         m_dataSourcesClosing.put(tableName, partition);
     }
 
-    /**
-     * Notification that a data source has been closed (or shut down)
-     *
-     * @param tableName
-     * @param partition
-     */
     @Override
     public synchronized void onClosedSource(String tableName, int partition) {
         boolean removed = m_dataSourcesClosing.remove(tableName, partition);

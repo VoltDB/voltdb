@@ -188,15 +188,12 @@ public interface ExportManagerInterface {
 
     public ExportMode getExportMode();
 
-    // FIXME - make true abstracts
     /**
      * @return {@code <Boolean.TRUE, null>} if catalog update is possible, or
      *          {@code <Boolean.FALSE, String>} if catalog update is not possible, with
      *           an error message in the {@code String}
      */
-    default public Pair<Boolean, String> canUpdateCatalog() {
-        return new Pair<>(Boolean.TRUE, null);
-    }
+    public Pair<Boolean, String> canUpdateCatalog();
 
     /**
      * Notification that a data source was drained
@@ -204,9 +201,7 @@ public interface ExportManagerInterface {
      * @param tableName
      * @param partition
      */
-    default public void onDrainedSource(String tableName, int partition) {
-        // No-op
-    }
+    public void onDrainedSource(String tableName, int partition);
 
     /**
      * Notification that a data source is closing (or being shut down)
@@ -214,9 +209,7 @@ public interface ExportManagerInterface {
      * @param tableName
      * @param partition
      */
-    default public void onClosingSource(String tableName, int partition) {
-        // No-op
-    }
+    public void onClosingSource(String tableName, int partition);
 
     /**
      * Notification that a data source has been closed (or shut down)
@@ -224,7 +217,5 @@ public interface ExportManagerInterface {
      * @param tableName
      * @param partition
      */
-    default public void onClosedSource(String tableName, int partition) {
-        // No-op
-    }
+    public void onClosedSource(String tableName, int partition);
 }
