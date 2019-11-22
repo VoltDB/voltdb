@@ -1825,6 +1825,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return;
                 }
 
+                if (VoltZK.hasHashMismatchedSite(m_messenger.getZK())) {
+                    VoltDB.crashGlobalVoltDB("Cluster is running on master only mode and has become unviable.", false, null);
+                    return;
+                }
+
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
@@ -4849,8 +4854,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     public ExecutionEngine debugGetSpiedEE(int partitionId) {
         if (m_config.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
-            BaseInitiator init = (BaseInitiator)m_iv2Initiators.get(partitionId);
-            return init.debugGetSpiedEE();
+            Initiator init = m_iv2Initiators.get(partitionId);
+            return ((BaseInitiator<?>)init).debugGetSpiedEE();
         }
         else {
             return null;
