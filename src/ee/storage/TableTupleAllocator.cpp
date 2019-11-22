@@ -22,16 +22,19 @@ using namespace voltdb;
 using namespace voltdb::storage;
 
 inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
-    // preferred list of chunk sizes ranging from 4KB to 4MB
-    static constexpr array<size_t, 11> const preferred{                 // 0x400 == 1024
+    // preferred list of chunk sizes ranging from 4KB to 16MB
+    static constexpr array<size_t, 14> const preferred{                 // 0x400 == 1024
+        512,                                                            // for testing
         4 * 0x400, 8 * 0x400, 16 * 0x400, 32 * 0x400, 64 * 0x400,       // 0x100_000 == 1024 * 1024
           128 * 0x400, 256 * 0x400, 512 * 0x400, 0x100000, 2 * 0x100000,
-          4 * 0x100000
+          4 * 0x100000, 8 * 0x100000, 16 * 0x100000
     };
     // we always pick smallest preferred chunk size to calculate
-    // how many tuples a chunk fits
+    // how many tuples a chunk fits. The picked chunk should fit
+    // for > 4 allocations
     return *find_if(preferred.cbegin(), preferred.cend(),
-            [tupleSize](size_t s) { return tupleSize <= s; }) / tupleSize * tupleSize;
+            [tupleSize](size_t s) { return tupleSize * 4 <= s; })
+        / tupleSize * tupleSize;
 }
 
 inline ChunkHolder::ChunkHolder(size_t tupleSize):
