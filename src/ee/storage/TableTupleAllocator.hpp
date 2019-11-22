@@ -33,8 +33,8 @@ namespace voltdb {
      * Holder for a chunk, whether it is self-compacting or not.
      */
     struct ChunkHolder {
-        size_t const m_tupleSize;                  // size of a table tuple per allocation
     protected:
+        size_t const m_tupleSize;                  // size of a table tuple per allocation
         size_t const m_chunkSize;                  // #bytes per chunk
         unique_ptr<char> m_resource;
         void*const m_begin;                        // the chunk of memory allocated at instance construction
@@ -50,6 +50,7 @@ namespace voltdb {
         void* allocate() noexcept;                 // returns NULL if this chunk is full.
         bool contains(void const*) const;          // query if a table tuple is stored in current chunk
         bool full() const noexcept;
+        bool empty() const noexcept;
     };
 
     /**
@@ -59,31 +60,61 @@ namespace voltdb {
      * Since we are keeping a free list of hole spaces, it is
      * only economic to use when tupleSize is large.
      */
-    class NonCompactingChunk final: public ChunkHolder {
+    class EagerNonCompactingChunk final: public ChunkHolder {
         stack<void*> m_freed{};
     public:
-        NonCompactingChunk(size_t tupleSize);
-        NonCompactingChunk(NonCompactingChunk const&) = delete;
-        NonCompactingChunk operator=(NonCompactingChunk const&) = delete;
-        NonCompactingChunk(NonCompactingChunk&&);
-        ~NonCompactingChunk() = default;
+        EagerNonCompactingChunk(size_t);
+        EagerNonCompactingChunk(EagerNonCompactingChunk const&) = delete;
+        EagerNonCompactingChunk operator=(EagerNonCompactingChunk const&) = delete;
+        EagerNonCompactingChunk(EagerNonCompactingChunk&&);
+        ~EagerNonCompactingChunk() = default;
         void* allocate() noexcept;
         void free(void*);
         bool full() const noexcept;
+        bool empty() const noexcept;
     };
 
+    /**
+     * Similar to EagerNonCompactingChunk, but decides itself full
+     * ignoring any/many free() operations, unless all of allocations
+     * in the chunk had been freed.
+     *
+     * This way, we are freed from book-keeping all freed
+     * locations and achieve faster free() at the cost of lower
+     * utilization.
+     */
+    class LazyNonCompactingChunk final: public ChunkHolder {
+        size_t m_freed = 0;
+    public:
+        LazyNonCompactingChunk(size_t);
+        LazyNonCompactingChunk(LazyNonCompactingChunk const&) = delete;
+        LazyNonCompactingChunk operator=(LazyNonCompactingChunk const&) = delete;
+        LazyNonCompactingChunk(LazyNonCompactingChunk&&) = default;
+        ~LazyNonCompactingChunk() = default;
+        // void* allocate() noexcept; same as ChunkHolder
+        // when contains(void const*) returns true, the addr may
+        // have already been freed: we just don't know.
+        // bool full() const noexcept is the same as ChunkHolder;
+        // but gives conservative, ignoring any holes.
+        void free(void*);
+        // bool empty() const noexcept is identical to ChunkHolder.
+    };
+
+    template<typename Chunk,
+        typename = typename enable_if<is_base_of<ChunkHolder, Chunk>::value>::type>
     class NonCompactingChunks final {
         size_t const m_tupleSize;
-        forward_list<NonCompactingChunk> m_storage{};
+        forward_list<Chunk> m_storage{};
     public:
         NonCompactingChunks(size_t);
         ~NonCompactingChunks() = default;
-        NonCompactingChunks(NonCompactingChunk const&) = delete;
+        NonCompactingChunks(EagerNonCompactingChunk const&) = delete;
         NonCompactingChunks(NonCompactingChunks&&) = default;
         NonCompactingChunks operator=(NonCompactingChunks const&) = delete;
         size_t tupleSize() const noexcept;
         void* allocate() noexcept;
         void free(void*);
+        bool empty() const noexcept;               // mostly for testing purpose
     };
 
     /**
@@ -118,7 +149,7 @@ namespace voltdb {
 
     template<> class CompactingStorageTrait<ShrinkDirection::tail> {
         using list_type = std::list<SelfCompactingChunk>;
-        using iterator_type = list<SelfCompactingChunk>::iterator;
+        using iterator_type = typename list_type::iterator;
     public:
         void snapshot(bool) noexcept;
         /**
@@ -139,7 +170,7 @@ namespace voltdb {
 
     template<> class CompactingStorageTrait<ShrinkDirection::head> {
         using list_type = std::list<SelfCompactingChunk>;
-        using iterator_type = list<SelfCompactingChunk>::iterator;
+        using iterator_type = typename list_type::iterator;
         bool m_inSnapshot = false;
         list_type* m_list = nullptr;
         boost::optional<iterator_type> m_last{};
@@ -157,12 +188,11 @@ namespace voltdb {
      */
     template<ShrinkDirection dir>
     class SelfCompactingChunks {
-    protected:
+        CompactingStorageTrait<dir> m_trait{};
     public:
         using list_type = std::list<SelfCompactingChunk>;
         size_t const m_tupleSize;
         list_type m_list{};
-        CompactingStorageTrait<dir> m_trait{};
         /**
          * Transaction view of the first chunk. When deleting
          * from head, the begin() will skip chunks that are empty
@@ -233,11 +263,17 @@ namespace voltdb {
         void remove(void const*);
     };
 
-    template<typename Alloc, RetainPolicy policy, typename Collections,       // set/map typedefs
-        // Alloc must be either NonCompactingChunks or SelfCompactingChunks
-        typename = enable_if<is_same<Alloc, NonCompactingChunks>::value ||
-            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::head>>::value ||
-            is_same<Alloc, SelfCompactingChunks<ShrinkDirection::tail>>::type>>
+    template<typename T>                           // concept check
+    using is_chunks = typename enable_if<
+            is_same<T, NonCompactingChunks<EagerNonCompactingChunk>>::value ||
+            is_same<T, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
+            is_same<T, SelfCompactingChunks<ShrinkDirection::head>>::value ||
+            is_same<T, SelfCompactingChunks<ShrinkDirection::tail>>::value>::type;
+
+    template<typename Alloc,
+        RetainPolicy policy,
+        typename Collections,       // set/map typedefs
+        typename = is_chunks<Alloc>>
     class TxnPreHook final {
         using set = typename Collections::set;
         using map = typename Collections::map;
@@ -288,6 +324,10 @@ namespace voltdb {
     /**
      * A iterable, self-compacting list of chunks, which deletes
      * from head of the list of chunks.
+     *
+     * We don't need to iterate a non-compacting list of chunks,
+     * using them as pure allocator. (i.e. wo. role of iterator).
+     *
      * \param Tag - callable on iterated value that tells if current iterating value is
      * considered worthy of handling to the client. If not, then
      * it is skipped. It is used to identify whether a tuple is
@@ -321,10 +361,12 @@ namespace voltdb {
                 m_iter;
             value_type m_cursor;
             void advance();
-        public:
+        protected:
             iterator_type(container_type);
             iterator_type(iterator_type const&) = default;
             iterator_type(iterator_type&&) = default;
+        public:
+            static iterator_type begin(container_type);
             static iterator_type end(container_type);
             bool operator==(iterator_type const&) const noexcept;
             inline bool operator!=(iterator_type const& o) const noexcept {
@@ -398,10 +440,28 @@ namespace voltdb {
         static end(cont_type const&, typename const_iterator_cb<Alloc, policy>::history_type);
     };
 
+    template<bool constness>
+    using iterator_fun_type = function<void(typename conditional<constness, void const*, void*>::type)>;
+    // concept check
+    template<typename iterator_type, typename Chunk, bool constness>
+    using is_iterator_of = typename enable_if<
+        is_base_of<typename Chunk::template iterator_type<constness, false>, iterator_type>::value ||
+        is_base_of<typename Chunk::template iterator_type<constness, true>, iterator_type>::value>::type;
+
     /**
-     * Auxillary iterator over all resouces allocated
+     * Auxillary iterator over all resouces allocated.
+     * Also serves as an example for using various types of iterator
      */
-    void for_each(SelfCompactingChunks<ShrinkDirection::head>&, function<void(void*)>&);
-    void for_each(SelfCompactingChunks<ShrinkDirection::head> const&, function<void(void const*)>&);
+    template<typename iterator_type, typename Chunks,       // lambda version
+        bool constness = is_const<Chunks>::value,
+        typename = is_chunks<Chunks>,
+        typename = is_iterator_of<iterator_type, Chunks, constness>>
+    void for_each(Chunks&, iterator_fun_type<constness>&);
+
+    template<typename iterator_type, typename Chunks, typename F,      // functor version
+        bool constness = is_const<Chunks>::value,
+        typename = is_chunks<Chunks>,
+        typename = is_iterator_of<iterator_type, Chunks, constness>>
+    void for_each(Chunks&, F&);
 }
 

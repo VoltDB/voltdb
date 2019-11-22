@@ -69,10 +69,16 @@ inline bool ChunkHolder::full() const noexcept {
     return m_next == m_end;
 }
 
-inline NonCompactingChunk::NonCompactingChunk(NonCompactingChunk&& o):
+inline bool ChunkHolder::empty() const noexcept {
+    return m_next == m_begin;
+}
+
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s): ChunkHolder(s) {}
+
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(EagerNonCompactingChunk&& o):
     ChunkHolder(move(o)), m_freed(move(o.m_freed)) {}
 
-inline void* NonCompactingChunk::allocate() noexcept {
+inline void* EagerNonCompactingChunk::allocate() noexcept {
     if (! m_freed.empty()) {               // allocate from free list first, in LIFO order
         void* r = m_freed.top();
         vassert(r < m_next && r >= m_begin);
@@ -83,7 +89,7 @@ inline void* NonCompactingChunk::allocate() noexcept {
     }
 }
 
-inline void NonCompactingChunk::free(void* src) {
+inline void EagerNonCompactingChunk::free(void* src) {
     if (reinterpret_cast<char*>(src) + m_tupleSize == m_next) {     // last element: decrement boundary ptr
         m_next = src;
     } else {                               // hole in the middle: keep track of it
@@ -91,20 +97,45 @@ inline void NonCompactingChunk::free(void* src) {
     }
 }
 
-inline bool NonCompactingChunk::full() const noexcept {
+inline bool EagerNonCompactingChunk::empty() const noexcept {
+    return ChunkHolder::empty() || m_tupleSize * m_freed.size() ==
+        reinterpret_cast<char const*>(m_next) - reinterpret_cast<char const*>(m_begin);
+}
+
+inline bool EagerNonCompactingChunk::full() const noexcept {
     return ChunkHolder::full() && m_freed.empty();
 }
 
-inline NonCompactingChunks::NonCompactingChunks(size_t tupleSize): m_tupleSize(tupleSize) {}
+inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t tupleSize) : ChunkHolder(tupleSize) {}
 
-inline size_t NonCompactingChunks::tupleSize() const noexcept {
+inline void LazyNonCompactingChunk::free(void* src) {
+    vassert(src >= m_begin && src < m_next);
+    if (reinterpret_cast<char*>(src) + m_tupleSize == m_next) {     // last element: decrement boundary ptr
+        m_next = src;
+    } else {
+        ++m_freed;
+    }
+    if (m_freed * m_tupleSize ==
+            reinterpret_cast<char const*>(m_next) - reinterpret_cast<char const*>(m_begin)) {
+        // everything had been freed, the chunk becomes empty
+        m_next = m_begin;
+        m_freed = 0;
+    }
+}
+
+template<typename C, typename E>
+inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize): m_tupleSize(tupleSize) {}
+
+template<typename C, typename E>
+inline size_t NonCompactingChunks<C, E>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-inline void* NonCompactingChunks::allocate() noexcept {
+template<typename C, typename E>
+inline void* NonCompactingChunks<C, E>::allocate() noexcept {
     // linear search for non-full chunk
     auto iter = find_if(m_storage.begin(), m_storage.end(),
-            [](NonCompactingChunk const& c) { return ! c.full(); });
+            [](C const& c) { return ! c.full(); });
     void* r;
     if (iter == m_storage.cend()) {        // all chunks are full
         m_storage.emplace_front(m_tupleSize);
@@ -116,13 +147,32 @@ inline void* NonCompactingChunks::allocate() noexcept {
     return r;
 }
 
-inline void NonCompactingChunks::free(void* src) {
-    // linear search for containing chunk
-    auto iter = find_if(m_storage.begin(), m_storage.end(),
-            [&src](NonCompactingChunk const& c) { return c.contains(src); });
+template<typename C, typename E>
+inline void NonCompactingChunks<C, E>::free(void* src) {
+    // linear search for containing chunk, keeping knowledge of
+    // previous chunk in singly linked list
+    auto iter = m_storage.begin(), prev = iter;
+    while (iter != m_storage.end() && ! iter->contains(src)) {
+        prev = iter++;
+    }
     vassert(iter != m_storage.end());
     iter->free(src);
+    if (iter->empty()) {                   // free the chunk
+        if (iter == m_storage.begin()) {
+            m_storage.pop_front();         // free first chunk
+        } else {
+            m_storage.erase_after(prev);   // free middle chunk
+        }
+    }
 }
+
+template<typename C, typename E>
+inline bool NonCompactingChunks<C, E>::empty() const noexcept {
+    return m_storage.empty();
+}
+
+template class NonCompactingChunks<EagerNonCompactingChunk>;
+template class NonCompactingChunks<LazyNonCompactingChunk>;
 
 inline SelfCompactingChunk::SelfCompactingChunk(size_t s) : ChunkHolder(s) {}
 
@@ -315,6 +365,14 @@ inline IterableTableTupleChunks<Tag, E>::iterator_type<Const, TxnView>::iterator
 template<typename Tag, typename E>
 template<bool Const, bool TxnView>
 inline typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView>
+IterableTableTupleChunks<Tag, E>::iterator_type<Const, TxnView>::begin(
+        typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView>::container_type c) {
+    return typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView>(c);
+}
+
+template<typename Tag, typename E>
+template<bool Const, bool TxnView>
+inline typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView>
 IterableTableTupleChunks<Tag, E>::iterator_type<Const, TxnView>::end(
         typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView>::container_type c) {
     typename IterableTableTupleChunks<Tag, E>::template iterator_type<Const, TxnView> cur(c);
@@ -491,31 +549,7 @@ inline typename IterableTableTupleChunks<Tag, E>::template const_iterator_cb<All
     return cend(c, h);
 }
 
-struct truth {
-    bool operator()(void*) const noexcept {
-        return true;
-    }
-    bool operator()(void const*) const noexcept {
-        return true;
-    }
-};
-
-void for_each(SelfCompactingChunks<ShrinkDirection::head>& c, function<void(void*)>& f) {
-    using iterator_type = typename IterableTableTupleChunks<truth>::iterator_type<false, false>;
-    for (auto iter = iterator_type(c); iter != iterator_type::end(c); ++iter) {
-        f(*iter);
-    }
-}
-
-void for_each(SelfCompactingChunks<ShrinkDirection::head> const& c, function<void(void const*)>& f) {
-    using iterator_type = typename IterableTableTupleChunks<truth>::iterator_type<true, false>;
-    for (auto iter = iterator_type(c); iter != iterator_type::end(c); ++iter) {
-        f(*iter);
-    }
-}
-
-inline BaseHistoryRetainTrait::BaseHistoryRetainTrait(
-        typename BaseHistoryRetainTrait::cb_type const& cb): m_cb(cb) {}
+inline BaseHistoryRetainTrait::BaseHistoryRetainTrait(typename BaseHistoryRetainTrait::cb_type const& cb): m_cb(cb) {}
 
 inline HistoryRetainTrait<RetainPolicy::never>::HistoryRetainTrait(
         typename BaseHistoryRetainTrait::cb_type const& cb): BaseHistoryRetainTrait(cb) {}
@@ -635,3 +669,14 @@ template<typename Alloc, RetainPolicy policy, typename C, typename E>
 inline void TxnPreHook<Alloc, policy, C, E>::postReverted(void const* src) {
     m_retainer.remove(src);
 }
+
+template<typename iterator_type, typename Chunks, bool constness, typename, typename>
+inline void for_each(Chunks& c, iterator_fun_type<constness>& f) {
+    for_each(iterator_type::begin(c), iterator_type::end(c), f);
+}
+
+template<typename iterator_type, typename Chunks, typename F, bool, typename, typename>
+inline void for_each(Chunks& c, F& f) {
+    for_each(iterator_type::begin(c), iterator_type::end(c), f);
+}
+
