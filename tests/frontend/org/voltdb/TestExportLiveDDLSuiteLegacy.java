@@ -159,12 +159,16 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         waitForExportAllRowsDelivered(client, m_streamNames);
 
 
+        // drop all streams at the same time to avoid catalog updates
+        // being rejected on streams not yet closed
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "EX" + i;
             m_streamNames.remove(tab);
-            response = client.callProcedure("@AdHoc", "drop stream " + tab);
-            assertEquals(response.getStatus(), ClientResponse.SUCCESS);
+            sb.append("drop stream ").append(tab).append(";");
         }
+        response = client.callProcedure("@AdHoc", sb.toString());
+        assertEquals(response.getStatus(), ClientResponse.SUCCESS);
 
         if (MiscUtils.isPro()) {
             // In the Pro path of the test the NEX streams don't get dropped
@@ -179,8 +183,20 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "EX" + i;
             m_streamNames.add(tab);
-            response = client.callProcedure("@AdHoc", "create stream " + tab +
-                    " export to target " + tab + " (i integer)");
+            for (int j = 0; j < 10; j++) {
+                response = null;
+                try {
+                    response = client.callProcedure("@AdHoc", "create stream " + tab +
+                            " export to target " + tab + " (i integer)");
+                    if (response.getStatus() == ClientResponse.SUCCESS) {
+                        break;
+                    }
+                } catch (Exception ex) {
+                    // let's try again
+                }
+                Thread.sleep(1000);
+            }
+            assertNotNull(response);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             response = client.callProcedure("@AdHoc", "insert into " + tab + " values(111)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
@@ -262,7 +278,23 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
 
         quiesce(client);
 
-        client.callProcedure("@AdHoc", "create stream ex0 (i integer)");
+        // Catalog update may fail if stream hasn't closed yet
+        ClientResponse response = null;
+        for (int i = 0; i < 10; i++) {
+            try {
+                response = null;
+                response = client.callProcedure("@AdHoc", "create stream ex0 (i integer)");
+                if (response.getStatus() == ClientResponse.SUCCESS) {
+                    break;
+                }
+            }
+            catch (Exception ex) {
+                // Try again
+            }
+            Thread.sleep(1000);
+        }
+        assertNotNull(response);
+        assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         client.callProcedure("@AdHoc", "create stream ex partition on column i (i integer not null)");
 
         quiesce(client);
