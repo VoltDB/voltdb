@@ -2637,27 +2637,37 @@ public abstract class CatalogUtil {
                                         CatalogInChunks catalogAndDeployment)
         throws KeeperException, InterruptedException
     {
-        if (catalogAndDeployment != null) {
-            fillCatalogHeader(catalogAndDeployment, version, genId);
-        }
+        assert (catalogAndDeployment != null);
+
+        fillCatalogHeader(catalogAndDeployment, version, genId);
         String path = VoltZK.catalogbytes + "/" + version;
         try {
             zk.create(path, new byte[] {(byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal()},
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException.NodeExistsException e) {
+            // mark the version as incomplete
+            ByteBuffer buffer = ByteBuffer.allocate(5);// flag (byte) + expected node count (int)
+            buffer.put((byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal());
+            buffer.putInt(0);
+            zk.setData(path, buffer.array(), -1);
             // Clear children nodes if version dir already exists
             List<String> children = zk.getChildren(path, false);
             for (String child : children) {
                 ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(path, child));
             }
         }
+        int expectedNodeCount = 0;
         for (ByteBuffer chunk : catalogAndDeployment.m_data) {
-            zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
+            String zkNode = zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT_SEQUENTIAL);
+            expectedNodeCount++;
         }
 
         // mark the version node complete
-        zk.setData(path, new byte[] {(byte)ZKUtil.ZKCatalogStatus.COMPLETE.ordinal()}, -1);
+        ByteBuffer buffer = ByteBuffer.allocate(5);// flag (byte) + expected node count (int)
+        buffer.put((byte)ZKUtil.ZKCatalogStatus.COMPLETE.ordinal());
+        buffer.putInt(expectedNodeCount);
+        zk.setData(path, buffer.array(), -1);
 
         // delete all previous versions
         List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
@@ -2723,7 +2733,7 @@ public abstract class CatalogUtil {
         }
     }
 
-    private static String findLatestViableCatalog(ZooKeeper zk) throws KeeperException, InterruptedException {
+    private static Pair<String, Integer> findLatestViableCatalog(ZooKeeper zk) throws KeeperException, InterruptedException {
         List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
         // sort in natural order
         Collections.sort(children);
@@ -2732,11 +2742,15 @@ public abstract class CatalogUtil {
         for (int i = children.size() - 1; i >= 0; i--) {
             catalogPath = ZKUtil.joinZKPath(VoltZK.catalogbytes, children.get(i));
             byte[] data = zk.getData(catalogPath, false, null);
-            if (data[0] == (byte)ZKUtil.ZKCatalogStatus.COMPLETE.ordinal()) {
-                break;
+            ByteBuffer buffer = ByteBuffer.wrap(data);
+            byte flag = buffer.get();
+            if (flag != (byte)ZKUtil.ZKCatalogStatus.COMPLETE.ordinal()) {
+                continue;
             }
+            int expectedNodeCount = buffer.getInt();
+            return new Pair<>(catalogPath, expectedNodeCount);
         }
-        return catalogPath;
+        return null;
     }
 
     /**
@@ -2761,15 +2775,26 @@ public abstract class CatalogUtil {
 
         // read the catalog from given version
         CatalogAndDeployment cad = null;
-        String catalogPath = findLatestViableCatalog(zk);
-        if (catalogPath != null) {
-            List<String> catalogNodes = zk.getChildren(catalogPath, false);
-            assert (!catalogNodes.isEmpty());
+        Pair<String, Integer> latestCatalog = findLatestViableCatalog(zk);
+        if (latestCatalog != null) {
+            List<String> catalogNodes = zk.getChildren(latestCatalog.getFirst(), false);
+            // updateCatalogToZK may delete the zk nodes while load catalog
+            // spin loop reading it during initialization.
+            if (catalogNodes.isEmpty()) {
+                return null;
+            }
             Collections.sort(catalogNodes);
+            if (latestCatalog.getSecond() != catalogNodes.size()) {
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("expected zk catalog node count: " + latestCatalog.getSecond() +
+                            ", actual: " + catalogNodes.size());
+                }
+                return null;
+            }
 
             for (int j = 0; j < catalogNodes.size(); j++) {
                 ByteBuffer catalogDeploymentBytes =
-                        ByteBuffer.wrap(zk.getData(ZKUtil.joinZKPath(catalogPath, catalogNodes.get(j)), false, null));
+                        ByteBuffer.wrap(zk.getData(ZKUtil.joinZKPath(latestCatalog.getFirst(), catalogNodes.get(j)), false, null));
                 if (j == 0) {
                     // first node, get the meta data.
                     version = catalogDeploymentBytes.getInt();
@@ -2800,17 +2825,6 @@ public abstract class CatalogUtil {
                 catalogDeploymentBytes = null;
             }
             assert (deploymentBytesRead == deploymentLength && catalogBytesRead == catalogLength);
-            //// print hash of merged catalog
-            MessageDigest md = null;
-            try {
-                md = MessageDigest.getInstance("SHA-1");
-            } catch (NoSuchAlgorithmException e) {
-                VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
-            }
-            md.update(catalogBytes);
-            hostLog.info("load catalog: " + Encoder.hexEncode(md.digest()));
-            ///
-
             try {
                 // get the catalog hash
                 catalogHash = (new InMemoryJarfile(catalogBytes)).getSha1Hash();
@@ -2829,15 +2843,6 @@ public abstract class CatalogUtil {
         buffer.get(src, offset, toRead);
         return toRead;
     }
-
-//    private static int writeBuffer(ByteBuffer buffer, byte[] src, int offset, int length) {
-//        if (!buffer.hasRemaining()) {
-//            return length;
-//        }
-//        int toRead = Math.min(length, buffer.remaining());
-//        buffer.put(src, offset, toRead);
-//        return length - toRead;
-//    }
 
     /**
      * Given plan graphs and a SQL statement, compute a bidirectional usage map between

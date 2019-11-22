@@ -362,7 +362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
-    String m_pathToStartupCatalog;
+    public String m_pathToStartupCatalog;
 
     // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
@@ -2643,41 +2643,47 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             DeploymentType deployment = null;
             try {
+                // Found local deployment file
                 if (deploymentBytes != null) {
-                    CatalogUtil.updateCatalogToZK(zk,
-                            0, // use default version 0 as start
-                            0L,
-                            CatalogInChunks.createStarterCatalog(deploymentBytes));
-                    hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
+                    // Check if initial catalog (version: 0) exists, compare with the local deployment file
+                    if (zk.exists(VoltZK.catalogbytes + "/0", false) != null) {
+                        CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                        byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
+                        if (deploymentBytesTemp != null) {
+                            //Check hash if its a supplied deployment on command line.
+                            //We will ignore the supplied or default deployment anyways.
+                            if (deploymentBytes != null && !m_config.m_deploymentDefault) {
+                                byte[] deploymentHashHere =
+                                    CatalogUtil.makeDeploymentHash(deploymentBytes);
+                                byte[] deploymentHash =
+                                    CatalogUtil.makeDeploymentHash(deploymentBytesTemp);
+                                if (!(Arrays.equals(deploymentHashHere, deploymentHash)))
+                                {
+                                    hostLog.warn("The locally provided deployment configuration did not " +
+                                            " match the configuration information found in the cluster.");
+                                } else {
+                                    hostLog.info("Deployment configuration pulled from other cluster node.");
+                                }
+                            }
+                            //Use remote deployment obtained.
+                            deploymentBytes = deploymentBytesTemp;
+                        } else {
+                            hostLog.error("Deployment file could not be loaded locally or remotely, "
+                                    + "local supplied path: " + m_config.m_pathToDeployment);
+                            deploymentBytes = null;
+                        }
+                    } else {
+                        // Initial catalog doesn't exist, upload one.
+                        CatalogUtil.updateCatalogToZK(zk,
+                                0, // use default version 0 as start
+                                0L,
+                                CatalogInChunks.createStarterCatalog(deploymentBytes));
+                        hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
+                    }
                 } else {
+                    // Didn't find local deployment file
                     CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
                     deploymentBytes = catalogStuff.deploymentBytes;
-                }
-            } catch (KeeperException.NodeExistsException e) {
-                CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-                byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
-                if (deploymentBytesTemp != null) {
-                    //Check hash if its a supplied deployment on command line.
-                    //We will ignore the supplied or default deployment anyways.
-                    if (deploymentBytes != null && !m_config.m_deploymentDefault) {
-                        byte[] deploymentHashHere =
-                            CatalogUtil.makeDeploymentHash(deploymentBytes);
-                        byte[] deploymentHash =
-                            CatalogUtil.makeDeploymentHash(deploymentBytesTemp);
-                        if (!(Arrays.equals(deploymentHashHere, deploymentHash)))
-                        {
-                            hostLog.warn("The locally provided deployment configuration did not " +
-                                    " match the configuration information found in the cluster.");
-                        } else {
-                            hostLog.info("Deployment configuration pulled from other cluster node.");
-                        }
-                    }
-                    //Use remote deployment obtained.
-                    deploymentBytes = deploymentBytesTemp;
-                } else {
-                    hostLog.error("Deployment file could not be loaded locally or remotely, "
-                            + "local supplied path: " + m_config.m_pathToDeployment);
-                    deploymentBytes = null;
                 }
             } catch(KeeperException.NoNodeException e) {
                 // no deploymentBytes case is handled below. So just log this error.

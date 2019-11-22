@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -117,14 +115,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     {
         return this;
     }
-
-    private static  void printBuffer(String prefix,ByteBuffer buff)
-    {
-        System.out.println(prefix+buff);
-        System.out.println(prefix+Arrays.toString(Arrays.copyOfRange(buff.array(), buff.position(), buff.limit())) + ", remaining " + buff.remaining());
-
-    }
-
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted

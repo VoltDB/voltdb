@@ -26,8 +26,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,7 +36,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -46,6 +43,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
@@ -65,7 +63,6 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.CatalogUtil.CatalogInChunks;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -96,7 +93,7 @@ public class Inits {
     final int m_threadCount;
     final Set<Thread> m_initThreads = new HashSet<>();
     // 52mb - 4k, leave space for zookeeper header
-    public static final int MAX_CATALOG_CHUNK_SIZE = BinaryInputArchive.maxBuffer - 4 * 1024;
+    public static final int MAX_CATALOG_CHUNK_SIZE = VoltPort.MAX_MESSAGE_LENGTH - 4 * 1024;
 
     abstract class InitWork implements Comparable<InitWork>, Runnable {
         Set<Class<? extends InitWork>> m_blockers = new HashSet<>();
@@ -264,7 +261,7 @@ public class Inits {
      * @return catalog bytes
      * @throws IOException
      */
-    private static byte[] readCatalog(String catalogUrl) throws IOException
+    public static byte[] readCatalog(String catalogUrl) throws IOException
     {
         assert (catalogUrl != null);
 
@@ -367,17 +364,6 @@ public class Inits {
 
                     // Get the catalog bytes and byte count.
                     CatalogInChunks catalogAndDeployment = readCatalogInChunks(m_rvdb.m_pathToStartupCatalog, deploymentBytes);
-                    //// print hash of original content
-                    byte[] cat = readCatalog(m_rvdb.m_pathToStartupCatalog);
-                    MessageDigest md = null;
-                    try {
-                        md = MessageDigest.getInstance("SHA-1");
-                    } catch (NoSuchAlgorithmException e) {
-                        VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
-                    }
-                    md.update(cat);
-                    hostLog.info("distribute catalog: " + Encoder.hexEncode(md.digest()));
-                    ///
 
                     //Export needs a cluster global unique id for the initial catalog version
                     long exportInitialGenerationUniqueId =
