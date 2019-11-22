@@ -33,8 +33,7 @@ public:
         srand(0);
         m_topend = new DummyTopend();
         m_pool = new Pool();
-        m_quantum = createInstanceFromPool<UndoQuantum>(*m_pool, 0, m_pool);
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, nullptr, "", 0, NULL, NULL, 0);
+        m_context = new ExecutorContext(0, 0, nullptr, m_topend, m_pool, nullptr, "", 0, NULL, NULL, 0);
     }
 
     virtual ~SystemTableFactoryTest() {
@@ -47,7 +46,6 @@ public:
 protected:
     DummyTopend *m_topend;
     Pool *m_pool;
-    UndoQuantum *m_quantum;
     ExecutorContext *m_context;
     SystemTableFactory m_factory;
 };
