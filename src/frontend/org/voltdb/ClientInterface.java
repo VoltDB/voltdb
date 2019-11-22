@@ -2463,7 +2463,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!VoltZK.hasHashMismatchedSite(m_zk)) {
                 return true;
             }
-            String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.stopReplicasInProgress,
+            String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress,
                     CreateMode.EPHEMERAL, tmLog, "remove replicas");
             if (errorMessage != null) {
                 tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
@@ -2499,7 +2499,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
             m_decommissionInProgress.set(false);
-            VoltZK.removeActionBlocker(m_zk, VoltZK.stopReplicasInProgress, tmLog);
+            VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
         }
         return false;
     }

@@ -52,6 +52,14 @@ import org.voltdb.iv2.MigratePartitionLeaderInfo;
  * ZooKeeper paths.
  */
 public class VoltZK {
+
+    private final static String ERROR_DECOMMISSION = "while decommissioning replicas is progress";
+    private final static String ERROR_REJOIN = "while node rejoin is progress";
+    private final static String ERROR_LEADER_MIGRATION = "while leader migration is progress";
+    private final static String ERROR_CATALOG_UPDATE = "while catalog update is progress";
+    private final static String ERROR_ELASTIC_OPERATION = "while elastic operation is progress";
+    private final static String ERROR_MP_REPAIR = "while leader promotion or transaction repair are in progress";
+
     public static final String root = "/db";
 
     public static final String buildstring = "/db/buildstring";
@@ -183,24 +191,27 @@ public class VoltZK {
     //                                     for the mesh does not support elastic operation during DR (i.e. version <= 7).
     //                                     It is now only released after a DR global reset.)
     // elasticMigration only blocks SPI Migration
-    public static final String leafNodeElasticOperationInProgress = "elastic_blocker";
+    private static final String leafNodeElasticOperationInProgress = "elastic_blocker";
     public static final String elasticOperationInProgress = actionBlockers + "/" + leafNodeElasticOperationInProgress;
-    public static final String leafNodeBanElasticOperation = "no_elastic_blocker";
+    private static final String leafNodeBanElasticOperation = "no_elastic_blocker";
     public static final String banElasticOperation = actionBlockers + "/" + leafNodeBanElasticOperation;
-    public static final String leafNodeElasticMigration = "elastic_migration_blocker";
+    private static final String leafNodeElasticMigration = "elastic_migration_blocker";
     public static final String elasticMigration = actionBlockers + "/" + leafNodeElasticMigration;
 
-    public static final String leafNodeRejoinInProgress = "rejoin_blocker";
+    private static final String leafNodeRejoinInProgress = "rejoin_blocker";
     public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
-    public static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
+    private static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
     public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String mpRepairBlocker = "mp_repair_blocker";
+    private static final String mpRepairBlocker = "mp_repair_blocker";
     public static final String mpRepairInProgress = actionBlockers + "/" + mpRepairBlocker;
 
-    public static final String stopReplicas = "stopReplicas_blocker";
-    public static final String stopReplicasInProgress = actionBlockers + "/" + stopReplicas;
+    private static final String decommissionReplicas = "decommissionReplicas_blocker";
+    public static final String decommissionReplicasInProgress = actionBlockers + "/" + decommissionReplicas;
+
+    private static final String snapshotBlocker = "snapshotBlocker";
+    public static final String snapshotSetupInProgress = actionBlockers + "/" + snapshotBlocker;
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -457,84 +468,89 @@ public class VoltZK {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         }
 
-        /*
-         * Validate exclusive access of elastic operation, rejoin, MigratePartitionLeader and catalog update.
-         */
-
-        // UAC can not happen during node rejoin
-        // some UAC can happen with elastic operation
-        // UAC NT and TXN are exclusive
+        // Validate exclusive access of elastic operation, rejoin, MigratePartitionLeader and catalog update.
         String errorMsg = null;
         try {
             List<String> blockers = zk.getChildren(VoltZK.actionBlockers, false);
             switch (node) {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry catalog update later.";
+                    errorMsg = ERROR_REJOIN;
                 } else if (blockers.contains(mpRepairBlocker)){
                     // Avoid UAC during MP repair or promotion since UAC will invoke GlobalServiceElector to
                     // register other promotable services while MPI is accepting promotion
-                    errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
+                    errorMsg = ERROR_MP_REPAIR;
                 } else if (blockers.contains(leafNodeElasticOperationInProgress)) {
-                    errorMsg = "while an elastic operation is active. Please retry catalog update later.";
+                    errorMsg = ERROR_ELASTIC_OPERATION;
                 }
                 break;
             case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic operation
                 if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retry node rejoin later.";
+                    errorMsg = ERROR_CATALOG_UPDATE;
                 } else if (blockers.contains(leafNodeElasticOperationInProgress)) {
-                    errorMsg = "while an elastic operation is active. Please retry node rejoin later.";
+                    errorMsg = ERROR_ELASTIC_OPERATION;
                 } else if (blockers.contains(migrate_partition_leader)){
-                    errorMsg = "while leader migration is active. Please retry node rejoin later.";
+                    errorMsg = ERROR_LEADER_MIGRATION;
                 } else if (blockers.contains(mpRepairBlocker)){
                     // Upon node failures, a MP repair blocker may be registered right before they
                     // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
-                    errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
-                } else if (blockers.contains(stopReplicas)){
-                    errorMsg = "while stopping replicas is active. Please retry node rejoin later.";
+                    errorMsg = ERROR_MP_REPAIR;
+                } else if (blockers.contains(decommissionReplicas)){
+                    errorMsg = ERROR_DECOMMISSION;
                 }
                 break;
             case elasticOperationInProgress:
                 // elastic operation can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry elastic operation later.";
+                    errorMsg = ERROR_REJOIN;
                 } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retry elastic operation later.";
+                    errorMsg = ERROR_CATALOG_UPDATE;
                 } else if (blockers.contains(leafNodeBanElasticOperation)) {
                     errorMsg = "while elastic operation is blocked by DR established with a cluster that "
                             + "does not support remote elastic operation during DR. "
                             + "DR needs to be reset before elastic operation is allowed again.";
                 } else if ( blockers.contains(migrate_partition_leader)) {
-                    errorMsg = "while leader migration is active. Please retry elastic operation later.";
-                } else if (blockers.contains(stopReplicas)){
-                    errorMsg = "while stopping replicas is active. Please retry node rejoin later.";
+                    errorMsg = ERROR_LEADER_MIGRATION;
+                } else if (blockers.contains(decommissionReplicas)){
+                    errorMsg = ERROR_DECOMMISSION;
                 }
                 break;
             case migratePartitionLeaderBlocker:
                 //MigratePartitionLeader can not happen when join (before data fully migrated), rejoin, catalog update, or repair is in progress.
                 blockers.remove(leafNodeBanElasticOperation);
                 if (blockers.size() > 1) {
-                    errorMsg = "while elastic operation, rejoin or catalog update is active";
+                    errorMsg = ERROR_ELASTIC_OPERATION;
+                } else if (blockers.contains(decommissionReplicas)){
+                    errorMsg = ERROR_DECOMMISSION;
                 }
                 break;
             case elasticMigration:
                 // elastic operation balancePartition currently cannot coexist with partition leader migration
                if (blockers.contains(migrate_partition_leader)) {
-                   errorMsg = "while leader migration is active.";
+                   errorMsg = ERROR_LEADER_MIGRATION;
+               } else if (blockers.contains(decommissionReplicas)){
+                   errorMsg = ERROR_DECOMMISSION;
                }
                break;
             case banElasticOperation:
                 if (blockers.contains(leafNodeElasticOperationInProgress)) {
-                    errorMsg = "while an elastic operation is active";
+                    errorMsg = ERROR_ELASTIC_OPERATION;
                 }
                 break;
             case mpRepairInProgress:
                 break;
-            case stopReplicasInProgress:
+            case decommissionReplicasInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry stop replicas operation later.";
+                    errorMsg = ERROR_REJOIN;
+                } else if (blockers.contains(snapshotBlocker)) {
+                    errorMsg = "while snapshot is in progress";
+                }
+                break;
+            case snapshotSetupInProgress:
+                if (blockers.contains(decommissionReplicas)) {
+                    errorMsg = ERROR_DECOMMISSION;
                 }
                 break;
             default:
