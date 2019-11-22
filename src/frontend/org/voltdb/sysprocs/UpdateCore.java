@@ -28,7 +28,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -241,10 +240,9 @@ public class UpdateCore extends VoltSystemProcedure {
                 throw ex;
             }
 
-            Pair<Boolean, String> canUpdate = ExportManagerInterface.instance().canUpdateCatalog();
-            if (Boolean.FALSE.equals(canUpdate.getFirst())) {
-                assert canUpdate.getSecond() != null : " missing error message";
-                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, canUpdate.getSecond());
+            String canUpdate = ExportManagerInterface.instance().canUpdateCatalog();
+            if (canUpdate != null) {
+                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, canUpdate);
             }
 
             // Send out fragments to do the initial round-trip to synchronize

@@ -618,19 +618,19 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public synchronized Pair<Boolean, String> canUpdateCatalog() {
+    public synchronized String canUpdateCatalog() {
         if (m_dataSourcesClosing.isEmpty()) {
-            return new Pair<>(Boolean.TRUE, null);
+            return null;
         }
         else {
-            String msg = "Unable to update catalog, these tables are still closing: "
+            String msg = "Unable to update catalog, these export streams are still closing: "
                     + m_dataSourcesClosing.keySet();
-            return new Pair<>(Boolean.FALSE,  msg);
+            return msg;
         }
     }
 
     @Override
-    public synchronized void onDrainedSource(String tableName, int partition) {
+    public void onDrainedSource(String tableName, int partition) {
         // No-op: handled by {@code ExportGeneration}
     }
 
@@ -647,7 +647,7 @@ public class ExportManager implements ExportManagerInterface
                 exportLog.debug("Closed " + tableName + ", partition " + partition);
             }
             else {
-                exportLog.info("Closed untracked " + tableName + ", partition " + partition + " (ok on shutdown)");
+                exportLog.debug("Closed untracked " + tableName + ", partition " + partition + " (ok on shutdown)");
             }
         }
     }

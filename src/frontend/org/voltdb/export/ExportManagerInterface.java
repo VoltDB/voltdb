@@ -189,11 +189,9 @@ public interface ExportManagerInterface {
     public ExportMode getExportMode();
 
     /**
-     * @return {@code <Boolean.TRUE, null>} if catalog update is possible, or
-     *          {@code <Boolean.FALSE, String>} if catalog update is not possible, with
-     *           an error message in the {@code String}
+     * @return null if catalog update is possible, or an error message if not.
      */
-    public Pair<Boolean, String> canUpdateCatalog();
+    public String canUpdateCatalog();
 
     /**
      * Notification that a data source was drained
