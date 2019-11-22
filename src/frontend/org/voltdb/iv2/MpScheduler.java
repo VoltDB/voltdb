@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.errorprone.annotations.Immutable;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -75,7 +77,7 @@ public class MpScheduler extends Scheduler
     private final List<Long> m_iv2Masters;
     private final Map<Integer, Long> m_partitionMasters;
     // Todo: update buddyHSIds
-    private final List<Long> m_buddyHSIds;
+    private ImmutableList<Long> m_buddyHSIds;
     // Leader migrated from one site to another
     private final Map<Long, Long> m_leaderMigrationMap;
 
@@ -96,12 +98,18 @@ public class MpScheduler extends Scheduler
     {
         super(partitionId, taskQueue);
         m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
-        m_buddyHSIds = buddyHSIds;
+        m_buddyHSIds = ImmutableList.<Long>builder().addAll(buddyHSIds).build();
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
         m_leaderId = leaderId;
         m_leaderMigrationMap = Maps.newHashMap();
+    }
+
+    // reset buddy Hsid list if local sites decommissioned
+    void updateBuddyHSIds(List<Long> buddyHSIds) {
+        m_buddyHSIds = ImmutableList.<Long>builder().addAll(buddyHSIds).build();
+        m_nextBuddy = 0;
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)

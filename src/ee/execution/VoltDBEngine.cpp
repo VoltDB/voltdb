@@ -292,11 +292,11 @@ VoltDBEngine::~VoltDBEngine() {
 }
 
 bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
-    VOLT_DEBUG("start decommission for partition %d, site %" PRId64, m_partitionId, m_siteId);
+    VOLT_DEBUG("start decommission for partition %d, site % " PRId64, m_partitionId, m_siteId);
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
             (true, isLowestSite(), []() {});
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
-        VOLT_DEBUG("is lowest site");
+        VOLT_DEBUG("on lowest site");
         // update site per host count for next countdown latch
         SynchronizedThreadLock::updateSitePerHost(newSitePerHost);
         // give up lowest site role
@@ -305,12 +305,13 @@ bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
             if (m_drReplicatedStream) {
                 m_drReplicatedStream = nullptr;
             }
+            cleanup();
             assert(!isLowestSite());
         }
     } else {
-        VOLT_DEBUG("non lowest site");
+        VOLT_DEBUG("on non lowest site");
         if (remove) {
-
+            cleanup();
         } else if (promote) {
             // take lowest site role
             s_lowestSiteId = m_siteId;
@@ -319,6 +320,9 @@ bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
             }
             assert(isLowestSite());
         }
+    }
+    if (remove) {
+        // SynchronizedThreadLock::deactiveEngineLocals(m_partitionId);
     }
     return true;
 }

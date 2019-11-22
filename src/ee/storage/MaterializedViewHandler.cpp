@@ -532,7 +532,7 @@ namespace voltdb {
     void ReplicatedMaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
         vassert(SynchronizedThreadLock::isInSingleThreadMode());
         vassert(SynchronizedThreadLock::usingMpMemory());
-        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        EngineLocals& curr = SynchronizedThreadLock::s_activeEnginesByPartitionId[m_handlerPartitionId];
         SynchronizedThreadLock::assumeSpecificSiteContext(curr);
         m_partitionedHandler->handleTupleInsert(sourceTable, fallible);
         SynchronizedThreadLock::assumeMpMemoryContext();
@@ -541,7 +541,7 @@ namespace voltdb {
     void ReplicatedMaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
         vassert(SynchronizedThreadLock::isInSingleThreadMode());
         vassert(SynchronizedThreadLock::usingMpMemory());
-        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        EngineLocals& curr = SynchronizedThreadLock::s_activeEnginesByPartitionId[m_handlerPartitionId];
         SynchronizedThreadLock::assumeSpecificSiteContext(curr);
         m_partitionedHandler->handleTupleDelete(sourceTable, fallible);
         SynchronizedThreadLock::assumeMpMemoryContext();

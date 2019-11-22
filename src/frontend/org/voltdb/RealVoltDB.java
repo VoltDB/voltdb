@@ -5268,11 +5268,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return -1;
     }
 
-    public Pair<Long, Integer> getLeaderSites() {
-        Supplier<Stream<Initiator>> leaderSites = () -> m_iv2Initiators.values().stream()
-                .filter(s -> ((SpInitiator) s).isLeader() && s.getPartitionId() != MpInitiator.MP_INIT_PID);
-        return new Pair (leaderSites.get().findFirst().map(Initiator::getInitiatorHSId).orElse(-1L),
-                leaderSites.get().count());
+    public List<Long> getLeaderSites() {
+        List<Long> leaderSites = new ArrayList<>();
+        for(Initiator init : m_iv2Initiators.values()) {
+            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                if (((SpInitiator) init).isLeader()) {
+                    leaderSites.add(init.getInitiatorHSId());
+                }
+            }
+        }
+        return  leaderSites;
     }
 }
 

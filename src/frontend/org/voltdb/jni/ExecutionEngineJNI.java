@@ -341,8 +341,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Decommissioning Execution Engine... " + pointer);
         if (pointer != 0L) {
             final int errorCode = nativeDecommission(pointer,remove,promote,newSitePerHost);
-            // reset
-            pointer = 0L;
             checkErrorCode(errorCode);
         }
         // Don't need reset the buffers, they can be reused after recommission

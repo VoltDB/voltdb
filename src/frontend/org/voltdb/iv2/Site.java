@@ -370,7 +370,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_tickProducer.cancel();
                 m_runningState = RunningState.DECOMMISSIONING;
                 // normal shutdown
-                startShutdown();
+                // startShutdown();
             }
         }
 
