@@ -5241,8 +5241,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    public void cleanupBackLogsOnDecommisionedResplicas(int executorPartition) {
-        // Trigger on the lowest master site
+    public void cleanupBackLogsOnDecommisionedReplicas(int executorPartition) {
+        // execute on the lowest master site only
         if (executorPartition == getLowestMasterPartitionId()) {
             m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
                     ((SpInitiator)p).getServiceState().isRemoved())
