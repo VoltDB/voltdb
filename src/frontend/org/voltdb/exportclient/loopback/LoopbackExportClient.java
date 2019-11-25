@@ -205,6 +205,12 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
+        public boolean pause() {
+            // This decoder cannot pause, must be shut down
+            return false;
+        }
+
+        @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             synchronized (this) {
                 if (m_ctx.m_outstandingTransactions.get() > 0 && !m_isShutDown) {
