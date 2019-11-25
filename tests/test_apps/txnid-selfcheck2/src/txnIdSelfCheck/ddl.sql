@@ -490,6 +490,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE PARTITION ON TABLE bigp COLUMN p FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
+CREATE PROCEDURE PARTITION ON TABLE bigp COLUMN p FROM CLASS txnIdSelfCheck.procedures.GenHashMismatchOnBigP;
+
 
 CREATE PROCEDURE PARTITION ON TABLE ttlmigratep COLUMN p FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATEPTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATERTableInsert;
