@@ -19,9 +19,9 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 
 public abstract class TableSaveFileState
@@ -42,8 +42,7 @@ public abstract class TableSaveFileState
         m_consistencyResult = "Table: " + m_tableName + " not yet processed";
     }
 
-    abstract public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st);
+    abstract public SynthesizedPlanFragment[] generateRestorePlan(SnapshotTableInfo tableInfo, SiteTracker st);
 
     String getTableName()
     {
