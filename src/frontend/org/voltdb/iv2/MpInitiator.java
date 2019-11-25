@@ -88,11 +88,12 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("Replica removal request with: " + CoreUtils.hsIdCollectionToString(m_replicasRemovedSet));
                 }
+                RealVoltDB db = (RealVoltDB) VoltDB.instance();
+                m_scheduler.updateBuddyHSIds(db.getLeaderSites());
                 m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
                         m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
                         new HashMismatchMessage());
-                RealVoltDB db = (RealVoltDB) VoltDB.instance();
-                m_scheduler.updateBuddyHSIds(db.getLeaderSites());
+
             }
         }
     };

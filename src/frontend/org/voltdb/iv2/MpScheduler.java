@@ -109,6 +109,8 @@ public class MpScheduler extends Scheduler
     // reset buddy Hsid list if local sites decommissioned
     void updateBuddyHSIds(List<Long> buddyHSIds) {
         m_buddyHSIds = ImmutableList.<Long>builder().addAll(buddyHSIds).build();
+        // We need at least one available sites on the MPI host
+        assert(m_buddyHSIds.size() > 0);
         m_nextBuddy = 0;
     }
 

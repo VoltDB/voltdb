@@ -57,7 +57,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     "CREATE INDEX idx_kv ON kv(nondetval);";
 
     Client client;
-    final int sitesPerHost = 1;
+    final int sitesPerHost = 2;
     final int hostCount = 2;
     final int kfactor = 1;
     static String expectedLogMessage = "Hash mismatch";
@@ -81,7 +81,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             server.setCallingClassName(method);
             assertTrue("Catalog compilation failed", server.compile(builder));
 
-            server.setHasLocalServer(true);
+            server.setHasLocalServer(false);
             List<String> logSearchPatterns = new ArrayList<>(1);
             logSearchPatterns.add(expectedLogMessage);
             logSearchPatterns.add(expectHashDetectionMessage);
@@ -119,7 +119,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     /**
      * Do a non-deterministic insertion
      */
-    @Test
+    @Test(timeout = 60_000)
     public void testNonDeterministicInsert() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministicInsert");
@@ -153,7 +153,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      * Do a non-deterministic insertion followed by a single partition read-only operation.
      * ENG-3288 - Expect non-deterministic read-only queries to succeed.
      */
-    @Test
+    @Test(timeout = 60_000)
     public void testNonDeterministic_RO_SP() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministic_RO_SP");
@@ -170,7 +170,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     /**
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
-    @Test
+    @Test(timeout = 60_000)
     public void testDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testDeterministicProc");
@@ -188,7 +188,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     /**
      * Test that different whitespace fails the determinism CRC check on SQL
      */
-    @Test
+    @Test(timeout = 60_000)
     public void testWhitespaceChanges() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testWhitespaceChanges");
@@ -218,7 +218,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    @Test(timeout = 60_000)
     public void testMultistatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testMultistatementNonDeterministicProc");
@@ -258,7 +258,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    @Test(timeout = 60_000)
     public void testPartialstatementNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testPartialstatementNonDeterministicProc");
@@ -298,7 +298,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    @Test(timeout = 60_000)
     public void testBuggyNonDeterministicProc() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testBuggyNonDeterministicProc");
@@ -328,7 +328,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    @Test(timeout = 60_000)
     public void testOnLargeCluster() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testOnLargeCluster", 2, 3, 18);
