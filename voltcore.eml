@@ -113,8 +113,8 @@
 	<lib name="metrics-core-2.2.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/metrics-core-2.2.0.jar!/"/>
 	</lib>
-	<lib name="scala-library-2.11.5.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.5.jar!/"/>
+	<lib name="scala-library-2.11.12.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.12.jar!/"/>
 	</lib>
 	<lib name="felix-framework-5.6.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/felix-framework-5.6.12.jar!/"/>
@@ -235,11 +235,11 @@
 	<lib name="jetty-security-9.4.15.v20190215.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="netty-tcnative-boringssl-static-2.0.20.Final.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.20.Final.jar!/"/>
+	<lib name="netty-tcnative-boringssl-static-2.0.27.Final.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.27.Final.jar!/"/>
 	</lib>
-	<lib name="netty-all-4.1.32.Final.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.32.Final.jar!/"/>
+	<lib name="netty-all-4.1.43.Final.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.43.Final.jar!/"/>
 	</lib>
 	<levels>
 		<level name="3pty_jars" value="project"/>
