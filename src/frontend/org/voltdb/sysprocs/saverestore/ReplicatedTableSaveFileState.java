@@ -24,9 +24,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.voltdb.ParameterSet;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
@@ -68,18 +68,12 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
     }
 
     @Override public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st) {
+            generateRestorePlan(SnapshotTableInfo table, SiteTracker st) {
         for (int hostId : m_hostsWithThisTable) {
             m_sitesWithThisTable.addAll(st.getSitesForHost(hostId));
         }
 
-        SynthesizedPlanFragment[] restore_plan = null;
-        if (catalogTable.getIsreplicated()) {
-            restore_plan = generateReplicatedToReplicatedPlan(st);
-        } else {
-            restore_plan = generateReplicatedToPartitionedPlan(st);
-        }
-        return restore_plan;
+        return table.isReplicated() ? generateReplicatedToReplicatedPlan(st) : generateReplicatedToPartitionedPlan(st);
     }
 
     private void checkSiteConsistency(VoltTableRow row) throws IOException {

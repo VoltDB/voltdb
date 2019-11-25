@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -55,7 +56,7 @@ import org.voltdb.utils.PosixAdvise;
  * as well as a byte to that is set once the file is completely written and synced.
  * A VoltTable header describing the schema follows the JSON blob.
  */
-public class TableSaveFile
+public class TableSaveFile implements Closeable
 {
 
     public static enum ChecksumType {
@@ -386,6 +387,7 @@ public class TableSaveFile
         return m_timestamp;
     }
 
+    @Override
     public void close() throws IOException {
         Thread chunkReader;
         synchronized (this) {
@@ -778,7 +780,9 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } finally {
-                    if (c != null) c.discard();
+                    if (c != null) {
+                        c.discard();
+                    }
                 }
             }
             fileInputBufferC.discard();
@@ -1041,7 +1045,9 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } finally {
-                    if (c != null) c.discard();
+                    if (c != null) {
+                        c.discard();
+                    }
                 }
             }
             fileInputBufferC.discard();
