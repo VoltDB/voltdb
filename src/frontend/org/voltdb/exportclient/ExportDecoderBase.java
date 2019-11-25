@@ -216,16 +216,9 @@ public abstract class ExportDecoderBase {
 
     /**
      * Pause this decoder to allow system-wide operations such as catalog update.
-     * <p>
-     * Most implementations should use this default implementation.
-     * <p>
-     * If this method returns false, VoltDB will shut down this instance and re-create
-     * a new instance on resume.
-     *
-     * @return true if paused, false if cannot pause and should be shut down.
      */
-    public boolean pause() {
-        return true;
+    public void pause() {
+        // no-op
     }
 
     /**
