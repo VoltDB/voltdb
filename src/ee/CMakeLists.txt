@@ -49,6 +49,7 @@
 #
 ########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
+variable_watch(__CMAKE_CXX_COMPILER_OUTPUT)
 PROJECT(VoltDB_EE)
 
 include(${CMAKE_SOURCE_DIR}/tools/VoltDB.cmake)
