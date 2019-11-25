@@ -62,6 +62,7 @@ public class TransactionTaskQueue
         }
     }
     private static class RelativeSiteOffset {
+        // Todo: deprecated m_lowestSiteId
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
 

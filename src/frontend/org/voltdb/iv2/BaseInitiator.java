@@ -241,7 +241,8 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
         }
 
         if (m_executionSite != null) {
-            // shutdown EE service
+            // decommission EE service
+            // m_executionSite.startDecommission();
         }
     }
 }

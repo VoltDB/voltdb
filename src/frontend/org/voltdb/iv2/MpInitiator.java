@@ -35,6 +35,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.TTLManager;
@@ -87,9 +88,12 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("Replica removal request with: " + CoreUtils.hsIdCollectionToString(m_replicasRemovedSet));
                 }
+                RealVoltDB db = (RealVoltDB) VoltDB.instance();
+                m_scheduler.updateBuddyHSIds(db.getLeaderSites());
                 m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
                         m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
                         new HashMismatchMessage());
+
             }
         }
     };

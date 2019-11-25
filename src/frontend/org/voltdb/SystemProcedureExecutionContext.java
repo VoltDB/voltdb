@@ -125,4 +125,6 @@ public interface SystemProcedureExecutionContext {
                                                List<DBBPool.BBContainer> outputBuffers);
 
     public InitiatorMailbox getInitiatorMailbox();
+
+    void decommissionSite(boolean remove, boolean promote, int newSitePerHost);
 }
