@@ -24,6 +24,8 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertNotEquals;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -36,6 +38,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.utils.VoltFile;
 
 public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
@@ -124,7 +127,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                 .getResults();
 
         while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            assertEquals("SUCCESS", results[0].getString("RESULT"));
         }
 
         // Kill and restart all the execution sites.
@@ -137,7 +140,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
             String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
             results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR, TESTNONCE).getResults();
 
-            assertEquals(results[0].getRowCount(), 0);
+            assertEquals(getSystemTableRowCount(), results[0].getRowCount());
         } catch (ProcCallException e) {
             System.err.println(Arrays.toString(e.getClientResponse().getResults()));
             throw e;
@@ -184,8 +187,8 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-            // 6 tables with 12 rows each in the result == 72
-            assertEquals(results[0].getRowCount(), 72);
+            // 6 tables with 12 rows each in the result == 72 + system table rows
+            assertEquals(72 + getSystemTableRowCount(), results[0].getRowCount());
         } catch (ProcCallException e) {
             System.err.println(Arrays.toString(e.getClientResponse().getResults()));
             throw e;
@@ -231,11 +234,9 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                     TESTNONCE).getResults();
 
             while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
+                assertNotEquals(results[0].getString("ERR_MSG"), "FAILURE", results[0].getString("RESULT"));
             }
-            assertEquals(results[0].getRowCount(), 0);
+            assertEquals(getSystemTableRowCount(), results[0].getRowCount());
         } catch (ProcCallException e) {
             System.err.println(Arrays.toString(e.getClientResponse().getResults()));
             throw e;
@@ -264,7 +265,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                 .getResults();
 
         while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            assertEquals("SUCCESS", results[0].getString("RESULT"));
         }
 
         // Kill and restart all the execution sites.
@@ -301,6 +302,14 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, newConfig);
 
         setConfig(newConfig);
+    }
+
+    /**
+     * @return the number of rows expected in the restore result which are from system tables
+     */
+    private static int getSystemTableRowCount() {
+        // One row for each table for each host
+        return SystemTable.values().length * 3;
     }
 
     public TestRestoreEmptyDatabaseSuite(final String name) {

@@ -454,13 +454,19 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
 }
 
 /**
- * This method is called to initially load table data.
+ * This method is called to initially load table data from a heap array
  * @param pointer the VoltDBEngine pointer
  * @param table_id catalog ID of the table
  * @param serialized_table the table data to be loaded
+ * @param txnId ID of current transaction
+ * @param spHandle for this sp transaction
+ * @param lastCommittedSpHandle spHandle which was most recently committed
+ * @param uniqueId for this transaction
+ * @param undoToken for this transaction
+ * @param callerId ID for LoadTableCaller enum
 */
 SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable__JI_3BJJJJJB (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
     jlong uniqueId, jlong undoToken, jbyte callerId)
@@ -496,6 +502,58 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
             engine->resetReusedResultOutputBuffer();
             e.serialize(engine->getExceptionOutputSerializer());
         }
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+
+    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+}
+
+/**
+ * This method is called to initially load table data from a direct byte buffer
+ * @param engine_ptr the VoltDBEngine pointer
+ * @param table_id catalog ID of the table
+ * @param serialized_table the table data to be loaded as a direct byte buffer
+ * @param txnId ID of current transaction
+ * @param spHandle for this sp transaction
+ * @param lastCommittedSpHandle spHandle which was most recently committed
+ * @param uniqueId for this transaction
+ * @param undoToken for this transaction
+ * @param callerId ID for LoadTableCaller enum
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable__JILjava_nio_ByteBuffer_2JJJJJB (
+    JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
+    jobject serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
+    jlong uniqueId, jlong undoToken, jbyte callerId)
+{
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+
+    engine->resetReusedResultOutputBuffer();
+
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+    VOLT_DEBUG("loading table %d in C++ on thread %d", table_id, ThreadLocalPool::getThreadPartitionId());
+
+    char *bytes = static_cast<char *>(env->GetDirectBufferAddress(serialized_table));
+    jlong length = env->GetDirectBufferCapacity(serialized_table);
+    VOLT_DEBUG("deserializing %d bytes on thread %d", (int) length, ThreadLocalPool::getThreadPartitionId());
+    ReferenceSerializeInputBE serialize_in(bytes, length);
+
+    try {
+        bool success = engine->loadTable(table_id, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                undoToken, LoadTableCaller::get(static_cast<LoadTableCaller::Id>(callerId)));
+        VOLT_DEBUG("deserialized table");
+
+        if (success)
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    } catch (const SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
