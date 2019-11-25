@@ -457,4 +457,8 @@ void SynchronizedThreadLock::setEngineLocalsForTest(int32_t partitionId,
     ThreadLocalPool::assignThreadLocals(enginesByPartitionId[partitionId]);
 }
 
+void SynchronizedThreadLock::swapContextforMPEngine() {
+        s_mpEngine.context = ExecutorContext::getExecutorContext();
+}
+
 }

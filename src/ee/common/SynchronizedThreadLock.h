@@ -124,6 +124,7 @@ public:
 
     static long int getThreadId();
     static void resetEngineLocalsForTest();
+    static void swapContextforMPEngine();
     static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
     static EngineLocals getMpEngine();
 };
