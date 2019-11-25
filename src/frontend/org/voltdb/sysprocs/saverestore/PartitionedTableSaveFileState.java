@@ -31,10 +31,10 @@ import java.util.TreeSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
@@ -123,20 +123,12 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st)
+            generateRestorePlan(SnapshotTableInfo table, SiteTracker st)
     {
-        SynthesizedPlanFragment[] restore_plan = null;
         LOG.info("Total partitions for Table: " + getTableName() + ": " +
                  getTotalPartitions());
-        if (!catalogTable.getIsreplicated())
-        {
-            restore_plan = generatePartitionedToPartitionedPlan(st);
-        }
-        else
-        {
-            restore_plan = generatePartitionedToReplicatedPlan(st);
-        }
-        return restore_plan;
+        return table.isReplicated() ? generatePartitionedToReplicatedPlan(st)
+                : generatePartitionedToPartitionedPlan(st);
     }
 
     private void checkSiteConsistency(VoltTableRow row) throws IOException

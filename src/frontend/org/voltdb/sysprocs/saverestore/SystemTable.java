@@ -16,7 +16,11 @@
  */
 package org.voltdb.sysprocs.saverestore;
 
+import java.util.Map;
+
 import org.voltdb.SnapshotTableInfo;
+
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 /**
  * Enum of all of the system tables defined in the EE. The IDs have to be kept in sync between here and
@@ -28,8 +32,29 @@ public enum SystemTable {
     KIPLING_GROUP_MEMBER_PROTOCOL(-3, "_KIPLING_GROUP_MEMBER_PROTOCOL"),
     KIPLING_GROUP_OFFSET(-4, "_KIPLING_GROUP_OFFSET");
 
+    private static final Map<String, SystemTable> s_nameToTable;
+
     private final int m_id;
     private final String m_name;
+
+    static {
+        // Use case insensitive order to allow case insensitive lookups
+        ImmutableSortedMap.Builder<String, SystemTable> builder = ImmutableSortedMap
+                .orderedBy(String.CASE_INSENSITIVE_ORDER);
+        for (SystemTable st : values()) {
+            builder.put(st.getName(), st);
+        }
+        s_nameToTable = builder.build();
+    }
+
+    /**
+     * @param name of system table
+     * @return {@link SnapshotTableInfo} for {@code name} or {@code null} if the system table does not exist
+     */
+    public static SnapshotTableInfo getTableInfo(String name) {
+        SystemTable table = s_nameToTable.get(name);
+        return table == null ? null : table.getTableInfo();
+    }
 
     SystemTable(int id, String name) {
         m_id = id;

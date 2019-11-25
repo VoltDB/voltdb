@@ -1040,10 +1040,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
 
     /**
+     * This method is called to initially load table data from a direct byte buffer
+     *
+     * @param pointer               the VoltDBEngine pointer
+     * @param table_id              catalog ID of the table
+     * @param serializedTable       the table data to be loaded
+     * @param txnId                 ID of the transaction
+     * @param spHandle              SP handle for this transaction
+     * @param lastCommittedSpHandle Most recently committed SP Handled
+     * @param uniqueId              Unique ID for the transaction
+     * @param undoToken             token for undo quantum where changes should be logged.
+     * @param callerId              ID of the caller who is invoking load table
+     */
+    protected native int nativeLoadTable(long pointer, int table_id, ByteBuffer serializedTable, long txnId,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
+
+    /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
-     * @param pointer the VoltDBEngine pointer
+     *
+     * @param pointer         the VoltDBEngine pointer
      * @param planFragmentIds ID of the plan fragment to be executed.
-     * @param inputDepIds list of input dependency ids or null if no deps expected
+     * @param inputDepIds     list of input dependency ids or null if no deps expected
      * @return error code
      */
     protected native int nativeExecutePlanFragments(
