@@ -498,16 +498,23 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
         }
-        byte[] serialized_table = PrivateVoltTableFactory.getTableDataReference(table).array();
+
+        ByteBuffer serializedTable = PrivateVoltTableFactory.getTableDataReference(table);
         if (HOST_TRACE_ENABLED) {
-            LOG.trace("passing " + serialized_table.length + " bytes to EE...");
+            LOG.trace("passing " + serializedTable.capacity() + " bytes to EE...");
         }
 
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              undoToken, caller.getId());
+        final int errorCode;
+        if (serializedTable.hasArray()) {
+            errorCode = nativeLoadTable(pointer, tableId, serializedTable.array(), txnId, spHandle,
+                    lastCommittedSpHandle, uniqueId, undoToken, caller.getId());
+        } else {
+            assert serializedTable.isDirect();
+            errorCode = nativeLoadTable(pointer, tableId, serializedTable, txnId, spHandle, lastCommittedSpHandle,
+                    uniqueId, undoToken, caller.getId());
+        }
         checkErrorCode(errorCode);
 
         try {
