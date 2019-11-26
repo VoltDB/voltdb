@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -35,8 +36,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.PolygonFactory;
-
-import scala.util.Random;
 
 public class TestGeospatialIndexes extends RegressionSuite{
 
@@ -370,8 +369,9 @@ public class TestGeospatialIndexes extends RegressionSuite{
 
         // Cross check Contains and NOT Contains result set from indexed and non-indexed tables
 
-        if(isValgrind())
+        if(isValgrind()) {
             System.out.println("*******Executing CONTAINS" );
+        }
 
         // Cross check Contains and NOT Contains result set from indexed and non-indexed tables
         // match the Contains results on indexed and non-indexed tables
@@ -386,8 +386,9 @@ public class TestGeospatialIndexes extends RegressionSuite{
         resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
 
-        if(isValgrind())
+        if(isValgrind()) {
             System.out.println("*******Executing NOT CONTAINS" );
+        }
 
         sql = "Select A.region, B.loc from INDEXED_BORDERS A, PLACES B "
                 + "where NOT CONTAINS(A.region, B.loc) "
@@ -404,8 +405,9 @@ public class TestGeospatialIndexes extends RegressionSuite{
         // To verify this, point which is inside polygon is fetched from the cached generated data and is supplied to SP.
         // Output result of the query should have only one matching polygon that contains the supplied. This polygon is
         // same as geography value in corresponding entry of polygon-point data
-        if (isValgrind())
+        if (isValgrind()) {
             System.out.println("Test parameterized contains() ... ");
+        }
         subTestParameterizedContains(client, true);
         subTestParameterizedContains(client, false);
 
