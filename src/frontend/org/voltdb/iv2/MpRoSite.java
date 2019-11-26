@@ -166,6 +166,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void setLowestSiteId()
+        {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public int getClusterId()
         {
             return getCorrespondingClusterId();

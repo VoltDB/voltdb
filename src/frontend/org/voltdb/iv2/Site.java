@@ -211,7 +211,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private PartitionDRGateway m_drGateway;
     private PartitionDRGateway m_mpDrGateway;
-    private final boolean m_isLowestSiteId; // true if this site has the MP gateway
+    private boolean m_isLowestSiteId; // true if this site has the MP gateway
 
     /*
      * Track the last producer-cluster unique IDs and drIds associated with an
@@ -342,18 +342,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         /*
          * Expensive to compute, memoize it
          */
-        private Boolean m_isLowestSiteId = null;
+        // private Boolean m_isLowestSiteId = null;
+        // for initialization time
         @Override
-        public boolean isLowestSiteId()
-        {
-            if (m_isLowestSiteId != null) {
-                return m_isLowestSiteId;
-            } else {
-                // FUTURE: should pass this status in at construction.
-                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-                m_isLowestSiteId = m_siteId == lowestSiteId;
-                return m_isLowestSiteId;
-            }
+        public boolean isLowestSiteId() {
+            return m_isLowestSiteId;
+        }
+
+        // for transition to master only mode
+        @Override
+        public void setLowestSiteId() {
+            m_isLowestSiteId = true;
         }
 
         // update the lowest site
