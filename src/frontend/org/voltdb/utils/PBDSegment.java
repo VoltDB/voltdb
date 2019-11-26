@@ -73,6 +73,7 @@ public abstract class PBDSegment<M> {
     final long m_index;
     // Persistent ID of this segment, based on managing a monotonic counter
     final long m_id;
+    boolean m_deleteOnAck;
 
     PBDSegment(File file, long index, long id) {
         super();
