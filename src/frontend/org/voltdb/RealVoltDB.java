@@ -2412,8 +2412,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * This host can be a leader if partition 0 is on it or it is in the same partition group as a node which has
-     * partition 0. This is because the partition group with partition 0 can never be removed by elastic remove.
+     * This host can be a leader if partition 0 is on it.
+     * This is because the partition group with partition 0 can never be removed by elastic remove.
+     * In the master only mode, this also guarantee the MPI host will always have viable site to do borrow task.
      *
      * @param partitions          {@link List} of partitions on this host
      * @param partitionGroupPeers {@link List} of hostIds which are in the same partition group as this host
@@ -2422,15 +2423,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     private boolean determineIfEligibleAsLeader(Collection<Integer> partitions, Set<Integer> partitionGroupPeers,
             AbstractTopology topology) {
-        if (partitions.contains(Integer.valueOf(0))) {
-            return true;
-        }
-        for (Integer host : topology.getHostIdList(0)) {
-            if (partitionGroupPeers.contains(host)) {
-                return true;
-            }
-        }
-        return false;
+        return partitions.contains(0);
     }
 
     /**
