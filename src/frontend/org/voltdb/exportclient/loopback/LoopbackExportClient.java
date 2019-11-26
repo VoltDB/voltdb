@@ -212,7 +212,7 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
-        public synchronized void resume() {
+        public void resume() {
             m_isPaused = false;
         }
 

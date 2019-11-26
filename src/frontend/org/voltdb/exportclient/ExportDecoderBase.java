@@ -215,7 +215,11 @@ public abstract class ExportDecoderBase {
     }
 
     /**
-     * Pause this decoder to allow system-wide operations such as catalog update.
+     * Pause this decoder to allow catalog update.
+     * <p>
+     * This method is called from the site thread when performing catalog update.
+     * By default this is a no-op. Override this method in case the decoder must be interrupted
+     * on catalog update.
      */
     public void pause() {
         // no-op
