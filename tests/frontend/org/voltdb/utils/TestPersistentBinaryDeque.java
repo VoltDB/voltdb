@@ -1294,6 +1294,42 @@ public class TestPersistentBinaryDeque {
         }
     }
 
+    @Test
+    public void testOutOfOrderAcks() throws Exception {
+        int numEntries = 2;
+        // write 2 segments
+        for (int i=0; i<2; i++) {
+            if (i>0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<numEntries; j++) {
+                m_pbd.offer( DBBPool.wrapBB(getFilledSmallBuffer(0)));
+            }
+        }
+        assertEquals(2, getSortedDirectoryListing().size());
+
+        // read all entries.
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        BBContainer cont = null;
+        int index=0;
+        BBContainer[] entries = new BBContainer[2*numEntries];
+        while ((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            entries[index++] = cont;
+        }
+        assertEquals(2, getSortedDirectoryListing().size());
+
+        // Ack backwards
+        index = entries.length-1;
+        for (int i=0; i<numEntries; i++) {
+            entries[index--].discard();
+        }
+        assertEquals(2, getSortedDirectoryListing().size());
+        for (int i=0; i<numEntries; i++) {
+            entries[index--].discard();
+        }
+        assertEquals(1, getSortedDirectoryListing().size());
+    }
+
     static <M> BinaryDequeReader.Entry<M> pollOnceWithoutDiscard(BinaryDequeReader<M> reader) throws IOException {
         BinaryDequeReader.Entry<M> entry = reader
                 .pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
