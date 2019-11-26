@@ -2609,7 +2609,7 @@ public abstract class CatalogUtil {
     }
 
     private static void fillCatalogHeader(
-                CatalogInChunks catalogAndDeployment,
+                SegmentedCatalog catalogAndDeployment,
                 int version,
                 long genId)
     {
@@ -2634,7 +2634,7 @@ public abstract class CatalogUtil {
     public static void updateCatalogToZK(ZooKeeper zk,
                                         int version,
                                         long genId,
-                                        CatalogInChunks catalogAndDeployment)
+                                        SegmentedCatalog catalogAndDeployment)
         throws KeeperException, InterruptedException
     {
         assert (catalogAndDeployment != null);
@@ -2679,26 +2679,35 @@ public abstract class CatalogUtil {
         }
     }
 
-    public static class CatalogInChunks {
+    public static class SegmentedCatalog {
         public final List<ByteBuffer> m_data;
         public final int m_deploymentLength;
         public final int m_catalogLength;
 
-        public CatalogInChunks(List<ByteBuffer> data, int deploymentSize, int catalogSize) {
+        public SegmentedCatalog(List<ByteBuffer> data, int deploymentSize, int catalogSize) {
             m_data = data;
             m_deploymentLength = deploymentSize;
             m_catalogLength = catalogSize;
         }
 
+        public static SegmentedCatalog create(byte[] catalogBytes, byte[] deploymentBytes, byte[] catalogHash) {
+            List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
+            int readBytes = 0;
+            // Reserve the header space for first buffer
+            int chunkOffset = CATALOG_BUFFER_HEADER;
+            // Copy deployment bytes into first buffer (deployment file is small enough to fit in a buffer)
+            System.arraycopy(deploymentBytes, 0, buffer, chunkOffset, deploymentBytes.length);
+        }
+
         // Used primarily in initialization to create a deployment file only catalog
-        public static CatalogInChunks createStarterCatalog(byte[] deploymentBytes) {
+        public static SegmentedCatalog createStarterCatalog(byte[] deploymentBytes) {
             List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
             byte[] content = new byte[CATALOG_BUFFER_HEADER + deploymentBytes.length];
             System.arraycopy(deploymentBytes, 0, content, CATALOG_BUFFER_HEADER, deploymentBytes.length);
             buffers.add(ByteBuffer.wrap(content));
             // spin loop in Inits.LoadCatalog.run() needs catalog length
             // to be of zero until we have a real catalog.
-            return new CatalogInChunks(buffers, deploymentBytes.length, 0);
+            return new SegmentedCatalog(buffers, deploymentBytes.length, 0);
         }
     }
 

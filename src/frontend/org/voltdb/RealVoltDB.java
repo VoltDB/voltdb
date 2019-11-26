@@ -198,7 +198,7 @@ import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
-import org.voltdb.utils.CatalogUtil.CatalogInChunks;
+import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
@@ -362,7 +362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
-    public String m_pathToStartupCatalog;
+    String m_pathToStartupCatalog;
 
     // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
@@ -2677,7 +2677,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         CatalogUtil.updateCatalogToZK(zk,
                                 0, // use default version 0 as start
                                 0L,
-                                CatalogInChunks.createStarterCatalog(deploymentBytes));
+                                SegmentedCatalog.createStarterCatalog(deploymentBytes));
                         hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                     }
                 } else {

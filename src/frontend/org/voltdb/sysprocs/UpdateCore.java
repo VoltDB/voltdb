@@ -45,6 +45,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
@@ -439,13 +440,13 @@ public class UpdateCore extends VoltSystemProcedure {
             throw vae;
         }
 
-//        try {
-//            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
-//                    catalogBytes, catalogHash, deploymentBytes);
-//        } catch (KeeperException | InterruptedException e) {
-//            log.error("error writing catalog bytes on ZK during @UpdateCore");
-//            throw e;
-//        }
+        try {
+            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                    catalogBytes, catalogHash, deploymentBytes);
+        } catch (KeeperException | InterruptedException e) {
+            log.error("error writing catalog bytes on ZK during @UpdateCore");
+            throw e;
+        }
 
         performCatalogUpdateWork(
                 catalogDiffCommands,

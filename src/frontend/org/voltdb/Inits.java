@@ -62,7 +62,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
-import org.voltdb.utils.CatalogUtil.CatalogInChunks;
+import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -261,7 +261,7 @@ public class Inits {
      * @return catalog bytes
      * @throws IOException
      */
-    public static byte[] readCatalog(String catalogUrl) throws IOException
+    private static byte[] readCatalog(String catalogUrl) throws IOException
     {
         assert (catalogUrl != null);
 
@@ -287,7 +287,7 @@ public class Inits {
      * @return catalog bytes
      * @throws IOException
      */
-    private static CatalogInChunks readCatalogInChunks(String catalogUrl, byte[] deploymentBytes) throws IOException
+    private static SegmentedCatalog readCatalogInChunks(String catalogUrl, byte[] deploymentBytes) throws IOException
     {
         assert (catalogUrl != null);
 
@@ -326,7 +326,7 @@ public class Inits {
         byte[] lastBuffer = Arrays.copyOf(buffer, chunkOffset);
         chunks.add(ByteBuffer.wrap(lastBuffer));
 
-        return new CatalogInChunks(chunks, deploymentBytes.length, totalCatalogBytes);
+        return new SegmentedCatalog(chunks, deploymentBytes.length, totalCatalogBytes);
     }
 
     private static File createEmptyStartupJarFile(String drRole){
@@ -363,7 +363,7 @@ public class Inits {
                     byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
 
                     // Get the catalog bytes and byte count.
-                    CatalogInChunks catalogAndDeployment = readCatalogInChunks(m_rvdb.m_pathToStartupCatalog, deploymentBytes);
+                    SegmentedCatalog catalogAndDeployment = readCatalogInChunks(m_rvdb.m_pathToStartupCatalog, deploymentBytes);
 
                     //Export needs a cluster global unique id for the initial catalog version
                     long exportInitialGenerationUniqueId =
