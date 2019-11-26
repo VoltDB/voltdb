@@ -63,9 +63,6 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="lib/tomcat-juli-7.0.96.jar"/>
-	<classpathentry kind="lib" path="lib/scala-library-2.11.12.jar"/>
-	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
-	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
 	<classpathentry kind="lib" path="lib/calcite-core-1.17.0.jar" sourcepath="lib/calcite-core-1.17.0-sources.jar"/>
 	<classpathentry kind="lib" path="lib/calcite-server-1.17.0.jar" sourcepath="lib/calcite-server-1.17.0-sources.jar"/>
