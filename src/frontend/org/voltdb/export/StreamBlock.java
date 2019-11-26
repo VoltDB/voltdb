@@ -85,10 +85,6 @@ public class StreamBlock {
         }
     }
 
-    public boolean canRelease() {
-        return m_refCount.get() == 1;
-    }
-
     public ExportRowSchema getSchema() {
         return m_entry.getExtraHeader();
     }
