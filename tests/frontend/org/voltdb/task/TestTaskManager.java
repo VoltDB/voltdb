@@ -376,7 +376,7 @@ public class TestTaskManager {
      */
     @Test
     public void minDelay() throws Exception {
-        m_schedulesConfig.setMinDelayMs(10000);
+        m_schedulesConfig.setMininterval(10000);
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);
@@ -390,7 +390,7 @@ public class TestTaskManager {
      */
     @Test
     public void maxRunFrequency() throws Exception {
-        m_schedulesConfig.setMaxRunFrequency(1.0);
+        m_schedulesConfig.setMaxfrequency(1.0);
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);

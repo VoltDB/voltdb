@@ -52,7 +52,7 @@
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
-      <xs:element name="tasks" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
+      <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
     </xs:all>
   </xs:complexType>
 
@@ -534,16 +534,22 @@
 
   <!-- SchedulerManager -->
   <xs:complexType name="taskSettingsType">
-    <xs:attribute name="min-delay-ms" type="xs:int" default="0"/>
-    <xs:attribute name="max-run-frequency" type="xs:double" default="0"/>
-    <xs:attribute name="host-thread-count" default="0">
-      <xs:simpleType>
-	<xs:restriction base="xs:int">
-          <xs:minInclusive value="0"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="partitioned-thread-count" default="0">
+    <xs:all>
+      <xs:element name="threadpools">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="host" minOccurs='0' type="taskThreadPoolType"/>
+            <xs:element name="partition" minOccurs='0' type="taskThreadPoolType"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+    <xs:attribute name="mininterval" type="xs:int" default="0"/>
+    <xs:attribute name="maxfrequency" type="xs:double" default="0"/>
+  </xs:complexType>
+
+  <xs:complexType name="taskThreadPoolType">
+    <xs:attribute name="size" default="0">
       <xs:simpleType>
         <xs:restriction base="xs:int">
           <xs:minInclusive value="0"/>

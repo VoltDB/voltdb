@@ -66,6 +66,7 @@ import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
+import org.voltdb.compiler.deploymentfile.TaskThreadPoolType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -233,7 +234,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> start(CatalogContext context) {
-        return start(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return start(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
@@ -273,7 +274,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> promoteToLeader(CatalogContext context) {
-        return promoteToLeader(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return promoteToLeader(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
@@ -303,7 +304,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> processUpdate(CatalogContext context, boolean classesUpdated) {
-        return processUpdate(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return processUpdate(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader(), classesUpdated);
     }
 
@@ -727,20 +728,20 @@ public final class TaskManager {
             configuration = new TaskSettingsType();
         } else if (log.isDebugEnabled()) {
             log.debug("MANAGER: Applying schedule configuration: "
-                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMinDelayMs())
-                            .add("maxRunFrequency", configuration.getMaxRunFrequency())
-                            .add("hostThreadCount", configuration.getHostThreadCount())
-                            .add("partitionedThreadCount", configuration.getPartitionedThreadCount()).toString());
+                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMininterval())
+                            .add("maxRunFrequency", configuration.getMaxfrequency())
+                            .add("hostThreadCount", getThreadPoolSize(configuration, true))
+                            .add("partitionedThreadCount", getThreadPoolSize(configuration, false)).toString());
         }
 
-        m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMinDelayMs());
+        m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMininterval());
         double originalFrequency = m_maxRunFrequency;
-        m_maxRunFrequency = configuration.getMaxRunFrequency() / 60.0;
+        m_maxRunFrequency = configuration.getMaxfrequency() / 60.0;
         boolean frequencyChanged = m_maxRunFrequency != originalFrequency;
 
         // Set the explicitly defined thread counts
-        m_singleExecutor.setThreadCount(configuration.getHostThreadCount());
-        m_partitionedExecutor.setThreadCount(configuration.getPartitionedThreadCount());
+        m_singleExecutor.setThreadCount(getThreadPoolSize(configuration, true));
+        m_partitionedExecutor.setThreadCount(getThreadPoolSize(configuration, false));
 
         boolean hasNonPartitionedSchedule = false;
         boolean hasPartitionedSchedule = false;
@@ -835,6 +836,19 @@ public final class TaskManager {
         }
 
         m_handlers = newHandlers;
+    }
+
+    private int getThreadPoolSize(TaskSettingsType configuration, boolean getHost) {
+        if (configuration != null) {
+            TaskSettingsType.Threadpools threadpools = configuration.getThreadpools();
+            if (threadpools != null) {
+                TaskThreadPoolType threadPool = getHost ? threadpools.getHost() : threadpools.getPartition();
+                if (threadPool != null) {
+                    return threadPool.getSize();
+                }
+            }
+        }
+        return 0;
     }
 
     /**
