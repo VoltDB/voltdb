@@ -59,8 +59,8 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -78,8 +78,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -5254,6 +5252,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
                     ((SpInitiator)p).getServiceState().isRemoved())
             .forEach(s -> ((SpInitiator)s).getScheduler().cleanupTransactionBacklogs());
+
+            // update active site count
+            final int leaderCount = getLeaderSites().size();
+            if (leaderCount != m_nodeSettings.getLocalSitesCount()) {
+                NavigableMap<String, String> settings = m_nodeSettings.asMap();
+                ImmutableMap<String, String> newSettings =
+                        new ImmutableMap.Builder<String, String>()
+                        .putAll(new HashMap<String, String>() {
+                            private static final long serialVersionUID = 1L;
+                        {
+                            putAll(settings);
+                            put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
+                         }})
+                        .build();
+                m_nodeSettings = NodeSettings.create(newSettings);
+                m_nodeSettings.store();
+                m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
+            }
         }
     }
 

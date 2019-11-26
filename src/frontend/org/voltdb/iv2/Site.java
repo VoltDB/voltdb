@@ -339,6 +339,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return m_context.getNodeSettings().getLocalSitesCount();
         }
 
+        @Override
+        public int getLocalActiveSitesCount() {
+            return m_context.getNodeSettings().getLocalActiveSitesCount();
+        }
+
         /*
          * Expensive to compute, memoize it
          */

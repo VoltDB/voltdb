@@ -252,6 +252,10 @@ public class CatalogContext {
         return m_dbSettings.getNodeSetting();
     }
 
+    public DbSettings getDbSettings() {
+        return m_dbSettings;
+    }
+
     public Catalog getNewCatalog(String diffCommands) {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);

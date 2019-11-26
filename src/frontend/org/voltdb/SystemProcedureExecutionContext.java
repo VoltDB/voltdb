@@ -47,6 +47,8 @@ public interface SystemProcedureExecutionContext {
 
     public int getLocalSitesCount();
 
+    public int getLocalActiveSitesCount();
+
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
 
