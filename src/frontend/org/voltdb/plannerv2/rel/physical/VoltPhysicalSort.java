@@ -62,7 +62,7 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     @Override
     public VoltPhysicalSort copy(
             RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit) {
-        return copy(traitSet, input, collation, offset, limit);
+        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit);
     }
 
     @Override

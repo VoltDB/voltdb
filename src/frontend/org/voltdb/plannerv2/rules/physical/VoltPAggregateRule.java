@@ -17,8 +17,9 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
-import com.google.common.collect.ImmutableMap;
-import com.google_voltpatches.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
@@ -36,9 +37,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.base.Preconditions;
 
 
 /**

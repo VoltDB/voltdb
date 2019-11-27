@@ -26,7 +26,6 @@ import org.apache.calcite.rel.metadata.RelMdParallelism;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.BuiltInMethod;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
  * VoltDB implementations of the

@@ -44,10 +44,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     public void testNLIJ() {
         m_tester.sql("SELECT R1.si, RI2.ti FROM R1 INNER JOIN RI2 ON R1.i = RI2.i")
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], split=[1])\n" +
-                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[inner], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
-                        "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], " +
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3])\n" +
+                        "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[inner], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
+                        "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], " +
                         "index=[VOLTDB_AUTOGEN_IDX_PK_RI2_I_INVALIDEQ1_1])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":[" +
                         "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}," +
@@ -76,10 +76,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
     public void testMJ() {
         // TODO: ambiguous plan generated
         m_tester.sql("SELECT RI1.SI, RI2.I FROM RI1 INNER JOIN RI2 ON RI2.TI = RI1.TI")
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND1])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND1_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], outerIndex=[RI1_IND1], innerIndex=[RI2_IND1])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND1_ASCEQ0_0])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}}," +
                         "{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]}," +
@@ -101,10 +101,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":" +
                         "{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"TARGET_TABLE_NAME\":\"RI1\",\"TARGET_TABLE_ALIAS\":\"RI1\"," +
                         "\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI1_IND1\"}],\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[inner], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}}," +
                         "{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]}," +
@@ -132,10 +132,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     public void testRightNLJ() {
         m_tester.sql("SELECT R1.si, RI2.ti FROM R1 RIGHT JOIN RI2 ON R1.i = RI2.i")
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t3], TI=[$t1], split=[1])\n" +
-                           "  VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[left], split=[1])\n" +
-                           "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3])\n" +
-                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t3], TI=[$t1])\n" +
+                           "  VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[left])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"TI\"," +
                         "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":1}}]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"NESTLOOP\"," +
@@ -158,10 +158,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     public void testLeftNLIJ() {
         m_tester.sql("SELECT R1.si, RI2.ti FROM R1 LEFT JOIN RI2 ON R1.i = RI2.i")
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], split=[1])\n" +
-                           "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[left], split=[1], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
-                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
-                           "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[VOLTDB_AUTOGEN_IDX_PK_RI2_I_INVALIDEQ1_1])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t1], TI=[$t3])\n" +
+                           "  VoltPhysicalNestLoopIndexJoin(condition=[=($0, $2)], joinType=[left], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                           "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[VOLTDB_AUTOGEN_IDX_PK_RI2_I_INVALIDEQ1_1])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}," +
                         "{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}," +
@@ -188,10 +188,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 //    public void testMJWithTwoIndexColumns() {
 //        m_tester.sql("SELECT RI2.I, RI2.si, RI2.BI, RI5.I, RI5.II FROM RI2 FULL JOIN RI5 " +
 //                     " ON RI2.I = RI5.I AND RI5.II = RI2.BI")
-//        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..4=[{exprs}], split=[1])\n" +
-//                    "  VoltPhysicalMergeJoin(condition=[AND(=($0, $3), =($5, $2))], joinType=[full], split=[1], outerIndex=[RI2_IND2], innerIndex=[RI5_IND_I_II_III])\n" +
-//                    "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..2=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
-//                    "    VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[CAST($t1):BIGINT], proj#0..1=[{exprs}], II0=[$t3], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+//        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..4=[{exprs}])\n" +
+//                    "  VoltPhysicalMergeJoin(condition=[AND(=($0, $3), =($5, $2))], joinType=[full], outerIndex=[RI2_IND2], innerIndex=[RI5_IND_I_II_III])\n" +
+//                    "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], proj#0..2=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
+//                    "    VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], expr#3=[CAST($t1):BIGINT], proj#0..1=[{exprs}], II0=[$t3], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
 //        .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":"
 //                + "[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
 //                + "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},"
@@ -236,7 +236,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 //
     public void testIndexScanWithOrderBy() {
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
-        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], " +
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], expr#3=[2], " +
                 "expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
         .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2," +
                 "\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32," +
@@ -252,7 +252,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
 
     public void testIndexScan() {
         m_tester.sql("SELECT II FROM RI5 WHERE ii = 2 and I - II > 0")
-                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], expr#5=[-($t0, $t1)], expr#6=[0], expr#7=[>($t5, $t6)], expr#8=[AND($t4, $t7)], II=[$t1], $condition=[$t8], index=[RI5_IND_II_INVALIDEQ1_1])\n")
+                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], expr#5=[-($t0, $t1)], expr#6=[0], expr#7=[>($t5, $t6)], expr#8=[AND($t4, $t7)], II=[$t1], $condition=[$t8], index=[RI5_IND_II_INVALIDEQ1_1])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2," +
                         "\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":" +
                         "{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1}}]}],\"PREDICATE\":{\"TYPE\":13,\"VALUE_TYPE\":23," +
@@ -270,10 +270,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
     public void testMJWithTwoIndexColumns() {
         m_tester.sql("SELECT RI2.I, RI2.si, RI2.BI, RI5.I, RI5.II FROM RI2 FULL JOIN RI5 " +
                      " ON RI2.I = RI5.I AND RI5.II = RI2.BI")
-        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..4=[{exprs}], split=[1])\n" +
-                    "  VoltPhysicalMergeJoin(condition=[AND(=($0, $3), =($5, $2))], joinType=[full], split=[1], outerIndex=[RI2_IND2], innerIndex=[RI5_IND_I_II_III])\n" +
-                    "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..2=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
-                    "    VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[CAST($t1):BIGINT], proj#0..1=[{exprs}], II0=[$t3], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+        .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..4=[{exprs}])\n" +
+                    "  VoltPhysicalMergeJoin(condition=[AND(=($0, $3), =($5, $2))], joinType=[full], outerIndex=[RI2_IND2], innerIndex=[RI5_IND_I_II_III])\n" +
+                    "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], proj#0..2=[{exprs}], index=[RI2_IND2_ASCEQ0_0])\n" +
+                    "    VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], expr#3=[CAST($t1):BIGINT], proj#0..1=[{exprs}], II0=[$t3], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
         .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":"
                 + "[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},"
                 + "{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},"
@@ -320,10 +320,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         // TODO: ambiguous plan generated
         m_tester.sql("SELECT RI1.SI, RI2.I FROM RI1 FULL JOIN RI2 ON RI2.TI = RI1.TI")
                 // Using inner index RI2_IND5_HASH
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[full], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[full], outerIndex=[RI1_IND1], innerIndex=[RI2_IND5_HASH])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND5_HASH_ASCEQ0_0])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"I\"," +
                         "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"MERGEJOIN\"," +
@@ -345,10 +345,10 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                         "{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"TARGET_TABLE_NAME\":\"RI1\",\"TARGET_TABLE_ALIAS\":\"RI1\"," +
                         "\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"RI1_IND1\"}],\"EXECUTE_LIST\":[3,2,1],\"IS_LARGE_QUERY\":false}")
                 // Using inner index RI2_IND1
-                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2], split=[1])\n" +
-                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[full], split=[1], outerIndex=[RI1_IND1], innerIndex=[RI2_IND1])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
-                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND1_ASCEQ0_0])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], SI=[$t0], I=[$t2])\n" +
+                        "  VoltPhysicalMergeJoin(condition=[=($3, $1)], joinType=[full], outerIndex=[RI1_IND1], innerIndex=[RI2_IND1])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], SI=[$t1], TI=[$t3], index=[RI1_IND1_ASCEQ0_0])\n" +
+                        "    VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], I=[$t0], TI=[$t3], index=[RI2_IND1_ASCEQ0_0])\n")
                 .json("{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[2],\"OUTPUT_SCHEMA\":" +
                         "[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"I\"," +
                         "\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"MERGEJOIN\"," +
