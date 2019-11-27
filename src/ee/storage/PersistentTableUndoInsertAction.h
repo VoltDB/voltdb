@@ -24,6 +24,8 @@
 namespace voltdb {
 
 class PersistentTableUndoInsertAction: public UndoOnlyAction {
+    char* m_tuple;
+    PersistentTableSurgeon *m_tableSurgeon;
 public:
     PersistentTableUndoInsertAction(
           char* insertedTuple, voltdb::PersistentTableSurgeon *tableSurgeon) :
@@ -40,9 +42,6 @@ public:
     char const* getTupleForTest() const {
        return m_tuple;
     }
-private:
-    char* m_tuple;
-    PersistentTableSurgeon *m_tableSurgeon;
 };
 
 }

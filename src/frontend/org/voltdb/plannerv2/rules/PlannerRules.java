@@ -50,6 +50,7 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateCalcMergeRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcJoinMergeRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
@@ -212,6 +213,7 @@ public class PlannerRules {
     private static final RuleSet HEP_LOGICAL_JOIN = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
             VoltLJoinCommuteRule.INSTANCE_RIGHT_TO_LEFT,
+            VoltLAggregateCalcMergeRule.INSTANCE,       // eliminate Calcite's SINGLE_VALUE aggregation
             VoltLCalcJoinMergeRule.INSTANCE
     );
 

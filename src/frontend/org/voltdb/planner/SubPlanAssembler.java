@@ -91,6 +91,17 @@ public abstract class SubPlanAssembler {
     }
 
     /**
+     * Used to mark that current plan cannot be generated, but nevertheless should not abort
+     * further plan generation.
+     * See how it affects plan generation in PlanAssembler#getBestCostPlan().
+     */
+    public static final class SkipCurrentPlanException extends RuntimeException {
+        public SkipCurrentPlanException() {
+            super();
+        }
+    }
+
+    /**
      * Called repeatedly to iterate through possible embedable select plans.
      * Returns null when no more plans exist.
      *

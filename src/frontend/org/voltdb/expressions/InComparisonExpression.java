@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -37,26 +38,26 @@ public class InComparisonExpression extends ComparisonExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
         //
         // Args list is not used by IN.
         //
         if (m_args != null) {
-            throw new Exception("ERROR: Args list was not null for '" + this + "'");
+            throw new ValidationError("Args list was not null for '%s'", toString());
         }
         //
         // We always need both a left node and a right node
         //
         if (m_left == null) {
-            throw new Exception("ERROR: The left node for '" + this + "' is NULL");
+            throw new ValidationError("The left node for '%s' is NULL", toString());
         } else if (m_right == null) {
-            throw new Exception("ERROR: The right node for '" + this + "' is NULL");
+            throw new ValidationError("The right node for '%s' is NULL", toString());
         }
 
         // right needs to be vector or parameter
         if (!(m_right instanceof VectorValueExpression) && !(m_right instanceof ParameterValueExpression)) {
-            throw new Exception("ERROR: The right node for '" + this + "' is not a list or a parameter");
+            throw new ValidationError("The right node for '%s' is not a list or a parameter", toString());
         }
     }
 
@@ -70,8 +71,7 @@ public class InComparisonExpression extends ComparisonExpression {
     }
 
     @Override
-    public void finalizeValueTypes()
-    {
+    public void finalizeValueTypes() {
         // First, make sure this node and its children have valid types.
         // This ignores the overall element type of the rhs.
         super.finalizeValueTypes();

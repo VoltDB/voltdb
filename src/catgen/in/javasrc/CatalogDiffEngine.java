@@ -575,6 +575,11 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        else if (suspect instanceof ThreadPool) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
+
         else if (suspect instanceof ConnectorTableInfo) {
             m_requiresNewExportGeneration = true;
             return null;
@@ -964,11 +969,11 @@ public class CatalogDiffEngine {
         if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
         }
-        if (suspect instanceof Connector && "enabled".equals(field)) {
+        if (suspect instanceof Connector && ("enabled".equals(field) || "loaderclass".equals(field) || "threadpoolname".equals(field))) {
             m_requiresNewExportGeneration = true;
             return null;
         }
-        if (suspect instanceof Connector && "loaderclass".equals(field)) {
+        if (suspect instanceof ThreadPool) {
             m_requiresNewExportGeneration = true;
             return null;
         }

@@ -32,10 +32,13 @@ import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.QueueingConsumer;
+import com.rabbitmq.client.ShutdownListener;
+import com.rabbitmq.client.ShutdownSignalException;
 
 import org.voltcore.logging.VoltLogger;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * A RabbitMQ consumer that verifies the export data.
@@ -59,12 +62,18 @@ public class ExportRabbitMQVerifier {
         m_exchangeName = exchangename;
     }
 
-    public void run() throws IOException, InterruptedException
+    public void run() throws IOException, InterruptedException, TimeoutException
     {
         final Connection connection = m_connFactory.newConnection();
         final Channel channel = connection.createChannel();
 
         try {
+            channel.addShutdownListener(new ShutdownListener() {
+                @Override
+                public void shutdownCompleted(ShutdownSignalException cause) {
+                    log.info("shutdownCompleted, cause: " + cause.toString());
+                }
+            });
             channel.exchangeDeclare(m_exchangeName, "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
             channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_RABBIT.#");
@@ -100,6 +109,7 @@ public class ExportRabbitMQVerifier {
                     success = false;
             }
         } finally {
+            log.info("tear down and close channel");
             tearDown(channel);
             channel.close();
             connection.close();
@@ -155,7 +165,7 @@ public class ExportRabbitMQVerifier {
         log.info("Command-line arguments: rabbitmq_server username password virtual_host");
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException
+    public static void main(String[] args) throws IOException, InterruptedException, TimeoutException
     {
         VoltLogger log = new VoltLogger("ExportRabbitMQVerifier.main");
 

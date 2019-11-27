@@ -398,7 +398,7 @@ public class TestPlansDML extends PlannerTestCase {
     private void checkTruncateFlag(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() == 2);
 
-        ArrayList<AbstractPlanNode> deletes = pns.get(1).findAllNodesOfType(PlanNodeType.DELETE);
+        List<AbstractPlanNode> deletes = pns.get(1).findAllNodesOfType(PlanNodeType.DELETE);
 
         assertTrue(deletes.size() == 1);
         assertTrue(((DeletePlanNode) deletes.get(0) ).isTruncate());

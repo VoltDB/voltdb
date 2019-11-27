@@ -17,6 +17,7 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.Deque;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
@@ -84,4 +85,7 @@ public class SubqueryLeafNode extends JoinNode {
         return true;
     }
 
+    @Override
+    protected void queueChildren(Deque<JoinNode> joinNodes) {
+    }
 }

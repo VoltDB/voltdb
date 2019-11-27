@@ -179,6 +179,7 @@ public class AsyncExportClient
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
+                TransactionCounts.incrementAndGet(INSERT);
                 long txid = clientResponse.getResults()[0].asScalarLong();
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 // log.info("Success " + trace);
@@ -209,6 +210,36 @@ public class AsyncExportClient
         }
     }
 
+    static class TableExportCallback implements ProcedureCallback
+    {
+        private final TxnIdWriter m_writer;
+        private final long m_type;
+        public TableExportCallback(TxnIdWriter writer, long type)
+        {
+            super();
+            m_type = type;
+            m_writer = writer;
+        }
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
+            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+            {
+
+                TrackingResults.incrementAndGet(0);
+                TransactionCounts.incrementAndGet(transType);
+            }
+            else
+            {
+                TrackingResults.incrementAndGet(1);
+                final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
+                log.info("TableExport failed: " + trace);
+            }
+        }
+    }
+
     // Connection configuration
     private final static class ConnectionConfig {
 
@@ -224,30 +255,42 @@ public class AsyncExportClient
         final String procedure;
         final boolean exportGroups;
         final int exportTimeout;
-        final boolean usemigrate;
-        final boolean usemigrateonly;
+        final boolean migrateWithTTL;
+        final boolean usetableexport;
+        final boolean migrateWithoutTTL;
+        final long migrateNoTTLInterval;
 
         ConnectionConfig( AppHelper apph) {
-            displayInterval = apph.longValue("displayinterval");
-            duration        = apph.longValue("duration");
-            servers         = apph.stringValue("servers");
-            port            = apph.intValue("port");
-            poolSize        = apph.intValue("poolsize");
-            rateLimit       = apph.intValue("ratelimit");
-            autoTune        = apph.booleanValue("autotune");
-            latencyTarget   = apph.intValue("latencytarget");
-            procedure       = apph.stringValue("procedure");
-            parsedServers   = servers.split(",");
-            exportGroups    = apph.booleanValue("exportgroups");
-            exportTimeout   = apph.intValue("timeout");
-            usemigrate      = apph.booleanValue("usemigrate");
-            usemigrateonly  = apph.booleanValue("usemigrateonly");
+            displayInterval      = apph.longValue("displayinterval");
+            duration             = apph.longValue("duration");
+            servers              = apph.stringValue("servers");
+            port                 = apph.intValue("port");
+            poolSize             = apph.intValue("poolsize");
+            rateLimit            = apph.intValue("ratelimit");
+            autoTune             = apph.booleanValue("autotune");
+            latencyTarget        = apph.intValue("latencytarget");
+            procedure            = apph.stringValue("procedure");
+            parsedServers        = servers.split(",");
+            exportGroups         = apph.booleanValue("exportgroups");
+            exportTimeout        = apph.intValue("timeout");
+            migrateWithTTL       = apph.booleanValue("migrate-ttl");
+            usetableexport       = apph.booleanValue("usetableexport");
+            migrateWithoutTTL    = apph.booleanValue("migrate-nottl");
+            migrateNoTTLInterval = apph.longValue("nottl-interval");
 
         }
     }
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
+
+    // If testing Table/Export, count inserts, deletes, update fore & aft
+
+    private static int INSERT = 1;
+    private static int DELETE = 2;
+    private static int UPDATE_OLD = 3;
+    private static int UPDATE_NEW = 4;
+    private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
@@ -295,10 +338,12 @@ public class AsyncExportClient
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
-                .add("exportgroups", "export_groups", "Multiple export connections", "false")
+                .add("exportgroups", "export_groups", "Multiple export connections", "true") // TODO: remove obsolescent exportgroups remnants
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
-                .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
-                .add("usemigrateonly","usemigrateonly","use DDL that includes MIGRATE without TTL","false")
+                .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
+                .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
+                .add("migrate-nottl", "false","use DDL that includes MIGRATE without TTL","false")
+                .add("nottl-interval", "milliseconds", "approximate migrate command invocation interval (in milliseconds)", 2500)
                 .setArguments(args)
             ;
 
@@ -343,6 +388,25 @@ public class AsyncExportClient
             , config.displayInterval*1000l
             );
 
+            // If migrate without TTL is enabled, set things up so a migrate is triggered
+            // roughly every 2.5 seconds, with the first one happening 3 seconds from now
+            // Use a separate Timer object to get a dedicated manual migration thread
+            Timer migrateTimer = new Timer(true);
+            Random migrateInterval = new Random();
+            if (config.migrateWithoutTTL) {
+                migrateTimer.scheduleAtFixedRate(new TimerTask()
+                {
+                    @Override
+                    public void run()
+                    {
+                        trigger_migrate(migrateInterval.nextInt(10)); // vary the migrate/delete interval a little
+                    }
+                }
+                , 3000l
+                , config.migrateNoTTLInterval
+                );
+            }
+
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             benchmarkStartTS = System.currentTimeMillis();
@@ -356,29 +420,33 @@ public class AsyncExportClient
             while (endTime > System.currentTimeMillis())
             {
                 long currentRowId = rowId.incrementAndGet();
-                // Post the request, asynchronously
-                try {
-                    clientRef.get().callProcedure(
-                                                  new AsyncCallback(writer, currentRowId),
-                                                  config.procedure,
-                                                  currentRowId,
-                                                  0);
-                }
-                catch (Exception e) {
-                    log.fatal("Exception: " + e);
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
 
-                // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
-                if (config.usemigrateonly && r.nextBoolean()) {
+                // Table with Export
+                if (config.usetableexport) {
+                    // call TableExport twice, once will insert, the second will randomly update or delete
+                    for (int i = 0; i < 2; i++) {
+                        try {
+                            clientRef.get().callProcedure(
+                                    new TableExportCallback(writer, r.nextInt(3)+1),
+                                    "TableExport",
+                                    currentRowId,
+                                    0);
+                        }
+                        catch (Exception e) {
+                            log.fatal("Exception: " + e);
+                            e.printStackTrace();
+                            System.exit(-1);
+                        }
+                    }
+                }
+               else {
+                // Post the request, asynchronously
                     try {
-                        int i = r.nextInt(10);
-                        log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
                         clientRef.get().callProcedure(
-                                new NullCallback(),
-                                "MigrateExport");
-                                // "MigrateExport", r.nextInt(10));
+                                                      new AsyncCallback(writer, currentRowId),
+                                                      config.procedure,
+                                                      currentRowId,
+                                                      0);
                     }
                     catch (Exception e) {
                         log.fatal("Exception: " + e);
@@ -395,18 +463,41 @@ public class AsyncExportClient
                     first_cat = !first_cat;
                 }
             }
-            shutdown.compareAndSet(false, true);
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // We're done - stop the performance statistics display task
             timer.cancel();
+            // likewise for the migrate task
+            migrateTimer.cancel();
+            if (config.migrateWithoutTTL) {
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+
+                // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
+                // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
+                log.info("triggering final migrate");
+                trigger_migrate(0);
+                Thread.sleep(7500);
+
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+            }
+
+            shutdown.compareAndSet(false, true);
+
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
+
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
@@ -438,6 +529,43 @@ public class AsyncExportClient
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
                 log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
+
+            // 2. Print TABLE EXPORT stats if that's configured
+            if (config.usetableexport) {
+                System.out.printf(
+                        "-------------------------------------------------------------------------------------\n"
+                      + " Table/Export Results\n"
+                      + "-------------------------------------------------------------------------------------\n\n"
+                      + "A total of %d calls were received...\n"
+                      + " - %,9d INSERT\n"
+                      + " - %,9d DELETE\n"
+                      + " - %,9d UPDATE"
+                      + "\n\n"
+                      + "-------------------------------------------------------------------------------------\n"
+                      , TrackingResults.get(0)+TrackingResults.get(1)
+                      , TransactionCounts.get(INSERT)
+                      , TransactionCounts.get(DELETE)
+                      , TransactionCounts.get(UPDATE_OLD)
+                      // old & new on each update so either = total updates, not the sum of the 2
+                      // +TransactionCounts.get(UPDATE_NEW)
+                      );
+
+                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
+                System.out.println("EXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
+                long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
+                System.out.println("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
+
+                // do some sanity checks on the counts...
+                long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
+                if (table_with_metadata_count != meta_data_expected) {
+                    System.err.println("Metadata counts don't match with table count: " + table_with_metadata_count);
+                }
+                long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
+                if (export_table_count != export_table_expected) {
+                    System.err.println("Insert and delete counts don't match export table count: " + export_table_count);
+                }
+
+            }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             log.info(
               "\n\n-------------------------------------------------------------------------------------\n"
@@ -468,10 +596,72 @@ public class AsyncExportClient
         }
     }
 
+    private static void log_migrating_counts(String table) {
+        try {
+            VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING; " +
+                                                                "SELECT COUNT(*) FROM " + table
+                                                                ).getResults();
+            long migrating = results[0].asScalarLong();
+            long not_migrating = results[1].asScalarLong();
+            long total = results[2].asScalarLong();
+
+            log.info("row counts for " + table +
+                     ": total: " + total +
+                     ", migrating: " + migrating +
+                     ", not migrating: " + not_migrating);
+        }
+        catch (Exception e) {
+            // log it and otherwise ignore it.  it's not fatal to fail if the
+            // SELECTS due to a migrate or some other exception
+            log.fatal("log_migrating_counts exception: " + e);
+            e.printStackTrace();
+        }
+    }
+
+    private static void trigger_migrate(int time_window) {
+        try {
+            VoltTable[] results;
+            if (config.procedure.equals("JiggleExportGroupSinglePartition")) {
+                results = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults();
+                log.info("Partitioned Migrate - window: " + time_window + " seconds" +
+                         ", kafka: " + results[0].asScalarLong() +
+                         ", rabbit: " + results[1].asScalarLong() +
+                         ", file: " + results[2].asScalarLong() +
+                         ", jdbc: " + results[3].asScalarLong()
+                         );
+            } else {
+                results = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults();
+                log.info("Replicated Migrate - window: " + time_window + " seconds" +
+                         ", kafka: " + results[0].asScalarLong() +
+                         ", rabbit: " + results[1].asScalarLong() +
+                         ", file: " + results[2].asScalarLong() +
+                         ", jdbc: " + results[3].asScalarLong()
+                         );
+            }
+        }
+        catch (Exception e) {
+            log.fatal("Exception: " + e);
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
+
+
+    private static long get_table_count(String sqlTable) {
+        long count = 0;
+        try {
+            count = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
+        }
+        catch (Exception e) {
+            System.err.println("Exception in get_table_count: " + e);
+            System.err.println("SELECT COUNT from table " + sqlTable + " failed");
+        }
+        return count;
+    }
+
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
-     *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
@@ -591,18 +781,25 @@ public class AsyncExportClient
                     + "increase --timeout arg for slower clients" );
                 }
                 Long pending = stats.getLong("TUPLE_PENDING");
+                String stream = stats.getString("SOURCE");
+                String target = stats.getString("TARGET");
+                String active = stats.getString("ACTIVE");
+                Long partition = stats.getLong("PARTITION_ID");
+
+                // don't wait for inactive partitions.
+                // there are cases where ACTIVE==FALSE is a bug that won't get caught here anyway
+                if (active.equalsIgnoreCase("FALSE"))
+                    continue;
                 if ( pending != lastPending) {
                     // reset the timer if we are making progress
                     maxTime = Instant.now().plusSeconds(timeout);
-                    pending = lastPending;
+                    lastPending = pending;
                 }
-                String stream = stats.getString("SOURCE");
-                Long partition = stats.getLong("PARTITION_ID");
-                log.info("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
+                // switch this message to debug out?
+                log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
                 if (pending != 0) {
                     passedThisTime = false;
                     log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
-
                     break;
                 }
             }

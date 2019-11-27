@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 
@@ -49,12 +50,12 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         // All Operation nodes need to have a target table
         if (m_targetTableName == null) {
-            throw new Exception("ERROR: The Target TableId is null for PlanNode '" + this + "'");
+            throw new ValidationError("The Target TableId is null for PlanNode '%s'", this);
         }
     }
 

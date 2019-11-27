@@ -50,7 +50,7 @@ namespace voltdb {
 
 OrderByPlanNode::~OrderByPlanNode() { }
 
-PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_ORDERBY; }
+PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PlanNodeType::OrderBy; }
 
 std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
 {

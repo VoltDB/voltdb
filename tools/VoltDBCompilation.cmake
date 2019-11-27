@@ -101,43 +101,18 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # for each of them. These are the versions of gcc and cmake for
 # each version of Linux we support.
 # OS Ver.        gcc vers     cmake ver.   Clang version
-# Centos6:          4.4.7     2.8.12.2
-# Ubuntu 10.04      N.A.      N.A.
-# Ubuntu 10.10      N.A.      N.A.
-# Ubuntu 12.04      4.6.3     2.8.7
-# Ubuntu 12.10      N.A.      N.A.
 # Ubuntu 14.04      4.8.4     2.8.12.2
 # Centos7:          4.8.5     2.8.12.2
-# Ubuntu 14.10      N.A.      N.A.
-# Ubuntu 15.04      4.9.2     3.0.2
-# Ubunty 15.10      5.2.1     3.2.2
 # Ubuntu 16.04      5.4.0     3.5.1
-# Ubuntu 16.10      6.2.0     3.5.2
-# Ubuntu 17.04      6.3.0     3.7.2
-# Ubuntu 17.10      7.2.0     3.9.1
+# Ubuntu 18.04      7.3.0     3.10.2
+# Centos8:          7.6.4     3.11.4
 #
 # We should have a similar table for the mac, but apparently we
 # don't.  We do have some empirical evidence that some configurations
 # will build and run correctly.
 #
 ########################################################################
-SET (VOLTDB_COMPILER_GCC8   "8.0.0")
-SET (VOLTDB_COMPILER_U18p04 "7.3.0")
-SET (VOLTDB_COMPILER_U17p10 "7.2.0")
-SET (VOLTDB_COMPILER_U17p04 "6.3.0")
-SET (VOLTDB_COMPILER_U16p10 "6.2.0")
-SET (VOLTDB_COMPILER_U16p04 "5.4.0")
-SET (VOLTDB_COMPILER_U15p10 "5.2.1")
-SET (VOLTDB_COMPILER_U15p04 "4.9.2")
 SET (VOLTDB_COMPILER_U14p04 "4.8.4")
-SET (VOLTDB_COMPILER_C7     "4.8.5")
-SET (VOLTDB_COMPILER_12p04  "4.6.3")
-SET (VOLTDB_COMPILER_C6     "4.4.7")
-SET (VOLTDB_COMPILER_OLDE   "4.4.0")
-#
-# Note: Update this when adding a new compiler support.
-#
-SET (VOLTDB_COMPILER_NEWEST ${VOLTDB_COMPILER_GCC8})
 #
 #
 #
@@ -145,68 +120,33 @@ MESSAGE("Using compiler ${CMAKE_CXX_COMPILER_ID}")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -pthread)
   SET (VOLTDB_IPC_LINK_FLAGS ${VOLTDB_LIB_LINK_FLAGS} -rdynamic)
-  VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
-  # It turns out to be easier to go from a higher version to a lower
-  # version, since we can't easily test <= and >=.
-  IF ( (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_GCC8)
-      OR (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL VOLTDB_COMPILER_GCC8))
-    # COMPILER_VERSION >= 8.0.0
-    MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds -Wno-error=class-memaccess -Wno-parentheses)
-    SET (CXX_VERSION_FLAG -std=c++17)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U18p04)
-    # 7.3.0 < COMPILER_VERSION < 8.0.0
-    MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-    MESSAGE ("We're using the options for ${CMAKE_COMPILER_NEWEST}, which is the newest one we've tried.  Good Luck.")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
-    SET (CXX_VERSION_FLAG -std=c++17)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p10 )
-    # 7.2.0 < COMPILER_VERSION <= 7.3.0
-    MESSAGE("Using the Ubuntu 17.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
-    SET (CXX_VERSION_FLAG -std=c++17)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
-    # < 6.3.0 COMPILER_VERSION <= 7.2.0
-    MESSAGE("Using the Ubuntu 17.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
-    SET (CXX_VERSION_FLAG -std=c++17)
-  ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p10)
-    # 6.2.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.3.0
-    MESSAGE("Using the Ubuntu 17.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
-    SET (CXX_VERSION_FLAG -std=c++14)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p04 )
-    # 5.4.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.2.0
-    MESSAGE("Using the Ubuntu 16.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
-    SET (CXX_VERSION_FLAG -std=c++14)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p10 )
-    # 5.2.1 < COMPILER_VERSION and COMPILER_VERSION <= 5.4.0
-    MESSAGE("Using the Ubuntu 16.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++14)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p04  )
-    # 4.9.2 < COMPILER_VERSION and COMPILER_VERSION <= 5.2.1
-    MESSAGE("Using the Ubuntu 15.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++14)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U14p04 )
-    # 4.8.4 < COMPILER_VERSION and COMPILER_VERSION <= 4.9.2
-    # Note that U14.04 and C7 are different versions, but equivalent
-    # for our needs here.
-    # Nothing special added to the compile flags.
-    MESSAGE("Using the Ubuntu 15.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_CXX0X)
-    # 4.6.0 < COMPILER_VERSION and COMPILER_VERSION <= 4.8.4
-    # Use -std=c++0x.  This is in GCC's experimental C++11 compiler
-    # support version, which is sufficient for our use.
-    MESSAGE("Using the Ubuntu 14.04 settings for ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
+  VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs)
+
+  # Some supported versions of cmake do not support VERSION_GREATER_EQUAL so use NOT ... VERSION_LESS
+  IF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS VOLTDB_COMPILER_U14p04)
+    message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_U14p04}.")
+  ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSE()
-    message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_CXX0X}.")
+    SET (CXX_VERSION_FLAG -std=c++14)
+
+    IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6")
+      VOLTDB_ADD_COMPILE_OPTIONS(-Wno-array-bounds)
+
+      IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "7")
+        SET (CXX_VERSION_FLAG -std=c++17)
+
+        IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8")
+          MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
+          VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=class-memaccess -Wno-parentheses)
+
+          IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9")
+            VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=deprecated-copy)
+          ENDIF()
+        ENDIF()
+      ENDIF()
+    ENDIF()
   ENDIF()
 ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   # All versions of clang use C++11.

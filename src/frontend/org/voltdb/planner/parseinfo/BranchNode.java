@@ -17,18 +17,13 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Predicate;
 
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.*;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.JoinType;
 
 /**
@@ -38,9 +33,9 @@ public class BranchNode extends JoinNode {
     // Join type
     private JoinType m_joinType;
     // Left child
-    private JoinNode m_leftNode = null;
+    private JoinNode m_leftNode;
     // Right child
-    private JoinNode m_rightNode = null;
+    private JoinNode m_rightNode;
     // index into the query catalog cache for a table alias
 
     /**
@@ -79,6 +74,14 @@ public class BranchNode extends JoinNode {
         return newNode;
     }
 
+    public boolean hasChild(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) || pred.test(getRightNode());
+    }
+
+    public boolean allChildren(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) && pred.test(getRightNode());
+    }
+
     public void setJoinType(JoinType joinType) {
         m_joinType = joinType;
     }
@@ -100,38 +103,69 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    public String getTableAlias() {
+        return null;
+    }
+
+    private static Set<TupleValueExpression> collectTVEs(AbstractExpression expr, Set<TupleValueExpression> acc) {
+        if (expr != null) {
+            if (expr instanceof TupleValueExpression) {
+                acc.add((TupleValueExpression) expr);
+            } else if (expr instanceof ComparisonExpression || expr instanceof ConjunctionExpression) {
+                collectTVEs(expr.getLeft(), acc);
+                collectTVEs(expr.getRight(), acc);
+            } else if (expr instanceof FunctionExpression) {
+                expr.getArgs().forEach(e -> collectTVEs(e, acc));
+            }
+        }
+        return acc;
+    }
+
+    private static boolean validWhere(AbstractExpression where, Set<String> rels) {
+        return collectTVEs(where, new HashSet<>())
+                .stream()
+                .allMatch(tve -> rels.contains(tve.getTableName()) || rels.contains(tve.getTableAlias()));
+    }
+
+    @Override
+    public void analyzeJoinExpressions(AbstractParsedStmt stmt) {
         JoinNode leftChild = getLeftNode();
         JoinNode rightChild = getRightNode();
-        leftChild.analyzeJoinExpressions(noneList);
-        rightChild.analyzeJoinExpressions(noneList);
+        leftChild.analyzeJoinExpressions(stmt);
+        rightChild.analyzeJoinExpressions(stmt);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<>();
-
         // Collect node's own join and where expressions
-        joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
-        whereList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+        List<AbstractExpression> joinList = new ArrayList<>(ExpressionUtil.uncombineAny(getJoinExpression()));
+        List<AbstractExpression> whereList = new ArrayList<>(ExpressionUtil.uncombineAny(getWhereExpression()));
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
-        if ( ! (leftChild instanceof BranchNode)) {
+        if (! (leftChild instanceof BranchNode)) {
             joinList.addAll(leftChild.m_joinInnerList);
             leftChild.m_joinInnerList.clear();
             whereList.addAll(leftChild.m_whereInnerList);
             leftChild.m_whereInnerList.clear();
         }
-        if ( ! (rightChild instanceof BranchNode)) {
+        if (! (rightChild instanceof BranchNode)) {
             joinList.addAll(rightChild.m_joinInnerList);
             rightChild.m_joinInnerList.clear();
             whereList.addAll(rightChild.m_whereInnerList);
             rightChild.m_whereInnerList.clear();
         }
 
-        Collection<String> outerTables = leftChild.generateTableJoinOrder();
-        Collection<String> innerTables = rightChild.generateTableJoinOrder();
+        final Collection<String> outerTables = leftChild.generateTableJoinOrder();
+        final Collection<String> innerTables = rightChild.generateTableJoinOrder();
+        if (! whereList.isEmpty()) {        // validate that all TVEs in WHERE clause have corresponding tables from outer or inner relations.
+            final Set<String> rels = new HashSet<String>() {{
+                    addAll(outerTables);
+                    addAll(innerTables);
+                }};
+            if (! whereList.stream().allMatch(expr -> validWhere(expr, rels))) {
+                throw new SubPlanAssembler.SkipCurrentPlanException();
+            }
+        }
 
         // Classify join expressions into the following categories:
         // 1. The OUTER-only join conditions. If any are false for a given outer tuple,
@@ -146,9 +180,11 @@ public class BranchNode extends JoinNode {
         // and either accept or reject that particular combination.
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
         // for the currently supported two table joins but could change if number of tables > 2.
+        // When that occurs, the call throws SkipCurrentPlanException, signaling its caller to continue with
+        // next possible plan.
         // Constant Value Expression may fall into this category.
         classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
-                m_joinInnerList, m_joinInnerOuterList, noneList);
+                m_joinInnerList, m_joinInnerOuterList, stmt.m_noTableSelectionList);
 
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
@@ -165,16 +201,16 @@ public class BranchNode extends JoinNode {
         // 3. The two-sided expressions. Same as the inner only conditions.
         // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
         classifyJoinExpressions(whereList, outerTables, innerTables,  m_whereOuterList,
-                m_whereInnerList, m_whereInnerOuterList, noneList);
+                m_whereInnerList, m_whereInnerOuterList, stmt.m_noTableSelectionList);
 
         // Apply implied transitive constant filter to where expressions
         applyTransitiveEquivalence(m_whereOuterList, m_whereInnerList, m_whereInnerOuterList);
 
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
-        pushDownExpressions(noneList);
+        pushDownExpressions(stmt.m_noTableSelectionList);
 
-        Iterator<AbstractExpression> iter = noneList.iterator();
+        Iterator<AbstractExpression> iter = stmt.m_noTableSelectionList.iterator();
         while (iter.hasNext()) {
             AbstractExpression noneExpr = iter.next();
             // Allow only CVE(TRUE/FALSE) for now.
@@ -192,7 +228,6 @@ public class BranchNode extends JoinNode {
                 iter.remove();
             }
         }
-
     }
 
     /**
@@ -204,8 +239,7 @@ public class BranchNode extends JoinNode {
      *  3. The WHERE expressions must be preserved for the FULL join type.
      * @param joinNode JoinNode
      */
-    protected void pushDownExpressions(List<AbstractExpression> noneList)
-    {
+    protected void pushDownExpressions(List<AbstractExpression> noneList) {
         JoinType joinType = getJoinType();
         if (joinType == JoinType.FULL) {
             return;
@@ -221,8 +255,7 @@ public class BranchNode extends JoinNode {
     }
 
     private void pushDownExpressionsRecursively(List<AbstractExpression> pushDownExprList,
-            List<AbstractExpression> noneList)
-    {
+            List<AbstractExpression> noneList) {
         // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
         // WHERE expressions.
         Collection<String> outerTables = getLeftNode().generateTableJoinOrder();
@@ -239,7 +272,7 @@ public class BranchNode extends JoinNode {
     public void explain_recurse(StringBuilder sb, String indent) {
 
         // Node id. Must be unique within a given tree
-        sb.append(indent).append("JOIN NODE id: " + m_id).append("\n");
+        sb.append(indent).append("JOIN NODE id: ").append(m_id).append("\n");
 
         // Join expression associated with this node
         if (m_joinExpr != null) {
@@ -273,36 +306,30 @@ public class BranchNode extends JoinNode {
 
     @Override
     protected void collectEquivalenceFilters(
-            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes) {
+            Map<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
+            Deque<JoinNode> joinNodes) {
         //* enable to debug */ System.out.println("DEBUG: Branch cEF in  " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
         if ( ! m_whereInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList, equivalenceSet);
         }
         if ( ! m_whereOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereOuterList, equivalenceSet);
         }
         if ( ! m_whereInnerOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerOuterList, equivalenceSet);
         }
         if ( ! m_joinInnerOuterList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList,
-                                                      equivalenceSet);
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList, equivalenceSet);
         }
         // One-sided join criteria can not be used to infer single partitioining for a
         // non-inner query. In general, they do not prevent results from being generated
         // on the partitions that don't have partition-key-qualified rows.
         if (m_joinType == JoinType.INNER) {
-            if ( ! m_joinInnerList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
-                                                          equivalenceSet);
+            if (! m_joinInnerList.isEmpty()) {
+                ExpressionUtil.collectPartitioningFilters(m_joinInnerList, equivalenceSet);
             }
-            if ( ! m_joinOuterList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(m_joinOuterList,
-                                                          equivalenceSet);
+            if (! m_joinOuterList.isEmpty()) {
+                ExpressionUtil.collectPartitioningFilters(m_joinOuterList, equivalenceSet);
             }
         }
 
@@ -351,30 +378,27 @@ public class BranchNode extends JoinNode {
      */
     @Override
     protected void extractSubTree(List<JoinNode> leafNodes) {
-        JoinNode[] children = {m_leftNode, m_rightNode};
-        for (JoinNode child : children) {
+        for (JoinNode child : new JoinNode[]{m_leftNode, m_rightNode}) {
 
             // Leaf nodes don't have a significant join type,
             // test for them first and never attempt to start a new tree at a leaf.
-            if ( ! (child instanceof BranchNode)) {
-                continue;
-            }
-
-            if (((BranchNode)child).m_joinType == m_joinType) {
-                // The join type for this node is the same as the root's one
-                // Keep walking down the tree
-                child.extractSubTree(leafNodes);
-            } else {
-                // The join type for this join differs from the root's one
-                // Terminate the sub-tree
-                leafNodes.add(child);
-                // Replace the join node with the temporary node having the id negated
-                JoinNode tempNode = new TableLeafNode(
-                        -child.m_id, child.m_joinExpr, child.m_whereExpr, null);
-                if (child == m_leftNode) {
-                    m_leftNode = tempNode;
+            if (child instanceof BranchNode) {
+                if (((BranchNode) child).m_joinType == m_joinType) {
+                    // The join type for this node is the same as the root's one
+                    // Keep walking down the tree
+                    child.extractSubTree(leafNodes);
                 } else {
-                    m_rightNode = tempNode;
+                    // The join type for this join differs from the root's one
+                    // Terminate the sub-tree
+                    leafNodes.add(child);
+                    // Replace the join node with the temporary node having the id negated
+                    JoinNode tempNode = new TableLeafNode(
+                            -child.m_id, child.m_joinExpr, child.m_whereExpr, null);
+                    if (child == m_leftNode) {
+                        m_leftNode = tempNode;
+                    } else {
+                        m_rightNode = tempNode;
+                    }
                 }
             }
         }
@@ -386,8 +410,7 @@ public class BranchNode extends JoinNode {
     @Override
     public boolean hasOuterJoin() {
         assert(m_leftNode != null && m_rightNode != null);
-        return m_joinType != JoinType.INNER ||
-                m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
+        return m_joinType != JoinType.INNER || m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
     }
 
     /**
@@ -406,14 +429,15 @@ public class BranchNode extends JoinNode {
 
     @Override
     public boolean hasSubqueryScans() {
-        if ((m_leftNode != null) && m_leftNode.hasSubqueryScans()) {
+        if (m_leftNode != null && m_leftNode.hasSubqueryScans()) {
             return true;
+        } else {
+            return m_rightNode != null && m_rightNode.hasSubqueryScans();
         }
-        return (m_rightNode != null && m_rightNode.hasSubqueryScans());
     }
 
     @Override
-    protected void listNodesJoinOrderRecursive(ArrayList<JoinNode> nodes, boolean appendBranchNodes) {
+    protected void listNodesJoinOrderRecursive(List<JoinNode> nodes, boolean appendBranchNodes) {
         m_leftNode.listNodesJoinOrderRecursive(nodes, appendBranchNodes);
         m_rightNode.listNodesJoinOrderRecursive(nodes, appendBranchNodes);
         if (appendBranchNodes) {
@@ -422,7 +446,7 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    protected void queueChildren(ArrayDeque<JoinNode> joinNodes) {
+    protected void queueChildren(Deque<JoinNode> joinNodes) {
         joinNodes.add(m_leftNode);
         joinNodes.add(m_rightNode);
     }
@@ -434,18 +458,14 @@ public class BranchNode extends JoinNode {
         if (Math.abs(m_leftNode.m_id) == Math.abs(node.m_id)) {
             m_leftNode = node;
             return true;
-        }
-        if (Math.abs(m_rightNode.m_id) == Math.abs(node.m_id)) {
+        } else if (Math.abs(m_rightNode.m_id) == Math.abs(node.m_id)) {
             m_rightNode = node;
             return true;
-        }
-        if (m_leftNode.replaceChild(node)) {
+        } else if (m_leftNode.replaceChild(node)) {
             return true;
+        } else {
+            return m_rightNode.replaceChild(node);
         }
-        if (m_rightNode.replaceChild(node)) {
-            return true;
-        }
-        return false;
     }
 
     /**

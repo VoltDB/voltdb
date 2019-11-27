@@ -133,7 +133,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
         vector<AbstractExecutor*> executorList = execVec->getExecutorList();
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
         bool usePlanForAgg = false;
-        if (apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
+        if (apn->getPlanNodeType() == PlanNodeType::IndexScan) {
             TableIndex* hardCodedIndex = m_indexForMinMax[idx];
             if (hardCodedIndex) {
 #ifdef VOLT_TRACE_ENABLED
@@ -231,7 +231,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
         // we can not use CoveringCellIndex for value comparison.
         vassert(selectedIndex->getKeySchema()->getColumnInfo(
                 static_cast<int>(m_groupByColumnCount))->getVoltType() !=
-               VALUE_TYPE_POINT);
+               ValueType::tPOINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;

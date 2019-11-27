@@ -147,7 +147,7 @@ const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const {
     while (true) {
         // An inline child projection is an excellent place to find an output schema.
         if (parent->m_validOutputColumnCount == SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION) {
-            schema_definer = parent->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION);
+            schema_definer = parent->getInlinePlanNode(PlanNodeType::Projection);
             DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != NULL),
                     "Incorrect output schema source for plannode:\n" << debug(""));
             DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer->m_validOutputColumnCount >= 0),
@@ -215,7 +215,7 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColum
 
 TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema() {
     // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
-    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
+    vector<voltdb::ValueType> columnTypes(1, ValueType::tBIGINT);
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
     vector<bool> columnInBytes(1, false);
@@ -256,7 +256,7 @@ std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomVal
             node->m_outputSchema.emplace_back(outputColumn);
         }
         node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());
-    } else if (node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION)) {
+    } else if (node->getInlinePlanNode(PlanNodeType::Projection)) {
         // Anticipate and mark the two different scenarios of missing output schema.
         // The actual output schema can be searched for on demand once the whole plan tree is loaded.
         // If there's an inline projection node,
@@ -377,10 +377,10 @@ string AbstractPlanNode::debug(const string& spacer) const {
     //
     string child_spacer = spacer + "  ";
     for (int ctr = 0, cnt = static_cast<int>(m_children.size()); ctr < cnt; ctr++) {
-        buffer << child_spacer << m_children[ctr]->getPlanNodeType() << "\n";
+        buffer << child_spacer << planNodeToString(m_children[ctr]->getPlanNodeType()) << "\n";
         buffer << m_children[ctr]->debug(child_spacer);
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
 // AbstractPlanNode nested class methods

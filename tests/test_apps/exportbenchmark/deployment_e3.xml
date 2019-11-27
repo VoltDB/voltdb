@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- IMPORTANT: This file is an auto-generated default deployment configuration.
+                Changes to this file will be overwritten. Copy it elsewhere if you
+                want to use it as a starting point for a custom configuration. -->
+<deployment>
+   <cluster hostcount="1" />
+   <export>
+     <configuration enabled="true" target="export_target" type="custom" exportconnectorclass="exportbenchmark.SocketExporter">
+       <property name="socket.dest">localhost</property>
+       <property name="socket.port">5001</property>
+       <property name="stats.duration">5</property>
+     </configuration>
+   </export>
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+   <features>
+     <feature name="export" option="advanced" />
+   </features>
+</deployment>

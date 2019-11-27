@@ -353,7 +353,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private boolean m_partitionDetected = false;
 
     private final HostWatcher m_hostWatcher;
-    private boolean m_hasAllSecondaryConnectionCreated = false;
     private Set<Integer> m_stopNodeNotice = new HashSet<Integer>();
 
     private final Object m_mapLock = new Object();
@@ -391,7 +390,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
-    private static Map<Integer, Integer> s_nextForeignHost = new HashMap<>();
     /*
      * used when coordinating joining hosts
      */
@@ -870,6 +868,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         fh.close();
         markZkZombieHost(hostId);
     }
+
 
     // Called from zk thread
     public synchronized void markZkZombieHost(int hostId) {
@@ -1884,5 +1883,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public int getFailedSiteCount() {
         return m_agreementSite.getFailedSiteCount();
+    }
+
+    public void notifyOfHostDown(int failedHostId) {
+        ForeignHost fh = m_foreignHosts.get(failedHostId);
+        if (fh != null) {
+            fh.updateDeadReportCount();
+        }
     }
 }

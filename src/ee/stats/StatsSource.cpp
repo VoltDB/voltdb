@@ -36,11 +36,30 @@ vector<string> StatsSource::generateBaseStatsColumnNames() {
 
 void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths,
         vector<bool> &allowNull, vector<bool> &inBytes) {
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(ValueType::tINTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(ValueType::tVARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(ValueType::tINTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    types.push_back(ValueType::tBIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
 }
 
 StatsSource::StatsSource()  : m_statsTable(NULL) {

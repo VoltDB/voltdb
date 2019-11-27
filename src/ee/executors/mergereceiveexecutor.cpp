@@ -173,7 +173,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // inline OrderByPlanNode
     m_orderby_node = dynamic_cast<OrderByPlanNode*>(merge_receive_node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_ORDERBY));
+                                     getInlinePlanNode(PlanNodeType::OrderBy));
     vassert(m_orderby_node != NULL);
     #if defined(VOLT_LOG_LEVEL)
     #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
@@ -186,7 +186,7 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // pickup an inlined limit, if one exists
     m_limit_node = dynamic_cast<LimitPlanNode*>(merge_receive_node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+                                     getInlinePlanNode(PlanNodeType::Limit));
 
     // aggregate
     m_agg_exec = voltdb::getInlineAggregateExecutor(merge_receive_node);
@@ -240,7 +240,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (m_limit_node != NULL) {
-        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
+        std::tie(limit, offset) = m_limit_node->getLimitAndOffset(params);
     }
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
     CountingPostfilter postfilter(m_tmpOutputTable, NULL, limit, offset);

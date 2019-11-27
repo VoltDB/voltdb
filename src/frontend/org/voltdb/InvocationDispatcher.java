@@ -373,9 +373,9 @@ public final class InvocationDispatcher {
                     || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)
                     || catProc.getSystemproc()) {
                 return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
-                        "Invalid procedure for " + (task.getAllPartition() ? "all-partition" : "work procedure")
-                                + " execution. Targeted procedure must be partitioned, "
-                                + "must be partitioned on the first parameter or none, "
+                        "Invalid procedure for all-partition execution. "
+                                + "Targeted procedure must be partitioned on the first parameter "
+                                + "or be a directed procedure, "
                                 + "and must not be a system procedure.",
                         task.clientHandle);
             }
@@ -391,7 +391,6 @@ public final class InvocationDispatcher {
                 // Client provided a partition parameter for backwards compatibility so strip off the first parameter
                 Object[] params = task.getParams().toArray();
                 task.setParams(Arrays.copyOfRange(params, 1, params.length));
-
             }
         } else if (task.getAllPartition()) {
             // must be single partition and must be partitioned on parameter 0
@@ -403,6 +402,12 @@ public final class InvocationDispatcher {
                                  "and must not be a system procedure.",
                         task.clientHandle);
             }
+        } else if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                    "Procedure " + catProc.getTypeName()
+                            + " is a work procedure and needs to be invoked appropriately. "
+                            + "The Client.callAllPartitionProcedure method should be used.",
+                    task.clientHandle);
         }
 
         if (catProc.getSystemproc()) {
@@ -525,6 +530,15 @@ public final class InvocationDispatcher {
                 // unable to hash to a site, return an error
                 return getMispartitionedErrorResponse(task, catProc, e);
             }
+
+            try {
+                // getPartitionsForProcedure and the directed procedure handling can modify the parameters
+                task = MiscUtils.roundTripForCL(task);
+            } catch (IOException e) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                        "Unable to execute " + task.getProcName() + " with parameters " + task.getParams());
+            }
+
             CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
                     catProc.getSinglepartition(), catProc.getEverysite(), partitions, task.getSerializedSize(),
                     nowNanos);
@@ -1434,8 +1448,8 @@ public final class InvocationDispatcher {
                     return new int[] { task.getPartitionDestination() };
                 } else {
                     throw new RuntimeException("Procedure " + procedure.getTypeName()
-                            + " is a work procedure and needs to invoked appropriatly. "
-                            + "In the client callAllPartitionProcedure should be used.");
+                            + " is a directed procedure and needs to invoked appropriately. "
+                            + "The Client.callAllPartitionProcedure method should be used.");
                 }
             }
             // break out the Hashinator and calculate the appropriate partition

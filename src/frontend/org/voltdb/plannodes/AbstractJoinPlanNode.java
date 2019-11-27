@@ -61,7 +61,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
         if (m_preJoinPredicate != null) {
@@ -113,8 +113,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     /**
      * @param predicate the where predicate to set
      */
-    public void setWherePredicate(AbstractExpression predicate)
-    {
+    public void setWherePredicate(AbstractExpression predicate) {
         if (predicate != null) {
             m_wherePredicate = predicate.clone();
         } else {
@@ -125,8 +124,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     /**
      * @param predicate the join predicate to set
      */
-    public void setPreJoinPredicate(AbstractExpression predicate)
-    {
+    public void setPreJoinPredicate(AbstractExpression predicate) {
         if (predicate != null) {
             m_preJoinPredicate = predicate.clone();
         } else {
@@ -137,8 +135,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     /**
      * @param predicate the join predicate to set
      */
-    public void setJoinPredicate(AbstractExpression predicate)
-    {
+    public void setJoinPredicate(AbstractExpression predicate) {
         if (predicate != null) {
             m_joinPredicate = predicate.clone();
         } else {
@@ -147,8 +144,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // FUTURE: At some point it would be awesome to further
         // cull the columns out of the join to remove columns that were only
         // used by scans/joins.  I think we can coerce HSQL into provide this
@@ -168,11 +164,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         }
 
         // Join the schema together to form the output schema
-        m_outputSchemaPreInlineAgg =
-            m_children.get(0).getOutputSchema().
-            join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
+        m_outputSchemaPreInlineAgg = m_children.get(0).getOutputSchema().
+                join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
-
         generateRealOutputSchema(db);
     }
 
@@ -185,11 +179,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     protected void generateRealOutputSchema(Database db) {
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
+        final AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
             // generate its subquery output schema
             aggNode.generateOutputSchema(db);
-
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
         } else {
             m_outputSchema = m_outputSchemaPreInlineAgg;
@@ -199,12 +192,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     // Given any non-inlined type of join, this method will resolve the column
     // order and TVE indexes for the output SchemaColumns.
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // First, assert that our topology is sane and then
         // recursively resolve all child/inline column indexes
-        IndexScanPlanNode index_scan =
-            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(m_children.size() == 2 && index_scan == null);
         for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
@@ -213,7 +204,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
         final NodeSchema inner_schema = m_children.get(1).getOutputSchema();
         final int outerSize = outer_schema.size();
-        final int innerSize = inner_schema.size();
 
         // resolve predicates
         resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
@@ -233,15 +223,13 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             int index;
             if (i < outerSize) {
                 index = tve.setColumnIndexUsingSchema(outer_schema);
-            }
-            else {
+            } else {
                 index = tve.setColumnIndexUsingSchema(inner_schema);
                 index += outerSize;
             }
 
             if (index == -1) {
-                throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
+                throw new RuntimeException("Unable to find index for column: " + col.toString());
             }
 
             tve.setColumnIndex(index);
@@ -279,12 +267,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggrNode != null && aggrNode.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
             return false;
-        }
-        // Not yet handling ORDER BY expressions based on more than just the left-most table
-        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN || outerTable instanceof AbstractJoinPlanNode) {
+        } else if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN || outerTable instanceof AbstractJoinPlanNode) {
+            // Not yet handling ORDER BY expressions based on more than just the left-most table
             return outerTable.isOutputOrdered(sortExpressions, sortDirections);
+        } else {
+            return false;
         }
-        return false;
     }
 
     // TODO: need to extend the sort direction for join from one table to the other table if possible
@@ -324,20 +312,17 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
         m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
         m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
 
-        if ( !jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name() ) ) {
+        if (! jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name())) {
             m_hasSignificantOutputSchema = true;
-            m_outputSchemaPreInlineAgg = loadSchemaFromJSONObject(jobj,
-                    Members.OUTPUT_SCHEMA_PRE_AGG.name());
-        }
-        else {
+            m_outputSchemaPreInlineAgg = loadSchemaFromJSONObject(jobj, Members.OUTPUT_SCHEMA_PRE_AGG.name());
+        } else {
             m_outputSchemaPreInlineAgg = m_outputSchema;
         }
     }
@@ -351,17 +336,13 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
      */
     protected static void resolvePredicate(AbstractExpression expression,
             NodeSchema outer_schema, NodeSchema inner_schema) {
-        List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(expression);
-        for (TupleValueExpression tve : predicate_tves) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expression)) {
             int index = tve.setColumnIndexUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1) {
                 index = tve.setColumnIndexUsingSchema(inner_schema);
                 if (index == -1) {
-                    throw new RuntimeException(
-                            "Unable to resolve column index for join TVE: " +
-                            tve.toString());
+                    throw new RuntimeException("Unable to resolve column index for join TVE: " + tve.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
@@ -377,16 +358,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     protected String explainFilters(String indent) {
-        String result = "";
+        StringBuilder result = new StringBuilder();
         String prefix = "\n" + indent + " filter by ";
         AbstractExpression[] predicates = { m_preJoinPredicate, m_joinPredicate, m_wherePredicate };
         for (AbstractExpression pred : predicates) {
             if (pred != null) {
-                result += prefix + pred.explain("!?"); // No default table name prefix for columns.
+                result.append(prefix).append(pred.explain("!?")); // No default table name prefix for columns.
                 prefix = " AND ";
             }
         }
-        return result;
+        return result.toString();
     }
 
     @Override
@@ -417,13 +398,13 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         // 0.888... (=8/9) for many EQUALITY filters.
         // The discount value is less than the partial index discount (0.1) to make sure
         // the index wins
-        AbstractExpression predicate = null;
+        final AbstractExpression predicate;
         if (childNode instanceof AbstractScanPlanNode) {
             predicate = ((AbstractScanPlanNode) childNode).getPredicate();
         } else if (childNode instanceof NestLoopPlanNode) {
             predicate = ((NestLoopPlanNode) childNode).getWherePredicate();
         } else if (childNode instanceof NestLoopIndexPlanNode) {
-            AbstractPlanNode inlineIndexScan = ((NestLoopIndexPlanNode) childNode).getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            AbstractPlanNode inlineIndexScan = childNode.getInlinePlanNode(PlanNodeType.INDEXSCAN);
             assert(inlineIndexScan != null);
             predicate = ((AbstractScanPlanNode) inlineIndexScan).getPredicate();
         } else {

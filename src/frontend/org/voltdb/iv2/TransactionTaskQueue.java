@@ -19,18 +19,22 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
+
+import com.google_voltpatches.common.collect.Collections2;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
 
 public class TransactionTaskQueue
 {
@@ -48,30 +52,45 @@ public class TransactionTaskQueue
         long timestamp = 0L;
         boolean missingTxn = false;
     }
+
+    private static class ScoreboardContainer {
+        final SiteTaskerQueue taskQueue;
+        final Scoreboard siteScoreboard;
+        public ScoreboardContainer(SiteTaskerQueue queue,Scoreboard scoreboard) {
+            taskQueue = queue;
+            siteScoreboard = scoreboard;
+        }
+    }
     private static class RelativeSiteOffset {
-        private SiteTaskerQueue[] m_stashedMpQueues;
-        private Scoreboard[] m_stashedMpScoreboards;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
-        private Mailbox[] m_mailBoxes;
+
+        // Reverse order to release countdown latch in EE to avoid context switch
+        private Map<Integer, ScoreboardContainer> m_scoreboardContainers = Maps.newTreeMap(Collections.reverseOrder());
+        private ImmutableSet<Scoreboard> m_scoreBoards = ImmutableSet.of();
         void resetScoreboards(int firstSiteId, int siteCount) {
-            m_stashedMpQueues = null;
-            m_stashedMpScoreboards = null;
+            m_scoreboardContainers.clear();
+            m_scoreBoards = ImmutableSet.of();
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard) {
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
-            if (m_stashedMpQueues == null) {
-                m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
-                m_stashedMpScoreboards = new Scoreboard[m_siteCount];
-                m_mailBoxes = new Mailbox[m_siteCount];
-            }
-            m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
-            m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
-            m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
+            m_scoreboardContainers.put(siteId, new ScoreboardContainer(queue, scoreboard));
+            ImmutableSet.Builder<Scoreboard> builder = ImmutableSet.builder();
+            builder.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
+            m_scoreBoards = builder.build();
+        }
+
+        void removeScoreboard(int siteId) {
+            ScoreboardContainer con = m_scoreboardContainers.remove(siteId);
+            assert(con != null);
+            ImmutableSet.Builder<Scoreboard> builder = ImmutableSet.builder();
+            builder.addAll(Collections2.transform(m_scoreboardContainers.values(), sc -> sc.siteScoreboard));
+            m_scoreBoards = builder.build();
+            m_siteCount--;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -80,15 +99,14 @@ public class TransactionTaskQueue
                 hostLog.debug("release stashed fragment messages:" + TxnEgo.txnIdToString(txnId));
             }
             long lastTxnId = 0;
-            for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                TransactionTask task = m_stashedMpScoreboards[ii].getFragmentTask();
+            for (ScoreboardContainer con : m_scoreboardContainers.values()) {
+                TransactionTask task = con.siteScoreboard.getFragmentTask();
                 assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
                 lastTxnId = task.getTxnId();
                 Iv2Trace.logSiteTaskerQueueOffer(task);
-                m_stashedMpQueues[ii].offer(task);
-                m_stashedMpScoreboards[ii].clearFragment();
+                con.taskQueue.offer(task);
+                con.siteScoreboard.clearFragment();
             }
-
         }
 
         // All sites receives CompletedTransactionTask messages, time to fire the task.
@@ -104,9 +122,9 @@ public class TransactionTaskQueue
                 }
 
                 CompletionCounter nextTaskCounter = new CompletionCounter();
-                for (int ii = m_siteCount - 1; ii >= 0; ii--) {
+                for (ScoreboardContainer con : m_scoreboardContainers.values()) {
                     // only release completions at head of queue
-                    Pair<CompleteTransactionTask, Boolean> task = m_stashedMpScoreboards[ii]
+                    Pair<CompleteTransactionTask, Boolean> task = con.siteScoreboard
                             .pollFirstCompletionTask(nextTaskCounter);
                     CompleteTransactionTask completion = task.getFirst();
                     if (missingTxn) {
@@ -116,7 +134,7 @@ public class TransactionTaskQueue
                         }
                     }
                     Iv2Trace.logSiteTaskerQueueOffer(completion);
-                    m_stashedMpQueues[ii].offer(completion);
+                    con.taskQueue.offer(completion);
                 }
 
                 if (nextTaskCounter.completionCount != m_siteCount) {
@@ -128,8 +146,8 @@ public class TransactionTaskQueue
             }
         }
 
-        Scoreboard[] getScoreboards() {
-            return m_stashedMpScoreboards;
+        ImmutableSet<Scoreboard> getScoreboards() {
+            return m_scoreBoards;
         }
 
         int getSiteCount() {
@@ -138,8 +156,8 @@ public class TransactionTaskQueue
 
         // should only be used for debugging purpose
         private void dumpStashedMpWrites(StringBuilder builder) {
-            for (int ii = 0; ii < m_siteCount; ii++) {
-                builder.append("\nQueue " + m_stashedMpQueues[ii].getPartitionId() + ":" + m_stashedMpScoreboards[ii]);
+            for (ScoreboardContainer con : m_scoreboardContainers.values()) {
+                builder.append("\nQueue " + con.taskQueue.getPartitionId() + ":" + con.siteScoreboard);
             }
         }
     }
@@ -201,11 +219,15 @@ public class TransactionTaskQueue
         }
     }
 
-    void initializeScoreboard(int siteId, Mailbox mailBox) {
+    void initializeScoreboard(int siteId) {
         synchronized (s_lock) {
-            if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
-            }
+            s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard);
+        }
+    }
+
+    public static void removeScoreboard(int siteId) {
+        synchronized (s_lock) {
+            s_stashedMpWrites.removeScoreboard(siteId);
         }
     }
 

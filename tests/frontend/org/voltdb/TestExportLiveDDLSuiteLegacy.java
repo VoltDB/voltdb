@@ -294,7 +294,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         client.callProcedure("@AdHoc", insertSql.toString());
 
         startListener();
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, 60_000, true);
 
         // must still be able to verify the export data.
         client.close();
@@ -498,7 +498,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config, false);
+        builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;
     }

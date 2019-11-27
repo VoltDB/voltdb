@@ -54,6 +54,8 @@ import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.decode.CSVWriterDecoder;
 import org.voltdb.utils.VoltFile;
@@ -117,6 +119,14 @@ public class ExportToFileClient extends ExportClientBase {
 
     //For test
     public static String TEST_VOLTDB_ROOT = null;
+
+    /**
+     * This export client requires decoding all table partitions in same thread.
+     */
+    @Override
+    public DecodingPolicy getDecodingPolicy() {
+        return DecodingPolicy.BY_TABLE;
+    }
 
     class DecoderMetaData {
         final String tableName;
@@ -259,7 +269,7 @@ public class ExportToFileClient extends ExportClientBase {
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException e) {
-                                Throwables.propagate(e);
+                                throw new RuntimeException(e);
                             }
                         }
                     } while (dirContainingFiles.exists());
@@ -513,7 +523,6 @@ public class ExportToFileClient extends ExportClientBase {
             // avoid synchronization and contention on the file resource, the creation of executor
             // is delayed till block start notification when the table information is available
             // and instead use the current thread available in base export client as the executor
-            m_es = null;
             m_metaData = new DecoderMetaData("", Long.MIN_VALUE, Integer.MIN_VALUE);
 
             CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
@@ -601,7 +610,7 @@ public class ExportToFileClient extends ExportClientBase {
                 try {
                     // TODO: if same export client is getting used, unregisterSelf(not implemented) during generation change
                     registerSelf(row);
-                    if (m_es == null) {
+                    if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC && m_es == null) {
                         ListeningExecutorService executor = m_decoderExecutor.get(row.tableName);
                         if (executor == null) {
                             executor = CoreUtils.getListeningSingleThreadExecutor(
@@ -622,7 +631,7 @@ public class ExportToFileClient extends ExportClientBase {
                         resetWriter();
                         throw new RestartBlockException("Fail to start the block", e.getCause(),true);
                     } else {
-                        Throwables.propagate(e);
+                        throw new RuntimeException(e);
                     }
                 } finally {
                     m_batchLock.writeLock().unlock();
@@ -652,7 +661,9 @@ public class ExportToFileClient extends ExportClientBase {
                     throw new RestartBlockException("Fail to start the block", e.getCause(),true);
                 }
                 else {
-                    Throwables.propagate(e);
+                    // Make sure to unlock
+                    m_batchLock.readLock().unlock();
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -681,7 +692,7 @@ public class ExportToFileClient extends ExportClientBase {
                 m_writer.flush();
             }
             catch (Throwable t) {
-                Throwables.propagate(t);
+                throw new RuntimeException(t);
             }
             finally {
                 m_batchLock.readLock().unlock();
@@ -713,7 +724,7 @@ public class ExportToFileClient extends ExportClientBase {
                     m_es = null;
                 }
                 catch (InterruptedException e) {
-                    Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -731,7 +742,7 @@ public class ExportToFileClient extends ExportClientBase {
             m_scheduledFileRotatorService.awaitTermination(365, TimeUnit.DAYS);
         }
         catch( InterruptedException iex) {
-            Throwables.propagate(iex);
+            throw new RuntimeException(iex);
         }
         m_batchLock.writeLock().lock();
         try {

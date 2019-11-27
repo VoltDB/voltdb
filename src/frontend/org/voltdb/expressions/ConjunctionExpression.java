@@ -42,8 +42,7 @@ public class ConjunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public void finalizeValueTypes()
-    {
+    public void finalizeValueTypes() {
         finalizeChildValueTypes();
         //
         // IMPORTANT:
@@ -70,7 +69,7 @@ public class ConjunctionExpression extends AbstractExpression {
     public boolean isValueTypeIndexable(StringBuffer msg) {
         // Conjunction expression include and and or expression that results in boolean result
         // boolean result are not indexable
-        msg.append("logical expression: '" + getExpressionType().symbol() + "'");
+        msg.append("logical expression: '").append(getExpressionType().symbol()).append("'");
         return false;
     }
 

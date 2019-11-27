@@ -112,32 +112,32 @@ function startvolt() {
 }
 
 function server() {
-    startvolt deployment.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment.xml ddl1.sql sp.jar
 
 }
 
 # run the voltdb server locally with kafka connector
 function server-kafka() {
-    startvolt deployment-kafka.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment-kafka.xml ddl1.sql sp.jar
 }
 
 function server-rabbitmq() {
     cp $RBMQ/rabbitmq.jar $VOLTDB_LIB/extension/
     cp ../../../../export-rabbitmq/voltdb-rabbitmq.jar $VOLTDB_LIB/extension/
-    startvolt deployment-rabbitmq.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment-rabbitmq.xml ddl1.sql sp.jar
 }
 
 # run the voltdb server locally with mysql connector
 function server-mysql() {
     cp $MYSQLLIB $VOLTDB_LIB/extension/
-    startvolt deployment_mysql.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_mysql.xml ddl1.sql sp.jar
 }
 
 
 # run the voltdb server locally with vertica connector
 function server-vertica() {
     cp $VERTICALIB $VOLTDB_LIB/extension/
-    startvolt deployment_vertica.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_vertica.xml ddl1.sql sp.jar
 }
 
 # run the voltdb server locally with postgresql connector
@@ -152,7 +152,7 @@ function server-vertica() {
 
 function server-pg() {
     cp $POSTGRESLIB $VOLTDB_LIB/extension/
-    startvolt deployment_pg_nocat.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_pg_nocat.xml ddl1.sql sp.jar
 }
 
 # to run the postgres jdbc geo export test manually:
@@ -166,7 +166,7 @@ function server-pg() {
 
 function server-pg-geo() {
     cp $POSTGRESLIB $VOLTDB_LIB/extension/
-    startvolt deployment_pg_nocat.xml ddl-all-nocat-geo.sql sp.jar
+    startvolt deployment_pg_nocat.xml ddl1.sql sp.jar
 
 }
 
@@ -179,7 +179,7 @@ function server-custom() {
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
     #$VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
-    startvolt deployment_custom.xml ddl-all-nocat.sql sp.jar
+    startvolt deployment_custom.xml ddl1.sql sp.jar
 }
 
 # run the client that drives the example
@@ -213,6 +213,11 @@ function clean-vertica() {
     echo "drop stream export_partitioned_stream" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
 }
 
+function async-export-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient --help
+}
+
 function async-export() {
     srccompile
     rm -rf $CLIENTLOG/*
@@ -228,6 +233,7 @@ function async-export() {
         --autotune=false \
         --latencytarget=10 \
         --ratelimit=500 \
+        --usetableexport=true \
         --timeout=300
 }
 
@@ -400,7 +406,8 @@ function stop-postgres() {
 
 function help() {
     echo "Usage: ./run.sh {clean|jars|server|async-benchmark|async-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
+    echo "       {...|async-export-help|async-export|async-export-geo}"
 }
 
 # Run the target passed as the first arg on the command line

@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <tuple>
 #include "largeorderbyexecutor.h"
 #include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
@@ -56,8 +57,7 @@ namespace voltdb {
 
 bool
 LargeOrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                             const ExecutorVector& executorVector)
-{
+                             const ExecutorVector& executorVector) {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     vassert(node);
 
@@ -75,7 +75,7 @@ LargeOrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     vassert(dynamic_cast<LargeTempTable*>(node->getOutputTable()));
 
     // pick up an inlined limit, if one exists
-    m_limitPlanNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    m_limitPlanNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
 
     return true;
 }
@@ -96,7 +96,7 @@ LargeOrderByExecutor::p_execute(const NValueArray &params) {
     int limit = -1;
     int offset = 0;
     if (m_limitPlanNode != NULL) {
-        m_limitPlanNode->getLimitAndOffsetByReference(params, limit, offset);
+        std::tie(limit, offset) = m_limitPlanNode->getLimitAndOffset(params);
     }
 
     inputTable->sort(&pmp,

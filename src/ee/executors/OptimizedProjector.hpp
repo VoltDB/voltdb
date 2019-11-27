@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef EXECUTORS_OPTIMIZED_PROJECTOR_HPP
-#define EXECUTORS_OPTIMIZED_PROJECTOR_HPP
+#pragma once
 
 #include <set>
 #include <vector>
@@ -70,6 +69,7 @@ typedef std::set<ProjectStep, StepComparator> ProjectStepSet;
  * fields are coalesced into a single call to memcpy.
  */
 class OptimizedProjector {
+    boost::scoped_ptr<ProjectStepSet> m_steps;
 public:
 
     /** Produce an optimized projector for the given set of expressions.
@@ -116,12 +116,7 @@ public:
 
     std::string debug(const std::string &title) const;
 
-private:
-
-    boost::scoped_ptr<ProjectStepSet> m_steps;
-
 };
 
 } // end namespace voltdb
 
-#endif

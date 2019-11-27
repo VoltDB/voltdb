@@ -44,4 +44,9 @@ final class CompositeActionScheduler implements ActionScheduler {
     public boolean restrictProcedureByScope() {
         return m_actionGenerator.restrictProcedureByScope();
     }
+
+    @Override
+    public boolean isReadOnly() {
+        return m_actionGenerator.isReadOnly();
+    }
 }

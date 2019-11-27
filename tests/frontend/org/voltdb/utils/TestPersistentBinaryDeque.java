@@ -235,6 +235,31 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testReopenReader() throws Exception {
+        System.out.println("Running testReopenReader");
+        int count = 10;
+        for (int ii = 0; ii < count; ii++) {
+            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+        }
+
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        assert(count >= 2);
+        // Read 2 and close and reopen
+        BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        cont.discard();
+        cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        cont.discard();
+        m_pbd.closeCursor(CURSOR_ID);
+        reader = m_pbd.openForRead(CURSOR_ID);
+        int readCount = 0;
+        while((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            cont.discard();
+            readCount++;
+        }
+        assertEquals(count, readCount);
+    }
+
+    @Test
     public void testTruncateFirstElement() throws Exception {
         System.out.println("Running testTruncateFirstElement");
         List<File> listing = getSortedDirectoryListing();

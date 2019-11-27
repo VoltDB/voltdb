@@ -144,7 +144,7 @@ public:
      * Hash this geography value (used for hash aggregation where a
      * geography is group by key).
      */
-    size_t hashCombine(std::size_t seed) const;
+    void hashCombine(std::size_t& seed) const;
 
     /**
      * Produce a human-readable summary of this geography
@@ -268,12 +268,12 @@ inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
 }
 
 
-inline size_t GeographyValue::hashCombine(std::size_t seed) const {
+inline void GeographyValue::hashCombine(std::size_t& seed) const {
 
     if (isNull()) {
         // Treat a null as a polygon with zero loops
         boost::hash_combine(seed, 0);
-        return seed;
+        return;
     }
 
     Polygon poly;
@@ -290,7 +290,6 @@ inline size_t GeographyValue::hashCombine(std::size_t seed) const {
             boost::hash_combine(seed, v.z());
         }
     }
-    return seed;
 }
 
 inline std::string GeographyValue::toString() const {

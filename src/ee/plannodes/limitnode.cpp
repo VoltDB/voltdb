@@ -48,22 +48,13 @@
 
 namespace voltdb {
 
-LimitPlanNode::~LimitPlanNode()
-{
-    delete limitExpression;
-}
-
-PlanNodeType LimitPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_LIMIT; }
-
 /*
  * This code is needed in the limit executor as well as anywhere limit
  * is inlined. Centralize it here.
  */
-void
-LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limitOut, int &offsetOut)
-{
-    limitOut = limit;
-    offsetOut = offset;
+std::tuple<int, int> LimitPlanNode::getLimitAndOffset(const NValueArray &params) {
+    int limitOut = limit;
+    int offsetOut = offset;
 
     // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
     // Converting the loop counter to NValue's doesn't make it cleaner -
@@ -75,7 +66,6 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT");
         }
-
     }
     if (offsetParamIdx != -1) {
         offsetOut = ValuePeeker::peekAsInteger(params[offsetParamIdx]);
@@ -87,24 +77,23 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
 
     // If the limit expression is not null, we need to evaluate it and assign
     // the result to limit, offset must be 0
-    if (limitExpression != NULL) {
+    if (limitExpression != nullptr) {
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
         limitOut = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
         vassert(offsetOut == 0);
     }
+    return std::make_tuple(limitOut, offsetOut);
 }
 
-std::string LimitPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "Limit[" << this->limit << "]\n";
     buffer << spacer << "Offset[" << this->offset << "]\n";
-    return (buffer.str());
+    return buffer.str();
 }
 
-void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     limit = obj.valueForKey("LIMIT").asInt();
     offset = obj.valueForKey("OFFSET").asInt();
 
@@ -118,9 +107,8 @@ void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj)
     if (obj.hasNonNullKey("LIMIT_EXPRESSION")) {
         PlannerDomValue expr = obj.valueForKey("LIMIT_EXPRESSION");
         limitExpression = AbstractExpression::buildExpressionTree(expr);
-    }
-    else {
-        limitExpression = NULL;
+    } else {
+        limitExpression = nullptr;
     }
 }
 

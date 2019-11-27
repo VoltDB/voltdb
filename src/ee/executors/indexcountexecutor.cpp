@@ -32,8 +32,8 @@ static long countNulls(TableIndex * tableIndex, AbstractExpression * countNULLEx
     }
     long numNULLs = 0;
     TableTuple tuple;
-    while ( ! (tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
-         if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
+    while (! (tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
+         if (! countNULLExpr->eval(&tuple, NULL).isTrue()) {
              break;
          }
         numNULLs++;
@@ -42,9 +42,8 @@ static long countNulls(TableIndex * tableIndex, AbstractExpression * countNULLEx
 }
 
 
-bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-                                const ExecutorVector& executorVector)
-{
+bool IndexCountExecutor::p_init(
+        AbstractPlanNode *abstractNode, const ExecutorVector& executorVector) {
     VOLT_DEBUG("init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
@@ -96,7 +95,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     vassert(m_numOfColumns == 1);
 
     // Miscellanous Information
-    m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
+    m_lookupType = IndexLookupType::Invalid;
     if (m_numOfSearchkeys != 0) {
         m_lookupType = m_node->getLookupType();
     }
@@ -130,8 +129,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool IndexCountExecutor::p_execute(const NValueArray &params)
-{
+bool IndexCountExecutor::p_execute(const NValueArray &params) {
     // update local target table with its most recent reference
     vassert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
     PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
@@ -151,7 +149,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
-    vassert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+    vassert(m_lookupType != IndexLookupType::Equal ||
             searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
             searchKey.getSchema()->columnCount() == m_numOfEndkeys);
 
@@ -180,8 +178,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             }
             try {
                 searchKey.setNValue(ctr, candidateValue);
-            }
-            catch (const SQLException &e) {
+            } catch (const SQLException &e) {
                 // This next bit of logic handles underflow, overflow and search key length
                 // exceeding variable length column size (variable lenght mismatch) when
                 // setting up the search keys.
@@ -201,9 +198,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // handle the case where this is a comparison, rather than equality match
                 // comparison is the only place where the executor might return matching tuples
                 // e.g. TINYINT < 1000 should return all values
-                if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
-                    vassert(localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
+                if (localLookupType != IndexLookupType::Equal && ctr == (activeNumOfSearchKeys - 1)) {
+                    vassert(localLookupType == IndexLookupType::Greater || localLookupType == IndexLookupType::GreaterEqual);
 
                     // See throwCastSQLValueOutOfRangeException to see that
                     // these three cases, TYPE_OVERFLOW, TYPE_UNDERFLOW and
@@ -221,18 +217,16 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                         // to account for it.  We think localLookupType can only be
                         // GT and GTE here (cf. the assert above).
                         switch (localLookupType) {
-                            case INDEX_LOOKUP_TYPE_GT:
-                            case INDEX_LOOKUP_TYPE_GTE:
-                                localLookupType = INDEX_LOOKUP_TYPE_GT;
+                            case IndexLookupType::Greater:
+                            case IndexLookupType::GreaterEqual:
+                                localLookupType = IndexLookupType::Greater;
                                 break;
                             default:
                                 vassert(!"IndexCountExecutor::p_execute - can't index on not equals");
                                 return false;
                         }
                     }
-                }
-                // if a EQ comparision is out of range, then return no tuples
-                else {
+                } else { // if a EQ comparision is out of range, then return no tuples
                     earlyReturnForSearchKeyOutOfRange = true;
                     break;
                 }
@@ -263,19 +257,17 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             }
             try {
                 endKey.setNValue(ctr, endKeyValue);
-            }
-            catch (const SQLException &e) {
+            } catch (const SQLException &e) {
                 // This next bit of logic handles underflow and overflow while
                 // setting up the search keys.
                 // e.g. TINYINT > 200 or INT <= 6000000000
 
                 // re-throw if not an overflow or underflow or TYPE_VAR_LENGTH_MISMATCH.
-                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
+                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW |
+                                SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                     throw e;
-                }
-
-                if (ctr == (m_numOfEndkeys - 1)) {
-                    vassert(m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
+                } else if (ctr == (m_numOfEndkeys - 1)) {
+                    vassert(m_endType == IndexLookupType::Less || m_endType == IndexLookupType::LessEqual);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
@@ -299,18 +291,16 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                         // search will be performed on shrinked key, so update lookup operation
                         // to account for it
                         switch (m_endType) {
-                            case INDEX_LOOKUP_TYPE_LT:
-                            case INDEX_LOOKUP_TYPE_LTE:
-                                m_endType = INDEX_LOOKUP_TYPE_LTE;
+                            case IndexLookupType::Less:
+                            case IndexLookupType::LessEqual:
+                                m_endType = IndexLookupType::LessEqual;
                                 break;
                             default:
                                 vassert(!"IndexCountExecutor::p_execute - invalid end type.");
                                 return false;
                         }
                     }
-                }
-                // if a EQ comparision is out of range, then return no tuples
-                else {
+                } else { // if a EQ comparision is out of range, then return no tuples
                     earlyReturnForSearchKeyOutOfRange = true;
                     break;
                 }
@@ -342,7 +332,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     bool reverseScanNullEdgeCase = false;
     bool reverseScanMovedIndexToScan = false;
     if (m_numOfSearchkeys < m_numOfEndkeys &&
-            (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE)) {
+            (m_endType == IndexLookupType::Less || m_endType == IndexLookupType::LessEqual)) {
         reverseScanNullEdgeCase = true;
         VOLT_DEBUG("Index count: reverse scan edge null case." );
     }
@@ -357,21 +347,18 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                    localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
-            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+            if (localLookupType == IndexLookupType::Greater) {
                 rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);
-            } else {
-                // handle start inclusive cases.
-                if (tableIndex->hasKey(&searchKey)) {
-                    leftIncluded = 1;
-                    rkStart = tableIndex->getCounterLET(&searchKey, false, indexCursor);
+            } else if (tableIndex->hasKey(&searchKey)) { // handle start inclusive cases.
+                leftIncluded = 1;
+                rkStart = tableIndex->getCounterLET(&searchKey, false, indexCursor);
 
-                    if (reverseScanNullEdgeCase) {
-                        tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-                        reverseScanMovedIndexToScan = true;
-                    }
-                } else {
-                    rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);
+                if (reverseScanNullEdgeCase) {
+                    tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
+                    reverseScanMovedIndexToScan = true;
                 }
+            } else {
+                rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);
             }
         } else {
             // Do not count null row or columns
@@ -386,7 +373,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     }
     if (reverseScanNullEdgeCase) {
         // reverse scan case
-        if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
+        if (!reverseScanMovedIndexToScan && localLookupType != IndexLookupType::Greater) {
             tableIndex->moveToEnd(true, indexCursor);
         }
         vassert(countNULLExpr);
@@ -401,15 +388,13 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor);
         } else {
             IndexLookupType localEndType = m_endType;
-            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
+            if (localEndType == IndexLookupType::Less) {
                 rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor);
+            } else if (tableIndex->hasKey(&endKey)) {
+                rightIncluded = 1;
+                rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor);
             } else {
-                if (tableIndex->hasKey(&endKey)) {
-                    rightIncluded = 1;
-                    rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor);
-                } else {
-                    rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor);
-                }
+                rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor);
             }
         }
     } else {
@@ -434,3 +419,4 @@ IndexCountExecutor::~IndexCountExecutor() {
         delete [] m_endKeyBackingStore;
     }
 }
+

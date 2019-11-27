@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDOUPDATEACTION_H_
-#define PERSISTENTTABLEUNDOUPDATEACTION_H_
+#pragma once
 
 #include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
@@ -24,6 +23,13 @@
 namespace voltdb {
 
 class PersistentTableUndoUpdateAction: public UndoReleaseAction {
+    char* const m_oldTuple;
+    char* const m_newTuple;
+    PersistentTableSurgeon * const m_tableSurgeon;
+    bool const m_revertIndexes;
+    std::vector<char*> const m_oldUninlineableColumns;
+    std::vector<char*> const m_newUninlineableColumns;
+    bool const m_updateMigrate;
 public:
     PersistentTableUndoUpdateAction(char* oldTuple,
                                     char* newTuple,
@@ -56,20 +62,11 @@ public:
      * to be undone in the future. In this case the string allocations
      * of the old tuple must be released.
      */
-    virtual void release() { NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns); }
-
+    virtual void release() {
+        NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns);
+    }
     virtual ~PersistentTableUndoUpdateAction() { }
-
-private:
-    char* const m_oldTuple;
-    char* const m_newTuple;
-    PersistentTableSurgeon * const m_tableSurgeon;
-    bool const m_revertIndexes;
-    std::vector<char*> const m_oldUninlineableColumns;
-    std::vector<char*> const m_newUninlineableColumns;
-    bool const m_updateMigrate;
 };
 
 }
 
-#endif /* PERSISTENTTABLEUNDOUPDATEACTION_H_ */

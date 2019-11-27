@@ -43,10 +43,11 @@ public class TaskStatsSource extends StatsSource {
     private static final String PREFIX_SCHEDULER = "SCHEDULER_";
     private static final String PREFIX_PROCEDURE = "PROCEDURE_";
 
-    private static final Collection<ColumnInfo> s_columns = ImmutableList.of(new ColumnInfo("NAME", VoltType.STRING),
+    private static final Collection<ColumnInfo> s_columns = ImmutableList.of(
+            new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltSystemProcedure.CTYPE_ID),
+            new ColumnInfo("TASK_NAME", VoltType.STRING),
             new ColumnInfo("STATE", VoltType.STRING),
             new ColumnInfo("SCOPE", VoltType.STRING),
-            new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltSystemProcedure.CTYPE_ID),
             new ColumnInfo(PREFIX_SCHEDULER + "INVOCATIONS", VoltType.BIGINT),
             new ColumnInfo(PREFIX_SCHEDULER + "TOTAL_EXECUTION", VoltType.BIGINT),
             new ColumnInfo(PREFIX_SCHEDULER + "MIN_EXECUTION", VoltType.BIGINT),
@@ -68,12 +69,14 @@ public class TaskStatsSource extends StatsSource {
             new ColumnInfo(PREFIX_PROCEDURE + "AVG_WAIT_TIME", VoltType.BIGINT),
             new ColumnInfo(PREFIX_PROCEDURE + "FAILURES", VoltType.BIGINT));
 
+    private static final int s_sharedSubSelectorColumnCount = 7;
+
     // Metadata to basically select a subset of columns from the full stats
     private static List<ColumnAs> s_schedulersConvert;
     private static List<ColumnAs> s_procedursConvert;
 
     private final String m_name;
-    private final String m_scope;
+    private final TaskScope m_scope;
     private final int m_partitionId;
 
     private String m_state;
@@ -131,37 +134,31 @@ public class TaskStatsSource extends StatsSource {
 
     private static List<ColumnAs> getSchedulersConverter(VoltTable source) {
         if (s_schedulersConvert == null) {
-            s_schedulersConvert = initializeConverter(source, PREFIX_SCHEDULER, PREFIX_PROCEDURE);
+            s_schedulersConvert = initializeConverter(source, PREFIX_SCHEDULER);
         }
         return s_schedulersConvert;
     }
 
     private static List<ColumnAs> getProceduresConverter(VoltTable source) {
         if (s_procedursConvert == null) {
-            s_procedursConvert = initializeConverter(source, PREFIX_PROCEDURE, PREFIX_SCHEDULER);
+            s_procedursConvert = initializeConverter(source, PREFIX_PROCEDURE);
         }
         return s_procedursConvert;
     }
 
     /**
-     * @param source       {@link VoltTable} which will be the source of the stats
-     * @param prefixRemove If a column has this prefix the column will be kept but the prefix will be removed from the
-     *                     name
-     * @param prefixSkip   If a column has this prefix it will be skipped
+     * @param source     {@link VoltTable} which will be the source of the stats
+     * @param prefixKeep If a column has this prefix it will be kept in the converted table
      * @return {@link List} of {@link ColumnAs} for selecting out desired stats
      */
-    private static List<ColumnAs> initializeConverter(VoltTable source, String prefixRemove, String prefixSkip) {
+    private static List<ColumnAs> initializeConverter(VoltTable source, String prefixKeep) {
         ImmutableList.Builder<ColumnAs> builder = ImmutableList.<ColumnAs>builder();
 
         for (int i = 0; i < source.getColumnCount(); ++i) {
             String columnName = source.getColumnName(i);
-            if (columnName.startsWith(prefixSkip)) {
-                continue;
+            if (i < s_sharedSubSelectorColumnCount || columnName.startsWith(prefixKeep)) {
+                builder.add(new ColumnAs(source, i, columnName));
             }
-            if (columnName.startsWith(prefixRemove)) {
-                columnName = columnName.substring(prefixRemove.length());
-            }
-            builder.add(new ColumnAs(source, i, columnName));
         }
 
         return builder.build();
@@ -171,11 +168,11 @@ public class TaskStatsSource extends StatsSource {
         return new TaskStatsSource(null, null, -1);
     }
 
-    static TaskStatsSource create(String name, String scope, int partitionId) {
+    static TaskStatsSource create(String name, TaskScope scope, int partitionId) {
         return new TaskStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId);
     }
 
-    private TaskStatsSource(String name, String scope, int partitionId) {
+    private TaskStatsSource(String name, TaskScope scope, int partitionId) {
         super(false);
         m_name = name;
         m_scope = scope;
@@ -209,10 +206,10 @@ public class TaskStatsSource extends StatsSource {
         int column = 3;
 
         // Header state info
+        rowValues[column++] = m_partitionId;
         rowValues[column++] = m_name;
         rowValues[column++] = m_state;
-        rowValues[column++] = m_scope;
-        rowValues[column++] = m_partitionId;
+        rowValues[column++] = m_scope.name();
 
         // Scheduler stats
         column = m_schedulerStats.pupulateStats(rowValues, column);

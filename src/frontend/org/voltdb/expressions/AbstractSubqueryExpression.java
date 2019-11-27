@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 
@@ -52,7 +53,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     protected AbstractPlanNode m_subqueryNode = null;
     // List of correlated parameter indexes that originate at the immediate parent's level
     // and need to be set by this SubqueryExpression on the EE side prior to the evaluation
-    private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
+    private List<Integer> m_parameterIdxList = new ArrayList<>();
 
     protected AbstractSubqueryExpression() {
         m_valueType = VoltType.BIGINT;
@@ -115,12 +116,15 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     }
 
     @Override
-    public void validate() throws Exception {
+    public void validate() {
         super.validate();
 
-        if (m_subqueryNode != null && m_subqueryNode.getPlanNodeId() != m_subqueryNodeId)
-            throw new Exception("ERROR: A subquery plan node id mismatch");
-
+        if (m_subqueryNode != null) {
+            if (m_subqueryNode.getPlanNodeId() != m_subqueryNodeId) {
+                throw new ValidationError("A subquery plan node id mismatch");
+            }
+            m_subqueryNode.validate();
+        }
     }
 
     @Override

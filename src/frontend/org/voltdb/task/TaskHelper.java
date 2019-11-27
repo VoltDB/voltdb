@@ -17,71 +17,43 @@
 
 package org.voltdb.task;
 
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
-
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.ClientInterface;
-import org.voltdb.DefaultProcedureManager;
-import org.voltdb.InvocationDispatcher;
-import org.voltdb.ParameterConverter;
-import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.ProcParameter;
-import org.voltdb.catalog.Procedure;
-
 /**
- * Helper class passed to {@link ActionSchedule}, {@link ActionGenerator} and {@link ActionScheduler} instances for
+ * Helper interface passed to {@link ActionSchedule}, {@link ActionGenerator} and {@link ActionScheduler} instances for
  * calling in to the volt system to perform logging, validation and other operations
  */
-public final class TaskHelper {
-    private final VoltLogger m_logger;
-    private final UnaryOperator<String> m_generateLogMessage;
-    private final String m_scope;
-    private final Function<String, Procedure> m_procedureGetter;
+public interface TaskHelper {
 
-    private static Function<String, Procedure> createProcedureFunction(Database database) {
-        if (database == null) {
-            return null;
-        }
-        DefaultProcedureManager defaultProcedureManager = new DefaultProcedureManager(database);
-        CatalogMap<Procedure> procedures = database.getProcedures();
-        return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
-    }
+    /**
+     * @return The name of the task
+     */
+    String getTaskName();
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope, Database database) {
-        this(logger, generateLogMessage, scope, createProcedureFunction(database));
-    }
+    /**
+     * @return The scope in which the task will be executing
+     */
+    TaskScope getTaskScepe();
 
-    TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
-            ClientInterface clientInterface) {
-        this(logger, generateLogMessage, scope, clientInterface::getProcedureFromName);
-    }
-
-    private TaskHelper(VoltLogger logger, UnaryOperator<String> generateLogMessage, String scope,
-            Function<String, Procedure> procedureGetter) {
-        m_logger = logger;
-        m_generateLogMessage = generateLogMessage;
-        m_scope = scope;
-        m_procedureGetter = procedureGetter;
-    }
+    /**
+     * Returns the ID of the scope when this helper is passed to an {@code instantiate} method otherwise {@code -1}
+     * <p>
+     * If {@code scope} is {@link TaskScope#PARTITIONS} {@code id} will be a partition ID. If {@code scope} is
+     * {@link TaskScope#HOSTS} {@code id} will be a host ID. Otherwise {@code id} will be {@code -1}
+     *
+     * @return The ID of the scope
+     */
+    int getScopeId();
 
     /**
      * @return {@code true} if debug logging is enabled
      */
-    public boolean isDebugLoggingEnabled() {
-        return m_logger.isDebugEnabled();
-    }
+    boolean isDebugLoggingEnabled();
 
     /**
      * Log a message in the system log at the debug log level
      *
      * @param message to log
      */
-    public void logDebug(String message) {
-        logDebug(message, null);
-    }
+    void logDebug(String message);
 
     /**
      * Log a message and throwable in the system log at the debug log level
@@ -89,18 +61,14 @@ public final class TaskHelper {
      * @param message   to log
      * @param throwable to log along with {@code message}
      */
-    public void logDebug(String message, Throwable throwable) {
-        m_logger.debug(generateLogMessage(message), throwable);
-    }
+    void logDebug(String message, Throwable throwable);
 
     /**
      * Log a message in the system log at the info log level
      *
      * @param message to log
      */
-    public void logInfo(String message) {
-        logInfo(message, null);
-    }
+    void logInfo(String message);
 
     /**
      * Log a message and throwable in the system log at the info log level
@@ -108,18 +76,14 @@ public final class TaskHelper {
      * @param message   to log
      * @param throwable to log along with {@code message}
      */
-    public void logInfo(String message, Throwable throwable) {
-        m_logger.info(generateLogMessage(message), throwable);
-    }
+    void logInfo(String message, Throwable throwable);
 
     /**
      * Log a message in the system log at the warning log level
      *
      * @param message to log
      */
-    public void logWarning(String message) {
-        logWarning(message, null);
-    }
+    void logWarning(String message);
 
     /**
      * Log a message and throwable in the system log at the warning log level
@@ -127,18 +91,14 @@ public final class TaskHelper {
      * @param message   to log
      * @param throwable to log along with {@code message}
      */
-    public void logWarning(String message, Throwable throwable) {
-        m_logger.warn(generateLogMessage(message), throwable);
-    }
+    void logWarning(String message, Throwable throwable);
 
     /**
      * Log a message in the system log at the error log level
      *
      * @param message to log
      */
-    public void logError(String message) {
-        logError(message, null);
-    }
+    void logError(String message);
 
     /**
      * Log a message and throwable in the system log at the error log level
@@ -146,9 +106,7 @@ public final class TaskHelper {
      * @param message   to log
      * @param throwable to log along with {@code message}
      */
-    public void logError(String message, Throwable throwable) {
-        m_logger.error(generateLogMessage(message), throwable);
-    }
+    void logError(String message, Throwable throwable);
 
     /**
      * Validate that a procedure with {@code name} exists and {@code parameters} are valid for that procedure.
@@ -161,65 +119,16 @@ public final class TaskHelper {
      * @param procedureName            Name of procedure to validate
      * @param parameters               that will be passed to {@code name}
      */
-    public void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope,
-            String procedureName, Object[] parameters) {
-        if (m_procedureGetter == null) {
-            return;
-        }
-        Procedure procedure = m_procedureGetter.apply(procedureName);
-        if (procedure == null) {
-            errors.addErrorMessage("Procedure does not exist: " + procedureName);
-            return;
-        }
+    void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope, String procedureName,
+            Object[] parameters);
 
-        if (procedure.getSystemproc()) {
-            // System procedures do not have parameter types in the procedure definition
-            return;
-        }
+    /**
+     * Test if a procedure is read only. If a procedure cannot be found with {@code procedureName} then {@code false} is
+     * returned
+     *
+     * @param procedureName Name of procedure.
+     * @return {@code true} if {@code procedureName} is read only
+     */
+    boolean isProcedureReadOnly(String procedureName);
 
-        if (restrictProcedureByScope) {
-            String error = TaskManager.isProcedureValidForScope(m_scope, procedure);
-            if (error != null) {
-                errors.addErrorMessage(error);
-                return;
-            }
-        }
-
-        CatalogMap<ProcParameter> parameterTypes = procedure.getParameters();
-
-        if (procedure.getSinglepartition() && parameterTypes.size() == parameters.length + 1) {
-            if (procedure.getPartitionparameter() != 0) {
-                errors.addErrorMessage(String.format(
-                        "Procedure %s is a partitioned procedure but the partition parameter is not the first",
-                        procedureName));
-                return;
-            }
-
-            Object[] newParameters = new Object[parameters.length + 1];
-            newParameters[0] = 0;
-            System.arraycopy(parameters, 0, newParameters, 1, parameters.length);
-            parameters = newParameters;
-        }
-
-        if (parameterTypes.size() != parameters.length) {
-            errors.addErrorMessage(String.format("Procedure %s takes %d parameters but %d were given", procedureName,
-                    procedure.getParameters().size(), parameters.length));
-            return;
-        }
-
-        for (ProcParameter pp : parameterTypes) {
-            Class<?> parameterClass = VoltType.classFromByteValue((byte) pp.getType());
-            try {
-                ParameterConverter.tryToMakeCompatible(parameterClass, parameters[pp.getIndex()]);
-            } catch (Exception e) {
-                errors.addErrorMessage(
-                        String.format("Could not convert parameter %d with the value \"%s\" to type %s: %s",
-                                pp.getIndex(), parameters[pp.getIndex()], parameterClass.getName(), e.getMessage()));
-            }
-        }
-    }
-
-    private String generateLogMessage(String body) {
-        return m_generateLogMessage.apply(body);
-    }
 }

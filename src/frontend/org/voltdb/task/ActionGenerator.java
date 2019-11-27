@@ -20,7 +20,7 @@ package org.voltdb.task;
 /**
  * Interface which generates actions to be be performed as part of a task on a schedule
  */
-public interface ActionGenerator extends Initializable {
+public interface ActionGenerator extends ActionGeneratorBase {
     /**
      * This method is invoked for the first action to be performed. All subsequent invocation will be of
      * {@link Action#getCallback()}
@@ -31,21 +31,4 @@ public interface ActionGenerator extends Initializable {
      * @return {@link Action} to perform
      */
     Action getFirstAction();
-
-    /**
-     * If this method returns {@code true} that means the type of procedure which this scheduler can run is restricted
-     * based upon the scope type.
-     * <ul>
-     * <li>SYSTEM - No restrictions</li>
-     * <li>HOSTS - Only NT procedures are allowed</li>
-     * <li>PARTITIONS - Only partitioned procedures are allowed</li>
-     * </ul>
-     * <p>
-     * Default return is {@code false}
-     *
-     * @return {@code true} if the type of procedure this scheduler can run should be restricted based upon scope
-     */
-    default boolean restrictProcedureByScope() {
-        return false;
-    }
 }

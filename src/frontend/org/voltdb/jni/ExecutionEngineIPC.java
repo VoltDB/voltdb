@@ -17,8 +17,11 @@
 
 package org.voltdb.jni;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
@@ -38,8 +41,10 @@ import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.UserDefinedAggregateFunctionRunner;
 import org.voltdb.UserDefinedScalarFunctionRunner;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -47,8 +52,8 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
@@ -277,10 +282,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_callJavaUserDefinedFunction = 107;
 
         /**
-         * An error code that can be sent at any time indicating that
-         * an export stream is dropped
+         * An error code that can be sent at any time indicating that an export stream is dropped
          */
         static final int kErrorCode_pushEndOfStream = 113;
+
+        /**
+         * Instruct the Java side to start a user-defined aggregate function.
+         */
+        static final int kErrorCode_callJavaUserDefinedAggregateStart = 114;
+
+        /**
+         * Instruct the Java side to assemble a user-defined aggregate function.
+         */
+        static final int kErrorCode_callJavaUserDefinedAggregateAssemble = 115;
+
+        /**
+         * Instruct the Java side to combine a result from another user-defined aggregate with this one.
+         */
+        static final int kErrorCode_callJavaUserDefinedAggregateCombine = 116;
+
+        /**
+         * Instruct the Java side to complete the worker portion of a user-defined aggregate function.
+         */
+        static final int kErrorCode_callJavaUserDefinedAggregateWorkerEnd = 117;
+
+        /**
+         * Instruct the Java side to calculate the result of a user-defined aggregate function.
+         */
+        static final int kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd = 118;
 
         ByteBuffer getBytes(int size) throws IOException {
             ByteBuffer header = ByteBuffer.allocate(size);
@@ -294,18 +323,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             return header;
         }
 
+        private ByteBuffer readMessage() throws IOException {
+            int bufferSize = m_connection.readInt();
+            final ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+            while (buffer.hasRemaining()) {
+                int read = m_socketChannel.read(buffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            buffer.flip();
+            return buffer;
+        }
+
         // Read per-fragment stats from the wire.
         void extractPerFragmentStatsInternal() {
             try {
-                int bufferSize = m_connection.readInt();
-                final ByteBuffer perFragmentStatsBuffer = ByteBuffer.allocate(bufferSize);
-                while (perFragmentStatsBuffer.hasRemaining()) {
-                    int read = m_socketChannel.read(perFragmentStatsBuffer);
-                    if (read == -1) {
-                        throw new EOFException();
-                    }
-                }
-                perFragmentStatsBuffer.flip();
+                final ByteBuffer perFragmentStatsBuffer = readMessage();
+
                 // Skip the perFragmentTimingEnabled flag.
                 perFragmentStatsBuffer.get();
                 m_succeededFragmentsCount = perFragmentStatsBuffer.getInt();
@@ -328,15 +363,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         void callJavaUserDefinedFunctionInternal() {
             try {
                 // Read the request content from the wire.
-                int bufferSize = m_connection.readInt();
-                final ByteBuffer udfBuffer = ByteBuffer.allocate(bufferSize);
-                while (udfBuffer.hasRemaining()) {
-                    int read = m_socketChannel.read(udfBuffer);
-                    if (read == -1) {
-                        throw new EOFException();
-                    }
-                }
-                udfBuffer.flip();
+                ByteBuffer udfBuffer = readMessage();
 
                 int functionId = udfBuffer.getInt();
                 UserDefinedScalarFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
@@ -375,6 +402,85 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_connection.write();
             }
             catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        void callJavaUserDefinedAggregateFunction(int operationId) {
+            try {
+                // Read the request content from the wire.
+                ByteBuffer udafBuffer = readMessage();
+
+                int functionId = udafBuffer.getInt();
+                UserDefinedAggregateFunctionRunner udafRunner = m_functionManager
+                        .getAggregateFunctionRunnerById(functionId);
+                assert (udafRunner != null);
+
+                Throwable throwable = null;
+                try {
+                    m_data.clear();
+                    // Put the status code for success (zero) into the buffer.
+                    m_data.putInt(0);
+
+                    if (operationId == kErrorCode_callJavaUserDefinedAggregateStart) {
+                        udafRunner.start();
+                    } else {
+                        int udafIndex = udafBuffer.getInt();
+
+                        switch (operationId) {
+                        case kErrorCode_callJavaUserDefinedAggregateAssemble:
+                            udafRunner.assemble(udafBuffer, udafIndex);
+                            break;
+                        case kErrorCode_callJavaUserDefinedAggregateCombine:
+                            udafRunner.combine(UserDefinedAggregateFunctionRunner.readObject(udafBuffer), udafIndex);
+                            break;
+                        case kErrorCode_callJavaUserDefinedAggregateWorkerEnd:
+                            Object workerInstance = udafRunner.getFunctionInstance(udafIndex);
+
+                            udafRunner.clearFunctionInstance(udafIndex);
+
+                            try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                                    ObjectOutput out = new ObjectOutputStream(bos)) {
+                                out.writeObject(workerInstance);
+                                out.flush();
+
+                                UserDefinedScalarFunctionRunner.writeValueToBuffer(m_data, VoltType.VARBINARY,
+                                        bos.toByteArray());
+                            }
+                            break;
+                        case kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd:
+                            Object returnValue = udafRunner.end(udafIndex);
+                            UserDefinedScalarFunctionRunner.writeValueToBuffer(m_data, udafRunner.getReturnType(),
+                                    returnValue);
+                            break;
+                        default:
+                            throw new IllegalArgumentException("Unknown operation: " + operationId);
+                        }
+                    }
+
+                    // Write the result to the buffer.
+
+                    m_data.flip();
+                    m_connection.write();
+                    return;
+                } catch (InvocationTargetException ex1) {
+                    // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+                    // We need to get its cause and throw that to the user.
+                    throwable = ex1.getCause();
+                } catch (Throwable ex2) {
+                    throwable = ex2;
+                }
+
+                // Getting here means the execution was not successful.
+                m_data.clear();
+
+                // Exception thrown, put return code = -1.
+                m_data.putInt(-1);
+                byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+                SerializationHelper.writeVarbinary(errorMsg, m_data);
+                m_data.flip();
+                m_connection.write();
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
@@ -538,6 +644,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
                 else if (status == kErrorCode_callJavaUserDefinedFunction) {
                     callJavaUserDefinedFunctionInternal();
+                } else if (status >= kErrorCode_callJavaUserDefinedAggregateStart
+                        && status <= kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd) {
+                    callJavaUserDefinedAggregateFunction(status);
                 }
                 else {
                     break;
@@ -828,8 +937,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId,
-            final long exportFlushTimeout) {
+            final boolean isLowestSiteId) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -859,8 +967,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                isLowestSiteId,
-                exportFlushTimeout);
+                isLowestSiteId);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -915,8 +1022,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int defaultDrBufferSize,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream,
-            final long exportFlushTimeout)
+            final boolean createDrReplicatedStream)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());

@@ -41,6 +41,21 @@ public class ExportClientBase {
     private String m_targetName;
 
     /**
+     * This enum defines how decoding should be threaded.
+     */
+    public static enum DecodingPolicy {
+        /**
+         * Decode each table and partition separately, i.e.
+         * they may be decoded in separate threads.
+         */
+        BY_PARTITION_TABLE,
+        /**
+         * Decode all table partitions together, i.e. in the same thread.
+         */
+        BY_TABLE
+    }
+
+    /**
      * Override this to take in configuration properties and setup your export
      * client connector.
      *
@@ -50,6 +65,18 @@ public class ExportClientBase {
     public void configure(Properties config) throws Exception {
         throw new UnsupportedOperationException("Configuration of onserver export client "
                 + "should be export client specific and must be implemented.");
+    }
+
+    /**
+     * Return the decoding policy.
+     * <p>
+     * By default the export clients allow decoding by table and partition.
+     * Some export clients may require decoding  all table partitions together.
+     *
+     * @return the decoding policy
+     */
+    public DecodingPolicy getDecodingPolicy() {
+        return DecodingPolicy.BY_PARTITION_TABLE;
     }
 
     public boolean isRunEverywhere() {

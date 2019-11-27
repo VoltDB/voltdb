@@ -776,7 +776,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkHasComplexAgg(List<AbstractPlanNode> pns,
             boolean projectPushdown) {
         assertTrue(pns.size() > 0);
-        boolean isDistributed = pns.size() > 1 ? true: false;
+        boolean isDistributed = pns.size() > 1;
 
         if (projectPushdown) {
             assertTrue(isDistributed);
@@ -1177,7 +1177,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments(sql);
         checkMVReaggregateFeatureMergeReceive(pns, false,
                 -1, -1,
-                false, false, sortDirection);
+                sortDirection);
     }
 
     private void checkMVNoFix_NoAgg(
@@ -1744,9 +1744,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
-    private void checkHavingClause(String sql,
-            boolean aggInline,
-            Object aggPostFilters) {
+    private void checkHavingClause(
+            String sql, boolean aggInline, Object aggPostFilters) {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments(sql);
@@ -1754,7 +1753,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractPlanNode p = pns.get(0);
         AggregatePlanNode aggNode;
 
-        ArrayList<AbstractPlanNode> nodesList = p.findAllNodesOfType(PlanNodeType.AGGREGATE);
+        List<AbstractPlanNode> nodesList = p.findAllNodesOfType(PlanNodeType.AGGREGATE);
         assertEquals(1, nodesList.size());
         p = nodesList.get(0);
 
@@ -1767,37 +1766,29 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String aggNodeStr = aggNode.toExplainPlanString().toLowerCase();
 
         if (aggPostFilters != null) {
-            String[] aggFilterStrings = null;
+            final String[] aggFilterStrings;
             if (aggPostFilters instanceof String) {
                 aggFilterStrings = new String[] { (String) aggPostFilters };
-            }
-            else {
+            } else {
                 aggFilterStrings = (String[]) aggPostFilters;
             }
             for (String aggFilter : aggFilterStrings) {
                 assertTrue(aggNodeStr.contains(aggFilter.toLowerCase()));
             }
-        }
-        else {
+        } else {
             assertNull(aggNode.getPostPredicate());
         }
     }
 
     private void checkMVFix_reAgg_MergeReceive(
-            String sql,
-            int numGroupByOfReaggNode, int numAggsOfReaggNode,
-            SortDirectionType sortDirection) {
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments(sql);
-        checkMVReaggregateFeatureMergeReceive(pns, true,
+            String sql, int numGroupByOfReaggNode, int numAggsOfReaggNode, SortDirectionType sortDirection) {
+        checkMVReaggregateFeatureMergeReceive(compileToFragments(sql), true,
                 numGroupByOfReaggNode, numAggsOfReaggNode,
-                false, false, sortDirection);
+                sortDirection);
 }
 
     private void checkMVFix_reAgg(
-            String sql,
-            int numGroupByOfReaggNode, int numAggsOfReaggNode) {
+            String sql, int numGroupByOfReaggNode, int numAggsOfReaggNode) {
         checkMVReaggreateFeature(sql, true,
                 -1, -1,
                 numGroupByOfReaggNode, numAggsOfReaggNode,
@@ -1821,10 +1812,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             int numGroupByOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupByOfReaggNode, int numAggsOfReaggNode,
             boolean aggPushdown, boolean aggInline) {
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments(sql);
-        checkMVReaggregateFeature(pns, needFix,
+        checkMVReaggregateFeature(compileToFragments(sql), needFix,
                 numGroupByOfTopAggNode, numAggsOfTopAggNode,
                 numGroupByOfReaggNode, numAggsOfReaggNode,
                 aggPushdown, aggInline);
@@ -1835,8 +1823,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
             boolean needFix,
             int numGroupByOfReaggNode,
             int numAggsOfReaggNode,
-            boolean aggPushdown,
-            boolean aggInline,
             SortDirectionType sortDirection) {
 
         assertEquals(2, pns.size());
@@ -1853,11 +1839,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         if (needFix) {
             assertNotNull(reAggNode);
-
             assertEquals(numGroupByOfReaggNode, reAggNode.getGroupByExpressionsSize());
             assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypesSize());
-        }
-        else {
+        } else {
             assertNull(reAggNode);
         }
 
@@ -1867,12 +1851,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         assertTrue(p instanceof IndexScanPlanNode);
         assertEquals(sortDirection, ((IndexScanPlanNode)p).getSortDirection());
-
     }
 
     // topNode, reAggNode
-    private void checkMVReaggregateFeature(List<AbstractPlanNode> pns,
-            boolean needFix,
+    private void checkMVReaggregateFeature(
+            List<AbstractPlanNode> pns, boolean needFix,
             int numGroupByOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupByOfReaggNode, int numAggsOfReaggNode,
             boolean aggPushdown, boolean aggInline) {
@@ -1894,7 +1877,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
         }
-        HashAggregatePlanNode reAggNode = null;
+        HashAggregatePlanNode reAggNode;
 
         List<AbstractPlanNode> nodes = p.findAllNodesOfClass(AbstractReceivePlanNode.class);
         assertEquals(1, nodes.size());
@@ -1929,12 +1912,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //
         // Hash top aggregate node
         //
-        AggregatePlanNode topAggNode = null;
+        AggregatePlanNode topAggNode;
         if (p instanceof AbstractJoinPlanNode) {
             // Inline aggregation with join
             topAggNode = AggregatePlanNode.getInlineAggregationNode(p);
-        }
-        else {
+        } else {
             assertTrue(p instanceof AggregatePlanNode);
             topAggNode = (AggregatePlanNode) p;
             p = p.getChild(0);
@@ -1963,8 +1945,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertTrue(!needFix);
             if (aggInline) {
                 assertNotNull(AggregatePlanNode.getInlineAggregationNode(p));
-            }
-            else {
+            } else {
                 assertTrue(p instanceof AggregatePlanNode);
                 p = p.getChild(0);
             }
@@ -1972,10 +1953,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         if (needFix) {
             assertTrue(p instanceof AbstractScanPlanNode);
-        }
-        else {
-            assertTrue(p instanceof AbstractScanPlanNode ||
-                    p instanceof AbstractJoinPlanNode);
+        } else {
+            assertTrue(p instanceof AbstractScanPlanNode || p instanceof AbstractJoinPlanNode);
         }
 
     }

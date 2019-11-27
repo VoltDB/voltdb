@@ -25,7 +25,7 @@
 
 // this is a copy of pounder.groovy file with difference being it uses
 // kafka client 10.2.1 api instead of 8.2.2.
-@Grab('org.apache.kafka:kafka-clients:0.10.2.1')
+@Grab('org.apache.kafka:kafka-clients:2.3.0')
 
 
 import org.voltdb.client.*
@@ -83,7 +83,7 @@ def kconf = [
     (VALUE_SERIALIZER_CLASS_CONFIG):StringSerializer.class.name,
     (BOOTSTRAP_SERVERS_CONFIG):opts.b,
     (COMPRESSION_TYPE_CONFIG):opts.c,
-    (BLOCK_ON_BUFFER_FULL_CONFIG):true,
+    (MAX_BLOCK_MS_CONFIG):60000,
     (ACKS_CONFIG):'all',
     (RETRIES_CONFIG):4
 ]

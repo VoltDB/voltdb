@@ -412,6 +412,10 @@ public class Cartographer extends StatsSource
         return Cartographer.getPartitions(m_zk);
     }
 
+    public List<Integer> getPartitionIdsForLocalhost() {
+        return (List<Integer>) getHostToPartitionMap().get(m_hostMessenger.getHostId());
+    }
+
     public int getPartitionCount()
     {
         // The list returned by getPartitions includes the MP PID.  Need to remove that for the

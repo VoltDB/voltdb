@@ -57,7 +57,7 @@ struct ProgressStats {
     int64_t TuplesProcessedInFragment = 0;
     int64_t TuplesProcessedSinceReport = 0;
     int64_t TupleReportThreshold = LONG_OP_THRESHOLD;
-    PlanNodeType LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    PlanNodeType LastAccessedPlanNodeType = PlanNodeType::Invalid;
     void resetForNewBatch() {
         TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
     }
@@ -408,7 +408,7 @@ class ExecutorContext {
             e.serialize(m_engine->getExceptionOutputSerializer());
         }
 
-        m_progressStats.LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+        m_progressStats.LastAccessedPlanNodeType = PlanNodeType::Invalid;
     }
 
     /**

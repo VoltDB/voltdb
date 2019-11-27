@@ -79,8 +79,6 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
 
         m_config.shutDown();
-        ExportManager.setInstanceForTest(null);
-
         m_config.startUp(false);
 
         System.out.println("Restart is done...........");

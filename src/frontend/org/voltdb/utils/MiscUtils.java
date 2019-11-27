@@ -1115,4 +1115,39 @@ public class MiscUtils {
         }
         return written;
     }
+
+    /**
+     * Log (to the fatal logger) the list of ports in use.
+     * Uses "lsof -i" internally.
+     *
+     * @param log VoltLogger used to print output or warnings.
+     */
+    public static synchronized void printPortsInUse(VoltLogger log) {
+        try {
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + CLibrary.getpid());
+            if (str != null) {
+                log.fatal(str);
+            }
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    log.fatal(str);
+                }
+            }
+        }
+        catch (Exception e) {
+            log.fatal("Unable to list ports in use at this time.");
+        }
+    }
 }

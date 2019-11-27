@@ -46,8 +46,7 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         assert(m_children.size() == 1);
         m_children.get(0).generateOutputSchema(db);
         m_outputSchemaPreInlineAgg =
@@ -68,12 +67,11 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         resolveColumnIndexes(m_outputSchemaPreInlineAgg);
 
         AbstractPlanNode orderNode = getInlinePlanNode(PlanNodeType.ORDERBY);
-        assert(orderNode != null && orderNode instanceof OrderByPlanNode);
+        assert(orderNode instanceof OrderByPlanNode);
         OrderByPlanNode opn = (OrderByPlanNode) orderNode;
         opn.resolveSortIndexesUsingSchema(m_outputSchemaPreInlineAgg);
 

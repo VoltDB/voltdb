@@ -52,7 +52,7 @@ public class testPlannerTester extends PlannerTestCase {
         AbstractPlanNode pn = null;
         pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
 
-        ArrayList<AbstractScanPlanNode> collected = pn.getScanNodeList();
+        List<AbstractScanPlanNode> collected = pn.getScanNodeList();
         System.out.println(collected);
         System.out.println(collected.size());
         for (AbstractPlanNode n : collected) {
@@ -108,11 +108,11 @@ public class testPlannerTester extends PlannerTestCase {
         System.out.println(pn.toExplainPlanString());
         plannerTester.writePlanToFile(pn, m_homeDir, "prettyJson.txt", "");
 
-        ArrayList<String> getsql = new ArrayList<String>();
+        List<String> getsql = new ArrayList<String>();
         AbstractPlanNode pn2 = plannerTester.loadPlanFromFile(m_homeDir + "prettyJson.txt", getsql);
         System.out.println(pn2.toExplainPlanString());
-        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
-        ArrayList<AbstractPlanNode> list2 = pn2.getPlanNodeList();
+        List<AbstractPlanNode> list1 = pn.getPlanNodeList();
+        List<AbstractPlanNode> list2 = pn2.getPlanNodeList();
         assertTrue(list1.size() == list2.size());
         for (int i = 0; i < list1.size(); i++) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -134,11 +134,11 @@ public class testPlannerTester extends PlannerTestCase {
         System.out.println(pn.toJSONString());
         plannerTester.writePlanToFile(pn, m_homeDir, "prettyJson.txt", "");
 
-        ArrayList<String> getsql = new ArrayList<>();
+        List<String> getsql = new ArrayList<>();
         AbstractPlanNode pn2 = plannerTester.loadPlanFromFile(m_homeDir + "prettyJson.txt", getsql);
         System.out.println(pn2.toExplainPlanString());
-        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
-        ArrayList<AbstractPlanNode> list2 = pn2.getPlanNodeList();
+        List<AbstractPlanNode> list1 = pn.getPlanNodeList();
+        List<AbstractPlanNode> list2 = pn2.getPlanNodeList();
         assertTrue(list1.size() == list2.size());
         for (int i = 0; i < list1.size(); i++) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -154,7 +154,7 @@ public class testPlannerTester extends PlannerTestCase {
         AbstractPlanNode pn1 = null;
         pn1 = compile("select * from l, t where t.b=l.b limit ?;");
 
-        ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeList();
+        List<AbstractPlanNode> pnlist = pn1.getPlanNodeList();
 
         System.out.println(pn1.toExplainPlanString());
         System.out.println(pnlist.size());

@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <tuple>
 #include "common/SerializableEEException.h"
 #include "executors/aggregateexecutor.h"
 #include "plannodes/aggregatenode.h"
@@ -290,8 +291,8 @@ public:
             // zero, and [de-]normalized numbers).  This is also enforced
             // in the front end.
             vassert(! isVariableLengthType(ValuePeeker::peekValueType(val))
-                    && ValuePeeker::peekValueType(val) != VALUE_TYPE_POINT
-                    && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
+                    && ValuePeeker::peekValueType(val) != ValueType::tPOINT
+                    && ValuePeeker::peekValueType(val) != ValueType::tDOUBLE);
 
             int32_t valLength = 0;
             const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
@@ -319,7 +320,7 @@ public:
 class ValsToHyperLogLogAgg : public ApproxCountDistinctAgg {
 public:
     NValue finalize(ValueType type) override {
-        vassert(type == VALUE_TYPE_VARBINARY);
+        vassert(type == ValueType::tVARBINARY);
         // serialize the hyperloglog as varbinary, to send to
         // coordinator.
         //
@@ -340,7 +341,7 @@ public:
 class HyperLogLogsToCardAgg : public ApproxCountDistinctAgg {
 public:
     void advance(const NValue& val) override {
-        vassert(ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        vassert(ValuePeeker::peekValueType(val) == ValueType::tVARBINARY);
         vassert(!val.isNull());
 
         // TODO: we're doing some unnecessary copying here to
@@ -577,9 +578,9 @@ inline void AggregateExecutorBase::initCountingPredicate(const NValueArray& para
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     auto* inlineLimitNode = dynamic_cast<LimitPlanNode*>(
-            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+            m_abstractNode->getInlinePlanNode(PlanNodeType::Limit));
     if (inlineLimitNode) {
-        inlineLimitNode->getLimitAndOffsetByReference(params, limit, offset);
+        std::tie(limit, offset) = inlineLimitNode->getLimitAndOffset(params);
     }
     m_postfilter = CountingPostfilter(m_tmpOutputTable, m_postPredicate, limit, offset, parentPostfilter);
 }

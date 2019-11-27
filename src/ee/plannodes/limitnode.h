@@ -43,55 +43,41 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORELIMITNODE_H
-#define HSTORELIMITNODE_H
+#pragma once
 
-#include <sstream>
 #include "abstractplannode.h"
 #include "common/debuglog.h"
 #include "common/valuevector.h"
 
 namespace voltdb {
 
-class Table;
-
-/**
- *
- */
 class LimitPlanNode : public AbstractPlanNode {
-public:
-    LimitPlanNode()
-        : limit(-1)
-        , offset(0)
-        , limitParamIdx(-1)
-        , offsetParamIdx(-1)
-        , limitExpression(NULL)
-    {
-    }
-
-    ~LimitPlanNode();
-    PlanNodeType getPlanNodeType() const;
-
-    // evaluate possibly parameterized limit and offsets.
-    void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
-
-    std::string debugInfo(const std::string &spacer) const;
-
-private:
     void loadFromJSONObject(PlannerDomValue obj);
-    int limit;
-    int offset;
-    int limitParamIdx;
-    int offsetParamIdx;
+    int limit = -1;
+    int offset = 0;
+    int limitParamIdx = -1;
+    int offsetParamIdx = -1;
 
     /*
      * If the query has limit and offset, the pushed-down limit node will
      * have a limit expression of the sum of the limit parameter and the
      * offset parameter, and offset will be 0
      */
-    AbstractExpression* limitExpression;
+    AbstractExpression* limitExpression = nullptr;
+public:
+    LimitPlanNode() = default;
+    ~LimitPlanNode() {
+        delete limitExpression;
+    }
+    PlanNodeType getPlanNodeType() const {
+        return PlanNodeType::Limit;
+    }
+
+    // evaluate possibly parameterized limit and offsets.
+    std::tuple<int, int> getLimitAndOffset(const NValueArray &params);
+
+    std::string debugInfo(const std::string &spacer) const;
 };
 
 }
 
-#endif

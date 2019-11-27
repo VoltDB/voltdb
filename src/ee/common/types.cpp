@@ -49,23 +49,23 @@ map<V, K> revert(map<K, V>const& original) {
 }
 
 map<ValueType, string> const mapOfTypeName {
-   {VALUE_TYPE_TINYINT, "TINYINT"},
-   {VALUE_TYPE_SMALLINT, "SMALLINT"},
-   {VALUE_TYPE_INTEGER, "INTEGER"},
-   {VALUE_TYPE_BIGINT, "BIGINT"},
-   {VALUE_TYPE_DOUBLE, "FLOAT"},
-   {VALUE_TYPE_VARCHAR, "VARCHAR"},
-   {VALUE_TYPE_VARBINARY, "VARBINARY"},
-   {VALUE_TYPE_TIMESTAMP, "TIMESTAMP"},
-   {VALUE_TYPE_DECIMAL, "DECIMAL"},
-   {VALUE_TYPE_BOOLEAN, "BOOLEAN"},
-   {VALUE_TYPE_POINT, "POINT"},
-   {VALUE_TYPE_GEOGRAPHY, "GEOGRAPHY"},
-   {VALUE_TYPE_ADDRESS, "ADDRESS"},
-   {VALUE_TYPE_INVALID, "INVALID"},
-   {VALUE_TYPE_NULL, "NULL"},
-   {VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC, "NUMERIC"},
-   {VALUE_TYPE_ARRAY, "ARRAY"}
+   {ValueType::tTINYINT, "TINYINT"},
+   {ValueType::tSMALLINT, "SMALLINT"},
+   {ValueType::tINTEGER, "INTEGER"},
+   {ValueType::tBIGINT, "BIGINT"},
+   {ValueType::tDOUBLE, "FLOAT"},
+   {ValueType::tVARCHAR, "VARCHAR"},
+   {ValueType::tVARBINARY, "VARBINARY"},
+   {ValueType::tTIMESTAMP, "TIMESTAMP"},
+   {ValueType::tDECIMAL, "DECIMAL"},
+   {ValueType::tBOOLEAN, "BOOLEAN"},
+   {ValueType::tPOINT, "POINT"},
+   {ValueType::tGEOGRAPHY, "GEOGRAPHY"},
+   {ValueType::tADDRESS, "ADDRESS"},
+   {ValueType::tINVALID, "INVALID"},
+   {ValueType::tNULL, "NULL"},
+   {ValueType::NumericDiagnostics, "NUMERIC"},
+   {ValueType::tARRAY, "ARRAY"}
 };
 
 map<TableStreamType, string> const mapOfStreamTypeName {
@@ -97,34 +97,34 @@ map<SortDirectionType, string> const mapOfSortDirectionType {
 map<string, SortDirectionType> const mapToSortDirectionType = revert(mapOfSortDirectionType);
 
 map<PlanNodeType, string> const mapOfPlanNodeType {
-   {PLAN_NODE_TYPE_INVALID, "INVALID"},
-   {PLAN_NODE_TYPE_SEQSCAN, "SEQSCAN"},
-   {PLAN_NODE_TYPE_INDEXSCAN, "INDEXSCAN"},
-   {PLAN_NODE_TYPE_INDEXCOUNT, "INDEXCOUNT"},
-   {PLAN_NODE_TYPE_TABLECOUNT, "TABLECOUNT"},
-   {PLAN_NODE_TYPE_NESTLOOP, "NESTLOOP"},
-   {PLAN_NODE_TYPE_NESTLOOPINDEX, "NESTLOOPINDEX"},
-   {PLAN_NODE_TYPE_MERGEJOIN, "MERGEJOIN"},
-   {PLAN_NODE_TYPE_UPDATE, "UPDATE"},
-   {PLAN_NODE_TYPE_INSERT, "INSERT"},
-   {PLAN_NODE_TYPE_DELETE, "DELETE"},
-   {PLAN_NODE_TYPE_SWAPTABLES, "SWAPTABLES"},
-   {PLAN_NODE_TYPE_MIGRATE, "MIGRATE"},
-   {PLAN_NODE_TYPE_SEND, "SEND"},
-   {PLAN_NODE_TYPE_RECEIVE, "RECEIVE"},
-   {PLAN_NODE_TYPE_MERGERECEIVE, "MERGERECEIVE"},
-   {PLAN_NODE_TYPE_AGGREGATE, "AGGREGATE"},
-   {PLAN_NODE_TYPE_HASHAGGREGATE, "HASHAGGREGATE"},
-   {PLAN_NODE_TYPE_PARTIALAGGREGATE, "PARTIALAGGREGATE"},
-   {PLAN_NODE_TYPE_UNION, "UNION"},
-   {PLAN_NODE_TYPE_ORDERBY, "ORDERBY"},
-   {PLAN_NODE_TYPE_PROJECTION, "PROJECTION"},
-   {PLAN_NODE_TYPE_MATERIALIZE, "MATERIALIZE"},
-   {PLAN_NODE_TYPE_LIMIT, "LIMIT"},
-   {PLAN_NODE_TYPE_MATERIALIZEDSCAN, "MATERIALIZEDSCAN"},
-   {PLAN_NODE_TYPE_TUPLESCAN, "TUPLESCAN"},
-   {PLAN_NODE_TYPE_WINDOWFUNCTION, "WINDOWFUNCTION"},
-   {PLAN_NODE_TYPE_COMMONTABLE, "COMMONTABLE"}
+   {PlanNodeType::Invalid, "INVALID"},
+   {PlanNodeType::SeqScan, "SEQSCAN"},
+   {PlanNodeType::IndexScan, "INDEXSCAN"},
+   {PlanNodeType::IndexCount, "INDEXCOUNT"},
+   {PlanNodeType::TableCount, "TABLECOUNT"},
+   {PlanNodeType::Nestloop, "NESTLOOP"},
+   {PlanNodeType::NestloopIndex, "NESTLOOPINDEX"},
+   {PlanNodeType::MergeJoin, "MERGEJOIN"},
+   {PlanNodeType::Update, "UPDATE"},
+   {PlanNodeType::Insert, "INSERT"},
+   {PlanNodeType::Delete, "DELETE"},
+   {PlanNodeType::SwapTables, "SWAPTABLES"},
+   {PlanNodeType::Migrate, "MIGRATE"},
+   {PlanNodeType::Send, "SEND"},
+   {PlanNodeType::Receive, "RECEIVE"},
+   {PlanNodeType::MergeReceive, "MERGERECEIVE"},
+   {PlanNodeType::Aggregate, "AGGREGATE"},
+   {PlanNodeType::HashAggregate, "HASHAGGREGATE"},
+   {PlanNodeType::PartialAggregate, "PARTIALAGGREGATE"},
+   {PlanNodeType::Union, "UNION"},
+   {PlanNodeType::OrderBy, "ORDERBY"},
+   {PlanNodeType::Projection, "PROJECTION"},
+   {PlanNodeType::Materialize, "MATERIALIZE"},
+   {PlanNodeType::Limit, "LIMIT"},
+   {PlanNodeType::MaterializedScan, "MATERIALIZEDSCAN"},
+   {PlanNodeType::TupleScan, "TUPLESCAN"},
+   {PlanNodeType::WindowFunction, "WINDOWFUNCTION"},
+   {PlanNodeType::CommonTable, "COMMONTABLE"}
 };
 
 map<string, PlanNodeType> const mapToPlanNodeType = revert(mapOfPlanNodeType);
@@ -197,13 +197,13 @@ map<QuantifierType, string> const mapOfQuantifierType {
 map<string, QuantifierType> const mapToQuantifierType = revert(mapOfQuantifierType);
 
 map<IndexLookupType, string> const mapOfIndexLookupType {
-   {INDEX_LOOKUP_TYPE_INVALID, "INVALID"},
-   {INDEX_LOOKUP_TYPE_EQ, "EQ"},
-   {INDEX_LOOKUP_TYPE_GT, "GT"},
-   {INDEX_LOOKUP_TYPE_GTE, "GTE"},
-   {INDEX_LOOKUP_TYPE_LT, "LT"},
-   {INDEX_LOOKUP_TYPE_LTE, "LTE"},
-   {INDEX_LOOKUP_TYPE_GEO_CONTAINS, "GEO_CONTAINS"}
+   {IndexLookupType::Invalid, "INVALID"},
+   {IndexLookupType::Equal, "EQ"},
+   {IndexLookupType::Greater, "GT"},
+   {IndexLookupType::GreaterEqual, "GTE"},
+   {IndexLookupType::Less, "LT"},
+   {IndexLookupType::LessEqual, "LTE"},
+   {IndexLookupType::GeoContains, "GEO_CONTAINS"}
 };
 
 map<string, IndexLookupType> const mapToIndexLookupType = revert(mapOfIndexLookupType);
@@ -211,25 +211,25 @@ map<string, IndexLookupType> const mapToIndexLookupType = revert(mapOfIndexLooku
 /** Testing utility */
 bool isNumeric(ValueType type) {
     switch (type) {
-      case (VALUE_TYPE_TINYINT):
-      case (VALUE_TYPE_SMALLINT):
-      case (VALUE_TYPE_INTEGER):
-      case (VALUE_TYPE_BIGINT):
-      case (VALUE_TYPE_DECIMAL):
-      case (VALUE_TYPE_DOUBLE):
-        return true;
-      break;
-      case (VALUE_TYPE_VARCHAR):
-      case (VALUE_TYPE_VARBINARY):
-      case (VALUE_TYPE_TIMESTAMP):
-      case (VALUE_TYPE_POINT):
-      case (VALUE_TYPE_GEOGRAPHY):
-      case (VALUE_TYPE_NULL):
-      case (VALUE_TYPE_INVALID):
-      case (VALUE_TYPE_ARRAY):
-        return false;
-      default:
-          throw exception();
+        case ValueType::tTINYINT:
+        case ValueType::tSMALLINT:
+        case ValueType::tINTEGER:
+        case ValueType::tBIGINT:
+        case ValueType::tDECIMAL:
+        case ValueType::tDOUBLE:
+            return true;
+            break;
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tTIMESTAMP:
+        case ValueType::tPOINT:
+        case ValueType::tGEOGRAPHY:
+        case ValueType::tNULL:
+        case ValueType::tINVALID:
+        case ValueType::tARRAY:
+            return false;
+        default:
+            throw exception();
     }
     throw exception();
 }
@@ -237,33 +237,33 @@ bool isNumeric(ValueType type) {
 /** Used in index optimization **/
 bool isIntegralType(ValueType type) {
     switch (type) {
-      case (VALUE_TYPE_TINYINT):
-      case (VALUE_TYPE_SMALLINT):
-      case (VALUE_TYPE_INTEGER):
-      case (VALUE_TYPE_BIGINT):
-        return true;
-      break;
-      case (VALUE_TYPE_DOUBLE):
-      case (VALUE_TYPE_VARCHAR):
-      case (VALUE_TYPE_VARBINARY):
-      case (VALUE_TYPE_TIMESTAMP):
-      case (VALUE_TYPE_POINT):
-      case (VALUE_TYPE_GEOGRAPHY):
-      case (VALUE_TYPE_NULL):
-      case (VALUE_TYPE_DECIMAL):
-      case (VALUE_TYPE_ARRAY):
-        return false;
-      default:
-          throw exception();
+        case ValueType::tTINYINT:
+        case ValueType::tSMALLINT:
+        case ValueType::tINTEGER:
+        case ValueType::tBIGINT:
+            return true;
+            break;
+        case ValueType::tDOUBLE:
+        case ValueType::tVARCHAR:
+        case ValueType::tVARBINARY:
+        case ValueType::tTIMESTAMP:
+        case ValueType::tPOINT:
+        case ValueType::tGEOGRAPHY:
+        case ValueType::tNULL:
+        case ValueType::tDECIMAL:
+        case ValueType::tARRAY:
+            return false;
+        default:
+            throw exception();
     }
     throw exception();
 }
 
 bool isVariableLengthType(ValueType type) {
     switch (type) {
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY:
+        case ValueType::tVARCHAR:
+    case ValueType::tVARBINARY:
+    case ValueType::tGEOGRAPHY:
         return true;
     default:
         return false;
@@ -272,7 +272,7 @@ bool isVariableLengthType(ValueType type) {
 
 string getTypeName(ValueType type) {
   return lookup(mapOfTypeName, type,
-         string("UNKNOWN[").append(to_string(type)).append("]"));
+         string("UNKNOWN[").append(std::to_string(static_cast<int>(type))).append("]"));
 }
 
 string tableStreamTypeToString(TableStreamType type) {
@@ -284,15 +284,15 @@ string valueToString(ValueType type) {
    return getTypeName(type);
 }
 
-ValueType stringToValue(string nam) {
-   return lookup(mapToValueType, nam, VALUE_TYPE_INVALID);
+ValueType stringToValue(string const& nam) {
+   return lookup(mapToValueType, nam, ValueType::tINVALID);
 }
 
 string joinToString(JoinType type) {
    return lookup(mapOfJoinType, type, "INVALID");
 }
 
-JoinType stringToJoin(string nam) {
+JoinType stringToJoin(string const& nam) {
    return lookup(mapToJoinType, nam, JOIN_TYPE_INVALID);
 }
 
@@ -300,7 +300,7 @@ string sortDirectionToString(SortDirectionType type) {
    return lookup(mapOfSortDirectionType, type, "INVALID");
 }
 
-SortDirectionType stringToSortDirection(string nam) {
+SortDirectionType stringToSortDirection(string const& nam) {
    return lookup(mapToSortDirectionType, nam, SORT_DIRECTION_TYPE_INVALID);
 }
 
@@ -308,15 +308,15 @@ string planNodeToString(PlanNodeType type) {
    return lookup(mapOfPlanNodeType, type, "UNDEFINED");
 }
 
-PlanNodeType stringToPlanNode(string nam) {
-   return lookup(mapToPlanNodeType, nam, PLAN_NODE_TYPE_INVALID);
+PlanNodeType stringToPlanNode(string const& nam) {
+   return lookup(mapToPlanNodeType, nam, PlanNodeType::Invalid);
 }
 
 string expressionToString(ExpressionType type) {
    return lookup(mapOfExpressionType, type, "INVALID");
 }
 
-ExpressionType stringToExpression(string str) {
+ExpressionType stringToExpression(string const& str) {
    return lookup(mapToExpressionType, str, EXPRESSION_TYPE_INVALID);
 }
 
@@ -324,7 +324,7 @@ string quantifierToString(QuantifierType type) {
    return lookup(mapOfQuantifierType, type, "INVALID");
 }
 
-QuantifierType stringToQuantifier(string nam) {
+QuantifierType stringToQuantifier(string const& nam) {
    return lookup(mapToQuantifierType, nam, QUANTIFIER_TYPE_NONE);
 }
 
@@ -332,8 +332,8 @@ string indexLookupToString(IndexLookupType type) {
    return lookup(mapOfIndexLookupType, type, "INVALID");
 }
 
-IndexLookupType stringToIndexLookup(string nam) {
-   return lookup(mapToIndexLookupType, nam, INDEX_LOOKUP_TYPE_INVALID);
+IndexLookupType stringToIndexLookup(string const& nam) {
+   return lookup(mapToIndexLookupType, nam, IndexLookupType::Invalid);
 }
 
 /** takes in 0-F, returns 0-15 */
@@ -353,16 +353,16 @@ int32_t hexCharToInt(char c) {
 
 int64_t getMaxTypeValue (ValueType type) {
     switch(type) {
-    case VALUE_TYPE_TINYINT:
-        return static_cast<int64_t>(INT8_MAX);
-    case VALUE_TYPE_SMALLINT:
-        return static_cast<int64_t>(INT16_MAX);
-    case VALUE_TYPE_INTEGER:
-        return static_cast<int64_t>(INT32_MAX);
-    case VALUE_TYPE_BIGINT:
-        return static_cast<int64_t>(INT64_MAX);
-    default:
-        return static_cast<int64_t>(-1);
+        case ValueType::tTINYINT:
+            return static_cast<int64_t>(INT8_MAX);
+        case ValueType::tSMALLINT:
+            return static_cast<int64_t>(INT16_MAX);
+        case ValueType::tINTEGER:
+            return static_cast<int64_t>(INT32_MAX);
+        case ValueType::tBIGINT:
+            return static_cast<int64_t>(INT64_MAX);
+        default:
+            return static_cast<int64_t>(-1);
     }
 }
 

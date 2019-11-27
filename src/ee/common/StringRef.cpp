@@ -24,8 +24,6 @@
 
 using namespace voltdb;
 
-char const* empty_string = "";
-
 inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
    return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
 }
@@ -44,19 +42,15 @@ int32_t StringRef::getObjectLength() const {
 
 const char* StringRef::getObject(int32_t& lengthOut) const {
     /*/ enable to debug
-    std::cout << this << " DEBUG: getting [" << asSizedObject(m_stringPtr)->m_size << "]"
-              << std::string(asSizedObject(m_stringPtr)->m_data,
-                             asSizedObject(m_stringPtr)->m_size)
-              << std::endl;
+      std::cout << this << " DEBUG: getting [" << asSizedObject(m_stringPtr)->m_size << "]"
+      << std::string(asSizedObject(m_stringPtr)->m_data,
+      asSizedObject(m_stringPtr)->m_size)
+      << std::endl;
     // */
     auto const* sized = asSizedObject(m_stringPtr);
     lengthOut = sized->m_size;
-    if (lengthOut > 0) {
-        return sized->m_data;
-    } else {
-        lengthOut = 0;
-        return empty_string;
-    }
+    vassert(lengthOut >= 0);
+    return sized->m_data;
 }
 
 int32_t StringRef::getAllocatedSizeInPersistentStorage() const {

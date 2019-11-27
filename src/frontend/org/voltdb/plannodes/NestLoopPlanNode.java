@@ -36,8 +36,7 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
                                      DatabaseEstimates estimates,
-                                     ScalarValueHints[] paramHints)
-    {
+                                     ScalarValueHints[] paramHints) {
 
         m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
         // Discount outer child estimates based on the number of its filters

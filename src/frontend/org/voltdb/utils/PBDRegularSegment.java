@@ -343,7 +343,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         // Zero entry count means the segment is empty or corrupted, in both cases
         // the segment can be deleted.
         if (initialEntryCount == 0) {
-            reader.close();
+            reader.close(false);
             close();
             return Integer.MAX_VALUE;
         }
@@ -403,7 +403,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
         int entriesScanned = reader.readIndex();
-        reader.close();
+        reader.close(false);
 
         if (entriesTruncated == 0) {
             int entriesNotScanned = initialEntryCount - entriesScanned;
@@ -450,7 +450,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
             return entriesTruncated;
         } finally {
-            reader.purge();
+            reader.close();
         }
     }
 
@@ -466,7 +466,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
             return 0;
         } finally {
-            reader.purge();
+            reader.close();
         }
     }
 
@@ -1076,12 +1076,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         @Override
         public void close() throws IOException {
-            close(true);
+            close(false);
         }
 
         @Override
-        public void purge() throws IOException {
-            close(false);
+        public void closeAndSaveReaderState() throws IOException {
+            close(true);
         }
 
         private void close(boolean keep) throws IOException {

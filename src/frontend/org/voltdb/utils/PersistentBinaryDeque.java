@@ -118,7 +118,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         return null;
                     }
 
-                    segmentReader.close();
+                    segmentReader.closeAndSaveReaderState();
                     m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
                     // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
@@ -1407,5 +1407,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     interface PBDSegmentFactory {
         <M> PBDSegment<M> create(long segmentIndex, long segmentId, File file, VoltLogger logger,
                 BinaryDequeSerializer<M> extraHeaderSerializer);
+    }
+
+    @Override
+    public int countCursors() {
+        return m_readCursors.size();
     }
 }

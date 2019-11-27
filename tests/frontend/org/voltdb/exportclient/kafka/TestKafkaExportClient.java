@@ -23,11 +23,11 @@
 
 package org.voltdb.exportclient.kafka;
 
+import static junit.framework.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.util.Properties;
-import static junit.framework.Assert.assertFalse;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -61,7 +61,7 @@ public class TestKafkaExportClient extends ExportClientTestBase {
         assertEquals("fakehost", client.m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
         assertEquals(StringSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG));
         assertEquals(StringSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG));
-        assertEquals("0", client.m_producerConfig.getProperty(ProducerConfig.ACKS_CONFIG));
+        assertEquals("-1", client.m_producerConfig.getProperty(ProducerConfig.ACKS_CONFIG));
         assertEquals("voltdbexport", client.m_topicPrefix);
         assertEquals("voltdb", client.m_producerConfig.getProperty("client.id"));
         assertFalse(client.m_skipInternals);

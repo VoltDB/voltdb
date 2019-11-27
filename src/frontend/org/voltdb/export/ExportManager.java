@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,12 +37,9 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
-import org.voltdb.ExportStatsBase;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
-import org.voltdb.StatsSelector;
 import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -72,7 +68,7 @@ import com.google_voltpatches.common.base.Preconditions;
  *
  * Processors are loaded by reflection based on configuration in project.xml.
  */
-public class ExportManager
+public class ExportManager implements ExportManagerInterface
 {
     /**
      * the only supported processor class
@@ -104,29 +100,12 @@ public class ExportManager
     public static final byte RELEASE_BUFFER = 1;
 
     /**
-     * Thrown if the initial setup of the loader fails
-     */
-    public static class SetupException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        SetupException(final String msg) {
-            super(msg);
-        }
-
-        SetupException(final Throwable cause) {
-            super(cause);
-        }
-    }
-
-    /**
      * Connections OLAP loaders. Currently at most one loader allowed.
      * Supporting multiple loaders mainly involves reference counting
      * the EE data blocks and bookkeeping ACKs from processors.
      */
     AtomicReference<ExportDataProcessor> m_processor = new AtomicReference<ExportDataProcessor>();
 
-    /** Obtain the global ExportManager via its instance() method */
-    private static ExportManager m_self;
     private ExportStats m_exportStats;
     private final int m_hostId;
 
@@ -142,105 +121,9 @@ public class ExportManager
     private SimpleClientResponseAdapter m_adapter;
     private ClientInterface m_ci;
 
-    public class ExportStats extends ExportStatsBase {
-        List<ExportStatsRow> m_stats;
-
-        ExportStats() {
-            super();
-        }
-
-        @Override
-        public Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-            m_stats = getStats(interval);
-            return buildIterator();
-        }
-
-        private Iterator<Object> buildIterator() {
-            return new Iterator<Object>() {
-                int index = 0;
-
-                @Override
-                public boolean hasNext() {
-                    return index < m_stats.size();
-                }
-
-                @Override
-                public Object next() {
-                    if (index < m_stats.size()) {
-                        return index++;
-                    }
-                    throw new NoSuchElementException();
-                }
-
-                @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
-                }
-
-            };
-        }
-
-        @Override
-        protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-            super.updateStatsRow(rowKey, rowValues);
-            int rowIndex = (Integer) rowKey;
-            assert (rowIndex >= 0);
-            assert (rowIndex < m_stats.size());
-            ExportStatsRow stat = m_stats.get(rowIndex);
-            rowValues[columnNameToIndex.get(Columns.SITE_ID)] = stat.m_siteId;
-            rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
-            rowValues[columnNameToIndex.get(Columns.SOURCE_NAME)] = stat.m_sourceName;
-            rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
-            rowValues[columnNameToIndex.get(Columns.ACTIVE)] = stat.m_exportingRole;
-            rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
-            rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
-            rowValues[columnNameToIndex.get(Columns.LAST_QUEUED_TIMESTAMP)] = stat.m_lastQueuedTimestamp;
-            rowValues[columnNameToIndex.get(Columns.LAST_ACKED_TIMESTAMP)] = stat.m_lastAckedTimestamp;
-            rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
-            rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
-            rowValues[columnNameToIndex.get(Columns.QUEUE_GAP)] = stat.m_queueGap;
-            rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
-        }
-
-        public ExportStatsRow getStatsRow(Object rowKey) {
-            int rowIndex = (Integer) rowKey;
-            assert (rowIndex >= 0);
-            assert (rowIndex < m_stats.size());
-            ExportStatsRow stat = m_stats.get(rowIndex);
-            return stat;
-        }
-    }
-
-    /**
-     * Construct ExportManager using catalog.
-     *
-     * NOTE: this synchronizes on the ExportManager class, but everyone else
-     * synchronizes on the instance.
-     *
-     * @param myHostId
-     * @param catalogContext
-     * @throws ExportManager.SetupException
-     */
-    public static synchronized void initialize(
-            int myHostId,
-            CatalogContext catalogContext,
-            boolean isRejoin,
-            boolean forceCreate,
-            HostMessenger messenger,
-            List<Pair<Integer, Integer>> partitions)
-            throws ExportManager.SetupException
-    {
-        ExportManager em = new ExportManager(myHostId, catalogContext, messenger);
-        m_self = em;
-        if (forceCreate) {
-            em.clearOverflowData();
-        }
-        em.initialize(catalogContext, partitions, isRejoin);
-
-        RealVoltDB db=(RealVoltDB)VoltDB.instance();
-        db.getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
-                myHostId, // m_siteId,
-                em.getExportStats());
+    @Override
+    public ExportManagerInterface.ExportMode getExportMode() {
+        return ExportManagerInterface.ExportMode.BASIC;
     }
 
     /**
@@ -248,6 +131,7 @@ public class ExportManager
      * leaders for the given partition id
      * @param partitionId
      */
+    @Override
     synchronized public void becomeLeader(int partitionId) {
         m_masterOfPartitions.add(partitionId);
         ExportGeneration generation = m_generation.get();
@@ -255,18 +139,6 @@ public class ExportManager
             return;
         }
         generation.becomeLeader(partitionId);
-    }
-
-    /**
-     * Get the global instance of the ExportManager.
-     * @return The global single instance of the ExportManager.
-     */
-    public static ExportManager instance() {
-        return m_self;
-    }
-
-    public static void setInstanceForTest(ExportManager self) {
-        m_self = self;
     }
 
     protected ExportManager() {
@@ -277,15 +149,18 @@ public class ExportManager
     /**
      * Read the catalog to setup manager and loader(s)
      */
-    private ExportManager(
+    public ExportManager(
             int myHostId,
             CatalogContext catalogContext,
             HostMessenger messenger)
     throws ExportManager.SetupException
     {
+        exportLog.info("Export starting in BASIC mode");
         m_hostId = myHostId;
         m_messenger = messenger;
         m_exportStats = new ExportStats();
+
+        exportLog.info("Running " + this.getClass().getName());
 
         boolean compress = !Boolean.getBoolean(StreamBlockQueue.EXPORT_DISABLE_COMPRESSION_OPTION);
         exportLog.info("Export has compression "
@@ -301,7 +176,12 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
 
-    private void clearOverflowData() throws ExportManager.SetupException {
+    public HostMessenger getHostMessenger() {
+        return m_messenger;
+    }
+
+    @Override
+    public void clearOverflowData() throws ExportManagerInterface.SetupException {
         String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
@@ -318,6 +198,7 @@ public class ExportManager
 
     }
 
+    @Override
     public synchronized void startPolling(CatalogContext catalogContext, StreamStartAction action) {
         m_startPolling = true;
 
@@ -381,16 +262,19 @@ public class ExportManager
         m_processorConfig = config;
     }
 
+    @Override
     public int getExportTablesCount() {
         return m_exportTablesCount;
     }
 
+    @Override
     public int getConnCount() {
         return m_connCount;
     }
 
     /** Creates the initial export processor if export is enabled */
-    private void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+    @Override
+    public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin) {
         try {
             CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
@@ -427,6 +311,7 @@ public class ExportManager
         }
     }
 
+    @Override
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
@@ -577,6 +462,7 @@ public class ExportManager
         return newProcessor;
     }
 
+    @Override
     public void shutdown() {
         ExportGeneration generation = m_generation.getAndSet(null);
         if (generation != null) {
@@ -588,7 +474,8 @@ public class ExportManager
         }
     }
 
-    private List<ExportStatsRow> getStats(final boolean interval) {
+    @Override
+    public List<ExportStatsRow> getStats(final boolean interval) {
         try {
             ExportGeneration generation = m_generation.get();
             if (generation != null) {
@@ -602,9 +489,6 @@ public class ExportManager
     }
 
     /*
-     * This method pulls double duty as a means of pushing export buffers
-     * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
-     * writing the data to a file instead of keeping it all in memory.
      * End of stream indicates that no more data is coming from this source
      * for this generation.
      */
@@ -613,11 +497,7 @@ public class ExportManager
             String tableName) {
     }
     /*
-     * This method pulls double duty as a means of pushing export buffers
-     * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
-     * writing the data to a file instead of keeping it all in memory.
-     * End of stream indicates that no more data is coming from this source
-     * for this generation.
+     * Push an export buffer
      */
     public static void pushExportBuffer(
             int partitionId,
@@ -630,9 +510,24 @@ public class ExportManager
             ByteBuffer buffer) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
-        ExportManager instance = instance();
+        ExportManagerInterface instance = ExportManagerInterface.instance();
+        instance.pushBuffer(partitionId, tableName,
+                startSequenceNumber, committedSequenceNumber,
+                tupleCount, uniqueId, buffer);
+    }
+
+    @Override
+    public void pushBuffer(
+            int partitionId,
+            String tableName,
+            long startSequenceNumber,
+            long committedSequenceNumber,
+            long tupleCount,
+            long uniqueId,
+            ByteBuffer buffer) {
+
         try {
-            ExportGeneration generation = instance.m_generation.get();
+            Generation generation = getGeneration();
             if (generation == null) {
                 if (buffer != null) {
                     DBBPool.wrapBB(buffer).discard();
@@ -648,6 +543,8 @@ public class ExportManager
         }
     }
 
+
+    @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition) {
@@ -667,26 +564,41 @@ public class ExportManager
         }
     }
 
-    public static synchronized void sync() {
+    // FIXME: Review synchronization
+    @Override
+    public synchronized void sync() {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
-        ExportGeneration generation = instance().m_generation.get();
+        syncSources();
+    }
+
+    private static void syncSources() {
+
+        Generation generation = ExportManagerInterface.instance().getGeneration();
         if (generation != null) {
             generation.sync();
         }
     }
 
+    @Override
     public ExportStats getExportStats() {
         return m_exportStats;
     }
 
+    @Override
+    public Generation getGeneration() {
+        return m_generation.get();
+    }
+
+    @Override
     public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
         }
     }
 
+    @Override
     public void clientInterfaceStarted(ClientInterface clientInterface) {
         m_ci = clientInterface;
         m_adapter = new SimpleClientResponseAdapter(ClientInterface.MIGRATE_ROWS_DELETE_CID,
@@ -694,6 +606,7 @@ public class ExportManager
         m_ci.bindAdapter(m_adapter, null);
     }
 
+    @Override
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb) {
         m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});

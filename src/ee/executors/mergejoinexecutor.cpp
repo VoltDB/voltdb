@@ -124,7 +124,7 @@ struct IndexTableCursor : public TableCursor {
         TableCursor(persistTable), tableIndex(persistTable->index(indexNode->getTargetIndexName())),
         indexCursor(tableIndex->getTupleSchema()),
         post_expression(indexNode->getPredicate()),
-        projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION))) {
+        projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PlanNodeType::Projection))) {
         tableIndex->moveToEnd(true, indexCursor);
         if (projectionNode) {
             numOfProjectColumns = projectionNode->getOutputColumnExpressions().size();
@@ -188,7 +188,7 @@ private:
 // Helper method to instantiate either an Index or Temp table's cursor
 // depending on the type of the node
 std::unique_ptr<TableCursor> buildTableCursor(AbstractPlanNode* node, Table* nodeTable) {
-    if (node->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
+    if (node->getPlanNodeType() == PlanNodeType::IndexScan) {
         auto* indexNode = dynamic_cast<IndexScanPlanNode*>(node);
         vassert(dynamic_cast<PersistentTable*>(indexNode->getTargetTable()));
         return std::unique_ptr<TableCursor>(new IndexTableCursor(indexNode,
@@ -227,7 +227,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
 
     // inner table is guaranteed to be an index scan over a persistent table
     auto* innerIndexNode = dynamic_cast<IndexScanPlanNode*>(
-            m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
+            m_abstractNode->getInlinePlanNode(PlanNodeType::IndexScan));
     vassert(innerIndexNode);
     auto* persistTable = dynamic_cast<PersistentTable*>(innerIndexNode->getTargetTable());
     vassert(persistTable);
@@ -272,11 +272,11 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
         innerTableFilter.init(innerCursor.getTable());
     }
 
-    auto* limitNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    auto* limitNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
     int limit = CountingPostfilter::NO_LIMIT;
     int offset = CountingPostfilter::NO_OFFSET;
     if (limitNode) {
-        limitNode->getLimitAndOffsetByReference(params, limit, offset);
+        tie(limit, offset) = limitNode->getLimitAndOffset(params);
     }
 
     int const outerCols = outerTable->columnCount();

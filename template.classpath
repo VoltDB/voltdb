@@ -24,7 +24,7 @@
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-3.4.0.jar"/>
-	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
+	<classpathentry kind="lib" path="lib/snappy-java-1.1.7.3.jar"/>
 	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/owner-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/owner-java8-1.0.10.jar"/>
@@ -40,8 +40,9 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-3.0.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-clients-0.10.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-clients-2.3.0.jar"/>
+	<classpathentry kind="lib" path="lib/lz4-java-1.6.0.jar"/>
+	<classpathentry kind="lib" path="lib/zstd-jni-1.4.4-2.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/scala-library-2.11.5.jar"/>
 	<classpathentry kind="lib" path="lib/felix-framework-5.6.12.jar"/>

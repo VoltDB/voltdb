@@ -374,6 +374,115 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    private static Long[] getNthColumnAsLong(int colIndex, VoltTable tbl) {
+        final int colCount = tbl.getColumnCount();
+        assertTrue("Asking for" + colIndex + "-th column from a " + colCount + "-column table",
+                colCount > colIndex);
+        final int rowCount = tbl.getRowCount();
+        final Long[] result = new Long[rowCount];
+        for(int i = 0; i < rowCount; ++i) {
+            result[i] = tbl.getLong(colIndex);
+            tbl.advanceRow();
+        }
+        return result;
+    }
+
+    @Test
+    public void testENG18533() {        // presence of order-by in 2nd sub-query used to make planner think it's cross-partition
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE RPT_PERF_BREAKDOWN (\n" +
+                        "    CUSTOM2 varchar(30),\n" +
+                        "    CLIENT_ID integer NOT NULL,\n" +
+                        "    IMPRESSIONS integer\n" +
+                        ");\n" +
+                        "PARTITION TABLE RPT_PERF_BREAKDOWN ON COLUMN CLIENT_ID;",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            // populate table
+            Stream.of("INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 0, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 0, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 0, 5);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 1, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 1, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 1);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 2, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 2, 5);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foo', 3, 0);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 2);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 3);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 4);\n" +
+                    "INSERT INTO RPT_PERF_BREAKDOWN VALUES('foox', 3, 5);\n")
+                    .forEach(query -> {
+                        try {
+                            assertEquals("Insertion \"" + query + "\" Should have worked",
+                                    ClientResponse.SUCCESS,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have inserted a row: \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+            Stream.of(Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown\n" +
+                            "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                            "LEFT OUTER JOIN (\n" +
+                            "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                            "    FROM rpt_perf_breakdown\n" +
+                            "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                            "    ORDER BY metric) t2\n" +
+                            "ON t1.CLIENT_ID = t2.CLIENT_ID AND t1.CUSTOM2=t2.CUSTOM2\n" +
+                            "ORDER BY t1.IMPRESSIONS;",
+                    new Object[][] {{0}, {1}, {2}, {4}, {9}, {11}, {13}, {14}}),
+                    Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID > 0\n" +
+                                    "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                                    "LEFT OUTER JOIN (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID < 5\n" +
+                                    "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                                    "    ORDER BY metric) t2\n" +
+                                    "ON t1.CLIENT_ID = t2.CLIENT_ID AND t1.CUSTOM2=t2.CUSTOM2\n" +
+                                    "ORDER BY t1.IMPRESSIONS;",
+                            new Object[][] {{0}, {1}, {2}, {9}, {13}, {14}}),
+                    Pair.of("SELECT t1.IMPRESSIONS FROM (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                                    "    GROUP BY CLIENT_ID,CUSTOM2) t1\n" +
+                                    "LEFT OUTER JOIN (\n" +
+                                    "    SELECT CLIENT_ID, CUSTOM2, sum(IMPRESSIONS) as IMPRESSIONS, cast(SUM(IMPRESSIONS) as decimal) AS metric\n" +
+                                    "    FROM rpt_perf_breakdown WHERE CLIENT_ID = 1\n" +
+                                    "    GROUP BY CLIENT_ID, CUSTOM2\n" +
+                                    "    ORDER BY metric) t2\n" +
+                                    "ON t1.CUSTOM2=t2.CUSTOM2\n" +
+                                    "ORDER BY t1.IMPRESSIONS;",
+                            new Object[][] {{1}, {9}}))
+                    .forEach(queryAndResult -> {
+                        final String query = queryAndResult.getFirst();
+                        final Object[][] expected = queryAndResult.getSecond();
+                        try {
+                            final ClientResponse response = env.m_client.callProcedure("@AdHoc", query);
+                            assertEquals("Query \"" + query + "\" Should have passed",
+                                    ClientResponse.SUCCESS, response.getStatus());
+                            assertContentOfTable(expected, response.getResults()[0]);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+
     @Test
     public void testENG16982() {
         final TestEnv env = new TestEnv(
@@ -655,9 +764,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // ENG-14210 more than 1025 parameters
             Object[] params = new Object[1201];
             // The first parameter is the query text.
-            params[0] = new StringBuilder("SELECT * FROM BLAH WHERE IVAL IN (")
-                    .append(String.join(",", Collections.nCopies(1200, "?")))
-                    .append(");").toString();
+            params[0] = "SELECT * FROM BLAH WHERE IVAL IN (" +
+                    String.join(",", Collections.nCopies(1200, "?")) +
+                    ");";
             for (int i = 1; i <= 1200; i++) {
                 params[i] = i;
             }
@@ -774,6 +883,64 @@ public class TestAdHocQueries extends AdHocQueryTester {
                         }
                     });
             verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{2});
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testENG17134() throws Exception {
+        // Multiple table joins, including non-inner joins.
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE PRPLISCLAIMINFO (REGISTNO varchar(22));\n" +
+                        "CREATE TABLE PRPLISDISPATCHSURVEYLOG (REGISTNO varchar(22) NOT NULL);\n" +
+                        "CREATE TABLE PRPLISMAININFO (REGISTNO varchar(22), MAKECODE varchar(10));\n" +
+                        "CREATE TABLE PRPLISORGANIZATIONCACHE (COMCODE varchar(10));\n" +
+                        "CREATE INDEX PRPLISORGANIZATIONCACHE_INDEX1 ON PRPLISORGANIZATIONCACHE (COMCODE);\n" +
+                        "CREATE TABLE PRPLISRISKINFO (REGISTNO varchar(22), RISKLEVEL integer);\n",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            assertEquals("Insertions failed?", ClientResponse.SUCCESS,
+                    env.m_client.callProcedure("@AdHoc",
+                            "INSERT INTO PRPLISCLAIMINFO VALUES('foo');\n" +
+                                    "INSERT INTO PRPLISDISPATCHSURVEYLOG  VALUES('foo');\n" +
+                                    "INSERT INTO PRPLISMAININFO VALUES('foo', 'baz');\n" +
+                                    "INSERT INTO PRPLISORGANIZATIONCACHE VALUES('baz');\n" +
+                                    "INSERT INTO PRPLISRISKINFO VALUES('foo', 1);\n")
+                            .getStatus());
+            final String query = "SELECT COUNT(*) FROM PRPLISCLAIMINFO a\n" +
+                    "LEFT JOIN PRPLISDISPATCHSURVEYLOG b on a.registno = b.registno \n" +
+                    "JOIN PRPLISMAININFO d on a.registno = d.registno \n" +
+                    "JOIN PRPLISRISKINFO c on a.registno = c.registno \n" +
+                    "LEFT JOIN PRPLISORGANIZATIONCACHE e on e.comcode = d.makecode \n" +
+                    "WHERE C.RISKLEVEL =1;";
+            final ClientResponse response = env.m_client.callProcedure("@AdHoc", query);
+            assertEquals(String.format("Query \"%s\" should have succeeded", query),
+                    ClientResponse.SUCCESS, response.getStatus());
+            final VoltTable result = response.getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(String.format("Query \"%s\" should return 1", query),
+                    1, result.getLong(0));
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testENG13840() throws Exception {
+        final TestEnv env = new TestEnv(
+                "CREATE TABLE R1(i int);\nCREATE TABLE R2(i int);",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            env.m_client.callProcedure("@AdHoc",
+                    "SELECT i FROM R2,\n" +
+                            "   (SELECT MAX(i) FROM R2\n" +
+                            "    WHERE i > (SELECT COUNT(R2.i) FROM R1\n" +
+                            "               WHERE i IS NOT DISTINCT FROM R2.i\n" +
+                            "               GROUP BY i ORDER BY i))\n" +
+                            "    TA2;");
         } finally {
             env.tearDown();
         }

@@ -101,7 +101,7 @@
         <fileset dir='${lib.dir}'>
             <include name='felix-framework-5.6.12.jar'/>
             <include name='commons-lang3-3.8.1.jar'/>
-            <include name='kafka-clients-0.10.2.1.jar'/>
+            <include name='kafka-clients-2.3.0.jar'/>
         </fileset>
         <fileset refid="voltpro.classpath"/>
      </path>
@@ -121,9 +121,10 @@
             <include name="org/voltdb/importclient/kafka10/*.class"/>
             <include name="org/voltdb/importclient/kafka/util/*.class"/>
             <include name="au/com/bytecode/opencsv_voltpatches/**/*.class"/>
-            <zipfileset src="${base.dir}/lib/kafka-clients-0.10.2.1.jar" />
-            <zipfileset src="${base.dir}/third_party/java/jars/snappy-java-1.1.2.6.jar" />
-            <zipfileset src="${base.dir}/third_party/java/jars/lz4-1.3.0.jar" />
+            <zipfileset src="${base.dir}/lib/kafka-clients-2.3.0.jar" />
+            <zipfileset src="${base.dir}/lib/snappy-java-1.1.7.3.jar" />
+            <zipfileset src="${base.dir}/lib/lz4-java-1.6.0.jar" />
+            <zipfileset src="${base.dir}/lib/zstd-jni-1.4.4-2.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/slf4j-api-1.7.21.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/slf4j-log4j12-1.7.21.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/log4j-1.2.17.jar" />

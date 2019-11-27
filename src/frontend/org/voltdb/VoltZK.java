@@ -465,6 +465,8 @@ public class VoltZK {
                     // Avoid UAC during MP repair or promotion since UAC will invoke GlobalServiceElector to
                     // register other promotable services while MPI is accepting promotion
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
+                } else if (blockers.contains(leafNodeElasticOperationInProgress)) {
+                    errorMsg = "while an elastic operation is active. Please retry catalog update later.";
                 }
                 break;
             case rejoinInProgress:
@@ -487,7 +489,7 @@ public class VoltZK {
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retyr elastic operation later.";
+                    errorMsg = "while a catalog update is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeBanElasticOperation)) {
                     errorMsg = "while elastic operation is blocked by DR established with a cluster that "
                             + "does not support remote elastic operation during DR. "

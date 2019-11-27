@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
@@ -118,6 +119,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     };
 
     private String m_methodName;
+    private boolean m_cleanupAfterTest = false;
 
     private final Set<Long> m_generatedKeys = new HashSet<>();
 
@@ -158,8 +160,19 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
     }
 
+    @After
+    public void optionalCleanUp() {
+        if (m_cleanupAfterTest) {
+            shutdownAllClustersAndClients();
+        }
+    }
+
     public String getMethodName() {
         return m_methodName;
+    }
+
+    protected void cleanupAfterTest() {
+        m_cleanupAfterTest = true;
     }
 
     /**
@@ -288,14 +301,14 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             LocalCluster lc = null;
             Client c = null;
 
+            DrRoleType drRoleType = config.getDrRole(configs.size());
             try {
                 System.out.println("Creating cluster " + clusterNumber);
                 String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, streamTargets);
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
-                        m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME,
-                        configs.size() > 1 ? DrRoleType.XDCR : DrRoleType.NONE, false, config.builder,
-                        getClass().getSimpleName(), m_methodName, false, ImmutableMap.of());
+                        m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
+                        false, config.builder, getClass().getSimpleName(), m_methodName, false, ImmutableMap.of());
 
                 System.out.println("Creating client for cluster " + clusterNumber);
                 c = lc.createAdminClient(cc);
@@ -307,7 +320,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             CLUSTERS_AND_CLIENTS.add(Pair.of(lc, c));
 
             if (clusterNumber > 0) {
-                handleMultipleClusterStartup(clusterNumber, c);
+                handleMultipleClusterStartup(clusterNumber, c, drRoleType);
             }
 
             ++clusterNumber;
@@ -541,7 +554,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     protected void waitForDRToDrain(int clusterId) throws Exception {}
 
-    protected void handleMultipleClusterStartup(int clusterNumber, Client client) throws Exception {}
+    protected void handleMultipleClusterStartup(int clusterNumber, Client client, DrRoleType drRoleType)
+            throws Exception {}
 
     public enum TableType {
         PARTITIONED("", PARTITIONED_TABLE_FMT),
@@ -565,6 +579,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         final int siteCount;
         final int hostCount;
         final int kfactor;
+        final DrRoleType drRoleType;
         final VoltProjectBuilder builder;
 
         public ClusterConfiguration(int siteCount) {
@@ -572,14 +587,20 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         }
 
         public ClusterConfiguration(int siteCount, int hostCount, int kfactor) {
-            this(siteCount, hostCount, kfactor, null);
+            this(siteCount, hostCount, kfactor, null, null);
         }
 
         public ClusterConfiguration(int siteCount, int hostCount, int kfactor, VoltProjectBuilder builder) {
+            this(siteCount, hostCount, kfactor, null, builder);
+        }
+
+        public ClusterConfiguration(int siteCount, int hostCount, int kfactor, DrRoleType drRoleType,
+                VoltProjectBuilder builder) {
             super();
             this.siteCount = siteCount;
             this.hostCount = hostCount;
             this.kfactor = kfactor;
+            this.drRoleType = drRoleType;
             this.builder = builder;
         }
 
@@ -607,6 +628,10 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
             ClusterConfiguration other = (ClusterConfiguration) obj;
             return siteCount == other.siteCount && hostCount == other.hostCount && kfactor == other.kfactor;
+        }
+
+        public DrRoleType getDrRole(int clusterCount) {
+            return drRoleType == null ? clusterCount > 1 ? DrRoleType.XDCR : DrRoleType.NONE : drRoleType;
         }
 
         @Override

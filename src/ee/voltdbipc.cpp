@@ -47,6 +47,7 @@
 
 static int g_cleanUpCountdownLatch = -1;
 static pthread_mutex_t g_cleanUpMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_cleanUpCondition = PTHREAD_COND_INITIALIZER;
 
 namespace voltdb {
 class Pool;
@@ -146,7 +147,7 @@ public:
      * and this method will make sure that the VoltDBEngine is deleted and that the program will attempt
      * to free all memory allocated on the heap.
      */
-    void terminate();
+    void shutDown();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block);
@@ -184,8 +185,6 @@ private:
     int8_t tick(struct ipc_command *cmd);
 
     int8_t quiesce(struct ipc_command *cmd);
-
-    int8_t shutDown();
 
     int8_t setLogLevels(struct ipc_command *cmd);
 
@@ -491,11 +490,13 @@ VoltDBIPC::VoltDBIPC(int fd)
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    // Normally, all resources should be freed by the server calling "shutDown".
     if (m_engine != NULL) {
-        // If the server simulates a crash, shutDown message may never get sent.
-        // Clean up here so that valgrind doesn't complain
-        shutDown();
+        delete m_engine;
+        delete [] m_reusedResultBuffer;
+        delete [] m_perFragmentStatsBuffer;
+        delete [] m_udfBuffer;
+        delete [] m_tupleBuffer;
+        delete [] m_exceptionBuffer;
     }
 }
 
@@ -588,7 +589,8 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           result = kErrorCode_None;
           break;
       case 30:
-          result = shutDown();
+          shutDown();
+          result = kErrorCode_Success;
           break;
       case 31:
           setViewsEnabled(cmd);
@@ -845,19 +847,6 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     return kErrorCode_Success;
 }
 
-int8_t VoltDBIPC::shutDown() {
-    delete m_engine;
-    delete [] m_reusedResultBuffer;
-    delete [] m_perFragmentStatsBuffer;
-    delete [] m_udfBuffer;
-    delete [] m_tupleBuffer;
-    delete [] m_exceptionBuffer;
-
-    m_engine = NULL;
-
-    return kErrorCode_Success;
-}
-
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
 
@@ -986,6 +975,9 @@ int VoltDBIPC::callJavaUserDefinedFunction() {
 }
 
 int VoltDBIPC::callJavaUserDefinedAggregateStart(int functionId) {
+    ReferenceSerializeOutput udfOutput(m_udfBuffer, MAX_MSG_SZ);
+    udfOutput.writeInt(sizeof(functionId));
+    udfOutput.writeInt(functionId);
     return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateStart);
 }
 
@@ -1069,7 +1061,7 @@ int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
     return kErrorCode_Success;
 }
 
-void VoltDBIPC::terminate() {
+void VoltDBIPC::shutDown() {
     m_terminate = true;
 }
 
@@ -1796,23 +1788,22 @@ struct VoltDBIPCDeleter {
         if (voltipc->getEngine() == NULL || !voltipc->getEngine()->isLowestSite()) {
             // if the engine was already destroyed, or if it's not the lowest site,
             // just decrement the latch.
+            delete voltipc;
             pthread_mutex_lock(&g_cleanUpMutex);
-            --g_cleanUpCountdownLatch;
+            if (--g_cleanUpCountdownLatch <= 1) {
+                pthread_cond_broadcast(&g_cleanUpCondition);
+            }
             pthread_mutex_unlock(&g_cleanUpMutex);
         }
         else {
             // The lowest site: wait for the other sites to shut down before exiting.
-            while (true) {
-                pthread_mutex_lock(&g_cleanUpMutex);
-                volatile int latchVal = g_cleanUpCountdownLatch;
-                pthread_mutex_unlock(&g_cleanUpMutex);
-                if (latchVal <= 1) {
-                    break;
-                }
+            pthread_mutex_lock(&g_cleanUpMutex);
+            while (g_cleanUpCountdownLatch > 1) {
+                pthread_cond_wait(&g_cleanUpCondition, &g_cleanUpMutex);
             }
+            pthread_mutex_unlock(&g_cleanUpMutex);
+            delete voltipc;
         }
-
-        delete voltipc;
     }
 };
 

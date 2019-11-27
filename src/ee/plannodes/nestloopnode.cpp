@@ -48,6 +48,6 @@ namespace voltdb {
 
 NestLoopPlanNode::~NestLoopPlanNode() { }
 
-PlanNodeType NestLoopPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_NESTLOOP; }
+PlanNodeType NestLoopPlanNode::getPlanNodeType() const { return PlanNodeType::Nestloop; }
 
 } // namespace voltdb

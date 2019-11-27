@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.DuplicateCounter.HashResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -160,8 +161,8 @@ public class MpScheduler extends Scheduler
             List<Long> doneCounters = new LinkedList<Long>();
             for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
                 DuplicateCounter counter = entry.getValue();
-                int result = counter.updateReplicas(m_iv2Masters);
-                if (result == DuplicateCounter.DONE) {
+                HashResult result = counter.updateReplicas(m_iv2Masters);
+                if (result.isDone()) {
                     doneCounters.add(entry.getKey());
                 }
             }
@@ -268,7 +269,6 @@ public class MpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-
         /*
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
@@ -325,7 +325,8 @@ public class MpScheduler extends Scheduler
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters,
-                    message);
+                    message,
+                    localId);
             safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
@@ -511,26 +512,32 @@ public class MpScheduler extends Scheduler
             }
             return;
         }
-
         if (counter != null) {
-            int result = counter.offer(message);
-            if (result == DuplicateCounter.DONE) {
+            HashResult result = counter.offer(message);
+            if (result.isDone()) {
                 m_duplicateCounters.remove(message.getTxnId());
                 advanceRepairTruncationHandle(message);
                 m_outstandingTxns.remove(message.getTxnId());
                 m_mailbox.send(counter.m_destinationId, message);
-            }
-            else if (result == DuplicateCounter.MISMATCH) {
+            } else if (result.isAbort() || result.isMismatch()) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
-            } else if (result == DuplicateCounter.ABORT) {
-                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT running every-site system procedure.", true, null);
             }
-            // doing duplicate suppresion: all done.
-        }
-        else {
+        } else {
             advanceRepairTruncationHandle(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
-            assert(txn != null);
+            if (txn == null) {
+                // The thread (updateReplicas) could wipe out duplicate counters for run-everywhere system procedures
+                // if the duplicate counters contain only the partition masters from failed hosts.
+                // If a response from a failed partition master get here after the transaction has been declared completed, ignore it.
+                final Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                if (liveHosts.contains(CoreUtils.getHostIdFromHSId(message.m_sourceHSId))) {
+                    // This should not happen
+                    tmLog.warn("Received InitiateResponseMessage after the transaction is completed from " + CoreUtils.hsIdToString(message.m_sourceHSId));
+                    assert(false);
+                }
+                // Message is from a dead host
+                return;
+            }
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
