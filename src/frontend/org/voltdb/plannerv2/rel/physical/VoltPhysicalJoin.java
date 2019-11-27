@@ -110,12 +110,6 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         return systemFieldList;
     }
 
-    // NOTE: we set this to 1 for SP queries.
-    @Override
-    public int getSplitCount() {
-        return 1;
-    }
-
     protected void setOutputSchema(AbstractJoinPlanNode node) {
         Preconditions.checkNotNull(node, "Plan node is null");
         final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getInput(0).getRowType(), 0)

@@ -28,17 +28,11 @@ import org.apache.calcite.rel.core.Exchange;
 
 public abstract class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
 
-    public static final int DISTRIBUTED_SPLIT_COUNT = 30;
-
     protected VoltPhysicalExchange(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input) {
         super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
                 traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
-    }
-
-    @Override public int getSplitCount() {
-        return 1;       // NOTE: we can add it back later
     }
 
     @Override public VoltPhysicalExchange copy(

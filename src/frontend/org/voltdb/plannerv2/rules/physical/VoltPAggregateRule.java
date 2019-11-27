@@ -88,7 +88,7 @@ public class VoltPAggregateRule extends RelOptRule {
         final RelNode serialAggr = new VoltPhysicalSerialAggregate(
                 aggregate.getCluster(), convertedAggrTraits, convert(input, convertedInputTraits), aggregate.indicator,
                 aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList(), null,
-                1, false);
+                false);
         // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
         // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
         // that both (a new sort and the serial aggregate) relations are equivalent to the original
@@ -97,7 +97,7 @@ public class VoltPAggregateRule extends RelOptRule {
         if (hasGroupBy(aggregate)) {
             final VoltPhysicalSort sort = new VoltPhysicalSort(
                     aggregate.getCluster(), convertedAggrTraits, serialAggr,
-                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE), 1);
+                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE));
             call.transformTo(sort, ImmutableMap.of(serialAggr, aggregate));
         } else {
             call.transformTo(serialAggr);

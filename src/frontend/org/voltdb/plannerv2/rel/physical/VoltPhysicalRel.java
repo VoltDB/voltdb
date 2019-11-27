@@ -41,15 +41,6 @@ public interface VoltPhysicalRel extends RelNode {
     }
 
     /**
-     * Return number of concurrent processes that this VoltPhysicalRel will be executed in.
-     * If this rel/plan node belongs to a coordinator then its split count is 1
-     * For a fragment rel/node the split count = a number of hosts * number of sites per host
-     *
-     * @return Split count
-     */
-    int getSplitCount();
-
-    /**
      * Return a child VoltDBRel node in a specified position
      *
      * @param node         Parent Node

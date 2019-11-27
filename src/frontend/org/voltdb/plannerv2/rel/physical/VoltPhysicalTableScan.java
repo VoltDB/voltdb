@@ -55,7 +55,6 @@ import com.google_voltpatches.common.base.Preconditions;
 public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implements VoltPhysicalRel {
 
     protected final RexProgram m_program;
-    protected final int m_splitCount;
 
     // Inline Rels
     protected RexNode m_offset;
@@ -77,12 +76,10 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      * @param aggregate Aggregate
      * @param preAggregateRowType The type of the rows returned by this relational expression before aggregation
      * @param preAggregateProgram The program before aggregation
-     * @param splitCount Number of concurrent processes that this relational expression will be executed in
      */
     protected VoltPhysicalTableScan(
             RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltDBTable, RexProgram program,
-            RexNode offset, RexNode limit, RelNode aggregate, RelDataType preAggregateRowType, RexProgram preAggregateProgram,
-            int splitCount) {
+            RexNode offset, RexNode limit, RelNode aggregate, RelDataType preAggregateRowType, RexProgram preAggregateProgram) {
         super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
         Preconditions.checkArgument(aggregate == null || aggregate instanceof VoltPhysicalAggregate);
@@ -93,7 +90,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         m_aggregate = aggregate;
         m_preAggregateRowType = preAggregateRowType;
         m_preAggregateProgram = preAggregateProgram;
-        m_splitCount = splitCount;
     }
 
     public RexProgram getProgram() {
@@ -110,7 +106,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         // specially when we merge scans with other redundant nodes like sort for example.
         // Are there better ways of doing this?
         String dg = super.computeDigest();
-        dg += "_split_" + m_splitCount;
         if (m_program != null) {
             dg += "_program_" + m_program.toString();
         }
@@ -148,7 +143,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("split", m_splitCount);
         if (m_program != null) {
             m_program.explainCalc(pw);
         }
@@ -235,11 +229,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     private boolean hasLimitOffset() {
         return (m_limit != null || m_offset != null);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
     }
 
     /**

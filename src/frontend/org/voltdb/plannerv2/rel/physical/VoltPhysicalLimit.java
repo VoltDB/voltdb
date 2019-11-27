@@ -43,25 +43,22 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     private final RexNode m_offset;
     private final RexNode m_limit;
 
-    private final int m_splitCount;
-
     public VoltPhysicalLimit(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
         super(cluster, traitSet, input);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
         m_limit = limit;
-        m_splitCount = splitCount;
     }
 
     public VoltPhysicalLimit copy(
-            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, splitCount);
+            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
+        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit);
     }
 
     @Override
     public VoltPhysicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
-        return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
+        return copy(traitSet, sole(inputs), m_offset, m_limit);
     }
 
     public RexNode getOffset() {
@@ -75,17 +72,9 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("split", m_splitCount);
         pw.itemIf("limit", m_limit, m_limit != null);
         pw.itemIf("offset", m_offset, m_offset != null);
         return pw;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
-        return digest;
     }
 
     @Override
@@ -100,11 +89,6 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         double rowCount = estimateRowCount(mq);
         double cpu = rowCount;
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
     }
 
     @Override

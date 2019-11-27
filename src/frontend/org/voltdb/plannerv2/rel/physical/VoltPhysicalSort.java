@@ -17,6 +17,12 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -25,7 +31,6 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
@@ -40,57 +45,24 @@ import org.voltdb.plannodes.OrderByPlanNode;
 
 import com.google.common.base.Preconditions;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     public VoltPhysicalSort(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, int splitCount) {
-        this(cluster, traitSet, input, collation, null, null, splitCount);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation) {
+        this(cluster, traitSet, input, collation, null, null);
     }
 
     private VoltPhysicalSort(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset,
-            RexNode limit, int splitCount) {
+            RexNode limit) {
         super(cluster, traitSet, input, collation, offset, limit);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override
     public VoltPhysicalSort copy(
             RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit) {
-        return copy(traitSet, input, collation, offset, limit, m_splitCount);
-    }
-
-    public VoltPhysicalSort copy(
-            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit, splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
-        return digest;
-    }
-
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("split", m_splitCount);
-        return pw;
+        return copy(traitSet, input, collation, offset, limit);
     }
 
     @Override

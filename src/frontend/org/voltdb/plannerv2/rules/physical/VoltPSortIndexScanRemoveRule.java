@@ -90,14 +90,14 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
                         scan.getTraitSet().replace(scanSortCollation),
                         scan.getTable(), scan.getVoltTable(), scan.getProgram(), scan.getIndex(), accessPath,
                         scan.getOffsetRexNode(), scan.getLimitRexNode(), scan.getAggregateRelNode(),
-                        scan.getPreAggregateRowType(), scan.getPreAggregateProgram(), scan.getSplitCount(),
+                        scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
                         indexCollation, scan.isInlinedInnerScan());
                 final RelNode result;
                 if (calc == null) {
                     result = newScan;
                 } else { // The new Calc collation must match the original Sort collation
                     result = calc.copy(calc.getTraitSet().replace(origSortCollation), newScan,
-                            calc.getProgram(), calc.getSplitCount());
+                            calc.getProgram());
                 }
                 call.transformTo(result);
             }

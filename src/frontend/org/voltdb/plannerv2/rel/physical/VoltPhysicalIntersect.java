@@ -39,8 +39,6 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     /**
      * Creates a VoltPhysicalIntersect.
      *
@@ -50,19 +48,13 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalIntersect(
-            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override public VoltPhysicalIntersect copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
-        return new VoltPhysicalIntersect(getCluster(), traitSet, inputs, all, m_splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
+        return new VoltPhysicalIntersect(getCluster(), traitSet, inputs, all);
     }
 
     @Override

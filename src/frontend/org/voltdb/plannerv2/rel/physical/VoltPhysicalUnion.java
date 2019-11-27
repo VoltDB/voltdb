@@ -38,8 +38,6 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     /**
      * Creates a VoltPhysicalUnion.
      *
@@ -49,14 +47,13 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalUnion(
-            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override public VoltPhysicalUnion copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
-        return new VoltPhysicalUnion(getCluster(), traitSet, inputs, all, m_splitCount);
+        return new VoltPhysicalUnion(getCluster(), traitSet, inputs, all);
     }
 
     @Override
@@ -70,11 +67,6 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
         double rowCount = estimateRowCount(mq);
         double cpu = rowCount;
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
     }
 
 }

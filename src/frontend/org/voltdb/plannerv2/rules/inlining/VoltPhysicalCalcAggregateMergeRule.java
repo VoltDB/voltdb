@@ -66,7 +66,6 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
                 conditionExpr,
-                aggregate.getSplitCount(),
                 aggregate.getIsCoordinatorAggr());
 
         RexProgramBuilder programBuilder = RexProgramBuilder
@@ -79,8 +78,7 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
                 calc.getCluster(),
                 calc.getTraitSet(),
                 newAggregate,
-                newProgram,
-                calc.getSplitCount());
+                newProgram);
 
         call.transformTo(newCalc);
     }

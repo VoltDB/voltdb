@@ -52,11 +52,6 @@ public class VoltRelUtil {
         return rel.accept(traitShuttle);
     }
 
-    public static int decideSplitCount(RelNode rel) {
-        return (rel instanceof VoltPhysicalRel) ?
-                ((VoltPhysicalRel) rel).getSplitCount() : 1;
-    }
-
     /**
      * Transform sort's collation pushing it through a Calc.
      * If the collationsort relies on non-trivial expressions we can't transform and
