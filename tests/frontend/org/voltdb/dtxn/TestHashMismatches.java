@@ -24,6 +24,8 @@ package org.voltdb.dtxn;
 
 import static org.junit.Assert.*;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +36,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -348,28 +351,40 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 insertMoreNormalData(10001, 10092);
                 client.drain();
 
-//                System.out.println("Saving snapshot...");
-//                VoltTable results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults()[0];
-//                while (results.advanceRow()) {
-//                    assertTrue(results.getString("RESULT").equals("SUCCESS"));
-//                }
-//
-//                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
-//                long rows = results.asScalarLong();
-//                System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
-//                results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
-//                while (results.advanceRow()) {
-//                    if (results.getString("RESULT").equals("FAILURE")) {
-//                        fail(results.getString("ERR_MSG"));
-//                    }
-//                }
-//                System.out.println("snapshot reloaded");
-//                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
-//                assert(rows == results.asScalarLong());
+                File tempDir = new File(TMPDIR);
+                if (!tempDir.exists()) {
+                    assertTrue(tempDir.mkdirs());
+                }
+                deleteTestFiles(TESTNONCE);
+
+                System.out.println("Saving snapshot...");
+                ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
+                VoltTable results = resp.getResults()[0];
+                System.out.println(results.toFormattedString());
+                while (results.advanceRow()) {
+                    assertTrue(results.getString("RESULT").equals("SUCCESS"));
+                }
+
+                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+                long rows = results.asScalarLong();
+                client.callProcedure("@AdHoc", "delete from KV");
+
+                System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
+                results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+                System.out.println(results.toFormattedString());
+                while (results.advanceRow()) {
+                    if (results.getString("RESULT").equals("FAILURE")) {
+                        fail(results.getString("ERR_MSG"));
+                    }
+                }
+                System.out.println("snapshot reloaded");
+                results = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+                assert(rows == results.asScalarLong());
             } else {
                 fail("testOnLargeCluster failed");
             }
         } catch (ProcCallException e) {
+            e.printStackTrace();
             assertTrue(e.getMessage().contains("Connection to database") ||
                     e.getMessage().contains("Crash deliberately"));
             // make sure every host witnessed the hash mismatch
@@ -423,4 +438,52 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
         assert(done);
     }
+
+    protected void deleteTestFiles(final String nonce) {
+        FilenameFilter cleaner = new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String file) {
+                return file.startsWith(nonce) || file.endsWith(".vpt") || file.endsWith(".digest")
+                        || file.endsWith(".tsv") || file.endsWith(".csv") || file.endsWith(".incomplete")
+                        || new File(dir, file).isDirectory();
+            }
+        };
+
+        File tmp_dir = new File(TMPDIR);
+        File[] tmp_files = tmp_dir.listFiles(cleaner);
+        for (File tmp_file : tmp_files) {
+            deleteRecursively(tmp_file);
+        }
+    }
+
+    private void deleteRecursively(File f) {
+        if (f.isDirectory()) {
+            for (File f2 : f.listFiles()) {
+                deleteRecursively(f2);
+            }
+            boolean deleted = f.delete();
+            if (!deleted) {
+                if (!f.exists()) {
+                    return;
+                }
+                System.err.println("Couldn't delete " + f.getPath());
+                System.err.println("Remaining files are:");
+                for (File f2 : f.listFiles()) {
+                    System.err.println("    " + f2.getPath());
+                }
+                //Recurse until stack overflow trying to delete, y not rite?
+                deleteRecursively(f);
+            }
+        } else {
+            boolean deleted = f.delete();
+            if (!deleted) {
+                if (!f.exists()) {
+                    return;
+                }
+                System.err.println("Couldn't delete " + f.getPath());
+            }
+            assertTrue(deleted);
+        }
+    }
+
 }

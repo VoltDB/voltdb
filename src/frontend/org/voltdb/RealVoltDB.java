@@ -5252,20 +5252,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
                     ((SpInitiator)p).getServiceState().isRemoved())
             .forEach(s -> ((SpInitiator)s).getScheduler().cleanupTransactionBacklogs());
+        }
+    }
+
+    public void updateLocalActiveSiteCount(int executorPartition) {
+        // execute on the lowest master site only
+        if (executorPartition == getLowestMasterPartitionId()) {
 
             // update active site count
             final int leaderCount = getLeaderSites().size();
             if (leaderCount != m_nodeSettings.getLocalSitesCount()) {
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
-                ImmutableMap<String, String> newSettings =
-                        new ImmutableMap.Builder<String, String>()
+                ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
                         .putAll(new HashMap<String, String>() {
-                            private static final long serialVersionUID = 1L;
-                        {
+                            private static final long serialVersionUID = 1L; {
                             putAll(settings);
                             put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
-                         }})
-                        .build();
+                         }}).build();
                 m_nodeSettings = NodeSettings.create(newSettings);
                 m_nodeSettings.store();
                 m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
