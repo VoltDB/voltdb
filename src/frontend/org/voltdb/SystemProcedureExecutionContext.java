@@ -52,6 +52,8 @@ public interface SystemProcedureExecutionContext {
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
 
+    public void setLowestSiteId();
+
     public int getClusterId();
 
     public int getHostId();
