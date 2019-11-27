@@ -160,6 +160,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public int getLocalActiveSitesCount() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public boolean isLowestSiteId()
         {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
