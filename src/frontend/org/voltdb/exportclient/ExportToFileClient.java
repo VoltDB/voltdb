@@ -178,6 +178,11 @@ public class ExportToFileClient extends ExportClientBase {
         protected Date start;
         protected final Set<String> m_batchSchemasWritten = new HashSet<>();
 
+        @Override
+        public String toString() {
+            return "PEC: " + System.identityHashCode(this) + ", start: " + start;
+        }
+
         class FileHandle implements Comparable<FileHandle> {
             final String tableName;
             final long generation;
@@ -391,7 +396,7 @@ public class ExportToFileClient extends ExportClientBase {
                 assert(oldFile.canWrite());
 
                 File newFile = new VoltFile(newPath);
-                assert(!newFile.exists());
+                assert !newFile.exists() : "Can't rename " + oldPath + " to existing " + newPath;
                 if (!oldFile.renameTo(newFile)) {
                     m_logger.error("Failed to rename export file from " + oldPath + " to " + newPath);
                 }
@@ -746,6 +751,7 @@ public class ExportToFileClient extends ExportClientBase {
         }
         m_batchLock.writeLock().lock();
         try {
+            m_logger.info("SHUTDOWN: " + m_current);
             m_current.closeAllWriters();
         }
         finally {
@@ -764,7 +770,7 @@ public class ExportToFileClient extends ExportClientBase {
         try {
             m_current = new PeriodicExportContext();
 
-            m_logger.trace("Rolling batch.");
+            m_logger.info("Rolling - PREV: " + previous + ", NEW: " + m_current);
 
             for( ExportToFileDecoder decoder : m_tableDecoders.values()) {
                 decoder.resetWriter();
