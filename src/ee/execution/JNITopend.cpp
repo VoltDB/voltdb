@@ -197,7 +197,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJJILjava/nio/ByteBuffer;)J");
+            "(IJJJJJILjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
