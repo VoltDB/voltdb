@@ -447,4 +447,13 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
     }
 
+    public void testPartitionedWithLimit() {
+        m_tester.sql("select P1.I from P1 limit 10")
+        .transform("VoltLogicalLimit(limit=[10])\n" +
+                    "  VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalLimit(limit=[10])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
 }

@@ -251,6 +251,11 @@ public class Plannerv2TestCase extends PlannerTestCase {
             final RelDistribution distribution = transform();
             assertTrue("Got SINGLETON distribution without partition equal value",
                     distribution.getIsSP());
+            if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                anyMatch(m_expectedTransforms, actualTransform);
+            }
+
         }
 
         @Override public void fail() {

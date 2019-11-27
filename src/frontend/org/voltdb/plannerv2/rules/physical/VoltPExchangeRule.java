@@ -21,41 +21,39 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltPhysicalLimit}.
+ * VoltDB physical rule that transform {@link VoltLogicalExchange} to {@link VoltPhysicalExchange}.
  *
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltPLimitRule extends RelOptRule {
+public class VoltPExchangeRule extends RelOptRule {
 
-    public static final VoltPLimitRule INSTANCE = new VoltPLimitRule();
+    public static final VoltPExchangeRule INSTANCE = new VoltPExchangeRule();
 
-    VoltPLimitRule() {
-        super(operand(VoltLogicalLimit.class,
+    VoltPExchangeRule() {
+        super(operand(VoltLogicalExchange.class,
                 VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalLimit limitOffset = call.rel(0);
-        RelNode input = limitOffset.getInput();
-        RelTraitSet convertedTraits = limitOffset.getTraitSet()
+        VoltLogicalExchange exchange = call.rel(0);
+        RelNode input = exchange.getInput();
+        RelTraitSet convertedTraits = exchange.getTraitSet()
                 .replace(VoltPhysicalRel.CONVENTION).simplify();
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
 
-        call.transformTo(new VoltPhysicalLimit(
-                limitOffset.getCluster(),
+        call.transformTo(new VoltPhysicalExchange(
+                exchange.getCluster(),
                 convertedTraits,
                 convertedInput,
-                limitOffset.getOffset(),
-                limitOffset.getLimit(),
-                false));
+                exchange.getDistribution()));
     }
 }

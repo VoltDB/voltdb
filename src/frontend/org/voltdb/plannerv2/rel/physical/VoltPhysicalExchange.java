@@ -17,33 +17,46 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
-public abstract class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
+import com.google_voltpatches.common.base.Preconditions;
 
-    protected VoltPhysicalExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input) {
-        super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
+public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
+
+    public VoltPhysicalExchange(
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution newDistribution) {
+        super(cluster, traitSet, input, newDistribution);
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
                 traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
     }
 
-    @Override public VoltPhysicalExchange copy(
+    @Override
+    public VoltPhysicalExchange copy(
             RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-        return copyInternal(traitSet, newInput);
+        return new VoltPhysicalExchange(getCluster(), traitSet, newInput, newDistribution);
     }
 
-    /*public VoltPhysicalExchange copy(
-            RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution, boolean isTopExchange) {
-        return copyInternal(traitSet, newInput);
-    }*/
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return getInput().estimateRowCount(mq);
+    }
 
-    protected abstract VoltPhysicalExchange copyInternal(RelTraitSet traitSet, RelNode newInput);
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        // row count and cpu cost are the same
+        double rowCount = estimateRowCount(mq);
+        double cpu = rowCount;
+        double io = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, io);
+    }
+
 }

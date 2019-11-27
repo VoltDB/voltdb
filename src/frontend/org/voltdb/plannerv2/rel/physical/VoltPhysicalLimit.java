@@ -43,22 +43,30 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     private final RexNode m_offset;
     private final RexNode m_limit;
 
+    // In a partitioned query Limit could be pushed down to fragments
+    // by the LimitExchange Transpose Rule -
+    // Limit / RenNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
+
     public VoltPhysicalLimit(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit,
+            boolean isPushedDown) {
         super(cluster, traitSet, input);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
         m_limit = limit;
+        m_isPushedDown = isPushedDown;
     }
 
     public VoltPhysicalLimit copy(
-            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
-        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit);
+            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, boolean isPushedDown) {
+        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, isPushedDown);
     }
 
     @Override
     public VoltPhysicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
-        return copy(traitSet, sole(inputs), m_offset, m_limit);
+        return copy(traitSet, sole(inputs), m_offset, m_limit, m_isPushedDown);
     }
 
     public RexNode getOffset() {
@@ -69,11 +77,16 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         return m_limit;
     }
 
+    public boolean isPushedDown() {
+        return m_isPushedDown;
+    }
+
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.itemIf("limit", m_limit, m_limit != null);
         pw.itemIf("offset", m_offset, m_offset != null);
+        pw.item("pusheddown", m_isPushedDown);
         return pw;
     }
 
