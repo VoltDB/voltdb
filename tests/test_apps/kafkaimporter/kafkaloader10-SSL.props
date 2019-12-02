@@ -8,3 +8,5 @@ fetch.max.wait.ms=10000
 security.protocol=SSL
 ssl.truststore.location=apprunner-keystore
 ssl.truststore.password=password
+# disable server host name verification
+ssl.endpoint.identification.algorithm=

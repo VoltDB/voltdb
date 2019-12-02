@@ -120,6 +120,14 @@ public class ExportToFileClient extends ExportClientBase {
     //For test
     public static String TEST_VOLTDB_ROOT = null;
 
+    /**
+     * This export client requires decoding all table partitions in same thread.
+     */
+    @Override
+    public DecodingPolicy getDecodingPolicy() {
+        return DecodingPolicy.BY_TABLE;
+    }
+
     class DecoderMetaData {
         final String tableName;
         final long generation;
@@ -181,8 +189,15 @@ public class ExportToFileClient extends ExportClientBase {
                 this.creationTime = System.currentTimeMillis();
             }
 
+            // Use no revision to generate a file path
             String getPathUtility(String extension, String hostId, String prefix) {
+                return getPathUtility(extension, hostId, prefix, 0);
+            }
+
+            // Use a specific revision to generate a file path
+            String getPathUtility(String extension, String hostId, String prefix, int revision) {
                 String res = "";
+                String rev = revision == 0 ? "" : ("-" + revision);
                 if(m_batched) {
                     res = m_dirContainingFiles.getPath() +
                           File.separator +
@@ -190,6 +205,7 @@ public class ExportToFileClient extends ExportClientBase {
                           "-" +
                           tableName +
                           hostId +
+                          rev +
                           extension;
                 }
                 else {
@@ -204,17 +220,24 @@ public class ExportToFileClient extends ExportClientBase {
                           "-" +
                           m_dateformat.get().format(start) +
                           hostId +
+                          rev +
                           extension;
                 }
                 return res;
             }
 
+            // Use no revision to generate a file path
             String getPath(String prefix) {
+                return getPath(prefix, 0);
+            }
+
+            // Use a specific revision to generate a file path
+            String getPath(String prefix, int revision) {
                 String hostId = "";
                 if(m_uniquenames) {
                     hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 }
-                return getPathUtility(m_extension, hostId, prefix);
+                return getPathUtility(m_extension, hostId, prefix, revision);
             }
 
             String getPathForSchema() {
@@ -237,7 +260,8 @@ public class ExportToFileClient extends ExportClientBase {
 
             @Override
             public String toString() {
-                return "FileHandle for " + tableName + " Generation " + generation + " Creation time: " + creationTime;
+                return "FileHandle for " + tableName + " Generation " + generation
+                        + " Creation time: " + creationTime;
             }
         }
 
@@ -375,22 +399,38 @@ public class ExportToFileClient extends ExportClientBase {
             for (FileHandle handle : keys)
             {
                 String oldPath = handle.getPath(ACTIVE_PREFIX);
-                String newPath = handle.getPath("");
-
                 File oldFile = new VoltFile(oldPath);
                 assert(oldFile.exists());
                 assert(oldFile.isFile());
                 assert(oldFile.canWrite());
 
-                File newFile = new VoltFile(newPath);
-                assert(!newFile.exists());
-                if (!oldFile.renameTo(newFile)) {
-                    m_logger.error("Failed to rename export file from " + oldPath + " to " + newPath);
+                File newFile = getNonConflictingFinalFile(handle);
+                if (newFile == null || !oldFile.renameTo(newFile)) {
+                    m_logger.error("Failed to rename export file from " + oldPath
+                            + " to any revisions of " + handle.getPath(""));
                 }
 
                 notifySet[i] = newFile;
                 i++;
             }
+        }
+
+        // ENG-18599, catalog updates occurring in same time frame can result in
+        // conflicting file names. Allow for a maximum number of conflicts before
+        // failing.
+        File getNonConflictingFinalFile(FileHandle handle) {
+            for (int i = 0; i < 10; i++) {
+                String finalPath = handle.getPath("", i);
+                File finalFile = new VoltFile(finalPath);
+                if (!finalFile.exists()) {
+                    if (i > 0) {
+                        m_logger.info("Created new revision: " + finalPath);
+                    }
+                    return finalFile;
+                }
+            }
+            m_logger.error("Error: Unable to create an output file that will not conflict with " + handle.getPath("", 0));
+            return null;
         }
 
         CSVWriter getWriter(String tableName, long generation) throws IOException {
@@ -435,6 +475,7 @@ public class ExportToFileClient extends ExportClientBase {
             m_writers.put(handle, writer);
             return writer;
         }
+
 
         void writeSchema(String tableName, long generation, String schema) throws IOException {
             // if no schema's enabled pretend like this worked
@@ -755,8 +796,6 @@ public class ExportToFileClient extends ExportClientBase {
         final PeriodicExportContext previous = m_current;
         try {
             m_current = new PeriodicExportContext();
-
-            m_logger.trace("Rolling batch.");
 
             for( ExportToFileDecoder decoder : m_tableDecoders.values()) {
                 decoder.resetWriter();
