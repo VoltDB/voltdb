@@ -188,7 +188,32 @@ public interface ExportManagerInterface {
 
     public ExportMode getExportMode();
 
-    default public void onDrainedSource(String tableName, int partition) {
-        // No-op
-    }
+    /**
+     * @return null if catalog update is possible, or an error message if not.
+     */
+    public String canUpdateCatalog();
+
+    /**
+     * Notification that a data source was drained
+     *
+     * @param tableName
+     * @param partition
+     */
+    public void onDrainedSource(String tableName, int partition);
+
+    /**
+     * Notification that a data source is closing (or being shut down)
+     *
+     * @param tableName
+     * @param partition
+     */
+    public void onClosingSource(String tableName, int partition);
+
+    /**
+     * Notification that a data source has been closed (or shut down)
+     *
+     * @param tableName
+     * @param partition
+     */
+    public void onClosedSource(String tableName, int partition);
 }

@@ -1001,7 +1001,8 @@ public class ExportCoordinator {
     }
 
     /**
-     * Returns true if the acked sequence number passes the safe point.
+     * Returns true if the acked sequence number passes the safe point,
+     * or if the safe point needs to be re-evaluated.
      *
      * @param ackedSeqNo the acked sequence number
      * @return true if this passed the safe point
@@ -1021,8 +1022,7 @@ public class ExportCoordinator {
             return false;
         }
 
-        if (m_safePoint == 0L || m_safePoint > ackedSeqNo) {
-            // Not waiting for safe point or not reached safe point
+        if (m_safePoint > ackedSeqNo) {
             return false;
         }
         resetSafePoint();
