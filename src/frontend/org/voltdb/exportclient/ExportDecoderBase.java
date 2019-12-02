@@ -215,6 +215,24 @@ public abstract class ExportDecoderBase {
     }
 
     /**
+     * Pause this decoder to allow catalog update.
+     * <p>
+     * This method is called from the site thread when performing catalog update.
+     * By default this is a no-op. Override this method in case the decoder must be interrupted
+     * on catalog update.
+     */
+    public void pause() {
+        // no-op
+    }
+
+    /**
+     * Resume this decoder after a call to {@code pause()}
+     */
+    public void resume() {
+        // no-op
+    }
+
+    /**
      * Process a row of octets from the Export stream. Overridden by subclasses
      * to provide whatever specific processing is desired by this ELClient
      *

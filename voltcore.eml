@@ -113,9 +113,6 @@
 	<lib name="metrics-core-2.2.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/metrics-core-2.2.0.jar!/"/>
 	</lib>
-	<lib name="scala-library-2.11.12.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.12.jar!/"/>
-	</lib>
 	<lib name="felix-framework-5.6.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/felix-framework-5.6.12.jar!/"/>
 	</lib>
@@ -157,12 +154,6 @@
 	</lib>
 	<lib name="tomcat-juli.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli.jar!/"/>
-	</lib>
-	<lib name="scala-parser-combinators_2.11-1.0.2.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-parser-combinators_2.11-1.0.2.jar!/"/>
-	</lib>
-	<lib name="scala-xml_2.11-1.0.2.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-xml_2.11-1.0.2.jar!/"/>
 	</lib>
 	<lib name="javassist-3.20.0-GA.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javassist-3.20.0-GA.jar!/"/>

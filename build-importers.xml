@@ -95,7 +95,6 @@
         <pathelement location='${build.client.dir}' />
         <pathelement location='${build.prod.dir}' />
         <fileset dir='${vendor.lib.dir}'>
-            <exclude name='kafka-clients-0.8.2.2.jar' />
             <exclude name='ant.jar' />
         </fileset>
         <fileset dir='${lib.dir}'>
