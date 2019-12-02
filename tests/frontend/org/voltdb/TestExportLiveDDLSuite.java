@@ -161,11 +161,15 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         waitForStreamedTableAllocatedMemoryZero(client);
 
 
+        // drop all streams at the same time to avoid catalog updates
+        // being rejected on streams not yet closed
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 5; i++) {
             String tab = "ex" + i;
-            response = client.callProcedure("@AdHoc", "drop stream " + tab);
-            assertEquals(response.getStatus(), ClientResponse.SUCCESS);
+            sb.append("drop stream ").append(tab).append(";");
         }
+        response = client.callProcedure("@AdHoc", sb.toString());
+        assertEquals(response.getStatus(), ClientResponse.SUCCESS);
 
         quiesce(client);
 
@@ -175,7 +179,19 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         //recreate tables and export again
         for (int i = 0; i < 5; i++) {
             String tab = "ex" + i;
-            response = client.callProcedure("@AdHoc", "create stream " + tab + " (i integer)");
+            for (int j = 0; j < 10; j++) {
+                response = null;
+                try {
+                    response = client.callProcedure("@AdHoc", "create stream " + tab + " (i integer)");
+                    if (response.getStatus() == ClientResponse.SUCCESS) {
+                        break;
+                    }
+                } catch (Exception ex) {
+                    // let's try again
+                }
+                Thread.sleep(1000);
+            }
+            assertNotNull(response);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             response = client.callProcedure("@AdHoc", "insert into " + tab + " values(111)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
@@ -266,7 +282,23 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         quiesce(client);
 
-        client.callProcedure("@AdHoc", "create stream ex0 (i integer)");
+        // Catalog update may fail if stream hasn't closed yet
+        ClientResponse response = null;
+        for (int i = 0; i < 10; i++) {
+            try {
+                response = null;
+                response = client.callProcedure("@AdHoc", "create stream ex0 (i integer)");
+                if (response.getStatus() == ClientResponse.SUCCESS) {
+                    break;
+                }
+            }
+            catch (Exception ex) {
+                // Try again
+            }
+            Thread.sleep(1000);
+        }
+        assertNotNull(response);
+        assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         client.callProcedure("@AdHoc", "create stream ex partition on column i (i integer not null)");
 
         quiesce(client);

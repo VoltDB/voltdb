@@ -920,18 +920,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * This is called on updateCatalog when an exporting stream is dropped.
-     *
+     * <p>
      * Note: The {@code ExportDataProcessor} must have been shut down prior
-     *      to calling this method.
-     *
-     * @return
+     * to calling this method.
+     * <p>
+     * The {@code closeAndDelete} sequence is executed asynchronously and the
+     * {@link ExportManager} will be notified in {@code onCoordinatorShutdown}
+     * when the sequence has completed. This is used to prevent the same table
+     * being re-created by catalog updates while the data sources are closing.
      */
-    public ListenableFuture<?> closeAndDelete() {
+    public void closeAndDelete() {
         // We're going away, so shut ourselves from the external world
         m_closed = true;
         m_ackMailboxRefs.set(null);
 
-        return m_es.submit(new Runnable() {
+        m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -964,7 +967,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public ListenableFuture<?> close() {
+    /**
+     * Shutdown: closes the data source.
+     * <p>
+     * {@link ExportManager} will be notified in {@code onCoordinatorShutdown}.
+     *
+     * @return a {@link ListenableFuture} to sync on the closing of PBDs,
+     *      note that this future does not wait for the {@link ExportCoordinator} shutdown.
+     */
+    public ListenableFuture<?> shutdown() {
         m_closed = true;
         return m_es.submit(new Runnable() {
             @Override
@@ -987,6 +998,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Shutdown executor");
         }
         m_es.shutdown();
+        ExportManager.instance().onClosedSource(m_tableName, m_partitionId);
     }
 
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.

@@ -54,6 +54,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.HashMultimap;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -135,6 +136,8 @@ public class ExportManager
     private int m_connCount = 0;
     private boolean m_startPolling = false;
 
+    // Track the data sources being closed
+    private HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
 
     public class ExportStats extends ExportStatsBase {
         List<ExportStatsRow> m_stats;
@@ -579,7 +582,7 @@ public class ExportManager
     public void shutdown() {
         ExportGeneration generation = m_generation.getAndSet(null);
         if (generation != null) {
-            generation.close();
+            generation.shutdown();
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
@@ -684,6 +687,33 @@ public class ExportManager
     public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
+        }
+    }
+
+    public synchronized String canUpdateCatalog() {
+        if (m_dataSourcesClosing.isEmpty()) {
+            return null;
+        }
+        else {
+            String msg = "Unable to update catalog, these export streams are still closing: "
+                    + m_dataSourcesClosing.keySet();
+            return msg;
+        }
+    }
+
+    public synchronized void onClosingSource(String tableName, int partition) {
+        m_dataSourcesClosing.put(tableName, partition);
+    }
+
+    public synchronized void onClosedSource(String tableName, int partition) {
+        boolean removed = m_dataSourcesClosing.remove(tableName, partition);
+        if (exportLog.isDebugEnabled()) {
+            if (removed) {
+                exportLog.debug("Closed " + tableName + ", partition " + partition);
+            }
+            else {
+                exportLog.debug("Closed untracked " + tableName + ", partition " + partition + " (ok on shutdown)");
+            }
         }
     }
 }

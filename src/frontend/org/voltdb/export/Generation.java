@@ -31,7 +31,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 public interface Generation {
 
     public void acceptMastership(int partitionId);
-    public void close();
+    public void shutdown();
 
     public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDone(int partitionId, String signature);

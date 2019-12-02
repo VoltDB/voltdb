@@ -247,7 +247,7 @@ public class TestExportGeneration {
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.close();
+        m_exportGeneration.shutdown();
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }

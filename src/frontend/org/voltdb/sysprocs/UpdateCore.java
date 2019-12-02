@@ -46,6 +46,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.export.ExportManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -259,6 +260,11 @@ public class UpdateCore extends VoltSystemProcedure {
                          ", cleaning up temp catalog jar file");
                 VoltDB.instance().cleanUpTempCatalogJar();
                 throw ex;
+            }
+
+            String canUpdate = ExportManager.instance().canUpdateCatalog();
+            if (canUpdate != null) {
+                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, canUpdate);
             }
 
             // Send out fragments to do the initial round-trip to synchronize

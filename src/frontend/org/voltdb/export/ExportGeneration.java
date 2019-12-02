@@ -682,18 +682,11 @@ public class ExportGeneration {
             }
         }
 
-        //Do closings outside the synchronized block and wait for completion.
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        //Do closings outside the synchronized block
         for (ExportDataSource source : doneSources) {
             exportLog.info("Finished processing " + source);
-            tasks.add(source.closeAndDelete());
-        }
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            //Logging of errors  is done inside the tasks so nothing to do here
-            //intentionally not failing if there is an issue with close
-            exportLog.error("Error deleting export data sources", e);
+            ExportManager.instance().onClosingSource(source.getTableName(), source.getPartitionId());
+            source.closeAndDelete();
         }
     }
 
@@ -729,8 +722,8 @@ public class ExportGeneration {
             }
         }
 
-        //Do closing outside the synchronized block. Do not wait on future since
-        // we're invoked from the source's executor thread.
+        //Do closing outside the synchronized block.
+        ExportManager.instance().onClosingSource(tableName, partitionId);
         source.closeAndDelete();
     }
 
@@ -886,21 +879,21 @@ public class ExportGeneration {
         }
     }
 
-    public void close() {
+    public void shutdown() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : sources.values()) {
-                    tasks.add(source.close());
+                    tasks.add(source.shutdown());
                 }
             }
         }
         try {
-            Futures.allAsList(tasks).get();
+            if (!tasks.isEmpty()) {
+                Futures.allAsList(tasks).get();
+          }
         } catch (Exception e) {
-            //Logging of errors  is done inside the tasks so nothing to do here
-            //intentionally not failing if there is an issue with close
-            exportLog.error("Error closing export data sources", e);
+            exportLog.error("Unexpected exception shutting down export data.", e);
         }
         //Do this before so no watchers gets created.
         shutdown = true;
