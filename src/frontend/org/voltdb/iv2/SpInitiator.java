@@ -120,11 +120,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // configure DR
         PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
         setDurableUniqueIdListener(drGateway);
-
+        m_repairLog.registerTransactionCommitInterest(drGateway);
         final PartitionDRGateway mpPDRG;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
             setDurableUniqueIdListener(mpPDRG);
+            m_repairLog.registerTransactionCommitInterest(mpPDRG);
         } else {
             mpPDRG = null;
         }

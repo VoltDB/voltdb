@@ -71,7 +71,7 @@ class Topend {
             bool sync,
             bool endOfStream) = 0;
 
-    virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+    virtual int64_t pushDRBuffer(int32_t partitionId, int64_t committedSpHandle, StreamBlock *block) = 0;
 
     virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -133,7 +133,7 @@ public:
 
     virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, int64_t committedSpHandle, voltdb::StreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,

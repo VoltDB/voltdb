@@ -25,6 +25,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
@@ -58,7 +59,7 @@ public class RepairLog
 
     // Truncation point
     long m_truncationHandle = Long.MIN_VALUE;
-    final List<TransactionCommitInterest> m_txnCommitInterests = new ArrayList<>();
+    final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -148,17 +149,26 @@ public class RepairLog
         }
     }
 
+    boolean hasNoTxnCommitInterests() {
+        return m_txnCommitInterests.isEmpty();
+    }
+
+    void notifyTxnCommitInterests(long handle) {
+        for (TransactionCommitInterest txnCommitInterest : m_txnCommitInterests) {
+            txnCommitInterest.transactionCommitted(handle);
+        }
+    }
+
     // Offer a new message to the repair log. This will truncate
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
-            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
+            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage) msg;
             // We can't repair read only SP transactions. Just don't log them to the repair log.
             if (m.isReadOnly()) {
                 return;
             }
-
             m_lastSpHandle = m.getSpHandle();
             truncate(m.getTruncationHandle(), IS_SP);
             m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
@@ -223,9 +233,7 @@ public class RepairLog
             deq = m_logSP;
             if (m_truncationHandle < handle) {
                 m_truncationHandle = handle;
-                for (TransactionCommitInterest interest : m_txnCommitInterests) {
-                    interest.transactionCommitted(m_truncationHandle);
-                }
+                notifyTxnCommitInterests(handle);
             }
         }
         else {
@@ -313,7 +321,7 @@ public class RepairLog
         return responses;
     }
 
-    public void registerTransactionCommitInterest(TransactionCommitInterest interest)
+    void registerTransactionCommitInterest(TransactionCommitInterest interest)
     {
         m_txnCommitInterests.add(interest);
     }

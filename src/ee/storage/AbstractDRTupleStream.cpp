@@ -50,7 +50,7 @@ void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
 void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream)
 {
     if (sync) return;
-    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, m_committedSpHandle, block);
     if (rowTarget >= 0) {
         m_rowTarget = rowTarget;
     }
@@ -82,8 +82,7 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost)
     TupleStreamBase::rollbackTo(mark, drRowCost);
 }
 
-void
-AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
+void AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
                                      int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush

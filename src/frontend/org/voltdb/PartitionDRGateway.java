@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionCommitInterest;
 import org.voltdb.jni.ExecutionEngine.EventType;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -35,7 +36,7 @@ import org.voltdb.utils.MiscUtils;
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
-public class PartitionDRGateway implements DurableUniqueIdListener {
+public class PartitionDRGateway implements DurableUniqueIdListener, TransactionCommitInterest {
 
     public enum DRRecordType {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
@@ -144,8 +145,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     {}
     public void onSuccessfulProcedureCall(StoredProcedureInvocation spi) {}
     public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
-    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
-            long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
+    public long onBinaryDR(long lastCommittedSpHandle, int partitionId, long startSequenceNumber, long lastSequenceNumber,
+                           long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -157,6 +158,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public static long pushDRBuffer(
             int partitionId,
+            long lastCommittedSpHandle,
             long startSequenceNumber,
             long lastSequenceNumber,
             long lastSpUniqueId,
@@ -167,7 +169,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         if (pdrg == null) {
             return -1;
         }
-        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
+        return pdrg.onBinaryDR(lastCommittedSpHandle, partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
     }
 
@@ -191,4 +193,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                                  existingMetaTableForInsert, existingTupleTableForInsert,
                                                  newMetaTableForInsert, newTupleTableForInsert);
     }
+
+    @Override
+    public void transactionCommitted(long spHandle) {}
 }
