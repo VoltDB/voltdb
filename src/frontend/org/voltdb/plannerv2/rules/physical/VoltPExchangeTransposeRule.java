@@ -22,10 +22,13 @@ import java.util.function.Predicate;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalMergeExchange;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
@@ -37,7 +40,8 @@ import org.voltdb.plannerv2.utils.VoltRelUtil;
 public class VoltPExchangeTransposeRule extends RelOptRule {
 
     private enum ExchangeType {
-        LIMIT_EXCHANGE
+        LIMIT_EXCHANGE,
+        SORT_EXCHANGE
     }
 
     /**
@@ -50,6 +54,17 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                             operand(VoltPhysicalExchange.class,
                                     operand(RelNode.class, any()))),
                     ExchangeType.LIMIT_EXCHANGE);
+
+    /**
+     * Predicate to stop SORT_EXCHANGE to match on SORT / EXCHANGE / SORT
+    */
+    private static final Predicate<VoltPhysicalSort> SORT_STOP_PREDICATE = rel -> !rel.isPushedDown();
+    public static final VoltPExchangeTransposeRule INSTANCE_SORT_EXCHANGE =
+            new VoltPExchangeTransposeRule(
+                    operandJ(VoltPhysicalSort.class, null, SORT_STOP_PREDICATE,
+                            operand(VoltPhysicalExchange.class,
+                                    operand(RelNode.class, any()))),
+                    ExchangeType.SORT_EXCHANGE);
 
     private final ExchangeType mExchangeType;
 
@@ -64,6 +79,9 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             case LIMIT_EXCHANGE:
                 transposeLimitExchange(call);
                 break;
+            case SORT_EXCHANGE:
+                transposeSortExchange(call);
+                break;
         }
     }
 
@@ -74,6 +92,31 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
 
         VoltRelUtil.pushLimitThroughExchange(limit, exchange, child)
             .ifPresent(newLimit -> call.transformTo(newLimit));
+    }
+
+    private void transposeSortExchange(RelOptRuleCall call) {
+        VoltPhysicalSort sort = (VoltPhysicalSort) call.rels[0];
+        Exchange exchange = (Exchange) call.rels[1];
+        RelNode child = call.rels[2];
+
+        // Fragment Sort
+        VoltPhysicalSort fragmentSort = new VoltPhysicalSort(
+                sort.getCluster(),
+                sort.getTraitSet().replace(exchange.getDistribution()),
+                child,
+                sort.getCollation(),
+                false);
+        // New exchange. Since fragment's results will be sorted we can use MergeExchange
+        // to eliminate redundant coordinator's sort
+        Exchange newExchange = new VoltPhysicalMergeExchange(exchange.getCluster(), exchange.getTraitSet(), fragmentSort, exchange.getDistribution());
+        // New Coordinator's Sort
+        VoltPhysicalSort coordinatorSort = new VoltPhysicalSort(
+                sort.getCluster(),
+                sort.getTraitSet().replace(RelDistributions.SINGLETON),
+                newExchange,
+                sort.getCollation(),
+                true);
+        call.transformTo(coordinatorSort);
     }
 
 }

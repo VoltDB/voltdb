@@ -31,6 +31,7 @@ import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
 
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
@@ -91,6 +92,11 @@ public class MPQueryFallBackRule extends RelOptRule {
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
                         RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
                         call.transformTo(coordinatorLimit);
+                    } else if (node instanceof VoltLogicalSort) {
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
+                                node.getTraitSet().replace(dist), node.getInput(), dist);
+                        RelNode coordinatorSort = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        call.transformTo(coordinatorSort);
                     } else {
                         call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
                     }

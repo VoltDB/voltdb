@@ -97,7 +97,7 @@ public class VoltPAggregateRule extends RelOptRule {
         if (hasGroupBy(aggregate)) {
             final VoltPhysicalSort sort = new VoltPhysicalSort(
                     aggregate.getCluster(), convertedAggrTraits, serialAggr,
-                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE));
+                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE), false);
             call.transformTo(sort, ImmutableMap.of(serialAggr, aggregate));
         } else {
             call.transformTo(serialAggr);

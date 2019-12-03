@@ -31,6 +31,7 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
@@ -47,22 +48,30 @@ import com.google.common.base.Preconditions;
 
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
+    // In a partitioned query Limit could be pushed down to fragments
+    // by the LimitExchange Transpose Rule -
+    // Limit / RenNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
+
     public VoltPhysicalSort(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation) {
-        this(cluster, traitSet, input, collation, null, null);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation,
+            boolean isPushedDown) {
+        this(cluster, traitSet, input, collation, null, null, isPushedDown);
     }
 
     private VoltPhysicalSort(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset,
-            RexNode limit) {
+            RexNode limit, boolean isPushedDown) {
         super(cluster, traitSet, input, collation, offset, limit);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
+        m_isPushedDown = isPushedDown;
     }
 
     @Override
     public VoltPhysicalSort copy(
             RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit) {
-        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit);
+        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit, m_isPushedDown);
     }
 
     @Override
@@ -106,6 +115,13 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     }
 
     @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("pusheddown", m_isPushedDown);
+        return pw;
+    }
+
+    @Override
     public AbstractPlanNode toPlanNode() {
         final AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
         final LimitPlanNode lpn;
@@ -128,4 +144,10 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
             return lpn;
         }
     }
+
+    public boolean isPushedDown() {
+        return m_isPushedDown;
+    }
+
+
 }

@@ -47,6 +47,6 @@ public class VoltPSortConvertRule extends ConverterRule {
         final RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
         return new VoltPhysicalSort(sort.getCluster(), traits.plus(sort.getCollation()), convertedInput,
-                sort.getCollation());
+                sort.getCollation(), false);
     }
 }

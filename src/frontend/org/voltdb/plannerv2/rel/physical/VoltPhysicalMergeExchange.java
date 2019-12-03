@@ -28,14 +28,14 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 
 import com.google_voltpatches.common.base.Preconditions;
 
-public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
+public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalRel {
 
-    public VoltPhysicalExchange(
+    public VoltPhysicalMergeExchange(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution newDistribution) {
         super(cluster, traitSet, input, newDistribution);
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
@@ -43,9 +43,9 @@ public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
     }
 
     @Override
-    public VoltPhysicalExchange copy(
+    public VoltPhysicalMergeExchange copy(
             RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-        return new VoltPhysicalExchange(getCluster(), traitSet, newInput, newDistribution);
+        return new VoltPhysicalMergeExchange(getCluster(), traitSet, newInput, newDistribution);
     }
 
     @Override
@@ -67,7 +67,7 @@ public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
         final AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
         final SendPlanNode spn = new SendPlanNode();
         spn.addAndLinkChild(child);
-        final ReceivePlanNode rpn = new ReceivePlanNode();
+        final MergeReceivePlanNode rpn = new MergeReceivePlanNode();
         rpn.addAndLinkChild(spn);
         return rpn;
     }

@@ -133,7 +133,7 @@ class VoltPRelFactories {
         public RelNode createSort(RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
             return new VoltPhysicalSort(input.getCluster(),
                     input.getTraitSet().plus(collation).replace(VoltPhysicalRel.CONVENTION),
-                    input, collation);
+                    input, collation, false);
         }
         @Override @Deprecated // to be removed before 2.0
         public RelNode createSort(
