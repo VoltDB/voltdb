@@ -175,7 +175,6 @@ public class VoltRelUtil {
             fragmentLimit = new VoltPhysicalLimit(
                     coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(exchange.getDistribution()), fragmentNode,
                     null, combinedLimit, false);
-            
         }
         // Build chain
         Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
