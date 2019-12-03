@@ -102,7 +102,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithLimit() {
         m_tester.sql("select i from R1 limit 5")
-                .transform("VoltPhysicalLimit(limit=[5])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
@@ -110,7 +110,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithLimitParam() {
         m_tester.sql("select i from R1 limit ?")
-                .transform("VoltPhysicalLimit(limit=[?0])\n" +
+                .transform("VoltPhysicalLimit(limit=[?0], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
@@ -118,7 +118,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithFilterAndLimit() {
         m_tester.sql("select i from R1 where si > 3 limit 5")
-                .transform("VoltPhysicalLimit(limit=[5])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], I=[$t0], $condition=[$t7])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
@@ -126,7 +126,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithOrderByAndLimitAndFilter() {
         m_tester.sql("select si, i from RI1 where I > 3 order by si limit 3")
-                .transform("VoltPhysicalLimit(limit=[3])\n" +
+                .transform("VoltPhysicalLimit(limit=[3], pusheddown=[false])\n" +
                         "  VoltPhysicalSort(sort0=[$0], dir0=[ASC])\n" +
                         "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], expr#4=[3], " +
                         "expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5], index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDGT1_0])\n")
@@ -135,7 +135,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithOffset() {
         m_tester.sql("select i from R1 offset 1")
-                .transform("VoltPhysicalLimit(offset=[1])\n" +
+                .transform("VoltPhysicalLimit(offset=[1], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
@@ -143,7 +143,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithLimitOffset() {
         m_tester.sql("select i from R1 limit 5 offset 1")
-                .transform("VoltPhysicalLimit(limit=[5], offset=[1])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], offset=[1], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
@@ -151,7 +151,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithLimitOffsetSort() {
         m_tester.sql("select i from R1 order by bi limit 5 offset 1")
-                .transform("VoltPhysicalLimit(limit=[5], offset=[1])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], offset=[1], pusheddown=[false])\n" +
                         "  VoltPhysicalSort(sort0=[$1], dir0=[ASC])\n" +
                         "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
@@ -198,7 +198,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testSeqScanWithOrderByAndLimit() {
         m_tester.sql("select bi, i, si from R1 order by i limit 5")
-                .transform("VoltPhysicalLimit(limit=[5])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], pusheddown=[false])\n" +
                         "  VoltPhysicalSort(sort0=[$1], dir0=[ASC])\n" +
                         "    VoltPhysicalCalc(expr#0..5=[{inputs}], BI=[$t3], I=[$t0], SI=[$t1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
@@ -207,7 +207,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testIndexScanWithLimitOffset() {
         m_tester.sql("select si, i from RI1 where I > 3 limit 3 offset 4")
-                .transform("VoltPhysicalLimit(limit=[3], offset=[4])\n" +
+                .transform("VoltPhysicalLimit(limit=[3], offset=[4], pusheddown=[false])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], " +
                         "expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5], " +
                         "index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDGT1_0])\n")
@@ -350,7 +350,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                 .pass();
 
         m_tester.sql("select max(TI), SI from R1 where I > 0 group by SI, I order by SI limit 3")
-                .transform("VoltPhysicalLimit(limit=[3])\n" +
+                .transform("VoltPhysicalLimit(limit=[3], pusheddown=[false])\n" +
                         "  VoltPhysicalSort(sort0=[$1], dir0=[ASC])\n" +
                         "    VoltPhysicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t2], SI=[$t0])\n" +
                         "      VoltPhysicalHashAggregate(group=[{0, 1}], EXPR$0=[MAX($2)], coordinator=[false], type=[hash])\n" +

@@ -57,7 +57,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
     @Test
     public void testSetOpsLimit() {
         m_tester.sql("select si from R1 union ALL select si from R2 limit ? offset ?")
-                .transform("VoltPhysicalLimit(limit=[?0], offset=[?1])\n" +
+                .transform("VoltPhysicalLimit(limit=[?0], offset=[?1], pusheddown=[false])\n" +
                            "  VoltPhysicalUnion(all=[true])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "      VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
@@ -66,7 +66,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                 .pass();
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
-                .transform("VoltPhysicalLimit(limit=[5], offset=[4])\n" +
+                .transform("VoltPhysicalLimit(limit=[5], offset=[4], pusheddown=[false])\n" +
                            "  VoltPhysicalSort(sort0=[$0], dir0=[ASC])\n" +
                            "    VoltPhysicalUnion(all=[true])\n" +
                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +

@@ -26,6 +26,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * Rules that to push Limit, Sort and Aggregation nodes down through an Exchange node
@@ -36,21 +37,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 public class VoltPExchangeTransposeRule extends RelOptRule {
 
     private enum ExchangeType {
-//        SORT_EXCHANGE,
         LIMIT_EXCHANGE
-//        LIMIT_SORT_EXCHANGE
     }
-
-//    /**
-//     * Predicate to stop SORT_EXCHANGE to match on SORT / EXCHANGE / SORT
-//    */
-//    private static final Predicate<RelNode> SORT_STOP_PREDICATE = rel -> !(rel instanceof Sort);
-//    public static final VoltLExchangeTransposeRule INSTANCE_SORT_EXCHANGE =
-//            new VoltLExchangeTransposeRule(
-//                    operand(VoltLogicalSort.class,
-//                            operand(VoltLogicalExchange.class,
-//                                    operandJ(RelNode.class, null, SORT_STOP_PREDICATE, any()))),
-//                    ExchangeType.SORT_EXCHANGE);
 
     /**
      * Predicate to stop LIMIT_EXCHANGE to match on LIMIT / EXCHANGE / LIMIT
@@ -63,14 +51,6 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                                     operand(RelNode.class, any()))),
                     ExchangeType.LIMIT_EXCHANGE);
 
-//    public static final VoltPExchangeTransposeRule INSTANCE_LIMIT_SORT_EXCHANGE =
-//            new VoltPExchangeTransposeRule(
-//                    operand(VoltLogicalLimit.class,
-//                            operand(VoltLogicalSort.class,
-//                                    operand(VoltLogicalExchange.class,
-//                                            operand(VoltLogicalSort.class, any())))),
-//                    ExchangeType.LIMIT_SORT_EXCHANGE);
-
     private final ExchangeType mExchangeType;
 
     private VoltPExchangeTransposeRule(RelOptRuleOperand operand, ExchangeType exchangeType) {
@@ -81,60 +61,19 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         switch (mExchangeType) {
-//            case SORT_EXCHANGE:
-//                transposeSortExchange(call);
-//                break;
             case LIMIT_EXCHANGE:
                 transposeLimitExchange(call);
                 break;
-//            case LIMIT_SORT_EXCHANGE:
-//                transposeLimitSortExchange(call);
-//                break;
         }
     }
-
-//    private void transposeSortExchange(RelOptRuleCall call) {
-//        Sort sort = (Sort) call.rels[0];
-//        Exchange exchange = (Exchange) call.rels[1];
-//        RelNode child = call.rels[2];
-//        Sort fragmentSort = sort.copy(sort.getTraitSet().replace(exchange.getDistribution()), child, sort.getCollation());
-//        Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentSort, exchange.getDistribution());
-//        Sort coordinatorSort = sort.copy(sort.getTraitSet(), newExchange, sort.getCollation());
-//        call.transformTo(coordinatorSort);
-//    }
 
     private void transposeLimitExchange(RelOptRuleCall call) {
         VoltPhysicalLimit limit = (VoltPhysicalLimit) call.rels[0];
         Exchange exchange = (Exchange) call.rels[1];
         RelNode child = call.rels[2];
 
-        // Check when LIMIT / OFFSET
-        VoltPhysicalLimit fragmentLimit = new VoltPhysicalLimit(
-                limit.getCluster(), limit.getTraitSet().replace(exchange.getDistribution()), child,
-                limit.getOffset(), limit.getLimit(), false);
-                Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-                VoltPhysicalLimit coordinatorLimit = new VoltPhysicalLimit(
-                                limit.getCluster(), limit.getTraitSet(), newExchange,
-                                limit.getOffset(), limit.getLimit(), true);
-        call.transformTo(coordinatorLimit);
+        VoltRelUtil.pushLimitThroughExchange(limit, exchange, child)
+            .ifPresent(newLimit -> call.transformTo(newLimit));
     }
-
-//    private void transposeLimitSortExchange(RelOptRuleCall call) {
-//        VoltLogicalLimit limit = (VoltLogicalLimit) call.rels[0];
-//        Sort coordinatorSort = (Sort) call.rels[1];
-//        Exchange exchange = (Exchange) call.rels[2];
-//        Sort fragmentSort = (Sort) call.rels[3];
-//
-//        // Check when LIMIT / OFFSET
-//        VoltLogicalLimit fragmentLimit = new VoltLogicalLimit(
-//                limit.getCluster(), limit.getTraitSet().replace(exchange.getDistribution()), fragmentSort,
-//                limit.getOffset(), limit.getLimit());
-//        Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-//        Sort newCoordinatorSort = coordinatorSort.copy(coordinatorSort.getTraitSet(), newExchange, coordinatorSort.getCollation());
-//        VoltLogicalLimit coordinatorLimit = new VoltLogicalLimit(
-//                limit.getCluster(), limit.getTraitSet(), newCoordinatorSort,
-//                limit.getOffset(), limit.getLimit());
-//        call.transformTo(coordinatorLimit);
-//    }
 
 }

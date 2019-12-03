@@ -42,13 +42,32 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
         super.tearDown();
     }
 
-    public void testPartitionedLimit() {
+    public void testPartitionedLimit1() {
         m_tester.sql("select i from P1 limit 10")
-                .transform("VoltPhysicalLimit(limit=[10], pusheddown=[false])\n" +
+                .transform("VoltPhysicalLimit(limit=[10], pusheddown=[true])\n" +
                             "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
                             "    VoltPhysicalLimit(limit=[10], pusheddown=[false])\n" +
                             "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                             "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
+    public void testPartitionedLimit2() {
+        m_tester.sql("select i from P1 limit 10 offset 3")
+                .transform("VoltPhysicalLimit(limit=[10], offset=[3], pusheddown=[true])\n" +
+                            "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalLimit(limit=[13], pusheddown=[false])\n" +
+                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                            "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
+    public void testPartitionedLimit3() {
+        m_tester.sql("select i from P1 offset 3")
+                .transform("VoltPhysicalLimit(offset=[3], pusheddown=[false])\n" +
+                            "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                            "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
     }
 

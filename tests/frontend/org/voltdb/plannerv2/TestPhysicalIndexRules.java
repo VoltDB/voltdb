@@ -74,7 +74,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexInlineRules() {
         // CREATE INDEX RI2_IND1 ON RI2(ti)
         m_tester.sql("select ti from ri2 where ti > 5 and i + si > 4 limit 3")
-                .transform("VoltPhysicalLimit(limit=[3])\n" +
+                .transform("VoltPhysicalLimit(limit=[3], pusheddown=[false])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, RI2]], expr#0..3=[{inputs}], " +
                         "expr#4=[5], expr#5=[>($t3, $t4)], expr#6=[+($t0, $t1)], expr#7=[4], expr#8=[>($t6, $t7)], " +
                         "expr#9=[AND($t5, $t8)], TI=[$t3], $condition=[$t9], index=[RI2_IND1_INVALIDGT1_0])\n")

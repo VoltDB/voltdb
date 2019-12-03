@@ -242,7 +242,7 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
 
             // Exchange Transpose Rules
-//            VoltPExchangeTransposeRule.INSTANCE_LIMIT_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_EXCHANGE,
 
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,

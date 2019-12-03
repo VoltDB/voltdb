@@ -115,7 +115,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     // a unique one with a lesser cost
     public void testEng2541Plan() {
         m_tester.sql("select * from l where lname=? and b=0 order by id asc limit ?")
-                .transform("VoltPhysicalLimit(limit=[?1])\n" +
+                .transform("VoltPhysicalLimit(limit=[?1], pusheddown=[false])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, L]], expr#0..3=[{inputs}], " +
                         "expr#4=[?0], expr#5=[=($t1, $t4)], expr#6=[CAST($t3):INTEGER NOT NULL], expr#7=[0], " +
                         "expr#8=[=($t6, $t7)], expr#9=[AND($t5, $t8)], proj#0..3=[{exprs}], $condition=[$t9], " +
@@ -129,7 +129,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     // ordering allowing the SORT to be dropped
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         m_tester.sql("select id from a where deleted=? and updated_date <= ? order by id limit ?")
-                .transform("VoltPhysicalLimit(limit=[?2])\n" +
+                .transform("VoltPhysicalLimit(limit=[?2], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[?0], expr#4=[=($t1, $t3)], expr#5=[?1], expr#6=[<=($t2, $t5)], expr#7=[AND($t4, $t6)], ID=[$t0], $condition=[$t7])\n" +
                         "    VoltPhysicalTableIndexScan(table=[[public, A]], expr#0..2=[{inputs}], proj#0..2=[{exprs}], index=[VOLTDB_AUTOGEN_CONSTRAINT_IDX_ID_ASCEQ0_0])\n")
                 .pass();

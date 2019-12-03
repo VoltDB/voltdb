@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import org.aeonbits.owner.util.Collections;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistribution;
@@ -28,6 +29,8 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
@@ -80,7 +83,20 @@ public class MPQueryFallBackRule extends RelOptRule {
                 } else {
                     dist = childDist;
                 }
-                call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                // Nodes that require LogicalExchange for a multi-partitioned query-
+                // Sort, Limit, Aggregate
+                if (RelDistributions.SINGLETON.getType() != dist.getType()) {
+                    if (node instanceof VoltLogicalLimit) {
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
+                                node.getTraitSet().replace(dist), node.getInput(), dist);
+                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        call.transformTo(coordinatorLimit);
+                    } else {
+                        call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                    }
+                } else {
+                    call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                }
             }
         }
     }

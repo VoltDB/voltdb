@@ -128,7 +128,7 @@ public class TestPhysicalMergeJoin extends Plannerv2TestCase {
 
     public void testReplicatedMergeJoin5() {
         m_tester.sql("select RI1.ti from RI1 inner join RI2 on RI1.I = RI2.I offset 4")
-                .transform("VoltPhysicalLimit(offset=[4])\n" +
+                .transform("VoltPhysicalLimit(offset=[4], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..2=[{inputs}], TI=[$t1])\n" +
                         "    VoltPhysicalMergeJoin(condition=[=($0, $2)], joinType=[inner], " +
                         "outerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI1_I], innerIndex=[VOLTDB_AUTOGEN_IDX_PK_RI2_I])\n" +
