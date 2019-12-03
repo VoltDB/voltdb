@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORECOMMON_H
-#define HSTORECOMMON_H
+#pragma once
 
 //
 // List of header files that almost all parts of the system will need
@@ -53,4 +52,3 @@
 #include "common/ids.h"
 #include "common/debuglog.h"
 #include "common/NValue.hpp"
-#endif

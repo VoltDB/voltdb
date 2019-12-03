@@ -358,25 +358,41 @@ void testCompactingChunks() {
         // we can continue, each time free()-ing half of
         // what is left. But that is not needed since we already
         // checked twice. See documents on CompactingChunksIgnoreableFree
-        // for why it need to be exception-ignorant.
+        // for why it need to be exception-tolerant.
 
-        // NOTE/TODO: this ranged deleter would cause eecheck to
-        // SEGFAULT, even though running this executable
-        // individually shows no problem.
-
-//        while (! alloc.empty()) {
-//            try {
-//                for_each<iterator>(alloc, [&alloc, &j](void* p) { alloc.free(p); ++j; });
-//            } catch (range_error const&) { }
-//        }
-//        assert(j == NumTuples);
+        while (! alloc.empty()) {
+            try {
+                for_each<iterator>(alloc, [&alloc, &j](void* p) { alloc.free(p); ++j; });
+            } catch (range_error const&) { }
+        }
+        assert(j == NumTuples);
     }
 }
+
+template<typename Alloc, typename Compactible = typename Alloc::compactibility> struct TrackedDeleter;
+// compacting chunks' free() returns ptr that we will track
+template<typename Alloc> struct TrackedDeleter<Alloc, integral_constant<bool, true>> {
+    Alloc& m_alloc;
+    bool& m_freed;
+    TrackedDeleter(Alloc& alloc, bool& freed) : m_alloc(alloc), m_freed(freed) {}
+    void operator()(void* p) {
+        m_freed |= m_alloc.free(p) != nullptr;
+    }
+};
+// non-compacting chunks' free() is void
+template<typename Alloc> struct TrackedDeleter<Alloc, integral_constant<bool, false>> {
+    Alloc& m_alloc;
+    bool& m_freed;
+    TrackedDeleter(Alloc& alloc, bool& freed) : m_alloc(alloc), m_freed(freed) {}
+    void operator()(void* p) {
+        m_freed = true;
+        m_alloc.free(p);
+    }
+};
 
 template<typename Chunks, size_t NthBit>
 void testCustomizedIterator(size_t skipped) {      // iterator that skips on every #skipped# elems
     using Tag = NthBitChecker<NthBit>;
-    Tag const tag;
     using const_iterator = typename IterableTableTupleChunks<Chunks, Tag>::const_iterator;
     using iterator = typename IterableTableTupleChunks<Chunks, Tag>::iterator;
     class Gen : public StringGen<TupleSize> {
@@ -413,26 +429,39 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
                 if (i % skipped == 0) {
                     ++i;
                 }
-                assert(p == addresses[i++]);
+                if (Chunks::compactibility::value) {
+                    assert(p == addresses[i]);
+                }
+                ++i;
             });
     assert(i == NumTuples);
     // Free all tuples via allocator. Note that allocator needs
     // to be aware the "emptiness" from the iterator POV, not
     // allocator's POV.
-    bool freed;
-    do {
-        freed = false;
-        try {
-            for_each<iterator>(alloc, [&alloc, &freed, &tag](void* p) {
+
+    // TODO: enable them when non-compacting chunks is working on
+    // it. delete crashes when iterator is advancing, pointing to invalid chunk
+    if (Chunks::compactibility::value) {
+        bool freed;
+        TrackedDeleter<Chunks> deleter(alloc, freed);
+        Tag const tag;
+        do {
+            freed = false;
+            try {
+                i = 0;
+                for_each<iterator>(alloc, [&deleter, &tag, &i](void* p) {
                         assert(tag(p));
-                        freed |= alloc.free(p) != nullptr;
-                    });
-        } catch (range_error const&) {}
-    } while(freed);
-    // Check using normal iterator (i.e. non-skipping one) that
-    // the remains are what should be.
-    for_each<typename IterableTableTupleChunks<Chunks, truth>::const_iterator>(
-            alloc_cref, [&tag](void const* p) { assert(! tag(p)); });
+                        deleter(p);
+                        ++i;                                       // on non-compacting chunk: crash when i == 4
+//                        printf("%lu\n", i); fflush(stdout);
+                        });
+            } catch (range_error const&) {}
+        } while(freed);
+        // Check using normal iterator (i.e. non-skipping one) that
+        // the remains are what should be.
+        for_each<typename IterableTableTupleChunks<Chunks, truth>::const_iterator>(
+                alloc_cref, [&tag](void const* p) { assert(! tag(p)); });
+    }
 }
 
 TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
@@ -441,8 +470,8 @@ TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
     for (auto skipped = 8lu; skipped < 64; skipped +=8) {
         testCustomizedIterator<CompactingChunks<ShrinkDirection::head>, 3>(skipped);
         testCustomizedIterator<CompactingChunks<ShrinkDirection::tail>, 3>(skipped);
-//        testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
-//        testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
+        testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
+        testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
     }
 }
 
