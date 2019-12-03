@@ -95,7 +95,7 @@ public class ExportBenchmark {
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
-    public int m_target = 0;
+    public int target = 0;
 
     // Server-side stats - Note: access synchronized on serverStats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
@@ -362,7 +362,8 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    public void doInserts(Client client, int target) {
+    // public void doInserts(Client client, int target) {
+    public void doInserts(Client client) {
 
         // Don't track warmup inserts
         long now;
@@ -372,18 +373,22 @@ public class ExportBenchmark {
             now = System.currentTimeMillis();
             rowId = new AtomicLong(0);
             while (benchmarkWarmupEndTS > now) {
+                for (int t = 1; t <= config.targets; t++) {
                 try {
                     client.callProcedure(
                             new NullCallback(),
-                            "InsertExport"+target,
+                            "InsertExport"+t,
                             rowId.getAndIncrement(),
                             config.multiply,
                             1);
+                    System.out.println("calling "+"InsertExport"+target);
+
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
                     }
                 } catch (Exception ignore) {}
+                }
             }
             System.out.println("Warmup complete");
             rowId.set(0);
@@ -407,10 +412,11 @@ public class ExportBenchmark {
                 break;
             }
 
+            for (int t = 1; t <= config.targets; t++) {
             try {
                 client.callProcedure(
                         new ExportCallback(),
-                        "InsertExport"+target,
+                        "InsertExport"+t,
                         rowId.getAndIncrement(),
                         config.multiply,
                         config.targets);
@@ -422,6 +428,7 @@ public class ExportBenchmark {
                 System.err.println("Couldn't insert into VoltDB\n");
                 e.printStackTrace();
                 System.exit(1);
+            }
             }
         }
 
@@ -611,15 +618,18 @@ public class ExportBenchmark {
             }
 
             // Do the inserts in a separate thread
-            for (m_target = 0; m_target < config.targets; m_target++) {
-                System.out.println("Creating thread " + m_target);
-                writes = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    doInserts(client, m_target);
-                    }
-                });
-            }
+            // for (target = 0; target < config.targets; target++) {
+                System.out.println("Creating thread ");
+            	writes = new Thread(new Runnable() {
+            		@Override
+            		public void run() {
+                        System.out.println("Creating thread target " + target);
+            			// doInserts(client, target);
+            			doInserts(client);
+
+            		}
+            	});
+            // }
             writes.start();
             Thread.sleep(config.warmup * 1000);
         }
