@@ -153,6 +153,7 @@ public class LoopbackExportClient extends ExportClientBase {
         private boolean m_restarted = false;
         private boolean m_wrote = false;
         private volatile boolean m_isShutDown;
+        private volatile boolean m_isPaused;
 
         private final Supplier<CSVWriter> m_rejs;
 
@@ -197,7 +198,7 @@ public class LoopbackExportClient extends ExportClientBase {
             }
             m_user = getVoltDB().getCatalogContext().authSystem.getImporterUser();
             m_invoker = getVoltDB().getClientInterface().getInternalConnectionHandler();
-            m_shouldContinue = (x) -> !isShutDown();
+            m_shouldContinue = (x) -> !isShutDown() && !isPaused();
         }
 
         public boolean isShutDown() {
@@ -205,9 +206,24 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
+        public synchronized void pause() {
+            m_isPaused = true;
+            notifyAll();
+        }
+
+        @Override
+        public void resume() {
+            m_isPaused = false;
+        }
+
+        private boolean isPaused() {
+            return m_isPaused;
+        }
+
+        @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             synchronized (this) {
-                if (m_ctx.m_outstandingTransactions.get() > 0 && !m_isShutDown) {
+                if (m_ctx.m_outstandingTransactions.get() > 0 && !m_isShutDown && !m_isPaused) {
                     try {
                         wait();
                     } catch (InterruptedException e) {
@@ -215,7 +231,7 @@ public class LoopbackExportClient extends ExportClientBase {
                     }
                 }
             }
-            if (m_isShutDown) { // if shut down, the GuestProcessor will always re-process the block when it's up
+            if (m_isShutDown || m_isPaused) { // if shut down or paused, always re-process the block
                 return;
             }
             m_restarted = !m_ctx.m_rq.isEmpty();
