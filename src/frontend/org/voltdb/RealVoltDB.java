@@ -5248,27 +5248,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    public void updateLocalActiveSiteCount(int executorPartition) {
-        // execute on the lowest master site only
-        if (executorPartition == getLowestMasterPartitionId()) {
-
-            // update active site count
-            final int leaderCount = getLeaderSites().size();
-            if (leaderCount != m_nodeSettings.getLocalSitesCount()) {
-                NavigableMap<String, String> settings = m_nodeSettings.asMap();
-                ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
-                        .putAll(new HashMap<String, String>() {
-                            private static final long serialVersionUID = 1L; {
-                            putAll(settings);
-                            put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
-                         }}).build();
-                m_nodeSettings = NodeSettings.create(newSettings);
-                m_nodeSettings.store();
-                m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
-            }
-        }
-    }
-
     public int getLowestMasterPartitionId(){
         for(Initiator init : m_iv2Initiators.values()) {
             if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
@@ -5290,6 +5269,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
         return  leaderSites;
+    }
+
+    public void updateLocalActiveSiteCount(int leaderCount) {
+        if (leaderCount == m_nodeSettings.getLocalSitesCount()) {
+            return;
+        }
+        // update active site count
+        synchronized(m_catalogContext) {
+            if (leaderCount != m_nodeSettings.getLocalSitesCount()) {
+                NavigableMap<String, String> settings = m_nodeSettings.asMap();
+                ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
+                        .putAll(new HashMap<String, String>() {
+                            private static final long serialVersionUID = 1L; {
+                                putAll(settings);
+                                put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
+                            }}).build();
+                m_nodeSettings = NodeSettings.create(newSettings);
+                m_nodeSettings.store();
+                m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
+            }
+        }
     }
 }
 

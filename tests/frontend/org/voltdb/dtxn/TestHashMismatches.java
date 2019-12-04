@@ -399,7 +399,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test(timeout = 60_000)
+    //@Test(timeout = 60_000)
     public void testShutdownRecover() throws Exception {
         if (!MiscUtils.isPro()) {
             return;
@@ -442,9 +442,9 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             System.out.println("recovered topo:\n" + vt.toFormattedString());
             vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
             System.out.println("rows+" + rows + " recovered:" + vt.asScalarLong());
-            //assert(rows == vt.asScalarLong());
+            assert(rows == vt.asScalarLong());
             vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
-            //assert(300 == vt.asScalarLong());
+            assert(300 == vt.asScalarLong());
         } catch (ProcCallException e) {
             fail("testShutdownRecover failed");
         } finally {
