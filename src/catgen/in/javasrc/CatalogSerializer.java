@@ -94,17 +94,14 @@ public final class CatalogSerializer implements CatalogVisitor {
         Object value = ct.getField(field);
         if (value == null) {
             m_builder.append("null");
-        }
-        else if (value.getClass() == Integer.class) {
-            m_builder.append(value);
-        } else if (value.getClass() == Boolean.class) {
-            m_builder.append(Boolean.toString((Boolean)value));
+        } else if (value.getClass() == Byte.class || value.getClass() == Integer.class || value.getClass() == Boolean.class) {
+                m_builder.append(value);
         } else if (value.getClass() == String.class) {
             m_builder.append("\"").append(value).append("\"");
         } else if (value instanceof CatalogType) {
             m_builder.append(((CatalogType)value).getCatalogPath());
         } else {
-            throw new CatalogException("Unsupported field type '" + value + "'");
+            throw new CatalogException("Unsupported field value '" +   value + "' type '" + value.getClass() + "'");
         }
         m_builder.append("\n");
     }
