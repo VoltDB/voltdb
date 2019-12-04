@@ -43,7 +43,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.VoltPort;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
@@ -92,8 +91,6 @@ public class Inits {
     final PriorityBlockingQueue<InitWork> m_readyJobs = new PriorityBlockingQueue<>();
     final int m_threadCount;
     final Set<Thread> m_initThreads = new HashSet<>();
-    // 52mb - 4k, leave space for zookeeper header
-    public static final int MAX_CATALOG_CHUNK_SIZE = VoltPort.MAX_MESSAGE_LENGTH - 4 * 1024;
 
     abstract class InitWork implements Comparable<InitWork>, Runnable {
         Set<Class<? extends InitWork>> m_blockers = new HashSet<>();
@@ -301,7 +298,7 @@ public class Inits {
             // Invalid URL. Try as a file.
             fin = new FileInputStream(catalogUrl);
         }
-        byte[] buffer = new byte[MAX_CATALOG_CHUNK_SIZE];
+        byte[] buffer = new byte[CatalogUtil.MAX_CATALOG_CHUNK_SIZE];
         int readBytes = 0;
         // Reserve the header space for first buffer
         int chunkOffset = CatalogUtil.CATALOG_BUFFER_HEADER;
@@ -316,7 +313,7 @@ public class Inits {
                 if (chunkOffset == buffer.length) {
                     chunkOffset = 0;
                     chunks.add(ByteBuffer.wrap(buffer));
-                    buffer = new byte[MAX_CATALOG_CHUNK_SIZE];
+                    buffer = new byte[CatalogUtil.MAX_CATALOG_CHUNK_SIZE];
                 }
                 readBytes = fin.read(buffer, chunkOffset, buffer.length - chunkOffset);
             }

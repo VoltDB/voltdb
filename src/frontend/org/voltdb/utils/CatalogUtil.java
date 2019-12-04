@@ -77,6 +77,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
@@ -229,10 +230,12 @@ public abstract class CatalogUtil {
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
+    // 52mb - 4k, leave space for zookeeper header
+    public static final int MAX_CATALOG_CHUNK_SIZE = VoltPort.MAX_MESSAGE_LENGTH - 4 * 1024;
     public static final int CATALOG_BUFFER_HEADER = 4 +  // version number
                                                     8 +  // generation Id
                                                     4 +  // deployment bytes length
-                                                    4;  // catalog bytes length
+                                                    4;   // catalog bytes length
 
     static {
         try {
@@ -2608,7 +2611,7 @@ public abstract class CatalogUtil {
         return hash;
     }
 
-    private static void fillCatalogHeader(
+    private static void makeCatalogHeader(
                 SegmentedCatalog catalogAndDeployment,
                 int version,
                 long genId)
@@ -2639,7 +2642,7 @@ public abstract class CatalogUtil {
     {
         assert (catalogAndDeployment != null);
 
-        fillCatalogHeader(catalogAndDeployment, version, genId);
+        makeCatalogHeader(catalogAndDeployment, version, genId);
         String path = VoltZK.catalogbytes + "/" + version;
         try {
             zk.create(path, new byte[] {(byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal()},
@@ -2690,13 +2693,36 @@ public abstract class CatalogUtil {
             m_catalogLength = catalogSize;
         }
 
-        public static SegmentedCatalog create(byte[] catalogBytes, byte[] deploymentBytes, byte[] catalogHash) {
+        public static SegmentedCatalog create(byte[] catalogBytes, byte[] catalogHash, byte[] deploymentBytes) {
             List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
-            int readBytes = 0;
             // Reserve the header space for first buffer
             int chunkOffset = CATALOG_BUFFER_HEADER;
+            int totalBytes = catalogBytes.length + deploymentBytes.length + CATALOG_BUFFER_HEADER;
+            int bufferSize = Math.min(MAX_CATALOG_CHUNK_SIZE, totalBytes);
+            byte[] buffer = new byte[bufferSize];
+            buffers.add(ByteBuffer.wrap(buffer));
             // Copy deployment bytes into first buffer (deployment file is small enough to fit in a buffer)
             System.arraycopy(deploymentBytes, 0, buffer, chunkOffset, deploymentBytes.length);
+            chunkOffset += deploymentBytes.length;
+
+            // Wrap catalog bytes into ByteBuffers
+            int remaining = totalBytes - chunkOffset;
+            int catalogOffset = 0;
+            while (remaining > 0) {
+                int copyLength = Math.min(MAX_CATALOG_CHUNK_SIZE, remaining) - chunkOffset;
+                System.arraycopy(catalogBytes, catalogOffset, buffer, chunkOffset, copyLength);
+                catalogOffset += copyLength;
+                chunkOffset += copyLength;
+                remaining = totalBytes - chunkOffset;
+                if (remaining > 0) {
+                    bufferSize = Math.min(MAX_CATALOG_CHUNK_SIZE, remaining);
+                    buffer = new byte[bufferSize];
+                    buffers.add(ByteBuffer.wrap(buffer));
+                    chunkOffset = 0;
+                }
+            }
+
+            return new SegmentedCatalog(buffers, deploymentBytes.length, catalogBytes.length);
         }
 
         // Used primarily in initialization to create a deployment file only catalog
