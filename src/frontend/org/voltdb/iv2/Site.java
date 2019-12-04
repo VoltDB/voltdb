@@ -356,8 +356,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         // for transition to master only mode
         @Override
-        public void setLowestSiteId() {
-            m_isLowestSiteId = true;
+        public void setLowestSiteId(boolean isLowestSiteId) {
+            m_isLowestSiteId = isLowestSiteId;
         }
 
         // update the lowest site
