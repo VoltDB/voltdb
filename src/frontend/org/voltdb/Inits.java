@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
@@ -374,7 +375,8 @@ public class Inits {
                             m_rvdb.getHostMessenger().getZK(),
                             0, // Initial version
                             exportInitialGenerationUniqueId,
-                            catalogAndDeployment);
+                            catalogAndDeployment,
+                            ZKCatalogStatus.COMPLETE);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);

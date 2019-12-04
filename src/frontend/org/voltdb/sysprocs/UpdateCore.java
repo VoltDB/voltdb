@@ -47,7 +47,6 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
@@ -232,6 +231,7 @@ public class UpdateCore extends VoltSystemProcedure {
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
 
+            log.info("Executing PF_updateCatalogPrecheckAndSync");
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
             } catch (Exception ex) {
@@ -279,6 +279,7 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean hasSecurityUserChange = ((Byte) params.toArray()[7]) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
+            log.info("Executing PF_updateCatalog");
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
@@ -329,6 +330,7 @@ public class UpdateCore extends VoltSystemProcedure {
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalog, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+            log.info("Executing PF_updateCatalogAggregate");
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateCatalog));
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogAggregate, result);
         }
@@ -378,9 +380,7 @@ public class UpdateCore extends VoltSystemProcedure {
                            String catalogDiffCommands,
                            int expectedCatalogVersion,
                            long genId,
-                           byte[] catalogBytes,
                            byte[] catalogHash,
-                           byte[] deploymentBytes,
                            byte[] deploymentHash,
                            byte worksWithElastic,
                            String[] tablesThatMustBeEmpty,
@@ -443,8 +443,7 @@ public class UpdateCore extends VoltSystemProcedure {
         }
 
         try {
-            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
-                    SegmentedCatalog.create(catalogBytes, catalogHash, deploymentBytes));
+            CatalogUtil.publishCatalog(zk, expectedCatalogVersion + 1);
         } catch (KeeperException | InterruptedException e) {
             log.error("error writing catalog bytes on ZK during @UpdateCore");
             throw e;

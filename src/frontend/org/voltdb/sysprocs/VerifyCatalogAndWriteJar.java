@@ -20,11 +20,14 @@ package org.voltdb.sysprocs;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.NTProcedureService;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -85,16 +88,24 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     public final static long TIMEOUT = getTimeoutValue();
 
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String encodedDiffCommands,
-            byte[] catalogHash, byte[] deploymentBytes)
+    public CompletableFuture<ClientResponse> run(String encodedDiffCommands, int expectedCatalogVersion)
     {
         // This should only be called once on each host
         String diffCommands = CompressionService.decodeBase64AndDecompress(encodedDiffCommands);
         log.info("Verify user procedure classes and write catalog jar (compressed size = " + encodedDiffCommands.length() +
                 ", uncompressed size = " + diffCommands.length() +")");
 
+        CatalogAndDeployment cad = null;
+        try {
+            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(),
+                    expectedCatalogVersion + 1);
+        } catch (KeeperException | InterruptedException e) {
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    "unexpected error reading staging catalog from zookeeper: " + e);
+        }
+
         String err = VoltDB.instance().verifyJarAndPrepareProcRunners(
-                catalogBytes, diffCommands, catalogHash, deploymentBytes);
+                cad.catalogBytes, diffCommands, cad.catalogHash, cad.deploymentBytes);
         if (err != null) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
                     "unexpected error verifying classes or preparing procedure runners: " + err);
@@ -102,7 +113,7 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
 
         // Write the new catalog to a temporary jar file
         try {
-            VoltDB.instance().writeCatalogJar(catalogBytes);
+            VoltDB.instance().writeCatalogJar(cad.catalogBytes);
         } catch (Exception e) {
             // Catalog disk write failed, include the message
             VoltDB.instance().cleanUpTempCatalogJar();

@@ -119,6 +119,7 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
@@ -2677,7 +2678,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         CatalogUtil.updateCatalogToZK(zk,
                                 0, // use default version 0 as start
                                 0L,
-                                SegmentedCatalog.createStarterCatalog(deploymentBytes));
+                                SegmentedCatalog.createStarterCatalog(deploymentBytes),
+                                ZKCatalogStatus.COMPLETE);
                         hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                     }
                 } else {
