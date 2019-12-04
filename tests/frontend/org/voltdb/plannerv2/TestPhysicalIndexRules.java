@@ -139,7 +139,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy1() {
         // There is no index BI, or (SI, BI). Sequence scan with sort
         m_tester.sql("SELECT * FROM RI2 WHERE si = 2 ORDER BY BI")
-                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):INTEGER], expr#5=[2], expr#6=[=($t4, $t5)], " +
                         "proj#0..3=[{exprs}], $condition=[$t6])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
@@ -181,7 +181,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
         // Indexes RI5_IND_I_II_III ON RI5 (i, ii, iii) and RI5_IND_II_III ON RI5 (ii, iii)
         // are not applicable. Sort is required
         m_tester.sql("SELECT * FROM RI5 WHERE ii > 2 and i = 3 ORDER BY III")
-                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], pusheddown=[false])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], " +
                         "expr#3=[2], expr#4=[>($t1, $t3)], expr#5=[3], expr#6=[=($t0, $t5)], expr#7=[AND($t4, $t6)], " +
                         "proj#0..2=[{exprs}], $condition=[$t7], index=[RI5_UNIQUE_IND_I_INVALIDEQ1_1])\n")
@@ -211,7 +211,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy8() {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is not applicable applicable - sort direction mismatch
         m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I ASC, III DESC")
-                .transform("VoltPhysicalSort(sort0=[$0], sort1=[$2], dir0=[ASC], dir1=[DESC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$0], sort1=[$2], dir0=[ASC], dir1=[DESC], pusheddown=[false])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, RI5]], expr#0..2=[{inputs}], expr#3=[2], " +
                         "expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_II_INVALIDEQ1_1])\n")
                 .pass();
@@ -221,7 +221,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy9() {
         // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is not applicable applicable - column order
         m_tester.sql("SELECT * FROM RI5 ORDER BY II, I")
-                .transform("VoltPhysicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, RI5]], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
@@ -240,7 +240,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     public void testIndexWithOrderBy11() {
         // I = BI is not an equality expression with a CONST. Sort is required
         m_tester.sql("SELECT * FROM RI2 WHERE i = bi ORDER BY BI")
-                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], pusheddown=[false])\n" +
                         "  VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t0):BIGINT], expr#5=[=($t4, $t2)], " +
                         "proj#0..3=[{exprs}], $condition=[$t5])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")

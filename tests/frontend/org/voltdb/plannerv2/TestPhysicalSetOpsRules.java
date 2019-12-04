@@ -67,7 +67,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
                 .transform("VoltPhysicalLimit(limit=[5], offset=[4], pusheddown=[false])\n" +
-                           "  VoltPhysicalSort(sort0=[$0], dir0=[ASC])\n" +
+                           "  VoltPhysicalSort(sort0=[$0], dir0=[ASC], pusheddown=[false])\n" +
                            "    VoltPhysicalUnion(all=[true])\n" +
                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "        VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
@@ -79,7 +79,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
     @Test
     public void testSetOpsOrderBy() {
         m_tester.sql("select si*2 as si2, si as si1 from R1 union ALL select i, bi from R2 order by si2 ASC, si1 DESC")
-                .transform("VoltPhysicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC])\n" +
+                .transform("VoltPhysicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], pusheddown=[false])\n" +
                            "  VoltPhysicalUnion(all=[true])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], SI2=[$t7], SI1=[$t1])\n" +
                            "      VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
