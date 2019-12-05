@@ -42,6 +42,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
+import org.voltdb.LogEntryType;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
@@ -1594,6 +1595,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Generate Iv2LogFault message and send it to replicas
             Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, lastUniqueId);
             m_mailbox.send(m_sendToHSIds, faultMsg);
+        }
+        return written;
+    }
+
+    public SettableFuture<Boolean> logMasterMode() {
+        SettableFuture<Boolean> written = null;
+        if (m_replayComplete && m_isLeader) {
+            long faultSpHandle = advanceTxnEgo().getTxnId();
+            Set<Long> master = Sets.newHashSet();
+            master.add(m_mailbox.getHSId());
+            written = m_cl.logIv2Fault(m_mailbox.getHSId(),
+                    master, m_partitionId, faultSpHandle, LogEntryType.MASTERMODE);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Log master only mode on site " + CoreUtils.hsIdToString(m_mailbox.getHSId()));
+            }
         }
         return written;
     }

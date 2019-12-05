@@ -158,6 +158,17 @@ public class LeaderAppointer implements Promotable
                 tmLog.debug(String.format(WHOMIM + "Newly seen replicas:%s, Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
                         CoreUtils.hsIdCollectionToString(missingHSIds)));
             }
+            // No leader election is needed
+            if (updatedHSIds.contains(m_currentLeader)) {
+                // Check for k-safety
+                if (!isClusterKSafe(null)) {
+                    VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                            false, null);
+                }
+                m_replicas.clear();
+                m_replicas.addAll(updatedHSIds);
+                return;
+            }
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
                 if (missingHSIds.size() > 0) {

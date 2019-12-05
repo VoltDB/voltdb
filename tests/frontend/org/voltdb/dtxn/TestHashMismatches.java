@@ -67,12 +67,21 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     static String expectedLogMessage = "Hash mismatch";
     static String expectHashDetectionMessage = "Hash mismatch is detected";
 
-    LocalCluster createCluster(String method) {
+    LocalCluster createCluster(String method) throws IOException {
         return createCluster(method, kfactor, hostCount, sitesPerHost);
     }
-
-    LocalCluster createCluster(String method, int k, int hostcount, int sph) {
+    LocalCluster createCluster(String method, int k, int hosts, int sph) throws IOException {
+        return createCluster(method, k, hosts, sph, false);
+    }
+    LocalCluster createCluster(String method, int k, int hostcount, int sph, boolean clEnabled) throws IOException {
         LocalCluster server = null;
+        VoltFile.resetSubrootForThisProcess();
+        File tempDir = new File(TMPDIR);
+        if (!tempDir.exists()) {
+            assertTrue(tempDir.mkdirs());
+        }
+        deleteTestFiles(TESTNONCE);
+        System.out.println("*** executing *** " + method);
         try {
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(SCHEMA);
@@ -83,6 +92,9 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             server = new LocalCluster(method + ".jar", sph, hostcount, k, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
             server.setCallingClassName(method);
+            if (clEnabled) {
+                builder.configureLogging(null, null, true, true, 200, Integer.MAX_VALUE, 300);
+            }
             assertTrue("Catalog compilation failed", server.compile(builder));
 
             server.setHasLocalServer(false);
@@ -92,9 +104,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             server.setLogSearchPatterns(logSearchPatterns);
 
             client = ClientFactory.createClient();
-
             server.startUp();
-
             for (String s : server.getListenerAddresses()) {
                 client.createConnection(s);
             }
@@ -115,7 +125,8 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         if (cluster != null) {
             try {
                 cluster.shutDown();
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
@@ -159,7 +170,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      */
     @Test(timeout = 60_000)
     public void testNonDeterministic_RO_SP() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testNonDeterministic_RO_SP");
         try {
             insertMoreNormalData(1, 100);
@@ -176,7 +186,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      */
     @Test(timeout = 60_000)
     public void testDeterministicProc() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testDeterministicProc");
         try {
             insertMoreNormalData(1, 100);
@@ -194,7 +203,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      */
     @Test(timeout = 60_000)
     public void testWhitespaceChanges() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testWhitespaceChanges");
         try {
             client.callProcedure(
@@ -224,9 +232,8 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     @Test(timeout = 60_000)
     public void testMultistatementNonDeterministicProc() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testMultistatementNonDeterministicProc");
-        // preload some data
+
         try {
             for (int i = 0; i < 10000; i++) {
                 client.callProcedure("KV.insert", i, 999);
@@ -264,9 +271,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     @Test(timeout = 60_000)
     public void testPartialstatementNonDeterministicProc() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster("testPartialstatementNonDeterministicProc");
-        // preload some data
         try {
             for (int i = 0; i < 10000; i++) {
                 client.callProcedure("KV.insert", i, 999);
@@ -304,8 +309,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     @Test(timeout = 60_000)
     public void testBuggyNonDeterministicProc() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
-        LocalCluster server = createCluster("testBuggyNonDeterministicProc");
+       LocalCluster server = createCluster("testBuggyNonDeterministicProc");
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -333,12 +337,11 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     }
 
     @Test(timeout = 60_000)
-    public void testSnapshotSaveRestore() throws Exception {
+    public void testSnapshotSaveRestoreWithoutCL() throws Exception {
         if (!MiscUtils.isPro()) {
             return;
         }
-        VoltFile.resetSubrootForThisProcess();
-        LocalCluster server = createCluster("testSnapshotSaveRestore", 2, 3, 18);
+        LocalCluster server = createCluster("testSnapshotSaveRestoreWithoutCL", 2, 3, 18);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
@@ -349,6 +352,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                         i,
                         NonDeterministicSPProc.MISMATCH_INSERTION);
             }
+            vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
             for (int i = 0; i < 200; i++) {
                 client.callProcedure("mp.insert",i,i);
             }
@@ -376,6 +380,8 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
             vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
             long rows = vt.asScalarLong();
+            vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
+            long mprows = vt.asScalarLong();
             client.callProcedure("@AdHoc", "delete from KV");
             client.callProcedure("@AdHoc", "delete from MP");
 
@@ -391,21 +397,20 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
             assert(rows == vt.asScalarLong());
             vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
-            assert(300 == vt.asScalarLong());
+            assert(mprows == vt.asScalarLong());
         } catch (ProcCallException e) {
-            fail("testSnapshotSaveRestore failed");
+            fail("testSnapshotSaveRestoreWithoutCL failed");
         } finally {
             shutDown(server);
         }
     }
 
-    //@Test(timeout = 60_000)
-    public void testShutdownRecover() throws Exception {
+    @Test(timeout = 180_000)
+    public void testShutdownRecoverWithoutCL() throws Exception {
         if (!MiscUtils.isPro()) {
             return;
         }
-        VoltFile.resetSubrootForThisProcess();
-        LocalCluster server = createCluster("testShutdownRecover", 2, 3, 18);
+        LocalCluster server = createCluster("testShutdownRecoverWithoutCL", 2, 3, 18);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
@@ -428,7 +433,96 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             }
             vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
             long rows = vt.asScalarLong();
+            vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
+            long mprows = vt.asScalarLong();
             client.drain();
+
+            System.out.println("Saving snapshot...");
+            ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
+            vt = resp.getResults()[0];
+            System.out.println(vt.toFormattedString());
+            while (vt.advanceRow()) {
+                assertTrue(vt.getString("RESULT").equals("SUCCESS"));
+            }
+            client.close();
+            server.shutDown();
+            Thread.sleep(2000);
+            System.out.println("Shutdown cluster and recover");
+            server.overrideStartCommandVerb("RECOVER");
+            server.startUp(false);
+            System.out.println("cluster recovered!");
+            client = ClientFactory.createClient();
+            client.createConnection("", server.port(0));
+            vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+            System.out.println("recovered topo:\n" + vt.toFormattedString());
+
+            System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
+            vt = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+            System.out.println(vt.toFormattedString());
+            while (vt.advanceRow()) {
+                if (vt.getString("RESULT").equals("FAILURE")) {
+                    fail(vt.getString("ERR_MSG"));
+                }
+            }
+            System.out.println("snapshot reloaded");
+            vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+            System.out.println("rows+" + rows + " recovered:" + vt.asScalarLong());
+            assert(rows == vt.asScalarLong());
+            vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
+            assert(mprows == vt.asScalarLong());
+        } catch (ProcCallException e) {
+            fail("testShutdownRecoverWithoutCL failed");
+        } finally {
+            shutDown(server);
+        }
+    }
+
+    @Test(timeout = 180_000)
+    public void testShutdownRecoverToMasterOnlyModeWithCL() throws Exception {
+        testShutdownRecoverWithCL("testShutdownRecoverToMasterOnlyModeWithCL", false);
+    }
+
+    @Test(timeout = 180_000)
+    public void testShutdownRecoverToFullClusterWithCL() throws Exception {
+        testShutdownRecoverWithCL("testShutdownRecoverToFullClusterWithCL", true);
+    }
+
+    private void testShutdownRecoverWithCL(String testCase, boolean correctStoreProc) throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        LocalCluster server = createCluster(testCase, 2, 3, 18, true);
+        VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+        System.out.println(vt.toFormattedString());
+        try {
+            for (int i = 5000; i < 5091; i++) {
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        i,
+                        i,
+                        NonDeterministicSPProc.MISMATCH_INSERTION);
+            }
+            for (int i = 0; i < 10; i++) {
+                client.callProcedure("mp.insert",i,i);
+            }
+
+            verifyTopologyAfterHashMismatch(server);
+            System.out.println("Stopped replicas.");
+            insertMoreNormalData(10001, 10092);
+            for (int i = 10; i < 20; i++) {
+                client.callProcedure("mp.insert",i,i);
+            }
+            vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+            long rows = vt.asScalarLong();
+            vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
+            long mprows = vt.asScalarLong();
+            client.drain();
+
+            //Can do an UAC here to correct the problem stored procedure
+            //hack here to correct the stored procedure!
+            if (correctStoreProc) {
+                server.setJavaProperty("DISABLE_HASH_MISMATCH_TEST", "true");
+            }
             client.close();
             server.shutDown();
             Thread.sleep(2000);
@@ -444,14 +538,17 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             System.out.println("rows+" + rows + " recovered:" + vt.asScalarLong());
             assert(rows == vt.asScalarLong());
             vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
-            assert(300 == vt.asScalarLong());
+            assert(mprows == vt.asScalarLong());
+            insertMoreNormalData(10100, 10110);
+            for (int i = 20; i < 25; i++) {
+                client.callProcedure("mp.insert",i,i);
+            }
         } catch (ProcCallException e) {
-            fail("testShutdownRecover failed");
+            fail(testCase + " failed");
         } finally {
             shutDown(server);
         }
     }
-
     private void insertMoreNormalData(int start, int end) throws NoConnectionsException, IOException, ProcCallException {
         for (int i = start; i < end; i++) {
             client.callProcedure("NonDeterministicSPProc", i, i, NonDeterministicSPProc.NO_PROBLEM);

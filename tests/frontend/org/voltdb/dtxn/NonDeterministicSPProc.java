@@ -56,6 +56,10 @@ public class NonDeterministicSPProc extends VoltProcedure {
             System.loadLibrary("VoltDBMissingLibraryTrap");
         }
 
+        String disabled = System.getProperty("DISABLE_HASH_MISMATCH_TEST");
+        if ("true".equalsIgnoreCase(disabled)) {
+            failType = NO_PROBLEM;
+        }
         if (failType == MISMATCH_INSERTION) {
             voltQueueSQL(sql, key, id);
         } else if (failType == MULTI_STATEMENT_MISMATCH) {
