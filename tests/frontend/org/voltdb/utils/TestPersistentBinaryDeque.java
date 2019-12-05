@@ -262,11 +262,25 @@ public class TestPersistentBinaryDeque {
     @Test
     public void testReopenReaderMultiSegment() throws Exception {
         System.out.println("Running testReopenReaderMultiSegment");
+
+        // ENG-18635: verify that last cursor closing does not purge PBD segments
+        commonReopenReaderMultiSegment(150, 150, false);
+    }
+
+    @Test
+    public void testReopenReaderMultiSegmentDR() throws Exception {
+        System.out.println("Running testReopenReaderMultiSegment");
+
+        // ENG-18635: verify that last cursor closing does purge PBD segments for DR
+        commonReopenReaderMultiSegment(150, 9, true);
+    }
+
+    private void commonReopenReaderMultiSegment(int initialCount, int finalCount, boolean purgeOnLastCursor)
+            throws IOException {
         List<File> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
 
-        int count = 150;
-        for (int ii = 0; ii < count; ii++) {
+        for (int ii = 0; ii < initialCount; ii++) {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
@@ -275,9 +289,9 @@ public class TestPersistentBinaryDeque {
 
         // Open and close a read cursor
         BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
-        m_pbd.closeCursor(CURSOR_ID);
+        m_pbd.closeCursor(CURSOR_ID, purgeOnLastCursor);
 
-        // Verify that closing the cursor did not discard any segments (ENG-18635)
+        // Verify behavior on last closing cursor
         reader = m_pbd.openForRead(CURSOR_ID);
         int readCount = 0;
         BBContainer cont;
@@ -285,7 +299,7 @@ public class TestPersistentBinaryDeque {
             cont.discard();
             readCount++;
         }
-        assertEquals(count, readCount);
+        assertEquals(readCount, finalCount);
     }
 
     @Test
