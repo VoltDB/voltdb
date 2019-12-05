@@ -1006,6 +1006,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
         reader.close();
 
+        // If we closed the last cursor, leave the PBD segments as they are, which
+        // is consistent with a cursorless PBD.
+        if (m_readCursors.isEmpty()) {
+            return;
+        }
+
         // check all segments from latest to oldest to see if segments before that segment can be deleted
         // We need this only in closeCursor() now, which is currently only used when removing snapshot placeholder
         // cursor in one-to-many DR, this extra check is needed because other normal cursors may have read past some

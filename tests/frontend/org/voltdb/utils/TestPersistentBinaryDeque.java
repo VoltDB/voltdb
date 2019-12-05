@@ -260,6 +260,35 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testReopenReaderMultiSegment() throws Exception {
+        System.out.println("Running testReopenReaderMultiSegment");
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+
+        int count = 150;
+        for (int ii = 0; ii < count; ii++) {
+            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+        }
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 4);
+
+        // Open and close a read cursor
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        m_pbd.closeCursor(CURSOR_ID);
+
+        // Verify that closing the cursor did not discard any segments (ENG-18635)
+        reader = m_pbd.openForRead(CURSOR_ID);
+        int readCount = 0;
+        BBContainer cont;
+        while((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            cont.discard();
+            readCount++;
+        }
+        assertEquals(count, readCount);
+    }
+
+    @Test
     public void testTruncateFirstElement() throws Exception {
         System.out.println("Running testTruncateFirstElement");
         List<File> listing = getSortedDirectoryListing();
