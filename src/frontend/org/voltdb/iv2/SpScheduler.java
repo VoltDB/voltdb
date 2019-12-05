@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -43,11 +44,13 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
-import org.voltdb.LogEntryType;
 import org.voltdb.CommandLog.DurabilityListener;
+import org.voltdb.LogEntryType;
+import org.voltdb.ParameterSet;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -57,9 +60,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.iv2.DuplicateCounter.HashResult;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
+import org.voltdb.iv2.SpInitiator.ServiceState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -77,6 +80,8 @@ import org.voltdb.messaging.MPBacklogFlushMessage;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -1121,7 +1126,55 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         TransactionTask task;
+        Iv2InitiateTaskMessage clMessage = msg.getInitiateTask();
         if (msg.isSysProcTask()) {
+            // inject catalog bytes into c/l
+            if (msg.getProcedureName().equalsIgnoreCase("@UpdateCore") && msg.getInitiateTask() != null) {
+                // First find the expected catalog version in the parameters
+                ParameterSet ps = msg.getParameterSetForFragment(0);
+                Object[] params = ps.toArray();
+                int catalogVersion = (int)params[1];
+                CatalogAndDeployment cad = null;
+                try {
+                    cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion);
+                } catch (KeeperException | InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Fail to get catalog bytes while processing catalog update", true, null);
+                }
+                // create a new StoredProcedureInvocation, assign it to msg.getInitiateTask
+                StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+                // create the execution site task
+                invocation.setProcName("@UpdateCore");
+                invocation.setParams(params[0],
+                                     params[1],
+                                     params[2],
+                                     cad.catalogBytes,
+                                     params[3],
+                                     cad.deploymentBytes,
+                                     params[4],
+                                     params[5],
+                                     params[6],
+                                     params[7],
+                                     params[8],
+                                     params[9],
+                                     params[10],
+                                     params[11],
+                                     params[12]);
+                Iv2InitiateTaskMessage uac = msg.getInitiateTask();
+                invocation.setClientHandle(uac.getStoredProcedureInvocation().getClientHandle());
+                clMessage = new Iv2InitiateTaskMessage(
+                        uac.getInitiatorHSId(),
+                        uac.getCoordinatorHSId(),
+                        uac.getTruncationHandle(),
+                        uac.getTxnId(),
+                        uac.getUniqueId(),
+                        uac.isReadOnly(),
+                        uac.isSinglePartition(),
+                        null,
+                        invocation,
+                        uac.getClientInterfaceHandle(),
+                        uac.getConnectionId(),
+                        uac.isForReplay());
+            }
             task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, msg, null);
@@ -1133,7 +1186,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         if (logThis) {
             ListenableFuture<Object> durabilityBackpressureFuture =
-                    m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
+                    m_cl.log(clMessage, msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);
 
             if (traceLog != null && durabilityBackpressureFuture != null) {
