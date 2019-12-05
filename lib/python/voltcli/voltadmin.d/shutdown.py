@@ -19,6 +19,7 @@ import signal
 from voltcli import checkstats
 from voltcli.checkstats import StatisticsProcedureException
 from voltcli import utility
+from voltcli.hostinfo import Hosts
 
 
 @VOLT.Command(
@@ -53,6 +54,19 @@ def shutdown(runner):
         else:
             runner.info('Shutdown canceled.')
     else:
+        response = runner.call_proc('@SystemInformation',
+                                    [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                    ['OVERVIEW'])
+
+        # Convert @SystemInformation results to objects.
+        hosts = Hosts(runner.abort)
+        for tuple in response.table(0).tuples():
+            hosts.update(*tuple)
+        host = hosts.hosts_by_id.itervalues().next()
+        if host.get('clustersafety') == "REDUCED":
+            runner.info('Since cluster is in reduced k safety mode, taking a final snapshot before shutdown.')
+            runner.opts.save = True
+
         runner.info('Cluster shutdown in progress.')
         if not runner.opts.forcing:
             stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'

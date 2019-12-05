@@ -85,6 +85,7 @@ public class MockVoltDB implements VoltDBInterface
     StatsAgent m_statsAgent = null;
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(false), null);
     private OperationMode m_mode = OperationMode.RUNNING;
+    private boolean m_masteronly = false;
     private volatile String m_localMetadata;
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
     boolean m_noLoadLib = false;
@@ -608,6 +609,16 @@ public class MockVoltDB implements VoltDBInterface
     public OperationMode getMode()
     {
         return m_mode;
+    }
+
+    @Override
+    public boolean IsMasterOnly() {
+        return m_masteronly;
+    }
+
+    @Override
+    public void setMasterOnly() {
+        m_masteronly = true;
     }
 
     @Override

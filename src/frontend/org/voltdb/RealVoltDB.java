@@ -455,6 +455,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
+    private volatile boolean m_masteronly = false;
     private volatile OperationMode m_startMode = OperationMode.RUNNING;
 
     volatile String m_localMetadata = "";
@@ -4418,6 +4419,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public OperationMode getMode()
     {
         return m_mode;
+    }
+
+    @Override
+    public boolean IsMasterOnly() {
+        return m_masteronly;
+    }
+
+    @Override
+    public void setMasterOnly() {
+        m_masteronly = true;
     }
 
     @Override
