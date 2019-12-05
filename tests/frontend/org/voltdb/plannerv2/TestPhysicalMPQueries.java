@@ -80,4 +80,25 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testPartitionedLimitSort1() {
+        m_tester.sql("select i from PI1 order by ii limit 10 offset 4")
+                .transform("VoltPhysicalLimit(limit=[10], offset=[4], pusheddown=[true])\n" +
+                            "  VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[true])\n" +
+                            "    VoltPhysicalMergeExchange(distribution=[hash[0]])\n" +
+                            "      VoltPhysicalLimit(limit=[14], pusheddown=[false])\n" +
+                            "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], II=[$t2])\n" +
+                            "          VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
+                .pass();
+    }
+
+    public void testPartitionedLimitSort2() {
+        m_tester.sql("select i from PI1 order by ii offset 10")
+                .transform("VoltPhysicalLimit(offset=[10], pusheddown=[false])\n" +
+                            "  VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[true])\n" +
+                            "    VoltPhysicalMergeExchange(distribution=[hash[0]])\n" +
+                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], II=[$t2])\n" +
+                            "        VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
+                .pass();
+    }
+
 }

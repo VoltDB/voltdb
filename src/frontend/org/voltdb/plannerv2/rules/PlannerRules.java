@@ -244,6 +244,7 @@ public class PlannerRules {
             // Exchange Transpose Rules
             VoltPExchangeTransposeRule.INSTANCE_LIMIT_EXCHANGE,
             VoltPExchangeTransposeRule.INSTANCE_SORT_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_SORT_EXCHANGE,
 
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,

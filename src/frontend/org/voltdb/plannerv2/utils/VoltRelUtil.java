@@ -25,10 +25,10 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexCallBinding;
@@ -134,15 +134,14 @@ public class VoltRelUtil {
     }
 
     /**
-     * Given a coordinator's LIMIT node build a fragment's LIMIT node and return a new
-     * Coordinator Limit / Exchange / Fragment Limit / Rest sub tree
+     * Given a coordinator's LIMIT node build a fragment's LIMIT node
      *
      * @param coordinatorLimit
-     * @param exchange
+     * @param fragmentDist
      * @param fragmentNode
      * @return
      */
-    public static Optional<VoltPhysicalLimit> pushLimitThroughExchange(VoltPhysicalLimit coordinatorLimit, Exchange exchange, RelNode fragmentNode) {
+    public static Optional<VoltPhysicalLimit> buildFragmentLimit(VoltPhysicalLimit coordinatorLimit, RelDistribution fragmentDist, RelNode fragmentNode) {
         RexNode limit = coordinatorLimit.getLimit();
         RexNode offset = coordinatorLimit.getOffset();
         // Can't push OFFEST only to fragments
@@ -154,7 +153,7 @@ public class VoltRelUtil {
         if (offset == null) {
             // Simply push the limit to fragments
             fragmentLimit = new VoltPhysicalLimit(
-                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(exchange.getDistribution()), fragmentNode,
+                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(fragmentDist), fragmentNode,
                     null, limit, false);
         } else {
             // make a new limit by combining coordinator's limit and offset
@@ -173,14 +172,10 @@ public class VoltRelUtil {
                         limit);
             }
             fragmentLimit = new VoltPhysicalLimit(
-                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(exchange.getDistribution()), fragmentNode,
+                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(fragmentDist), fragmentNode,
                     null, combinedLimit, false);
         }
-        // Build chain
-        Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-        VoltPhysicalLimit newCoordinatorLimit = new VoltPhysicalLimit(
-                coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet(), newExchange,
-                coordinatorLimit.getOffset(), coordinatorLimit.getLimit(), true);
-        return Optional.of(newCoordinatorLimit);
+        return Optional.of(fragmentLimit);
     }
+
 }
