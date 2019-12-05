@@ -171,7 +171,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void setLowestSiteId(boolean isLowestSiteId)
+        public void setLowestSiteId()
         {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
