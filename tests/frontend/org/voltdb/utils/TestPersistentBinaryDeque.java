@@ -260,6 +260,49 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testReopenReaderMultiSegment() throws Exception {
+        System.out.println("Running testReopenReaderMultiSegment");
+
+        // ENG-18635: verify that last cursor closing does not purge PBD segments
+        commonReopenReaderMultiSegment(150, 150, false);
+    }
+
+    @Test
+    public void testReopenReaderMultiSegmentDR() throws Exception {
+        System.out.println("Running testReopenReaderMultiSegment");
+
+        // ENG-18635: verify that last cursor closing does purge PBD segments for DR
+        commonReopenReaderMultiSegment(150, 9, true);
+    }
+
+    private void commonReopenReaderMultiSegment(int initialCount, int finalCount, boolean purgeOnLastCursor)
+            throws IOException {
+        List<File> listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 1);
+
+        for (int ii = 0; ii < initialCount; ii++) {
+            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
+        }
+
+        listing = getSortedDirectoryListing();
+        assertEquals(listing.size(), 4);
+
+        // Open and close a read cursor
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        m_pbd.closeCursor(CURSOR_ID, purgeOnLastCursor);
+
+        // Verify behavior on last closing cursor
+        reader = m_pbd.openForRead(CURSOR_ID);
+        int readCount = 0;
+        BBContainer cont;
+        while((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            cont.discard();
+            readCount++;
+        }
+        assertEquals(readCount, finalCount);
+    }
+
+    @Test
     public void testTruncateFirstElement() throws Exception {
         System.out.println("Running testTruncateFirstElement");
         List<File> listing = getSortedDirectoryListing();
