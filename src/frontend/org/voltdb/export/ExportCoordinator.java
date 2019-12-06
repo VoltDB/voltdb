@@ -361,8 +361,9 @@ public class ExportCoordinator {
                                 // through another runnable and the invocation path.
                                 requestTrackers();
                             } else {
-                                // Reset the safe point to force a Mastership re-evaluation
+                                // Reset the safe point and resune polling to force a Mastership re-evaluation
                                 resetSafePoint();
+                                m_eds.resumePolling();
                             }
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
