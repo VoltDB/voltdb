@@ -325,7 +325,7 @@ public class StreamBlockQueue {
                     if (startSequenceNumber > truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
-                    final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
+                    b.getLong(); // committedSequenceNumber
                     final int tupleCountPos = b.position();
                     final int tupleCount = b.getInt();
                     // There is nothing to do with this buffer
@@ -346,7 +346,7 @@ public class StreamBlockQueue {
                             // Indicate this is the end of the interesting data.
                             b.limit(b.position());
                             // update tuple count in the header
-                            b.putInt(tupleCountPos, offset - 1);
+                            b.putInt(tupleCountPos, offset);
                             b.position(0);
                             return new ByteBufferTruncatorResponse(b);
                         }
@@ -378,7 +378,7 @@ public class StreamBlockQueue {
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
-                final long committedSequenceNumber = b.getLong();
+                b.getLong(); // committed sequence number
                 final int tupleCount = b.getInt();
                 b.order(endianness);
                 tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
