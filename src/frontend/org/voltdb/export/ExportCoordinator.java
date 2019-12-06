@@ -361,7 +361,7 @@ public class ExportCoordinator {
                                 // through another runnable and the invocation path.
                                 requestTrackers();
                             } else {
-                                // Reset the safe point and resune polling to force a Mastership re-evaluation
+                                // Reset the safe point and resume polling to force a Mastership re-evaluation
                                 resetSafePoint();
                                 m_eds.resumePolling();
                             }
