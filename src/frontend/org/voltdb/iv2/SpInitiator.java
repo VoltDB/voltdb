@@ -443,4 +443,8 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_executionSite.setServiceState(m_serviceState);
         m_scheduler.setServiceState(m_serviceState);
     }
+
+    public void logMasterMode() {
+        m_scheduler.logMasterMode();
+    }
 }

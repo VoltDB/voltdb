@@ -84,6 +84,13 @@ public interface CommandLog {
             int partitionId, long spHandle);
 
     /**
+     * IV2-only method. Write this Iv2FaultLogEntry to the fault log portion of the command log.
+     * @return a settable future that is set true after the entry has been written to disk.
+     */
+    public abstract SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle, LogEntryType entryType);
+
+    /**
      * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
      * Thread it through here because the durability listener is owned by the command log thread.
      * @param uniqueId    The last durable unique ID passed from the master.
