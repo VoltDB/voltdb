@@ -381,7 +381,7 @@ public class ExportBenchmark {
                             rowId.getAndIncrement(),
                             config.multiply,
                             1);
-                    System.out.println("calling "+"InsertExport"+target);
+                    // System.out.println("calling "+"InsertExport"+target);
 
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
@@ -620,15 +620,15 @@ public class ExportBenchmark {
             // Do the inserts in a separate thread
             // for (target = 0; target < config.targets; target++) {
                 System.out.println("Creating thread ");
-            	writes = new Thread(new Runnable() {
-            		@Override
-            		public void run() {
+                writes = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
                         System.out.println("Creating thread target " + target);
-            			// doInserts(client, target);
-            			doInserts(client);
+                        // doInserts(client, target);
+                        doInserts(client);
 
-            		}
-            	});
+                    }
+                });
             // }
             writes.start();
             Thread.sleep(config.warmup * 1000);
