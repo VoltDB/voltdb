@@ -594,36 +594,26 @@
   <!-- <topics> -->
   <xs:complexType name="topicsType">
     <xs:sequence>
-      <xs:element name="default-group" type="topicDefaultGroupType" minOccurs="0" maxOccurs="1"/>
-      <xs:element name="group" type="topicGroupType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
+      <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 
-  <xs:complexType name="topicDefaultGroupType">
+  <xs:complexType name="topicDefaultsType">
     <xs:sequence>
       <xs:element name="retention" type="topicRetentionType" minOccurs="0" maxOccurs="1" />
     </xs:sequence>
-    <xs:attribute name="format" type="topicFormatEnum" default="csv"/>
   </xs:complexType>
 
-  <xs:complexType name="topicGroupType">
+  <xs:complexType name="topicProfileType">
     <xs:sequence>
       <xs:element name="retention" type="topicRetentionType" minOccurs="0" maxOccurs="1" />
     </xs:sequence>
     <xs:attribute name="name" type="xs:string" use="required" />
-    <xs:attribute name="format" type="topicFormatEnum" default="csv"/>
   </xs:complexType>
 
-  <xs:simpleType name="topicFormatEnum">
-    <xs:restriction base="xs:token">
-      <xs:enumeration value="csv"/>
-      <xs:enumeration value="avro"/>
-      <xs:enumeration value="json"/>
-    </xs:restriction>
-  </xs:simpleType>
-
   <xs:complexType name="topicRetentionType">
-    <xs:attribute name="policy" type="topicRetentionPolicyEnum" use="required" />
+    <xs:attribute name="policy" type="topicRetentionPolicyEnum" default="time" />
     <xs:attribute name="limit" type="xs:string" use="required" />
   </xs:complexType>
 
