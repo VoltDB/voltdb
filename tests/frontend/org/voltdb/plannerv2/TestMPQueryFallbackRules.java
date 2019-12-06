@@ -475,4 +475,34 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testPartitionedWithAggregate1() {
+        m_tester.sql("select max(P1.I) from P1")
+        .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[MAX($0)])\n" +
+                    "  VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate2() {
+        m_tester.sql("select max(P1.I), P1.SI from P1 group by P1.SI having max(P1.I) > 0")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t1, $t2)], EXPR$0=[$t1], SI=[$t0], $condition=[$t3])\n" +
+                    "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
+                    "    VoltLogicalExchange(distribution=[hash[1]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate3() {
+        m_tester.sql("select max(P1.I), P1.SI from P1 group by P1.SI having max(P1.I) > 0 order by P1.SI")
+        .transform("VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
+                    "  VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t1, $t2)], EXPR$0=[$t1], SI=[$t0], $condition=[$t3])\n" +
+                    "    VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
+                    "      VoltLogicalExchange(distribution=[hash[1]])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
 }

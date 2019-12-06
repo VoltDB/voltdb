@@ -29,6 +29,7 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
@@ -97,6 +98,16 @@ public class MPQueryFallBackRule extends RelOptRule {
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
                         RelNode coordinatorSort = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
                         call.transformTo(coordinatorSort);
+                    } else if (node instanceof VoltLogicalAggregate) {
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
+                                node.getTraitSet().replace(dist), node.getInput(), dist);
+                        // COUNT, AVG, etc transformation would happen during the physical transformation phase
+                        // when a physical aggregate is transposed with an exchange node
+                        // At that stage decision will be made whether an aggregate can / should be pushed down to
+                        // fragments, does it need to be modified (COUNT, AVG), is coordinator aggregate is required
+                        // based on partitioning info (column, value)
+                        RelNode coordinatorAggregate = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        call.transformTo(coordinatorAggregate);
                     } else {
                         call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
                     }

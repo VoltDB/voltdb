@@ -101,4 +101,35 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                 .pass();
     }
 
+    // Should go to the physical test
+    public void testPartitionedWithAggregate4() {
+        m_tester.sql("select count(*) from P1")
+        .transform("\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate5() {
+        m_tester.sql("select count(P1.I) from P1")
+        .transform("\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate6() {
+        m_tester.sql("select avg(P1.I) from P1")
+        .transform("\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate7() {
+        m_tester.sql("select distinct(P1.I) from P1") // no coord aggr because P1.I is part column
+        .transform("\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate8() {
+        m_tester.sql("select distinct(P1.SI) from P1") // coord aggr because P1.SI is not a part column
+        .transform("\n")
+        .pass();
+    }
+
 }
