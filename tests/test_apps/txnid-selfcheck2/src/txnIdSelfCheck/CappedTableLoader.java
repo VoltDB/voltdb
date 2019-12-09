@@ -165,16 +165,33 @@ public class CappedTableLoader extends BenchmarkThread {
                 "INTEGER").getResults()[0];
         long count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
         if (count > 10) {
-            log.error("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10)");
-            ret = true;
+            // retry once
+            try { Thread.sleep(1000); } catch (Exception e2) {}
+            count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
+            log.warn("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10) retrying in 1 sec");
+            if ( count > 10 ) {
+                log.error("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10)");
+                ret = true;
+            }
         }
         while (partitions.advanceRow()) {
             long id = partitions.getLong(0);
             long key = partitions.getLong(1);
-            count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
-            if (count > 10) {
-                log.error("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
-                ret = true;
+            boolean retry = true;
+            boolean ret = false;
+            while ( true ) {
+                count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
+                if (count > 10 && retry ) {
+                    retry = false;
+                    log.warn("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id+" , retrying in 1 sec");
+                    try { Thread.sleep(1000); } catch (Exception e2) {}
+                } else if (count > 10) {
+                    log.error("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
+                    ret = true;
+                    break;
+                } else {
+                    break;
+                }
             }
         }
         return ret;
