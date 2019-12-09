@@ -5282,13 +5282,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return  leaderSites;
     }
 
-    public void updateLocalActiveSiteCount(int leaderCount) {
-        if (leaderCount == m_nodeSettings.getLocalSitesCount()) {
-            return;
+    private Set<Integer> getNonLeaderPartitionId() {
+        Set<Integer> pids = new HashSet<>();
+        for(Initiator init : m_iv2Initiators.values()) {
+            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                if (!((SpInitiator) init).isLeader()) {
+                    pids.add(init.getPartitionId());
+                }
+            }
         }
-        // update active site count
-        synchronized(m_catalogContext) {
-            if (leaderCount != m_nodeSettings.getLocalSitesCount()) {
+        return  pids;
+    }
+
+    public void processReplicaDecommission(int leaderCount) {
+        synchronized(m_catalogUpdateLock) {
+            if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
                 ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
                         .putAll(new HashMap<String, String>() {
@@ -5296,9 +5304,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 putAll(settings);
                                 put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
                             }}).build();
+                // update active site count
                 m_nodeSettings = NodeSettings.create(newSettings);
                 m_nodeSettings.store();
                 m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
+                hostLog.info("Update local active site count to :" + leaderCount);
+
+                // release export resources
+                ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionId());
             }
         }
     }

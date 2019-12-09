@@ -21,6 +21,7 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
@@ -216,4 +217,11 @@ public interface ExportManagerInterface {
      * @param partition
      */
     public void onClosedSource(String tableName, int partition);
+
+    /**
+     * The local partitions on the host has been removed after hash mismatch. Release the associated
+     * resources.
+     * @param removedPartitions  The de-commissioned local partitions
+     */
+    public void releaseResources(Set<Integer> removedPartitions);
 }
