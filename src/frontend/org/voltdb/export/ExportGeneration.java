@@ -1056,6 +1056,24 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    public void closeDataSources(Set<Integer> removedPartitions) {
+        synchronized (m_dataSourcesByPartition) {
+            for (Map.Entry<Integer, Map<String, ExportDataSource>> dataSources : m_dataSourcesByPartition.entrySet()) {
+                Integer partition = dataSources.getKey();
+                if (removedPartitions.contains(partition)) {
+                    for (ExportDataSource source : dataSources.getValue().values()) {
+                        source.closeAndDelete();
+                    }
+                }
+            }
+            m_dataSourcesByPartition.keySet().removeAll(removedPartitions);
+            removedPartitions.stream().forEach(p -> removeMailbox(p));
+            if (exportLog.isDebugEnabled()) {
+                exportLog.info("Remaining datasources:" + m_dataSourcesByPartition);
+            }
+        }
+    }
+
     @Override
     public void updateGenerationId(long genId) {
         synchronized(m_dataSourcesByPartition) {

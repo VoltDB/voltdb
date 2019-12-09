@@ -146,7 +146,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MISMATCH_INSERTION);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                verifyTopologyAfterHashMismatch(server);
+                verifyTopologyAfterHashMismatch();
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(1000, 1100);
             } else {
@@ -212,7 +212,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MISMATCH_WHITESPACE_IN_SQL);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                verifyTopologyAfterHashMismatch(server);
+                verifyTopologyAfterHashMismatch();
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -251,7 +251,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.MULTI_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                verifyTopologyAfterHashMismatch(server);
+                verifyTopologyAfterHashMismatch();
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -289,7 +289,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.PARTIAL_STATEMENT_MISMATCH);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                verifyTopologyAfterHashMismatch(server);
+                verifyTopologyAfterHashMismatch();
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -318,7 +318,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     NonDeterministicSPProc.TXN_ABORT);
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
-                verifyTopologyAfterHashMismatch(server);
+                verifyTopologyAfterHashMismatch();
                 System.out.println("Stopped replicas.");
                 insertMoreNormalData(10001, 10100);
             } else {
@@ -356,7 +356,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             for (int i = 0; i < 200; i++) {
                 client.callProcedure("mp.insert",i,i);
             }
-            verifyTopologyAfterHashMismatch(server);
+            verifyTopologyAfterHashMismatch();
             System.out.println("Stopped replicas.");
             insertMoreNormalData(10001, 10092);
             for (int i = 200; i < 300; i++) {
@@ -425,7 +425,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 client.callProcedure("mp.insert",i,i);
             }
 
-            verifyTopologyAfterHashMismatch(server);
+            verifyTopologyAfterHashMismatch();
             System.out.println("Stopped replicas.");
             insertMoreNormalData(10001, 10092);
             for (int i = 200; i < 300; i++) {
@@ -506,7 +506,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 client.callProcedure("mp.insert",i,i);
             }
 
-            verifyTopologyAfterHashMismatch(server);
+            verifyTopologyAfterHashMismatch();
             System.out.println("Stopped replicas.");
             insertMoreNormalData(10001, 10092);
             for (int i = 10; i < 20; i++) {
@@ -555,7 +555,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
-    private void verifyTopologyAfterHashMismatch(LocalCluster server) {
+    private void verifyTopologyAfterHashMismatch() {
         //allow time to get the stats
         final long maxSleep = TimeUnit.MINUTES.toMillis(5);
         boolean done = false;
