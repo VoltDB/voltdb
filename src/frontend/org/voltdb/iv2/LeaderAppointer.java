@@ -158,8 +158,8 @@ public class LeaderAppointer implements Promotable
                 tmLog.debug(String.format(WHOMIM + "Newly seen replicas:%s, Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
                         CoreUtils.hsIdCollectionToString(missingHSIds)));
             }
-            // No leader election is needed
-            if (updatedHSIds.contains(m_currentLeader)) {
+            // Could happen during command log replay if there is a hash mismatch and cluster is moved to master-only mode
+            if (!m_replayComplete.get() && updatedHSIds.contains(m_currentLeader)) {
                 // Check for k-safety
                 if (!isClusterKSafe(null)) {
                     VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
