@@ -947,6 +947,8 @@ public class DDLCompiler {
                 addUserDefinedFunctionToCatalog(db, node);
             }
         }
+        // push down parsing schema for catalog
+        db.getCatalog().parse(m_schema.toXML());
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
                 addTableToCatalog(db, node, isXDCR);        // Inside the function, it skips when a table catalog had already been created.

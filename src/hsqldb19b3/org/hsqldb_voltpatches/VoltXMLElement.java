@@ -17,6 +17,8 @@
 
 package org.hsqldb_voltpatches;
 
+import org.apache.commons.lang3.StringEscapeUtils;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -122,7 +124,7 @@ public class VoltXMLElement {
             sb.append(sep)
               .append(e.getKey())
               .append("=\"")
-              .append(e.getValue())
+              .append(StringEscapeUtils.escapeXml11(e.getValue()))
               .append("\"");
             sep = attrIndent;
         }
