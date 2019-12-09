@@ -78,6 +78,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -5252,34 +5253,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     public void cleanupBackLogsOnDecommisionedReplicas(int executorPartition) {
         // execute on the lowest master site only
-        if (executorPartition == getLowestMasterPartitionId()) {
+        if (executorPartition == getLowestLeaderPartitionId()) {
             m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
                     ((SpInitiator)p).getServiceState().isRemoved())
             .forEach(s -> ((SpInitiator)s).getScheduler().cleanupTransactionBacklogs());
         }
     }
 
-    public int getLowestMasterPartitionId(){
-        for(Initiator init : m_iv2Initiators.values()) {
-            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                if (((SpInitiator)init).isLeader()) {
-                    return init.getPartitionId();
-                }
-            }
-        }
-        return -1;
+    private int getLowestLeaderPartitionId(){
+        List<Integer> leaderPartitions = getLeaderPartitionIds();
+        return leaderPartitions.isEmpty() ? -1 : leaderPartitions.iterator().next();
+    }
+
+    public List<Integer> getLeaderPartitionIds(){
+        return m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && ((SpInitiator) p).isLeader())
+                .map(Initiator::getPartitionId).collect(Collectors.toList());
+    }
+
+    public List<Integer> getNonLeaderPartitionIds(){
+        return m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && !((SpInitiator) p).isLeader())
+                .map(Initiator::getPartitionId).collect(Collectors.toList());
     }
 
     public List<Long> getLeaderSites() {
-        List<Long> leaderSites = new ArrayList<>();
-        for(Initiator init : m_iv2Initiators.values()) {
-            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                if (((SpInitiator) init).isLeader()) {
-                    leaderSites.add(init.getInitiatorHSId());
-                }
-            }
-        }
-        return  leaderSites;
+        return  m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && ((SpInitiator) p).isLeader())
+                .map(Initiator::getInitiatorHSId).collect(Collectors.toList());
     }
 
     public void updateLocalActiveSiteCount(int leaderCount) {
