@@ -33,7 +33,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -59,6 +61,16 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     "PARTITION TABLE kv ON COLUMN key;" +
                     "CREATE INDEX idx_kv ON kv(nondetval);" +
                     "CREATE TABLE mp(key bigint not null, nondetval bigint not null);";
+
+    static final String SCHEMA_UPDATE =
+            "CREATE TABLE kv (" +
+                    "key bigint not null, " +
+                    "nondetval bigint not null, " +
+                    "PRIMARY KEY(key)" +
+                    "); " +
+                    "PARTITION TABLE kv ON COLUMN key;" +
+                    "CREATE INDEX idx_kv ON kv(nondetval);" +
+                    "CREATE TABLE mp_update(key bigint not null, nondetval bigint not null);";
 
     Client client;
     final int sitesPerHost = 2;
@@ -405,6 +417,54 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
+    @Test(timeout = 60_000)
+    public void testUacAfterHashMismatch() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        LocalCluster server = createCluster("testUacAfterHashMismatch", 2, 3, 18);
+        try {
+            for (int i = 5000; i < 5091; i++) {
+                client.callProcedure(
+                        "NonDeterministicSPProc",
+                        i,
+                        i,
+                        NonDeterministicSPProc.MISMATCH_INSERTION);
+            }
+            for (int i = 0; i < 200; i++) {
+                client.callProcedure("mp.insert",i,i);
+            }
+            verifyTopologyAfterHashMismatch();
+            System.out.println("Stopped replicas.");
+            insertMoreNormalData(10001, 10092);
+            for (int i = 200; i < 300; i++) {
+                client.callProcedure("mp.insert",i,i);
+            }
+            client.drain();
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(SCHEMA);
+            builder.addProcedure(NonDeterministicSPProc.class, "kv.key: 0");
+            builder.addProcedure(NonDeterministic_RO_SP.class, "kv.key: 0");
+            builder.addProcedure(Deterministic_RO_SP.class, "kv.key: 0");
+            builder.addProcedure(NonDeterministic_RO_MP.class);
+            LocalCluster localserver = new LocalCluster("update.jar", 18, 3, 2, BackendTarget.NATIVE_EE_JNI);
+            boolean compile = localserver.compile(builder);
+            assertTrue(compile);
+
+            String newCatalogURL = Configuration.getPathToCatalogForTest("update.jar");
+            byte[] catBytes2 = MiscUtils.fileToBytes(new File(newCatalogURL));
+            ClientResponseImpl response = (ClientResponseImpl) client.callProcedure(
+                    "@UpdateApplicationCatalog", catBytes2, null);
+            assert(response.getStatus() == ClientResponse.SUCCESS);
+            insertMoreNormalData(10092, 10098);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            fail("testUacAfterHashMismatch failed");
+        } finally {
+            shutDown(server);
+        }
+    }
+
     @Test(timeout = 180_000)
     public void testShutdownRecoverWithoutCL() throws Exception {
         if (!MiscUtils.isPro()) {
@@ -638,5 +698,4 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             assertTrue(deleted);
         }
     }
-
 }
