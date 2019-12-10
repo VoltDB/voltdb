@@ -85,7 +85,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.DefaultProcedureManager;
 import org.voltdb.HealthMonitor;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -2674,11 +2673,13 @@ public abstract class CatalogUtil {
         zk.setData(path, buffer.array(), -1);
 
         // delete all previous versions
-        List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
-        for (String child : children) {
-            int priorVersion = Integer.parseInt(child);
-            if (priorVersion < version) {
-                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+        if (catalogStatus == ZKCatalogStatus.COMPLETE) {
+            List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+            for (String child : children) {
+                int priorVersion = Integer.parseInt(child);
+                if (priorVersion < version) {
+                    ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+                }
             }
         }
     }
@@ -2693,6 +2694,15 @@ public abstract class CatalogUtil {
         buffer.position(0);
         buffer.put((byte)ZKCatalogStatus.COMPLETE.ordinal());
         zk.setData(path, buffer.array(), -1);
+
+        // delete all previous versions
+        List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+        for (String child : children) {
+            int priorVersion = Integer.parseInt(child);
+            if (priorVersion < version) {
+                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+            }
+        }
     }
 
     public static void stageCatalogToZK(ZooKeeper zk, int version, long genId, SegmentedCatalog catalogAndDeployment)
@@ -2931,19 +2941,14 @@ public abstract class CatalogUtil {
         return toRead;
     }
 
-    public static StoredProcedureInvocation copyUACInvocation(ParameterSet ps) {
-        Object[] params = ps.toArray();
+    public static void copyUACInvocation(StoredProcedureInvocation invocation, Object[] params) {
         int catalogVersion = (int)params[1];
         CatalogAndDeployment cad = null;
         try {
-            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion);
+            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion + 1);
         } catch (KeeperException | InterruptedException e) {
             VoltDB.crashLocalVoltDB("Fail to get catalog bytes while processing catalog update", true, null);
         }
-        // create a new StoredProcedureInvocation, assign it to msg.getInitiateTask
-        StoredProcedureInvocation invocation = new StoredProcedureInvocation();
-        // create the execution site task
-        invocation.setProcName("@UpdateCore");
         invocation.setParams(params[0],             // diff commands
                              params[1],             // expected catalog version
                              params[2],             // gen id
@@ -2959,7 +2964,6 @@ public abstract class CatalogUtil {
                              params[10],            // hasSchemaChange
                              params[11],            // requiresNewExportGeneration
                              params[12]);           // hasSecurityUserChange
-        return invocation;
     }
 
     /**

@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +46,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.LogEntryType;
-import org.voltdb.ParameterSet;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -1127,14 +1127,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Iv2InitiateTaskMessage clMessage = msg.getInitiateTask();
         if (msg.isSysProcTask()) {
             // inject catalog bytes into c/l
-            if (msg.getInitiateTask() != null && ("@UpdateCore").equalsIgnoreCase(msg.getProcedureName())) {
+            if (clMessage != null && ("@UpdateCore").equalsIgnoreCase(msg.getProcedureName())) {
                 // Only one site writes the real UAC initiate task, other sites write dummy tasks, to command log
-                Iv2InitiateTaskMessage uac = msg.getInitiateTask();
+                Iv2InitiateTaskMessage uac = clMessage;
+                StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+                invocation.setProcName("@UpdateCore");
                 if (m_isLowestSiteId) {
                     // First find the expected catalog version in the parameters
-                    ParameterSet ps = msg.getParameterSetForFragment(0);
-                    StoredProcedureInvocation invocation = CatalogUtil.copyUACInvocation(ps);
+                    CatalogUtil.copyUACInvocation(invocation, uac.getParameters());
                     invocation.setClientHandle(uac.getStoredProcedureInvocation().getClientHandle());
+                    if (invocation.getSerializedParams() == null) {
+                        try {
+                            invocation = MiscUtils.roundTripForCL(invocation);
+                        } catch (IOException e) {
+                            hostLog.fatal("Failed to serialize invocation @UpdateCore: " + e.getMessage());
+                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                        }
+                    }
                     clMessage = new Iv2InitiateTaskMessage(
                             uac.getInitiatorHSId(),
                             uac.getCoordinatorHSId(),
@@ -1158,7 +1167,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             uac.isReadOnly(),
                             uac.isSinglePartition(),
                             uac.getNParitionIds(),
-                            new StoredProcedureInvocation(), // dummy invocation takes 1 byte to serialize in cl
+                            invocation, // dummy invocation
                             uac.getClientInterfaceHandle(),
                             uac.getConnectionId(),
                             uac.isForReplay());
