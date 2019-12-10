@@ -221,6 +221,7 @@ public class ExportBenchmark {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
+        // clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
@@ -438,11 +439,12 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls");
+        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls" +
+            " (excludes warmup)");
         System.out.println("Failed " + failedInserts.get() + " procedure calls");
         // Use this to correlate the total rows exported
         System.out.println("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
-                + (totalInserts * config.multiply));
+                + (totalInserts * config.multiply) + " (includes warmup)");
     }
 
     /**
