@@ -93,11 +93,23 @@ public interface BinaryDeque<M> {
     public BinaryDequeReader<M> openForRead(String cursorId) throws IOException;
 
     /**
-     * Close a BinaryDequeReader for reader, also close the SegmentReader for the segment if it is reading one
+     * Close a BinaryDequeReader reader, also close the SegmentReader for the segment if it is reading one.
      * @param cursorId a String identifying the cursor.
      * @throws IOException on any errors trying to close the SegmentReader if it is the last one for the segment
      */
-    public void closeCursor(String cursorId);
+    default public void closeCursor(String cursorId) {
+        closeCursor(cursorId, false);
+    }
+
+    /**
+     * Close a BinaryDequeReader reader, optionally purging the segments on the last reader closing.
+     * <p>
+     * Purging segments on last reader closing is a DR-specific requirement, see implementation.
+     *
+     * @param cursorId
+     * @param purgeOnLastCursor true if segment purge is requested on last reader closing.
+     */
+    public void closeCursor(String cursorId, boolean purgeOnLastCursor);
 
     public int countCursors();
 
