@@ -1238,7 +1238,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public synchronized void closeCursor(String cursorId) {
+    public synchronized void closeCursor(String cursorId, boolean purgeOnLastCursor) {
         if (m_closed) {
             return;
         }
@@ -1248,12 +1248,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
         reader.close();
 
-        // check all segments from latest to oldest to see if segments before that segment can be deleted
-        // We need this only in closeCursor() now, which is currently only used when removing snapshot placeholder
-        // cursor in one-to-many DR, this extra check is needed because other normal cursors may have read past some
-        // segments, leaving them hold only by the placeholder cursor, since we won't have triggers to check deletion
-        // eligibility for these segments anymore, the check needs to take place here to prevent leaking of segments
-        // file
+        // Check all segments from latest to oldest to see if segments before that segment can be deleted.
+        //
+        // In the one-to-many DR use case, the snapshot placeholder cursor prevents purging segments that have
+        // been read by the other cursors. Therefore, DR calls this method with {@code purgeOnLastCursor} == true,
+        // in order to ensure that closing the last DR cursor will purge those segments.
+        if (m_readCursors.isEmpty() && !purgeOnLastCursor) {
+            return;
+        }
         try {
             boolean deleteSegment = false;
             Iterator<PBDSegment<M>> iter = m_segments.descendingMap().values().iterator();
@@ -1271,6 +1273,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
+    /**
+     * Return true if segments before this one can be deleted, i.e. no open readers on previous segments.
+     * <p>
+     * Note: returns true when no read cursors are open.
+     *
+     * @param segment
+     * @return
+     */
     private boolean canDeleteSegmentsBefore(PBDSegment<M> segment) {
         String retentionCursor = (m_retentionPolicy == null) ? null : m_retentionPolicy.getCursorId();
         for (ReadCursor cursor : m_readCursors.values()) {
