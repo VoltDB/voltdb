@@ -84,7 +84,7 @@ public class TestPersistentBinaryDequeCorruption {
 
     @Parameters
     public static Collection<Object[]> parameters() {
-        CorruptionChecker scanEntries = pbd -> pbd.scanEntries(b -> {});
+        CorruptionChecker scanEntries = pbd -> pbd.scanEntries(b -> { return -1; });
         CorruptionChecker parseAndTruncate = pbd -> pbd.parseAndTruncate(b -> null);
 
         ImmutableList.Builder<Object[]> args = ImmutableList.builder();

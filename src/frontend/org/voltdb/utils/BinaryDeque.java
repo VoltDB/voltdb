@@ -156,11 +156,22 @@ public interface BinaryDeque<M> {
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
-            PARTIAL_TRUNCATE
+            PARTIAL_TRUNCATE,
+            NO_TRUNCATE;
         }
-        public final Status status;
+        public final Status m_status;
+        public long m_rowId = -1;
+
         public TruncatorResponse(Status status) {
-            this.status = status;
+            m_status = status;
+        }
+        public TruncatorResponse(Status status, long rowId) {
+            m_status = status;
+            m_rowId = rowId;
+        }
+
+        public long getRowId() {
+            return m_rowId;
         }
 
         public int getTruncatedBuffSize() throws IOException {
@@ -190,7 +201,12 @@ public interface BinaryDeque<M> {
     }
 
     public interface BinaryDequeScanner {
-        public void scan(BBContainer bb);
+        /**
+         * @param bb
+         * @return id of the last entry in the buffer. Implementation may return -1,
+         *         if it doesn't care about storing rowId range in the PBD header.
+         */
+        public long scan(BBContainer bb);
     }
 
     public interface BinaryDequeValidator<M> {

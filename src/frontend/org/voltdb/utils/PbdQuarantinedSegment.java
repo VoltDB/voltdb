@@ -93,7 +93,7 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     }
 
     @Override
-    int offer(BBContainer cont) {
+    int offer(BBContainer cont, long startId, long endId) {
         throw new UnsupportedOperationException();
     }
 

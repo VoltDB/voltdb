@@ -40,6 +40,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 
 import com.google_voltpatches.common.base.Preconditions;
 
@@ -75,6 +76,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
+    private long m_startId = -1;
+    private long m_endId = -1;
     private boolean m_compress;
     private int m_segmentRandomId;
     private int m_extraHeaderSize = 0;
@@ -105,6 +108,14 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             m_entryHeaderBuf.discard();
             m_entryHeaderBuf = null;
         }
+    }
+
+    long getStartId() {
+        return m_startId;
+    }
+
+    long getEndId() {
+        return m_endId;
     }
 
     @Override
@@ -190,10 +201,10 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             setFinal(false);
+            m_segmentRandomId = RANDOM.nextInt();
             initNumEntries(0, 0);
             m_compress = compress;
             m_isActive = true;
-            m_segmentRandomId = RANDOM.nextInt();
         }
         if (forWrite) {
             m_fc.position(m_fc.size());
@@ -237,6 +248,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 int crc = b.getInt();
                 int numOfEntries = b.getInt();
                 int size = b.getInt();
+                b.getLong(); // startId
+                b.getLong(); // endId
                 int segmentRandomId = b.getInt();
                 int extraHeaderSize = b.getInt();
                 int extraHeaderCrc = b.getInt();
@@ -293,6 +306,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         b.putInt(crc);
         b.putInt(m_numOfEntries);
         b.putInt(m_size);
+        b.putLong(m_startId);
+        b.putLong(m_endId);
         b.putInt(m_segmentRandomId);
         b.putInt(m_extraHeaderSize);
         b.putInt(m_extraHeaderCrc);
@@ -348,11 +363,17 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
         int sizeInBytes = 0;
 
-        DBBPool.BBContainer cont;
+        long lastReadId = -1;
         while (true) {
             final long beforePos = reader.readOffset();
 
-            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true, !isFinal());
+            DBBPool.BBContainer cont = null;
+            try {
+                cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
+            } catch(IOException e) {
+                m_usageSpecificLog.warn("Truncating segment file to the last safe point due to error", e);
+                reader.truncateToCurrentReadIndex(m_startId == -1 ? -1 : lastReadId);
+            }
             if (cont == null) {
                 break;
             }
@@ -363,12 +384,16 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             try {
                 // Handoff the object to the truncator and await a decision
                 BinaryDeque.TruncatorResponse retval = truncator.parse(cont);
-                if (retval == null) {
+                if (retval == null || retval.m_status == Status.NO_TRUNCATE) {
                     // Nothing to do, leave the object alone and move to the next
                     sizeInBytes += uncompressedLength;
+                    if (retval != null) {
+                        lastReadId = retval.getRowId();
+                    }
+                    assert(m_startId == -1 || lastReadId != -1);
                 } else {
                     // If the returned bytebuffer is empty, remove the object and truncate the file
-                    if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
+                    if (retval.m_status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
                         if (reader.readIndex() == 1) {
                             /*
                              * If truncation is occurring at the first object Whammo! Delete the file.
@@ -377,12 +402,13 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                         } else {
                             entriesTruncated = initialEntryCount - (reader.readIndex() - 1);
 
+                            m_endId = lastReadId; // lastid was read in the previous buffer. Written to header by initNumEntries below
                             // Don't forget to update the number of entries in the file
                             initNumEntries(reader.readIndex() - 1, sizeInBytes);
                             m_fc.truncate(reader.readOffset() - (compressedLength + ENTRY_HEADER_BYTES));
                         }
                     } else {
-                        assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
+                        assert retval.m_status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
                         entriesTruncated = initialEntryCount - reader.readIndex();
                         // Partial object truncation
                         reader.rewindReadOffset(compressedLength + ENTRY_HEADER_BYTES);
@@ -391,6 +417,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
                         final int written = writeTruncatedEntry(retval, reader.readIndex());
                         sizeInBytes += written;
+                        assert(m_startId == -1 || retval.getRowId() != -1);
+                        m_endId = retval.getRowId(); // written to header by initNumEntries below
                         initNumEntries(reader.readIndex(), sizeInBytes);
                         m_fc.truncate(partialEntryBeginOffset + written + ENTRY_HEADER_BYTES);
                     }
@@ -423,18 +451,25 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         SegmentReader reader = openForRead(SCANNER_CURSOR);
         try {
             validateHeader();
-            DBBPool.BBContainer cont = null;
             int initialEntryCount = getNumEntries();
             if (initialEntryCount == 0) {
                 return 0;
             }
+            long lastReadId = -1;
             while (true) {
-                cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true, true);
+                DBBPool.BBContainer cont = null;
+                try {
+                    cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                } catch(IOException e) {
+                    m_usageSpecificLog.warn("Truncating segment file to the last safe point due to error", e);
+                    reader.truncateToCurrentReadIndex(lastReadId);
+                }
                 if (cont == null) {
                     break;
                 }
                 try {
-                    scanner.scan(cont);
+                    lastReadId = scanner.scan(cont);
+                    assert(m_startId == -1 || lastReadId != -1);
                 } finally {
                     cont.discard();
                 }
@@ -548,10 +583,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         return m_isFinal;
     }
 
-    private void incrementNumEntries(int size) throws IOException
+    private void updateHeaderDataAfterOffer(int size, long startId, long endId) throws IOException
     {
         m_numOfEntries++;
         m_size += size;
+        m_startId = (m_startId == -1) ? startId : m_startId;
+        m_endId = endId;
         writeOutHeader();
     }
 
@@ -644,8 +681,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     // Used by Export path
     @Override
-    int offer(DBBPool.BBContainer cont) throws IOException
+    int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException
     {
+        assert(m_endId == -1 || startId > m_endId);
         if (m_closed) {
             throw new IOException("Segment closed");
         }
@@ -686,7 +724,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_fc.write(destBuf.b());
             }
             // Update segment header
-            incrementNumEntries(remaining);
+            updateHeaderDataAfterOffer(remaining, startId, endId);
         } finally {
             destBuf.discard();
             if (compress) {
@@ -728,7 +766,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_fc.write(destBuf.b());
             }
             // Update segment header
-            incrementNumEntries(written);
+            updateHeaderDataAfterOffer(written, -1, -1);
             return written;
         } finally {
             destBuf.discard();
@@ -886,12 +924,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         @Override
         public DBBPool.BBContainer poll(OutputContainerFactory factory) throws IOException {
-            return poll(factory, false, false);
+            return poll(factory, false);
         }
 
-        DBBPool.BBContainer poll(OutputContainerFactory factory, boolean canTruncate, boolean checkCrc)
+        DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCrc)
                 throws IOException {
-            assert !checkCrc || canTruncate : "canTruncate must be true if checkCrc is true";
             if (m_readerClosed) {
                 throw new IOException("Reader closed");
             }
@@ -907,9 +944,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 //Get the length and size prefix and then read the object
                 ByteBuffer b = m_entryHeaderBuf.b();
                 b.clear();
-                if (!read(b)) {
-                    return null;
-                }
+                read(b);
                 b.flip();
                 final int entryCRC = b.getInt();
                 final int length = b.getInt();
@@ -919,15 +954,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 final int uncompressedLen;
 
                 if (length < 1 || length > PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES) {
-                    handleCorruptHeader("File corruption detected in " + m_file.getName() + ": invalid entry length.",
-                            canTruncate);
-                    return null;
+                    throw new IOException ("File corruption detected in " + m_file.getName() + ": invalid entry length.");
                 }
 
                 if (entryId != m_segmentRandomId + m_objectReadIndex + 1) {
-                    handleCorruptHeader("File corruption detected in " + m_file.getName() + ": invalid entry id.",
-                            canTruncate);
-                    return null;
+                    throw new IOException("File corruption detected in " + m_file.getName() + ": invalid entry id.");
                 }
 
                 DBBPool.BBContainer retcont = null;
@@ -935,9 +966,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     if (compressed) {
                         final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
                         try {
-                            if (!fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCrc)) {
-                                return null;
-                            }
+                            fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCrc);
 
                             uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
                             retcont = factory.getContainer(uncompressedLen);
@@ -951,11 +980,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                         retcont = factory.getContainer(length);
                         retcont.b().limit(length);
 
-                        if (!fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCrc)) {
-                            retcont.discard();
-                            return null;
-                        }
+                        fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCrc);
                     }
+                } catch(IOException e) {
+                    // rethrow with filename also in the exception message
+                    throw new IOException("Error reading segment " + m_file.getName());
                 } catch (Throwable t) {
                     if (retcont != null) {
                         retcont.discard();
@@ -982,57 +1011,30 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                         m_discardCount++;
                     }
                 };
-            } catch (IOException e) {
-                if (canTruncate) {
-                    m_usageSpecificLog.warn(
-                            "Error reading segment " + m_file.getName() + ". Truncate the file to last safe point.",
-                            e);
-                    truncateToCurrentReadIndex();
-                    return null;
-                }
-                throw e;
             } finally {
                 m_readOffset = m_fc.position();
                 m_fc.position(writePos);
             }
         }
 
-        private void handleCorruptHeader(String message, boolean canTruncate) throws IOException {
-            if (canTruncate) {
-                message += " Truncate the file to last safe point.";
-            }
-            m_usageSpecificLog.warn(message);
-            if (canTruncate) {
-                truncateToCurrentReadIndex();
-            } else {
-                throw new IOException(message);
-            }
-        }
-
-        private boolean fillBuffer(ByteBuffer entry, int entryId, char flags, int crc, boolean checkCrc)
+        private void fillBuffer(ByteBuffer entry, int entryId, char flags, int crc, boolean checkCrc)
                 throws IOException {
             int origPosition = entry.position();
-            if (!read(entry)) {
-                return false;
-            }
+            read(entry);
 
             entry.position(origPosition);
 
             if (checkCrc) {
                 if (crc != PBDUtils.calculateEntryCrc(m_crcReader, entry, entryId, flags)
                         || INJECT_PBD_CHECKSUM_ERROR) {
-                    m_usageSpecificLog.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
+                    throw new IOException("File corruption detected in " + m_file.getName() + ": checksum error. "
                             + "Truncate the file to last safe point.");
-                    truncateToCurrentReadIndex();
-                    return false;
                 }
                 entry.position(origPosition);
             }
-
-            return true;
         }
 
-        private boolean read(ByteBuffer buffer) throws IOException {
+        private void read(ByteBuffer buffer) throws IOException {
             do {
                 try {
                     int read = m_fc.read(buffer);
@@ -1044,13 +1046,13 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     throw new IOException("Error encountered reading: " + m_file, e);
                 }
             } while (buffer.hasRemaining());
-            return true;
         }
 
-        private void truncateToCurrentReadIndex() throws IOException {
+        private void truncateToCurrentReadIndex(long endId) throws IOException {
             boolean wasReadOnly = m_fc.reopen(true);
             try {
                 setFinal(false);
+                m_endId = endId;
                 initNumEntries(m_objectReadIndex, m_bytesRead);
                 m_fc.position(m_readOffset);
             } finally {
