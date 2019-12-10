@@ -322,7 +322,7 @@ public class StreamBlockQueue {
                 try {
                     final long startSequenceNumber = b.getLong();
                     // If after the truncation point is the first row in the block, the entire block is to be discarded
-                    if (startSequenceNumber > truncationSeqNo) {
+                    if (startSequenceNumber >= truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
                     b.getLong(); // committedSequenceNumber
@@ -373,15 +373,17 @@ public class StreamBlockQueue {
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
         m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
-            public void scan(BBContainer bbc) {
+            public long scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
                 b.getLong(); // committed sequence number
                 final int tupleCount = b.getInt();
+                final long endSequenceNumber = startSequenceNumber + tupleCount - 1;
                 b.order(endianness);
-                tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
+                tracker.addRange(startSequenceNumber, endSequenceNumber);
+                return endSequenceNumber;
             }
 
         });

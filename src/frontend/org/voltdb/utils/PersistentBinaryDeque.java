@@ -543,6 +543,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     private M m_extraHeader;
     private PBDRetentionPolicy m_retentionPolicy;
+    private Boolean m_requiresId;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path. This is a
@@ -1044,16 +1045,25 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized int offer(BBContainer object) throws IOException {
+        return offer(object, -1, -1);
+    }
+
+    public synchronized int offer(BBContainer object, long startId, long endId) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
         }
 
+        assert((startId >= 0 && endId >= startId) || (startId == -1 && endId == -1));
+        boolean requires = startId >= 0;
+        assert(m_requiresId == null || m_requiresId.booleanValue() == requires);
+        m_requiresId = requires;
+
         PBDSegment<M> tail = peekLastSegment();
-        int written = tail.offer(object);
+        int written = tail.offer(object, startId, endId);
         if (written < 0) {
             tail = addSegment(tail);
-            written = tail.offer(object);
+            written = tail.offer(object, startId, endId);
             if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
             }
@@ -1070,6 +1080,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         if (m_closed) {
             throw new IOException("Cannot offer(): PBD has been Closed");
         }
+
+        assert(m_requiresId == null || m_requiresId.booleanValue() == false);
+        m_requiresId = false;
 
         PBDSegment<M> tail = peekLastSegment();
         int written = tail.offer(ds);
@@ -1189,7 +1202,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             curId = prevId;
 
             while (currentSegmentContents.peek() != null) {
-                writeSegment.offer(currentSegmentContents.pollFirst());
+                writeSegment.offer(currentSegmentContents.pollFirst(), -1, -1);
                 m_numObjects++;
             }
 
@@ -1373,7 +1386,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         private final CRC32 m_crc;
 
         public ByteBufferTruncatorResponse(ByteBuffer retval) {
-            super(Status.PARTIAL_TRUNCATE);
+            this(retval, -1);
+        }
+
+        public ByteBufferTruncatorResponse(ByteBuffer retval, long rowId) {
+            super(Status.PARTIAL_TRUNCATE, rowId);
             assert retval.remaining() > 0;
             m_retval = retval;
             m_crc = new CRC32();

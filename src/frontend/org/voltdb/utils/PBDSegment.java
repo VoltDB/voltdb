@@ -39,6 +39,8 @@ public abstract class PBDSegment<M> {
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
     //  - total bytes of data (4 bytes, uncompressed size),
+    //  - id of the first data entry (8 bytes)
+    //  - id of the last data entry (8 bytes)
     //  - random id assigned to segment ( 4 bytes )
     //  - size in bytes of extra header ( 4 bytes )
     //  - crc for the extra header ( 4 bytes )
@@ -47,7 +49,9 @@ public abstract class PBDSegment<M> {
     public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
     public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
-    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_START_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 8;
+    public static final int HEADER_END_ID_OFFSET = HEADER_START_ID_OFFSET + 8;
+    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_END_ID_OFFSET + 4;
     public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_RANDOM_ID_OFFSET + 4;
     public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
     static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
@@ -146,12 +150,14 @@ public abstract class PBDSegment<M> {
     /**
      * Writes passed in bytes to this segment as next entry in the PBD.
      * @param cont BBContainer with the bytes to be written
+     * @param startId the starting id of the data that is being offered
+     * @param endId the ending id of the data that is being offered
      * @return the number of bytes written. If compression is enables, bytes written will be
-     *         differnt from the number passed in. -1 will be returned if the bytes cannot
+     *         different from the number passed in. -1 will be returned if the bytes cannot
      *         fit into this segment.
      * @throws IOException if any IO error occurs trying to write to the pbd segment file.
      */
-    abstract int offer(DBBPool.BBContainer cont) throws IOException;
+    abstract int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
