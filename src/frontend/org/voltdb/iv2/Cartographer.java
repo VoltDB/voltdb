@@ -1033,11 +1033,6 @@ public class Cartographer extends StatsSource
             Host targetHost = reverseIt.previous();
             if (!targetHost.equals(srcHost)) {
                 for (Integer partition : srcHost.m_masterPartitionIDs) {
-                    // ByPass partition 0
-                    // as partition 0 co-locate with MPI, not migrating partition 0
-                    if (partition == 0) {
-                        continue;
-                    }
                     if (targetHost.m_replicaPartitionIDs.contains(partition)) {
                         return Pair.of(partition, targetHost.m_hostId);
                     }
