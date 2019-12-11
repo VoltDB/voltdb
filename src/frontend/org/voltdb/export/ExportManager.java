@@ -626,7 +626,7 @@ public class ExportManager implements ExportManagerInterface
     public synchronized void waitOnClosingSources() {
         boolean locked = false;
         try {
-            locked = m_allowCatalogUpdate.tryAcquire(1, UPDATE_CORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            locked = m_allowCatalogUpdate.tryAcquire(UPDATE_CORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!locked && !m_dataSourcesClosing.isEmpty()) {
                 exportLog.warn("After " + UPDATE_CORE_TIMEOUT_SECONDS
                         + " seconds, these export streams are still closing: "
