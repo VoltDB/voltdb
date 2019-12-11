@@ -189,6 +189,8 @@ public interface ExportManagerInterface {
     public ExportMode getExportMode();
 
     /**
+     * If data sources are still closing, wait until a fixed timeout.
+     *
      * @return null if catalog update is possible, or an error message if not.
      */
     public String canUpdateCatalog();

@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -122,8 +124,11 @@ public class ExportManager implements ExportManagerInterface
     private SimpleClientResponseAdapter m_adapter;
     private ClientInterface m_ci;
 
-    // Track the data sources being closed
+    // Track the data sources being closed, and a lock allowing {@code canUpdateCatalog()}
+    // to wait for all closed sources.
     private HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
+    private final Semaphore m_allowCatalogUpdate = new Semaphore(1);
+    private final long UPDATE_CORE_TIMEOUT_SECONDS = 30;
 
     @Override
     public ExportManagerInterface.ExportMode getExportMode() {
@@ -619,14 +624,31 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public synchronized String canUpdateCatalog() {
-        if (m_dataSourcesClosing.isEmpty()) {
-            return null;
+        String msg = null;
+        boolean locked = false;
+        try {
+            locked = m_allowCatalogUpdate.tryAcquire(1, UPDATE_CORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!locked) {
+                msg = "Unable to update catalog after " + UPDATE_CORE_TIMEOUT_SECONDS + " seconds";
+                if (!m_dataSourcesClosing.isEmpty()) {
+                    msg += "; these export streams are still closing: "
+                            + m_dataSourcesClosing.keySet();
+                }
+            }
         }
-        else {
-            String msg = "Unable to update catalog, these export streams are still closing: "
-                    + m_dataSourcesClosing.keySet();
-            return msg;
+        catch (Exception ex) {
+            msg = "Unable to update catalog: " + ex;
+            if (!m_dataSourcesClosing.isEmpty()) {
+                msg += "; these export streams are still closing: "
+                        + m_dataSourcesClosing.keySet();
+            }
         }
+        finally {
+            if (locked) {
+                m_allowCatalogUpdate.release();
+            }
+        }
+        return msg;
     }
 
     @Override
@@ -636,6 +658,12 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public synchronized void onClosingSource(String tableName, int partition) {
+        if (m_dataSourcesClosing.isEmpty()) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Locking catalog updates");
+            }
+            m_allowCatalogUpdate.acquireUninterruptibly();
+        }
         m_dataSourcesClosing.put(tableName, partition);
     }
 
@@ -649,6 +677,12 @@ public class ExportManager implements ExportManagerInterface
             else {
                 exportLog.debug("Closed untracked " + tableName + ", partition " + partition + " (ok on shutdown)");
             }
+        }
+        if (removed && m_dataSourcesClosing.isEmpty()) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Unlocking catalog updates");
+            }
+            m_allowCatalogUpdate.release();
         }
     }
 }
