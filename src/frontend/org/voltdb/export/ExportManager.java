@@ -623,24 +623,20 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public synchronized String canUpdateCatalog() {
-        String msg = null;
+    public synchronized void waitOnClosingSources() {
         boolean locked = false;
         try {
             locked = m_allowCatalogUpdate.tryAcquire(1, UPDATE_CORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (!locked) {
-                msg = "Unable to update catalog after " + UPDATE_CORE_TIMEOUT_SECONDS + " seconds";
-                if (!m_dataSourcesClosing.isEmpty()) {
-                    msg += "; these export streams are still closing: "
-                            + m_dataSourcesClosing.keySet();
-                }
+            if (!locked && !m_dataSourcesClosing.isEmpty()) {
+                exportLog.warn("After " + UPDATE_CORE_TIMEOUT_SECONDS
+                        + " seconds, these export streams are still closing: "
+                        + m_dataSourcesClosing.keySet());
             }
         }
         catch (Exception ex) {
-            msg = "Unable to update catalog: " + ex;
             if (!m_dataSourcesClosing.isEmpty()) {
-                msg += "; these export streams are still closing: "
-                        + m_dataSourcesClosing.keySet();
+                exportLog.warn("Unable to wait: " + ex + ", these export streams are still closing: "
+                        + m_dataSourcesClosing.keySet());
             }
         }
         finally {
@@ -648,7 +644,6 @@ public class ExportManager implements ExportManagerInterface
                 m_allowCatalogUpdate.release();
             }
         }
-        return msg;
     }
 
     @Override
