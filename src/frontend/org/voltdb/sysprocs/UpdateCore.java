@@ -240,10 +240,9 @@ public class UpdateCore extends VoltSystemProcedure {
                 throw ex;
             }
 
-            String canUpdate = ExportManagerInterface.instance().canUpdateCatalog();
-            if (canUpdate != null) {
-                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, canUpdate);
-            }
+            // Note: this call can block up to a fixed timeout waiting for data source
+            // to complete closing.
+            ExportManagerInterface.instance().waitOnClosingSources();
 
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
