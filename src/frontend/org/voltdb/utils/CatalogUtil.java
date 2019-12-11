@@ -237,8 +237,8 @@ public abstract class CatalogUtil {
     public static final int CATALOG_BUFFER_HEADER = 4 +  // version number
                                                     8 +  // generation Id
                                                     4 +  // deployment bytes length
-                                                    4;   // catalog bytes length
-
+                                                    4 +  // catalog bytes length
+                                                    20;  // catalog SHA-1 hash
     static {
         try {
             // This schema shot the sheriff.
@@ -2628,6 +2628,7 @@ public abstract class CatalogUtil {
         buf.putLong(genId);
         buf.putInt(catalogAndDeployment.m_deploymentLength);
         buf.putInt(catalogAndDeployment.m_catalogLength);
+        buf.put(catalogAndDeployment.m_catalogHash);
         buf.position(0);
     }
 
@@ -2714,11 +2715,14 @@ public abstract class CatalogUtil {
         public final List<ByteBuffer> m_data;
         public final int m_deploymentLength;
         public final int m_catalogLength;
+        public final byte[] m_catalogHash;
 
-        public SegmentedCatalog(List<ByteBuffer> data, int deploymentSize, int catalogSize) {
+        public SegmentedCatalog(List<ByteBuffer> data, int deploymentSize, int catalogSize, byte[] catalogHash) {
             m_data = data;
             m_deploymentLength = deploymentSize;
             m_catalogLength = catalogSize;
+            m_catalogHash = catalogHash;
+
         }
 
         public static SegmentedCatalog create(byte[] catalogBytes, byte[] catalogHash, byte[] deploymentBytes) {
@@ -2751,18 +2755,7 @@ public abstract class CatalogUtil {
                 }
             }
 
-            return new SegmentedCatalog(buffers, deploymentBytes.length, catalogBytes.length);
-        }
-
-        // Used primarily in initialization to create a deployment file only catalog
-        public static SegmentedCatalog createStarterCatalog(byte[] deploymentBytes) {
-            List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
-            byte[] content = new byte[CATALOG_BUFFER_HEADER + deploymentBytes.length];
-            System.arraycopy(deploymentBytes, 0, content, CATALOG_BUFFER_HEADER, deploymentBytes.length);
-            buffers.add(ByteBuffer.wrap(content));
-            // spin loop in Inits.LoadCatalog.run() needs catalog length
-            // to be of zero until we have a real catalog.
-            return new SegmentedCatalog(buffers, deploymentBytes.length, 0);
+            return new SegmentedCatalog(buffers, deploymentBytes.length, catalogBytes.length, catalogHash);
         }
     }
 
@@ -2855,6 +2848,7 @@ public abstract class CatalogUtil {
                 genId = catalogDeploymentBytes.getLong();
                 deploymentLength = catalogDeploymentBytes.getInt();
                 catalogLength = catalogDeploymentBytes.getInt();
+                catalogDeploymentBytes.get(catalogHash);
                 deploymentBytes = new byte[deploymentLength];
                 catalogBytes = new byte[catalogLength];
                 // Get deployment bytes first
@@ -2879,14 +2873,6 @@ public abstract class CatalogUtil {
             catalogDeploymentBytes = null;
         }
         assert (deploymentBytesRead == deploymentLength && catalogBytesRead == catalogLength);
-        try {
-            // get the catalog hash
-            catalogHash = (new InMemoryJarfile(catalogBytes)).getSha1Hash();
-        }
-        catch (IOException ioe) {
-            VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
-                    true, ioe);
-        }
         return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
     }
 
@@ -2910,7 +2896,8 @@ public abstract class CatalogUtil {
 
     /**
      * Retrieve an unpublished catalog and deployment configuration from zookeeper.
-     * This is primarily used by @VerifyCatalogAndWriteJar.
+     * This is primarily used by @VerifyCatalogAndWriteJar and @UpdateCore to pass
+     * large bytes through zookeeper network.
      * @param zk
      * @param catalogVersion
      * @return

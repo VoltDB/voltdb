@@ -2678,7 +2678,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         CatalogUtil.updateCatalogToZK(zk,
                                 0, // use default version 0 as start
                                 0L,
-                                SegmentedCatalog.createStarterCatalog(deploymentBytes),
+                                SegmentedCatalog.create(new byte[0], new byte[]{0}, deploymentBytes),
                                 ZKCatalogStatus.COMPLETE);
                         hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                     }

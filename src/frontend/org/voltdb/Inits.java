@@ -324,7 +324,7 @@ public class Inits {
         byte[] lastBuffer = Arrays.copyOf(buffer, chunkOffset);
         chunks.add(ByteBuffer.wrap(lastBuffer));
 
-        return new SegmentedCatalog(chunks, deploymentBytes.length, totalCatalogBytes);
+        return new SegmentedCatalog(chunks, deploymentBytes.length, totalCatalogBytes, new byte[] {0});
     }
 
     private static File createEmptyStartupJarFile(String drRole){
@@ -425,7 +425,15 @@ public class Inits {
                 } catch (IOException e){
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
-                if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
+                InMemoryJarfile remoteNodeCatalog = null;
+                try {
+                    // Compute the remote catalog hash,
+                    remoteNodeCatalog = new InMemoryJarfile(catalogStuff.catalogBytes);
+                }
+                catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Failed to load remote schema: " + e.getMessage(), false, e);
+                }
+                if (!Arrays.equals(remoteNodeCatalog.getSha1Hash(), thisNodeCatalog.getSha1Hash())) {
                     VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
                 }
             }
