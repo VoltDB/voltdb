@@ -35,38 +35,56 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot voltdbroot
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
+# compile the source code for procedures and the client into jarfiles
+function jars() {
     mkdir -p obj
+    # compile java source
     javac -classpath $APPCLASSPATH -d obj \
-        src/oneshotkv/*.java \
-        src/oneshotkv/procedures/*.java
+        src/${APPNAME}/*.java \
+        src/${APPNAME}/procedures/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
+}
+
+# run the client that drives the example
+function client() {
+    oneshot-benchmark
 }
 
 function oneshot-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$LOG4J \
         oneshotkv.OneShotBenchmark \
         --displayinterval=5 \
         --duration=60 \
@@ -82,9 +100,8 @@ function oneshot-benchmark() {
         --mpthreads=2
 }
 
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|oneshot-benchmark|...}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|client|oneshot-benchmark|...}"
 }
 
 # Run the target passed as the first arg on the command line

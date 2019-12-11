@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="matviewbenchmark"
+APPNAME2="-streamview"
 
 DDL=ddl.sql
 STREAMVIEW="false"
@@ -42,60 +43,51 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME-streamview.jar voltdbroot statement-plans catalog-report.html log
+    rm -rf obj debugoutput ${APPNAME}*.jar  voltdbroot statement-plans catalog-report.html log
 }
 
+# compile the source code for the client
 function jars() {
-    ant all
+    mkdir -p obj
+    # compile java source
+    javac -classpath $APPCLASSPATH -d obj \
+        src/${APPNAME}/*.java
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
 # compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $APPCLASSPATH -d obj \
-        src/matviewbenchmark/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars
+    fi
 }
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the kvbenchmark application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    echo "voltdb legacycompile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql"
-    echo
-    $VOLTDB legacycompile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql
-
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# run the voltdb server locally
-function streamview() {
-    export APPNAME="$APPNAME-streamview"
-    STREAMVIEW="true"
-    server
-}
-
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
     # truncate the voltdb log
-    [[ -d log && -w log ]] && > log/volt.log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar"
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl$1.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
     echo
-    ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl$1.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
+}
+
+# run the voltdb server locally
+function streamview() {
+    STREAMVIEW="true"
+    server ${APPNAME2}
 }
 
 # run the client that drives the example
@@ -110,13 +102,13 @@ function streamview-client() {
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function matviewbenchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj matviewbenchmark.MaterializedViewBenchmark --help
+    jars-ifneeded
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar matviewbenchmark.MaterializedViewBenchmark --help
 }
 
 function matviewbenchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$LOG4J \
         matviewbenchmark.MaterializedViewBenchmark \
         --displayinterval=5 \
         --servers=localhost \
@@ -128,7 +120,7 @@ function matviewbenchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|srccompile|catalog|server|client|matviewbenchmark|matviewbenchmark-help}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|streamview|client|streamview-client|matviewbenchmark|matviewbenchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
