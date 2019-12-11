@@ -48,7 +48,7 @@ import java.util.concurrent.TimeoutException;
 public class ExportRabbitMQVerifier {
     static VoltLogger log = new VoltLogger("ExportRabbitMQVerifier");
     private static final long VALIDATION_REPORT_INTERVAL = 10000;
-
+    private final long MAX_STALL_TIMEOUT_SECS;
     private final ConnectionFactory m_connFactory;
     private String m_exchangeName;
     private boolean success = true;
@@ -63,6 +63,7 @@ public class ExportRabbitMQVerifier {
         m_connFactory.setPassword(password);
         m_connFactory.setVirtualHost(vhost);
         m_exchangeName = exchangename;
+        MAX_STALL_TIMEOUT_SECS = 1200;
     }
 
     public void run() throws IOException, InterruptedException, TimeoutException
@@ -97,11 +98,23 @@ public class ExportRabbitMQVerifier {
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
             log.info(String.format("populator has finished creating %d rows", expectedRows));
 
+            long startTime = System.currentTimeMillis();
+            long lastRcvd = 0;
             while (expectedRows > rowIdCounts.size()) {
+                long rcvdRows = rowIdCounts.size();
                 log.info(String.format(
-                                       "Expecting %d rows, verified %d",
+                                       "Expecting %d rows, received %d",
                                        expectedRows,
-                                       rowIdCounts.size()));
+                                       rcvdRows));
+                long now = System.currentTimeMillis();
+                if (rcvdRows > lastRcvd) {
+                    lastRcvd = rcvdRows;
+                    startTime = now;
+                } else if (now - startTime > MAX_STALL_TIMEOUT_SECS*1000) {
+                    success = false;
+                    log.error(String.format("export stalled for %d minutes, failing", MAX_STALL_TIMEOUT_SECS));
+                    break;
+                }
                 Thread.sleep(5000);
             }
 
