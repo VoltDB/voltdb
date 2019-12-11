@@ -178,7 +178,6 @@ public class CappedTableLoader extends BenchmarkThread {
             long id = partitions.getLong(0);
             long key = partitions.getLong(1);
             boolean retry = true;
-            boolean ret = false;
             while ( true ) {
                 count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
                 if (count > 10 && retry ) {
