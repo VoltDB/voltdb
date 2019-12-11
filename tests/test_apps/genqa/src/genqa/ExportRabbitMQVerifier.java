@@ -114,9 +114,7 @@ public class ExportRabbitMQVerifier {
                                    totalRcvd - rowIdCounts.size()
                                    ));
         } finally {
-            log.info("tear down and close channel");
-
-            tearDown(channel);
+            log.info("close channel");
             channel.close();
             connection.close();
         }
@@ -166,14 +164,9 @@ public class ExportRabbitMQVerifier {
         };
     }
 
-    private void tearDown(Channel channel) throws IOException
-    {
-        channel.exchangeDelete(m_exchangeName);
-    }
-
     private static void usage()
     {
-        log.info("Command-line arguments: rabbitmq_server username password virtual_host");
+        log.info("Command-line arguments: rabbitmq_server username password virtual_host exchange_name");
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, TimeoutException
