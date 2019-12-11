@@ -622,8 +622,9 @@ public class ExportManager implements ExportManagerInterface
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
     }
 
+    // Note: not synchronized as only needs to touch the semaphore and must not block {@code onClosedSource}
     @Override
-    public synchronized void waitOnClosingSources() {
+    public void waitOnClosingSources() {
         boolean locked = false;
         try {
             locked = m_allowCatalogUpdate.tryAcquire(UPDATE_CORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
