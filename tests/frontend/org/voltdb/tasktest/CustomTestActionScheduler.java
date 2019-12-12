@@ -26,7 +26,7 @@ package org.voltdb.tasktest;
 import java.util.concurrent.TimeUnit;
 
 import org.voltdb.task.ActionScheduler;
-import org.voltdb.task.DelayedAction;
+import org.voltdb.task.ScheduledAction;
 import org.voltdb.task.TestTasksEnd2End;
 
 /**
@@ -34,7 +34,7 @@ import org.voltdb.task.TestTasksEnd2End;
  */
 public class CustomTestActionScheduler implements ActionScheduler {
     @Override
-    public DelayedAction getFirstDelayedAction() {
-        return DelayedAction.createCallback(5, TimeUnit.SECONDS, r -> getFirstDelayedAction());
+    public ScheduledAction getFirstScheduledAction() {
+        return ScheduledAction.createCallback(5, TimeUnit.SECONDS, r -> getFirstScheduledAction());
     }
 }

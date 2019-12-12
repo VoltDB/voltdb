@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  * Simple abstract class to handle the common duration parsing and validation of schedulers which use a static duration
  * in the form of &lt;interval&gt; &lt;timeUnit&gt;
  */
-abstract class DurationSchedule implements ActionSchedule {
+abstract class DurationIntervalGenerator implements IntervalGenerator {
     TaskHelper m_helper;
     long m_durationNs = -1;
 

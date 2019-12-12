@@ -18,26 +18,26 @@
 package org.voltdb.task;
 
 /**
- * Simple {@link ActionScheduler} implementation which takes a {@link ActionGenerator} and {@link ActionSchedule} and
- * combines the results of those two instances to make a {@link DelayedAction}
+ * Simple {@link ActionScheduler} implementation which takes a {@link ActionGenerator} and {@link IntervalGenerator} and
+ * combines the results of those two instances to make a {@link ScheduledAction}
  */
 final class CompositeActionScheduler implements ActionScheduler {
     private final ActionGenerator m_actionGenerator;
-    private final ActionSchedule m_actionSchedule;
+    private final IntervalGenerator m_intervalGenerator;
 
-    CompositeActionScheduler(ActionGenerator actionGenerator, ActionSchedule actionSchedule) {
+    CompositeActionScheduler(ActionGenerator actionGenerator, IntervalGenerator intervalGenerator) {
         super();
         m_actionGenerator = actionGenerator;
-        m_actionSchedule = actionSchedule;
+        m_intervalGenerator = intervalGenerator;
     }
 
     @Override
-    public DelayedAction getFirstDelayedAction() {
+    public ScheduledAction getFirstScheduledAction() {
         Action action = m_actionGenerator.getFirstAction();
         if (action.getType().isStop()) {
-            return DelayedAction.createStop(action);
+            return ScheduledAction.createStop(action);
         }
-        return DelayedAction.create(m_actionSchedule.getFirstDelay(), action);
+        return ScheduledAction.create(m_intervalGenerator.getFirstInterval(), action);
     }
 
     @Override

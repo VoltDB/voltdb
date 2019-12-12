@@ -22,8 +22,9 @@ package org.voltdb.task;
  */
 public interface ActionGenerator extends ActionGeneratorBase {
     /**
-     * This method is invoked for the first action to be performed. All subsequent invocation will be of
-     * {@link Action#getCallback()}
+     * This method is invoked only once to obtain the first action. The first action will be performed after a time
+     * interval has elapsed. After the action has been performed {@link Action#getCallback() callback} will be invoked
+     * with the {@link ActionResult result} of this action. The return of the callback will be used as the next action.
      * <p>
      * If this method throws an exception or returns {@code null} the task instance will halted and put into an error
      * state.
