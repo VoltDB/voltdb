@@ -727,14 +727,4 @@ public class VoltZK {
         }
         return false;
     }
-
-    public static boolean isReducedSafety() {
-        try {
-            List<String> blockers = VoltDB.instance().getHostMessenger().getZK().getChildren(VoltZK.actionBlockers, false);
-            return blockers.contains(leafReducedClusterSafety);
-        } catch (KeeperException|InterruptedException e) {
-            tmLog.error("Error reading children of ZK " + VoltZK.actionBlockers + ": " + e.getMessage(), e);
-            return false;
-        }
-    }
 }

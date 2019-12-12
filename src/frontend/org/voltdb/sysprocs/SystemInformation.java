@@ -412,7 +412,7 @@ public class SystemInformation extends VoltSystemProcedure
         String cluster_state = VoltDB.instance().getMode().toString();
         vt.addRow(hostId, "CLUSTERSTATE", cluster_state);
 
-        vt.addRow(hostId, "CLUSTERSAFETY", VoltZK.isReducedSafety() ? "REDUCED" : "FULL");
+        vt.addRow(hostId, "CLUSTERSAFETY", VoltDB.instance().isMasterOnly() ? "REDUCED" : "FULL");
 
         // INITIALIZED, used by VEM to determine the spinny icon state.
         org.voltdb.OperationMode mode = VoltDB.instance().getMode();

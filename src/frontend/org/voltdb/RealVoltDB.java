@@ -457,6 +457,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
 
+    private volatile boolean m_isMasterOnly = false;
+
     private volatile OperationMode m_startMode = OperationMode.RUNNING;
 
     volatile String m_localMetadata = "";
@@ -5239,6 +5241,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
         }
+    }
+
+    @Override
+    public boolean isMasterOnly() {
+        return m_isMasterOnly;
+    }
+
+    @Override
+    public void setMasterOnly() {
+        m_isMasterOnly = true;
     }
 
     public void cleanupBackLogsOnDecommisionedReplicas(int executorPartition) {
