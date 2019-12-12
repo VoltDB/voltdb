@@ -191,6 +191,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean allReadAndDiscarded() {
+            return false;
+        }
+
+        @Override
         public void close() {
         }
 
