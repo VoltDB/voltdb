@@ -270,10 +270,6 @@ public interface VoltDBInterface
      */
     public OperationMode getMode();
 
-    public boolean IsMasterOnly();
-
-    public void setMasterOnly();
-
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 
     public ScheduledExecutorService getSES(boolean priority);
