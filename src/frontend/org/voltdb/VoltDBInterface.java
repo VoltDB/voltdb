@@ -270,10 +270,6 @@ public interface VoltDBInterface
      */
     public OperationMode getMode();
 
-    public boolean IsMasterOnly();
-
-    public void setMasterOnly();
-
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
 
     public ScheduledExecutorService getSES(boolean priority);
@@ -364,4 +360,7 @@ public interface VoltDBInterface
      * notify surviving node upon shutting itself down
      */
     public void notifyOfShutdown();
+
+    boolean isMasterOnly();
+    void setMasterOnly();
 }

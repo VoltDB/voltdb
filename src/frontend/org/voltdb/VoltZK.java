@@ -53,7 +53,9 @@ import org.voltdb.iv2.MigratePartitionLeaderInfo;
  */
 public class VoltZK {
 
+    static final VoltLogger tmLog = new VoltLogger("TM");
     private final static String ERROR_DECOMMISSION = "while decommissioning replicas is progress";
+    private final static String ERROR_REDUCEDCLUSTERSAFETY = "while cluster is in reduced safety mode";
     private final static String ERROR_REJOIN = "while node rejoin is progress";
     private final static String ERROR_LEADER_MIGRATION = "while leader migration is progress";
     private final static String ERROR_CATALOG_UPDATE = "while catalog update is progress";
@@ -210,7 +212,13 @@ public class VoltZK {
     private static final String decommissionReplicas = "decommissionReplicas_blocker";
     public static final String decommissionReplicasInProgress = actionBlockers + "/" + decommissionReplicas;
 
-    private static final String snapshotBlocker = "snapshotBlocker";
+    // ReducedClusterSafety has longer scope than decommissionReplicasBlocker (will not been release until transfer back to full cluster mode)
+    // It prohibit cluster topology changed related operation
+    // but do allow snapshot operation
+    private static final String leafReducedClusterSafety = "reduced_clustersafety_block";
+    public static final String reducedClusterSafety = actionBlockers + "/" + leafReducedClusterSafety;
+
+    private static final String snapshotBlocker = "snapshot_blocker";
     public static final String snapshotSetupInProgress = actionBlockers + "/" + snapshotBlocker;
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
@@ -499,6 +507,8 @@ public class VoltZK {
                     errorMsg = ERROR_MP_REPAIR;
                 } else if (blockers.contains(decommissionReplicas)){
                     errorMsg = ERROR_DECOMMISSION;
+                } else if (blockers.contains(leafReducedClusterSafety)){
+                    errorMsg = ERROR_REDUCEDCLUSTERSAFETY;
                 }
                 break;
             case elasticOperationInProgress:
@@ -515,6 +525,8 @@ public class VoltZK {
                     errorMsg = ERROR_LEADER_MIGRATION;
                 } else if (blockers.contains(decommissionReplicas)){
                     errorMsg = ERROR_DECOMMISSION;
+                } else if (blockers.contains(leafReducedClusterSafety)){
+                    errorMsg = ERROR_REDUCEDCLUSTERSAFETY;
                 }
                 break;
             case migratePartitionLeaderBlocker:
@@ -524,14 +536,14 @@ public class VoltZK {
                     errorMsg = ERROR_ELASTIC_OPERATION;
                 } else if (blockers.contains(decommissionReplicas)){
                     errorMsg = ERROR_DECOMMISSION;
+                } else if (blockers.contains(leafReducedClusterSafety)){
+                    errorMsg = ERROR_REDUCEDCLUSTERSAFETY;
                 }
                 break;
             case elasticMigration:
                 // elastic operation balancePartition currently cannot coexist with partition leader migration
                if (blockers.contains(migrate_partition_leader)) {
                    errorMsg = ERROR_LEADER_MIGRATION;
-               } else if (blockers.contains(decommissionReplicas)){
-                   errorMsg = ERROR_DECOMMISSION;
                }
                break;
             case banElasticOperation:
@@ -547,6 +559,8 @@ public class VoltZK {
                 } else if (blockers.contains(snapshotBlocker)) {
                     errorMsg = "while snapshot is in progress";
                 }
+                break;
+            case reducedClusterSafety:
                 break;
             case snapshotSetupInProgress:
                 if (blockers.contains(decommissionReplicas)) {
