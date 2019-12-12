@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltdb.client.ClientResponse;
 
 /**
- * The result of executing an {@link Action} which was produed by either an {@link ActionSchedule} or
+ * The result of executing an {@link Action} which was produed by either an {@link IntervalGenerator} or
  * {@link ActionScheduler}
  */
 public interface ActionResult {
@@ -32,12 +32,12 @@ public interface ActionResult {
     public ActionType getType();
 
     /**
-     * Retrieve the delay which was applied to the executed action.
+     * Retrieve the interval after which the action was executed.
      *
-     * @param timeUnit {@link TimeUnit} of delay returned by this method
-     * @return Time delay in {@code timeUnit}
+     * @param timeUnit {@link TimeUnit} of interval returned by this method
+     * @return Time interval in {@code timeUnit}
      */
-    public long getDelay(TimeUnit timeUnit);
+    public long getInterval(TimeUnit timeUnit);
 
     /**
      * @return Name of procedure that was executed. Will be {@code null} if the action was a {@link ActionType#CALLBACK}

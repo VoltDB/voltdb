@@ -24,9 +24,9 @@ import java.util.concurrent.TimeUnit;
 import fc.cron.CronExpression;
 
 /**
- * {@link ActionSchedule} based upon a cron style configuration schedule
+ * {@link IntervalGenerator} based upon a cron style configuration schedule
  */
-public final class CronSchedule implements ActionSchedule {
+public final class CronIntervalGenerator implements IntervalGenerator {
     private CronExpression m_cronExpression;
 
     public static String validateParameters(String cronConfiguration) {
@@ -48,11 +48,11 @@ public final class CronSchedule implements ActionSchedule {
     }
 
     @Override
-    public ActionDelay getFirstDelay() {
-        return new ActionDelay(getDelayNs(), TimeUnit.NANOSECONDS, r -> getFirstDelay());
+    public Interval getFirstInterval() {
+        return new Interval(getIntervalNs(), TimeUnit.NANOSECONDS, r -> getFirstInterval());
     }
 
-    private long getDelayNs() {
+    private long getIntervalNs() {
         ZonedDateTime now = ZonedDateTime.now();
         ZonedDateTime barrier = now.plusYears(20);
         ZonedDateTime runAt = m_cronExpression.nextTimeAfter(now, barrier);
