@@ -818,8 +818,8 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
-            exportLog.error("PUSH Could not find export data sources for partition "
-                    + partitionId + ". The export data is being discarded.");
+            exportLog.warn("Could not find export data sources for partition "
+                    + partitionId + ". The partition replica may have been decommissioned. The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
