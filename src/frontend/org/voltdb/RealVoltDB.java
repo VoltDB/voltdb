@@ -5315,5 +5315,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
     }
+
+    public boolean isPartitionDecommissioned(int partitionId) {
+        if (partitionId != MpInitiator.MP_INIT_PID) {
+            SpInitiator init = (SpInitiator)m_iv2Initiators.get(partitionId);
+            return (init != null && !(init.getServiceState().isNormal()));
+        }
+        return false;
+    }
 }
 
