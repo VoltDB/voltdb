@@ -354,6 +354,8 @@ if __name__ == "__main__":
                 buildCommunity()
                 buildRabbitMQExport(versionCentos, "community")
                 copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+                makeMavenJars()
+                copyMavenJarsToReleaseDir(releaseDir, versionCentos)
             buildEnterprise(versionCentos)
             buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
@@ -363,8 +365,6 @@ if __name__ == "__main__":
             copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
             licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)
             copyTrialLicenseToReleaseDir(builddir + "/pro/" + licensefile, releaseDir)
-            makeMavenJars()
-            copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
     except Exception as e:
         print traceback.format_exc()
