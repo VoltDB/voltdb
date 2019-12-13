@@ -331,6 +331,10 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
     table->serializeTo(out);
 }
 
+PersistentTable* VoltDBEngine::getSystemTable(const SystemTableId id) const {
+    return findInMapOrNull(id, m_systemTables);
+}
+
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
@@ -1200,11 +1204,10 @@ static bool haveDifferentSchema(
 void VoltDBEngine::createSystemTables() {
     SystemTableFactory factory(m_compactionThreshold);
     for (SystemTableId id : SystemTableFactory::getAllSystemTableIds()) {
-        int32_t intId = static_cast<int32_t>(id);
-        vassert(m_systemTables.find(intId) == m_systemTables.end());
+        vassert(m_systemTables.find(id) == m_systemTables.end());
         PersistentTable *table = factory.create(id);
         table->incrementRefcount();
-        m_systemTables[intId] = table;
+        m_systemTables[id] = table;
     }
 }
 
@@ -1899,7 +1902,9 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
-        m_tables.insert(m_systemTables.begin(), m_systemTables.end());
+        for (auto entry : m_systemTables) {
+            m_tables[static_cast<CatalogId>(entry.first)] = entry.second;
+        }
     }
 
     // Walk through table delegates and update local table collections

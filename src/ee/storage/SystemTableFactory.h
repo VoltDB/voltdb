@@ -17,17 +17,10 @@
 
 #pragma once
 
-#include "persistenttable.h"
+#include "storage/persistenttable.h"
+#include "storage/SystemTableId.h"
 
 namespace voltdb {
-
-// These IDs must be shared between the EE and the jvm layer
-enum class SystemTableId : int32_t {
-    KIPLING_GROUP = -1,
-    KIPLING_GROUP_MEMBER = -2,
-    KIPLING_GROUP_MEMBER_PROTOCOL = -3,
-    KIPLING_GROUP_OFFSET = -4
-};
 
 class SystemTableFactory {
 
@@ -47,17 +40,18 @@ public:
      */
     PersistentTable* create(const SystemTableId id);
 
-private:
     // Common utility method for creating a system table
+    PersistentTable *createTable(const std::string& name, TupleSchema *schema, const std::vector<std::string> &columnNames,
+            const int partitionColumn) const {
+        return createTable(name.c_str(), schema, columnNames, partitionColumn);
+    }
     PersistentTable *createTable(char const *name, TupleSchema *schema, const std::vector<std::string> &columnNames,
-            const int partitionColumn, const std::vector<int32_t> &primaryKeyColumns);
+            const int partitionColumn) const;
 
-    // Methods for creating the different types of system tables
-    PersistentTable *createKiplingGroup();
-    PersistentTable *createKiplingGroupMember();
-    PersistentTable *createKiplingGroupMemberProtocol();
-    PersistentTable *createKiplingGroupOffset();
-
+    // Add an index to the table. unique must be true for the index to be a primary key
+    void addIndex(PersistentTable *table, const std::string suffix, const std::vector<int32_t> &columns,
+            bool unique = true, bool primary = true) const;
+private:
     // Member variables
     int32_t m_compactionThreshold;
 };

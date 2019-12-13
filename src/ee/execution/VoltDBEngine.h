@@ -60,6 +60,7 @@
 #include "stats/StatsAgent.h"
 
 #include "storage/BinaryLogSinkWrapper.h"
+#include "storage/SystemTableId.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -162,6 +163,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         Table* getTableById(int32_t tableId) const;
         Table* getTableByName(std::string const& name) const;
         TableCatalogDelegate* getTableDelegate(std::string const& name) const;
+        PersistentTable* getSystemTable(const SystemTableId id) const;
 
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
@@ -710,7 +712,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::map<CatalogId, Table*> m_tables;
 
         // map system table id to table pointers
-        std::map<CatalogId, PersistentTable *> m_systemTables;
+        std::map<SystemTableId, PersistentTable *> m_systemTables;
 
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
