@@ -214,6 +214,7 @@ SET (VOLTDB_SRC
   kipling/messages/SyncGroup.cpp
   kipling/messages/OffsetCommit.cpp
   kipling/messages/OffsetFetch.cpp
+  kipling/TableFactory.cpp
   logging/JNILogProxy.cpp
   logging/LogManager.cpp
   plannodes/SchemaColumn.cpp
