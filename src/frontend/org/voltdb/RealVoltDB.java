@@ -3952,7 +3952,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         deploymentBytes = catalogStuff.deploymentBytes;
                     } catch (Exception e) {
                         // impossible to hit, log for debug purpose
-                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes);
+                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
                         throw new RuntimeException("Error reading catalog from zookeeper");
                     }
                 } else {

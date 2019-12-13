@@ -33,7 +33,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.OperationMode;
@@ -538,9 +537,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         hostLog.info("About to call @UpdateCore");
         try {
-            CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
-                    SegmentedCatalog.create(ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes),
-                    ZKCatalogStatus.PENDING);
+            CatalogUtil.stageCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
+                    SegmentedCatalog.create(ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes));
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing stage catalog bytes on ZK during " + invocationName;
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
