@@ -229,6 +229,10 @@ public:
         return m_current < m_end;
     }
 
+    int64_t remaining() {
+        return m_end - m_current;
+    }
+
 private:
     template <typename T>
     T readPrimitive() {

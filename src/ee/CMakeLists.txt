@@ -210,6 +210,10 @@ SET (VOLTDB_SRC
   indexes/IndexStats.cpp
   indexes/tableindex.cpp
   indexes/tableindexfactory.cpp
+  kipling/messages/JoinGroup.cpp
+  kipling/messages/SyncGroup.cpp
+  kipling/messages/OffsetCommit.cpp
+  kipling/messages/OffsetFetch.cpp
   logging/JNILogProxy.cpp
   logging/LogManager.cpp
   plannodes/SchemaColumn.cpp
