@@ -556,6 +556,11 @@ public class InitiatorMailbox implements Mailbox
     // Mark this site as eligible to be removed
     private void updateServiceState() {
         final RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        if (db.rejoining()) {
+            VoltDB.crashLocalVoltDB("Hash mismatch found before this node could finish rejoining. " +
+                    "As a result, the rejoin operation has been canceled.");
+            return;
+        }
         final SpInitiator init = (SpInitiator) db.getInitiator(m_partitionId);
         if (init.getServiceState().isNormal()) {
             init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
