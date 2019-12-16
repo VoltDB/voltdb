@@ -565,6 +565,9 @@ public class InitiatorMailbox implements Mailbox
         if (init.getServiceState().isNormal()) {
             init.updateServiceState(ServiceState.ELIGIBLE_REMOVAL);
             VoltZK.addHashMismatchedSite(db.getHostMessenger().getZK(), getHSId());
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Add hash mismatch site:" + CoreUtils.hsIdToString(getHSId()));
+            }
         }
     }
 

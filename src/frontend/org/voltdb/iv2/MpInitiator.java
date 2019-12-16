@@ -18,10 +18,9 @@
 package org.voltdb.iv2;
 
 import java.util.List;
-import java.util.Set;
-import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -48,7 +47,6 @@ import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -65,42 +63,21 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
             if (cache == null || cache.isEmpty()) {
                 return;
             }
-            Set<Long> replicas = Sets.newHashSet();
-            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                replicas.add(entry.getValue().m_HSId);
-            }
-            boolean requireReplicaRemoval = false;
-            synchronized(m_lock) {
-                if (m_replicasRemovedSet.isEmpty()) {
-                    requireReplicaRemoval = true;
-                } else {
-                    for (Long r : replicas) {
-                        if (!m_replicasRemovedSet.remove(r)) {
-                            requireReplicaRemoval = true;
-                            break;
-                        }
-                    }
-                }
-                m_replicasRemovedSet.clear();
-                m_replicasRemovedSet.addAll(replicas);
-            }
-            if (requireReplicaRemoval) {
+            if (m_replicaRemovalInvoked.compareAndSet(false, true)) {
                 if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Replica removal request with: " + CoreUtils.hsIdCollectionToString(m_replicasRemovedSet));
+                    tmLog.debug("Replica removal started.");
                 }
                 RealVoltDB db = (RealVoltDB) VoltDB.instance();
                 m_scheduler.updateBuddyHSIds(db.getLeaderSites());
                 m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
                         m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
                         new HashMismatchMessage());
-
             }
         }
     };
 
     LeaderCache m_replicaRemovalCache;
-    Set<Long> m_replicasRemovedSet = Sets.newHashSet();
-    Object m_lock = new Object();
+    private AtomicBoolean m_replicaRemovalInvoked = new AtomicBoolean(false);
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
     {
         super(VoltZK.iv2mpi,

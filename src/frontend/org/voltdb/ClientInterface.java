@@ -2442,7 +2442,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Many replicas could trigger hash mismatch, do not over schedule the task
-            // Let's delay for 5s, reschedule it if it is blocked.
+            // Let's delay for 1s, reschedule it if it is blocked.
             if (!m_decommissionInProgress.get()) {
                 m_decommissionInProgress.set(true);
                 m_replicaRemovalExecutor.schedule(() -> {
@@ -2452,7 +2452,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         m_mailbox.deliver(new HashMismatchMessage());
                     }
-                }, 5, TimeUnit.SECONDS);
+                }, 1, TimeUnit.SECONDS);
             }
         }
     }
@@ -2461,6 +2461,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         try {
             // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
             if (!VoltZK.hasHashMismatchedSite(m_zk)) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Skip @StopReplicas, no hash mismatch sites are found.");
+                }
                 return true;
             }
             String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress,
@@ -2478,6 +2481,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
+            }
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Invoke @StopReplicas");
             }
             synchronized (m_executeTaskAdpater) {
                 if (createTransaction(m_executeTaskAdpater.connectionId(),
