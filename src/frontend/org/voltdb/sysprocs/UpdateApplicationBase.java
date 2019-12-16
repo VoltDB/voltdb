@@ -323,17 +323,18 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             CatalogUtil.validateRetentionUpdate("topic defaults", newDefaults.getRetention(),
                     curDefaults.getRetention(), errors);
         }
-        for(TopicProfileType newProfile : newProfiles.values()) {
-            TopicProfileType curProfile = curProfiles != null ? curProfiles.get(newProfile.getName()) : null;
-            if (curProfile == null) {
-                continue;
+        if (curProfiles != null) {
+            for(TopicProfileType newProfile : newProfiles.values()) {
+                TopicProfileType curProfile = curProfiles.get(newProfile.getName());
+                if (curProfile == null) {
+                    continue;
+                }
+                String what = "topic profile " + newProfile.getName();
+                CatalogUtil.validateRetentionUpdate(what, newProfile.getRetention(),
+                        curProfile.getRetention(), errors);
+
             }
-            String what = "topic profile " + newProfile.getName();
-            CatalogUtil.validateRetentionUpdate(what, newProfile.getRetention(),
-                    curProfile.getRetention(), errors);
-
         }
-
         if (errors.hasErrors()) {
             result.errorMsg = errors.getErrorMessage();
         }
