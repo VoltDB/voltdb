@@ -35,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -51,6 +52,7 @@ import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
@@ -899,6 +901,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        // Ideally reducedClusterSafety should be persistent,
+        // but since we don't tolerate node down, this has no effect even set as persistent.
+        VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
+                CreateMode.EPHEMERAL, tmLog, "Transfer to Reduced Safety Mode");
+
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         for (Integer integer : liveHids) {
             m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);

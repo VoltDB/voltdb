@@ -2498,10 +2498,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (Exception e) {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
-            // Ideally reducedClusterSafety should be persistent,
-            // but since we don't tolerate node down, this has no effect even set as persistent.
-            VoltZK.createActionBlocker(m_zk, VoltZK.reducedClusterSafety,
-                    CreateMode.EPHEMERAL, tmLog, "Transfer to Reduced Safety Mode");
             m_decommissionInProgress.set(false);
             VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
         }
