@@ -862,6 +862,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return;
                 }
 
+                boolean requiresId = (segment.getStartId() >= 0);
+                assert(m_requiresId == null || m_requiresId.booleanValue() == requiresId);
+                assert(segment.getEndId() >= segment.getStartId());
+                PBDSegment<M> lastSegment = peekLastSegment();
+                assert(!requiresId || lastSegment == null || lastSegment.getEndId() < segment.getStartId());
+                m_requiresId = requiresId;
+
                 // Any recovered segment that is not final should be checked
                 // for internal consistency.
                 if (!segment.isFinal()) {

@@ -25,6 +25,7 @@ package org.voltdb.utils;
 import static org.junit.Assert.fail;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Random;
 
 import org.junit.After;
@@ -79,8 +80,17 @@ public class TestPBDsWithIds {
     @Test
     public void testVerifySegmentIds() throws Exception {
         int numSegments = 10;
-        int maxNumIds = 100;
-        int maxNumBuffers = 10;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10);
+
+        verifySegmentIds(numSegments, segmentIds);
+    }
+
+    /*
+     * Utility method that creates and populates segments based on given parameters
+     * and returns an array with the start and end ids of the segments.
+     */
+    private Pair<Long, Long>[] createPopulateSegments(int numSegments, int maxNumIds, int maxNumBuffers)
+            throws Exception {
         Random random = new Random(System.currentTimeMillis());
         long nextId = Math.abs(random.nextInt());
         @SuppressWarnings("unchecked")
@@ -99,11 +109,16 @@ public class TestPBDsWithIds {
             segmentIds[i] = new Pair<Long, Long>(segmentStartId, nextId-1);
         }
 
+        return segmentIds;
+    }
+
+    private void verifySegmentIds(int numSegments, Pair<Long, Long>[] segmentIds) throws Exception {
         int segmentIndex = 0;
         assert(numSegments == m_pbd.getSegments().values().size());
         for (PBDSegment<ExtraHeaderMetadata> segment : m_pbd.getSegments().values()) {
             PBDRegularSegment<ExtraHeaderMetadata> s = (PBDRegularSegment<ExtraHeaderMetadata>) segment;
-            assert(segmentIds[segmentIndex].getFirst().longValue() == s.getStartId());
+            assert(segmentIds[segmentIndex].getFirst().longValue() == s.getStartId()) : "For segment index " + segmentIndex + " " +
+                                                                                         segmentIds[segmentIndex].getFirst() + "!=" + s.getStartId();
             assert(segmentIds[segmentIndex].getSecond().longValue() == s.getEndId());
             segmentIndex++;
         }
@@ -204,6 +219,28 @@ public class TestPBDsWithIds {
                 }
             }
         });
+    }
+
+    @Test
+    public void testIdsAfterRecover() throws Exception {
+        int numSegments = 10;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10);
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
+                        .compression(true)
+                        .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
+        // We create a new segment on recover
+        numSegments++;
+        Pair<Long, Long>[] newSegmentIds = Arrays.copyOf(segmentIds, numSegments);
+        newSegmentIds[numSegments-1] = new Pair<Long, Long>(-1L, -1L);
+        verifySegmentIds(numSegments, newSegmentIds);
+
+        negativeOffer(-1, -1);
+        long nextId = newSegmentIds[numSegments-2].getSecond() + 1;
+        long endId = nextId + 50;
+        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextId, endId);
+        newSegmentIds[numSegments-1] = new Pair<Long, Long>(nextId, endId);
+        verifySegmentIds(numSegments, newSegmentIds);
     }
 
     private void negativeOffer(long startId, long endId) throws Exception {

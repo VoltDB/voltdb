@@ -110,11 +110,15 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
     }
 
-    long getStartId() {
+    @Override
+    long getStartId() throws IOException {
+        initializeFromHeader();
         return m_startId;
     }
 
-    long getEndId() {
+    @Override
+    long getEndId() throws IOException {
+        initializeFromHeader();
         return m_endId;
     }
 
@@ -248,8 +252,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 int crc = b.getInt();
                 int numOfEntries = b.getInt();
                 int size = b.getInt();
-                b.getLong(); // startId
-                b.getLong(); // endId
+                m_startId = b.getLong();
+                m_endId = b.getLong();
                 int segmentRandomId = b.getInt();
                 int extraHeaderSize = b.getInt();
                 int extraHeaderCrc = b.getInt();

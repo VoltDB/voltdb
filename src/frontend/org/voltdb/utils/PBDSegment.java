@@ -108,6 +108,20 @@ public abstract class PBDSegment<M> {
         return (m_fileSize > 0) ? m_fileSize : m_file.length();
     }
 
+    /**
+     * Returns the start id stored in this segment's header.
+     *
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getStartId() throws IOException;
+
+    /**
+     * Returns the end id stored in this segment's header.
+     *
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getEndId() throws IOException ;
+
     abstract int getNumEntries() throws IOException;
 
     abstract boolean isBeingPolled();
