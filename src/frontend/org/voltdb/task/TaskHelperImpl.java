@@ -30,6 +30,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.utils.CompoundErrors;
 
 /**
  * Helper class passed to {@link IntervalGenerator}, {@link ActionGenerator} and {@link ActionScheduler} instances for
@@ -198,14 +199,14 @@ final class TaskHelperImpl implements TaskHelper {
      * <p>
      * Note: parameter validation might not work for system procedures
      *
-     * @param errors                   {@link TaskValidationErrors} instance to collect errors
+     * @param errors                   {@link CompoundErrors} instance to collect errors
      * @param restrictProcedureByScope If true type of procedures will be restricted. See
      *                                 {@link ActionScheduler#restrictProcedureByScope()}
      * @param procedureName            Name of procedure to validate
      * @param parameters               that will be passed to {@code name}
      */
     @Override
-    public void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope,
+    public void validateProcedure(CompoundErrors errors, boolean restrictProcedureByScope,
             String procedureName, Object[] parameters) {
         if (m_procedureGetter == null) {
             return;

@@ -141,6 +141,11 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
+import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
+import org.voltdb.compiler.deploymentfile.TopicProfileType;
+import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
+import org.voltdb.compiler.deploymentfile.TopicRetentionType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
@@ -1333,6 +1338,113 @@ public abstract class CatalogUtil {
                         "the built-in ADMINISTRATOR role in the deployment file.";
                 throw new RuntimeException(msg);
             }
+        }
+        validateTopicRefs(catalog, deployment);
+    }
+
+    // FIXME: need to check cross-references between DDL topics and deployment profiles/defaults
+    // FIXME: topic syntax/limits is validated in updateApplicationBase
+    private static void validateTopicRefs(Catalog catalog, DeploymentType deployment) {
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment);
+        TopicDefaultsType defaults = topics.getFirst();
+        Map<String, TopicProfileType> profileMap = topics.getSecond();
+
+        hostLog.warn("FIXME: validate the topic references !!!");
+    }
+
+    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(DeploymentType deployment) {
+        TopicsType topics = deployment.getTopics();
+        if (topics == null) {
+            return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(null, null);
+        }
+
+        TopicDefaultsType defaults = topics.getDefaults();
+        if (defaults != null) {
+            TopicRetentionType retention = defaults.getRetention();
+            if (retention == null) {
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("No retention in topic defaults of deployment");
+                }
+            }
+            else {
+                // FIXME validateTopicRetentionPolicy(retention);
+            }
+        }
+
+        List<TopicProfileType> profiles = topics.getProfile();
+        if (profiles == null) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("No topic profiles in deployment");
+            }
+            return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(defaults, null);
+        }
+
+        Map<String, TopicProfileType> profileMap = new HashMap<>();
+        for (TopicProfileType profile : profiles) {
+            TopicRetentionType retention = profile.getRetention();
+            if (retention == null) {
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Profile " + profile.getName() + ": no retention");
+                }
+            }
+            else {
+             // FIXME validateTopicRetentionPolicy(retention);
+            }
+            profileMap.put(profile.getName(), profile);
+        }
+        return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(defaults, profileMap);
+    }
+
+    public final static void validateTopicDefaults(TopicDefaultsType newDefaults,
+            TopicDefaultsType curDefaults, CompoundErrors errors) {
+        if (newDefaults == null) {
+            // Note: if removing default profile, any outstanding references to it are checked in
+            // @link #validateTopicRefs(Catalog catalog, DeploymentType deployment)}
+            return;
+        }
+        String what = "topic defaults";
+        validateRetention(what, newDefaults.getRetention(), errors);
+
+        if (curDefaults == null) {
+            // Adding new defaults, no further checks necessary
+            return;
+        }
+        validateRetentionChange(what, newDefaults.getRetention(), curDefaults.getRetention(), errors);
+    }
+
+    public final static void validateTopicProfile(TopicProfileType newProfile,
+            TopicProfileType curProfile, CompoundErrors errors) {
+        if (newProfile == null) {
+            // Note: if removing a profile, any outstanding references to it are checked in
+            // {@code CatalogUtil.validateTopicRefs}
+            return;
+        }
+        String what = "topic profile " + newProfile.getName();
+        validateRetention(what, newProfile.getRetention(), errors);
+
+        if (curProfile == null) {
+            // Adding a new profile, no further checks necessary
+            return;
+        }
+        validateRetentionChange(what, newProfile.getRetention(), curProfile.getRetention(), errors);
+    }
+
+    private final static void validateRetention(String what, TopicRetentionType retention,
+            CompoundErrors errors) {
+        try {
+
+        }
+        catch (Exception ex) {
+            errors.addErrorMessage("Failed to validate retention policy in " + what + ":" + ex.getMessage());
+        }
+    }
+
+    private final static void validateRetentionChange(String what, TopicRetentionType newRetention,
+            TopicRetentionType curRetention, CompoundErrors errors) {
+        TopicRetentionPolicyEnum newPol = newRetention != null ? newRetention.getPolicy() : null;
+        TopicRetentionPolicyEnum curPol = curRetention != null ? curRetention.getPolicy() : null;
+        if (newPol != curPol) {
+            errors.addErrorMessage("The retention policy in " + what + " cannot be changed");
         }
     }
 
