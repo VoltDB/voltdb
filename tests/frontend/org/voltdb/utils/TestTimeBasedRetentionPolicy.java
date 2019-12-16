@@ -23,10 +23,12 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
@@ -34,7 +36,11 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.RetentionPolicyMgr.RetentionLimitException;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
+
+import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 public class TestTimeBasedRetentionPolicy {
@@ -192,5 +198,45 @@ public class TestTimeBasedRetentionPolicy {
     public void tearDown() throws Exception {
         m_pbd.close();
         TestPersistentBinaryDeque.tearDownTestDir();
+    }
+
+    private static final Map<String, Long> s_validLimits;
+    static {
+        ImmutableMap.Builder<String, Long> bldr = ImmutableMap.builder();
+        bldr.put("1mn", 60_000L);
+        bldr.put("2 MN", 2L * 60_000L);
+        bldr.put("10 Mn", 10L * 60_000L);
+        bldr.put("2 hr", 2L * 60L * 60_000L);
+        bldr.put("23 HR", 23L * 60L * 60_000L);
+        bldr.put("+3 dy", 3L * 24L * 60L * 60_000L);
+        bldr.put("2mo" , 60L * 24L * 60L * 60_000L);
+        bldr.put("5 yr", 5 * 365L * 24L * 60L * 60_000L);
+        s_validLimits = bldr.build();
+    }
+    private static final Set<String> s_invalidLimits;
+    static {
+        ImmutableSet.Builder<String> bldr = ImmutableSet.builder();
+        bldr.add("2 mi");
+        bldr.add("-2 mn");
+        bldr.add("4 days");
+        bldr.add("foo 4 dy");
+        s_invalidLimits = bldr.build();
+    }
+
+    @Test
+    public void testParsingLimits() throws Exception {
+        for (Map.Entry<String, Long> e : s_validLimits.entrySet()) {
+            long lim = RetentionPolicyMgr.parseTimeLimit(e.getKey());
+            assertEquals(lim, e.getValue().longValue());
+        }
+        for (String limStr : s_invalidLimits) {
+            try {
+                long lim = RetentionPolicyMgr.parseTimeLimit(limStr);
+                assertNull(limStr);
+            }
+            catch (RetentionLimitException expected) {
+                ; // good
+            }
+        }
     }
 }
