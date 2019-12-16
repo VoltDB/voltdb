@@ -428,7 +428,8 @@ public class UpdateCore extends VoltSystemProcedure {
         // log the start of UpdateCore
         log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
         log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+                ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10) +
+                ", version: " + (expectedCatalogVersion + 1));
 
         start = System.nanoTime();
 
