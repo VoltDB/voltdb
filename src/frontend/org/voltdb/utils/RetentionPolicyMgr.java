@@ -25,11 +25,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltdb.utils.BinaryDeque.RetentionPolicyType;
 
+import com.google.common.collect.ImmutableMap;
+
 /**
- *  Manager class that is the entry point for adding time based retention policy to PBDs.
+ *  Manager class that is the entry point for adding a time based or size based retention policy to a PBD.
  */
 class RetentionPolicyMgr {
     // TODO: Is there a way to avoid the static?
@@ -37,6 +40,35 @@ class RetentionPolicyMgr {
     public static RetentionPolicyMgr getInstance() {
         return s_instance;
     }
+
+    public static class RetentionLimitException extends Exception {
+        private static final long serialVersionUID = 1L;
+        RetentionLimitException() { super(); }
+        RetentionLimitException(String s) { super(s); }
+    }
+
+    // A map of time configuration qualifiers to millisecond value
+    private static final Map<String, Long> s_timeLimitConverter;
+    static {
+        ImmutableMap.Builder<String, Long>bldr = ImmutableMap.builder();
+        bldr.put("mn", 60_000L);
+        bldr.put("hr", 60L * 60_000L);
+        bldr.put("dy", 24L * 60L * 60_000L);
+        bldr.put("wk", 7L * 24L * 60L * 60_000L);
+        bldr.put("mo", 30L * 24L * 60L * 60_000L);
+        bldr.put("yr", 365L * 24L * 60L * 60_000L);
+        s_timeLimitConverter = bldr.build();
+    }
+
+    // A map of byte configuration qualifiers to bytes value
+    private static final Map<String, Long> s_byteLimitConverter;
+    static {
+        ImmutableMap.Builder<String, Long>bldr = ImmutableMap.builder();
+        bldr.put("mb", 1024L * 1024L);
+        bldr.put("gb", 1024L * 1024L * 1024L);
+        s_byteLimitConverter = bldr.build();
+    }
+    private static long s_minBytesLimitMb = 64;
 
     private ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(2);
     private Map<String, ScheduledFuture<?>> m_futures = new HashMap<>();
@@ -57,8 +89,8 @@ class RetentionPolicyMgr {
 
     private TimeBasedRetentionPolicy addTimeBasedRetentionPolicy(PersistentBinaryDeque<?> pbd, Object... params) {
         assert(params.length == 1);
-        assert(params[0]!=null && params[0] instanceof Integer);
-        int retainMillis = ((Integer) params[0]).intValue();
+        assert(params[0]!=null && params[0] instanceof Long);
+        long retainMillis = ((Long) params[0]).intValue();
         assert (retainMillis > 0);
         return new TimeBasedRetentionPolicy(pbd, retainMillis);
     }
@@ -129,9 +161,9 @@ class RetentionPolicyMgr {
         private static final String CURSOR_NAME = "_TimeBasedRetention_";
         private static final long MIN_DELAY = 50; // minimum delay between schedules to avoid over scheduling
 
-        private final int m_retainMillis;
+        private final long m_retainMillis;
 
-        public TimeBasedRetentionPolicy(PersistentBinaryDeque<?> pbd, int retainMillis) {
+        public TimeBasedRetentionPolicy(PersistentBinaryDeque<?> pbd, long retainMillis) {
             super(pbd);
             m_retainMillis = retainMillis;
         }
@@ -263,5 +295,47 @@ class RetentionPolicyMgr {
                 scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, 0);
             }
         }
+    }
+
+    public static long parseTimeLimit(String limitStr) throws RetentionLimitException {
+        return parseLimit(limitStr, s_timeLimitConverter);
+    }
+
+    public static long parseByteLimit(String limitStr) throws RetentionLimitException {
+        long limit = parseLimit(limitStr, s_byteLimitConverter);
+        long minLimit = s_minBytesLimitMb * s_byteLimitConverter.get("mb");
+        if (limit < minLimit) {
+            throw new RetentionLimitException("Size-based retention limit must be > " + s_minBytesLimitMb + " mb");
+        }
+        return limit;
+    }
+
+    // Parse a retention limit qualified by a 2-character qualifier and return its converted value
+    private static long parseLimit(String limitStr, Map<String, Long> cvt) throws RetentionLimitException {
+        if (StringUtils.isEmpty(limitStr)) {
+            throw new RetentionLimitException("empty retention limit");
+        }
+        String parse = limitStr.trim().toLowerCase();
+        if (parse.length() <= 2) {
+            throw new RetentionLimitException("\"" + limitStr + "\" is too short for a retention limit");
+        }
+        String qualifier = parse.substring(parse.length() - 2);
+        if (!cvt.keySet().contains(qualifier)) {
+            throw new RetentionLimitException("\"" + qualifier + "\" is not a valid limit qualifier: "
+                    + cvt.keySet() + " are the valid values");
+        }
+        String valStr = parse.substring(0, parse.length() - 2);
+        long limit = 0;
+        try {
+            limit = Long.parseLong(valStr.trim());
+            limit *= cvt.get(qualifier);
+        }
+        catch (Exception ex) {
+            throw new RetentionLimitException("Failed to parse\"" + limitStr + "\": " + ex);
+        }
+        if (limit <= 0) {
+            throw new RetentionLimitException("A retention limit must have a positive value");
+        }
+        return limit;
     }
 }

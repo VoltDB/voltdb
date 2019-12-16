@@ -899,6 +899,7 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
+            validateTopics(catalog, deployment);
             validateThreadPoolsConfiguration(deployment.getThreadpools());
             Cluster catCluster = getCluster(catalog);
 
@@ -1339,16 +1340,27 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(msg);
             }
         }
-        validateTopicRefs(catalog, deployment);
     }
 
     // FIXME: need to check cross-references between DDL topics and deployment profiles/defaults
-    // FIXME: topic syntax/limits is validated in updateApplicationBase
-    private static void validateTopicRefs(Catalog catalog, DeploymentType deployment) {
+    private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment);
         TopicDefaultsType defaults = topics.getFirst();
         Map<String, TopicProfileType> profileMap = topics.getSecond();
 
+        CompoundErrors errors = new CompoundErrors();
+        if (defaults != null) {
+            validateRetention("topic defaults", defaults.getRetention(), errors);
+        }
+        if (profileMap != null) {
+            for(TopicProfileType profile : profileMap.values()) {
+                String what = "topic profile " + profile.getName();
+                validateRetention(what, profile.getRetention(), errors);
+            }
+        }
+        if (errors.hasErrors()) {
+            throw new RuntimeException(errors.getErrorMessage());
+        }
         hostLog.warn("FIXME: validate the topic references !!!");
     }
 
@@ -1359,18 +1371,6 @@ public abstract class CatalogUtil {
         }
 
         TopicDefaultsType defaults = topics.getDefaults();
-        if (defaults != null) {
-            TopicRetentionType retention = defaults.getRetention();
-            if (retention == null) {
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("No retention in topic defaults of deployment");
-                }
-            }
-            else {
-                // FIXME validateTopicRetentionPolicy(retention);
-            }
-        }
-
         List<TopicProfileType> profiles = topics.getProfile();
         if (profiles == null) {
             if (hostLog.isDebugEnabled()) {
@@ -1381,66 +1381,37 @@ public abstract class CatalogUtil {
 
         Map<String, TopicProfileType> profileMap = new HashMap<>();
         for (TopicProfileType profile : profiles) {
-            TopicRetentionType retention = profile.getRetention();
-            if (retention == null) {
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Profile " + profile.getName() + ": no retention");
-                }
-            }
-            else {
-             // FIXME validateTopicRetentionPolicy(retention);
-            }
             profileMap.put(profile.getName(), profile);
         }
         return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(defaults, profileMap);
     }
 
-    public final static void validateTopicDefaults(TopicDefaultsType newDefaults,
-            TopicDefaultsType curDefaults, CompoundErrors errors) {
-        if (newDefaults == null) {
-            // Note: if removing default profile, any outstanding references to it are checked in
-            // @link #validateTopicRefs(Catalog catalog, DeploymentType deployment)}
-            return;
-        }
-        String what = "topic defaults";
-        validateRetention(what, newDefaults.getRetention(), errors);
-
-        if (curDefaults == null) {
-            // Adding new defaults, no further checks necessary
-            return;
-        }
-        validateRetentionChange(what, newDefaults.getRetention(), curDefaults.getRetention(), errors);
-    }
-
-    public final static void validateTopicProfile(TopicProfileType newProfile,
-            TopicProfileType curProfile, CompoundErrors errors) {
-        if (newProfile == null) {
-            // Note: if removing a profile, any outstanding references to it are checked in
-            // {@code CatalogUtil.validateTopicRefs}
-            return;
-        }
-        String what = "topic profile " + newProfile.getName();
-        validateRetention(what, newProfile.getRetention(), errors);
-
-        if (curProfile == null) {
-            // Adding a new profile, no further checks necessary
-            return;
-        }
-        validateRetentionChange(what, newProfile.getRetention(), curProfile.getRetention(), errors);
-    }
-
     private final static void validateRetention(String what, TopicRetentionType retention,
             CompoundErrors errors) {
+        if (retention == null) {
+            return;
+        }
         try {
-
+            switch(retention.getPolicy()) {
+            case TIME:
+                RetentionPolicyMgr.parseTimeLimit(retention.getLimit());
+                break;
+            case SIZE:
+                RetentionPolicyMgr.parseByteLimit(retention.getLimit());
+                break;
+            default:
+                errors.addErrorMessage("Unsupported retention policy \"" + retention.getPolicy() + "\"");
+            }
         }
         catch (Exception ex) {
-            errors.addErrorMessage("Failed to validate retention policy in " + what + ":" + ex.getMessage());
+            errors.addErrorMessage("Failed to validate retention policy in " + what + ": " + ex.getMessage());
         }
     }
 
-    private final static void validateRetentionChange(String what, TopicRetentionType newRetention,
+    // Assumes the topics have been validated beforehand
+    public final static void validateRetentionUpdate(String what, TopicRetentionType newRetention,
             TopicRetentionType curRetention, CompoundErrors errors) {
+        // The limit can be changed, but not the policy.
         TopicRetentionPolicyEnum newPol = newRetention != null ? newRetention.getPolicy() : null;
         TopicRetentionPolicyEnum curPol = curRetention != null ? curRetention.getPolicy() : null;
         if (newPol != curPol) {

@@ -239,7 +239,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
             // Topic configuration is not compiled into the catalog and cannot be validated
             // by the CatalogDiffEngine, so validate the changes here.
-            if (!validateTopics(dt, context.getDeployment(), retval)) {
+            if (!validateTopicUpdates(dt, context.getDeployment(), retval)) {
                 return retval;
             }
 
@@ -301,16 +301,15 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     /**
-     * Validate that the topic configuration is valid, and that changes to the existing
-     * configuration are valid; otherwise set an appropriate error message in the passed-in
-     * {@link CatalogChangeResult}
+     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * an appropriate error message in the passed-in {@link CatalogChangeResult}
      *
      * @param newDep    new deployment
      * @param curDep    current deployment
      * @param result    catalog change result (may be updated
      * @return          {@code true} if topics are valid
      */
-    private static boolean validateTopics(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
+    private static boolean validateTopicUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
         Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep);
         TopicDefaultsType newDefaults = newTopics.getFirst();
         Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
@@ -320,10 +319,19 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         Map<String, TopicProfileType> curProfiles = curTopics.getSecond();
 
         CompoundErrors errors = new CompoundErrors();
-        CatalogUtil.validateTopicDefaults(newDefaults, curDefaults, errors);
+        if (newDefaults != null && curDefaults != null) {
+            CatalogUtil.validateRetentionUpdate("topic defaults", newDefaults.getRetention(),
+                    curDefaults.getRetention(), errors);
+        }
         for(TopicProfileType newProfile : newProfiles.values()) {
             TopicProfileType curProfile = curProfiles != null ? curProfiles.get(newProfile.getName()) : null;
-            CatalogUtil.validateTopicProfile(newProfile, curProfile, errors);
+            if (curProfile == null) {
+                continue;
+            }
+            String what = "topic profile " + newProfile.getName();
+            CatalogUtil.validateRetentionUpdate(what, newProfile.getRetention(),
+                    curProfile.getRetention(), errors);
+
         }
 
         if (errors.hasErrors()) {

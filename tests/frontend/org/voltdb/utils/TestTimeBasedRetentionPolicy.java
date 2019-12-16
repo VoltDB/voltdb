@@ -184,7 +184,7 @@ public class TestTimeBasedRetentionPolicy {
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
-        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, s_retainMillis);
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, new Long(s_retainMillis));
         m_pbd.startRetentionPolicyEnforcement();
     }
 
