@@ -465,7 +465,7 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "PLACEMENTGROUP","NULL");
         }
         Set<Integer> buddies = VoltDB.instance().getCartographer().getHostIdsWithinPartitionGroup(hostId);
-        String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
+        String[] strIds = buddies.stream().sorted().map(String::valueOf).toArray(String[]::new);
         vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
     }
 
