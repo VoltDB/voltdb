@@ -29,7 +29,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
@@ -259,7 +258,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 CreateMode.EPHEMERAL, SNAP_LOG, "Set up snapshot");
         if (errorMessage != null) {
             VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
-            results[0].addRow("FAILURE", "Replica decommissioning in progress");
+            results[0].addRow("FAILURE", errorMessage);
             return results;
         }
 
