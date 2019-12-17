@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -261,9 +262,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
     private final AtomicBoolean m_isAcceptingConnections = new AtomicBoolean(false);
-
-    // The hash mismatch @StopReplicas request is being processed.
-    private final AtomicBoolean m_decommissionInProgress = new AtomicBoolean(false);
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -2435,25 +2433,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     void processReplicaRemovalTask(HashMismatchMessage message) {
+        final RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        if (db.rejoining() || db.isJoining()) {
+            VoltDB.crashLocalVoltDB("Hash mismatch found before this node could finish " + (db.rejoining() ? "rejoin" : "join") +
+                    "As a result, the rejoin operation has been canceled.");
+            return;
+        }
+        // Only work on MPI host
+        if (db.m_leaderAppointer == null || !db.m_leaderAppointer.isLeader()) {
+            return;
+        }
+
         synchronized(m_lock) {
             if (m_replicaRemovalExecutor == null) {
                 m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
                         CoreUtils.getThreadFactory("ReplicaRemoval"));
             }
-
-            // Many replicas could trigger hash mismatch, do not over schedule the task
-            // Let's delay for 1s, reschedule it if it is blocked.
-            if (!m_decommissionInProgress.get()) {
-                m_decommissionInProgress.set(true);
-                m_replicaRemovalExecutor.schedule(() -> {
-                    if (!decommissionReplicas()) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("@StopReplicas is blocked, reshchedule it.");
-                        }
-                        m_mailbox.deliver(new HashMismatchMessage());
+            m_replicaRemovalExecutor.schedule(() -> {
+                if (!decommissionReplicas()) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("@StopReplicas is blocked, reshchedule it.");
                     }
-                }, 1, TimeUnit.SECONDS);
-            }
+                    m_mailbox.deliver(new HashMismatchMessage());
+                }
+            }, 2, TimeUnit.SECONDS);
         }
     }
 
@@ -2470,6 +2473,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     CreateMode.EPHEMERAL, tmLog, "remove replicas");
             if (errorMessage != null) {
                 tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+                // If rejoining is progress, send a message to the rejoining node and shutdown it down
+                if (VoltZK.zkNodeExists(m_zk, VoltZK.rejoinInProgress)) {
+                    RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
+                    Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
+                    m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(Collections.max(liveHids), HostMessenger.CLIENT_INTERFACE_SITE_ID), new HashMismatchMessage());
+                }
                 return false;
             }
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
@@ -2504,7 +2513,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (Exception e) {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
-            m_decommissionInProgress.set(false);
             VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
         }
         return false;
