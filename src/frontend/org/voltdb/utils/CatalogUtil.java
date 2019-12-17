@@ -2642,16 +2642,18 @@ public abstract class CatalogUtil {
                                         int version,
                                         long genId,
                                         SegmentedCatalog catalogAndDeployment,
-                                        ZKCatalogStatus catalogStatus)
+                                        ZKCatalogStatus catalogStatus,
+                                        long txnId)
         throws KeeperException, InterruptedException
     {
         assert (catalogAndDeployment != null);
 
         makeCatalogHeader(catalogAndDeployment, version, genId);
         String path = VoltZK.catalogbytes + "/" + version;
-        ByteBuffer buffer = ByteBuffer.allocate(5);// flag (byte) + expected node count (int)
+        ByteBuffer buffer = ByteBuffer.allocate(13);// flag (byte:1) + expected node count (int:4) + txnId (long:8)
         buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
         buffer.putInt(catalogAndDeployment.m_data.size());
+        buffer.putLong(txnId);
         hostLog.info("***update " + path + " " + catalogStatus);
         Stat stat = null;
         try {
@@ -2694,7 +2696,7 @@ public abstract class CatalogUtil {
         hostLog.info("***publish " + path);
         Stat stat = new Stat();
         byte[] data = zk.getData(path, false, stat);
-        ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int)
+        ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int) + txnId (long)
         byte status = buffer.get();
         assert (status == (byte)ZKCatalogStatus.PENDING.ordinal());
         int expectedNodeCount = buffer.getInt();
@@ -2715,9 +2717,9 @@ public abstract class CatalogUtil {
         }
     }
 
-    public static void stageCatalogToZK(ZooKeeper zk, int version, long genId, SegmentedCatalog catalogAndDeployment)
+    public static void stageCatalogToZK(ZooKeeper zk, int version, long genId, long txnId, SegmentedCatalog catalogAndDeployment)
             throws KeeperException, InterruptedException {
-        updateCatalogToZK(zk, version, genId, catalogAndDeployment, ZKCatalogStatus.PENDING);
+        updateCatalogToZK(zk, version, genId, catalogAndDeployment, ZKCatalogStatus.PENDING, txnId);
     }
 
     public static class SegmentedCatalog {
@@ -2805,18 +2807,21 @@ public abstract class CatalogUtil {
      * {@code null}, the highest catalog version stored in ZK will be returned, no matter what the status it is.
      * @param zk
      * @param expectedFlag  {@code Complete}, {@code Pending} or {@code null}
+     * @param expectedTxnId Ignore the check if {@code expectedTxnId} is -1
      * @return catalog version
      * @throws KeeperException
      * @throws InterruptedException
      */
-    private static Pair<String, Integer> findLatestViableCatalog(ZooKeeper zk, ZKCatalogStatus expectedFlag) throws KeeperException, InterruptedException {
+    private static Pair<String, Integer> findLatestViableCatalog( ZooKeeper zk,
+                                                                  ZKCatalogStatus expectedFlag,
+                                                                  long expectedTxnId)
+            throws KeeperException, InterruptedException {
         List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
         // sort in natural order
         Collections.sort(children);
-        String catalogPath = null;
         // find the latest catalog version that is complete
         for (int i = children.size() - 1; i >= 0; i--) {
-            catalogPath = ZKUtil.joinZKPath(VoltZK.catalogbytes, children.get(i));
+            String catalogPath = ZKUtil.joinZKPath(VoltZK.catalogbytes, children.get(i));
             byte[] data = zk.getData(catalogPath, false, null);
             ByteBuffer buffer = ByteBuffer.wrap(data);
             byte flag = buffer.get();
@@ -2824,6 +2829,12 @@ public abstract class CatalogUtil {
                 continue;
             }
             int expectedNodeCount = buffer.getInt();
+            long txnId = buffer.getLong();
+            // In command log replay, only one node uploads the staging catalog bytes to ZK,
+            // rest of nodes use expectedTxnId to match the data.
+            if (expectedTxnId != -1 && txnId != expectedTxnId) {
+                continue;
+            }
             return new Pair<>(catalogPath, expectedNodeCount);
         }
         return null;
@@ -2905,7 +2916,7 @@ public abstract class CatalogUtil {
             throws KeeperException, InterruptedException {
 
         // read the catalog from given version
-        Pair<String, Integer> latestCatalog = findLatestViableCatalog(zk, ZKCatalogStatus.COMPLETE);
+        Pair<String, Integer> latestCatalog = findLatestViableCatalog(zk, ZKCatalogStatus.COMPLETE, -1);
         hostLog.info("***get Catalog from ZK " + latestCatalog);
         if (latestCatalog == null) {
             return null;
@@ -2973,17 +2984,24 @@ public abstract class CatalogUtil {
                              params[12]);           // hasSecurityUserChange
     }
 
-    public static int getLatestCatalogVersion(ZooKeeper zk) {
+    public static Pair<Integer, Boolean> getMatchingOrHighestCatalogVersionNumber(ZooKeeper zk, long txnId) {
         Pair<String, Integer> catalogPair = null;
+        boolean match = true;
         try {
-            catalogPair = findLatestViableCatalog(zk, null);
+            // First try to find matching catalog version node
+            catalogPair = findLatestViableCatalog(zk, null, txnId);
+            // If not find the highest catalog version node
+            if (catalogPair == null) {
+                match = false;
+                catalogPair = findLatestViableCatalog(zk, null, -1);
+            }
         } catch (KeeperException | InterruptedException ignore) {}
         if (catalogPair != null) {
             // Split the version number part from /db/catalogbytes/<version>
             String version = catalogPair.getFirst().substring(catalogPair.getFirst().lastIndexOf('/') + 1);
-            return Integer.parseInt(version);
+            return new Pair<>(Integer.parseInt(version), match);
         } else {
-            return VoltDB.instance().getCatalogContext().catalogVersion;
+           return new Pair<>(VoltDB.instance().getCatalogContext().catalogVersion, match);
         }
     }
 

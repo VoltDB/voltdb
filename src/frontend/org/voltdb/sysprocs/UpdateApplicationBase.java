@@ -537,7 +537,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         hostLog.info("About to call @UpdateCore");
         try {
-            CatalogUtil.stageCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
+            CatalogUtil.stageCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId, -1,
                     SegmentedCatalog.create(ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes));
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing stage catalog bytes on ZK during " + invocationName;

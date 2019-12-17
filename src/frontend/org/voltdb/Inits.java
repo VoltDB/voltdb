@@ -376,7 +376,8 @@ public class Inits {
                             0, // Initial version
                             exportInitialGenerationUniqueId,
                             catalogAndDeployment,
-                            ZKCatalogStatus.COMPLETE);
+                            ZKCatalogStatus.COMPLETE,
+                            -1); // dummy txnId
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
