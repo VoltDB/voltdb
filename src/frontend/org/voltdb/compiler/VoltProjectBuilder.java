@@ -54,9 +54,9 @@ import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
-import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.FeatureType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
+import org.voltdb.compiler.deploymentfile.FlushIntervalType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -1374,7 +1374,7 @@ public class VoltProjectBuilder {
             conn.setSsl(m_drConsumerSslPropertyFile);
         }
 
-        setFeatureOptions(deployment);
+        deployment.setFeatures(m_featureOptions);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1386,24 +1386,6 @@ public class VoltProjectBuilder {
         final String deploymentPath = file.getPath();
         return deploymentPath;
     }
-
-    private void setFeatureOptions(DeploymentType deployment) {
-        // set export mode to ADVANCED in pro builds, unless it is already explicitly set.
-        // This is so that we can run E3 export in pro junits by default.
-           if (m_featureOptions == null &&
-               VoltDB.instance().getConfig() != null && VoltDB.instance().getConfig().m_isEnterprise) {
-            m_featureOptions = new FeaturesType();
-            FeatureType exportFeature = new FeatureType();
-            exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
-            exportFeature.setOption(ExportMode.ADVANCED.name());
-            m_featureOptions.getFeature().add(exportFeature);
-        }
-
-        if (m_featureOptions != null) {
-            deployment.setFeatures(m_featureOptions);
-        }
-    }
-
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
     {
