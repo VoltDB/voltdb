@@ -38,6 +38,8 @@ import com.rabbitmq.client.ShutdownSignalException;
 import org.voltcore.logging.VoltLogger;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -46,11 +48,12 @@ import java.util.concurrent.TimeoutException;
 public class ExportRabbitMQVerifier {
     static VoltLogger log = new VoltLogger("ExportRabbitMQVerifier");
     private static final long VALIDATION_REPORT_INTERVAL = 10000;
-
+    private final long MAX_STALL_TIMEOUT_SECS;
     private final ConnectionFactory m_connFactory;
-    private volatile long m_verifiedRows = 0;
     private String m_exchangeName;
     private boolean success = true;
+    private final ConcurrentHashMap<Long,AtomicInteger> rowIdCounts = new ConcurrentHashMap<Long,AtomicInteger>();
+
     public ExportRabbitMQVerifier(String host, String username, String password, String vhost, String exchangename)
             throws IOException, InterruptedException
     {
@@ -60,6 +63,7 @@ public class ExportRabbitMQVerifier {
         m_connFactory.setPassword(password);
         m_connFactory.setVirtualHost(vhost);
         m_exchangeName = exchangename;
+        MAX_STALL_TIMEOUT_SECS = 1200;
     }
 
     public void run() throws IOException, InterruptedException, TimeoutException
@@ -78,13 +82,8 @@ public class ExportRabbitMQVerifier {
             String dataQueue = channel.queueDeclare().getQueue();
             channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_RABBIT.#");
             channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_RABBIT.#");
-            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2.#");
-            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_FOO.#");
-            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2_FOO.#");
-            // channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_FOO.#");
             String doneQueue = channel.queueDeclare().getQueue();
             channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_RABBIT.#");
-            // channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_FOO.#");
 
             // Setup callback for data stream
             channel.basicConsume(dataQueue, false, createConsumer(channel));
@@ -97,20 +96,38 @@ public class ExportRabbitMQVerifier {
             final QueueingConsumer.Delivery doneMsg = doneConsumer.nextDelivery();
             final long expectedRows = Long.parseLong(RoughCSVTokenizer
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
+            log.info(String.format("populator has finished creating %d rows", expectedRows));
 
-            while (expectedRows > m_verifiedRows) {
-                Thread.sleep(5000);
-                log.warn("Expected rows: " + expectedRows + ", Verified rows: " + m_verifiedRows +
-                    "\n\tdifference: " + (expectedRows - m_verifiedRows));
-                if (m_verifiedRows > expectedRows) {
-                    log.warn("More rows received than expected. Assume it's due to duplicates.");
-                    success = true;
-                } else
+            long startTime = System.currentTimeMillis();
+            long lastRcvd = 0;
+            while (expectedRows > rowIdCounts.size()) {
+                long rcvdRows = rowIdCounts.size();
+                log.info(String.format(
+                                       "Expecting %d rows, received %d",
+                                       expectedRows,
+                                       rcvdRows));
+                long now = System.currentTimeMillis();
+                if (rcvdRows > lastRcvd) {
+                    lastRcvd = rcvdRows;
+                    startTime = now;
+                } else if (now - startTime > MAX_STALL_TIMEOUT_SECS*1000) {
                     success = false;
+                    log.error(String.format("export stalled for %d minutes, failing", MAX_STALL_TIMEOUT_SECS));
+                    break;
+                }
+                Thread.sleep(5000);
             }
+
+            final long totalRcvd = rowIdCounts.reduceValues(1, AtomicInteger::get,  (l, r) -> l + r);
+            log.info(String.format(
+                                   "rows expected: %d, verified: %d, received: %d, duplicates: %d",
+                                   expectedRows,
+                                   rowIdCounts.size(),
+                                   totalRcvd,
+                                   totalRcvd - rowIdCounts.size()
+                                   ));
         } finally {
-            log.info("tear down and close channel");
-            tearDown(channel);
+            log.info("close channel");
             channel.close();
             connection.close();
         }
@@ -146,8 +163,13 @@ public class ExportRabbitMQVerifier {
                     success = false;
                 }
 
-                if (++m_verifiedRows % VALIDATION_REPORT_INTERVAL == 0) {
-                    log.info("Verified " + m_verifiedRows + " rows.");
+                Long rowid = Long.parseLong(row[7]);
+                AtomicInteger counter = rowIdCounts.computeIfAbsent(rowid, k -> new AtomicInteger());
+                counter.incrementAndGet();
+
+                int rows_verified = rowIdCounts.size();
+                if (rows_verified % VALIDATION_REPORT_INTERVAL == 0) {
+                    log.info("Verified " + rows_verified + " rows.");
                 }
 
                 channel.basicAck(deliveryTag, false);
@@ -155,14 +177,9 @@ public class ExportRabbitMQVerifier {
         };
     }
 
-    private void tearDown(Channel channel) throws IOException
-    {
-        channel.exchangeDelete(m_exchangeName);
-    }
-
     private static void usage()
     {
-        log.info("Command-line arguments: rabbitmq_server username password virtual_host");
+        log.info("Command-line arguments: rabbitmq_server username password virtual_host exchange_name");
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, TimeoutException
