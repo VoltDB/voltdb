@@ -2272,6 +2272,22 @@ END OF TERMS AND CONDITIONS
 
 ================================================================================
 
+kafka-avro-serializer-3.0.0 uses the following license:
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+================================================================================
+
 Common Public License - v 1.0
 Updated 16 Apr 2009
 As of 25 Feb 2009, IBM has assigned the Agreement Steward role for the CPL to the Eclipse Foundation. Eclipse has designated the Eclipse Public License (EPL) as the follow-on version of the CPL.
