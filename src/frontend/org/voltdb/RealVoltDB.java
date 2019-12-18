@@ -1829,11 +1829,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return;
                 }
 
-                if (VoltZK.hasHashMismatchedSite(m_messenger.getZK())) {
-                    VoltDB.crashGlobalVoltDB("Cluster is running on master only mode and has become unviable.", false, null);
-                    return;
-                }
-
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
