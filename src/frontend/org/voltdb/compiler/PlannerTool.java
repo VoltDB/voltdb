@@ -230,6 +230,7 @@ public class PlannerTool {
         JoinCounter scanCounter = new JoinCounter();
         rel.accept(scanCounter);
         boolean canCommuteJoins = scanCounter.canCommuteJoins();
+        boolean hasJoins = scanCounter.hasJoins();
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
@@ -262,8 +263,9 @@ public class PlannerTool {
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
         final RelDistribution distribution = transformed.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-        if (! distribution.getIsSP()) { // defer SP/MP detection outside MP_FALLBACK phase
-            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+        // Allow MP single table queries only
+        if (! distribution.getIsSP() && hasJoins) { // defer SP/MP detection outside MP_FALLBACK phase
+            throw new PlannerFallbackException("MP query with join(s) is not supported in Calcite planner.");
         }
 
         // Transform RIGHT Outer joins to LEFT ones
@@ -419,7 +421,11 @@ public class PlannerTool {
             return joinCount < DEFAULT_MAX_JOIN_TABLES;
         }
 
-         @Override
+        public boolean hasJoins() {
+            return joinCount > 0;
+        }
+
+        @Override
         public RelNode visit(LogicalJoin join) {
             ++joinCount;
             return super.visit(join);

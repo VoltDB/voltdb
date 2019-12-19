@@ -88,25 +88,23 @@ public class MPQueryFallBackRule extends RelOptRule {
                 // Nodes that require LogicalExchange for a multi-partitioned query-
                 // Sort, Limit, Aggregate
                 if (RelDistributions.SINGLETON.getType() != dist.getType()) {
+                    // Create a new multi partitioned SINGLETON distribution for the coordinator fragment
+                    RelDistribution topDist = RelDistributions.SINGLETON.with(dist.getPartitionEqualValue(), false);
                     if (node instanceof VoltLogicalLimit) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
-                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
                         call.transformTo(coordinatorLimit);
                     } else if (node instanceof VoltLogicalSort) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
-                        RelNode coordinatorSort = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        RelNode coordinatorSort = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
                         call.transformTo(coordinatorSort);
                     } else if (node instanceof VoltLogicalAggregate) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
-                        // COUNT, AVG, etc transformation would happen during the physical transformation phase
-                        // when a physical aggregate is transposed with an exchange node
-                        // At that stage decision will be made whether an aggregate can / should be pushed down to
-                        // fragments, does it need to be modified (COUNT, AVG), is coordinator aggregate is required
-                        // based on partitioning info (column, value)
-                        RelNode coordinatorAggregate = node.copy(node.getTraitSet().replace(RelDistributions.SINGLETON), Collections.list(exchange));
+                        // COUNT, AVG, etc transformation would happen at a later phase
+                        RelNode coordinatorAggregate = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
                         call.transformTo(coordinatorAggregate);
                     } else {
                         call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));

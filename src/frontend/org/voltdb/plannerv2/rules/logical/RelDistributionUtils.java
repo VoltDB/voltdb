@@ -575,8 +575,8 @@ final class RelDistributionUtils {
                         innerPartColumns.stream().map(col -> col + outerTableColumns).collect(Collectors.toSet()),
                 combinedPartColumns = new HashSet<>(outerPartColumns);
         combinedPartColumns.addAll(adjustedInnerPartColumns);
-        final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
-                innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
+        final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !outerDist.getIsSP(),
+                innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !innerDist.getIsSP(),
                 outerHasPartitionKey = outerDist.getPartitionEqualValue() != null,
                 innerHasPartitionKey = innerDist.getPartitionEqualValue() != null;
         final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());

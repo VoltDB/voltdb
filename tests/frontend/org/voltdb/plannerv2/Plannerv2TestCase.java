@@ -36,6 +36,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
+import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlannerTestCase;
@@ -249,8 +250,13 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void pass() throws AssertionError {
             super.pass();
             final RelDistribution distribution = transform();
+            PlannerTool.JoinCounter scanCounter = new PlannerTool.JoinCounter();
+            m_transformedNode.accept(scanCounter);
+            boolean isJoin = scanCounter.hasJoins();
             assertTrue("Got SINGLETON distribution without partition equal value",
-                    distribution.getIsSP());
+                    distribution.getIsSP()  // A true SP query
+                    || !isJoin              // A MP Query over a single table (no joins)
+                    );
             if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
                 anyMatch(m_expectedTransforms, actualTransform);
