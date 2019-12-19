@@ -1390,7 +1390,7 @@ public class VoltProjectBuilder {
             conn.setSsl(m_drConsumerSslPropertyFile);
         }
 
-        setFeatureOptions(deployment);
+        deployment.setFeatures(m_featureOptions);
         setKiplingConfiguration(deployment);
 
         // Have some yummy boilerplate!
@@ -1404,29 +1404,11 @@ public class VoltProjectBuilder {
         return deploymentPath;
     }
 
-    private void setFeatureOptions(DeploymentType deployment) {
-        // set export mode to ADVANCED in pro builds, unless it is already explicitly set.
-        // This is so that we can run E3 export in pro junits by default.
-           if (m_featureOptions == null &&
-               VoltDB.instance().getConfig() != null && VoltDB.instance().getConfig().m_isEnterprise) {
-            m_featureOptions = new FeaturesType();
-            FeatureType exportFeature = new FeatureType();
-            exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
-            exportFeature.setOption(ExportMode.ADVANCED.name());
-            m_featureOptions.getFeature().add(exportFeature);
-        }
-
-        if (m_featureOptions != null) {
-            deployment.setFeatures(m_featureOptions);
-        }
-    }
-
     private void setKiplingConfiguration(DeploymentType deployment) {
         if (m_kiplingConfiguration != null) {
             deployment.setKipling(m_kiplingConfiguration);
         }
     }
-
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
     {

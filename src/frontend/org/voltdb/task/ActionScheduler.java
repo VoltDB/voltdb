@@ -18,18 +18,20 @@
 package org.voltdb.task;
 
 /**
- * Interface which generates actions to be performed as well as calculating the delay until that should be performed
- * according to a schedule
+ * Interface which generates actions to be performed as well as calculating the interval that should elapse before the
+ * action is performed.
  */
 public interface ActionScheduler extends ActionGeneratorBase {
     /**
-     * This method is invoked for the first action to be performed. All subsequent invocation will be of
-     * {@link DelayedAction#getCallback()}. After the delay has elapsed and the action has been performed.
+     * This method is invoked only once to obtain the first action and interval. The action will be performed after the
+     * provided time interval has elapsed. After the action has been performed the {@link ScheduledAction#getCallback()
+     * callback} will be invoked with the {@link ActionResult result} of the action. The return of the callback will be
+     * used as the next action and interval.
      * <p>
      * If this method throws an exception or returns {@code null} the task instance will halted and put into an error
      * state.
      *
-     * @return {@link DelayedAction} with the action and delay of that action
+     * @return {@link ScheduledAction} with the action and interval after which the action is performed
      */
-    DelayedAction getFirstDelayedAction();
+    ScheduledAction getFirstScheduledAction();
 }

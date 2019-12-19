@@ -18,7 +18,7 @@
 package org.voltdb.task;
 
 /**
- * Helper interface passed to {@link ActionSchedule}, {@link ActionGenerator} and {@link ActionScheduler} instances for
+ * Helper interface passed to {@link IntervalGenerator}, {@link ActionGenerator} and {@link ActionScheduler} instances for
  * calling in to the volt system to perform logging, validation and other operations
  */
 public interface TaskHelper {

@@ -32,7 +32,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 
 /**
- * Helper class passed to {@link ActionSchedule}, {@link ActionGenerator} and {@link ActionScheduler} instances for
+ * Helper class passed to {@link IntervalGenerator}, {@link ActionGenerator} and {@link ActionScheduler} instances for
  * calling in to the volt system to perform logging, validation and other operations
  */
 final class TaskHelperImpl implements TaskHelper {
