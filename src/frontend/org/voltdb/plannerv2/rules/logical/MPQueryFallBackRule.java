@@ -87,7 +87,8 @@ public class MPQueryFallBackRule extends RelOptRule {
                 }
                 // Nodes that require LogicalExchange for a multi-partitioned query-
                 // Sort, Limit, Aggregate
-                if (RelDistributions.SINGLETON.getType() != dist.getType()) {
+                if (RelDistributions.SINGLETON.getType() != dist.getType() &&
+                        dist.getPartitionEqualValue() == null) {
                     // Create a new multi partitioned SINGLETON distribution for the coordinator fragment
                     RelDistribution topDist = RelDistributions.SINGLETON.with(dist.getPartitionEqualValue(), false);
                     if (node instanceof VoltLogicalLimit) {

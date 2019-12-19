@@ -22,6 +22,8 @@ import java.util.function.Predicate;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
@@ -42,6 +44,8 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     private enum ExchangeType {
         LIMIT_EXCHANGE,
         SORT_EXCHANGE,
+        AGGREGATE_EXCHANGE,
+        CALC_AGGREGATE_EXCHANGE,
         LIMIT_SORT_EXCHANGE
     }
 
@@ -114,6 +118,9 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             case LIMIT_SORT_EXCHANGE:
                 transposeLimitSortExchange(call);
                 break;
+            case AGGREGATE_EXCHANGE:
+                transposeAggregateExchange(call);
+                break;
         }
     }
 
@@ -127,8 +134,12 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 // Build chain
                 Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
                 VoltPhysicalLimit newCoordinatorLimit = new VoltPhysicalLimit(
-                        coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet(), newExchange,
-                        coordinatorLimit.getOffset(), coordinatorLimit.getLimit(), true);
+                        coordinatorLimit.getCluster(),
+                        coordinatorLimit.getTraitSet(),
+                        newExchange,
+                        coordinatorLimit.getOffset(),
+                        coordinatorLimit.getLimit(),
+                        true);
                 call.transformTo(newCoordinatorLimit);
             });
     }
@@ -149,9 +160,14 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         // to eliminate redundant coordinator's sort
         Exchange newExchange = new VoltPhysicalMergeExchange(exchange.getCluster(), exchange.getTraitSet(), fragmentSort, exchange.getDistribution());
         // New Coordinator's Sort
+        // If the sort node was created by the Calcite (from an existing collation trait)
+        // its distribution needs to be reset
+        RelDistribution coordinatorDist = RelDistributions.SINGLETON.with(
+                sort.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getPartitionEqualValue(),
+                false);
         VoltPhysicalSort coordinatorSort = new VoltPhysicalSort(
                 sort.getCluster(),
-                sort.getTraitSet().replace(RelDistributions.SINGLETON),
+                sort.getTraitSet().replace(coordinatorDist),
                 newExchange,
                 sort.getCollation(),
                 true);
@@ -184,4 +200,12 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             });
     }
 
+    private void transposeAggregateExchange(RelOptRuleCall call) {
+        // How to deal with Calc / Aggr / Exchange vs Aggr / Exchange
+        // If we have aggr with HAVING we should move both Calc and Aggr to fragment
+        // but rule Aggr / Exchange may move just the Aggr (this rule is required
+        // for aggr without HAVING or GROUP BY)
+        // Moving just Aggr without the Calc may be OK but  sub-optimal and should have a higher
+        // cost than the plan with both Calc / Aggr pushed down
+    }
 }

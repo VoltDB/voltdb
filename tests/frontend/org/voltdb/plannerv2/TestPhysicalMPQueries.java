@@ -41,6 +41,19 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
     public void tearDown() throws Exception {
         super.tearDown();
     }
+    public void testPartitioned1() {
+        m_tester.sql("select I from P1")
+                .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                            "  VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
+    public void testPartitioned2() {
+        m_tester.sql("select I from P1 where I = 10")
+                .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[10], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                            "  VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
 
     public void testPartitionedLimit1() {
         m_tester.sql("select i from P1 limit 10")
@@ -72,11 +85,9 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
     }
 
     public void testPartitionedSort() {
-        m_tester.sql("select i from PI1 order by ii")
-                .transform("VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[true])\n" +
-                            "  VoltPhysicalMergeExchange(distribution=[hash[0]])\n" +
-                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], II=[$t2])\n" +
-                            "      VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
+        m_tester.sql("select i from PI1 where I = 6 order by ii")
+                .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[6], expr#7=[=($t0, $t6)], I=[$t0], II=[$t2], $condition=[$t7])\n" +
+                            "  VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
                 .pass();
     }
 
@@ -101,7 +112,12 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                 .pass();
     }
 
-    // Should go to the physical test
+    public void testPartitionedWithAggregate() {
+        m_tester.sql("select max(R1.I) from R1")
+        .transform("\n")
+        .pass();
+    }
+
     public void testPartitionedWithAggregate4() {
         m_tester.sql("select count(*) from P1")
         .transform("\n")

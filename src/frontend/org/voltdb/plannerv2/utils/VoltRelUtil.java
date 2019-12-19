@@ -26,6 +26,8 @@ import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
@@ -47,6 +49,7 @@ import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 
 import com.google.common.base.Preconditions;
@@ -112,8 +115,23 @@ public class VoltRelUtil {
 
         RexConverter.PARAM_COUNTER.reset();
 
-        AbstractPlanNode root = new SendPlanNode();
-        root.addAndLinkChild(rel.toPlanNode());
+        AbstractPlanNode root = rel.toPlanNode();
+        // if the root has a distribution other than SINGLETON
+        // and the partitioning value is not set
+        // we need to add an additional Receive / Send pair to collect
+        // partitions results
+        RelDistribution rootDist = rel.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        if (RelDistributions.SINGLETON.getType() != rootDist.getType()
+                && rootDist.getPartitionEqualValue() == null) {
+            SendPlanNode fragmentSend = new SendPlanNode();
+            fragmentSend.addAndLinkChild(root);
+            root = new ReceivePlanNode();
+            root.addAndLinkChild(fragmentSend);
+        }
+        // Add final Send node to be the root
+        SendPlanNode coordinatorSend = new SendPlanNode();
+        coordinatorSend.addAndLinkChild(root);
+        root = coordinatorSend;
 
         compiledPlan.rootPlanGraph = root;
 
@@ -153,7 +171,9 @@ public class VoltRelUtil {
         if (offset == null) {
             // Simply push the limit to fragments
             fragmentLimit = new VoltPhysicalLimit(
-                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(fragmentDist), fragmentNode,
+                    coordinatorLimit.getCluster(),
+                    coordinatorLimit.getTraitSet().replace(fragmentDist),
+                    fragmentNode,
                     null, limit, false);
         } else {
             // make a new limit by combining coordinator's limit and offset

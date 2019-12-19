@@ -475,6 +475,15 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testPartitionedWithSortAndLimit1() {
+        m_tester.sql("select P1.I from P1 where I = 10 order by 1 limit 10")
+        .transform("VoltLogicalLimit(limit=[10])\n" +
+                    "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[10], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
     public void testPartitionedWithAggregate1() {
         m_tester.sql("select max(P1.I) from P1")
         .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[MAX($0)])\n" +

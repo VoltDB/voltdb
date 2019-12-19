@@ -39,6 +39,7 @@ import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -47,6 +48,8 @@ import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -336,7 +339,9 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 }
                 if (! m_expectedVoltPlanJsons.isEmpty()) {
                     assertTrue(m_transformedNode instanceof VoltPhysicalRel);
-                    AbstractPlanNode voltPlan = ((VoltPhysicalRel)m_transformedNode).toPlanNode();
+                    CompiledPlan compiledPlan = new CompiledPlan(false);
+                    calciteToVoltDBPlan((VoltPhysicalRel) m_transformedNode, compiledPlan);
+                    AbstractPlanNode voltPlan = compiledPlan.rootPlanGraph;
                     PlanNodeList planNodeList = new PlanNodeList(voltPlan, false);
                     anyMatch(m_expectedVoltPlanJsons, planNodeList.toJSONString());
                 }
