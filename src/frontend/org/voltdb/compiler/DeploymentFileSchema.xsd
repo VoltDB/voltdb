@@ -612,6 +612,17 @@
     <xs:attribute name="name" type="xs:string" use="required" />
   </xs:complexType>
 
+  <!--
+  Retention policy specification
+
+  Examples: 
+    <retention policy="size" limit="5 GB"/> 
+    <retention policy="time" limit="6mo"/>
+     
+  Acceptable limit qualifiers (case insensitive):
+    - size: "mb" (megabytes, minimum 64), "gb" (gigabytes)
+    - time: "mn" (minutes), "hr" (hours), "dy" (days), "wk" (weeks), "mo" (months), "yr" (years) 
+  -->
   <xs:complexType name="topicRetentionType">
     <xs:attribute name="policy" type="topicRetentionPolicyEnum" default="time" />
     <xs:attribute name="limit" type="xs:string" use="required" />

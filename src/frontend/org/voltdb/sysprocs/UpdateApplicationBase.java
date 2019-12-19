@@ -310,15 +310,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * @return          {@code true} if topics are valid
      */
     private static boolean validateTopicUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep);
+        CompoundErrors errors = new CompoundErrors();
+
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep, errors);
         TopicDefaultsType newDefaults = newTopics.getFirst();
         Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
 
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> curTopics = CatalogUtil.getDeploymentTopics(curDep);
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> curTopics = CatalogUtil.getDeploymentTopics(curDep, errors);
         TopicDefaultsType curDefaults = curTopics.getFirst();
         Map<String, TopicProfileType> curProfiles = curTopics.getSecond();
 
-        CompoundErrors errors = new CompoundErrors();
         if (newDefaults != null && curDefaults != null) {
             CatalogUtil.validateRetentionUpdate("topic defaults", newDefaults.getRetention(),
                     curDefaults.getRetention(), errors);

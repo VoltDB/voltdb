@@ -63,16 +63,16 @@ public final class CompoundErrors {
      * @return An error message or {@code null} if {@link #hasErrors()} returns {@code false}
      */
     public String getErrorMessage() {
-        return getErrorMessage('\n');
+        return getErrorMessage("\n");
     }
 
     /**
      * A specialized version of {@link #getErrorMessage()}, using a specific separator.
      *
-     * @param separator character separating individual error messages in the final string.
+     * @param separator String separating individual error messages in the final string.
      * @return An error message or {@code null} if {@link #hasErrors()} returns {@code false}
      */
-    public String getErrorMessage(char separator) {
+    public String getErrorMessage(String separator) {
         if (m_errors == null) {
             return null;
         }

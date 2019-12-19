@@ -23,7 +23,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -190,7 +190,7 @@ public class TestTimeBasedRetentionPolicy {
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
-        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, new Long(s_retainMillis));
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(s_retainMillis));
         m_pbd.startRetentionPolicyEnforcement();
     }
 
@@ -232,7 +232,7 @@ public class TestTimeBasedRetentionPolicy {
         for (String limStr : s_invalidLimits) {
             try {
                 long lim = RetentionPolicyMgr.parseTimeLimit(limStr);
-                assertNull(limStr);
+                fail();
             }
             catch (RetentionLimitException expected) {
                 ; // good

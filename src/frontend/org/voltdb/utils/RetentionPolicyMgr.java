@@ -330,7 +330,7 @@ class RetentionPolicyMgr {
             limit = Long.parseLong(valStr.trim());
             limit *= cvt.get(qualifier);
         }
-        catch (Exception ex) {
+        catch (NumberFormatException ex) {
             throw new RetentionLimitException("Failed to parse\"" + limitStr + "\": " + ex);
         }
         if (limit <= 0) {

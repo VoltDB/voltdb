@@ -1344,11 +1344,12 @@ public abstract class CatalogUtil {
 
     // FIXME: need to check cross-references between DDL topics and deployment profiles/defaults
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment);
+        CompoundErrors errors = new CompoundErrors();
+
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment, errors);
         TopicDefaultsType defaults = topics.getFirst();
         Map<String, TopicProfileType> profileMap = topics.getSecond();
 
-        CompoundErrors errors = new CompoundErrors();
         if (defaults != null) {
             validateRetention("topic defaults", defaults.getRetention(), errors);
         }
@@ -1364,10 +1365,12 @@ public abstract class CatalogUtil {
         hostLog.warn("FIXME: validate the topic references !!!");
     }
 
-    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(DeploymentType deployment) {
+    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+            DeploymentType deployment, CompoundErrors errors) {
+
         TopicsType topics = deployment.getTopics();
         if (topics == null) {
-            return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(null, null);
+            return Pair.of(null, null);
         }
 
         TopicDefaultsType defaults = topics.getDefaults();
@@ -1376,14 +1379,16 @@ public abstract class CatalogUtil {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("No topic profiles in deployment");
             }
-            return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(defaults, null);
+            return Pair.of(defaults, null);
         }
 
         Map<String, TopicProfileType> profileMap = new HashMap<>();
         for (TopicProfileType profile : profiles) {
-            profileMap.put(profile.getName(), profile);
+            if (profileMap.put(profile.getName(), profile) != null) {
+                errors.addErrorMessage("Profile " + profile.getName() + " is already defined");
+            }
         }
-        return new Pair<TopicDefaultsType, Map<String, TopicProfileType>>(defaults, profileMap);
+        return Pair.of(defaults, profileMap);
     }
 
     private final static void validateRetention(String what, TopicRetentionType retention,
