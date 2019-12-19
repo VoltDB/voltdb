@@ -412,8 +412,8 @@ public class TestPersistentBinaryDequeCorruption {
     private void corruptSegment(PBDSegment<?> segment, ByteBuffer corruptData, int position) throws IOException {
         File file = segment.file();
         if (m_corruptionPoints == null) {
-        try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
-            channel.write(corruptData, position);
+            try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
+                channel.write(corruptData, position);
             }
         } else {
             m_corruptionPoints.put(file.getName(), Long.valueOf(position));

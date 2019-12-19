@@ -22,10 +22,16 @@
  */
 package org.voltdb.utils;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.junit.After;
@@ -37,6 +43,8 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.BinaryDequeReader.NoSuchOffsetException;
+import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
 import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
@@ -80,7 +88,7 @@ public class TestPBDsWithIds {
     @Test
     public void testVerifySegmentIds() throws Exception {
         int numSegments = 10;
-        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10);
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10, -1);
 
         verifySegmentIds(numSegments, segmentIds);
     }
@@ -89,7 +97,7 @@ public class TestPBDsWithIds {
      * Utility method that creates and populates segments based on given parameters
      * and returns an array with the start and end ids of the segments.
      */
-    private Pair<Long, Long>[] createPopulateSegments(int numSegments, int maxNumIds, int maxNumBuffers)
+    private Pair<Long, Long>[] createPopulateSegments(int numSegments, int maxNumIds, int maxNumBuffers, int gapSegment)
             throws Exception {
         Random random = new Random(System.currentTimeMillis());
         long nextId = Math.abs(random.nextInt());
@@ -100,6 +108,9 @@ public class TestPBDsWithIds {
                 m_pbd.updateExtraHeader(null);
             }
             int numBuffers = random.nextInt(maxNumBuffers) + 1;
+            if (i == gapSegment) {
+                nextId += random.nextInt(500) + 1;
+            }
             long segmentStartId = nextId;
             for (int j=0; j<numBuffers; j++) {
                 int numIds = random.nextInt(maxNumIds) + 1;
@@ -224,7 +235,7 @@ public class TestPBDsWithIds {
     @Test
     public void testIdsAfterRecover() throws Exception {
         int numSegments = 10;
-        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10);
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10, -1);
         m_pbd.close();
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
@@ -241,6 +252,358 @@ public class TestPBDsWithIds {
         m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextId, endId);
         newSegmentIds[numSegments-1] = new Pair<Long, Long>(nextId, endId);
         verifySegmentIds(numSegments, newSegmentIds);
+    }
+
+    @Test
+    public void testSeekEmpty() throws Exception {
+        long seekId = 10;
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+    }
+
+    @Test
+    public void testSingleSegmentSeek() throws Exception {
+        int numSegments = 1;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+
+        // seek to beginning
+        runValidSeeksInSegment(reader, segmentIds[0]);
+        // middle
+        runValidSeeksInSegment(reader, segmentIds[numSegments/2]);
+        // end
+        runValidSeeksInSegment(reader, segmentIds[numSegments-1]);
+
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+    @Test
+    public void testValidSeeks() throws Exception {
+        int numSegments = 5;
+        Random rand = new Random(System.currentTimeMillis());
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, rand.nextInt(numSegments-1)+1);
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        List<BBContainer> toDiscard = readBuffers(reader, rand.nextInt(50));
+
+        // seek to beginning
+        runValidSeeksInSegment(reader, segmentIds[0]);
+        // middle
+        runValidSeeksInSegment(reader, segmentIds[numSegments/2]);
+        // end
+        runValidSeeksInSegment(reader, segmentIds[numSegments-1]);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    private void runValidSeeksInSegment(PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader, Pair<Long, Long> range) throws Exception {
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+            toDiscard.add(verifySeek(reader, range.getFirst(), errorRule, range));
+            toDiscard.add(verifySeek(reader, (range.getFirst() + range.getSecond())/2, errorRule, range));
+            toDiscard.add(verifySeek(reader, range.getSecond(), errorRule, range));
+        }
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekEntryBeforeFirst() throws Exception {
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(3, 10, 10, -1);
+        long firstAvailable = segmentIds[0].getFirst();
+        if (firstAvailable == 0) { // cannot run this test in this random run`
+            return;
+        }
+        long seekId = firstAvailable - 1;
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        List<BBContainer> toDiscard = readBuffers(reader, (new Random(System.currentTimeMillis())).nextInt(30));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+        reader.seekToSegment(seekId, SeekErrorRule.SEEK_AFTER);
+        BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        container.discard();
+        PBDSegment<ExtraHeaderMetadata> currSegment = ((PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor) reader).getCurrentSegment();
+        assert(currSegment.getStartId() == firstAvailable);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekEntryAfterLast() throws Exception {
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(3, 10, 10, -1);
+        long lastAvailable = segmentIds[segmentIds.length-1].getSecond();
+        long seekId = lastAvailable + 1;
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        List<BBContainer> toDiscard = readBuffers(reader, (new Random(System.currentTimeMillis())).nextInt(30));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+        reader.seekToSegment(seekId, SeekErrorRule.SEEK_BEFORE);
+        BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        container.discard();
+        // The discard should have triggered deletion of previous segments.
+        // We still have to discard the prev buffers because we still expect
+        // discards for all segments between prev segment position and curr segment after seek.
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        PBDSegment<ExtraHeaderMetadata> currSegment = ((PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor) reader).getCurrentSegment();
+        assert(currSegment.getEndId() == lastAvailable);
+    }
+
+    @Test
+    public void testSeekGapInBetween() throws Exception {
+        int numSegments = 5;
+        Random rand = new Random(System.currentTimeMillis());
+        int gapSegment = rand.nextInt(numSegments-1) + 1; // exclude first segment
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 100, 10, gapSegment);
+        long gapStart = segmentIds[gapSegment-1].getSecond()+1;
+        long gapEnd = segmentIds[gapSegment].getFirst()-1;
+
+        //BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        List<BBContainer> toDiscard = readBuffers(reader, rand.nextInt(50));
+        negativeSeek(reader, gapStart, SeekErrorRule.THROW);
+        negativeSeek(reader, gapEnd, SeekErrorRule.THROW);
+        negativeSeek(reader, (gapStart+gapEnd)/2, SeekErrorRule.THROW);
+
+        toDiscard.add(verifySeek(reader, gapStart, SeekErrorRule.SEEK_BEFORE, segmentIds[gapSegment-1]));
+        toDiscard.add(verifySeek(reader, gapEnd, SeekErrorRule.SEEK_BEFORE, segmentIds[gapSegment-1]));
+        toDiscard.add(verifySeek(reader, (gapStart+gapEnd)/2, SeekErrorRule.SEEK_BEFORE, segmentIds[gapSegment-1]));
+        toDiscard.add(verifySeek(reader, gapStart, SeekErrorRule.SEEK_AFTER, segmentIds[gapSegment]));
+        toDiscard.add(verifySeek(reader, gapEnd, SeekErrorRule.SEEK_AFTER, segmentIds[gapSegment]));
+        toDiscard.add(verifySeek(reader, (gapStart+gapEnd)/2, SeekErrorRule.SEEK_AFTER, segmentIds[gapSegment]));
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekAllQuarantined() throws Exception {
+        int numSegments = 3;
+        createPopulateSegments(numSegments, 10, 10, -1);
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            m_pbd.quarantineSegment(entry);
+        }
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        negativeSeek(reader, 5, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, 5, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, 5, SeekErrorRule.THROW);
+    }
+
+    @Test
+    public void testSeekFirstQuarantined() throws Exception {
+        int numSegments = 3;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        m_pbd.quarantineSegment(m_pbd.getSegments().entrySet().iterator().next());
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (int i=1; i<numSegments; i++) {
+            for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+                toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), errorRule, segmentIds[i]));
+            }
+        }
+        long seekId = 0;
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_AFTER, segmentIds[1]));
+        negativeSeek(reader, 0, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, 0, SeekErrorRule.THROW);
+        seekId = segmentIds[numSegments-1].getSecond() + 1;
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_BEFORE, segmentIds[numSegments-1]));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekLastQuarantined() throws Exception {
+        int numSegments = 3;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            if (entry.getKey().longValue() == numSegments) {
+                m_pbd.quarantineSegment(entry);
+            }
+        }
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (int i=0; i<numSegments-1; i++) {
+            for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+                toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), errorRule, segmentIds[i]));
+            }
+        }
+        long seekId = segmentIds[numSegments-2].getSecond() + 1;
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_BEFORE, segmentIds[numSegments-2]));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekFirstLastQuarantined() throws Exception {
+        int numSegments = 5;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            long key = entry.getKey().longValue();
+            if (key == 1 || key == numSegments) {
+                m_pbd.quarantineSegment(entry);
+            }
+        }
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (int i=1; i<numSegments-1; i++) {
+            for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+                toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), errorRule, segmentIds[i]));
+            }
+        }
+
+        long seekId = segmentIds[0].getSecond();
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_AFTER, segmentIds[1]));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekOnlyFirstValid() throws Exception {
+        int numSegments = 3;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            if (entry.getKey().longValue() != 1) {
+                m_pbd.quarantineSegment(entry);
+            }
+        }
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+            toDiscard.add(verifySeek(reader, segmentIds[0].getFirst(), errorRule, segmentIds[0]));
+            toDiscard.add(verifySeek(reader, segmentIds[0].getSecond(), errorRule, segmentIds[0]));
+        }
+
+        long seekId = segmentIds[1].getFirst();
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_BEFORE, segmentIds[0]));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekOnlyLastValid() throws Exception {
+        int numSegments = 3;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            if (entry.getKey().longValue() != numSegments) {
+                m_pbd.quarantineSegment(entry);
+            }
+        }
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+            toDiscard.add(verifySeek(reader, segmentIds[numSegments-1].getFirst(), errorRule, segmentIds[numSegments-1]));
+            toDiscard.add(verifySeek(reader, segmentIds[numSegments-1].getSecond(), errorRule, segmentIds[numSegments-1]));
+        }
+
+        long seekId = segmentIds[0].getSecond();
+        toDiscard.add(verifySeek(reader, seekId, SeekErrorRule.SEEK_AFTER, segmentIds[numSegments-1]));
+        negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
+        negativeSeek(reader, seekId, SeekErrorRule.THROW);
+
+        for (BBContainer c : toDiscard) {
+            c.discard();
+        }
+    }
+
+    @Test
+    public void testSeekRandomQuarantined() throws Exception {
+        int numSegments = 10;
+        Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        Random random = new Random(System.currentTimeMillis());
+        int numQuarantined = 3;
+        HashSet<Long> quarantinedIndexes = new HashSet<>();
+        for (int i=0; i<numQuarantined; i++) {
+            // quarantine segments other than ones at index 1 and numSegments (2 through numSegments-1)
+            quarantinedIndexes.add((long) random.nextInt(numSegments-2)+2);
+        }
+        for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
+            if (quarantinedIndexes.contains(entry.getKey().longValue())) {
+                m_pbd.quarantineSegment(entry);
+            }
+        }
+
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        ArrayList<BBContainer> toDiscard = new ArrayList<>();
+        for (int i=0; i<numSegments; i++) {
+            if (quarantinedIndexes.contains((long)i+1)) {
+                int prev = i-1; // indexes start at 1
+                while (quarantinedIndexes.contains(prev+1L)) {
+                    prev--;
+                }
+                int next = i+1;
+                while (quarantinedIndexes.contains(next+1L)) {
+                    next++;
+                }
+                toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), SeekErrorRule.SEEK_AFTER, segmentIds[next]));
+                toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), SeekErrorRule.SEEK_BEFORE, segmentIds[prev]));
+                negativeSeek(reader, segmentIds[i].getFirst(), SeekErrorRule.THROW);
+                toDiscard.add(verifySeek(reader, segmentIds[i].getSecond(), SeekErrorRule.SEEK_AFTER, segmentIds[next]));
+                toDiscard.add(verifySeek(reader, segmentIds[i].getSecond(), SeekErrorRule.SEEK_BEFORE, segmentIds[prev]));
+                negativeSeek(reader, segmentIds[i].getSecond(), SeekErrorRule.THROW);
+            } else {
+                for (SeekErrorRule errorRule : SeekErrorRule.values()) {
+                    toDiscard.add(verifySeek(reader, segmentIds[i].getFirst(), errorRule, segmentIds[i]));
+                    toDiscard.add(verifySeek(reader, segmentIds[i].getSecond(), errorRule, segmentIds[i]));
+                }
+            }
+        }
+    }
+
+    private BBContainer verifySeek(PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader, long seekId, SeekErrorRule errorRule, Pair<Long, Long> expectedRange)
+        throws IOException, NoSuchOffsetException {
+        reader.seekToSegment(seekId, errorRule);
+        BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        PBDSegment<ExtraHeaderMetadata> currSegment = reader.getCurrentSegment();
+        assert(currSegment.getStartId() == expectedRange.getFirst());
+        assert(currSegment.getEndId() == expectedRange.getSecond());
+        return container;
+    }
+
+    private List<BBContainer> readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws IOException {
+        ArrayList<BBContainer> containers = new ArrayList<>();
+        for (int i=0; i<numBuffers; i++) {
+            BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (container == null) {
+                break;
+            } else {
+                containers.add(container);
+            }
+        }
+
+        return containers;
+    }
+
+    private void negativeSeek(BinaryDequeReader<ExtraHeaderMetadata> reader, long seekId, SeekErrorRule errorRule) throws Exception {
+        try {
+            reader.seekToSegment(seekId, errorRule);
+            fail();
+        } catch(NoSuchOffsetException e) {
+            // expected
+        }
     }
 
     private void negativeOffer(long startId, long endId) throws Exception {

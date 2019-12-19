@@ -45,9 +45,9 @@ public abstract class PBDSegment<M> {
     //  - size in bytes of extra header ( 4 bytes )
     //  - crc for the extra header ( 4 bytes )
     public static final int HEADER_START_OFFSET = 0;
-    public static final int HEADER_VERSION_OFFSET = HEADER_START_OFFSET;
-    public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
-    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_CRC_OFFSET = HEADER_START_OFFSET;
+    public static final int HEADER_VERSION_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_VERSION_OFFSET + 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
     public static final int HEADER_START_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 8;
     public static final int HEADER_END_ID_OFFSET = HEADER_START_ID_OFFSET + 8;
