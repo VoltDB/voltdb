@@ -5292,6 +5292,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void processReplicaDecommission(int leaderCount) {
         synchronized(m_catalogUpdateLock) {
             if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
+                setMasterOnly();
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
                 ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
                         .putAll(new HashMap<String, String>() {
