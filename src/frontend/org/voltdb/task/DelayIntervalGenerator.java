@@ -20,19 +20,19 @@ package org.voltdb.task;
 import java.util.concurrent.TimeUnit;
 
 /**
- * {@link ActionSchedule} implementation which executes actions at fixed delay between execution times
+ * {@link IntervalGenerator} implementation which executes actions separated by a fixed delay
  */
-public final class DelaySchedule extends DurationSchedule {
-    private ActionDelay m_delay;
+public final class DelayIntervalGenerator extends DurationIntervalGenerator {
+    private Interval m_delay;
 
     @Override
     public void initialize(TaskHelper helper, int interval, String timeUnit) {
         super.initialize(helper, interval, timeUnit);
-        m_delay = new ActionDelay(m_durationNs, TimeUnit.NANOSECONDS, r -> m_delay);
+        m_delay = new Interval(m_durationNs, TimeUnit.NANOSECONDS, r -> m_delay);
     }
 
     @Override
-    public ActionDelay getFirstDelay() {
+    public Interval getFirstInterval() {
         return m_delay;
     }
 }

@@ -376,7 +376,7 @@ public class TestTaskManager {
      */
     @Test
     public void minDelay() throws Exception {
-        m_schedulesConfig.setMinDelayMs(10000);
+        m_schedulesConfig.setMininterval(10000);
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);
@@ -390,7 +390,7 @@ public class TestTaskManager {
      */
     @Test
     public void maxRunFrequency() throws Exception {
-        m_schedulesConfig.setMaxRunFrequency(1.0);
+        m_schedulesConfig.setMaxfrequency(1.0);
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync();
         promoteToLeaderSync(task);
@@ -550,7 +550,7 @@ public class TestTaskManager {
      */
     @Test
     public void testCustomSchedule() throws Exception {
-        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 50, 250);
+        Task task = createTask(TestIntervalGenerator.class, TaskScope.DATABASE, 50, 250);
 
         startSync();
         promoteToLeaderSync(task);
@@ -647,7 +647,7 @@ public class TestTaskManager {
 
     @Test
     public void mustExecuteWorkProcsOnPartitions() throws Exception {
-        Task task = createTask(TestActionSchedule.class, TaskScope.DATABASE, 10, 100);
+        Task task = createTask(TestIntervalGenerator.class, TaskScope.DATABASE, 10, 100);
         m_procedure.setSinglepartition(true);
         m_procedure.setPartitionparameter(-1);
 
@@ -668,7 +668,7 @@ public class TestTaskManager {
         m_taskManager.shutdown();
         m_taskManager = new TaskManager(m_clientInterface, m_statsAgent, 0, true, () -> m_readOnly);
 
-        Task task = createTask(TestActionSchedule.class, TaskScope.PARTITIONS, 10, 100);
+        Task task = createTask(TestIntervalGenerator.class, TaskScope.PARTITIONS, 10, 100);
         m_procedure.setSinglepartition(true);
         m_procedure.setPartitionparameter(-1);
 
@@ -871,9 +871,9 @@ public class TestTaskManager {
             task.setActiongeneratorclass(clazz.getName());
             setParameters(task.getActiongeneratorparameters(), params);
 
-            task.setScheduleclass(DelaySchedule.class.getName());
+            task.setScheduleclass(DelayIntervalGenerator.class.getName());
             setParameters(task.getScheduleparameters(), 1, "MILLISECONDS");
-        } else if (ActionSchedule.class.isAssignableFrom(clazz)) {
+        } else if (IntervalGenerator.class.isAssignableFrom(clazz)) {
             task.setScheduleclass(clazz.getName());
             setParameters(task.getScheduleparameters(), params);
 
@@ -980,14 +980,14 @@ public class TestTaskManager {
 
     public static class TestActionScheduler implements ActionScheduler {
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
-        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
+        public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
         @Override
@@ -1002,14 +1002,14 @@ public class TestTaskManager {
         public void initialize(int arg1, String arg2, byte[] arg3) {}
 
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
-        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
+        public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
     }
 
@@ -1022,20 +1022,20 @@ public class TestTaskManager {
         }
 
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
             return ++m_runCount < m_maxRunCount
-                    ? DelayedAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
-                    : DelayedAction.createExit(null);
+                    ? ScheduledAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : ScheduledAction.createExit(null);
         }
 
-        public DelayedAction getNextAction(ActionResult previousProcedureRun) {
+        public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
             assertNull(previousProcedureRun.getProcedure());
             s_postRunActionSchedulerCallCount.getAndIncrement();
 
             return ++m_runCount < m_maxRunCount
-                    ? DelayedAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
-                    : DelayedAction.createExit(null);
+                    ? ScheduledAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : ScheduledAction.createExit(null);
         }
     }
 
@@ -1047,7 +1047,7 @@ public class TestTaskManager {
         public void initialize(String value) {}
 
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             return null;
         }
     }
@@ -1062,7 +1062,7 @@ public class TestTaskManager {
         }
     }
 
-    public static class TestActionSchedule implements ActionSchedule {
+    public static class TestIntervalGenerator implements IntervalGenerator {
         private long m_min;
         private long m_max;
 
@@ -1072,15 +1072,15 @@ public class TestTaskManager {
         }
 
         @Override
-        public ActionDelay getFirstDelay() {
+        public Interval getFirstInterval() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return new ActionDelay(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
+            return new Interval(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
                     this::getNextDelay);
         }
 
-        private ActionDelay getNextDelay(ActionResult result) {
+        private Interval getNextDelay(ActionResult result) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return new ActionDelay(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
+            return new Interval(ThreadLocalRandom.current().nextLong(m_min, m_max), TimeUnit.NANOSECONDS,
                     this::getNextDelay);
         }
     }
@@ -1103,14 +1103,14 @@ public class TestTaskManager {
 
     public static class TestReadOnlyScheduler implements ActionScheduler {
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+            return ScheduledAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
         }
 
-        private DelayedAction getNextAction(ActionResult result) {
+        private ScheduledAction getNextAction(ActionResult result) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return DelayedAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+            return ScheduledAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
         }
 
         @Override

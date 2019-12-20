@@ -359,11 +359,24 @@ public class SynchronizedStatesManager {
 
 
         public void registerStateMachineWithManager(ByteBuffer requestedInitialState) throws InterruptedException {
+            ListenableFuture<?> initComplete = registerStateMachineWithManagerAsync(requestedInitialState);
+            if (initComplete == null) {
+                return;
+            }
+            try {
+                initComplete.get();
+            }
+            catch (ExecutionException e) {
+                Throwables.propagate(e.getCause());
+            }
+        }
+
+        public ListenableFuture<?> registerStateMachineWithManagerAsync(ByteBuffer requestedInitialState) throws InterruptedException {
             assert(requestedInitialState != null);
             assert(requestedInitialState.remaining() < Short.MAX_VALUE);
             m_requestedInitialState = requestedInitialState;
 
-            registerStateMachine(this);
+            return registerStateMachineAsync(this);
         }
 
         /**
@@ -2025,8 +2038,9 @@ public class SynchronizedStatesManager {
         }
     };
 
-    private synchronized void registerStateMachine(StateMachineInstance machine) throws InterruptedException {
+    private synchronized ListenableFuture<?> registerStateMachineAsync(StateMachineInstance machine) throws InterruptedException {
         assert(m_registeredStateMachineInstances < m_registeredStateMachines.length);
+        ListenableFuture<?> initComplete = null;
 
         m_registeredStateMachines[m_registeredStateMachineInstances] = (machine);
         ++m_registeredStateMachineInstances;
@@ -2043,14 +2057,9 @@ public class SynchronizedStatesManager {
             }
             // Do all the initialization and notifications on the executor to avoid a race with
             // the group membership changes
-            ListenableFuture<?> initComplete = m_shared_es.submit(initializeInstances);
-            try {
-                initComplete.get();
-            }
-            catch (ExecutionException e) {
-                Throwables.propagate(e.getCause());
-            }
+            initComplete = m_shared_es.submit(initializeInstances);
         }
+        return initComplete;
     }
 
     private class CallbackExceptionHandler implements Runnable {

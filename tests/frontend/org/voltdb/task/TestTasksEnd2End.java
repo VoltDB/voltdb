@@ -413,12 +413,12 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
 
         @Override
-        public DelayedAction getFirstDelayedAction() {
+        public ScheduledAction getFirstScheduledAction() {
             return getNextAction(null);
         }
 
-        public DelayedAction getNextAction(ActionResult result) {
-            return DelayedAction.createCallback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
+        public ScheduledAction getNextAction(ActionResult result) {
+            return ScheduledAction.createCallback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
                     .setStatusMessage(m_status);
         }
 
