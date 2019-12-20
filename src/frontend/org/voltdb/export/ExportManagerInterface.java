@@ -61,25 +61,34 @@ public interface ExportManagerInterface {
     }
 
     static ExportMode getExportFeatureMode(FeaturesType features) throws SetupException {
+        boolean isEnterprise = VoltDB.instance().getConfig().m_isEnterprise;
+        String modeName = getExportFeatureConfigured(features);
+
+        if (modeName == null) {
+            return isEnterprise ? ExportMode.ADVANCED : ExportMode.BASIC;
+        }
+
+        for (ExportMode modeEnum : ExportMode.values()) {
+            if (modeName.equalsIgnoreCase(modeEnum.name())) {
+                if (!isEnterprise && modeEnum == ExportMode.ADVANCED) {
+                    throw new SetupException("Cannot use ADVANCED export mode in community edition");
+                }
+                return modeEnum;
+            }
+        }
+        throw new SetupException("Unknown export feature mode: " + modeName);
+    }
+
+    static String getExportFeatureConfigured(FeaturesType features) {
         if (features == null) {
-            return ExportMode.BASIC;
+            return null;
         }
         for (FeatureType feature : features.getFeature()) {
             if (feature.getName().equalsIgnoreCase(EXPORT_FEATURE)) {
-                String mode = feature.getOption();
-                for (ExportMode modeEnum : ExportMode.values()) {
-                    if (mode.equalsIgnoreCase(modeEnum.name())) {
-                        if (!VoltDB.instance().getConfig().m_isEnterprise && modeEnum == ExportMode.ADVANCED) {
-                            throw new SetupException("Cannot use ADVANCED export mode in community edition");
-                        }
-                        return modeEnum;
-                    }
-                }
-                throw new SetupException("Unknown export feature mode: " + mode);
+                return feature.getOption();
             }
         }
-
-        return ExportMode.BASIC;
+        return null;
     }
 
     static AtomicReference<ExportManagerInterface> m_self = new AtomicReference<>();

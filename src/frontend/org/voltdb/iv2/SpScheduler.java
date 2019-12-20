@@ -901,10 +901,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
-        // Ideally reducedClusterSafety should be persistent,
-        // but since we don't tolerate node down, this has no effect even set as persistent.
         VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
-                CreateMode.EPHEMERAL, tmLog, "Transfer to Reduced Safety Mode");
+                CreateMode.PERSISTENT, tmLog, "Transfer to Reduced Safety Mode");
 
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         for (Integer integer : liveHids) {

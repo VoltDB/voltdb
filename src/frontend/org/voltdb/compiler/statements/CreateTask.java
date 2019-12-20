@@ -31,9 +31,9 @@ import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
-import org.voltdb.task.CronSchedule;
-import org.voltdb.task.DelaySchedule;
-import org.voltdb.task.IntervalSchedule;
+import org.voltdb.task.CronIntervalGenerator;
+import org.voltdb.task.DelayIntervalGenerator;
+import org.voltdb.task.IntervalIntervalGenerator;
 import org.voltdb.task.SingleProcGenerator;
 import org.voltdb.task.TaskScope;
 
@@ -84,14 +84,14 @@ public class CreateTask extends StatementProcessor {
 
             if (scheduleClass == null) {
                 if (matcher.group("cron") != null) {
-                    task.setScheduleclass(CronSchedule.class.getName());
+                    task.setScheduleclass(CronIntervalGenerator.class.getName());
                     addParameter(scheduleParams, 0, matcher.group("cron"));
                 } else {
                     String intervalSchedule = matcher.group("intervalSchedule");
                     if ("delay".equalsIgnoreCase(intervalSchedule)) {
-                        task.setScheduleclass(DelaySchedule.class.getName());
+                        task.setScheduleclass(DelayIntervalGenerator.class.getName());
                     } else if ("every".equalsIgnoreCase(intervalSchedule)) {
-                        task.setScheduleclass(IntervalSchedule.class.getName());
+                        task.setScheduleclass(IntervalIntervalGenerator.class.getName());
                     } else {
                         throw m_compiler.new VoltCompilerException("Could not determine type of scheduler to use");
                     }

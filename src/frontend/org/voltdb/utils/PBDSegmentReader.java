@@ -40,6 +40,11 @@ interface PBDSegmentReader<M> {
     public boolean anyReadAndDiscarded();
 
     /**
+     * @return {@code true} if ALL entries have been read and discarded from this segment by this reader
+     */
+    public boolean allReadAndDiscarded();
+
+    /**
      * Read the next entry from the segment for this reader.
      * Returns null if all entries in this segment were already read by this reader.
      *
@@ -88,14 +93,14 @@ interface PBDSegmentReader<M> {
     public void reopen() throws IOException;
 
     /**
-     * Close this reader and release any resources. {@link PBDSegment#getReader(String)} will still return this reader
-     * until the segment is closed.
+     * Close this reader and release any resources.
      */
     public void close() throws IOException;
 
     /**
-     * Close this reader and release any resources. Different between this and {@link #close()} is that
+     * Close this reader and release any resources. Difference between this and {@link #close()} is that
      * this keeps track of the closed reader. This call is used only internally when a reader is polling through segments.
+     * {@link PBDSegment#getReader(String)} will still return this reader until the segment is closed or until all buffers are acked.
      */
     public void closeAndSaveReaderState() throws IOException;
 
