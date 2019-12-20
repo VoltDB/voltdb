@@ -1385,7 +1385,7 @@ public abstract class CatalogUtil {
         Map<String, TopicProfileType> profileMap = new HashMap<>();
         for (TopicProfileType profile : profiles) {
             if (profileMap.put(profile.getName(), profile) != null) {
-                errors.addErrorMessage("Profile " + profile.getName() + " is already defined");
+                errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
             }
         }
         return Pair.of(defaults, profileMap);
