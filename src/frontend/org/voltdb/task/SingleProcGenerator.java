@@ -17,6 +17,8 @@
 
 package org.voltdb.task;
 
+import org.voltdb.utils.CompoundErrors;
+
 /**
  * Simple implementation of a {@link ActionGenerator} which always returns the same procedure to run with the same
  * parameters
@@ -26,7 +28,7 @@ public final class SingleProcGenerator implements ActionGenerator {
     private boolean m_isReadOnly;
 
     public static String validateParameters(TaskHelper helper, String procedure, Object... procedureParameters) {
-        TaskValidationErrors errors = new TaskValidationErrors();
+        CompoundErrors errors = new CompoundErrors();
         helper.validateProcedure(errors, true, procedure, procedureParameters);
         return errors.getErrorMessage();
     }

@@ -600,9 +600,9 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/task/Interval.java" />
             <include name="src/frontend/org/voltdb/task/IntervalGenerator.java" />
             <include name="src/frontend/org/voltdb/task/ScheduledAction.java" />
-            <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
             <include name="src/frontend/org/voltdb/task/TaskScope.java" />
             <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
+            <include name="src/frontend/org/voltdb/utils/CompoundErrors.java" />
         </fileset>
     </javadoc>
 

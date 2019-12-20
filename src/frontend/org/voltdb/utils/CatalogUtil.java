@@ -141,6 +141,11 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
+import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
+import org.voltdb.compiler.deploymentfile.TopicProfileType;
+import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
+import org.voltdb.compiler.deploymentfile.TopicRetentionType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
@@ -894,6 +899,7 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
+            validateTopics(catalog, deployment);
             validateThreadPoolsConfiguration(deployment.getThreadpools());
             Cluster catCluster = getCluster(catalog);
 
@@ -1333,6 +1339,88 @@ public abstract class CatalogUtil {
                         "the built-in ADMINISTRATOR role in the deployment file.";
                 throw new RuntimeException(msg);
             }
+        }
+    }
+
+    // FIXME: need to check cross-references between DDL topics and deployment profiles/defaults
+    private static void validateTopics(Catalog catalog, DeploymentType deployment) {
+        CompoundErrors errors = new CompoundErrors();
+
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment, errors);
+        TopicDefaultsType defaults = topics.getFirst();
+        Map<String, TopicProfileType> profileMap = topics.getSecond();
+
+        if (defaults != null) {
+            validateRetention("topic defaults", defaults.getRetention(), errors);
+        }
+        if (profileMap != null) {
+            for(TopicProfileType profile : profileMap.values()) {
+                String what = "topic profile " + profile.getName();
+                validateRetention(what, profile.getRetention(), errors);
+            }
+        }
+        if (errors.hasErrors()) {
+            throw new RuntimeException(errors.getErrorMessage());
+        }
+        hostLog.warn("FIXME: validate the topic references !!!");
+    }
+
+    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+            DeploymentType deployment, CompoundErrors errors) {
+
+        TopicsType topics = deployment.getTopics();
+        if (topics == null) {
+            return Pair.of(null, null);
+        }
+
+        TopicDefaultsType defaults = topics.getDefaults();
+        List<TopicProfileType> profiles = topics.getProfile();
+        if (profiles == null) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("No topic profiles in deployment");
+            }
+            return Pair.of(defaults, null);
+        }
+
+        Map<String, TopicProfileType> profileMap = new HashMap<>();
+        for (TopicProfileType profile : profiles) {
+            if (profileMap.put(profile.getName(), profile) != null) {
+                errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
+            }
+        }
+        return Pair.of(defaults, profileMap);
+    }
+
+    private final static void validateRetention(String what, TopicRetentionType retention,
+            CompoundErrors errors) {
+        if (retention == null) {
+            return;
+        }
+        try {
+            switch(retention.getPolicy()) {
+            case TIME:
+                RetentionPolicyMgr.parseTimeLimit(retention.getLimit());
+                break;
+            case SIZE:
+                RetentionPolicyMgr.parseByteLimit(retention.getLimit());
+                break;
+            default:
+                errors.addErrorMessage("Unsupported retention policy \"" + retention.getPolicy() + "\"");
+            }
+        }
+        catch (Exception ex) {
+            errors.addErrorMessage("Failed to validate retention policy in " + what + ": " + ex.getMessage());
+        }
+    }
+
+    // Assumes the topics have been validated beforehand
+    public final static void validateRetentionUpdate(String what, TopicRetentionType newRetention,
+            TopicRetentionType curRetention, CompoundErrors errors) {
+        // The limit can be changed, but not the policy.
+        TopicRetentionPolicyEnum newPol = newRetention != null ? newRetention.getPolicy() : null;
+        TopicRetentionPolicyEnum curPol = curRetention != null ? curRetention.getPolicy() : null;
+        if (newPol != curPol) {
+            errors.addErrorMessage("The retention policy in " + what + " cannot be changed");
         }
     }
 

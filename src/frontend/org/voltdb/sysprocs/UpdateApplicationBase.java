@@ -51,11 +51,14 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
+import org.voltdb.compiler.deploymentfile.TopicProfileType;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompoundErrors;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -234,6 +237,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
+            // Topic configuration is not compiled into the catalog and cannot be validated
+            // by the CatalogDiffEngine, so validate the changes here.
+            if (!validateTopicUpdates(dt, context.getDeployment(), retval)) {
+                return retval;
+            }
+
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
@@ -289,6 +298,48 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     e.getMessage();
         }
         return retval;
+    }
+
+    /**
+     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * an appropriate error message in the passed-in {@link CatalogChangeResult}
+     *
+     * @param newDep    new deployment
+     * @param curDep    current deployment
+     * @param result    catalog change result (may be updated
+     * @return          {@code true} if topics are valid
+     */
+    private static boolean validateTopicUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
+        CompoundErrors errors = new CompoundErrors();
+
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep, errors);
+        TopicDefaultsType newDefaults = newTopics.getFirst();
+        Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
+
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> curTopics = CatalogUtil.getDeploymentTopics(curDep, errors);
+        TopicDefaultsType curDefaults = curTopics.getFirst();
+        Map<String, TopicProfileType> curProfiles = curTopics.getSecond();
+
+        if (newDefaults != null && curDefaults != null) {
+            CatalogUtil.validateRetentionUpdate("topic defaults", newDefaults.getRetention(),
+                    curDefaults.getRetention(), errors);
+        }
+        if (curProfiles != null) {
+            for(TopicProfileType newProfile : newProfiles.values()) {
+                TopicProfileType curProfile = curProfiles.get(newProfile.getName());
+                if (curProfile == null) {
+                    continue;
+                }
+                String what = "topic profile " + newProfile.getName();
+                CatalogUtil.validateRetentionUpdate(what, newProfile.getRetention(),
+                        curProfile.getRetention(), errors);
+
+            }
+        }
+        if (errors.hasErrors()) {
+            result.errorMsg = errors.getErrorMessage();
+        }
+        return !errors.hasErrors();
     }
 
     /**

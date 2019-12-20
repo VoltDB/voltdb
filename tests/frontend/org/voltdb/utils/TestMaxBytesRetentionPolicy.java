@@ -24,12 +24,15 @@ package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
@@ -37,7 +40,11 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.RetentionPolicyMgr.RetentionLimitException;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
+
+import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 
@@ -224,5 +231,45 @@ public class TestMaxBytesRetentionPolicy {
     public void tearDown() throws Exception {
         m_pbd.close();
         TestPersistentBinaryDeque.tearDownTestDir();
+    }
+
+    private static final Map<String, Long> s_validLimits;
+    static {
+        ImmutableMap.Builder<String, Long> bldr = ImmutableMap.builder();
+        bldr.put("64mb", 64 * 1024L * 1024L);
+        bldr.put("240 MB", 240L * 1024L * 1024L);
+        bldr.put("100 Mb", 100L * 1024L * 1024L);
+        bldr.put("2gb", 2L * 1024L * 1024L * 1024L);
+        bldr.put("3 GB", 3L * 1024L * 1024L * 1024L);
+        bldr.put("+5 gb", 5L * 1024L * 1024L * 1024L);
+        s_validLimits = bldr.build();
+    }
+    private static final Set<String> s_invalidLimits;
+    static {
+        ImmutableSet.Builder<String> bldr = ImmutableSet.builder();
+        bldr.add("2 mb");
+        bldr.add("63 mb");
+        bldr.add("66 Mo");
+        bldr.add("-2 gb");
+        bldr.add("4 go");
+        bldr.add("foo 4 gb");
+        s_invalidLimits = bldr.build();
+    }
+
+    @Test
+    public void testParsingLimits() throws Exception {
+        for (Map.Entry<String, Long> e : s_validLimits.entrySet()) {
+            long lim = RetentionPolicyMgr.parseByteLimit(e.getKey());
+            assertEquals(lim, e.getValue().longValue());
+        }
+        for (String limStr : s_invalidLimits) {
+            try {
+                long lim = RetentionPolicyMgr.parseByteLimit(limStr);
+                fail();
+            }
+            catch (RetentionLimitException expected) {
+                ; // good
+            }
+        }
     }
 }
