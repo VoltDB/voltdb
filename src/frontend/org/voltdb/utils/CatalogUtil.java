@@ -2634,6 +2634,39 @@ public abstract class CatalogUtil {
     }
 
     /**
+     *  Attempt to create the ZK node and write the catalog/deployment bytes
+     *  to ZK.  Used during the initial cluster deployment discovery and
+     *  distribution.
+     */
+    public static void writeDeploymentToZK(ZooKeeper zk,
+                                           long genId,
+                                           SegmentedCatalog catalogAndDeployment,
+                                           ZKCatalogStatus catalogStatus,
+                                           long txnId)
+        throws KeeperException, InterruptedException
+    {
+        // use default version 0 as start
+        makeCatalogHeader(catalogAndDeployment, 0, genId);
+        String path = VoltZK.catalogbytes + "/" + 0;
+        ByteBuffer buffer = ByteBuffer.allocate(13);// flag (byte:1) + expected data node count (int:4) + txnId (long:8)
+        buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
+        buffer.putInt(catalogAndDeployment.m_data.size());
+        buffer.putLong(txnId);
+        hostLog.info("***write deployment to " + path + " " + catalogStatus);
+        zk.create(path, buffer.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        for (ByteBuffer chunk : catalogAndDeployment.m_data) {
+            zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT_SEQUENTIAL);
+        }
+        if (catalogStatus == ZKCatalogStatus.COMPLETE) {
+            // mark the version node complete if requested
+            buffer.position(0);
+            buffer.put((byte)catalogStatus.ordinal());
+            zk.setData(path, buffer.array(), -1);
+        }
+    }
+
+    /**
      * Update the catalog/deployment contained in ZK. If the catalog/deployment is larger than
      * single ZK node size limit, break the object into multiple ZK nodes under the version
      * directory.
