@@ -119,13 +119,14 @@ public class CappedTableLoader extends BenchmarkThread {
             try {
                 currentRowCount = TxnId2Utils.getRowCount(client, tableName);
             } catch (Exception e) {
-                hardStop("getrowcount exception", e);
+                hardStop("CappedTableLoader getrowcount exception", e);
             }
 
-            try {
-                // insert some batches...
-                int tc = batchSize * r.nextInt(99);
-                while ((currentRowCount < tc) && (m_shouldContinue.get())) {
+            // insert some batches...
+            int tc = batchSize * r.nextInt(99);
+            log.info("CappedTableLoader adding "+String.valueOf(tc)+" rows");
+            while ((currentRowCount < tc) && (m_shouldContinue.get())) {
+               try {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
@@ -139,7 +140,7 @@ public class CappedTableLoader extends BenchmarkThread {
                     try {
                         nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                     } catch (Exception e) {
-                        hardStop("getrowcount exception", e);
+                        hardStop("CappedTableLoader getrowcount exception", e);
                     }
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
@@ -147,52 +148,51 @@ public class CappedTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                     if (exceedsCappedLimit())
-                        hardStop("Capped table exceeds 10 rows, this shoudln't happen. Exiting. ");
+                        hardStop("CappedTableLoader Capped table exceeds 10 rows, this shoudn't happen. Exiting. ");
+                } catch (Exception e) {
+                    log.warn("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
+                    try { Thread.sleep(3000); } catch (Exception e2) { }
                 }
             }
-            catch (Exception e) {
-                // on exception, log and end the thread, but don't kill the process
-                log.warn("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
-                try { Thread.sleep(3000); } catch (Exception e2) { }
-            }
+            log.info("CappedTableLoader completed and verified batch");
+            try { Thread.sleep(3000); } catch (Exception e2) { }
         }
         log.info("CappedTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
 
     private boolean exceedsCappedLimit() throws NoConnectionsException, IOException, ProcCallException {
-        boolean ret = false;
         VoltTable partitions = client.callProcedure("@GetPartitionKeys",
                 "INTEGER").getResults()[0];
         long count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
         if (count > 10) {
             // retry once
+            log.warn("CappedTableLoader Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10) retrying in 1 sec");
             try { Thread.sleep(1000); } catch (Exception e2) {}
             count = TxnId2Utils.doAdHoc(client,"SELECT COUNT(*) FROM capr;").getResults()[0].fetchRow(0).getLong(0);
-            log.warn("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10) retrying in 1 sec");
             if ( count > 10 ) {
-                log.error("Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10)");
-                ret = true;
+                log.error("CappedTableLoader Replicated table CAPR has more rows ("+count+") than the limit set by capped collections (10)");
+                return(true);
+            } else {
+                log.info("CappedTableLoader Replicated table CAPR has been limited to "+count+" rows");
             }
         }
         while (partitions.advanceRow()) {
             long id = partitions.getLong(0);
             long key = partitions.getLong(1);
-            boolean retry = true;
-            while ( true ) {
+
+            count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
+            if (count > 10) {
+                log.warn("CappedTableLoader Partitioned table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id+" , retrying in 1 sec");
+                try { Thread.sleep(1000); } catch (Exception e2) {}
                 count = client.callProcedure("CAPPCountPartitionRows",key).getResults()[0].fetchRow(0).getLong(0);
-                if (count > 10 && retry ) {
-                    retry = false;
-                    log.warn("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id+" , retrying in 1 sec");
-                    try { Thread.sleep(1000); } catch (Exception e2) {}
-                } else if (count > 10) {
-                    log.error("Replicated table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
-                    ret = true;
-                    break;
+                if (count > 10) {
+                    log.error("CappedTableLoader Partitioned table CAPP has more rows ("+count+") than the limit set by capped collections (10) on partition "+id);
+                    return(true);
                 } else {
-                    break;
+                    log.info("CappedTableLoader Partitioned table CAPP partition "+id+" has been limited to "+count+" rows");
                 }
             }
         }
-        return ret;
+        return(false);
     }
 }
