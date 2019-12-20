@@ -56,7 +56,7 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     private static VoltLogger log = new VoltLogger("HOST");
 
     private static long getTimeoutValue() {
-        long timeoutSeconds = 60; // default value 60 seconds
+        long timeoutSeconds = 600; // default value 600 seconds
 
         String timeoutEnvString = null;
         try {
