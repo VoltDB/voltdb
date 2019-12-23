@@ -116,16 +116,16 @@ public class OrphanedTuples implements ActionGenerator {
         }
 
         InetAddress ip;
-        String hostName;
+        String hostName = null;
 		try {
 			ip = InetAddress.getLocalHost();
-			hostname = ip.getHostName();
+			hostName = ip.getHostName();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		}
         for (Map.Entry<String, Long> t: tableTupleCount.entrySet()) {
             helper.logWarning(
-                    "Host: " + hostname + " Stream " + t.getKey() + " has " + t.getValue() + " tuples pending but is not actively exporting anything");
+                    "Host: " + hostName + " Stream " + t.getKey() + " has " + t.getValue() + " tuples pending but is not actively exporting anything");
         }
     }
 }
