@@ -120,6 +120,7 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
+import org.voltdb.CatalogContext.CatalogInfo;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
@@ -3936,30 +3937,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
-                byte[] newCatalogBytes = null;
-                byte[] catalogBytesHash = null;
-                byte[] deploymentBytes = null;
+                CatalogInfo catalogInfo = null;
+                Catalog newCatalog = null;
+                CatalogContext ctx = VoltDB.instance().getCatalogContext();
                 if (isForReplay) {
                     try {
                         CatalogAndDeployment catalogStuff =
                                 CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                        newCatalogBytes = catalogStuff.catalogBytes;
-                        catalogBytesHash = catalogStuff.catalogHash;
-                        deploymentBytes = catalogStuff.deploymentBytes;
+                        byte[] depbytes = catalogStuff.deploymentBytes;
+                        if (depbytes == null) {
+                            depbytes = ctx.m_catalogInfo.m_deploymentBytes;
+                        }
+                        catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
+                        newCatalog = ctx.getNewCatalog(diffCommands);
                     } catch (Exception e) {
                         // impossible to hit, log for debug purpose
                         hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
                         throw new RuntimeException("Error reading catalog from zookeeper");
                     }
                 } else {
-                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
                     if (ctx.m_preparedCatalogInfo == null) {
                         // impossible to hit, log for debug purpose
                         throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
                     }
-                    newCatalogBytes = ctx.m_preparedCatalogInfo.m_catalogBytes;
-                    catalogBytesHash = ctx.m_preparedCatalogInfo.m_catalogHash;
-                    deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
+                    // using the prepared catalog information if prepared
+                    catalogInfo = ctx.m_preparedCatalogInfo;
+                    newCatalog = catalogInfo.m_catalog;
                 }
 
                 byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
@@ -3967,11 +3970,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext = m_catalogContext.update(isForReplay,
-                                                           diffCommands,
+                                                           newCatalog,
                                                            genId,
-                                                           newCatalogBytes,
-                                                           catalogBytesHash,
-                                                           deploymentBytes,
+                                                           catalogInfo,
                                                            m_messenger,
                                                            hasSchemaChange);
 
