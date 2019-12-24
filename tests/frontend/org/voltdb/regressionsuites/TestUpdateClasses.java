@@ -1003,4 +1003,83 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    /*
+     * Do multiple big catalog updates that bring the total size of catalog in memory go beyond 50 MB.
+     */
+    @Test
+    public void testUpdateBigJarFile() throws Exception {
+        System.out.println("\n\n-----\n testUpdateBigJarFile \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table tt (PID varchar(20 BYTES) NOT NULL, CITY varchar(6 BYTES), " +
+                "CONSTRAINT IDX_TT_PKEY PRIMARY KEY (PID)); \n" +
+                "PARTITION TABLE TT ON COLUMN PID;\n");
+
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+
+            // Testing system can load jar file from class path, but not the internal class files
+            try {
+                resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+                fail("TestProcedure is not loaded");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Procedure TestProcedure was not found"));
+            }
+
+            try {
+                Class.forName("voter.TestProcedure");
+                fail("Should not load the class file from the jar file on disk automatically");
+            } catch (ClassNotFoundException e) {
+                assertTrue(e.getMessage().contains("voter.TestProcedure"));
+            }
+
+            // Update classes with a 33M jar file
+            InMemoryJarfile boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmtBig.jar"));
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("@AdHoc", "create procedure partition ON TABLE tt COLUMN pid from class voter.TestProcedure;");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // UpdateClass with the new changed StmtSQL jar with the size of 23M, bring the total
+            // catalog in memory to 56M.
+            boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmtNewBig.jar"));
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // run with a new query without problems
+            resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // Invalid SQLStmt should fail during UpdateClasses
+            boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmtInvalid.jar"));
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                fail("Invalid SQLStmt should fail during UpdateClasses");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Failed to plan for statement"));
+                assertTrue(e.getMessage().contains("object not found: TT_INVALID_QUERY"));
+            }
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
