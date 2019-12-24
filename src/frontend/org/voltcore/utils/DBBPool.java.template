@@ -508,6 +508,7 @@ public final class DBBPool {
                 logDeallocation(buf.capacity());
                 DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
+                HOST.fatal("Failed to deallocate direct byte buffer", e);
                 crash("Failed to deallocate direct byte buffer", false, e);
             }
         }

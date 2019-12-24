@@ -58,11 +58,12 @@ public class TestExportFeatureOption extends JUnit4LocalClusterTest {
 
     @Test
     public void testNoOption() throws Exception {
+        ExportMode expected = m_mockVolt.getConfig().m_isEnterprise ? ExportMode.ADVANCED : ExportMode.BASIC;
         ExportMode exportMode = ExportManagerInterface.getExportFeatureMode(null);
-        assertEquals(ExportMode.BASIC, exportMode);
+        assertEquals(expected, exportMode);
         FeaturesType features = new FeaturesType();
         exportMode = ExportManagerInterface.getExportFeatureMode(features);
-        assertEquals(ExportMode.BASIC, exportMode);
+        assertEquals(expected, exportMode);
     }
 
     @Test
