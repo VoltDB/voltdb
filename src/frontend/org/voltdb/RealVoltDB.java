@@ -2659,7 +2659,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     deploymentBytes = catalogStuff.deploymentBytes;
                 }
             } catch (KeeperException.NodeExistsException e) {
-                CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                CatalogAndDeployment catalogStuff;
+                do {
+                    catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                } while (catalogStuff == null);
                 byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
                 if (deploymentBytesTemp != null) {
                     //Check hash if its a supplied deployment on command line.
