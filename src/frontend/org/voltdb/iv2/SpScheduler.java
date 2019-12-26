@@ -1615,7 +1615,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             written = m_cl.logIv2Fault(m_mailbox.getHSId(),
                     master, m_partitionId, faultSpHandle, LogEntryType.MASTERMODE);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Log master only mode on site " + CoreUtils.hsIdToString(m_mailbox.getHSId()));
+                tmLog.debug("Log master only mode on site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " partition:" + m_partitionId);
             }
         }
         return written;
