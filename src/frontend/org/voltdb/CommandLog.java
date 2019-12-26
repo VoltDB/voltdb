@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -23,6 +24,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -214,4 +216,14 @@ public interface CommandLog {
      * Assign DurabilityListener from each SpScheduler to commmand log
      */
     public abstract void registerDurabilityListener(DurabilityListener durabilityListener);
+
+    /**
+     * @param partitions teh dcommissioned partitions on this host
+     */
+    public void setDecommissionedPartitions(List<Integer> partitions);
+
+    /**
+     * @return return a list of decommissioned replicas on this host
+     */
+    public ImmutableSet<Integer> getDecommissionedPartitions();
 }
