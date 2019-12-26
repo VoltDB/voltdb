@@ -1608,7 +1608,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public SettableFuture<Boolean> logMasterMode() {
         SettableFuture<Boolean> written = null;
-        if (m_replayComplete && m_isLeader) {
+        if (m_replayComplete) {
             long faultSpHandle = advanceTxnEgo().getTxnId();
             Set<Long> master = Sets.newHashSet();
             master.add(m_mailbox.getHSId());

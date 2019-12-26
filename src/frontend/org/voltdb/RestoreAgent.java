@@ -670,12 +670,14 @@ SnapshotCompletionInterest, Promotable
                     for (Integer cmdpart : cmdlogmap.keySet()) {
                         Long snaptxnId = snapmap.get(cmdpart);
                         if (snaptxnId == null) {
-                            m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                            .append(info.nonce)
-                                            .append(" due to missing partition: ")
-                                            .append(cmdpart);
-                            info = null;
-                            break;
+                            if (!m_replayAgent.isDecommissionedPartition(cmdpart)) {
+                                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                                .append(info.nonce)
+                                .append(" due to missing partition: ")
+                                .append(cmdpart);
+                                info = null;
+                                break;
+                            }
                         }
                         else if (snaptxnId < cmdlogmap.get(cmdpart)) {
                             m_snapshotErrLogStr.append("\nRejected snapshot ")
