@@ -88,7 +88,8 @@ public class SynchronizedStatesManager {
     private Set<String> m_groupMembers = new HashSet<String>();
     private final StateMachineInstance m_registeredStateMachines [];
     private int m_registeredStateMachineInstances = 0;
-    private static final ListeningExecutorService m_shared_es = CoreUtils.getListeningExecutorService("SSM Daemon", 1);
+    private static final ListeningExecutorService s_shared_es = CoreUtils.getListeningExecutorService("SSM Daemon", 1);
+    private final ListeningExecutorService m_ssm_es;
     // We assume that we are far enough along that the HostMessenger is up and running. Otherwise add to constructor.
     private final ZooKeeper m_zk;
     private final String m_ssmRootNode;
@@ -205,6 +206,7 @@ public class SynchronizedStatesManager {
         private int m_currentParticipants = 0;
         private Set<String> m_memberResults = null;
         private int m_lastProposalVersion = 0;
+        private final ListeningExecutorService m_smi_es;
 
         private boolean m_initializationCompleted = false;
 
@@ -273,7 +275,7 @@ public class SynchronizedStatesManager {
             public void process(final WatchedEvent event) {
                 try {
                     if (!m_done.get()) {
-                        m_shared_es.submit(HandlerForDistributedLockEvent);
+                        m_smi_es.submit(HandlerForDistributedLockEvent);
                     }
                 } catch (RejectedExecutionException e) {
                 }
@@ -288,7 +290,7 @@ public class SynchronizedStatesManager {
             public void process(final WatchedEvent event) {
                 try {
                     if (!m_done.get()) {
-                        m_shared_es.submit(HandlerForBarrierParticipantsEvent);
+                        m_smi_es.submit(HandlerForBarrierParticipantsEvent);
                     }
                 } catch (RejectedExecutionException e) {
                 }
@@ -315,7 +317,7 @@ public class SynchronizedStatesManager {
             public void process(final WatchedEvent event) {
                 try {
                     if (!m_done.get()) {
-                        m_shared_es.submit(HandlerForBarrierResultsEvent);
+                        m_smi_es.submit(HandlerForBarrierResultsEvent);
                     }
                 } catch (RejectedExecutionException e) {
                 }
@@ -327,6 +329,7 @@ public class SynchronizedStatesManager {
         // Used only for Mocking StateMachineInstance
         public StateMachineInstance()
         {
+            m_smi_es = s_shared_es;
             m_statePath = "MockInstanceStatePath";
             m_barrierResultsPath = "MockBarrierResultsPath";
             m_myResultPath = "MockMyResultPath";
@@ -339,10 +342,18 @@ public class SynchronizedStatesManager {
         }
 
         public StateMachineInstance(String instanceName, VoltLogger logger) throws RuntimeException {
+            this(s_shared_es, instanceName, logger);
+            if (logger.isDebugEnabled()) {
+                logger.debug("State machine " + instanceName + " uses default executor");
+            }
+        }
+
+        public StateMachineInstance(ListeningExecutorService es, String instanceName, VoltLogger logger) throws RuntimeException {
             if (instanceName.equals(m_memberNode)) {
                 throw new RuntimeException("State machine name may not be named " + m_memberNode);
             }
             assert(!instanceName.equals(m_memberNode));
+            m_smi_es = es;
             m_stateMachineName = instanceName;
             m_statePath = ZKUtil.joinZKPath(m_stateMachineRoot, instanceName);
             m_lockPath = ZKUtil.joinZKPath(m_statePath, "LOCK_CONTENDERS");
@@ -442,7 +453,7 @@ public class SynchronizedStatesManager {
                         m_log.debug("Error in StateMachineInstance callbacks.", e);
                     }
                     m_initializationCompleted = false;
-                    m_shared_es.submit(new CallbackExceptionHandler(this));
+                    m_smi_es.submit(new CallbackExceptionHandler(this));
                 }
             }
             else {
@@ -670,7 +681,7 @@ public class SynchronizedStatesManager {
                                             m_log.debug("Error in StateMachineInstance callbacks.", e);
                                         }
                                         m_initializationCompleted = false;
-                                        m_shared_es.submit(new CallbackExceptionHandler(this));
+                                        m_smi_es.submit(new CallbackExceptionHandler(this));
                                     }
                                 }
                                 else {
@@ -681,7 +692,7 @@ public class SynchronizedStatesManager {
                                             m_log.debug("Error in StateMachineInstance callbacks.", e);
                                         }
                                         m_initializationCompleted = false;
-                                        m_shared_es.submit(new CallbackExceptionHandler(this));
+                                        m_smi_es.submit(new CallbackExceptionHandler(this));
                                     }
                                 }
                             }
@@ -703,7 +714,7 @@ public class SynchronizedStatesManager {
                                     m_log.debug("Error in StateMachineInstance callbacks.", e);
                                 }
                                 m_initializationCompleted = false;
-                                m_shared_es.submit(new CallbackExceptionHandler(this));
+                                m_smi_es.submit(new CallbackExceptionHandler(this));
                             }
                         }
                         else {
@@ -972,7 +983,7 @@ public class SynchronizedStatesManager {
                             m_log.debug("Error in StateMachineInstance callbacks.", e);
                         }
                         m_initializationCompleted = false;
-                        m_shared_es.submit(new CallbackExceptionHandler(this));
+                        m_smi_es.submit(new CallbackExceptionHandler(this));
                     }
 
                     if (m_initializationCompleted) {
@@ -1043,7 +1054,7 @@ public class SynchronizedStatesManager {
                             m_log.debug("Error in StateMachineInstance callbacks.", e);
                         }
                         m_initializationCompleted = false;
-                        m_shared_es.submit(new CallbackExceptionHandler(this));
+                        m_smi_es.submit(new CallbackExceptionHandler(this));
                     }
 
                     if (m_initializationCompleted) {
@@ -1073,7 +1084,7 @@ public class SynchronizedStatesManager {
                                 m_log.debug("Error in StateMachineInstance callbacks.", e);
                             }
                             m_initializationCompleted = false;
-                            m_shared_es.submit(new CallbackExceptionHandler(this));
+                            m_smi_es.submit(new CallbackExceptionHandler(this));
                         }
                     }
                     else {
@@ -1092,7 +1103,7 @@ public class SynchronizedStatesManager {
                                 m_log.debug("Error in StateMachineInstance callbacks.", e);
                             }
                             m_initializationCompleted = false;
-                            m_shared_es.submit(new CallbackExceptionHandler(this));
+                            m_smi_es.submit(new CallbackExceptionHandler(this));
                         }
                     }
 
@@ -1240,7 +1251,7 @@ public class SynchronizedStatesManager {
                         m_log.debug("Error in StateMachineInstance callbacks.", e);
                     }
                     m_initializationCompleted = false;
-                    m_shared_es.submit(new CallbackExceptionHandler(this));
+                    m_smi_es.submit(new CallbackExceptionHandler(this));
                 }
             }
             if (staleTask != null) {
@@ -1251,7 +1262,7 @@ public class SynchronizedStatesManager {
                         m_log.debug("Error in StateMachineInstance callbacks.", e);
                     }
                     m_initializationCompleted = false;
-                    m_shared_es.submit(new CallbackExceptionHandler(this));
+                    m_smi_es.submit(new CallbackExceptionHandler(this));
                 }
             }
         }
@@ -1451,7 +1462,7 @@ public class SynchronizedStatesManager {
                         m_log.debug("Error in StateMachineInstance callbacks.", e);
                     }
                     m_initializationCompleted = false;
-                    m_shared_es.submit(new CallbackExceptionHandler(this));
+                    m_smi_es.submit(new CallbackExceptionHandler(this));
                 }
             }
             assert(!debugIsLocalStateLocked());
@@ -1511,7 +1522,7 @@ public class SynchronizedStatesManager {
                         m_log.debug("Error in StateMachineInstance callbacks.", e);
                     }
                     m_initializationCompleted = false;
-                    m_shared_es.submit(new CallbackExceptionHandler(this));
+                    m_smi_es.submit(new CallbackExceptionHandler(this));
                 }
             }
         }
@@ -1891,6 +1902,7 @@ public class SynchronizedStatesManager {
 
     // Used only for Mocking StateMachineInstance
     public SynchronizedStatesManager() {
+        m_ssm_es = s_shared_es;
         m_zk = null;
         m_registeredStateMachines = null;
         m_ssmRootNode = "MockRootForZooKeeper";
@@ -1902,13 +1914,25 @@ public class SynchronizedStatesManager {
         m_resetLimit = m_resetAllowance;
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId, int registeredInstances)
-            throws KeeperException, InterruptedException {
+    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId,
+            int registeredInstances) throws KeeperException, InterruptedException {
         this(zk, rootPath, ssmNodeName, memberId, registeredInstances, 5); // default resetAllowance is 5
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId, int registeredInstances, int resetAllowance)
+    public SynchronizedStatesManager(ListeningExecutorService es, ZooKeeper zk, String rootPath, String ssmNodeName,
+            String memberId, int registeredInstances) throws KeeperException, InterruptedException {
+        this(es, zk, rootPath, ssmNodeName, memberId, registeredInstances, 5); // default resetAllowance is 5
+    }
+
+    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId,
+            int registeredInstances, int resetAllowance) throws KeeperException, InterruptedException {
+        this(s_shared_es, zk, rootPath, ssmNodeName, memberId, registeredInstances, resetAllowance);
+    }
+
+    public SynchronizedStatesManager(ListeningExecutorService es, ZooKeeper zk, String rootPath, String ssmNodeName, String memberId,
+            int registeredInstances, int resetAllowance)
             throws KeeperException, InterruptedException {
+        m_ssm_es = es;
         m_zk = zk;
         // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
         m_registeredStateMachines = new StateMachineInstance[registeredInstances];
@@ -1925,8 +1949,12 @@ public class SynchronizedStatesManager {
         m_memberId = m_canonical_memberId + "_v" + m_resetCounter;
     }
 
+    public ListeningExecutorService getExecutor() {
+        return m_ssm_es;
+    }
+
     public void ShutdownSynchronizedStatesManager() throws InterruptedException {
-        ListenableFuture<?> disableComplete = m_shared_es.submit(disableInstances);
+        ListenableFuture<?> disableComplete = m_ssm_es.submit(disableInstances);
         try {
             disableComplete.get();
         }
@@ -1993,7 +2021,7 @@ public class SynchronizedStatesManager {
                     for (StateMachineInstance stateMachine : m_registeredStateMachines) {
                         stateMachine.checkMembership();
                     }
-                    m_shared_es.submit(membershipEventHandler);
+                    m_ssm_es.submit(membershipEventHandler);
                 }
             } catch (RejectedExecutionException e) {
             }
@@ -2057,7 +2085,7 @@ public class SynchronizedStatesManager {
             }
             // Do all the initialization and notifications on the executor to avoid a race with
             // the group membership changes
-            initComplete = m_shared_es.submit(initializeInstances);
+            initComplete = m_ssm_es.submit(initializeInstances);
         }
         return initComplete;
     }
