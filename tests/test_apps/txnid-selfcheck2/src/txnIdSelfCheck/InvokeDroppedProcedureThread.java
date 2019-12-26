@@ -54,7 +54,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
-            log.info("InvokeDroppedProcedureThread response '" + clientResponse.getStatusString() + "' (" +  clientResponse.getStatus() + ")");
+            //log.info("InvokeDroppedProcedureThread response '" + clientResponse.getStatusString() + "' (" +  clientResponse.getStatus() + ")");
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
                 Benchmark.txnCount.incrementAndGet();
                 hardStop("InvokeDroppedProcedureThread returned an unexpected status " + clientResponse.getStatus());
