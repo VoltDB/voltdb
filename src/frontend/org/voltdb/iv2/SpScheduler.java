@@ -1608,14 +1608,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public SettableFuture<Boolean> logMasterMode() {
         SettableFuture<Boolean> written = null;
-        if (m_replayComplete && m_isLeader) {
+        if (m_replayComplete) {
             long faultSpHandle = advanceTxnEgo().getTxnId();
             Set<Long> master = Sets.newHashSet();
             master.add(m_mailbox.getHSId());
             written = m_cl.logIv2Fault(m_mailbox.getHSId(),
                     master, m_partitionId, faultSpHandle, LogEntryType.MASTERMODE);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Log master only mode on site " + CoreUtils.hsIdToString(m_mailbox.getHSId()));
+                tmLog.debug("Log master only mode on site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " partition:" + m_partitionId);
             }
         }
         return written;

@@ -409,6 +409,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         if (isLeader()) {
             return;
         }
+        logMasterMode();
         try {
             final String partitionPath = LeaderElector.electionDirForPartition(
                     VoltZK.leaders_initiators, m_partitionId);
