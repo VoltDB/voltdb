@@ -108,11 +108,9 @@ public class DummyCommandLog implements CommandLog {
         return null;
     }
 
-    @Override
     public void setDecommissionedPartitions(List<Integer> partitions) {
     }
 
-    @Override
     public ImmutableSet<Integer> getDecommissionedPartitions() {
         return null;
     }
