@@ -527,6 +527,42 @@ public class Benchmark {
         }
         return partitionCount;
     }
+    
+    private void reportTaskStats() {
+        ClientResponse cr = null;
+        try {
+           cr = client.callProcedure("@Statistics", "TASK", 0);
+        } catch (Exception e) {
+            log.error(e.getStackTrace());
+        }
+
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            log.error("Failed to call Statistics proc at startup. Exiting.");
+            log.error(((ClientResponseImpl) cr).toJSONString());
+            printJStack();
+            System.exit(-1);
+        }
+        // try {
+        long failures = 0;
+        VoltTable t = cr.getResults()[0];
+        log.info(String.format("%15s%15s%15s%15s", 
+                "TASK NAME", "PARTITION ID", "INVOCATIONS", "FAILURES"));
+        while (t.advanceRow()) {
+            long f = t.getLong("PROCEDURE_FAILURES");
+            log.info(String.format("%15s%15s%15s%15s",                    
+                    t.getString("TASK_NAME"), t.getLong("PARTITION_ID"), t.getLong("SCHEDULER_INVOCATIONS"), f));
+            if (f > 0)
+                failures += f;
+        }
+        if (failures > 0) {
+            log.error(failures + " unexpected TASK failures");
+            System.exit(-1);
+        }
+        // } catch (Exception e) {
+            // log.error(e.getStackTrace());
+            // System.exit(-11);
+        // }
+    }
 
     private byte reportDeadThread(Thread th) {
         log.error("Thread '" + th.getName() + "' is not alive");
@@ -924,6 +960,13 @@ public class Benchmark {
                 }
                 */
                 // cancel periodic stats printing
+
+                /** **/
+                log.info("\n+++ Calling reportTaskStats\n");
+                if (replTasklt != null || partTasklt != null) {
+                    reportTaskStats();
+                }
+
                 timer.cancel();
                 checkpointTimer.cancel();
                 /*

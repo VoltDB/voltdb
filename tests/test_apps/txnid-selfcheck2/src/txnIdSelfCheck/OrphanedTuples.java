@@ -32,11 +32,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.task.Action;
 import org.voltdb.task.ActionGenerator;
 import org.voltdb.task.ActionResult;
@@ -97,32 +97,26 @@ public class OrphanedTuples implements ActionGenerator {
     private void processStats(VoltTable stats) {
         Map<String, Long> partitionMap = new HashMap<String, Long>();
         Map<String, Long> tableTupleCount = new HashMap<String, Long>();
-        
+
         while (stats.advanceRow()) {
-        	long partitionid = stats.getLong("PARTITION_ID");
-        	String source = stats.getString("SOURCE");
-			String active = stats.getString("ACTIVE");
-			long tuplePending = stats.getLong("TUPLE_PENDING");
-        	String tablePart = source + "_" + partitionid;
-        	if (! partitionMap.containsKey(tablePart)) {
-        		// only put this table+partition count in the map once
-        		partitionMap.put(tablePart, tuplePending);        	
-        		if ("FALSE".equalsIgnoreCase(active) && tuplePending > 0)
-        			if (! tableTupleCount.containsKey(source))
-        				tableTupleCount.put(source, tuplePending);
-        			else
-        				tableTupleCount.put(source, tableTupleCount.get(source) + tuplePending);
-        	}
+            long partitionid = stats.getLong("PARTITION_ID");
+            String source = stats.getString("SOURCE");
+            String active = stats.getString("ACTIVE");
+            long tuplePending = stats.getLong("TUPLE_PENDING");
+            String tablePart = source + "_" + partitionid;
+            if (! partitionMap.containsKey(tablePart)) {
+                // only put this table+partition count in the map once
+                partitionMap.put(tablePart, tuplePending);
+                if ("FALSE".equalsIgnoreCase(active) && tuplePending > 0)
+                    if (! tableTupleCount.containsKey(source))
+                        tableTupleCount.put(source, tuplePending);
+                    else
+                        tableTupleCount.put(source, tableTupleCount.get(source) + tuplePending);
+            }
         }
 
-        InetAddress ip;
-        String hostName = null;
-		try {
-			ip = InetAddress.getLocalHost();
-			hostName = ip.getHostName();
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-		}
+        // InetAddress ip;
+        String hostName = CoreUtils.getHostnameAndAddress();
         for (Map.Entry<String, Long> t: tableTupleCount.entrySet()) {
             helper.logWarning(
                     "Host: " + hostName + " Stream " + t.getKey() + " has " + t.getValue() + " tuples pending but is not actively exporting anything");
