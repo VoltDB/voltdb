@@ -153,8 +153,6 @@ VoltEEExceptionType VoltDBEngine::s_loadTableException =
     VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE;
 int VoltDBEngine::s_drHiddenColumnSize = 0;
 
-std::atomic<int64_t> VoltDBEngine::s_lowestSiteId {-1};
-// Todo: shuffle this into per host resource static class
 AbstractDRTupleStream* VoltDBEngine::s_drReplicatedStream = nullptr;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(logProxy), m_topend(topend) {
@@ -172,16 +170,12 @@ VoltDBEngine::initialize(
         int32_t drClusterId,
         int32_t defaultDrBufferSize,
         int64_t tempTableMemoryLimit,
-        bool isLowestSiteId,
+        bool isLowestSite,
         int32_t compactionThreshold) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
-    m_isLowestSite = isLowestSiteId;
+    m_isLowestSite = isLowestSite;
     m_partitionId = partitionId;
-    if (m_isLowestSite) {
-        s_lowestSiteId = siteId;
-        VOLT_DEBUG("Lowest site partition %d site %" PRId64, partitionId, siteId);
-    }
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
 
@@ -302,22 +296,20 @@ bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
             SynchronizedThreadLock::updateSitePerHost(newSitePerHost);
             // give up lowest site role
             if (remove) {
-                s_lowestSiteId = -1;
+                m_isLowestSite = false;
                 if (m_drReplicatedStream) {
                     m_drReplicatedStream = nullptr;
                 }
-                assert(!isLowestSite());
             }
         } else {
             VOLT_DEBUG("on non lowest site");
             if (promote) {
-                // take lowest site role
-                s_lowestSiteId = m_siteId;
+                m_isLowestSite = true;
                 if (s_drReplicatedStream) {
                     m_drReplicatedStream = s_drReplicatedStream;
                 }
                 SynchronizedThreadLock::swapContextforMPEngine();
-                assert(isLowestSite());
+
             }
         }
     }
