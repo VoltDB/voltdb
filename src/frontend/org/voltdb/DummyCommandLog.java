@@ -108,7 +108,7 @@ public class DummyCommandLog implements CommandLog {
         return null;
     }
 
-    public void setDecommissionedPartitions(List<Integer> partitions) {
+    public void notifyDecommissionPartitions(List<Integer> partitions) {
     }
 
     public ImmutableSet<Integer> getDecommissionedPartitions() {

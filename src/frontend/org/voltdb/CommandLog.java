@@ -220,7 +220,7 @@ public interface CommandLog {
     /**
      * @param partitions teh dcommissioned partitions on this host
      */
-    public void setDecommissionedPartitions(List<Integer> partitions);
+    public void notifyDecommissionPartitions(List<Integer> partitions);
 
     /**
      * @return return a list of decommissioned replicas on this host
