@@ -899,14 +899,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_mailbox.send(Longs.toArray(counter.getMisMatchedReplicas()), new HashMismatchMessage());
         tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
 
-        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
                 CreateMode.PERSISTENT, tmLog, "Transfer to Reduced Safety Mode");
 
-        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
-        for (Integer integer : liveHids) {
-            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+        if (VoltDB.instance().isClusterComplete()) {
+            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
+            Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+            for (Integer integer : liveHids) {
+                m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+            }
         }
     }
 
