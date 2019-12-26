@@ -257,7 +257,7 @@ public class TestPBDsWithIds {
     @Test
     public void testSeekEmpty() throws Exception {
         long seekId = 10;
-        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader", true);
         negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
         negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
         negativeSeek(reader, seekId, SeekErrorRule.THROW);
@@ -267,7 +267,7 @@ public class TestPBDsWithIds {
     public void testSingleSegmentSeek() throws Exception {
         int numSegments = 1;
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
 
         // seek to beginning
         runValidSeeksInSegment(reader, segmentIds[0]);
@@ -283,7 +283,7 @@ public class TestPBDsWithIds {
         int numSegments = 5;
         Random rand = new Random(System.currentTimeMillis());
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, rand.nextInt(numSegments-1)+1);
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         List<BBContainer> toDiscard = readBuffers(reader, rand.nextInt(50));
 
         // seek to beginning
@@ -296,7 +296,7 @@ public class TestPBDsWithIds {
         for (BBContainer c : toDiscard) {
             c.discard();
         }
-        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        assertEquals(numSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
     private void runValidSeeksInSegment(PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader, Pair<Long, Long> range) throws Exception {
@@ -319,7 +319,7 @@ public class TestPBDsWithIds {
             return;
         }
         long seekId = firstAvailable - 1;
-        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader", true);
         List<BBContainer> toDiscard = readBuffers(reader, (new Random(System.currentTimeMillis())).nextInt(30));
         negativeSeek(reader, seekId, SeekErrorRule.SEEK_BEFORE);
         negativeSeek(reader, seekId, SeekErrorRule.THROW);
@@ -339,20 +339,17 @@ public class TestPBDsWithIds {
         Pair<Long, Long>[] segmentIds = createPopulateSegments(3, 10, 10, -1);
         long lastAvailable = segmentIds[segmentIds.length-1].getSecond();
         long seekId = lastAvailable + 1;
-        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader", true);
         List<BBContainer> toDiscard = readBuffers(reader, (new Random(System.currentTimeMillis())).nextInt(30));
         negativeSeek(reader, seekId, SeekErrorRule.SEEK_AFTER);
         negativeSeek(reader, seekId, SeekErrorRule.THROW);
         reader.seekToSegment(seekId, SeekErrorRule.SEEK_BEFORE);
         BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         container.discard();
-        // The discard should have triggered deletion of previous segments.
-        // We still have to discard the prev buffers because we still expect
-        // discards for all segments between prev segment position and curr segment after seek.
         for (BBContainer c : toDiscard) {
             c.discard();
         }
-        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        assertEquals(3, TestPersistentBinaryDeque.getSortedDirectoryListing().size()); // transient readers don't delete segments
         PBDSegment<ExtraHeaderMetadata> currSegment = ((PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor) reader).getCurrentSegment();
         assert(currSegment.getEndId() == lastAvailable);
     }
@@ -366,8 +363,7 @@ public class TestPBDsWithIds {
         long gapStart = segmentIds[gapSegment-1].getSecond()+1;
         long gapEnd = segmentIds[gapSegment].getFirst()-1;
 
-        //BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testReader");
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         List<BBContainer> toDiscard = readBuffers(reader, rand.nextInt(50));
         negativeSeek(reader, gapStart, SeekErrorRule.THROW);
         negativeSeek(reader, gapEnd, SeekErrorRule.THROW);
@@ -392,7 +388,7 @@ public class TestPBDsWithIds {
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
             m_pbd.quarantineSegment(entry);
         }
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         negativeSeek(reader, 5, SeekErrorRule.SEEK_AFTER);
         negativeSeek(reader, 5, SeekErrorRule.SEEK_BEFORE);
         negativeSeek(reader, 5, SeekErrorRule.THROW);
@@ -403,7 +399,7 @@ public class TestPBDsWithIds {
         int numSegments = 3;
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
         m_pbd.quarantineSegment(m_pbd.getSegments().entrySet().iterator().next());
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (int i=1; i<numSegments; i++) {
             for (SeekErrorRule errorRule : SeekErrorRule.values()) {
@@ -433,7 +429,7 @@ public class TestPBDsWithIds {
                 m_pbd.quarantineSegment(entry);
             }
         }
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (int i=0; i<numSegments-1; i++) {
             for (SeekErrorRule errorRule : SeekErrorRule.values()) {
@@ -460,7 +456,7 @@ public class TestPBDsWithIds {
                 m_pbd.quarantineSegment(entry);
             }
         }
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (int i=1; i<numSegments-1; i++) {
             for (SeekErrorRule errorRule : SeekErrorRule.values()) {
@@ -486,7 +482,7 @@ public class TestPBDsWithIds {
                 m_pbd.quarantineSegment(entry);
             }
         }
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (SeekErrorRule errorRule : SeekErrorRule.values()) {
             toDiscard.add(verifySeek(reader, segmentIds[0].getFirst(), errorRule, segmentIds[0]));
@@ -512,7 +508,7 @@ public class TestPBDsWithIds {
                 m_pbd.quarantineSegment(entry);
             }
         }
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (SeekErrorRule errorRule : SeekErrorRule.values()) {
             toDiscard.add(verifySeek(reader, segmentIds[numSegments-1].getFirst(), errorRule, segmentIds[numSegments-1]));
@@ -546,7 +542,7 @@ public class TestPBDsWithIds {
             }
         }
 
-        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader");
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
         ArrayList<BBContainer> toDiscard = new ArrayList<>();
         for (int i=0; i<numSegments; i++) {
             if (quarantinedIndexes.contains((long)i+1)) {

@@ -96,10 +96,16 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         // If a rewind occurred this is set to the segment id where this cursor was before the rewind
         private long m_rewoundFromId = -1;
         private boolean m_cursorClosed = false;
+        private final boolean m_isTransient;
 
         public ReadCursor(String cursorId, int numObjectsDeleted) {
+            this(cursorId, numObjectsDeleted, false);
+        }
+
+        public ReadCursor(String cursorId, int numObjectsDeleted, boolean isTransient) {
             m_cursorId = cursorId;
             m_numObjectsDeleted = numObjectsDeleted;
+            m_isTransient = isTransient;
         }
 
         @Override
@@ -122,7 +128,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     }
 
                     // Save closed readers until everything in the segment is acked.
-                    if (segmentReader.allReadAndDiscarded()) {
+                    if (m_isTransient || segmentReader.allReadAndDiscarded()) {
                         segmentReader.close();
                     } else {
                         segmentReader.closeAndSaveReaderState();
@@ -182,6 +188,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void seekToSegment(long entryId, SeekErrorRule errorRule)
                 throws NoSuchOffsetException, IOException {
+            // Support this only for transient readers for now.
+            // if we support this for non-transient reader, revisit wrapRetCont asserts as well.
+            assert(m_isTransient);
             assert(entryId >= 0);
 
             synchronized(PersistentBinaryDeque.this) {
@@ -414,23 +423,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     synchronized(PersistentBinaryDeque.this) {
                         checkDoubleFree();
                         retcont.discard();
-                        // TODO: Because of seek, a segment may be deleted after a seek forward,
-                        // before the old acks before seek are received. Commenting this out for now.
-                        // We can probably add this back once we make topic cursors not affect deletion
-                        // of PBD data.
-                        //assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
 
+                        // Transient readers do not affect PBD data deletion.
+                        if (m_isTransient) {
+                            return;
+                        }
+
+                        assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
                         if (m_cursorClosed) {
                             return;
                         }
 
                         //Close and remove segment readers that were all acked and before current PBD reader segment.
                         PBDSegmentReader<M> segmentReader = segment.getReader(m_cursorId);
-                        // Seek closes the segment reader. In which case, this discard should have no effect.
-                        // Otherwise segment reader is only closed and removed after all are acked
-                        if (segmentReader == null) {
-                            return;
-                        }
+                        assert(segmentReader != null); // non-transient reader is only closed and removed after all are acked
 
                         assert(m_segment != null);
                         // If the reader has moved past this and all have been acked close this segment reader.
@@ -523,6 +529,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
 
             for (ReadCursor cursor : m_readCursors.values()) {
+                if (cursor.m_isTransient) {
+                    continue;
+                }
                 PBDSegmentReader<M> segmentReader = segment.getReader(cursor.m_cursorId);
                 // segment reader is null if the cursor hasn't reached this segment or
                 // all has been read and discarded.
@@ -1306,6 +1315,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_usageSpecificLog.debug("Closing and deleting segment " + segment.file()
                 + " (final: " + segment.isFinal() + ")");
         }
+        if (assertionsOn) { // track the numRead for transient readers, when we delete ones not read by them.
+            for (ReadCursor reader : m_readCursors.values()) {
+                if (!reader.m_isTransient) {
+                    continue;
+                }
+                if (reader.m_segment == null) {
+                    reader.m_numRead += toDelete;
+                } else if (segment.m_index >= reader.m_segment.m_index) {
+                    PBDSegmentReader<M> sreader = segment.getReader(reader.m_cursorId);
+                    reader.m_numRead += toDelete - (sreader == null ? 0 : sreader.readIndex());
+                }
+            }
+        }
+
         segment.closeAndDelete();
         m_numDeleted += toDelete;
     }
@@ -1404,15 +1427,21 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized ReadCursor openForRead(String cursorId) throws IOException {
+        return openForRead(cursorId, false);
+    }
+
+    @Override
+    public synchronized ReadCursor openForRead(String cursorId, boolean isTransient) throws IOException {
         if (m_closed) {
             throw new IOException("Cannot openForRead(): PBD has been Closed");
         }
 
         ReadCursor reader = m_readCursors.get(cursorId);
         if (reader == null) {
-            reader = new ReadCursor(cursorId, m_numDeleted);
+            reader = new ReadCursor(cursorId, m_numDeleted, isTransient);
             m_readCursors.put(cursorId, reader);
         }
+        assert(reader.m_isTransient == isTransient);
 
         return reader;
     }
@@ -1468,6 +1497,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private boolean canDeleteSegmentsBefore(PBDSegment<M> segment) {
         String retentionCursor = (m_retentionPolicy == null) ? null : m_retentionPolicy.getCursorId();
         for (ReadCursor cursor : m_readCursors.values()) {
+            if (cursor.m_isTransient) {
+                continue;
+            }
             if (cursor.m_segment == null) {
                 return false;
             }
