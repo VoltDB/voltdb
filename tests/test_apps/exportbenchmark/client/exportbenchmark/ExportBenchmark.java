@@ -643,11 +643,11 @@ public class ExportBenchmark {
                 success = waitForStreamedAllocatedMemoryZero();
             } catch (IOException e) {
                 System.err.println("Error while waiting for export: ");
-		e.printStackTrace();
+                e.printStackTrace();
                 e.getLocalizedMessage();
             } catch (ProcCallException e) {
                 System.err.println("Error while calling procedures: ");
-		e.printStackTrace();
+                e.printStackTrace();
                 e.getLocalizedMessage();
             }
         }
