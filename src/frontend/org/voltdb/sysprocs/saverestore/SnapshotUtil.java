@@ -64,6 +64,7 @@ import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExtensibleSnapshotDigestData;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
@@ -197,6 +198,19 @@ public class SnapshotUtil {
                     stringer.value(tables.get(ii).getTypeName());
                 }
                 stringer.endArray();
+
+                //In master-only mode, partition replicas are de-commissioned
+                RealVoltDB db = (RealVoltDB)VoltDB.instance();
+                if (db.isMasterOnly()) {
+                    List<Integer> missingPartitions = db.getNonLeaderPartitionIds();
+                    if (!missingPartitions.isEmpty()) {
+                        stringer.key("missingPartitions").array();
+                        for (Integer p : missingPartitions ) {
+                            stringer.value(p);
+                        }
+                        stringer.endArray();
+                    }
+                }
 
                 stringer.key("partitionTransactionIds").object();
                 for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
@@ -681,6 +695,14 @@ public class SnapshotUtil {
             return m_nonce;
         }
 
+        public void addMissingPartition(Integer pid) {
+            m_missingPartitions.add(pid);
+        }
+
+        public List<Integer> getMissingPartitions() {
+            return m_missingPartitions;
+        }
+
         public final List<File> m_digests = new ArrayList<File>();
         public File m_hashConfig = null;
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
@@ -691,6 +713,7 @@ public class SnapshotUtil {
         private final String m_nonce;
         private InstanceId m_instanceId = null;
         private long m_txnId;
+        private List<Integer> m_missingPartitions = new ArrayList<Integer>();
     }
 
     /**
@@ -880,6 +903,12 @@ public class SnapshotUtil {
                     }
                     named_s.m_digestTables.add(tableSet);
                     named_s.m_digests.add(f);
+                    if (digest.has("missingPartitions")) {
+                        JSONArray missingPartitions = digest.getJSONArray("missingPartitions");
+                        for (int ii = 0; ii < missingPartitions.length(); ii++) {
+                            named_s.addMissingPartition(missingPartitions.optInt(ii));
+                        }
+                    }
                 } else if (f.getName().endsWith(".jar")) {
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);

@@ -109,10 +109,4 @@ public interface CommandLogReinitiator {
      * Resume any elastic operations which were already started
      */
     public void resumeElasticOperationIfNecessary();
-
-    /**
-     * @param partitionId
-     * @return true if FaultLog reports that the partition is decommissioned
-     */
-    public boolean isDecommissionedPartition(int partitionId);
 }
