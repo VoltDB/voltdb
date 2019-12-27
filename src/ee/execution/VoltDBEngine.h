@@ -486,7 +486,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         bool isLowestSite() const {
-            return m_siteId == s_lowestSiteId;
+            return m_isLowestSite;
         }
 
         void setLowestSiteForTest() {
@@ -688,14 +688,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int64_t m_siteId = -1;
 
-        //TODO deprecate m_isLowestSite
         bool m_isLowestSite = false;
 
         int32_t m_partitionId = -1;
-
-        // the initiator that has the lowest local partition ID is consider lowest site
-        static std::atomic<int64_t> s_lowestSiteId;
-
         int32_t m_clusterIndex;
 
         std::unique_ptr<TheHashinator> m_hashinator;
