@@ -584,7 +584,15 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 server.setJavaProperty("DISABLE_HASH_MISMATCH_TEST", "true");
             }
             client.close();
-            server.shutDown();
+            // make a terminal snapshot
+            Client adminClient = ClientFactory.createClient();
+            adminClient.createConnection(server.getAdminAddress(0));
+            try {
+                server.shutdownSave(adminClient);
+                server.waitForNodesToShutdown();
+            } finally {
+                adminClient.close();
+            }
             Thread.sleep(2000);
             System.out.println("Shutdown cluster and recover");
             server.overrideStartCommandVerb("RECOVER");
