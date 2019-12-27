@@ -5296,6 +5296,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // release export resources
                 ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionIds());
+                if (m_commandLog != null) {
+                    m_commandLog.notifyDecommissionPartitions(getNonLeaderPartitionIds());
+                }
             }
         }
     }
