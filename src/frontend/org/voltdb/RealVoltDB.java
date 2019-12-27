@@ -5277,18 +5277,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .map(Initiator::getInitiatorHSId).collect(Collectors.toList());
     }
 
-    private Set<Integer> getNonLeaderPartitionId() {
-        Set<Integer> pids = new HashSet<>();
-        for(Initiator init : m_iv2Initiators.values()) {
-            if (init.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                if (!((SpInitiator) init).isLeader()) {
-                    pids.add(init.getPartitionId());
-                }
-            }
-        }
-        return  pids;
-    }
-
     public void processReplicaDecommission(int leaderCount) {
         synchronized(m_catalogUpdateLock) {
             if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
@@ -5307,10 +5295,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.info("Update local active site count to :" + leaderCount);
 
                 // release export resources
-                ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionId());
-                if (m_commandLog != null) {
-                    m_commandLog.notifyDecommissionPartitions(getNonLeaderPartitionIds());
-                }
+                ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionIds());
             }
         }
     }

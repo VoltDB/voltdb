@@ -96,9 +96,4 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public void initPartitionTracking() {}
-
-    @Override
-    public boolean isDecommissionedPartition(int partitionId) {
-        return false;
-    }
 }

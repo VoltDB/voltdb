@@ -22,6 +22,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -261,7 +262,7 @@ SnapshotCompletionInterest, Promotable
         public final Set<String> fileTables = new HashSet<String>();
         public final SnapshotPathType pathType;
         public final JSONObject elasticOperationMetadata;
-
+        public final List<Integer> m_missingPartitions = new ArrayList<Integer>();
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
@@ -670,7 +671,7 @@ SnapshotCompletionInterest, Promotable
                     for (Integer cmdpart : cmdlogmap.keySet()) {
                         Long snaptxnId = snapmap.get(cmdpart);
                         if (snaptxnId == null) {
-                            if (!m_replayAgent.isDecommissionedPartition(cmdpart)) {
+                            if (!e.getMissingPartitions().contains(cmdpart)) {
                                 m_snapshotErrLogStr.append("\nRejected snapshot ")
                                 .append(info.nonce)
                                 .append(" due to missing partition: ")
@@ -678,8 +679,7 @@ SnapshotCompletionInterest, Promotable
                                 info = null;
                                 break;
                             }
-                        }
-                        else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                        } else if (snaptxnId < cmdlogmap.get(cmdpart)) {
                             m_snapshotErrLogStr.append("\nRejected snapshot ")
                                             .append(info.nonce)
                                             .append(" because it does not overlap the command log")
@@ -695,7 +695,6 @@ SnapshotCompletionInterest, Promotable
                     }
                 }
             }
-
 
             if (info != null) {
                 snapshotInfos.add(info);
