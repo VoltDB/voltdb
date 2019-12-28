@@ -2449,14 +2449,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
                         CoreUtils.getThreadFactory("ReplicaRemoval"));
             }
-            m_replicaRemovalExecutor.schedule(() -> {
-                if (!decommissionReplicas()) {
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("@StopReplicas is blocked, reshchedule it.");
-                    }
-                    m_mailbox.deliver(new HashMismatchMessage());
+            if (message.isReschedule()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("@StopReplicas is blocked, reshcheduled.");
                 }
-            }, 2, TimeUnit.SECONDS);
+                m_replicaRemovalExecutor.schedule(() -> {
+                    if (!decommissionReplicas()) {
+                        m_mailbox.deliver(new HashMismatchMessage(true));
+                    }
+                }, 2, TimeUnit.SECONDS);
+            } else {
+                m_replicaRemovalExecutor.submit(() -> {
+                    if (!decommissionReplicas()) {
+                        m_mailbox.deliver(new HashMismatchMessage(true));
+                    }
+                });
+            }
         }
     }
 
