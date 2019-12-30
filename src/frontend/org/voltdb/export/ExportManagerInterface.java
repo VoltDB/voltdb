@@ -241,5 +241,5 @@ public interface ExportManagerInterface {
      * resources.
      * @param removedPartitions  The de-commissioned local partitions
      */
-    public void releaseResources(Set<Integer> removedPartitions);
+    public void releaseResources(List<Integer> removedPartitions);
 }

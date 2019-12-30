@@ -1060,7 +1060,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    public void closeDataSources(Set<Integer> removedPartitions) {
+    public void closeDataSources(List<Integer> removedPartitions) {
         synchronized (m_dataSourcesByPartition) {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> dataSources : m_dataSourcesByPartition.entrySet()) {
                 Integer partition = dataSources.getKey();
