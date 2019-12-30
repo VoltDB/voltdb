@@ -239,10 +239,5 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
         } catch (Exception e) {
             tmLog.info("Exception during shutdown service.", e );
         }
-
-        if (m_executionSite != null) {
-            // decommission EE service
-            // m_executionSite.startDecommission();
-        }
     }
 }
