@@ -95,12 +95,24 @@ public interface BinaryDeque<M> {
 
     /**
      * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * This is equivalent to {@link BinaryDeque#openForRead(cursorId, isTransient)} with false for {@code isTransient}.
      * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
      * the existing cursor will be returned.
      * @return a BinaryDequeReader for this cursorId
      * @throws IOException on any errors trying to read the PBD files
      */
     public BinaryDequeReader<M> openForRead(String cursorId) throws IOException;
+
+    /**
+     * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
+     * the existing cursor will be returned.
+     * @param isTransient true if this reader is transient, which means the BinaryDeque doesn't need to wait
+     *        discards of reads from this reader before deleting data.
+     * @return a BinaryDequeReader for this cursorId
+     * @throws IOException on any errors trying to read the PBD files
+     */
+    public BinaryDequeReader<M> openForRead(String cursorId, boolean isTransient) throws IOException;
 
     /**
      * Close a BinaryDequeReader reader, also close the SegmentReader for the segment if it is reading one.
