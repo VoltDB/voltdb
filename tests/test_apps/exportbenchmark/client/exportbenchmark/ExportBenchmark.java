@@ -66,12 +66,14 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
  */
 public class ExportBenchmark {
 
+    static VoltLogger log = new VoltLogger("ExportBenchmark");
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
@@ -177,7 +179,7 @@ public class ExportBenchmark {
             if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
             if (target.equals("other") && count == 0 ) {
                count = 10000000+40000;
-               System.out.println("Using count mode with count: " + count);
+               log.info("Using count mode with count: " + count);
             }
             //If count is specified turn warmup off.
             if (count > 0) {
@@ -197,7 +199,7 @@ public class ExportBenchmark {
                 successfulInserts.incrementAndGet();
             } else {
                 failedInserts.incrementAndGet();
-                System.out.println(response.getStatusString());
+                log.info(response.getStatusString());
             }
         }
     }
@@ -208,8 +210,8 @@ public class ExportBenchmark {
      * @param e         The exception thrown
      */
     private void exitWithException(String message, Exception e) {
-        System.err.println(message);
-        System.err.println(e.getLocalizedMessage());
+        log.error(message);
+        log.info(e.getLocalizedMessage());
         System.exit(-1);
     }
 
@@ -267,12 +269,12 @@ public class ExportBenchmark {
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
-                System.out.println("Waited too long...");
-                System.out.println(stats);
+                log.info("Waited too long...");
+                log.info(stats);
                 break;
             }
             if (ctime - st > (3 * 60 * 1000)) {
-                System.out.println(stats);
+                log.info(stats);
                 st = System.currentTimeMillis();
             }
             long ts = 0;
@@ -284,7 +286,7 @@ public class ExportBenchmark {
                 }
                 if (0 != stats.getLong("TUPLE_PENDING")) {
                     passedThisTime = false;
-                    System.out.println("Partition Not Zero.");
+                    log.info("Partition Not Zero.");
                     break;
                 }
             }
@@ -298,12 +300,12 @@ public class ExportBenchmark {
                     passed = true;
                     break;
                 }
-                System.out.println("Passed but not ready to declare victory.");
+                log.info("Passed but not ready to declare victory.");
             }
             Thread.sleep(5000);
         }
-        System.out.println("Passed is: " + passed);
-        System.out.println(stats);
+        log.info("Passed is: " + passed);
+        log.info(stats);
         return passed;
     }
 
@@ -317,10 +319,10 @@ public class ExportBenchmark {
             client.createConnection(server);
         }
         catch (IOException e) {
-            System.err.println("Connection to " + server + " failed");
+            log.info("Connection to " + server + " failed");
             return;
         }
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+        log.info("Connected to VoltDB node at: " + server);
     }
 
     /**
@@ -329,7 +331,7 @@ public class ExportBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
         connectToOneServer(serverArray[0]);
@@ -348,7 +350,7 @@ public class ExportBenchmark {
         long now;
         AtomicLong rowId = new AtomicLong(0);
         if (benchmarkWarmupEndTS > 0) {
-            System.out.println("Warming up...");
+            log.info("Warming up...");
             now = System.currentTimeMillis();
             rowId = new AtomicLong(0);
             while (benchmarkWarmupEndTS > now) {
@@ -360,7 +362,7 @@ public class ExportBenchmark {
                             rowId.getAndIncrement(),
                             config.multiply,
                             1);
-                    // System.out.println("calling "+"InsertExport"+target);
+                    // log.info("calling "+"InsertExport"+target);
 
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
@@ -369,7 +371,7 @@ public class ExportBenchmark {
                 } catch (Exception ignore) {}
                 }
             }
-            System.out.println("Warmup complete");
+            log.info("Warmup complete");
             rowId.set(0);
         }
 
@@ -380,7 +382,7 @@ public class ExportBenchmark {
         schedulePeriodicStats();
 
         // Insert objects until we've run for long enough
-        System.out.println("Running benchmark...");
+        log.info("Running benchmark...");
         now = System.currentTimeMillis();
         while (true) {
             if ((benchmarkEndTS != 0) && (now > benchmarkEndTS)) {
@@ -404,7 +406,7 @@ public class ExportBenchmark {
                     now = System.currentTimeMillis();
                 }
             } catch (Exception e) {
-                System.err.println("Couldn't insert into VoltDB\n");
+                log.error("Couldn't insert into VoltDB\n");
                 e.printStackTrace();
                 System.exit(1);
             }
@@ -417,11 +419,11 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls" +
+        log.info("Benchmark complete: " + successfulInserts.get() + " successful procedure calls" +
             " (excludes warmup)");
-        System.out.println("Failed " + failedInserts.get() + " procedure calls");
+        log.info("Failed " + failedInserts.get() + " procedure calls");
         // Use this to correlate the total rows exported
-        System.out.println("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
+        log.info("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
                 + (totalInserts * config.multiply) + " (includes warmup)");
     }
 
@@ -474,7 +476,7 @@ public class ExportBenchmark {
             int messageLength = buffer.get();
 
             if (messageLength > buffer.capacity()) {
-                System.out.println("WARN: packet exceeds allocate size; message truncated");
+                log.info("WARN: packet exceeds allocate size; message truncated");
             }
 
             byte[] localBuf = new byte[messageLength];
@@ -489,7 +491,7 @@ public class ExportBenchmark {
         try {
             json = new JSONObject(message);
         } catch (JSONException e) {
-            System.err.println("Received invalid JSON: " + e.getLocalizedMessage());
+            log.error("Received invalid JSON: " + e.getLocalizedMessage());
             return;
         }
 
@@ -503,7 +505,7 @@ public class ExportBenchmark {
             startTime = new Long(json.getLong("startTime"));
             endTime = new Long(json.getLong("endTime"));
         } catch (JSONException e) {
-            System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
+            log.error("Unable to parse JSON " + e.getLocalizedMessage());
             return;
         }
         // Round up elapsed time to 1 ms to avoid invalid data when startTime == endTime
@@ -527,7 +529,7 @@ public class ExportBenchmark {
         }
         // If the else is called it means we received invalid data from the export client
         else {
-            System.out.println("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions +
+            log.info("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions +
                     " | startTime: " + startTime + " | endTime: " + endTime);
         }
     }
@@ -555,7 +557,7 @@ public class ExportBenchmark {
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
             channel.register(statsSocketSelector, SelectionKey.OP_READ);
-            System.out.println("socket setup completed " + CoreUtils.getLocalAddress().toString() +":"+ config.statsPort);
+            log.info("socket setup completed " + CoreUtils.getLocalAddress().toString() +":"+ config.statsPort);
         } catch (IOException e) {
             exitWithException("Couldn't bind to socket", e);
         }
@@ -573,10 +575,10 @@ public class ExportBenchmark {
         // int t = config.targets;
         // Connect to servers
         try {
-            System.out.println("Test initialization");
+            log.info("Test initialization");
             connect(config.servers);
         } catch (InterruptedException e) {
-            System.err.println("ERROR: Error connecting to VoltDB");
+            log.error("ERROR: Error connecting to VoltDB");
             e.printStackTrace();
             System.exit(1);
         }
@@ -599,11 +601,11 @@ public class ExportBenchmark {
 
             // Do the inserts in a separate thread
             // for (target = 0; target < config.targets; target++) {
-                System.out.println("Creating thread ");
+                log.info("Creating thread ");
                 writes = new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        System.out.println("Creating thread target " + target);
+                        log.info("Creating thread target " + target);
                         // doInserts(client, target);
                         doInserts(client);
 
@@ -622,7 +624,7 @@ public class ExportBenchmark {
             statsListener = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    System.out.println("Running statsListener ...");
+                    log.info("Running statsListener ...");
                     setupSocketListener();
                     listenForStats(listenerRunning);
                 }
@@ -634,7 +636,7 @@ public class ExportBenchmark {
         if (!config.socketmode.equals("receiver")) {
             writes.join();
             periodicStatsTimer.cancel();
-            System.out.println("Client finished; ready for export to finish");
+            log.info("Client finished; ready for export to finish");
         }
 
         // wait for export to finish draining if we are receiver..
@@ -642,24 +644,22 @@ public class ExportBenchmark {
             try {
                 success = waitForStreamedAllocatedMemoryZero();
             } catch (IOException e) {
-                System.err.println("Error while waiting for export: ");
+                log.error("Error while waiting for export: ");
                 e.printStackTrace();
-                e.getLocalizedMessage();
             } catch (ProcCallException e) {
-                System.err.println("Error while calling procedures: ");
+                log.error("Error while calling procedures: ");
                 e.printStackTrace();
-                e.getLocalizedMessage();
             }
         }
 
-        System.out.println("Finished benchmark");
+        log.info("Finished benchmark");
 
         // On a socket test, stop the stats listener
         testFinished.set(true);
         if (isSocketTest) {
             statsSocketSelector.wakeup();
             statsListener.join();
-            System.out.println("Finished statsListener ...");
+            log.info("Finished statsListener ...");
         }
 
         // Print results & close
@@ -671,17 +671,17 @@ public class ExportBenchmark {
         // Make sure we got serverside stats if we are acting as a receiver
         if (isSocketTest) {
             if (serverStats.size() == 0 ) {
-                System.err.println("ERROR: Never received stats from export clients");
+                log.error("ERROR: Never received stats from export clients");
                 success = false;
             }
         }
 
 
         if (!success) {
-            System.err.println("Export client failed");
+            log.error("Export client failed");
             System.exit(-1);
         } else {
-            System.out.println("Export client finished successfully");
+            log.info("Export client finished successfully");
             System.exit(0);
         }
 
@@ -696,12 +696,13 @@ public class ExportBenchmark {
 
         // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
         // log merger correlate correctly
-        System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
-        System.out.printf(" Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
-                stats.kPercentileLatencyAsDouble(0.99999));
+        // System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
+        log.info(String.format(" Throughput %d/s, ", stats.getTxnThroughput()));
+        log.info(String.format(" Throughput %d/s, ", stats.getTxnThroughput()));
+        log.info(String.format("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors()));
+        log.info(String.format("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.99999)));
     }
 
     /**
@@ -735,36 +736,36 @@ public class ExportBenchmark {
         }
 
         // Performance statistics
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Client Workload Statistics");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Client Workload Statistics");
+        log.info(HORIZONTAL_RULE);
 
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
-        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
-        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
-        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
-        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
-        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
-        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
-        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
-        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
-        System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
+        log.info(String.format("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput()));
+        log.info(String.format("Average latency:               %,9.2f ms\n", stats.getAverageLatency()));
+        log.info(String.format("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1)));
+        log.info(String.format("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25)));
+        log.info(String.format("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5)));
+        log.info(String.format("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75)));
+        log.info(String.format("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9)));
+        log.info(String.format("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95)));
+        log.info(String.format("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99)));
+        log.info(String.format("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995)));
+        log.info(String.format("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999)));
+        log.info(String.format("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999)));
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics (note: only valid on socket tests for first test execution after voltdb startup)");
-        System.out.printf("Exported rows collected:       %,9d \n", serverTxn);
-        System.out.printf("Average throughput:            %,9d txns/sec\n", serverTps);
+        log.info("\n" + HORIZONTAL_RULE);
+        log.info(" System Server Statistics (note: only valid on socket tests for first test execution after voltdb startup)");
+        log.info(String.format("Exported rows collected:       %,9d \n", serverTxn));
+        log.info(String.format("Average throughput:            %,9d txns/sec\n", serverTps));
 
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
+        log.info(String.format("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency()));
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" Latency Histogram");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(stats.latencyHistoReport());
+        log.info("\n" + HORIZONTAL_RULE);
+        log.info(" Latency Histogram");
+        log.info(HORIZONTAL_RULE);
+        log.info(stats.latencyHistoReport());
 
         // Write stats to file if requested
         try {
@@ -779,7 +780,7 @@ public class ExportBenchmark {
                 fw.close();
             }
         } catch (IOException e) {
-            System.err.println("Error writing stats file");
+            log.error("Error writing stats file");
             e.printStackTrace();
         }
     }
@@ -791,6 +792,7 @@ public class ExportBenchmark {
      * @throws Exception if anything goes wrong.
      */
     public static void main(String[] args) {
+        VoltLogger log = new VoltLogger("ExportBenchmark.main");
         ExportBenchConfig config = new ExportBenchConfig();
         config.parse(ExportBenchmark.class.getName(), args);
 
