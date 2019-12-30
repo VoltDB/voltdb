@@ -367,14 +367,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 Site.this.decommissionSite(remove, promote, newSitePerHost);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted decommission execution site.", e);
-                e.printStackTrace();
             }
             if (remove) {
                 // cancel tick
                 m_tickProducer.cancel();
                 m_runningState = RunningState.DECOMMISSIONING;
-                // normal shutdown
-                // startShutdown();
             }
         }
 
