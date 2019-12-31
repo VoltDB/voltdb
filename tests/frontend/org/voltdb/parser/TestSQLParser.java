@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -969,6 +970,159 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
             assertEquals("Statement: " + statement + " group: " + group, expectedGroupValues.get(group),
                     matcher.group(group));
         }
+    }
+
+    /**
+     * Test the CREATE STREAM modifier clauses, i.e. the clauses between "CREATE STREAM <name>" and
+     * the table column definitions starting with "(". Due to the parsing structure the DDL statement
+     * is not tested as a whole.
+     * <p>
+     * Note 1: the 3 top-level clauses "EXPORT TO TARGET", "PARTITION ON COLUMN" and "AS TOPIC" can be
+     * in any order, but the sub-clauses of "AS TOPIC" must be in the correct order:
+     * "PROFILE", "FORMAT", "KEY-COLUMNS", "ALLOW".
+     * <p>
+     * Note 2: the parsing accepts syntax that may be rejected in subsequent validation, e.g. "EXPORT" clause
+     * coexisting with an "AS TOPIC" clause.
+     */
+    @Test
+    public void testCreateStreamModifierClauses() {
+
+        // Individual clauses
+        validateStreamModifierClauses(
+                "  EXPORT TO TARGET foo (",
+                ImmutableMap.of("targetName", "foo"));
+
+        validateStreamModifierClauses(
+                "  PARTITION ON COLUMN foo (",
+                ImmutableMap.of("partitionColumnName", "foo"));
+
+        // Verify AS TOPIC parsing of subclauses, each subclause being optional
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo(",
+                ImmutableMap.of("topicProfileName", "foo"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo(",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 (",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo" ,
+                        "topicKeyColumnNames", "col1"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2(",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo" ,
+                        "topicKeyColumnNames", "col1 , col2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2 ALLOW role1(",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo" ,
+                        "topicKeyColumnNames", "col1 , col2",
+                        "topicAllowedRoleNames", "role1"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo" ,
+                        "topicKeyColumnNames", "col1 , col2,col3",
+                        "topicAllowedRoleNames", "role1 , role2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC FORMAT zoo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                ImmutableMap.of("topicFormatName", "zoo" ,
+                        "topicKeyColumnNames", "col1 , col2,col3",
+                        "topicAllowedRoleNames", "role1 , role2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                ImmutableMap.of("topicProfileName", "foo",
+                        "topicKeyColumnNames", "col1 , col2,col3",
+                        "topicAllowedRoleNames", "role1 , role2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo FORMAT zoo ALLOW role1 , role2 (",
+                ImmutableMap.of("topicProfileName", "foo", "topicFormatName", "zoo" ,
+                        "topicAllowedRoleNames", "role1 , role2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE foo KEY-COLUMNS col1 , col2,col3 (",
+                ImmutableMap.of("topicProfileName", "foo",
+                        "topicKeyColumnNames", "col1 , col2,col3"));
+
+        // Combinations of 2 clauses
+        validateStreamModifierClauses(
+                "  EXPORT TO TARGET foo AS TOPIC PROFILE bar ALLOW role1 , role2(",
+                ImmutableMap.of("targetName", "foo", "topicProfileName", "bar",
+                        "topicAllowedRoleNames", "role1 , role2"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE bar FORMAT zoo EXPORT TO TARGET foo (",
+                ImmutableMap.of("targetName", "foo", "topicFormatName", "zoo",
+                    "topicProfileName", "bar"));
+
+        validateStreamModifierClauses(
+                "  EXPORT TO TARGET foo PARTITION ON COLUMN bar (",
+                ImmutableMap.of("targetName", "foo", "partitionColumnName", "bar"));
+
+        validateStreamModifierClauses(
+                "  PARTITION ON COLUMN bar EXPORT TO TARGET foo (",
+                ImmutableMap.of("targetName", "foo", "partitionColumnName", "bar"));
+
+        validateStreamModifierClauses(
+                "  PARTITION ON COLUMN foo AS TOPIC FORMAT bar (",
+                ImmutableMap.of("partitionColumnName", "foo", "topicFormatName", "bar"));
+
+        validateStreamModifierClauses(
+                "  AS TOPIC PROFILE bar KEY-COLUMNS col1 , col2,col3 PARTITION ON COLUMN foo (",
+                ImmutableMap.of("partitionColumnName", "foo", "topicProfileName", "bar",
+                        "topicKeyColumnNames", "col1 , col2,col3"));
+
+        // FIXME: Combinations of the 3 clauses
+        validateStreamModifierClauses(
+                "  EXPORT TO TARGET foo AS TOPIC PROFILE bar ALLOW role1 , role2 PARTITION ON COLUMN goo (",
+                ImmutableMap.of("targetName", "foo", "topicProfileName", "bar",
+                        "topicAllowedRoleNames", "role1 , role2", "partitionColumnName", "goo"));
+
+        validateStreamModifierClauses(
+                " PARTITION ON COLUMN goo  AS TOPIC PROFILE bar FORMAT zoo EXPORT TO TARGET foo (",
+                ImmutableMap.of("targetName", "foo", "topicFormatName", "zoo",
+                    "topicProfileName", "bar", "partitionColumnName", "goo"));
+
+        validateStreamModifierClauses(
+                "  EXPORT TO TARGET foo PARTITION ON COLUMN bar AS TOPIC (",
+                ImmutableMap.of("targetName", "foo", "partitionColumnName", "bar"));
+
+        validateStreamModifierClauses(
+                "  PARTITION ON COLUMN bar EXPORT TO TARGET foo AS TOPIC PROFILE bar ALLOW role1 , role2 (",
+                ImmutableMap.of("targetName", "foo", "partitionColumnName", "bar",
+                     "topicProfileName", "bar",
+                        "topicAllowedRoleNames", "role1 , role2"));
+}
+
+    private static void validateStreamModifierClauses(String statement, Map<String, String> expectedGroupValues) {
+        Matcher matcher = SQLParser.matchAnyCreateStreamStatementClause(statement);
+
+        // Verify each expected clause is found once, and only once
+        Set<String> matched = new HashSet<>();
+        int start = 0;
+        while (matcher.find(start)) {
+            start = matcher.end();
+
+            for (Map.Entry<String, String> e : expectedGroupValues.entrySet()) {
+                String key = e.getKey();
+                String parsedValue = matcher.group(key);
+
+                if (parsedValue == null) {
+                    continue;
+                }
+                // Must match only once
+                assertFalse(matched.contains(key));
+                matched.add(key);
+
+                assertEquals(expectedGroupValues.get(key), parsedValue);
+            }
+        }
+        assertEquals(matched.size(), expectedGroupValues.keySet().size());
     }
 
     public final String PATTERN_1 = "\"line: 10, column: 1\"";

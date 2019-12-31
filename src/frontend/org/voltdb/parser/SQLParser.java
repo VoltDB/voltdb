@@ -1328,15 +1328,21 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Build a pattern segment to accept a single optional EXPORT or PARTITION clause
+     * Build a pattern segment to accept single optional EXPORT, PARTITION, or AS TOPIC clauses
      * to modify CREATE STREAM statements.
      *
      * @param captureTokens  Capture individual tokens if true
      * @return               Inner pattern to be wrapped by the caller as appropriate
      *
-     * Capture groups (when captureTokens is true):
-     *  (1) EXPORT clause: target name
-     *  (2) PARTITION clause: column name
+     * Capture groups, when captureTokens is true (with named capture groups):
+     *
+     *  (1) EXPORT TO TARGET    ("targetName"): target name
+     *  (2) PARTITION           ("partitionColumnName"): column name
+     *  If AS TOPIC:
+     *  (3) PROFILE             ("topicProfileName"): topic profile name
+     *  (4) FORMAT              ("topicFormatName"): topic format
+     *  (5) KEY-COLUMNS         ("topicKeyColumnNames"): list of column names
+     *  (6) ALLOW               ("topicAllowedRoleNames"): list of role names
      */
     private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
     {
@@ -1344,11 +1350,45 @@ public class SQLParser extends SQLPatternFactory
             SPF.oneOf(
                 SPF.clause(
                     SPF.token("export"),SPF.token("to"),SPF.token("target"),
-                    SPF.group(captureTokens,  SPF.databaseObjectName())
+                    SPF.group(captureTokens, "targetName", SPF.databaseObjectName())
                 ),
                 SPF.clause(
                     SPF.token("partition"), SPF.token("on"), SPF.token("column"),
-                    SPF.group(captureTokens, SPF.databaseObjectName())
+                    SPF.group(captureTokens, "partitionColumnName", SPF.databaseObjectName())
+                ),
+                SPF.clause(
+                    SPF.token("as"),SPF.token("topic"),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("profile"),
+                            SPF.group(captureTokens, "topicProfileName", SPF.databaseObjectName())
+                        )
+                    ),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("format"),
+                            // Note: not using SPF.oneOf() in order to improve error reporting
+                            SPF.group(captureTokens, "topicFormatName", SPF.databaseObjectName())
+                        )
+                    ),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("key-columns"),
+                            SPF.group(captureTokens,
+                                    "topicKeyColumnNames",
+                                    new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
+                            )
+                        )
+                    ),
+                    SPF.optional(
+                            SPF.clause(
+                                SPF.token("allow"),
+                                SPF.group(captureTokens,
+                                        "topicAllowedRoleNames",
+                                        new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
+                                )
+                            )
+                        )
                 )
             );
     }
