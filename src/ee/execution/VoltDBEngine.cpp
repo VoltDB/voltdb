@@ -299,6 +299,7 @@ bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
                 m_isLowestSite = false;
                 if (m_drReplicatedStream) {
                     m_drReplicatedStream = nullptr;
+                    m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
                 }
             }
         } else {
@@ -307,6 +308,7 @@ bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
                 m_isLowestSite = true;
                 if (s_drReplicatedStream) {
                     m_drReplicatedStream = s_drReplicatedStream;
+                    m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
                 }
                 SynchronizedThreadLock::swapContextforMPEngine();
 
