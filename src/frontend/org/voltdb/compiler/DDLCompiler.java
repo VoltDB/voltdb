@@ -759,7 +759,7 @@ public class DDLCompiler {
             if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
-            } else {
+            } else if (!isTopic) {
                 tableXML.attributes.put("export", targetName);
             }
 
@@ -1625,7 +1625,7 @@ public class DDLCompiler {
         }
     }
 
-    // Note: duplication if allowed topc format values in enterprise code.
+    // Note: duplication of allowed topic format values in enterprise code.
     private static final ImmutableSet<String> s_topicFormats = ImmutableSet.of("AVRO", "JSON", "CSV");
 
     private static void addTopicToCatalogTable (Table table,
@@ -1659,12 +1659,12 @@ public class DDLCompiler {
                 if (definedColumns.contains(col)) {
                     // Do not tolerate any ambiguous key topic definition
                     throw compiler.new VoltCompilerException(
-                            String.format("Column % is defined more than once in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Column %s is defined more than once in the KEY-COLUMNS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 if (!columnMap.keySet().contains(col)) {
                     throw compiler.new VoltCompilerException(
-                            String.format("Unknown column % defined in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Unknown column %s defined in the KEY-COLUMNS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 definedColumns.add(col);
@@ -1682,12 +1682,12 @@ public class DDLCompiler {
                 if (definedRoles.contains(role)) {
                     // Tolerate duplicates
                     compiler.addWarn(String.format(
-                                "Role % is defined more than once in the ALLOW attribute of STREAM %s",
+                                "Role %s is defined more than once in the ALLOW attribute of STREAM %s",
                                 role, table.getTypeName()));
                 }
                 if (db.getGroups().get(role) == null) {
                     throw compiler.new VoltCompilerException(
-                            String.format("Unknown user group % defined in the ALLOW attribute of STREAM %s",
+                            String.format("Unknown user group %s defined in the ALLOW attribute of STREAM %s",
                                     role, table.getTypeName()));
                 }
                 definedRoles.add(role);
