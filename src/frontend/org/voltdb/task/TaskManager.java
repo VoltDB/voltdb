@@ -66,8 +66,10 @@ import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
+import org.voltdb.compiler.deploymentfile.TaskThreadPoolType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.CompoundErrors;
 
 import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.MoreObjects.ToStringHelper;
@@ -108,8 +110,8 @@ public final class TaskManager {
             ClientInterface.TASK_MANAGER_CID, getClass().getSimpleName());
 
     // Global configuration values
-    volatile long m_minDelayNs = 0;
-    volatile double m_maxRunFrequency = 0;
+    volatile long m_minIntervalNs = 0;
+    volatile double m_maxFrequency = 0;
 
     // Local host ID
     final int m_hostId;
@@ -233,7 +235,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> start(CatalogContext context) {
-        return start(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return start(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
@@ -273,7 +275,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> promoteToLeader(CatalogContext context) {
-        return promoteToLeader(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return promoteToLeader(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader());
     }
 
@@ -303,7 +305,7 @@ public final class TaskManager {
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
     public ListenableFuture<?> processUpdate(CatalogContext context, boolean classesUpdated) {
-        return processUpdate(context.getDeployment().getTasks(), context.database.getTasks(), context.authSystem,
+        return processUpdate(context.getDeployment().getTask(), context.database.getTasks(), context.authSystem,
                 context.getCatalogJar().getLoader(), classesUpdated);
     }
 
@@ -438,7 +440,7 @@ public final class TaskManager {
      * @return An error message or {@code null} if no errors were found
      */
     public static String validateTasks(Database database, ClassLoader classLoader) {
-        TaskValidationErrors errors = new TaskValidationErrors();
+        CompoundErrors errors = new CompoundErrors();
         for (Task task : database.getTasks()) {
             errors.addErrorMessage(
                     validateTask(task, TaskScope.fromId(task.getScope()), database, classLoader).getErrorMessage());
@@ -498,7 +500,7 @@ public final class TaskManager {
             }
 
             InitializableFactory<ActionGenerator> actionGeneratorFactory;
-            InitializableFactory<ActionSchedule> actionScheduleFactory;
+            InitializableFactory<IntervalGenerator> intervalGeneratorFactory;
             try {
                 Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition, scope,
                         ActionGenerator.class, actionGeneratorClass, definition.getActiongeneratorparameters(),
@@ -514,20 +516,20 @@ public final class TaskManager {
             }
 
             try {
-                Pair<String, InitializableFactory<ActionSchedule>> result = createFactory(definition, scope,
-                        ActionSchedule.class, actionScheduleClass, definition.getScheduleparameters(),
+                Pair<String, InitializableFactory<IntervalGenerator>> result = createFactory(definition, scope,
+                        IntervalGenerator.class, actionScheduleClass, definition.getScheduleparameters(),
                         database, classLoader);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
                 }
-                actionScheduleFactory = result.getSecond();
+                intervalGeneratorFactory = result.getSecond();
             } catch (Exception e) {
                 return new TaskValidationResult(String.format("%s: Could not load and construct class: %s",
                         definition.getName(), actionScheduleClass), e);
             }
 
-            factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, actionScheduleFactory)
+            factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, intervalGeneratorFactory)
                     : null;
         }
 
@@ -727,20 +729,20 @@ public final class TaskManager {
             configuration = new TaskSettingsType();
         } else if (log.isDebugEnabled()) {
             log.debug("MANAGER: Applying schedule configuration: "
-                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMinDelayMs())
-                            .add("maxRunFrequency", configuration.getMaxRunFrequency())
-                            .add("hostThreadCount", configuration.getHostThreadCount())
-                            .add("partitionedThreadCount", configuration.getPartitionedThreadCount()).toString());
+                    + MoreObjects.toStringHelper(configuration).add("minDelayMs", configuration.getMininterval())
+                            .add("maxRunFrequency", configuration.getMaxfrequency())
+                            .add("hostThreadCount", getThreadPoolSize(configuration, true))
+                            .add("partitionedThreadCount", getThreadPoolSize(configuration, false)).toString());
         }
 
-        m_minDelayNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMinDelayMs());
-        double originalFrequency = m_maxRunFrequency;
-        m_maxRunFrequency = configuration.getMaxRunFrequency() / 60.0;
-        boolean frequencyChanged = m_maxRunFrequency != originalFrequency;
+        m_minIntervalNs = TimeUnit.MILLISECONDS.toNanos(configuration.getMininterval());
+        double originalFrequency = m_maxFrequency;
+        m_maxFrequency = configuration.getMaxfrequency() / 60.0;
+        boolean frequencyChanged = m_maxFrequency != originalFrequency;
 
         // Set the explicitly defined thread counts
-        m_singleExecutor.setThreadCount(configuration.getHostThreadCount());
-        m_partitionedExecutor.setThreadCount(configuration.getPartitionedThreadCount());
+        m_singleExecutor.setThreadCount(getThreadPoolSize(configuration, true));
+        m_partitionedExecutor.setThreadCount(getThreadPoolSize(configuration, false));
 
         boolean hasNonPartitionedSchedule = false;
         boolean hasPartitionedSchedule = false;
@@ -768,7 +770,7 @@ public final class TaskManager {
                     newHandlers.put(task.getName(), handler);
                     handler.updateDefinition(task);
                     if (frequencyChanged) {
-                        handler.setMaxRunFrequency(m_maxRunFrequency);
+                        handler.setMaxFrequency(m_maxFrequency);
                     }
                     if (scope == TaskScope.PARTITIONS) {
                         hasPartitionedSchedule = true;
@@ -835,6 +837,19 @@ public final class TaskManager {
         }
 
         m_handlers = newHandlers;
+    }
+
+    private int getThreadPoolSize(TaskSettingsType configuration, boolean getHost) {
+        if (configuration != null) {
+            TaskSettingsType.Threadpools threadpools = configuration.getThreadpools();
+            if (threadpools != null) {
+                TaskThreadPoolType threadPool = getHost ? threadpools.getHost() : threadpools.getPartition();
+                if (threadPool != null) {
+                    return threadPool.getSize();
+                }
+            }
+        }
+        return 0;
     }
 
     /**
@@ -1081,7 +1096,7 @@ public final class TaskManager {
             return TaskManager.generateLogMessage(m_definition.getName(), body);
         }
 
-        abstract void setMaxRunFrequency(double frequency);
+        abstract void setMaxFrequency(double frequency);
     }
 
     /**
@@ -1135,7 +1150,7 @@ public final class TaskManager {
         }
 
         @Override
-        void setMaxRunFrequency(double frequency) {
+        void setMaxFrequency(double frequency) {
             m_wrapper.setMaxRunFrequency(frequency);
         }
     }
@@ -1203,7 +1218,7 @@ public final class TaskManager {
         }
 
         @Override
-        void setMaxRunFrequency(double frequency) {
+        void setMaxFrequency(double frequency) {
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
                 wrapper.setMaxRunFrequency(frequency);
             }
@@ -1256,12 +1271,12 @@ public final class TaskManager {
     /**
      * Base class which wraps the execution and handling of a single {@link ActionScheduler} instance.
      * <p>
-     * On start {@link Scheduler#getNextAction(ScheduledAction)} is invoked with a null {@link ScheduledAction}
+     * On start {@link Scheduler#getNextAction(ActionResultImpl)} is invoked with a null {@link ActionResultImpl}
      * argument. If the result has a status of {@link Action.Type#PROCEDURE} then the provided procedure will be
-     * scheduled and executed after the delay. Once a response is received
-     * {@link Scheduler#getNextAction(ScheduledAction)} will be invoked again with the {@link ScheduledAction}
-     * previously returned and {@link ScheduledAction#getResponse()} updated with response. This repeats until this
-     * wrapper is cancelled or {@link Scheduler#getNextAction(ScheduledAction)} returns a non schedule result.
+     * scheduled and executed after the interval. Once a response is received
+     * {@link Scheduler#getNextAction(ActionResultImpl)} will be invoked again with the {@link ActionResultImpl}
+     * previously returned and {@link ActionResultImpl#getResponse()} updated with response. This repeats until this
+     * wrapper is cancelled or {@link Scheduler#getNextAction(ActionResultImpl)} returns a non schedule result.
      * <p>
      * This class needs to be thread safe since it's execution is split between the
      * {@link TaskManager#m_managerExecutor} and the schedule executors
@@ -1269,7 +1284,7 @@ public final class TaskManager {
      * @param <H> Type of {@link TaskHandler} which created this wrapper
      */
     private abstract class SchedulerWrapper<H extends TaskHandler> {
-        ScheduledAction m_scheduledAction;
+        ActionResultImpl m_scheduledAction;
 
         final H m_handler;
 
@@ -1280,7 +1295,7 @@ public final class TaskManager {
         private TaskStatsSource m_stats;
         private UnsynchronizedRateLimiter m_rateLimiter;
 
-        // Time at which the handleNextRun was enqueued or should be eligible to execute after a delay
+        // Time at which the handleNextRun was enqueued or should be eligible to execute after an interval
         private volatile long m_expectedExecutionTime;
 
         SchedulerWrapper(H handler, ListeningScheduledExecutorService executor) {
@@ -1317,7 +1332,7 @@ public final class TaskManager {
                 log.debug(generateLogMessage("Starting schedule in state " + m_wrapperState));
             }
 
-            setMaxRunFrequency(m_maxRunFrequency);
+            setMaxRunFrequency(m_maxFrequency);
 
             if (m_wrapperState == SchedulerWrapperState.RUNNING) {
                 m_scheduler = m_handler.constructScheduler(
@@ -1334,8 +1349,8 @@ public final class TaskManager {
         }
 
         /**
-         * Call {@link Scheduler#getNextAction(ScheduledAction)} and process the result including scheduling the next
-         * procedure to run
+         * Call {@link ActionScheduler#getFirstScheduledAction()} or {@link ActionResultImpl#callCallback()} to process the
+         * result including getting the next action to run
          * <p>
          * NOTE: method is not synchronized so the lock is not held during the scheduler execution
          */
@@ -1354,9 +1369,9 @@ public final class TaskManager {
                 log.trace(generateLogMessage("Calling scheduler"));
             }
 
-            DelayedAction action;
+            ScheduledAction action;
             try {
-                action = m_scheduledAction == null ? scheduler.getFirstDelayedAction()
+                action = m_scheduledAction == null ? scheduler.getFirstScheduledAction()
                         : m_scheduledAction.callCallback();
 
             } catch (RuntimeException e) {
@@ -1398,7 +1413,7 @@ public final class TaskManager {
                     throw new IllegalStateException("Unknown status: " + action.getType());
                 }
 
-                m_scheduledAction = new ScheduledAction(action);
+                m_scheduledAction = new ActionResultImpl(action);
 
                 try {
                     long delay = calculateDelay();
@@ -1660,12 +1675,12 @@ public final class TaskManager {
         }
 
         private synchronized long calculateDelay() {
-            long minDelayNs = m_minDelayNs;
+            long minDelayNs = m_minIntervalNs;
             if (m_rateLimiter != null) {
                 long rateLimitDelayNs = TimeUnit.MICROSECONDS.toNanos(m_rateLimiter.reserve(1));
                 minDelayNs = Math.max(minDelayNs, rateLimitDelayNs);
             }
-            return Math.max(m_scheduledAction.getDelay(TimeUnit.NANOSECONDS), minDelayNs);
+            return Math.max(m_scheduledAction.getInterval(TimeUnit.NANOSECONDS), minDelayNs);
         }
 
         /**
@@ -1887,23 +1902,23 @@ public final class TaskManager {
     }
 
     /**
-     * Factory for constructing a {@link ActionScheduler} from an {@link ActionGenerator} and {@link ActionSchedule}
+     * Factory for constructing a {@link ActionScheduler} from an {@link ActionGenerator} and {@link IntervalGenerator}
      */
     private static final class CompositeSchedulerFactory implements SchedulerFactory {
         private final InitializableFactory<ActionGenerator> m_actionGeneratorFactory;
-        private final InitializableFactory<ActionSchedule> m_actionScheduleFactory;
+        private final InitializableFactory<IntervalGenerator> m_intervalGeneratorFactory;
 
         CompositeSchedulerFactory(InitializableFactory<ActionGenerator> actionGeneratorFactory,
-                InitializableFactory<ActionSchedule> actionScheduleFactory) {
+                InitializableFactory<IntervalGenerator> intervalGeneratorFactory) {
             super();
             m_actionGeneratorFactory = actionGeneratorFactory;
-            m_actionScheduleFactory = actionScheduleFactory;
+            m_intervalGeneratorFactory = intervalGeneratorFactory;
         }
 
         @Override
         public ActionScheduler construct(TaskHelper helper) {
             return new CompositeActionScheduler(m_actionGeneratorFactory.construct(helper),
-                    m_actionScheduleFactory.construct(helper));
+                    m_intervalGeneratorFactory.construct(helper));
         }
 
         @Override
@@ -1913,7 +1928,7 @@ public final class TaskManager {
             }
             CompositeSchedulerFactory otherFactory = (CompositeSchedulerFactory) other;
             return m_actionGeneratorFactory.doHashesMatch(otherFactory.m_actionGeneratorFactory)
-                    && m_actionScheduleFactory.doHashesMatch(otherFactory.m_actionScheduleFactory);
+                    && m_intervalGeneratorFactory.doHashesMatch(otherFactory.m_intervalGeneratorFactory);
         }
     }
 

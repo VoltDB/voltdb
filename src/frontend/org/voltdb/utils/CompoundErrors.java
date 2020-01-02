@@ -15,18 +15,21 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.task;
+package org.voltdb.utils;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.task.Initializable;
+
 import com.google_voltpatches.common.base.Joiner;
 
 /**
- * Helper that can be used to collect errors that are encountered while validating the parameters of any
- * {@link Initializable} class.
+ * Helper that can be used to collect multiple errors that are encountered, e.g. while validating
+ * the parameters of any {@link Initializable} class. This enables implementing a validation logic
+ * that will not stop at the first error, and return a message compounding multiple error messages.
  */
-public final class TaskValidationErrors {
+public final class CompoundErrors {
     private List<String> m_errors = null;
 
     /**
@@ -54,13 +57,25 @@ public final class TaskValidationErrors {
     /**
      * Creates an error message comprised of all of the error messages added to this instance by calling
      * {@link #addErrorMessage(String)}. If no error messages were added then {@code null} is returned.
+     * <p>
+     * This method uses a newline ('\n') character to separate the different error messages.
      *
      * @return An error message or {@code null} if {@link #hasErrors()} returns {@code false}
      */
     public String getErrorMessage() {
+        return getErrorMessage("\n");
+    }
+
+    /**
+     * A specialized version of {@link #getErrorMessage()}, using a specific separator.
+     *
+     * @param separator String separating individual error messages in the final string.
+     * @return An error message or {@code null} if {@link #hasErrors()} returns {@code false}
+     */
+    public String getErrorMessage(String separator) {
         if (m_errors == null) {
             return null;
         }
-        return Joiner.on('\n').join(m_errors);
+        return Joiner.on(separator).join(m_errors);
     }
 }

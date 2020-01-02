@@ -95,6 +95,7 @@ public class ExportBenchmark {
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
+    public int target = 0;
 
     // Server-side stats - Note: access synchronized on serverStats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
@@ -144,7 +145,7 @@ public class ExportBenchmark {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
-        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka|other)")
+        @Option(desc = "Export to socket or export to Kafka cluster or discarding (socket|kafka|discarding|other)")
         String target = "socket";
 
         @Option(desc = "if a socket target, act as a client only 'client', socket 'receiver', or default 'both' ")
@@ -165,12 +166,12 @@ public class ExportBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (count < 0) exitWithMessageAndUsage("count must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other")) {
-                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\"");
+            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other") && !target.equals("discarding")) {
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\" or \"discarding\"");
             }
             if (target.equals("socket")) {
                 if ( !socketmode.equals("client") && !socketmode.equals("receiver") && !socketmode.equals("both")) {
-                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"reciever\" or \"both\"");
+                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"receiver\" or \"both\"");
                 }
             }
             if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
@@ -220,6 +221,7 @@ public class ExportBenchmark {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
+        // clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
@@ -361,6 +363,7 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
+    // public void doInserts(Client client, int target) {
     public void doInserts(Client client) {
 
         // Don't track warmup inserts
@@ -371,18 +374,22 @@ public class ExportBenchmark {
             now = System.currentTimeMillis();
             rowId = new AtomicLong(0);
             while (benchmarkWarmupEndTS > now) {
+                for (int t = 1; t <= config.targets; t++) {
                 try {
                     client.callProcedure(
                             new NullCallback(),
-                            "InsertExport",
+                            "InsertExport"+t,
                             rowId.getAndIncrement(),
                             config.multiply,
-                            config.targets);
+                            1);
+                    // System.out.println("calling "+"InsertExport"+target);
+
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
                     }
                 } catch (Exception ignore) {}
+                }
             }
             System.out.println("Warmup complete");
             rowId.set(0);
@@ -405,10 +412,12 @@ public class ExportBenchmark {
             if ( (config.count > 0) && (totalInserts > config.count) ) {
                 break;
             }
+
+            for (int t = 1; t <= config.targets; t++) {
             try {
                 client.callProcedure(
                         new ExportCallback(),
-                        "InsertExport",
+                        "InsertExport"+t,
                         rowId.getAndIncrement(),
                         config.multiply,
                         config.targets);
@@ -421,6 +430,7 @@ public class ExportBenchmark {
                 e.printStackTrace();
                 System.exit(1);
             }
+            }
         }
 
         try {
@@ -429,11 +439,12 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls");
+        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls" +
+            " (excludes warmup)");
         System.out.println("Failed " + failedInserts.get() + " procedure calls");
         // Use this to correlate the total rows exported
         System.out.println("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
-                + (totalInserts * config.multiply));
+                + (totalInserts * config.multiply) + " (includes warmup)");
     }
 
     /**
@@ -581,6 +592,7 @@ public class ExportBenchmark {
 
         boolean isSocketTest = config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"));
         boolean success = true;
+        // int t = config.targets;
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -600,7 +612,7 @@ public class ExportBenchmark {
             } else {
                 benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
             }
-            //If we are going by count turn of end by timestamp.
+            //If we are going by count turn off end by timestamp.
             if (config.count > 0) {
                 benchmarkEndTS = 0;
             } else {
@@ -608,12 +620,18 @@ public class ExportBenchmark {
             }
 
             // Do the inserts in a separate thread
-            writes = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    doInserts(client);
-                }
-            });
+            // for (target = 0; target < config.targets; target++) {
+                System.out.println("Creating thread ");
+                writes = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println("Creating thread target " + target);
+                        // doInserts(client, target);
+                        doInserts(client);
+
+                    }
+                });
+            // }
             writes.start();
             Thread.sleep(config.warmup * 1000);
         }

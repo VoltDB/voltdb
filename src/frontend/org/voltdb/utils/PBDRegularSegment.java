@@ -53,7 +53,7 @@ import com.google_voltpatches.common.base.Preconditions;
 class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private static final Random RANDOM = new Random();
 
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
@@ -110,11 +110,15 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
     }
 
-    long getStartId() {
+    @Override
+    long getStartId() throws IOException {
+        initializeFromHeader();
         return m_startId;
     }
 
-    long getEndId() {
+    @Override
+    long getEndId() throws IOException {
+        initializeFromHeader();
         return m_endId;
     }
 
@@ -237,6 +241,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 ByteBuffer b = m_segmentHeaderBuf.b();
                 b.clear();
                 PBDUtils.readBufferFully(m_fc, b, 0);
+                int crc = b.getInt();
                 int version = b.getInt();
                 if (version != VERSION) {
                     String message = "File version incorrect. Detected version " + version + " requires version "
@@ -245,17 +250,15 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     throw new IOException(message);
                 }
 
-                int crc = b.getInt();
                 int numOfEntries = b.getInt();
                 int size = b.getInt();
-                b.getLong(); // startId
-                b.getLong(); // endId
+                long startId = b.getLong();
+                long endId = b.getLong();
                 int segmentRandomId = b.getInt();
                 int extraHeaderSize = b.getInt();
                 int extraHeaderCrc = b.getInt();
                 if (crcCheck) {
-                    if (crc != calculateSegmentHeaderCrc(numOfEntries, size, segmentRandomId, extraHeaderSize,
-                            extraHeaderCrc)) {
+                    if (crc != calculateSegmentHeaderCrc()) {
                         m_usageSpecificLog
                                 .warn("File corruption detected in " + m_file.getName() + ": invalid file header. ");
                         throw new IOException(
@@ -276,11 +279,15 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                         }
                     }
                 }
+
                 if (skipInitialization) {
                     return;
                 }
+
                 m_numOfEntries = numOfEntries;
                 m_size = size;
+                m_startId = startId;
+                m_endId = endId;
                 m_segmentRandomId = segmentRandomId;
                 m_extraHeaderSize = extraHeaderSize;
                 m_extraHeaderCrc = extraHeaderCrc;
@@ -296,14 +303,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     }
 
     private void writeOutHeader() throws IOException {
-        int crc = calculateSegmentHeaderCrc(m_numOfEntries, m_size, m_segmentRandomId, m_extraHeaderSize,
-                m_extraHeaderCrc);
 
         ByteBuffer b = m_segmentHeaderBuf.b();
         b.clear();
-        // the checksum here is really an unsigned int, store integer to save 4 bytes
+        b.putInt(0); // dummy before crc calculation. We want to reuse this same buffer for crc calculation too.
         b.putInt(VERSION);
-        b.putInt(crc);
         b.putInt(m_numOfEntries);
         b.putInt(m_size);
         b.putLong(m_startId);
@@ -311,22 +315,22 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         b.putInt(m_segmentRandomId);
         b.putInt(m_extraHeaderSize);
         b.putInt(m_extraHeaderCrc);
-        b.flip();
+
+        int crc = calculateSegmentHeaderCrc();
+        b.position(HEADER_CRC_OFFSET);
+        b.putInt(crc);
+        b.position(HEADER_START_OFFSET);
         PBDUtils.writeBuffer(m_fc, m_segmentHeaderBuf.bDR(), PBDSegment.HEADER_START_OFFSET);
         m_syncedSinceLastEdit = false;
     }
 
-    private int calculateSegmentHeaderCrc(int numOfEntries, int size, int segmentRandomId, int extraHeaderSize,
-            int extraHeaderCrc) {
+    private int calculateSegmentHeaderCrc() {
+        ByteBuffer bb = m_segmentHeaderBuf.b();
+        bb.position(HEADER_VERSION_OFFSET);
         m_crc.reset();
-        m_crc.update(VERSION);
-        m_crc.update(numOfEntries);
-        m_crc.update(size);
-        m_crc.update(segmentRandomId);
-        m_crc.update(extraHeaderSize);
-        if (extraHeaderSize > 0) {
-            m_crc.update(extraHeaderCrc);
-        }
+        m_crc.update(m_segmentHeaderBuf.b());
+
+        // the checksum here is really an unsigned int
         return (int) m_crc.getValue();
     }
 

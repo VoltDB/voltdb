@@ -589,20 +589,20 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
             <include name="src/frontend/org/voltdb/task/package-info.java" />
-            <include name="src/frontend/org/voltdb/task/ActionScheduler.java" />
-            <include name="src/frontend/org/voltdb/task/DelayedAction.java" />
+            <include name="src/frontend/org/voltdb/task/Action.java" />
+            <include name="src/frontend/org/voltdb/task/ActionDescription.java" />
             <include name="src/frontend/org/voltdb/task/ActionGenerator.java" />
             <include name="src/frontend/org/voltdb/task/ActionGeneratorBase.java" />
-            <include name="src/frontend/org/voltdb/task/Action.java" />
-            <include name="src/frontend/org/voltdb/task/ActionSchedule.java" />
-            <include name="src/frontend/org/voltdb/task/ActionDelay.java" />
-            <include name="src/frontend/org/voltdb/task/ActionDescription.java" />
             <include name="src/frontend/org/voltdb/task/ActionResult.java" />
+            <include name="src/frontend/org/voltdb/task/ActionScheduler.java" />
             <include name="src/frontend/org/voltdb/task/ActionType.java" />
             <include name="src/frontend/org/voltdb/task/Initializable.java" />
-            <include name="src/frontend/org/voltdb/task/TaskValidationErrors.java" />
+            <include name="src/frontend/org/voltdb/task/Interval.java" />
+            <include name="src/frontend/org/voltdb/task/IntervalGenerator.java" />
+            <include name="src/frontend/org/voltdb/task/ScheduledAction.java" />
             <include name="src/frontend/org/voltdb/task/TaskScope.java" />
             <include name="src/frontend/org/voltdb/task/TaskHelper.java" />
+            <include name="src/frontend/org/voltdb/utils/CompoundErrors.java" />
         </fileset>
     </javadoc>
 

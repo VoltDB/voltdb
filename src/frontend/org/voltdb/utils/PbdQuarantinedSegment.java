@@ -212,4 +212,14 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         public void markAllReadAndDiscarded() {
         }
     };
+
+    @Override
+    long getStartId() throws IOException {
+        return -1;
+    }
+
+    @Override
+    long getEndId() throws IOException {
+        return -1;
+    }
 }

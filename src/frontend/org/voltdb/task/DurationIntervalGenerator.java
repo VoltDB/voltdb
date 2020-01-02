@@ -19,16 +19,18 @@ package org.voltdb.task;
 
 import java.util.concurrent.TimeUnit;
 
+import org.voltdb.utils.CompoundErrors;
+
 /**
  * Simple abstract class to handle the common duration parsing and validation of schedulers which use a static duration
  * in the form of &lt;interval&gt; &lt;timeUnit&gt;
  */
-abstract class DurationSchedule implements ActionSchedule {
+abstract class DurationIntervalGenerator implements IntervalGenerator {
     TaskHelper m_helper;
     long m_durationNs = -1;
 
     public static String validateParameters(TaskHelper helper, int interval, String timeUnit) {
-        TaskValidationErrors errors = new TaskValidationErrors();
+        CompoundErrors errors = new CompoundErrors();
         if (interval <= 0) {
             errors.addErrorMessage("Interval must be greater than 0: " + interval);
         }

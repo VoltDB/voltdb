@@ -40,6 +40,8 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
+import org.voltdb.utils.BinaryDequeReader.NoSuchOffsetException;
+import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
 import org.voltdb.utils.PairSequencer.CyclicSequenceException;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -94,10 +96,16 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         // If a rewind occurred this is set to the segment id where this cursor was before the rewind
         private long m_rewoundFromId = -1;
         private boolean m_cursorClosed = false;
+        private final boolean m_isTransient;
 
         public ReadCursor(String cursorId, int numObjectsDeleted) {
+            this(cursorId, numObjectsDeleted, false);
+        }
+
+        public ReadCursor(String cursorId, int numObjectsDeleted, boolean isTransient) {
             m_cursorId = cursorId;
             m_numObjectsDeleted = numObjectsDeleted;
+            m_isTransient = isTransient;
         }
 
         @Override
@@ -120,7 +128,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     }
 
                     // Save closed readers until everything in the segment is acked.
-                    if (segmentReader.allReadAndDiscarded()) {
+                    if (m_isTransient || segmentReader.allReadAndDiscarded()) {
                         segmentReader.close();
                     } else {
                         segmentReader.closeAndSaveReaderState();
@@ -170,6 +178,68 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         retcont.discard();
                     }
                 };
+            }
+        }
+
+        PBDSegment<M> getCurrentSegment() {
+            return m_segment;
+        }
+
+        @Override
+        public void seekToSegment(long entryId, SeekErrorRule errorRule)
+                throws NoSuchOffsetException, IOException {
+            // Support this only for transient readers for now.
+            // if we support this for non-transient reader, revisit wrapRetCont asserts as well.
+            assert(m_isTransient);
+            assert(entryId >= 0);
+
+            synchronized(PersistentBinaryDeque.this) {
+                PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
+                moveToValidSegment();
+
+                if (m_segment.segmentIndex() == seekSegment.segmentIndex()) {
+                    //Close and open to rewind reader to the beginning and reset everything
+                    if (m_segment.getReader(m_cursorId) != null) {
+                        m_numRead -= m_segment.getReader(m_cursorId).readIndex();
+                        m_segment.getReader(m_cursorId).close();
+                        m_segment.openForRead(m_cursorId);
+                    }
+                } else { // rewind or fastforward, adjusting the numRead accordingly
+                    if (m_segment.segmentIndex() > seekSegment.segmentIndex()) { // rewind
+                        for (PBDSegment<M> curr : m_segments.tailMap(seekSegment.segmentIndex(), true).values()) {
+                            if (curr.segmentIndex() > m_segment.segmentIndex()) {
+                                break;
+                            }
+                            PBDSegmentReader<M> currReader = curr.getReader(m_cursorId);
+                            if (curr.segmentIndex() == m_segment.segmentIndex()) {
+                                if (currReader != null) {
+                                    m_numRead -= currReader.readIndex();
+                                }
+                            } else {
+                                m_numRead -= curr.getNumEntries();
+                            }
+                            if (currReader != null) {
+                                currReader.close();
+                            }
+                        }
+                    } else { // fastforward
+                        PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
+                        m_numRead += m_segment.getNumEntries();
+                        if (segmentReader != null) {
+                            m_numRead -= segmentReader.readIndex();
+                            segmentReader.close();
+                        }
+                        // increment numRead
+                        // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
+                        for (PBDSegment<M> curr : m_segments.tailMap(m_segment.segmentIndex(), false).values()) {
+                            if (curr.segmentIndex() == seekSegment.segmentIndex()) {
+                                break;
+                            }
+                            m_numRead += curr.getNumEntries();
+                        }
+                    }
+                    m_segment = seekSegment;
+                }
             }
         }
 
@@ -353,15 +423,21 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     synchronized(PersistentBinaryDeque.this) {
                         checkDoubleFree();
                         retcont.discard();
-                        assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
 
+                        // Transient readers do not affect PBD data deletion.
+                        if (m_isTransient) {
+                            return;
+                        }
+
+                        assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
                         if (m_cursorClosed) {
                             return;
                         }
 
                         //Close and remove segment readers that were all acked and before current PBD reader segment.
                         PBDSegmentReader<M> segmentReader = segment.getReader(m_cursorId);
-                        assert(segmentReader != null); // segment reader is only closed and removed after all are acked
+                        assert(segmentReader != null); // non-transient reader is only closed and removed after all are acked
+
                         assert(m_segment != null);
                         // If the reader has moved past this and all have been acked close this segment reader.
                         if (segmentReader.allReadAndDiscarded() && segment.segmentIndex() < m_segment.m_index) {
@@ -453,6 +529,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
 
             for (ReadCursor cursor : m_readCursors.values()) {
+                if (cursor.m_isTransient) {
+                    continue;
+                }
                 PBDSegmentReader<M> segmentReader = segment.getReader(cursor.m_cursorId);
                 // segment reader is null if the cursor hasn't reached this segment or
                 // all has been read and discarded.
@@ -794,7 +873,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
      * @param prevEntry {@link Map.Entry} from {@link #m_segments} to quarantine
      * @throws IOException
      */
-    private void quarantineSegment(Map.Entry<Long, PBDSegment<M>> prevEntry) throws IOException {
+    void quarantineSegment(Map.Entry<Long, PBDSegment<M>> prevEntry) throws IOException {
         quarantineSegment(prevEntry, prevEntry.getValue(), prevEntry.getValue().getNumEntries());
     }
 
@@ -833,6 +912,101 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
+    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, long indexLimit) throws IOException {
+        if (segment == null || segment.getNumEntries() > 0) {
+            return segment;
+        }
+
+        // skip past quarantined segments
+        while (segment != null && segment.getNumEntries() == 0) {
+            if (segment.segmentIndex() == indexLimit) {
+                segment = null;
+                break;
+            }
+            if (higher) {
+                segment = m_segments.get(segment.segmentIndex()+1);
+            } else {
+                segment = m_segments.get(segment.segmentIndex()-1);
+            }
+        }
+
+        return segment;
+    }
+
+    private PBDSegment<M> findSegmentWithEntry(long entryId, SeekErrorRule errorRule) throws NoSuchOffsetException, IOException {
+        long invalidKey = m_segments.firstKey()-1;
+        PBDSegment<M> first = findValidSegmentFrom(peekFirstSegment(), true, invalidKey);
+        if (first == null) {
+            throw new NoSuchOffsetException("Offset " + entryId + "not found. Empty PBD");
+        }
+
+        if (!m_requiresId) {
+            throw new IllegalStateException("Seek is not supported in PBDs that don't store id ranges");
+        }
+
+        PBDSegment<M> last = findValidSegmentFrom(peekLastSegment(), false, invalidKey);
+
+        if (first.getStartId() > entryId) {
+            if (errorRule == SeekErrorRule.SEEK_AFTER) {
+                return first;
+            } else {
+                throw new NoSuchOffsetException("PBD[" + first.getStartId() + "-" +  last.getEndId() +
+                        "] does not contain offset: " + entryId);
+            }
+        }
+        if (last.getEndId() < entryId) {
+            if (errorRule == SeekErrorRule.SEEK_BEFORE) {
+                return last;
+            } else {
+                throw new NoSuchOffsetException("PBD[" + first.getStartId() + "-" +  last.getEndId() +
+                        "] does not contain offset: " + entryId);
+            }
+        }
+
+        // Assuming these are the common cases, eliminate these.
+        if (entryId >= first.getStartId() && entryId <= first.getEndId()) {
+            return first;
+        }
+        if (entryId >= last.getStartId() && entryId <= last.getEndId()) {
+            return last;
+        }
+
+        // At this point, either the entryId is within a segment or it is in a gap between segments.
+        // (As of current use of PBDs, there cannot be gaps in the middle of a segment).
+        long low = first.segmentIndex();
+        long high = last.segmentIndex();
+        while (low <= high) {
+            long mid = (low + high) / 2;
+            PBDSegment<M> midSegment = m_segments.get(mid);
+            // search up and down to skip over quarantined segments and find a valid segment.
+            // We must find one because of checks above that verify that the entryId is within the bounds of the PBD
+            PBDSegment<M> valid = findValidSegmentFrom(midSegment, true, high+1);
+            midSegment = (valid == null) ? findValidSegmentFrom(valid, false, low-1) : valid;
+            if (entryId >= midSegment.getStartId() && entryId <= midSegment.getEndId()) {
+                return midSegment;
+            } else if (entryId > midSegment.getEndId()) {
+                low = mid + 1;
+            } else if (entryId < midSegment.getStartId()) {
+                assert(mid > first.segmentIndex()); // because of the checks above
+                // entryId is at a gap or in one of the lower segments
+                PBDSegment<M> prevSegment = findValidSegmentFrom(m_segments.get(mid-1), false, invalidKey);
+                if (entryId > prevSegment.getEndId()) { // entryId is at a gap
+                    switch(errorRule) {
+                    case THROW       : throw new NoSuchOffsetException("Could not find entry with offset " + entryId);
+                    case SEEK_AFTER  : return midSegment;
+                    case SEEK_BEFORE : return prevSegment;
+                    default          : throw new IllegalArgumentException("Unsupported SeekErrorRule: " + errorRule);
+                    }
+                } else {
+                    high = mid - 1;
+                }
+            }
+        }
+
+        // Should not get here because of the initial checks
+        throw new RuntimeException("Unexpected error. Could not find offset " + entryId);
+    }
+
     /**
      * Recover a PBD segment and add it to m_segments
      *
@@ -861,6 +1035,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     segment.closeAndDelete();
                     return;
                 }
+
+                boolean requiresId = (segment.getStartId() >= 0);
+                assert(m_requiresId == null || m_requiresId.booleanValue() == requiresId);
+                assert(segment.getEndId() >= segment.getStartId());
+                assert(!requiresId || peekLastSegment() == null || peekLastSegment().getEndId() < segment.getStartId());
+                m_requiresId = requiresId;
 
                 // Any recovered segment that is not final should be checked
                 // for internal consistency.
@@ -1135,6 +1315,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_usageSpecificLog.debug("Closing and deleting segment " + segment.file()
                 + " (final: " + segment.isFinal() + ")");
         }
+        if (assertionsOn) { // track the numRead for transient readers, when we delete ones not read by them.
+            for (ReadCursor reader : m_readCursors.values()) {
+                if (!reader.m_isTransient) {
+                    continue;
+                }
+                if (reader.m_segment == null) {
+                    reader.m_numRead += toDelete;
+                } else if (segment.m_index >= reader.m_segment.m_index) {
+                    PBDSegmentReader<M> sreader = segment.getReader(reader.m_cursorId);
+                    reader.m_numRead += toDelete - (sreader == null ? 0 : sreader.readIndex());
+                }
+            }
+        }
+
         segment.closeAndDelete();
         m_numDeleted += toDelete;
     }
@@ -1233,15 +1427,21 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized ReadCursor openForRead(String cursorId) throws IOException {
+        return openForRead(cursorId, false);
+    }
+
+    @Override
+    public synchronized ReadCursor openForRead(String cursorId, boolean isTransient) throws IOException {
         if (m_closed) {
             throw new IOException("Cannot openForRead(): PBD has been Closed");
         }
 
         ReadCursor reader = m_readCursors.get(cursorId);
         if (reader == null) {
-            reader = new ReadCursor(cursorId, m_numDeleted);
+            reader = new ReadCursor(cursorId, m_numDeleted, isTransient);
             m_readCursors.put(cursorId, reader);
         }
+        assert(reader.m_isTransient == isTransient);
 
         return reader;
     }
@@ -1297,6 +1497,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private boolean canDeleteSegmentsBefore(PBDSegment<M> segment) {
         String retentionCursor = (m_retentionPolicy == null) ? null : m_retentionPolicy.getCursorId();
         for (ReadCursor cursor : m_readCursors.values()) {
+            if (cursor.m_isTransient) {
+                continue;
+            }
             if (cursor.m_segment == null) {
                 return false;
             }

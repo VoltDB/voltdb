@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
@@ -59,25 +60,34 @@ public interface ExportManagerInterface {
     }
 
     static ExportMode getExportFeatureMode(FeaturesType features) throws SetupException {
+        boolean isEnterprise = VoltDB.instance().getConfig().m_isEnterprise;
+        String modeName = getExportFeatureConfigured(features);
+
+        if (modeName == null) {
+            return isEnterprise ? ExportMode.ADVANCED : ExportMode.BASIC;
+        }
+
+        for (ExportMode modeEnum : ExportMode.values()) {
+            if (modeName.equalsIgnoreCase(modeEnum.name())) {
+                if (!isEnterprise && modeEnum == ExportMode.ADVANCED) {
+                    throw new SetupException("Cannot use ADVANCED export mode in community edition");
+                }
+                return modeEnum;
+            }
+        }
+        throw new SetupException("Unknown export feature mode: " + modeName);
+    }
+
+    static String getExportFeatureConfigured(FeaturesType features) {
         if (features == null) {
-            return ExportMode.BASIC;
+            return null;
         }
         for (FeatureType feature : features.getFeature()) {
             if (feature.getName().equalsIgnoreCase(EXPORT_FEATURE)) {
-                String mode = feature.getOption();
-                for (ExportMode modeEnum : ExportMode.values()) {
-                    if (mode.equalsIgnoreCase(modeEnum.name())) {
-                        if (!VoltDB.instance().getConfig().m_isEnterprise && modeEnum == ExportMode.ADVANCED) {
-                            throw new SetupException("Cannot use ADVANCED export mode in community edition");
-                        }
-                        return modeEnum;
-                    }
-                }
-                throw new SetupException("Unknown export feature mode: " + mode);
+                return feature.getOption();
             }
         }
-
-        return ExportMode.BASIC;
+        return null;
     }
 
     static AtomicReference<ExportManagerInterface> m_self = new AtomicReference<>();
@@ -192,9 +202,17 @@ public interface ExportManagerInterface {
     public ExportMode getExportMode();
 
     /**
-     * @return null if catalog update is possible, or an error message if not.
+     * If data sources are still closing, wait until a fixed timeout, and proceed.
+     * <p>
+     * When a data source is dropped, the shutdown of the export coordinators proceed in the
+     * background, as it involves shutting down multi-node synchronized state machines (SSM).
+     * It is necessary to wait for this process to be completed before running the next catalog
+     * update, in case the latter update re-creates data sources that were dropped, and attempts
+     * to initialize SSMs using the same Zookeeper nodes as the previous SSM instances.
+     *
+     * @see {@link ExportCoordinator}, {@link E3ExportCoordinator}, and {@link SynchronizedStatesManager}.
      */
-    public String canUpdateCatalog();
+    public void waitOnClosingSources();
 
     /**
      * Notification that a data source was drained

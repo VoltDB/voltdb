@@ -240,6 +240,103 @@ public class TestPBDMultipleReaders {
         assertEquals(1, m_pbd.numberOfSegments());
     }
 
+    @Test
+    public void testTransientReaderSkipPastDeleted() throws Exception {
+        // Test to verify that once regular reader finishes reading a segment,
+        // those segments get deleted, even if transient reader has not read it.
+        PersistentBinaryDeque<?>.ReadCursor transientReader = m_pbd.openForRead("transient", true);
+        PersistentBinaryDeque<?>.ReadCursor regularReader = m_pbd.openForRead("nontransient");
+        int numSegments = 3;
+        int numBuffers = 10;
+        // Create multiple segments
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<numBuffers; j++) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(i)));
+            }
+        }
+
+        // Both readers read just one buffer
+        readBuffer(transientReader);
+        readBuffer(regularReader);
+
+        for (int i=0; i<numSegments; i++) {
+            for (int j=0; j<numBuffers; j++) {
+                readBuffer(regularReader);
+            }
+            readBuffer(transientReader);
+            // Regular reader reads past one segment, while transient one doesn't.
+            // Verify that on next read, transient reader gets the buffer after the segment that got deleted.
+            assertEquals(regularReader.getCurrentSegment().m_index, transientReader.getCurrentSegment().m_index);
+        }
+
+        // Write more and read all using regular reader.
+        // Transient reader should only find the one buffer in the last segment that is not deleted.
+        for (int i=0; i<numBuffers; i++) {
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(i)));
+        }
+        m_pbd.updateExtraHeader(null);
+        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)));
+        for (int i=0; i<=numBuffers; i++) {
+            readBuffer(regularReader);
+        }
+        readBuffer(transientReader);
+        assertNull(transientReader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+    }
+
+    @Test
+    public void testTransientReaderDoesNotDelete() throws Exception {
+        int numSegments = 5;
+        int numBuffers = 10;
+        // Create multiple segments
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<numBuffers; j++) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(i)));
+            }
+        }
+
+        // Verify that transient readers read through and no segments get deleted
+        int totalBuffers = numSegments * numBuffers;
+        PersistentBinaryDeque<?>.ReadCursor transient1 = m_pbd.openForRead("transient1", true);
+        assertEquals(totalBuffers, readMultipleBuffers(transient1, totalBuffers));
+        assertEquals(numSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        PersistentBinaryDeque<?>.ReadCursor transient2 = m_pbd.openForRead("transient2", true);
+        assertEquals(totalBuffers, readMultipleBuffers(transient2, totalBuffers));
+        assertEquals(numSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        // Verify that regular reader reads through and segments get deleted
+        PersistentBinaryDeque<?>.ReadCursor regular = m_pbd.openForRead("regular");
+        assertEquals(totalBuffers, readMultipleBuffers(regular, totalBuffers));
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    private int readMultipleBuffers(PersistentBinaryDeque<?>.ReadCursor reader, int numBuffers) throws IOException {
+        int count = 0;
+        for (int i=0; i<numBuffers; i++) {
+            BBContainer bb = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (bb != null) {
+                bb.discard();
+                count++;
+            } else {
+                break;
+            }
+        }
+
+        return count;
+    }
+
+    private void readBuffer(PersistentBinaryDeque<?>.ReadCursor reader) throws IOException {
+        BBContainer bb = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        if (bb != null) {
+            bb.discard();
+        }
+    }
+
     @Before
     public void setUp() throws Exception {
         TestPersistentBinaryDeque.setupTestDir();
