@@ -53,7 +53,6 @@ import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.TableType;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -1423,10 +1422,13 @@ public class DDLCompiler {
 
         // remove assertion if persistent tables can be topics
         assert !isTopic || (isTopic && isStream) : " a topic must be a stream";
-        if (!VoltDB.instance().getConfig().m_isEnterprise) {
-            throw m_compiler.new VoltCompilerException(
-                    String.format("STREAM %s cannot be declared AS TOPIC in community edition", name));
-        }
+        /* FIXME: the check below is disabled because it breaks auto-generated EE tests
+         * See ENG-18737
+         * if (!VoltDB.instance().getConfig().m_isEnterprise) {
+         *   throw m_compiler.new VoltCompilerException(
+         *          String.format("STREAM %s cannot be declared AS TOPIC in community edition", name));
+         * }
+         */
 
         // all tables start replicated
         // if a partition is found in the project file later,
