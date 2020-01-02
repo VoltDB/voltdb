@@ -1342,10 +1342,10 @@ public abstract class CatalogUtil {
         }
     }
 
-    // FIXME: need to check cross-references between DDL topics and deployment profiles/defaults
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         CompoundErrors errors = new CompoundErrors();
 
+        // Validate topics in deployment file
         Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment, errors);
         TopicDefaultsType defaults = topics.getFirst();
         Map<String, TopicProfileType> profileMap = topics.getSecond();
@@ -1359,12 +1359,39 @@ public abstract class CatalogUtil {
                 validateRetention(what, profile.getRetention(), errors);
             }
         }
+
+        // Verify that every topic refers to an existing profile
+        CatalogMap<Table> tables = CatalogUtil.getDatabase(catalog).getTables();
+        for (Table t : tables) {
+            if (!t.getIstopic()) {
+                continue;
+            }
+            String profileName = t.getTopicprofile();
+            if (StringUtils.isEmpty(profileName)) {
+                if (defaults == null) {
+                    errors.addErrorMessage(String.format(
+                            "Topic %s has no explicit profile and requires topic defaults to be defined in deployment.",
+                            t.getTypeName()));
+                }
+            }
+            else if (profileMap.get(profileName) == null) {
+                errors.addErrorMessage(String.format(
+                        "Topic %s refers to profile %s which is not defined in deployment.",
+                        t.getTypeName(), profileName));
+            }
+        }
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
         }
-        hostLog.warn("FIXME: validate the topic references !!!");
     }
 
+    /**
+     * Get the topics defined in deployment file: defaults, and map of profiles, keyed CASE INSENSITIVE
+     *
+     * @param deployment
+     * @param errors
+     * @return Pair of {@link TopicDefaultsType}, case insensitive map of profile name to {@link TopicProfileType}
+     */
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
@@ -1382,9 +1409,9 @@ public abstract class CatalogUtil {
             return Pair.of(defaults, null);
         }
 
-        Map<String, TopicProfileType> profileMap = new HashMap<>();
+        Map<String, TopicProfileType> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (TopicProfileType profile : profiles) {
-            if (profileMap.put(profile.getName(), profile) != null) {
+            if (profileMap.put(profile.getName().toUpperCase(), profile) != null) {
                 errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
             }
         }
