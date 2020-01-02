@@ -117,6 +117,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   indexes/index_test
   harness_test/harness_tester
   kipling/KiplingTableFactoryTest
+  kipling/orm/GroupOrmTest
   logging/logging_test
   memleaktests/no_losses
   plannodes/PlanNodeFragmentTest

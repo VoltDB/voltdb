@@ -332,7 +332,7 @@ public:
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple& target);
 
-    void insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit = false);
+    TableTuple insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit = false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple& targetTupleToUpdate, TableTuple& sourceTupleWithNewValues) {

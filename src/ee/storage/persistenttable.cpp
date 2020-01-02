@@ -777,7 +777,7 @@ bool PersistentTable::insertTuple(TableTuple& source) {
     return true;
 }
 
-void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
+TableTuple PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
         std::ostringstream str;
         str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
@@ -809,6 +809,8 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     // SQLException, etc. The assumption we held that no other
     // exceptions should be thrown in the try-block is pretty
     // daring and likely not correct.
+
+    return target;
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
