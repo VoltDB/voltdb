@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -2687,7 +2688,6 @@ public abstract class CatalogUtil {
         buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
         buffer.putInt(catalogAndDeployment.m_data.size());
         buffer.putLong(txnId);
-        hostLog.info("***update " + path + " " + catalogStatus);
         Stat stat = null;
         try {
             zk.create(path, buffer.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -2851,8 +2851,12 @@ public abstract class CatalogUtil {
             throws KeeperException, InterruptedException {
         List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
         // sort in natural order
-        Collections.sort(children);
-        // find the latest catalog version that is complete
+        Collections.sort(children, new Comparator<String>() {
+            public int compare(String o1, String o2) {
+                return Integer.valueOf(o1) - Integer.valueOf(o2);
+            }
+        });
+        // find the latest version node that meets given requirements
         for (int i = children.size() - 1; i >= 0; i--) {
             String catalogPath = ZKUtil.joinZKPath(VoltZK.catalogbytes, children.get(i));
             byte[] data = zk.getData(catalogPath, false, null);
@@ -3021,7 +3025,7 @@ public abstract class CatalogUtil {
         Pair<String, Integer> catalogPair = null;
         boolean match = true;
         try {
-            // First try to find matching catalog version node
+            // First see if somebody created the version node for us
             catalogPair = findLatestViableCatalog(zk, null, txnId);
             // If not find the highest catalog version node
             if (catalogPair == null) {
