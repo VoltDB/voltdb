@@ -27,30 +27,51 @@ import org.voltdb.exportclient.decode.AvroDecoder;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
+/**
+ * Serializer for converting {@link ExportRow} to Avro format byte array as well as
+ * register the schema in the schema registry.
+ */
 public class ExportAvroSerializer {
     private final AvroDecoder m_decoder;
     private final KafkaAvroSerializer m_serializer;
-    private KafkaAvroSerializerConfig m_config;
+    private Map<String, String> m_configMap;
 
     public ExportAvroSerializer() {
         m_decoder = new AvroDecoder.Builder().build();
         m_serializer = new KafkaAvroSerializer();
+        m_configMap = buildConfigMap();
+        m_serializer.configure(m_configMap, false);
     }
 
+    /**
+     * Converting {@link ExportRow} to Avro format byte array as well as register the schema
+     * in the schema registry. Also responsible for handling the change of the
+     * {@code SchemaRegistryUrl} in the deployment file.
+     * @param rd
+     * @param topic
+     * @return The serialize byte array in Avro format.
+     */
     public byte[] serialize(ExportRow rd, String topic) {
-        GenericRecord avroRecord = (GenericRecord) m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,
+        GenericRecord avroRecord = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,
                 null, rd.values);
-        byte[] serializedData = m_serializer.serialize(topic, null, avroRecord);
-        return serializedData;
+        DeploymentType deploymentType = VoltDB.instance().getCatalogContext().getDeployment();
+        // update the serializer config if the schema_register_url in the deployment file changes
+        if (!Objects.equals(m_configMap.get(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG),
+                deploymentType.getSchemaRegistryUrl())) {
+            m_configMap = buildConfigMap();
+            m_serializer.configure(m_configMap, false);
+        }
+        return m_serializer.serialize(topic, null, avroRecord);
     }
 
-    public KafkaAvroSerializerConfig buildConfig() {
+    private Map<String, String> buildConfigMap() {
         Map<String, String> configMap = new HashMap<>();
         DeploymentType deploymentType = VoltDB.instance().getCatalogContext().getDeployment();
         if (deploymentType.getSchemaRegistryUrl() != null) {
             configMap.put(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, deploymentType.getSchemaRegistryUrl());
         }
-        return new KafkaAvroSerializerConfig(configMap);
+        return configMap;
     }
 }
