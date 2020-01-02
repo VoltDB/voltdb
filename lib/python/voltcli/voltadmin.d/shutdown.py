@@ -63,12 +63,13 @@ def shutdown(runner):
         for tuple in response.table(0).tuples():
             hosts.update(*tuple)
         host = hosts.hosts_by_id.itervalues().next()
-        if host.get('clustersafety') == "REDUCED":
-            runner.info('Since cluster is in reduced k safety mode, taking a final snapshot before shutdown.')
-            runner.opts.save = True
 
         runner.info('Cluster shutdown in progress.')
         if not runner.opts.forcing:
+            if host.get('clustersafety') == "REDUCED":
+                runner.info('Since cluster is in reduced k safety mode, taking a final snapshot before shutdown.')
+                runner.opts.save = True
+
             stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
             actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, '\
                             + 'continue to wait with "voltadmin shutdown",\n'\

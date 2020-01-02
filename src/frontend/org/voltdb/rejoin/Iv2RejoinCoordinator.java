@@ -175,7 +175,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                 return;
             }
             if (VoltZK.zkNodeExists(messenger.getZK(), VoltZK.reducedClusterSafety)) {
-                VoltDB.crashLocalVoltDB("Cluster is in reduced ksafety state before this node could finish rejoin" +
+                VoltDB.crashLocalVoltDB("Cluster is in reduced ksafety state before this node could finish rejoin. " +
                         "As a result, the rejoin operation has been canceled.");
                 return;
             }
