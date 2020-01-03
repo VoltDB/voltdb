@@ -1127,14 +1127,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Iv2InitiateTaskMessage clMessage = msg.getInitiateTask();
         if (msg.isSysProcTask()) {
             // inject catalog bytes into c/l
-            if (clMessage != null && ("@UpdateCore").equalsIgnoreCase(msg.getProcedureName())) {
+            if (logThis && clMessage != null && ("@UpdateCore").equalsIgnoreCase(msg.getProcedureName())) {
                 // Only one site writes the real UAC initiate task, other sites write dummy tasks, to command log
                 Iv2InitiateTaskMessage uac = clMessage;
                 StoredProcedureInvocation invocation = new StoredProcedureInvocation();
                 invocation.setProcName("@UpdateCore");
                 if (m_isLowestSiteId) {
                     // First find the expected catalog version in the parameters
-                    CatalogUtil.copyUACInvocation(invocation, uac.getParameters());
+                    CatalogUtil.copyUACParameters(invocation, uac.getParameters());
                     invocation.setClientHandle(uac.getStoredProcedureInvocation().getClientHandle());
                     if (invocation.getSerializedParams() == null) {
                         try {
@@ -1144,34 +1144,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                         }
                     }
-                    clMessage = new Iv2InitiateTaskMessage(
-                            uac.getInitiatorHSId(),
-                            uac.getCoordinatorHSId(),
-                            uac.getTruncationHandle(),
-                            uac.getTxnId(),
-                            uac.getUniqueId(),
-                            uac.isReadOnly(),
-                            uac.isSinglePartition(),
-                            uac.getNParitionIds(),
-                            invocation,
-                            uac.getClientInterfaceHandle(),
-                            uac.getConnectionId(),
-                            uac.isForReplay());
-                } else {
-                    clMessage = new Iv2InitiateTaskMessage(
-                            uac.getInitiatorHSId(),
-                            uac.getCoordinatorHSId(),
-                            uac.getTruncationHandle(),
-                            uac.getTxnId(),
-                            uac.getUniqueId(),
-                            uac.isReadOnly(),
-                            uac.isSinglePartition(),
-                            uac.getNParitionIds(),
-                            invocation, // dummy invocation
-                            uac.getClientInterfaceHandle(),
-                            uac.getConnectionId(),
-                            uac.isForReplay());
                 }
+                clMessage = new Iv2InitiateTaskMessage(
+                        uac.getInitiatorHSId(),
+                        uac.getCoordinatorHSId(),
+                        uac.getTruncationHandle(),
+                        uac.getTxnId(),
+                        uac.getUniqueId(),
+                        uac.isReadOnly(),
+                        uac.isSinglePartition(),
+                        uac.getNParitionIds(),
+                        invocation,
+                        uac.getClientInterfaceHandle(),
+                        uac.getConnectionId(),
+                        uac.isForReplay());
             }
             task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,

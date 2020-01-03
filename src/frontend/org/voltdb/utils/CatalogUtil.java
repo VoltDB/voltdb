@@ -2653,7 +2653,6 @@ public abstract class CatalogUtil {
         buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
         buffer.putInt(catalogAndDeployment.m_data.size());
         buffer.putLong(txnId);
-        hostLog.info("***write deployment to " + path + " " + catalogStatus);
         zk.create(path, buffer.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         for (ByteBuffer chunk : catalogAndDeployment.m_data) {
             zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
@@ -2717,7 +2716,6 @@ public abstract class CatalogUtil {
             for (String child : children) {
                 int priorVersion = Integer.parseInt(child);
                 if (priorVersion < version) {
-                    hostLog.info("***deleting " + ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
                     ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
                 }
             }
@@ -2726,17 +2724,16 @@ public abstract class CatalogUtil {
 
     public static void publishCatalog(ZooKeeper zk, int version) throws KeeperException, InterruptedException {
         String path = VoltZK.catalogbytes + "/" + version;
-        hostLog.info("***publish " + path);
         Stat stat = new Stat();
         byte[] data = zk.getData(path, false, stat);
         ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int) + txnId (long)
         byte status = buffer.get();
         assert (status == (byte)ZKCatalogStatus.PENDING.ordinal());
-        int expectedNodeCount = buffer.getInt();
+        int catalogSegmentCount = buffer.getInt();
         // Rewrite the flag
         buffer.position(0);
         buffer.put((byte)ZKCatalogStatus.COMPLETE.ordinal());
-        buffer.putInt(expectedNodeCount);
+        buffer.putInt(catalogSegmentCount);
         zk.setData(path, buffer.array(), stat.getVersion());
 
         // delete all previous versions
@@ -2744,7 +2741,6 @@ public abstract class CatalogUtil {
         for (String child : children) {
             int priorVersion = Integer.parseInt(child);
             if (priorVersion < version) {
-                hostLog.info("***deleting " + ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
                 ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
             }
         }
@@ -2865,14 +2861,14 @@ public abstract class CatalogUtil {
             if (expectedFlag != null && flag != (byte)expectedFlag.ordinal()) {
                 continue;
             }
-            int expectedNodeCount = buffer.getInt();
+            int catalogSegmentCount = buffer.getInt();
             long txnId = buffer.getLong();
             // In command log replay, only one node uploads the staging catalog bytes to ZK,
             // rest of nodes use expectedTxnId to match the data.
             if (expectedTxnId != -1 && txnId != expectedTxnId) {
                 continue;
             }
-            return new Pair<>(catalogPath, expectedNodeCount);
+            return new Pair<>(catalogPath, catalogSegmentCount);
         }
         return null;
     }
@@ -2954,7 +2950,6 @@ public abstract class CatalogUtil {
 
         // read the catalog from given version
         Pair<String, Integer> latestCatalog = findLatestViableCatalog(zk, ZKCatalogStatus.COMPLETE, -1);
-        hostLog.info("***get Catalog from ZK " + latestCatalog);
         if (latestCatalog == null) {
             return null;
         }
@@ -2974,7 +2969,6 @@ public abstract class CatalogUtil {
     public static CatalogAndDeployment getStagingCatalogFromZK(ZooKeeper zk, int catalogVersion)
             throws KeeperException, InterruptedException {
         String catalogPath = VoltZK.catalogbytes + "/" + catalogVersion;
-        hostLog.info("***get stage Catalog from ZK " + catalogPath);
         byte[] data = null;
         try {
             data = zk.getData(catalogPath, false, null);
@@ -2986,8 +2980,8 @@ public abstract class CatalogUtil {
         if (flag != (byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal()) {
             return null;
         }
-        int expectedNodeCount = buffer.getInt();
-        return readCatalogData(zk, catalogPath, expectedNodeCount);
+        int catalogSegmentCount = buffer.getInt();
+        return readCatalogData(zk, catalogPath, catalogSegmentCount);
     }
 
     private static int readBuffer(ByteBuffer buffer, byte[] src, int offset, int length) {
@@ -2996,7 +2990,7 @@ public abstract class CatalogUtil {
         return toRead;
     }
 
-    public static void copyUACInvocation(StoredProcedureInvocation invocation, Object[] params) {
+    public static void copyUACParameters(StoredProcedureInvocation invocation, Object[] params) {
         int catalogVersion = (int)params[1];
         CatalogAndDeployment cad = null;
         try {

@@ -231,7 +231,6 @@ public class UpdateCore extends VoltSystemProcedure {
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
 
-            log.info("Executing PF_updateCatalogPrecheckAndSync");
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
             } catch (Exception ex) {
@@ -279,7 +278,6 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean hasSecurityUserChange = ((Byte) params.toArray()[7]) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
-            log.info("Executing PF_updateCatalog");
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
