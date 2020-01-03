@@ -81,6 +81,9 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * nodes under the 'MEMBERS' node), the instance can be assured that it's peer instance is also there. This
  * implies that StateMachineInstances can only coexist in the same SynchronizedStatesManager if all instances
  * can be initialized (registered) before any individual instance needs to access the shared state.
+ *
+ * Each SSM instance uses a {@link ListeningExecutorService} that MUST be a monothread executor in order
+ * to provide synchronization.
  */
 public class SynchronizedStatesManager {
     private final AtomicBoolean m_done = new AtomicBoolean(false);
@@ -88,8 +91,8 @@ public class SynchronizedStatesManager {
     private Set<String> m_groupMembers = new HashSet<String>();
     private final StateMachineInstance m_registeredStateMachines [];
     private int m_registeredStateMachineInstances = 0;
-    private static final ListeningExecutorService s_shared_es = CoreUtils.getListeningExecutorService("SSM Daemon", 1);
-    private final ListeningExecutorService m_ssm_es;
+    private static final ListeningExecutorService s_sharedExecutor = CoreUtils.getListeningExecutorService("SSM Daemon", 1);
+    private final ListeningExecutorService m_executor;
     // We assume that we are far enough along that the HostMessenger is up and running. Otherwise add to constructor.
     private final ZooKeeper m_zk;
     private final String m_ssmRootNode;
@@ -329,7 +332,7 @@ public class SynchronizedStatesManager {
         // Used only for Mocking StateMachineInstance
         public StateMachineInstance()
         {
-            m_smi_es = s_shared_es;
+            m_smi_es = s_sharedExecutor;
             m_statePath = "MockInstanceStatePath";
             m_barrierResultsPath = "MockBarrierResultsPath";
             m_myResultPath = "MockMyResultPath";
@@ -342,7 +345,7 @@ public class SynchronizedStatesManager {
         }
 
         public StateMachineInstance(String instanceName, VoltLogger logger) throws RuntimeException {
-            this(s_shared_es, instanceName, logger);
+            this(s_sharedExecutor, instanceName, logger);
             if (logger.isDebugEnabled()) {
                 logger.debug("State machine " + instanceName + " uses default executor");
             }
@@ -1902,7 +1905,7 @@ public class SynchronizedStatesManager {
 
     // Used only for Mocking StateMachineInstance
     public SynchronizedStatesManager() {
-        m_ssm_es = s_shared_es;
+        m_executor = s_sharedExecutor;
         m_zk = null;
         m_registeredStateMachines = null;
         m_ssmRootNode = "MockRootForZooKeeper";
@@ -1926,13 +1929,13 @@ public class SynchronizedStatesManager {
 
     public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId,
             int registeredInstances, int resetAllowance) throws KeeperException, InterruptedException {
-        this(s_shared_es, zk, rootPath, ssmNodeName, memberId, registeredInstances, resetAllowance);
+        this(s_sharedExecutor, zk, rootPath, ssmNodeName, memberId, registeredInstances, resetAllowance);
     }
 
     public SynchronizedStatesManager(ListeningExecutorService es, ZooKeeper zk, String rootPath, String ssmNodeName, String memberId,
             int registeredInstances, int resetAllowance)
             throws KeeperException, InterruptedException {
-        m_ssm_es = es;
+        m_executor = es;
         m_zk = zk;
         // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
         m_registeredStateMachines = new StateMachineInstance[registeredInstances];
@@ -1949,12 +1952,8 @@ public class SynchronizedStatesManager {
         m_memberId = m_canonical_memberId + "_v" + m_resetCounter;
     }
 
-    public ListeningExecutorService getExecutor() {
-        return m_ssm_es;
-    }
-
     public void ShutdownSynchronizedStatesManager() throws InterruptedException {
-        ListenableFuture<?> disableComplete = m_ssm_es.submit(disableInstances);
+        ListenableFuture<?> disableComplete = m_executor.submit(disableInstances);
         try {
             disableComplete.get();
         }
@@ -2021,7 +2020,7 @@ public class SynchronizedStatesManager {
                     for (StateMachineInstance stateMachine : m_registeredStateMachines) {
                         stateMachine.checkMembership();
                     }
-                    m_ssm_es.submit(membershipEventHandler);
+                    m_executor.submit(membershipEventHandler);
                 }
             } catch (RejectedExecutionException e) {
             }
@@ -2085,7 +2084,7 @@ public class SynchronizedStatesManager {
             }
             // Do all the initialization and notifications on the executor to avoid a race with
             // the group membership changes
-            initComplete = m_ssm_es.submit(initializeInstances);
+            initComplete = m_executor.submit(initializeInstances);
         }
         return initComplete;
     }
