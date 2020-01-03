@@ -1411,7 +1411,7 @@ public abstract class CatalogUtil {
 
         Map<String, TopicProfileType> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (TopicProfileType profile : profiles) {
-            if (profileMap.put(profile.getName().toUpperCase(), profile) != null) {
+            if (profileMap.put(profile.getName(), profile) != null) {
                 errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
             }
         }
