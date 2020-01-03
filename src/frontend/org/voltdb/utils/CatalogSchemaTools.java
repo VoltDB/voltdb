@@ -126,6 +126,25 @@ public abstract class CatalogSchemaTools {
                         TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
+                if (catalog_tbl.getIstopic()) {
+                    table_sb.append(" AS TOPIC ");
+                    String topicProfileName = catalog_tbl.getTopicprofile();
+                    if (!StringUtils.isEmpty(topicProfileName)) {
+                        table_sb.append(" PROFILE ").append(topicProfileName);
+                    }
+                    String topicFormatName = catalog_tbl.getTopicformat();
+                    if (!StringUtils.isEmpty(topicFormatName)) {
+                        table_sb.append(" FORMAT ").append(topicFormatName);
+                    }
+                    String topicKeyColumnNames = catalog_tbl.getTopickeycolumnnames();
+                    if (!StringUtils.isEmpty(topicKeyColumnNames)) {
+                        table_sb.append(" KEY-COLUMNS ").append(topicKeyColumnNames);
+                    }
+                    String topicAllowedRoleNames = catalog_tbl.getTopicallowedrolenames();
+                    if (!StringUtils.isEmpty(topicAllowedRoleNames)) {
+                        table_sb.append(" ALLOW ").append(topicAllowedRoleNames);
+                    }
+                }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
                 if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
