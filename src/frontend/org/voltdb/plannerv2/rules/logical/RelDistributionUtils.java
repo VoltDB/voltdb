@@ -578,7 +578,20 @@ final class RelDistributionUtils {
         final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !outerDist.getIsSP(),
                 innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !innerDist.getIsSP(),
                 outerHasPartitionKey = outerDist.getPartitionEqualValue() != null,
-                innerHasPartitionKey = innerDist.getPartitionEqualValue() != null;
+                innerHasPartitionKey = innerDist.getPartitionEqualValue() != null,
+                outerHasExchange = outerDist.getType() == RelDistribution.Type.SINGLETON && !outerDist.getIsSP(),
+                innerHasExchange = innerDist.getType() == RelDistribution.Type.SINGLETON && !innerDist.getIsSP();
+
+        if ((outerHasExchange && innerIsPartitioned) ||
+                (innerHasExchange && outerIsPartitioned)) {
+            // Both relations are partitioned; and one of them already has an Exchange node.
+            // Since a join is distributed and would also require an Exchange node to be added
+            // on top it, the final plan would have two Exchanges resulting in more than one
+            // coordinator fragment.
+            throw new PlanningErrorException("SQL error while compiling query: " +
+                    "This query is not plannable because it requires multiple coordinator fragments.");
+        }
+
         final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());
         switch (join.getJoinType()) {
             case INNER:

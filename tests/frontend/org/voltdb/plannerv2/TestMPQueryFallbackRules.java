@@ -367,6 +367,14 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // NOTE: This is a good example that Calcite rewrites to table join operation.
         m_tester.sql("select i from R1 where i in (select si from P1)").fail();
 
+        // The re-written JOIN would require more than one Exchanges
+        m_tester.sql("select i from P2 where i in (select si from P1)")
+        .fail();
+
+        // The re-written JOIN is fine because IN clause is SP
+        m_tester.sql("select i from P2 where i in (select si from P1 where i = 5)")
+        .pass();
+
         // calcite will use equal to rewrite IN
         m_tester.sql("select * from P1 where i in (16)").pass();
 

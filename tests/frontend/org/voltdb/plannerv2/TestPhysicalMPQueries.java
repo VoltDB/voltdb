@@ -84,10 +84,39 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                 .pass();
     }
 
-    public void testPartitionedSort() {
+    public void testPartitionedLimit4() {
+        m_tester.sql("select i from P1 where i = 8 limit 3")
+                .transform("VoltPhysicalLimit(limit=[3], pusheddown=[false])\n" +
+                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[8], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                            "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
+    public void testPartitionedLimit5() {
+        m_tester.sql("select i from P1 where si = 8 limit 3")
+                .transform("VoltPhysicalLimit(limit=[3], pusheddown=[true])\n" +
+                            "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalLimit(limit=[3], pusheddown=[false])\n" +
+                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t6, $t7)], I=[$t0], $condition=[$t8])\n" +
+                            "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
+    public void testPartitionedSort1() {
         m_tester.sql("select i from PI1 where I = 6 order by ii")
                 .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[6], expr#7=[=($t0, $t6)], I=[$t0], II=[$t2], $condition=[$t7])\n" +
                             "  VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
+                .pass();
+    }
+
+    public void testPartitionedSort2() {
+        // Here the final plan does not have SORT pushed down because it's cost is the same
+        // as Sort / Merge Exchange / Sort / Scan plan
+        m_tester.sql("select i from P1 order by SI")
+                .transform("VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[false])\n" +
+                            "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                            "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
     }
 
@@ -145,6 +174,14 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
     public void testPartitionedWithAggregate8() {
         m_tester.sql("select distinct(P1.SI) from P1") // coord aggr because P1.SI is not a part column
         .transform("\n")
+        .pass();
+    }
+
+    public void testPartitionedWithAggregate9() {
+        m_tester.sql("select max(P1.I) from P1 where I = 8")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], coordinator=[false], type=[serial])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[8], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
         .pass();
     }
 

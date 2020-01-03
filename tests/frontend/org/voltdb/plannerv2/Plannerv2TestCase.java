@@ -271,6 +271,10 @@ public class Plannerv2TestCase extends PlannerTestCase {
             super.pass();
             try {
                 final RelDistribution distribution = transform();
+                if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
+                    String actualTransform = RelOptUtil.toString(m_transformedNode);
+                    anyMatch(m_expectedTransforms, actualTransform);
+                }
                 assertFalse("Expected fall back:\nGot distribution type " +
                                 distribution.getType().name() +
                                 " with partition equal value = " +
@@ -279,9 +283,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
                         distribution.getIsSP());
             } catch (PlanningErrorException e) {    // transform stage is allowed to throw:
                 // See RelDistributionUtils#isJoinSP()
-                assertEquals("SQL error while compiling query: This query is not plannable.  "
-                                + "The planner cannot guarantee that all rows would be in a single partition.",
-                        e.getMessage());
+                assertTrue(e.getMessage().startsWith(
+                        "SQL error while compiling query: This query is not plannable"));
             }
         }
     }
