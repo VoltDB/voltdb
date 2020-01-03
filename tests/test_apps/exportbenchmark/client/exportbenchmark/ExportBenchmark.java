@@ -286,7 +286,7 @@ public class ExportBenchmark {
                 }
                 if (0 != stats.getLong("TUPLE_PENDING")) {
                     passedThisTime = false;
-                    log.info("Partition Not Zero.");
+                    log.info("Table " + stats.getString("SOURCE") + "/" + stats.getString("TARGET") + ": Partition Not Zero... Pending: " + stats.getLong("TUPLE_PENDING"));
                     break;
                 }
             }
