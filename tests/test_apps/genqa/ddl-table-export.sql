@@ -207,16 +207,6 @@ CREATE TABLE export_mirror_partitioned_table2
 );
 PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
-(
-  txnid                     BIGINT        NOT NULL
-);
-
-CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
-(
-  txnid                     BIGINT        NOT NULL
-);
-
 -- Replicated Table
 CREATE TABLE replicated_table
 (
@@ -352,14 +342,12 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 -- CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateExport;
-CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
-CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 -- CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition;
 -- CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table2 COLUMN rowid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
--- CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportDoneTable;
 
 -- Export Table with extra Geo columns
 CREATE TABLE export_geo_partitioned_table EXPORT TO TARGET abc ON insert, delete, update
@@ -444,11 +432,6 @@ AS
         , COUNT(*)
      FROM EXPORT_PARTITIONED_TABLE
  GROUP BY rowid;
-
-CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
-(
-  txnid                     BIGINT        NOT NULL
-);
 
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
 CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;

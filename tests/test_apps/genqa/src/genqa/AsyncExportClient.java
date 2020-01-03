@@ -253,7 +253,6 @@ public class AsyncExportClient
         final int latencyTarget;
         final String [] parsedServers;
         final String procedure;
-        final boolean exportGroups;
         final int exportTimeout;
         final boolean migrateWithTTL;
         final boolean usetableexport;
@@ -271,7 +270,6 @@ public class AsyncExportClient
             latencyTarget        = apph.intValue("latencytarget");
             procedure            = apph.stringValue("procedure");
             parsedServers        = servers.split(",");
-            exportGroups         = apph.booleanValue("exportgroups");
             exportTimeout        = apph.intValue("timeout");
             migrateWithTTL       = apph.booleanValue("migrate-ttl");
             usetableexport       = apph.booleanValue("usetableexport");
@@ -338,7 +336,6 @@ public class AsyncExportClient
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
-                .add("exportgroups", "export_groups", "Multiple export connections", "true") // TODO: remove obsolescent exportgroups remnants
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
@@ -498,16 +495,10 @@ public class AsyncExportClient
             // Might need lots of waiting but we'll do that in the runapp driver.
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
 
-            log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
-            if (config.exportGroups) {
-                log.info("Insert row in Done table with JiggleExportGroupDoneTable proc");
-                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
-            }
-            else {
-                log.info("Insert row in Done table with JiggleExportDoneTable proc");
-                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
-            }
+            log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
+            clientRef.get().callProcedure("InsertExportDoneDetails", TrackingResults.get(0));
+
             writer.close(true);
 
             // Now print application results:
