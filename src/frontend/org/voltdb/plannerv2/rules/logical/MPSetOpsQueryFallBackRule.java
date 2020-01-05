@@ -64,6 +64,8 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
         // his distribution is a SINGLETON.
         // In case of a single partitioned table without a filter we need to and an Exchange node
         // above this table.
+        // Perhaps there is room for improvements like pushing pushing down Exchange node
+        // if partitioning column is part of SELECT columns for each statement
         RelDistribution newDistribution = RelDistributions.SINGLETON.with(
                 setOpState.getLiteral(), setOpState.isSP());
         List<RelNode> inputs;
