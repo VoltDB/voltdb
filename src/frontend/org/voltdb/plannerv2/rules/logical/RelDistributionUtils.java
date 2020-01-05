@@ -506,33 +506,30 @@ final class RelDistributionUtils {
         JoinState finalSetOpState = setOpNodes.stream().reduce(
                 initSetOpState,
                 (currentState, nextChild) -> {
-                    final RelDistribution nextDist = getDistribution(nextChild);
-                    if (!currentState.isSP() || !nextDist.getIsSP()) {
-                        // Either accumulated state or the next child is a MP and the whole result is MP
-                        return new JoinState(false, currentState.getLiteral(), currentState.getPartCols());
-                    } else {
-                        // Accumulated state and the next child are both SP.
-                        // Make sure their partitioning values are compatible
-                        RexNode currentPartitioningValue = currentState.getLiteral();
-                        RexNode nextPartitioningValue = nextDist.getPartitionEqualValue();
-                        if (currentPartitioningValue != null && nextPartitioningValue != null) {
-                            if (currentPartitioningValue.equals(nextPartitioningValue)) {
-                                // Same partitioning value
-                                return currentState;
-                            } else {
-                                // Partitioning values do not match. SetOp is MP
-                                return new JoinState(false, currentPartitioningValue, currentState.getPartCols());
-                            }
-                        } else {
-                            if (currentPartitioningValue == null) {
-                                // All previous nodes were replicated and the next one is a MP with non-null
-                                // partitioning value
-                                return new JoinState(true, nextPartitioningValue, Sets.newHashSet(nextDist.getKeys()));
-                            } else {
-                                // The next child is replicated
-                                return currentState;
+                    RelDistribution nextDist = getDistribution(nextChild);
+                    final boolean currentIsPartitioned = !currentState.getPartCols().isEmpty(),
+                            nextIsPartitioned = nextDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !nextDist.getIsSP();
+                    if (!currentIsPartitioned && !nextIsPartitioned) {
+                        // SP SetOP so far. Combined partitioning state is still the same
+                        return currentState;
+                    } else if (currentIsPartitioned) {
+                        if (nextIsPartitioned) {
+                            // The current state and the next child are both MP.
+                            // Need to make sure they have compatible partitioning
+                            RexNode currentPartValue = currentState.getLiteral();
+                            RexNode nextPartValue = nextDist.getPartitionEqualValue();
+                            if (currentPartValue == null || !currentPartValue.equals(nextPartValue)) {
+                                throw new PlanningErrorException("SQL error while compiling query: " +
+                                        "Statements are too complex in set operation using multiple partitioned tables.");
                             }
                         }
+                        // Either the next child is SP or partitioning values match
+                        return currentState;
+                    } else {
+                        assert (nextIsPartitioned);
+                        // All previous children are SP and this is the first MP one
+                        final Set<Integer> nextPartColumns = getPartitionColumns(nextChild);
+                        return new JoinState(false, nextDist.getPartitionEqualValue(), nextPartColumns);
                     }
                 },
                 (currentState, nextState) -> nextState);
@@ -589,7 +586,7 @@ final class RelDistributionUtils {
             // on top it, the final plan would have two Exchanges resulting in more than one
             // coordinator fragment.
             throw new PlanningErrorException("SQL error while compiling query: " +
-                    "This query is not plannable because it requires multiple coordinator fragments.");
+                    "This join is too complex using multiple partitioned tables");
         }
 
         final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());
@@ -602,6 +599,12 @@ final class RelDistributionUtils {
                             // join condition might be false (TestBooleanLiteralsSuite)
                             return new JoinState(true, srcLitera, combinedPartColumns);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
+                            // if outer and inner both have partitioning key they better match
+                            if (outerHasPartitionKey && innerHasPartitionKey &&
+                                    !outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) {
+                                throw new PlanningErrorException("SQL error while compiling query: " +
+                                        "Outer and inner statements use conflicting partitioned table filters.");
+                            }
                             return new JoinState(
                                     outerDist.getIsSP() && innerDist.getIsSP() && (! outerHasPartitionKey ||   // either outer is replicated (SINGLE); or partitioned with a key
                                             outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())),
@@ -628,6 +631,11 @@ final class RelDistributionUtils {
                                 outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) {
                             // Both relations are partitioned with keys, and they are equal --> SP
                             return new JoinState(true, srcLitera, combinedPartColumns);
+                        } else if (outerIsPartitioned && innerIsPartitioned) {
+                            // Both are partitioned but thepartitioning columns don't match
+                            // and no partitioning filters. Not plannable
+                            throw new PlanningErrorException("SQL error while compiling query: " +
+                                    "This join is too complex using multiple partitioned tables");
                         } else {
                             return new JoinState(false, srcLitera, combinedPartColumns);
                         }

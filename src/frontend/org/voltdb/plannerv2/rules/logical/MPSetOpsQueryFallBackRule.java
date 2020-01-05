@@ -17,6 +17,8 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -25,7 +27,10 @@ import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rules.logical.RelDistributionUtils.JoinState;
+
+import com.google.common.collect.Lists;
 
 /**
  * Rules that fallback a query with SetOp operator if it is multi-partitioned.
@@ -52,10 +57,35 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
         // either NULL (a child is a replicated scan) or equal each other
         // (implies that there is a "WHERE partitionColumn = LITERAL_VALUE" for each child)
         JoinState setOpState = RelDistributionUtils.isSetOpSP(setOp.getInputs());
-        RelDistribution newDistribution =
-                setOp.getInput(0).getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE)
-                .with(setOpState.getLiteral(), setOpState.isSP());
-
-        call.transformTo(setOp.copy(setOp.getTraitSet().replace(newDistribution), setOp.getInputs()));
+        // At the moment Volt only supports SetOP involving either a single partitioned table
+        // without a equality filter on its partitioning column or
+        // multiple partitioned ones with matching partitioning filters.
+        // In both cases, the SetOp itself should be part of a coordinator's fragment meaning
+        // his distribution is a SINGLETON.
+        // In case of a single partitioned table without a filter we need to and an Exchange node
+        // above this table.
+        RelDistribution newDistribution = RelDistributions.SINGLETON.with(
+                setOpState.getLiteral(), setOpState.isSP());
+        List<RelNode> inputs;
+        if (!setOpState.isSP() && setOpState.getLiteral() == null) {
+            inputs = Lists.newArrayList();
+            setOp.getInputs()
+                .stream()
+                .forEach(node -> {
+                    RelDistribution dist = node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+                    if (!dist.getIsSP() && dist.getPartitionEqualValue() == null &&
+                            RelDistribution.Type.SINGLETON != dist.getType()) {
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
+                                node.getTraitSet(), node, dist);
+                        inputs.add(exchange);
+                    } else {
+                        inputs.add(node);
+                    }
+                });
+        } else {
+            inputs = setOp.getInputs();
+        }
+        SetOp newSetOp = setOp.copy(setOp.getTraitSet().replace(newDistribution), inputs);
+        call.transformTo(newSetOp);
     }
 }
