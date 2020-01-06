@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="txnid"
-
+set -e
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
