@@ -170,14 +170,12 @@ VoltDBEngine::initialize(
         int32_t drClusterId,
         int32_t defaultDrBufferSize,
         int64_t tempTableMemoryLimit,
-        bool isLowestSite,
-        int32_t compactionThreshold) {
+        bool isLowestSite) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_isLowestSite = isLowestSite;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
-    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -1264,8 +1262,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                 if (updateReplicated) {
                     vassert(SynchronizedThreadLock::isLowestSiteContext());
                     ExecuteWithMpMemory useMpMemory;
-                    tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                                   m_compactionThreshold, this);
+                    tcd = new TableCatalogDelegate(catalogTable->signature(), this);
                     // use the delegate to init the table and create indexes n' stuff
                     tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                     const std::string& tableName = tcd->getTable()->name();
@@ -1288,7 +1285,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                 if (updateReplicated) {
                     continue;
                 }
-                tcd = new TableCatalogDelegate(catalogTable->signature(), m_compactionThreshold, this);
+                tcd = new TableCatalogDelegate(catalogTable->signature(), this);
                 // use the delegate to init the table and create indexes n' stuff
                 tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                 m_catalogDelegates[catalogTable->path()] = tcd;

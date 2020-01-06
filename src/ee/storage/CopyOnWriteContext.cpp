@@ -412,21 +412,6 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     }
 }
 
-void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
-    vassert(m_iterator.get() != NULL);
-    if (m_finishedTableScan) {
-        // There was a compaction while we are iterating through the m_backedUpTuples
-        // TempTable. Don't do anything because the passed in block is a PersistentTable
-        // block
-        return;
-    }
-    m_blocksCompacted++;
-    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-        TBPtr nextBlock = iter->m_blockIterator.data();
-                TBPtr newNextBlock = iter->m_blockIterator.data();
-    iter->notifyBlockWasCompactedAway(block);
-}
-
 bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {
     markTupleDirty(tuple, true);
     return true;

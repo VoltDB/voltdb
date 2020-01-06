@@ -81,7 +81,6 @@ class Table {
     int32_t m_columnHeaderSize = -1;
     int32_t m_refcount = 0;
     ThreadLocalPool m_tlPool;
-    int m_compactionThreshold = 95;
 
     Table();
     Table(Table const&);
@@ -318,23 +317,8 @@ protected:
     Table(int tableAllocationTargetSize);
     void resetTable();
 
-    bool compactionPredicate() {
-        //Unfortunate work around for the fact that multiple undo quantums cause this to happen
-        //Ideally there would be one per transaction and we could hard fail or
-        //the undo log would only trigger compaction once per transaction
-        if (m_tuplesPinnedByUndo != 0) {
-            return false;
-        }
-
-        size_t unusedTupleCount = allocatedTupleCount() - activeTupleCount();
-        size_t blockThreshold = m_tuplesPerBlock * 3;
-        size_t percentBasedThreshold = (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100;
-        size_t actualThreshold = std::max(blockThreshold, percentBasedThreshold);
-        return unusedTupleCount > actualThreshold;
-    }
-
     virtual void initializeWithColumns(TupleSchema* schema, std::vector<std::string> const& columnNames,
-          bool ownsTupleSchema, int32_t compactionThreshold = 95);
+          bool ownsTupleSchema);
     bool checkNulls(TableTuple& tuple) const;
 
     // ------------------------------------------------------------------

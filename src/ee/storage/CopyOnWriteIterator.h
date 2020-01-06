@@ -39,38 +39,6 @@ public:
 
     bool next(TableTuple &out);
 
-    void notifyBlockWasCompactedAway(TBPtr block) {
-        if (m_blockIterator != m_end) {
-            TBPtr nextBlock = m_blockIterator.data();
-            //The next block is the one that was compacted away
-            //Need to move the iterator forward to skip it
-            if (nextBlock == block) {
-                m_blockIterator++;
-
-                //There is another block after the one that was compacted away
-                if (m_blockIterator != m_end) {
-                    TBPtr newNextBlock = m_blockIterator.data();
-                    m_blocks.erase(block->address());
-                    m_blockIterator = m_blocks.find(newNextBlock->address());
-                    m_end = m_blocks.end();
-                    vassert(m_blockIterator != m_end);
-                } else {
-                    //No block after the one compacted away
-                    //set everything to end
-                    m_blocks.erase(block->address());
-                    m_blockIterator = m_blocks.end();
-                    m_end = m_blocks.end();
-                }
-            } else {
-                //Some random block was compacted away. Remove it and regenerate the iterator
-                m_blocks.erase(block->address());
-                m_blockIterator = m_blocks.find(nextBlock->address());
-                m_end = m_blocks.end();
-                vassert(m_blockIterator != m_end);
-            }
-        }
-    }
-
     virtual ~CopyOnWriteIterator() {}
 
     int64_t countRemaining() const;

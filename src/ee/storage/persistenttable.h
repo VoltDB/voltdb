@@ -72,10 +72,6 @@
 #include <map>
 #include <set>
 
-
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithMigratingRows;
-class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
 
 namespace catalog {
@@ -83,7 +79,6 @@ class MaterializedViewInfo;
 }
 
 namespace voltdb {
-class CoveringCellIndexTest_TableCompaction;
 class MaterializedViewTriggerForInsert;
 class MaterializedViewTriggerForWrite;
 class MaterializedViewHandler;
@@ -209,10 +204,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class TableFactory;
     friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
-    friend class ::CompactionTest_BasicCompaction;
-    friend class ::CompactionTest_CompactionWithMigratingRows;
-    friend class ::CompactionTest_CompactionWithCopyOnWrite;
-    friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
     friend class ScopedDeltaTableContext;
 
@@ -224,8 +215,7 @@ private:
 
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
-            bool ownsTupleSchema,
-            int32_t compactionThreshold = 95);
+            bool ownsTupleSchema);
     void rollbackIndexChanges(TableTuple* tuple, int upto);
 
 public:
@@ -244,9 +234,6 @@ public:
     }
 
     void notifyQuantumRelease() {
-        if (compactionPredicate()) {
-            doForcedCompaction();
-        }
     }
 
     // Return a table iterator by reference
@@ -424,8 +411,6 @@ public:
     size_t getBlocksNotPendingSnapshotCount() {
         return m_blocksNotPendingSnapshot.size();
     }
-
-    void doIdleCompaction();
 
     void printBucketInfo();
 
@@ -651,10 +636,6 @@ private:
 
     void nextFreeTuple(TableTuple* tuple);
 
-    bool doCompactionWithinSubset(TBBucketPtrVector* bucketVector);
-
-    bool doForcedCompaction();  // Returns true if a compaction was performed
-
     void insertIntoAllIndexes(TableTuple* tuple);
 
     void deleteFromAllIndexes(TableTuple* tuple);
@@ -670,8 +651,6 @@ private:
 
     // Add truncate operation to dr log stream if dr is enabled and running
     void drLogTruncate(ExecutorContext* ec, bool fallible);
-
-    void notifyBlockWasCompactedAway(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
@@ -820,8 +799,6 @@ private:
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
-
-    int m_failedCompactionCount;
 
     // This is a testability feature not intended for use in product logic.
     int m_invisibleTuplesPendingDeleteCount;

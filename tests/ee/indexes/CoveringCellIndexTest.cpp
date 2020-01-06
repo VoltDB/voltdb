@@ -465,34 +465,6 @@ private:
     boost::scoped_ptr<voltdb::AbstractDRTupleStream> m_drStream;
 };
 
-// Test table compaction, since this forces the index to be updated
-// when tuples move around.
-TEST_F(CoveringCellIndexTest, TableCompaction) {
-    // Create a table with 120 extra cols inline so it has more than one block.
-    unique_ptr<PersistentTable> table = createTable(120);
-    CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
-
-    loadTable(table.get());
-
-    // Delete 99% of the records.  This should make compaction possible.
-    int numTuples = table->visibleTupleCount();
-    deleteSomeRecords(table.get(), numTuples, numTuples * 0.99);
-
-#ifndef MEMCHECK
-    ASSERT_TRUE(table->doForcedCompaction());
-#else
-        // This returns a boolean indicating if compaction was done.
-        // MEMCHECK mode limits table blocks to one tuple for block, so
-        // compaction won't occur.  Too bad.
-        ASSERT_FALSE(table->doForcedCompaction());
-#endif
-
-    std::string msg;
-    ASSERT_TRUE_WITH_MESSAGE(ccIndex->checkValidityForTest(table.get(), &msg), msg.c_str());
-
-    std::cout << "            ";
-}
-
 // Test a larger workload of 1000 polygons.
 TEST_F(CoveringCellIndexTest, LargerWorkload) {
     unique_ptr<PersistentTable> table = createTable();

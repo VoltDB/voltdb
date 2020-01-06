@@ -88,38 +88,4 @@ bool ElasticScanner::next(TableTuple &out)
     return found;
 }
 
-/**
- * Block compaction hook.
- */
-void ElasticScanner::notifyBlockWasCompactedAway(TBPtr block) {
-    if (!m_scanComplete && m_blockIterator != m_blockEnd) {
-        TBPtr nextBlock = m_blockIterator.data();
-        if (nextBlock == block) {
-            // The next block was compacted away.
-            m_blockIterator++;
-            if (m_blockIterator != m_blockEnd) {
-                // There is a block to skip to.
-                TBPtr newNextBlock = m_blockIterator.data();
-                m_blockMap.erase(block->address());
-                m_blockIterator = m_blockMap.find(newNextBlock->address());
-                m_blockEnd = m_blockMap.end();
-                vassert(m_blockIterator != m_blockMap.end());
-            }
-            else {
-                // There isn't a block to skip to, so we're done.
-                m_blockMap.erase(block->address());
-                m_blockIterator = m_blockMap.end();
-                m_blockEnd = m_blockMap.end();
-            }
-        } else {
-            // Some random block was compacted away.
-            // Remove it and regenerate the iterator.
-            m_blockMap.erase(block->address());
-            m_blockIterator = m_blockMap.find(nextBlock->address());
-            m_blockEnd = m_blockMap.end();
-            vassert(m_blockIterator != m_blockMap.end());
-        }
-    }
-}
-
 } // namespace voltdb

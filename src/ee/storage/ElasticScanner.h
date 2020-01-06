@@ -54,11 +54,6 @@ class ElasticScanner : public TupleIterator
     virtual bool next(TableTuple &out);
 
     /**
-     * Block compaction hook.
-     */
-    void notifyBlockWasCompactedAway(TBPtr block);
-
-    /**
      * Return true after last tuple has been returned by next().
      */
     bool isScanComplete() const {

@@ -63,12 +63,11 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::unordered_
 
 class TableCatalogDelegate {
   public:
-    TableCatalogDelegate(const std::string& signature, int32_t compactionThreshold, VoltDBEngine* engine)
+    TableCatalogDelegate(const std::string& signature, VoltDBEngine* engine)
         : m_table(NULL)
         , m_tableType(PERSISTENT)
         , m_materialized(false)
         , m_signature(signature)
-        , m_compactionThreshold(compactionThreshold)
     {}
 
     ~TableCatalogDelegate();
@@ -156,7 +155,6 @@ class TableCatalogDelegate {
     TableType m_tableType;
     bool m_materialized;
     const std::string m_signature;
-    const int32_t m_compactionThreshold;
     char m_signatureHash[20];
 };
 

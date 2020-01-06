@@ -82,7 +82,7 @@ Table::~Table() {
         delete[] m_columnHeaderData;
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -140,8 +140,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     // set the data to be empty
     m_tupleCount = 0;
-
-    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------

@@ -75,11 +75,6 @@ class PersistentTableSurgeon;
         virtual bool notifyTupleDelete(TableTuple &tuple) = 0;
 
         /**
-         * Block compaction hook.
-         */
-        virtual void notifyBlockWasCompactedAway(TBPtr block) = 0;
-
-        /**
          * Called for each tuple moved.
          */
         virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
