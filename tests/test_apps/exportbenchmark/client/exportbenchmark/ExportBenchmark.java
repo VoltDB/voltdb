@@ -197,6 +197,7 @@ public class ExportBenchmark {
                 successfulInserts.incrementAndGet();
             } else {
                 failedInserts.incrementAndGet();
+                System.out.println(response.getStatusString());
             }
         }
     }
@@ -221,7 +222,7 @@ public class ExportBenchmark {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
-        // clientConfig.setTopologyChangeAware(true);
+        clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
@@ -307,32 +308,22 @@ public class ExportBenchmark {
     }
 
     /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * Connect to a single server.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server) {
-        int sleep = 1000;
-        while (true) {
-            try {
-                client.createConnection(server);
-                break;
-            }
-            catch (IOException e) {
-                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
-                if (sleep < 8000) sleep += sleep;
-            }
+    void connectToOneServer(String server) {
+        try {
+            client.createConnection(server);
+        }
+        catch (IOException e) {
+            System.err.println("Connection to " + server + " failed");
+            return;
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
-     *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
@@ -341,20 +332,7 @@ public class ExportBenchmark {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
-        final CountDownLatch connections = new CountDownLatch(serverArray.length);
-
-        // use a new thread to connect to each server
-        for (final String server : serverArray) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server);
-                    connections.countDown();
-                }
-            }).start();
-        }
-        // block until all have connected
-        connections.await();
+        connectToOneServer(serverArray[0]);
     }
 
     /**
@@ -665,9 +643,11 @@ public class ExportBenchmark {
                 success = waitForStreamedAllocatedMemoryZero();
             } catch (IOException e) {
                 System.err.println("Error while waiting for export: ");
+                e.printStackTrace();
                 e.getLocalizedMessage();
             } catch (ProcCallException e) {
                 System.err.println("Error while calling procedures: ");
+                e.printStackTrace();
                 e.getLocalizedMessage();
             }
         }
