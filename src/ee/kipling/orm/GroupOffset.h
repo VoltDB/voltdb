@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "kipling/messages/OffsetCommit.h"
 #include "kipling/orm/GroupOrmBase.h"
 
@@ -25,6 +27,8 @@ namespace kipling {
 
 class GroupOffset: public GroupOrmBase {
 public:
+    static void visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(GroupOffset&)> visitor);
+
     GroupOffset(const GroupTables& tables, const NValue& groupId, const NValue& topic, int32_t partition);
 
     /**
@@ -82,8 +86,10 @@ protected:
     PersistentTable* getTable() const override { return m_tables.getGroupOffsetTable(); }
 
 private:
+    GroupOffset(const GroupTables& tables, TableTuple& tuple, const NValue& groupId);
+
     // Name of topic
-    const NValue& m_topic;
+    const NValue m_topic;
     // Partition ID
     const int32_t m_partition;
 };

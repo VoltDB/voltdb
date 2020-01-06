@@ -38,6 +38,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 
 public class TestRestoreSchema extends LocalClustersTestBase {
     /*
@@ -90,7 +91,7 @@ public class TestRestoreSchema extends LocalClustersTestBase {
             fail(response.getStatusString() + '\n' + Arrays.toString(response.getResults()));
         }
 
-        assertEquals(response.getResults()[0].toString(), 2 * tableCount * sitesPerHost,
+        assertEquals(response.getResults()[0].toString(), 2 * tableCount * sitesPerHost + SystemTable.values().length,
                 response.getResults()[0].getRowCount());
 
         for (int i = 0; i < tableCount; ++i) {

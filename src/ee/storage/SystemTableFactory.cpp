@@ -51,8 +51,6 @@ PersistentTable* SystemTableFactory::create(const SystemTableId id) {
         return kipling::TableFactory::createGroup(*this);
     case SystemTableId::KIPLING_GROUP_MEMBER:
         return kipling::TableFactory::createGroupMember(*this);
-    case SystemTableId::KIPLING_GROUP_MEMBER_PROTOCOL:
-        return kipling::TableFactory::createGroupMemberProtocol(*this);
     case SystemTableId::KIPLING_GROUP_OFFSET:
         return kipling::TableFactory::createGroupOffset(*this);
     default:

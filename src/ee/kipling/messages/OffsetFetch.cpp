@@ -19,16 +19,15 @@
 
 namespace voltdb { namespace kipling {
 
-OffsetFetchRequestTopic::OffsetFetchRequestTopic(const int16_t version, SerializeInputBE& request) : m_topic(readString(request)) {
-    const int32_t partitionCount = readInt(request);
-    for (int i = 0; i < partitionCount; ++i) {
-        m_partitions.push_back(readInt(request));
+OffsetFetchResponsePartition::OffsetFetchResponsePartition(int16_t version, CheckedSerializeInput& in) :
+        m_partitionIndex(in.readInt()), m_offset(in.readLong()) {
+    if (version >= 5) {
+        m_leaderEpoch = in.readInt();
     }
-}
+    m_metadata = in.readString();
 
-OffsetFetchRequest::OffsetFetchRequest(const int16_t version, const NValue& groupId, SerializeInputBE& request) :
-        GroupRequest(version, groupId) {
-    readRequestComponents(version, request, m_topics);
+    int16_t error = in.readShort();
+    vassert(error == 0);
 }
 
 void OffsetFetchResponsePartition::write(const int16_t version, SerializeOutput& out) const {
@@ -37,8 +36,13 @@ void OffsetFetchResponsePartition::write(const int16_t version, SerializeOutput&
     if (version >= 5) {
         out.writeInt(m_leaderEpoch);
     }
-    writeString(m_metadata, out);
-    writeError(m_error, out);
+    writeString(m_metadata, out, true);
+    writeError(out);
+}
+
+OffsetFetchResponseTopic::OffsetFetchResponseTopic(int16_t version, CheckedSerializeInput& in) :
+        m_topic(in.readString()) {
+    in.readComponents(version, m_partitions);
 }
 
 void OffsetFetchResponseTopic::write(const int16_t version, SerializeOutput& out) const {
@@ -46,13 +50,20 @@ void OffsetFetchResponseTopic::write(const int16_t version, SerializeOutput& out
     writeResponses(m_partitions, version, out);
 }
 
-void OffsetFetchResponse::write(const int16_t version, SerializeOutput& out) const {
-    if (version >= 3) {
-        out.writeInt(throttleTimeMs());
+OffsetFetchResponse::OffsetFetchResponse(int16_t version, CheckedSerializeInput& in) {
+    readThrottleTime(version, in);
+    in.readComponents(version, m_topics);
+    if (version >= 2) {
+        int16_t error = in.readShort();
+        vassert(error == 0);
     }
+}
+
+void OffsetFetchResponse::write(const int16_t version, SerializeOutput& out) const {
+    writeThrottleTime(version, out);
     writeResponses(m_topics, version, out);
     if (version >= 2) {
-        writeError(error(), out);
+        writeError(out);
     }
 }
 

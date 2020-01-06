@@ -32,7 +32,7 @@ public:
      */
     static inline const std::vector<SystemTableId> getAllSystemTableIds() {
         return { SystemTableId::KIPLING_GROUP, SystemTableId::KIPLING_GROUP_MEMBER,
-            SystemTableId::KIPLING_GROUP_MEMBER_PROTOCOL, SystemTableId::KIPLING_GROUP_OFFSET };
+            SystemTableId::KIPLING_GROUP_OFFSET };
     }
 
     /**
