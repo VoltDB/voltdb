@@ -23,7 +23,7 @@ import com.google_voltpatches.common.base.Supplier;
 
 public class DbSettings {
 
-    private final NodeSettings m_nodeSettings;
+    private NodeSettings m_nodeSettings;
     private final Supplier<ClusterSettings> m_cluster;
     public DbSettings(Supplier<ClusterSettings> clusterSettings, NodeSettings pathSettings) {
         m_nodeSettings = pathSettings;
@@ -46,6 +46,9 @@ public class DbSettings {
         return m_nodeSettings;
     }
 
+    public void setNodeSettings(NodeSettings nodeSettings) {
+        m_nodeSettings = nodeSettings;
+    }
     @Override
     public String toString() {
         return "DbSettings [paths=" + m_nodeSettings + ", cluster=" + m_cluster

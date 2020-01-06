@@ -971,4 +971,12 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void notifyOfShutdown() {
      }
+
+    @Override
+    public boolean isMasterOnly() {
+        return false;
+    }
+
+    @Override
+    public void setMasterOnly() {}
 }

@@ -809,7 +809,10 @@ public class Benchmark {
                     // same formula used in BigTableLoader.java
                     Random r = new Random(0);
                     long p = Math.abs((long)(r.nextGaussian() * partitionCount-1));
-                    try {
+                    boolean success = false;
+                    while ( ! success) {
+                      try {
+
                         ClientResponse clientResponse = client.callProcedure("GenHashMismatchOnBigP", p);
 
                         byte status = clientResponse.getStatus();
@@ -821,13 +824,17 @@ public class Benchmark {
                             log.warn("GenHashMismatchOnBigP ungracefully failed to insert into BigP");
                             log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                         } else {
+                            success = true;
                             log.info("GenHashMismatchOnBigP executed successfully");
                         }
-                    } catch (IOException | ProcCallException e) {
-                        hardStop("GenHashMismatchOnBigP ungracefully failed to insert into BigP. IOException:"+e.getMessage());
-                    } catch (Exception e) {
+                     } catch (IOException | ProcCallException e) {
+                        log.warn("GenHashMismatchOnBigP ungracefully failed to insert into BigP. IOException:"+e.getMessage());
+                     } catch (Exception e) {
                         hardStop("Unexpected exception with generating hashmismatch:" + e.getMessage());
-                    }
+                        break;
+                     }
+                    success = true;
+                  }
                 }
             };
 

@@ -158,6 +158,17 @@ public class LeaderAppointer implements Promotable
                 tmLog.debug(String.format(WHOMIM + "Newly seen replicas:%s, Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
                         CoreUtils.hsIdCollectionToString(missingHSIds)));
             }
+            // Could happen during command log replay if there is a hash mismatch and cluster is moved to master-only mode
+            if (!m_replayComplete.get() && updatedHSIds.contains(m_currentLeader)) {
+                // Check for k-safety
+                if (!isClusterKSafe(null)) {
+                    VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                            false, null);
+                }
+                m_replicas.clear();
+                m_replicas.addAll(updatedHSIds);
+                return;
+            }
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
                 if (missingHSIds.size() > 0) {
@@ -185,6 +196,7 @@ public class LeaderAppointer implements Promotable
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(WHOMIM + "Leader election callback for partition " + m_partitionId);
                 }
+
                  // Check for k-safety
                 if (!isClusterKSafe(null)) {
                     VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
@@ -206,6 +218,14 @@ public class LeaderAppointer implements Promotable
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
                 Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
                 if (missingHSIds.contains(m_currentLeader)) {
+
+                    // Cluster is or about to enter master-only mode after hash mismatch is detected
+                    // The cluster is not viable for any new leader promotion.
+                    if (VoltZK.zkNodeExists(m_zk, VoltZK.reducedClusterSafety)) {
+                        VoltDB.crashGlobalVoltDB("Cluster is running on master only mode and has become unviable.", false, null);
+                        return;
+                    }
+
                     final long currentLeader = m_currentLeader;
 
                     // When a promotion is in progress and the site in promotion is not on the failed hosts, should not

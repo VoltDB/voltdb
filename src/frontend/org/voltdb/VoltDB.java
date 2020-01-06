@@ -882,6 +882,7 @@ public class VoltDB {
         public Map<String, String> asNodeSettingsMap() {
             return ImmutableMap.<String, String>builder()
                     .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_sitesperhost))
+                    .put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(m_sitesperhost))
                     .build();
         }
 

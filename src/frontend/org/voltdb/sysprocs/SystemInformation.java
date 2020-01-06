@@ -411,6 +411,9 @@ public class SystemInformation extends VoltSystemProcedure
 
         String cluster_state = VoltDB.instance().getMode().toString();
         vt.addRow(hostId, "CLUSTERSTATE", cluster_state);
+
+        vt.addRow(hostId, "CLUSTERSAFETY", VoltDB.instance().isMasterOnly() ? "REDUCED" : "FULL");
+
         // INITIALIZED, used by VEM to determine the spinny icon state.
         org.voltdb.OperationMode mode = VoltDB.instance().getMode();
         String areInitialized = Boolean.toString(!VoltDB.instance().rejoining() &&
@@ -462,7 +465,7 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "PLACEMENTGROUP","NULL");
         }
         Set<Integer> buddies = VoltDB.instance().getCartographer().getHostIdsWithinPartitionGroup(hostId);
-        String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
+        String[] strIds = buddies.stream().sorted().map(String::valueOf).toArray(String[]::new);
         vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
     }
 

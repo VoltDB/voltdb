@@ -57,7 +57,8 @@ bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 bool SynchronizedThreadLock::s_usingMpMemory = false;
 #endif
 
-SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
+SharedEngineLocalsType SynchronizedThreadLock::s_activeEnginesByPartitionId;
+SharedEngineLocalsType SynchronizedThreadLock::s_inactiveEnginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
@@ -94,7 +95,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
         s_globalTxnStartCountdownLatch = s_SITES_PER_HOST;
     }
     if (*newEngineLocals.enginePartitionId != 16383) {
-        s_enginesByPartitionId[*newEngineLocals.enginePartitionId] = newEngineLocals;
+        s_activeEnginesByPartitionId[*newEngineLocals.enginePartitionId] = newEngineLocals;
         if (newEngineLocals.context->getContextEngine()->isLowestSite()) {
             // We need the Replicated table memory before the MP Site is initialized so
             // Just track it in s_mpEngine.
@@ -162,13 +163,13 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
 #endif
         }
     } else {
-        EngineLocals& engine = s_enginesByPartitionId[partitionId];
+        EngineLocals& engine = s_activeEnginesByPartitionId[partitionId];
         engine.poolData = nullptr;
         engine.stringData = nullptr;
         engine.enginePartitionId = nullptr;
         engine.context = nullptr;
-        s_enginesByPartitionId.erase(partitionId);
-        if (s_enginesByPartitionId.empty()) {
+        s_activeEnginesByPartitionId.erase(partitionId);
+        if (s_activeEnginesByPartitionId.empty()) {
             // Junit Tests that use ServerThread (or LocalCluster.setHasLocalServer(true)) will use the same
             // static ee globals from one test to the next so the last engine of the previous test should
             // set this static to 0 so that the first engine in the next test will reinitialize the site count
@@ -179,8 +180,25 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
     unlockReplicatedResourceForInit();
 }
 
+void SynchronizedThreadLock::updateSitePerHost(int32_t sitePerHost) {
+    s_SITES_PER_HOST = sitePerHost;
+    VOLT_DEBUG("Update SitePerHost from %d to %d", s_SITES_PER_HOST, sitePerHost);
+}
+
+void SynchronizedThreadLock::deactiveEngineLocals(int32_t partitionId) {
+    VOLT_DEBUG("Deactive enginelocal for partition %d, s_mpMemoryPartitionId %d",  partitionId, s_mpMemoryPartitionId);
+    lockReplicatedResourceForInit();
+    EngineLocals& engine = s_activeEnginesByPartitionId[partitionId];
+    s_inactiveEnginesByPartitionId[partitionId] = engine;
+    s_activeEnginesByPartitionId.erase(partitionId);
+    if (partitionId == s_mpMemoryPartitionId) {
+        VOLT_DEBUG("Deactive enginelocal for  Replicated table memory pools allocated on the lowest site.");
+    }
+    unlockReplicatedResourceForInit();
+}
+
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
-    VOLT_DEBUG("Entering countdown latch...");
+    VOLT_DEBUG("Entering countdown latch... %d", s_globalTxnStartCountdownLatch);
     vassert(s_globalTxnStartCountdownLatch > 0);
     vassert(ThreadLocalPool::getEnginePartitionId() != 16383);
     vassert(!isInSingleThreadMode());
@@ -220,8 +238,8 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
 void SynchronizedThreadLock::signalLowestSiteFinished() {
     std::lock_guard<std::mutex> g(s_sharedEngineMutex);
     s_globalTxnStartCountdownLatch = s_SITES_PER_HOST;
-    VOLT_DEBUG("Restore context to lowest SP partition on thread %d",
-            ThreadLocalPool::getThreadPartitionId());
+    VOLT_DEBUG("Restore context to lowest SP partition on thread %d,  s_globalTxnStartCountdownLatch %d, s_SITES_PER_HOST %d ",
+            ThreadLocalPool::getThreadPartitionId(), s_globalTxnStartCountdownLatch, s_SITES_PER_HOST);
     setIsInSingleThreadMode(false);
     pthread_cond_broadcast(&s_sharedEngineCondition);
 }
@@ -249,7 +267,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
             realReleaseInterest = nullptr;
         }
         uq->registerSynchronizedUndoAction(realUndoAction, realReleaseInterest);
-        for (const SharedEngineLocalsType::value_type& enginePair : s_enginesByPartitionId) {
+        for (const SharedEngineLocalsType::value_type& enginePair : s_activeEnginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             if (uq != currUQ) {
@@ -272,7 +290,7 @@ void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantu
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder. Note that since we only touch quantum memory
         // we don't need to switch to the lowest site context when registering the undo action.
-        for (const SharedEngineLocalsType::value_type& enginePair : s_enginesByPartitionId) {
+        for (const SharedEngineLocalsType::value_type& enginePair : s_activeEnginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             UndoReleaseAction* undoAction;
@@ -388,7 +406,7 @@ void SynchronizedThreadLock::assumeLowestSiteContext() {
 #ifndef  NDEBUG
     setUsingMpMemory(false);
 #endif
-    ExecutorContext::assignThreadLocals(s_enginesByPartitionId.begin()->second);
+    ExecutorContext::assignThreadLocals(s_activeEnginesByPartitionId.begin()->second);
 }
 
 void SynchronizedThreadLock::assumeLocalSiteContext() {
@@ -397,7 +415,7 @@ void SynchronizedThreadLock::assumeLocalSiteContext() {
     setUsingMpMemory(false);
 #endif
     ExecutorContext::assignThreadLocals(
-            s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
+            s_activeEnginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
 
 void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
@@ -410,7 +428,7 @@ void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
 
 bool SynchronizedThreadLock::isLowestSiteContext() {
     return ExecutorContext::getExecutorContext() ==
-        s_enginesByPartitionId.begin()->second.context;
+        s_activeEnginesByPartitionId.begin()->second.context;
 }
 
 long int SynchronizedThreadLock::getThreadId() {
@@ -427,16 +445,20 @@ EngineLocals SynchronizedThreadLock::getMpEngine() {
 
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);
-    s_enginesByPartitionId.clear();
+    s_activeEnginesByPartitionId.clear();
     ExecutorContext::resetStateForTest();
 }
 
 void SynchronizedThreadLock::setEngineLocalsForTest(int32_t partitionId,
         EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId) {
     s_mpEngine = mpEngine;
-    s_enginesByPartitionId = enginesByPartitionId;
+    s_activeEnginesByPartitionId = enginesByPartitionId;
     ExecutorContext::assignThreadLocals(enginesByPartitionId[partitionId]);
     ThreadLocalPool::assignThreadLocals(enginesByPartitionId[partitionId]);
+}
+
+void SynchronizedThreadLock::swapContextforMPEngine() {
+        s_mpEngine.context = ExecutorContext::getExecutorContext();
 }
 
 }

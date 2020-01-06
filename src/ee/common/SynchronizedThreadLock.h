@@ -68,7 +68,8 @@ class SynchronizedThreadLock {
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
     static EngineLocals s_mpEngine;
-    static SharedEngineLocalsType s_enginesByPartitionId;
+    static SharedEngineLocalsType s_activeEnginesByPartitionId;
+    static SharedEngineLocalsType s_inactiveEnginesByPartitionId;
 
     // For use only by friends:
     static void lockReplicatedResource();
@@ -86,6 +87,8 @@ public:
     static void destroy();
     static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
     static void resetMemory(int32_t partitionId);
+    static void updateSitePerHost(int32_t sitePerHost);
+    static void deactiveEngineLocals(int32_t partitionId);
 
     /**
      * Cross-site synchronization functions
@@ -121,6 +124,7 @@ public:
 
     static long int getThreadId();
     static void resetEngineLocalsForTest();
+    static void swapContextforMPEngine();
     static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
     static EngineLocals getMpEngine();
 };

@@ -215,6 +215,8 @@ public interface ProducerDRGateway {
      */
     public void logActiveConversations();
 
+    public void notifyDecommissionPartitions(List<Integer> decommissionPartitions);
+
     /**
      * Enum to indicate which start mode the {@link ProducerDRGateway} instance is in
      */
