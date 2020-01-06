@@ -27,6 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Minus;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rel.util.PlanNodeUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 import com.google.common.base.Preconditions;
 
@@ -68,6 +70,11 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
         double rowCount = estimateRowCount(mq);
         double cpu = PlanCostUtil.computeSetOpCost(getInputs(), mq);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        return PlanNodeUtil.setOpToPlanNode(this);
     }
 
 }

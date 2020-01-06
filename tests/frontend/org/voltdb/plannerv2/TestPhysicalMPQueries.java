@@ -185,4 +185,48 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testPartitionedSetOp1() {
+        m_tester.sql("select I from p1 union select I from r1")
+        .transform("VoltPhysicalUnion(all=[false])\n" +
+                    "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
+    public void testPartitionedSetOp2() {
+        m_tester.sql("select I from p1 where i = 9 union select I from r1")
+        .transform("VoltPhysicalUnion(all=[false])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
+    public void testPartitionedSetOp3() {
+        m_tester.sql("select I from p1 where i = 9 union select I from p2 where i = 9")
+        .transform("VoltPhysicalUnion(all=[false])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, P2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
+    public void testPartitionedSetOp4() {
+        m_tester.sql("select I from r1 union (select I from p2 except select I from r2)")
+        .transform("VoltPhysicalUnion(all=[false])\n" +
+                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "  VoltPhysicalMinus(all=[false])\n" +
+                    "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltPhysicalTableSequentialScan(table=[[public, P2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, R2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
 }

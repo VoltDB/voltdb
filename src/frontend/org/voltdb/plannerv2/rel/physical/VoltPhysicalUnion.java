@@ -27,6 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rel.util.PlanNodeUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 import com.google.common.base.Preconditions;
 
@@ -67,6 +69,11 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
         double rowCount = estimateRowCount(mq);
         double cpu = rowCount;
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        return PlanNodeUtil.setOpToPlanNode(this);
     }
 
 }
