@@ -28,6 +28,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -37,6 +39,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Track responses from each partition. This should be subsumed
@@ -44,10 +47,10 @@ import com.google_voltpatches.common.collect.Sets;
  */
 public class DuplicateCounter
 {
-    private final static String FAIL_MSG = "Stored procedure %s succeeded on one partition but failed on another partition.";
-    private final static String MISMATCH_MSG = "Stored procedure %s generated different SQL queries at different partitions.";
+    public static final String FAIL_MSG = "Procedure response on replica is different from leader";
+    public static final String MISMATCH_MSG = "Hash mismatch happened";
 
-    public static enum HashResult{
+    public enum HashResult{
         MISMATCH(0),
         DONE(1),
         WAITING(2),
@@ -76,8 +79,8 @@ public class DuplicateCounter
     final long m_destinationId;
     int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
-    // if any response shows the transaction aborted
-    boolean m_txnSucceed = false;
+    // leader partition client response status
+    byte m_status;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     final long m_leaderHSID;
@@ -101,10 +104,10 @@ public class DuplicateCounter
 
     static class ResponseResult {
         final int[] hashes;
-        final boolean success;
-        public ResponseResult(int[] respHashes, boolean status) {
+        final byte status;
+        public ResponseResult(int[] respHashes, byte respStatus) {
             hashes = respHashes;
-            success = status;
+            status = respStatus;
         }
     }
 
@@ -153,23 +156,59 @@ public class DuplicateCounter
         m_expectedHSIds.add(newMaster);
     }
 
-    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
+    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos, byte status, long replicaHSID ) {
         if (misMatchPos >= 0) {
             if (recentMessage != null) {
                 ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
             }
             ((InitiateResponseMessage) m_lastResponse).setMismatchPos(misMatchPos);
         }
-        String msg = String.format(reason + " COMPARING: %d to %d\n"
-                + "REQUEST MESSAGE: %s\n"
-                + "PREV RESPONSE MESSAGE: %s\n"
-                + "CURR RESPONSE MESSAGE: %s\n",
-                hashes[0],
-                m_responseHashes[0],
-                m_openMessage.toString(),
-                m_lastResponse.toString(),
-                recentMessage != null ? recentMessage.toString():"");
-        tmLog.error(msg);
+
+        if (tmLog.isDebugEnabled()){
+            String msg = String.format(reason + " COMPARING: %d to %d\n"
+                            + "REQUEST MESSAGE: %s\n"
+                            + "PREV RESPONSE MESSAGE: %s\n"
+                            + "CURR RESPONSE MESSAGE: %s\n",
+                    hashes[0],
+                    m_responseHashes[0],
+                    m_openMessage.toString(),
+                    m_lastResponse.toString(),
+                    recentMessage != null ? recentMessage.toString():"");
+            tmLog.debug(msg);
+        }
+        // User friendly hash mismatch info
+        String procName = getStoredProcedureName();
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(reason + " occurred\n"
+                                    + "Procedure name: %s\n"
+                                    + "Partition: %d\n"
+                                    + "Between: %s and %s\n"
+                                    + "Procedure response: %d\n",
+                                    procName,
+                                    TxnEgo.getPartitionId(m_txnId),
+                                    CoreUtils.hsIdToString(m_leaderHSID), CoreUtils.hsIdToString(replicaHSID),
+                                    m_status));
+        if (misMatchPos < 0) {
+            sb.append(FAIL_MSG).append(" :").append(status);
+        } else if (misMatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
+            sb.append(MISMATCH_MSG).append(" after ").append(DeterminismHash.MAX_HASHES_COUNT / 2 - DeterminismHash.HEADER_OFFSET + 1).append(" statements.\n").
+                    append("For debugging purposes, use VOLTDB_OPTS=\"-DMAX_STATEMENTS_WITH_DETAIL=<hashcount>\" to set to a higher value, it could impact performance.");
+        } else {
+            sb.append(MISMATCH_MSG).append(" from statement ").append(misMatchPos/2).append("\n");
+            Procedure proc = CatalogUtil.getProcedure(procName);
+            if (proc == null) {
+                sb.append("Unknown procedure: ").append(procName);
+            } else if (proc.getSystemproc()) {
+                sb.append(procName).append(" is system procedure. Please Contact VoltDB Support.");
+            } else if (proc.getDefaultproc()) {
+                sb.append(procName).append(" is auto-generated CRUD procedure. Please Contact VoltDB Support.");
+            } else {
+                sb.append("Procedure SQL Executions:\n");
+                CatalogUtil.printUserProcedureDetailShort(proc, m_responseHashes, hashes, misMatchPos,
+                        CoreUtils.getHostIdFromHSId(m_leaderHSID), CoreUtils.getHostIdFromHSId(replicaHSID), sb);
+            }
+        }
+        tmLog.error(sb.toString());
     }
 
     void logWithCollidingDuplicateCounters(DuplicateCounter other) {
@@ -213,7 +252,7 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected HashResult checkCommon(int[] hashes, boolean recovering, VoltMessage message, boolean txnSucceed)
+    protected HashResult checkCommon(int[] hashes, boolean recovering, VoltMessage message, byte status)
     {
         if (!recovering) {
             m_lastResponse = message;
@@ -222,22 +261,21 @@ public class DuplicateCounter
                 int pos = -1;
                 if (m_responseHashes == null) {
                     m_responseHashes = hashes;
-                    m_txnSucceed = txnSucceed;
-                } else if (m_txnSucceed != txnSucceed) {
-                    tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
+                    m_status = status;
+                } else if (ClientResponseImpl.isTransactionallySuccessful(m_status) != ClientResponseImpl.isTransactionallySuccessful(status)) {
+                    logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos, status, message.m_sourceHSId);
                     return HashResult.ABORT;
                 } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
-                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
+                    logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos, status, message.m_sourceHSId);
                     return HashResult.MISMATCH;
                 }
             } else {
-                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes, txnSucceed));
+                m_responses.put(message.m_sourceHSId, new ResponseResult(hashes, status));
 
                 // Use the response message from local site
                 if (m_leaderHSID == message.m_sourceHSId) {
                     m_lastResponse = message;
+                    m_status = status;
                 }
             }
         }
@@ -250,6 +288,7 @@ public class DuplicateCounter
          */
         if (m_lastResponse == null) {
             m_lastResponse = message;
+            m_status = status;
         }
 
         m_expectedHSIds.remove(message.m_sourceHSId);
@@ -285,14 +324,17 @@ public class DuplicateCounter
             }
 
             ResponseResult res = entry.getValue();
-            if (leaderResponse.success != res.success) {
+            if (ClientResponseImpl.isTransactionallySuccessful(m_status) != ClientResponseImpl.isTransactionallySuccessful(res.status)) {
                 if (!misMatchLogged) {
-                    tmLog.error(String.format(FAIL_MSG, getStoredProcedureName()));
-                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, -1);
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, -1, res.status, entry.getKey());
                     misMatchLogged = true;
                 }
                 m_hashMatched = false;
                 m_misMatchedReplicas.add(entry.getKey());
+                continue;
+            }
+            if (!ClientResponseImpl.isTransactionallySuccessful(m_status)) {
+                // no need to check specific hashes if txn already failed
                 continue;
             }
             int pos = -1;
@@ -300,10 +342,7 @@ public class DuplicateCounter
             if (m_responseHashes != null && res.hashes != null &&
                     (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
                 if (!misMatchLogged) {
-                    tmLog.error(String.format(MISMATCH_MSG, getStoredProcedureName()));
-                    if (res.hashes != null) {
-                        logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, pos);
-                    }
+                    logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, pos, res.status, entry.getKey());
                     misMatchLogged = true;
                 }
                 m_hashMatched = false;
@@ -319,15 +358,15 @@ public class DuplicateCounter
 
     HashResult offer(FragmentResponseMessage message) {
         // No check on fragment message
-        return checkCommon(ZERO_HASHES, message.isRecovering(), message, false);
+        return checkCommon(ZERO_HASHES, message.isRecovering(), message, ClientResponse.SUCCESS);
     }
 
     HashResult offer(CompleteTransactionResponseMessage message) {
-        return checkCommon(ZERO_HASHES, message.isRecovering(), message, false);
+        return checkCommon(ZERO_HASHES, message.isRecovering(), message, ClientResponse.SUCCESS);
     }
 
     HashResult offer(DummyTransactionResponseMessage message) {
-        return checkCommon(ZERO_HASHES, false, message, false);
+        return checkCommon(ZERO_HASHES, false, message, ClientResponse.SUCCESS);
     }
 
     HashResult offer(InitiateResponseMessage message) {
@@ -335,7 +374,7 @@ public class DuplicateCounter
         return checkCommon(r.getHashes(),
                 message.isRecovering(),
                 message,
-                !(ClientResponseImpl.isTransactionallySuccessful(r.getStatus())));
+                r.getStatus());
     }
 
     VoltMessage getLastResponse() {

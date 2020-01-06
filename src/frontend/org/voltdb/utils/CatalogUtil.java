@@ -148,6 +148,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -195,6 +196,11 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
     public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+
+    // Hash Mismatch log string
+    public static final String MATCHED_STATEMENTS = "matching statements and parameters";
+    public static final String MISMATCHED_STATEMENTS = "mismatched statements";
+    public static final String MISMATCHED_PARAMETERS = "mismatched parameters";
 
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
@@ -3274,6 +3280,41 @@ public abstract class CatalogUtil {
             paths.getLargequeryswap().setPath(pathSettings.getLargeQuerySwap().toString());
         }
         return deployment;
+    }
+
+    public static Procedure getProcedure(String procName) {
+        return VoltDB.instance().getCatalogContext().database.getProcedures().get(procName);
+    }
+
+    public static void printUserProcedureDetailShort(Procedure proc, int[] leftHashes, int[] rightHashes, int misMatchPos, int leftHostId, int rightHostId, StringBuilder sb) {
+        if ((leftHashes[0] == rightHashes[0]) || (misMatchPos < 0)) {
+            return;
+        }
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        Map<Integer, String> stateMap = new HashMap<>();
+        for (Statement stmt : proc.getStatements()) {
+            // compute hash for determinism check
+            String sqlText = stmt.getSqltext();
+            crc.reset();
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            stateMap.put(hash, sqlText);
+        }
+
+        int pos = 0;
+        for (; pos < misMatchPos - (misMatchPos % 2); pos+=2) {
+            sb.append("\t").append("SQL Statement ").append(pos / 2).append(" - ").append(MATCHED_STATEMENTS).append(": ").
+                    append(stateMap.get(leftHashes[pos+DeterminismHash.HEADER_OFFSET])).append("\n");
+        }
+        if (misMatchPos % 2 == 0) { // mismatch statement
+            sb.append("\t").append("SQL Statement ").append(pos / 2).append(" - ").append(MISMATCHED_STATEMENTS).append("Host ").append(leftHostId).append(": ").
+                    append(stateMap.get(leftHashes[pos+DeterminismHash.HEADER_OFFSET])).append("\n");
+            sb.append("\t").append("SQL Statement ").append(pos / 2).append(" - ").append(MISMATCHED_STATEMENTS).append("Host ").append(rightHostId).append(": ").
+                    append(stateMap.get(rightHashes[pos+DeterminismHash.HEADER_OFFSET])).append("\n");
+        } else {  // mismatch parameter
+            sb.append("\t").append("SQL Statement ").append(pos / 2).append(" - ").append(MISMATCHED_PARAMETERS).append(": ").
+                    append(stateMap.get(leftHashes[pos+DeterminismHash.HEADER_OFFSET])).append("\n");
+        }
     }
 
     /*

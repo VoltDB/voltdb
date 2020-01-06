@@ -846,7 +846,7 @@ public class CoreUtils {
     }
 
     public static int getHostIdFromHSId(long HSId) {
-        return (int) (HSId & 0xffffffff);
+        return (int) (HSId);
     }
 
     public static Set<Integer> getHostIdsFromHSIDs(Collection<Long> hsids) {
@@ -862,7 +862,7 @@ public class CoreUtils {
     }
 
     public static String hsIdToString(long hsId, String delimiter) {
-        return Integer.toString((int)hsId) + delimiter + Integer.toString((int)(hsId >> 32));
+        return (int) hsId + delimiter + (int) (hsId >> 32);
     }
 
     public static void hsIdToString(long hsId, StringBuilder sb) {
@@ -929,7 +929,7 @@ public class CoreUtils {
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-            byte readBytes[] = new byte[1024 * 8];
+            byte[] readBytes = new byte[1024 * 8];
             while (true) {
                 int read = input.read(readBytes);
                 if (read == -1) {

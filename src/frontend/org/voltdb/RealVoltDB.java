@@ -5155,17 +5155,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public static void printDiagnosticInformation(CatalogContext context, String procName, LoadedProcedureSet procSet) {
         StringBuilder sb = new StringBuilder();
         final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
-        sb.append("Statements within " + procName + ": ").append("\n");
-        for (final Procedure proc : catalogProcedures) {
-            if (proc.getTypeName().equals(procName)) {
-                sb.append(CatalogUtil.printUserProcedureDetail(proc));
-            }
+        sb.append("Statements within ").append(procName).append(": ").append("\n");
+        Procedure proc = catalogProcedures.get(procName);
+        if (proc != null) {
+            sb.append(CatalogUtil.printUserProcedureDetail(proc));
+        } else {
+            sb.append("Unknown procedure: ").append(procName);
         }
-        sb.append("Default CRUD Procedures: ").append("\n");
-        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
-            sb.append(CatalogUtil.printCRUDProcedureDetail(pair.getValue(), procSet));
-        }
-
         hostLog.error(sb.toString());
     }
 

@@ -864,13 +864,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     if (m_isLeader && m_sendToHSIds.length > 0) {
                         StringBuilder sb = new StringBuilder();
                         for (long hsId : m_sendToHSIds) {
-                            sb.append(CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId)).append(" ");
+                            sb.append(CoreUtils.hsIdToString(hsId)).append(" ");
                         }
                         hostLog.info("Send dump plan message to other replicas: " + sb.toString());
                         m_mailbox.send(m_sendToHSIds, new DumpPlanThenExitMessage(counter.getStoredProcedureName()));
                     }
-                    RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
-                            counter.getStoredProcedureName(), m_procSet);
+                    if (tmLog.isDebugEnabled()) {
+                        RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                                counter.getStoredProcedureName(), m_procSet);
+                    }
                     VoltDB.crashLocalVoltDB("Hash mismatch: replicas produced different results.", true, null);
                 }
             }
@@ -1561,8 +1563,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         hostLog.error("This node is going to shutdown because a hash mismatch error was detected on " +
                        CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
-        RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
-                msg.getProcName(), m_procSet);
+        if (tmLog.isDebugEnabled()) {
+            RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                    msg.getProcName(), m_procSet);
+        }
         VoltDB.crashLocalVoltDB("Hash mismatch", true, null);
     }
 

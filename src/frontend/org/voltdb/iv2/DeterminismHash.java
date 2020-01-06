@@ -105,9 +105,12 @@ public class DeterminismHash {
     }
 
     /**
-     * Compare two hash arrays return true if the same.
+     * Compare two hash arrays
+     * @return -1 if the same;
+     *         HASH_NOT_INCLUDE if the mismatched hash isn't included in the per-statement hashes;
+     *         pos for the first mismatched hash detected.
+     *         even number for statement mismatch, odd number for parameter mismatch
      *
-     * For now, just compares first integer value in array.
      */
     public static int compareHashes(int[] leftHashes, int[] rightHashes) {
         assert(leftHashes != null);
@@ -122,12 +125,10 @@ public class DeterminismHash {
         int includedHashLeft = Math.min(leftHashes[2], MAX_HASHES_COUNT);
         int includedHashRight = Math.min(rightHashes[2], MAX_HASHES_COUNT);
         int includedHashMin = Math.min(includedHashLeft, includedHashRight);
-        int pos = 0;
-        for(int i = HEADER_OFFSET ; i < HEADER_OFFSET + includedHashMin; i += 2) {
-            if(leftHashes[i] != rightHashes[i] || leftHashes[i + 1] != rightHashes[i + 1]) {
-                return pos;
+        for(int i = HEADER_OFFSET ; i < HEADER_OFFSET + includedHashMin; i++) {
+            if (leftHashes[i] != rightHashes[i]) {
+                return i - HEADER_OFFSET;
             }
-            pos++;
         }
         // If the number of per-statement hashes is more than MAX_HASHES_COUNT and
         // the mismatched hash isn't included in the per-statement hashes
@@ -135,9 +136,9 @@ public class DeterminismHash {
     }
 
     /**
-     * Log the contents of the hash array
+     * Log the contents of the hash array for debug
      */
-    public static String description(int[] hashes, int m_hashMismatchPos) {
+    public static String description(int[] hashes, int mismatchPos) {
         assert(hashes != null);
         assert(hashes.length >= 3);
         StringBuilder sb = new StringBuilder();
@@ -151,14 +152,14 @@ public class DeterminismHash {
         for (int i = HEADER_OFFSET; i < HEADER_OFFSET + includedHashes; i += 2) {
             sb.append("\n  Ran Statement ").append(hashes[i]);
             sb.append(" with Parameters ").append(hashes[i + 1]);
-            if(pos == m_hashMismatchPos) {
+            if(pos == mismatchPos) {
                 sb.append(" <--- ALERT: Hash mismatch starts from here!");
             }
             pos++;
         }
         if (hashes[2] > MAX_HASHES_COUNT) {
             sb.append("\n  Additional SQL statements truncated.");
-            if (m_hashMismatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
+            if (mismatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
                 sb.append("\n  The mismatched hash is also truncated. "
                         + "For debugging purpose, use VOLTDB_OPTS=\"-DMAX_STATEMENTS_WITH_DETAIL=<hashcount>\" to set to a higher value, "
                         + "it could impact performance.");
