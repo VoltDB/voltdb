@@ -45,6 +45,14 @@ public interface BinaryDequeReader<M> {
     }
 
     /**
+     * Move the reader to the segment containing the id available after the input id.
+     * This call will position the reader after the input id only if the id is the end id of a segment.
+     * Otherwise, the reader will be moved to the segment containing the next id after the input id.
+     * If it is in the current segment, the reader will not be repositioned at all.
+     */
+    public void skipPast(long id) throws IOException;
+
+    /**
      * Read and return the object at the current read position of this reader.
      * The entry will be removed once all active readers have read the entry.
      * @param ocf
