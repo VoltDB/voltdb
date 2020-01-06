@@ -17,6 +17,7 @@
 
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
+#include <array>
 
 using namespace voltdb;
 using namespace voltdb::storage;
@@ -56,15 +57,15 @@ inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
     // For debug build, it starts with 512-byte block, which the
     // test logic assumes.
 #ifdef NDEBUG
-    static constexpr array<size_t, 13> const preferred{
+    static array<size_t, 13> const preferred{{
 #else
-    static constexpr array<size_t, 14> const preferred{0x200,
+    static array<size_t, 14> const preferred{{0x200,
 #endif
         4 * 0x400/*4KB*/,8 * 0x400,    0x10 * 0x400,  0x20 * 0x400,
         0x40 * 0x400,    0x80 * 0x400, 0x100 * 0x400, 0x200 * 0x400,
         0x100000/*1MB*/, 2 * 0x100000, 4 * 0x100000,  8 * 0x100000,
         0x10 * 0x100000
-    };
+    }};
     static LRU<512, size_t, size_t> lru;
     auto const* maybe_value = lru.get(tupleSize);
     if (maybe_value != nullptr) {
@@ -259,7 +260,7 @@ template<shrink_direction dir> inline void
 CompactingStorageTrait<dir>::LinearizedChunks::emplace(
         typename CompactingStorageTrait<dir>::list_type& o,
         typename CompactingStorageTrait<dir>::list_type::iterator const& it) noexcept {
-    constexpr static InsertionPos<dir> const insertion;
+    constexpr static InsertionPos<dir> const insertion {};
     list_type::splice(insertion(*this), o, it);
 }
 
@@ -452,7 +453,7 @@ template<> struct CompactingChunksIgnorableFree<shrink_direction::tail> {
 };
 
 template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
-    static CompactingChunksIgnorableFree<dir> const ignored;
+    static CompactingChunksIgnorableFree<dir> const ignored {};
     auto* pos = find(dst);                 // binary search
     if (pos == nullptr) {
         if (ignored(*this, dst)) {

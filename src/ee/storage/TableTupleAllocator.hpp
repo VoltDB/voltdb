@@ -718,7 +718,7 @@ namespace voltdb {
         map_type m_map{};
         array_type m_iters{};
         size_t m_insertPos = 0;
-        inline static constexpr void inc(size_t& s) noexcept {
+        inline static void inc(size_t& s) noexcept {
             s = (s + 1) % N;
         }
     public:
