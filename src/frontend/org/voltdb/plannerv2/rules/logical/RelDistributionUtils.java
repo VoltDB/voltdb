@@ -721,7 +721,23 @@ final class RelDistributionUtils {
                 } else { // else Both are replicated or SP subqueries: SP
                     return new JoinState(true, srcLitera, combinedPartColumns);
                 }
-            default: // Not inner-join type involving at least a partitioned table
+            default: // Outer join type involving at least a partitioned table
+                // If both sides are partitioned they better be joined on the respective
+                // partitioning columns
+                if (outerIsPartitioned && innerIsPartitioned) {
+                    assert join.getCondition() instanceof RexCall;
+                    final RexCall joinCondition = (RexCall) join.getCondition();
+                    final Set<Set<Integer>> joinColumnSets = getAllJoiningColumns(joinCondition);
+                    // Check that partition columns must be in equal-relations
+                    final Set<Integer> equalPartitionColumns =
+                            searchEqualPartitionColumns(
+                                    joinColumnSets, outerPartColumns, innerPartColumns, outerTableColumns);
+                    if (equalPartitionColumns.isEmpty()) {
+                        throw new PlanningErrorException("SQL error while compiling query: " +
+                                "This query is not plannable.  " +
+                                "The planner cannot guarantee that all rows would be in a single partition.");
+                    }
+                }
                 return new JoinState(!outerIsPartitioned && !innerIsPartitioned, srcLitera, combinedPartColumns);
         }
     }

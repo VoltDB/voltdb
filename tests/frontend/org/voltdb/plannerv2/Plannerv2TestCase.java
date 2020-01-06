@@ -36,8 +36,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
-import org.voltdb.compiler.PlannerTool;
-import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
@@ -252,14 +250,6 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
         @Override public void pass() throws AssertionError {
             super.pass();
-            final RelDistribution distribution = transform();
-            PlannerTool.JoinCounter scanCounter = new PlannerTool.JoinCounter();
-            m_transformedNode.accept(scanCounter);
-            boolean isJoin = scanCounter.hasJoins();
-            assertTrue("Got SINGLETON distribution without partition equal value",
-                    distribution.getIsSP()  // A true SP query
-                    || !isJoin              // A MP Query over a single table (no joins)
-                    );
             if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
                 anyMatch(m_expectedTransforms, actualTransform);
@@ -270,21 +260,15 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void fail() {
             super.pass();
             try {
-                final RelDistribution distribution = transform();
                 if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
                     String actualTransform = RelOptUtil.toString(m_transformedNode);
                     anyMatch(m_expectedTransforms, actualTransform);
                 }
-                assertFalse("Expected fall back:\nGot distribution type " +
-                                distribution.getType().name() +
-                                " with partition equal value = " +
-                                (distribution.getPartitionEqualValue() == null ? "null" :
-                                        distribution.getPartitionEqualValue().toString()),
-                        distribution.getIsSP());
+                assertFalse("Expected to fail but passed", true);
             } catch (PlanningErrorException e) {    // transform stage is allowed to throw:
                 // See RelDistributionUtils#isJoinSP()
                 assertTrue(e.getMessage().startsWith(
-                        "SQL error while compiling query: This query is not plannable"));
+                        "SQL error while compiling query:"));
             }
         }
     }

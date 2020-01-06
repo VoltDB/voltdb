@@ -130,6 +130,101 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 "R2  on R1.si = R2.si where R1.I + R2.ti = 5").pass();
     }
 
+    public void testOuterJoinPartitionedTable1() {
+        m_tester.sql("select P1.i, P2.v FROM P1 full join P2 " +
+                "on P1.si = P2.i AND P1.i = 34 and P2.i = 45")
+        .fail();
+
+        m_tester.sql("select P1.i, P2.v FROM P1 left join P2 " +
+                "on P1.si = P2.i")
+        .fail();
+
+        m_tester.sql("select P1.i, P2.v FROM P1 right join P2 " +
+                "on P1.si = P2.i")
+        .fail();
+    }
+
+    public void testOuterJoinPartitionedTable2() {
+        m_tester.sql("select p1.i from r1 left join p1 on p1.si = r1.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I0=[$t1])\n" +
+                    "  VoltLogicalJoin(condition=[=($2, $0)], joinType=[left])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t0, $t7)], I=[$t0], SI0=[$t6], $condition=[$t8])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable3() {
+        m_tester.sql("select p1.i from r1 full join p1 on p1.si = r1.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I0=[$t1])\n" +
+                    "  VoltLogicalJoin(condition=[AND(=($2, $0), =($1, 8))], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable4() {
+        m_tester.sql("select p1.i from p1 right join r1 on p1.si = r1.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[=($1, $2)], joinType=[right])\n" +
+                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t0, $t7)], I=[$t0], SI0=[$t6], $condition=[$t8])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable5() {
+        m_tester.sql("select p1.i from p1 full join r1 on p1.si = r1.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[AND(=($1, $2), =($0, 8))], joinType=[full])\n" +
+                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
+                    "        VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable6() {
+        m_tester.sql("select p1.i from p1 full join p2 on p1.i = p2.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[AND(=($0, $1), =($0, 8))], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P2]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable7() {
+        m_tester.sql("select p1.i from p1 left join p2 on p1.i = p2.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[AND(=($0, $1), =($0, 8))], joinType=[left])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P2]])\n")
+        .pass();
+    }
+
+    public void testOuterJoinPartitionedTable8() {
+        m_tester.sql("select p1.i from p1 right join p2 on p1.i = p2.i and p1.i = 8")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[right])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[8], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, P2]])\n")
+        .pass();
+    }
+
     public void testJoinPartitionedTable() {
         // Two partitioned table joined that results in SP
         m_tester.sql("select P1.i, P2.v FROM P1, P2 " +
