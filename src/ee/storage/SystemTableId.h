@@ -25,8 +25,7 @@ namespace voltdb {
 enum class SystemTableId : int32_t {
     KIPLING_GROUP = -1,
     KIPLING_GROUP_MEMBER = -2,
-    KIPLING_GROUP_MEMBER_PROTOCOL = -3,
-    KIPLING_GROUP_OFFSET = -4
+    KIPLING_GROUP_OFFSET = -3
 };
 
 }
