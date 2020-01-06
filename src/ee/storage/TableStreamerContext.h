@@ -110,11 +110,6 @@ public:
     }
 
     /**
-     * Optional block compaction handler.
-     */
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {}
-
-    /**
      * Optional tuple compaction handler.
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,

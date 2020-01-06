@@ -56,7 +56,7 @@ Table* TableFactory::getPersistentTable(
         voltdb::CatalogId databaseId, char const* name, TupleSchema* schema,
             const std::vector<std::string> &columnNames, char *signature, bool tableIsMaterialized,
             int partitionColumn, TableType tableType, int tableAllocationTargetSize,
-            int tupleLimit, int32_t compactionThreshold, bool drEnabled, bool isReplicated) {
+            int tupleLimit, bool drEnabled, bool isReplicated) {
     Table *table = NULL;
     StreamedTable *streamedTable = NULL;
     PersistentTable *persistentTable = NULL;
@@ -70,8 +70,8 @@ Table* TableFactory::getPersistentTable(
     }
 
     initCommon(databaseId, table, name, schema, columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+               true  // table will take ownership of TupleSchema object
+               );
 
     TableStats *stats;
     if (tableTypeIsStream(tableType)) {
@@ -93,8 +93,8 @@ Table* TableFactory::getPersistentTable(
     if (isTableWithStream(tableType)) {
         streamedTable = new StreamedTable(partitionColumn);
         initCommon(databaseId, streamedTable, name, schema, columnNames,
-                   false,  // companion streamed table will NOT take ownership of TupleSchema object
-                   compactionThreshold);
+                   false  // companion streamed table will NOT take ownership of TupleSchema object
+                   );
         persistentTable->setStreamedTable(streamedTable);
         VOLT_TRACE("Created companion streamed table for %s", persistentTable->name().c_str());
     }
@@ -106,12 +106,12 @@ Table* TableFactory::getPersistentTable(
 StreamedTable* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,
             const std::vector<std::string> &columnNames, ExportTupleStream* wrapper,
-            bool exportEnabled, int32_t compactionThreshold) {
+            bool exportEnabled) {
     StreamedTable *table = new StreamedTable(wrapper);
 
     initCommon(databaseId, table, name, schema, columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+               true  // table will take ownership of TupleSchema object
+               );
 
     // initialize stats for the table
     configureStats(name.c_str(), table->getTableStats());
@@ -166,14 +166,14 @@ LargeTempTable* TableFactory::buildLargeTempTable(const std::string &name, Tuple
 
 void TableFactory::initCommon(voltdb::CatalogId databaseId, Table *table,
         const std::string &name, TupleSchema *schema, const std::vector<std::string> &columnNames,
-        const bool ownsTupleSchema, const int32_t compactionThreshold) {
+        const bool ownsTupleSchema) {
     vassert(table != NULL);
     vassert(schema != NULL);
     vassert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;
-    table->initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
+    table->initializeWithColumns(schema, columnNames, ownsTupleSchema);
     vassert(table->columnCount() == schema->columnCount());
 }
 

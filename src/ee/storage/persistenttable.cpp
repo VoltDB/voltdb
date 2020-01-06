@@ -118,7 +118,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_blocksPendingSnapshot()
     , m_blocksWithSpace()
     , m_tableStreamer()
-    , m_failedCompactionCount(0)
     , m_invisibleTuplesPendingDeleteCount(0)
     , m_surgeon(*this)
     , m_tableForStreamIndexing(NULL)
@@ -146,11 +145,10 @@ PersistentTable::PersistentTable(int partitionColumn,
 
 void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             std::vector<std::string> const& columnNames,
-                                            bool ownsTupleSchema,
-                                            int32_t compactionThreshold) {
+                                            bool ownsTupleSchema) {
     vassert(schema != NULL);
 
-    Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
+    Table::initializeWithColumns(schema, columnNames, ownsTupleSchema);
 
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
@@ -1877,17 +1875,6 @@ size_t PersistentTable::hashCode() {
     return hashCode;
 }
 
-void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
-    if (m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end()) {
-        // do not find block in not pending snapshot container
-        vassert(m_tableStreamer.get() != NULL);
-        vassert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-        m_tableStreamer->notifyBlockWasCompactedAway(block);
-    } else { // check that block is in pending snapshot container
-       vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-    }
-}
-
 // Call-back from TupleBlock::merge() for each tuple moved.
 void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
       TableTuple& sourceTuple, TableTuple& targetTuple) {
@@ -1945,169 +1932,6 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
-}
-
-bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector* bucketVector) {
-    /**
-     * First find the two best candidate blocks
-     */
-    TBPtr fullest;
-    TBBucketI fullestIterator;
-    bool foundFullest = false;
-    for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 1); ii >= 0; ii--) {
-        fullestIterator = (*bucketVector)[ii]->begin();
-        if (fullestIterator != (*bucketVector)[ii]->end()) {
-            foundFullest = true;
-            fullest = *fullestIterator;
-            break;
-        }
-    }
-    if (!foundFullest) {
-        //std::cout << "Could not find a fullest block for compaction" << std::endl;
-        return false;
-    }
-
-    int fullestBucketChange = NO_NEW_BUCKET_INDEX;
-    while (fullest->hasFreeTuples()) {
-        TBPtr lightest;
-        TBBucketI lightestIterator;
-        bool foundLightest = false;
-
-        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
-            lightestIterator = (*bucketVector)[ii]->begin();
-            if (lightestIterator != (*bucketVector)[ii]->end()) {
-                lightest = lightestIterator.key();
-                if (lightest != fullest) {
-                    foundLightest = true;
-                    break;
-                }
-                vassert(lightest == fullest);
-                lightestIterator++;
-                if (lightestIterator != (*bucketVector)[ii]->end()) {
-                    lightest = lightestIterator.key();
-                    foundLightest = true;
-                    break;
-                }
-            }
-        }
-        if (!foundLightest) {
-            //could not find a lightest block for compaction
-            return false;
-        }
-
-        std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
-        int tempFullestBucketChange = bucketChanges.first;
-        if (tempFullestBucketChange != NO_NEW_BUCKET_INDEX) {
-            fullestBucketChange = tempFullestBucketChange;
-        }
-
-        if (lightest->isEmpty()) {
-            notifyBlockWasCompactedAway(lightest);
-            m_data.erase(lightest->address());
-            m_blocksWithSpace.erase(lightest);
-            m_blocksNotPendingSnapshot.erase(lightest);
-            m_blocksPendingSnapshot.erase(lightest);
-            lightest->swapToBucket(TBBucketPtr());
-        } else {
-            int lightestBucketChange = bucketChanges.second;
-            if (lightestBucketChange != NO_NEW_BUCKET_INDEX) {
-                lightest->swapToBucket((*bucketVector)[lightestBucketChange]);
-            }
-        }
-    }
-
-    if (fullestBucketChange != NO_NEW_BUCKET_INDEX) {
-        fullest->swapToBucket((*bucketVector)[fullestBucketChange]);
-    }
-    if (!fullest->hasFreeTuples()) {
-        m_blocksWithSpace.erase(fullest);
-    }
-    return true;
-}
-
-void PersistentTable::doIdleCompaction() {
-    if (!m_blocksNotPendingSnapshot.empty()) {
-        doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
-    }
-    if (!m_blocksPendingSnapshot.empty()) {
-        doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
-    }
-}
-
-bool PersistentTable::doForcedCompaction() {
-    bool hadWork1 = true;
-    bool hadWork2 = true;
-    int64_t notPendingCompactions = 0;
-    int64_t pendingCompactions = 0;
-
-    char msg[512];
-
-    boost::posix_time::ptime startTime(boost::posix_time::microsec_clock::universal_time());
-
-    int failedCompactionCountBefore = m_failedCompactionCount;
-    while (compactionPredicate()) {
-        vassert(hadWork1 || hadWork2);
-        if (!hadWork1 && !hadWork2) {
-            /*
-             * If this code is reached it means that the compaction predicate
-             * thinks that it should be possible to merge some blocks,
-             * but there were no blocks found in the load buckets that were
-             * eligible to be merged. This is a bug in either the predicate
-             * or more likely the code that moves blocks from bucket to bucket.
-             * This isn't fatal because the list of blocks with free space
-             * and deletion of empty blocks is handled independently of
-             * the book keeping for load buckets and merging. As the load
-             * of the missing (missing from the load buckets)
-             * blocks changes they should end up being inserted
-             * into the bucketing system again and will be
-             * compacted if necessary or deleted when empty.
-             * This is a work around for ENG-939
-             */
-            if (m_failedCompactionCount % 5000 == 0) {
-                snprintf(msg, sizeof(msg), "Compaction predicate said there should be "
-                         "blocks to compact but no blocks were found "
-                         "to be eligible for compaction. This has "
-                         "occurred %d times.", m_failedCompactionCount);
-                msg[sizeof msg - 1] = '\0';
-                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
-            }
-            if (m_failedCompactionCount == 0) {
-                printBucketInfo();
-            }
-            m_failedCompactionCount++;
-            break;
-        }
-        if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
-            //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
-            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
-            notPendingCompactions++;
-        }
-        if (!m_blocksPendingSnapshot.empty() && hadWork2) {
-            //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
-            hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
-            pendingCompactions++;
-        }
-    }
-    //If compactions have been failing lately, but it didn't fail this time
-    //then compaction progressed until the predicate was satisfied
-    if (failedCompactionCountBefore > 0 && failedCompactionCountBefore == m_failedCompactionCount) {
-        snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
-                "and compacted to the point that the compaction predicate was "
-                "satisfied after %d failed attempts", failedCompactionCountBefore);
-        msg[sizeof msg - 1] = '\0';
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
-        m_failedCompactionCount = 0;
-    }
-
-    vassert(!compactionPredicate());
-    boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
-    boost::posix_time::time_duration duration = endTime - startTime;
-    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms on table %s",
-            (intmax_t)notPendingCompactions, (intmax_t)pendingCompactions, (intmax_t)allocatedTupleCount(),
-            (intmax_t)duration.total_milliseconds(), m_name.c_str());
-    msg[sizeof msg - 1] = '\0';
-    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
-    return (notPendingCompactions + pendingCompactions) > 0;
 }
 
 void PersistentTable::printBucketInfo() {

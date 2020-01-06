@@ -63,7 +63,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     StreamedTable * st = new StreamedTable();
     st->m_name = tableName;
     st->m_wrapper = new ExportTupleStream(ctx->m_partitionId, ctx->m_siteId, 0, st->m_name);
-    st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
+    st->initializeWithColumns(schema, columnNames, false);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
 }
