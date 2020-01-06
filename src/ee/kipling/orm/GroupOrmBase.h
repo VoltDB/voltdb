@@ -154,9 +154,32 @@ protected:
      */
     virtual PersistentTable* getTable() const = 0;
 
-protected:
     // Class which holds all of the tables for groups
     const GroupTables& m_tables;
+
+    /**
+     * Read a string out of in. This does not copy the data but just refers to the data from in
+     */
+    static inline NValue readString(SerializeInputBE& in) {
+        int32_t length = in.readInt();
+        if (length < 0) {
+            return ValueFactory::getNullStringValue();
+        }
+
+        return ValueFactory::getTempStringValue(in.getRawPointer(length), length);
+    }
+
+    /***
+     * Read a byte array from in. This does not copy the data but just refers to the data from in
+     */
+    static inline NValue readBytes(SerializeInputBE& in) {
+        int32_t length = in.readInt();
+        if (length < 0) {
+            return ValueFactory::getNullBinaryValue();
+        }
+
+        return ValueFactory::getTempBinaryValue(in.getRawPointer(length), length);
+    }
 
 private:
     // Delete copy constructor and operator so that free of update tuple memory cannot be double freed
@@ -182,7 +205,7 @@ private:
     // Whether or not this instance needs to be committed
     bool m_dirty;
     // ID of the group
-    const NValue& m_groupId;
+    const NValue m_groupId;
 };
 
 } }

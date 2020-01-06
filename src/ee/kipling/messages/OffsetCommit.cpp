@@ -19,41 +19,20 @@
 
 namespace voltdb { namespace kipling {
 
-OffsetCommitRequestPartition::OffsetCommitRequestPartition(const int16_t version, SerializeInputBE& request) :
-        m_partitionIndex(readInt(request)), m_offset(readLong(request)) {
+OffsetCommitRequestPartition::OffsetCommitRequestPartition(const int16_t version, CheckedSerializeInput& request) :
+        m_partitionIndex(request.readInt()), m_offset(request.readLong()) {
     if (version >= 6) {
-        m_leaderEpoch = readInt(request);
+        m_leaderEpoch = request.readInt();
     }
     if (version == 1) {
-        m_timestamp = readLong(request);
+        m_timestamp = request.readLong();
     }
-    m_metadata = readString(request);
-}
-
-OffsetCommitRequestTopic::OffsetCommitRequestTopic(const int16_t version, SerializeInputBE& request) :
-        m_topic(readString(request)) {
-    readRequestComponents(version, request, m_partitions);
-}
-
-OffsetCommitRequest::OffsetCommitRequest(const int16_t version, const NValue& groupId, SerializeInputBE& request) :
-        GroupRequest(version, groupId) {
-    if (version >= 1) {
-        m_generationId = readInt(request);
-        m_memberId = readString(request);
-    }
-    if (version >= 7) {
-        m_groupInstanceId = readString(request);
-    }
-    if (version >= 2 && version <= 4) {
-        // Read and discard legacy retention time
-        readLong(request);
-    }
-    readRequestComponents(version, request, m_topics);
+    m_metadata = request.readString();
 }
 
 void OffsetCommitResponsePartition::write(const int16_t version, SerializeOutput& out) const {
     out.writeInt(m_partitionIndex);
-    writeError(m_error, out);
+    writeError(out);
 }
 
 void OffsetCommitResponseTopic::write(const int16_t version, SerializeOutput& out) const {
@@ -62,9 +41,7 @@ void OffsetCommitResponseTopic::write(const int16_t version, SerializeOutput& ou
 }
 
 void OffsetCommitResponse::write(const int16_t version, SerializeOutput& out) const {
-    if (version >= 3) {
-        out.writeInt(m_throttleTimeMs);
-    }
+    writeThrottleTime(version, out);
     writeResponses(m_topics, version, out);
 }
 

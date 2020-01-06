@@ -29,8 +29,7 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
 public enum SystemTable {
     KIPLING_GROUP(-1, "_KIPLING_GROUP"),
     KIPLING_GROUP_MEMBER(-2, "_KIPLING_GROUP_MEMBER"),
-    KIPLING_GROUP_MEMBER_PROTOCOL(-3, "_KIPLING_GROUP_MEMBER_PROTOCOL"),
-    KIPLING_GROUP_OFFSET(-4, "_KIPLING_GROUP_OFFSET");
+    KIPLING_GROUP_OFFSET(-3, "_KIPLING_GROUP_OFFSET");
 
     private static final Map<String, SystemTable> s_nameToTable;
 

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <functional>
 #include <unordered_map>
 
 #include "kipling/orm/GroupOrmBase.h"
@@ -25,25 +26,25 @@
 namespace voltdb {
 namespace kipling {
 
-enum class GroupState : int8_t {
-    EMPTY,
-    REBALNCE_PENDING,
-    REBALANCE_COMPLETE,
-    STABLE
-};
-
 /**
  * Class which represents a row from GroupTable. The row represents the state of a kipling group
  */
 class Group : public GroupOrmBase {
 public:
+    static void upsert(const GroupTables& tables, SerializeInputBE& group);
+
+    Group(const GroupTables& tables, TableTuple& tuple);
+
     Group(const GroupTables& tables, const NValue& groupId);
+
+    Group(const GroupTables& tables, const NValue& groupId, int64_t timestamp, int32_t generation,
+            const NValue& leader, const NValue& protocol);
 
     /**
      * Returns the timestmap for when this group was last committed or -1 if this group was never committed
      */
     const int64_t getCommitTimestamp() const {
-        return isInTable() ? ValuePeeker::peekTimestamp(getNValue(GroupTable::Column::COMMIT_TIMESTAMP)) : -1;
+        return ValuePeeker::peekTimestamp(getNValue(GroupTable::Column::COMMIT_TIMESTAMP));
     }
 
     /**
@@ -54,40 +55,10 @@ public:
     }
 
     /**
-     * Increments the group generation by 1
-     */
-    void incrementGeneration() {
-        NValue value = ValueFactory::getIntegerValue(getGeneration() + 1);
-        setNValue(GroupTable::Column::GENERATION, value);
-    }
-
-    /**
-     * Returns the current state of this group
-     */
-    const GroupState getState() const {
-        int8_t state = ValuePeeker::peekTinyInt(getNValue(GroupTable::Column::STATE));
-        return static_cast<GroupState>(state);
-    }
-
-    /**
-     * Sets the state of this group
-     */
-    void setState(GroupState state) {
-        setNValue(GroupTable::Column::STATE, ValueFactory::getTinyIntValue(static_cast<int8_t>(state)));
-    }
-
-    /**
      * Get the member ID of the current group leader. Type VARCHAR
      */
     const NValue getLeader() const {
         return getNValue(GroupTable::Column::LEADER);
-    }
-
-    /**
-     * Set the member ID who is the current group leader
-     */
-    void setLeader(const NValue& value) {
-        setNValue(GroupTable::Column::LEADER, value);
     }
 
     /**
@@ -98,18 +69,6 @@ public:
     }
 
     /**
-     * Set the name of the selected partition assignment protocol
-     */
-    void setProtocol(const NValue& value) {
-        setNValue(GroupTable::Column::PROTOCOL, value);
-    }
-
-    /**
-     * Initialize this tuple for insert into the table. isInTable() must return false
-     */
-    void initializeForInsert();
-
-    /**
      * Mark this group and group members for delete. Only works if group members are already loaded
      */
     void markForDelete() override;
@@ -118,7 +77,12 @@ public:
      * @param memberId: ID of member to return
      * @return the group member with the given member ID or nullptr if the member does not exist
      */
-    GroupMember* getMember(const NValue& memberId);
+    GroupMember* getMember(const NValue& memberId, bool includeDeleted = false);
+
+    /**
+     * Visit members of the group and pass the member to the visitor
+     */
+    void visitMembers(std::function<void(GroupMember&)> visitor, bool includeDeleted = false);
 
     /**
      * @param includeDeleted: If true then all members including deleted members are returned. Default false
@@ -131,14 +95,37 @@ public:
      */
     GroupMember& getOrCreateMember(const NValue& memberId);
 
-    bool equalDeleted(const GroupOrmBase& other) const override;
+    void commit() {
+        commit(0);
+    }
+
+    /**
+     * @return true if there is at least one member of this group
+     */
+    bool hasMember(bool includeDeleted = false);
+
+    /**
+     * Size of data that would be written when serialize is invoked
+     */
+    int32_t serializedSize();
+
+    /**
+     * Serialize this group and all members to out
+     */
+    void serialize(SerializeOutput& out);
+
+protected:
 
     virtual void commit(int64_t timestamp) override;
 
-protected:
     PersistentTable* getTable() const override { return m_tables.getGroupTable(); }
 
+    bool equalDeleted(const GroupOrmBase& other) const override;
+
 private:
+
+    void update(SerializeInputBE& updateIn);
+
     /**
      * Load group members if not already loaded
      */

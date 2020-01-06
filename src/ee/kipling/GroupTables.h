@@ -40,11 +40,6 @@ public:
     virtual PersistentTable* getGroupMemberTable() const = 0;
 
     /**
-     * Return a pointer to the table which holds all of the supported protocols of group members
-     */
-    virtual PersistentTable* getGroupMemberProtocolTable() const = 0;
-
-    /**
      * Return a pointer to the table which holds all of the committed group offsets
      */
     virtual PersistentTable* getGroupOffsetTable() const = 0;
