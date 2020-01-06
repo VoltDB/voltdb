@@ -86,11 +86,11 @@ ExecuteWithAllSitesMemory::~ExecuteWithAllSitesMemory()
 }
 
 SharedEngineLocalsType::iterator ExecuteWithAllSitesMemory::begin() {
-    return SynchronizedThreadLock::s_enginesByPartitionId.begin();
+    return SynchronizedThreadLock::s_activeEnginesByPartitionId.begin();
 }
 
 SharedEngineLocalsType::iterator ExecuteWithAllSitesMemory::end() {
-    return SynchronizedThreadLock::s_enginesByPartitionId.end();
+    return SynchronizedThreadLock::s_activeEnginesByPartitionId.end();
 }
 
 ScopedReplicatedResourceLock::ScopedReplicatedResourceLock() {

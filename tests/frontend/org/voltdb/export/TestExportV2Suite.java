@@ -26,19 +26,28 @@ package org.voltdb.export;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.FlakyTestRule;
+import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.MiscUtils;
 
 public class TestExportV2Suite extends TestExportBaseSocketExport {
     @Rule
@@ -46,6 +55,28 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
 
     private static final int k_factor = 1;
 
+    static final String SCHEMA =
+            "CREATE TABLE kv (" +
+                    "key bigint not null, " +
+                    "nondetval bigint not null, " +
+                    "PRIMARY KEY(key)" +
+                    "); " +
+                    "PARTITION TABLE kv ON COLUMN key;" +
+                    "CREATE INDEX idx_kv ON kv(nondetval);";
+
+    public static class NonDeterministicProc extends VoltProcedure {
+        public static final SQLStmt sql = new SQLStmt("insert into kv \nvalues ?, ?");
+        public VoltTable run(long key) {
+            long id = VoltDB.instance().getHostMessenger().getHostId();
+            voltQueueSQL(sql, key, id);
+            voltExecuteSQL();
+            return new VoltTable(new ColumnInfo("", VoltType.BIGINT));
+        }
+    }
+
+    private static  final String PROCEDURE =
+            "CREATE PROCEDURE FROM CLASS org.voltdb.export.TestExportV2Suite$NonDeterministicProc;" +
+            "PARTITION PROCEDURE TestExportV2Suite$NonDeterministicProc ON TABLE kv COLUMN key;";
     @Override
     public void setUp() throws Exception
     {
@@ -65,9 +96,6 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         closeSocketExporterClientAndServer();
     }
 
-    /**
-     * Multi-table test
-     */
     @Test
     public void testExportMultiTable() throws Exception
     {
@@ -79,7 +107,34 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        for (int i=0; i < 100; i++) {
+        for (int i = 0; i < 100; i++) {
+            // add data to a first (persistent) table
+            Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client,
+                    "S_ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            Object[] params = convertValsToParams("S_ALLOW_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertAllowNulls", params);
+
+            // add data to a second (streaming) table.
+            rowdata = TestSQLTypesSuite.m_defaultValues;
+            m_verifier.addRow(client,
+                    "S_NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            params = convertValsToParams("S_NO_NULLS", i, rowdata);
+            client.callProcedure("ExportInsertNoNulls", params);
+        }
+        // Trigger hash mismatch
+        if (MiscUtils.isPro()) {
+            client.callProcedure("TestExportV2Suite$NonDeterministicProc", 100);
+            verifyTopologyAfterHashMismatch(client);
+            VoltTable vt = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+
+            // All replicas are gone
+            while (vt.advanceRow()) {
+                assert("TRUE".equals(vt.getString("ACTIVE")));
+            }
+        }
+
+        for (int i= 100 ; i < 200; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
             m_verifier.addRow(client,
@@ -99,7 +154,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
 
     @Test
     public void testExportControlParams() throws Exception {
-        System.out.println("testFlowControl");
+        System.out.println("testExportControlParams");
         final Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
@@ -141,10 +196,13 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         project.addProcedures(ALLOWNULLS_PROCEDURES);
         project.addProcedures(NONULLS_PROCEDURES);
 
+        //non-determinisic proc
+        project.addLiteralSchema(SCHEMA);
+        project.addLiteralSchema(PROCEDURE);
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("export-ddl-cluster-rep.jar", 6, 3, k_factor,
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 12, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
@@ -153,4 +211,39 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         builder.addServerConfig(config);
         return builder;
     }
+    private void verifyTopologyAfterHashMismatch(Client client) {
+        //allow time to get the stats
+        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+        boolean done = false;
+        long start = System.currentTimeMillis();
+        while (!done) {
+            boolean inprogress = false;
+            try {
+                Thread.sleep(5000);
+                VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+                while (vt.advanceRow()) {
+                    long pid = vt.getLong(0);
+                    if (pid != MpInitiator.MP_INIT_PID) {
+                        String replicasStr = vt.getString(1);
+                        String[] replicas = replicasStr.split(",");
+                        if (replicas.length != 1) {
+                            inprogress = true;
+                            break;
+                        }
+                    }
+                }
+                if (!inprogress) {
+                   return;
+                }
+
+                if (maxSleep < (System.currentTimeMillis() - start)) {
+                    break;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        assert(done);
+    }
+
 }

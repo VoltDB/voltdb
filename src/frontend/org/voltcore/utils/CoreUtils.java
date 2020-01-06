@@ -858,8 +858,13 @@ public class CoreUtils {
     }
 
     public static String hsIdToString(long hsId) {
-        return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
+        return hsIdToString(hsId, ":");
     }
+
+    public static String hsIdToString(long hsId, String delimiter) {
+        return Integer.toString((int)hsId) + delimiter + Integer.toString((int)(hsId >> 32));
+    }
+
     public static void hsIdToString(long hsId, StringBuilder sb) {
         sb.append((int)hsId).append(":").append((int)(hsId >> 32));
     }
@@ -886,6 +891,11 @@ public class CoreUtils {
 
     public static int getSiteIdFromHSId(long siteId) {
         return (int)(siteId>>32);
+    }
+
+    public static int hsIdToInt(long hsId) {
+        int hostId = getHostIdFromHSId(hsId);
+        return Integer.valueOf((hostId > 0 ? String.valueOf(getHostIdFromHSId(hsId)) : "") + String.valueOf(getHostIdFromHSId(hsId)));
     }
 
     public static <K,V> ImmutableMap<K, ImmutableList<V>> unmodifiableMapCopy(Map<K, List<V>> m) {

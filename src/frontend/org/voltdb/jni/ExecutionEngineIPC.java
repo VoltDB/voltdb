@@ -991,6 +991,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_dataNetworkOrigin.discard();
     }
 
+    @Override
+    public void decommission(boolean remove, boolean promote, int newSitePerHost) throws EEException, InterruptedException {
+        System.out.println("Decommissioning IPC connection in progress.");
+        System.out.println("But first, a little history:\n" + m_history );
+
+
+        System.out.println("Decommissioned IPC connection done.");
+    }
+
     private void shutDown() {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
