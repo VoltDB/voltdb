@@ -265,7 +265,18 @@ public class ExportBenchmark {
         //Wait 10 mins only
         long end = st + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            long retryStats = 5;
+            while (retryStats-- > 0) {
+                try {
+                    stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+                    break;
+                } catch (ProcCallException e) {
+                    log.warn("Error while calling procedures: ");
+                    e.printStackTrace();
+                }
+                Thread.sleep(5000);
+            }
+
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
