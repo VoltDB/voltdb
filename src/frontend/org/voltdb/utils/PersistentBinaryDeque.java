@@ -272,20 +272,46 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return false;
                 }
 
-                skipToNextSegment();
+                skipToNextSegment(true);
                 return true;
             }
         }
 
-        private void skipToNextSegment() throws IOException {
+        @Override
+        public void skipPast(long id) throws IOException {
+            moveToValidSegment();
+            while (id >= m_segment.getEndId() && skipToNextSegment(false));
+        }
+
+        // This is used by retention cursor and regular skip forward.
+        // With retention cursors, you want to delete the current segment,
+        // while with regular skip forward, you want to delete the older segments only.
+        // In regular skip, current segment is ready to be deleted only after at least
+        // one entry from the next segment is read and discarded.
+        private boolean skipToNextSegment(boolean deleteCurrent) throws IOException {
             PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
             if (segmentReader == null) {
                 segmentReader = m_segment.openForRead(m_cursorId);
             }
-            m_numRead += m_segment.getNumEntries();
+            m_numRead += m_segment.getNumEntries() - segmentReader.readIndex();
             segmentReader.markAllReadAndDiscarded();
-            m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-            deleteSegmentsBefore(m_segment, 1);
+
+            Map.Entry<Long, PBDSegment<M>> entry = m_segments.higherEntry(m_segment.segmentIndex());
+            if (entry == null) { // on the last segment
+                // We are marking this one as read. So OK to delete segments before this
+                deleteSegmentsBefore(m_segment, 1);
+                return false;
+            }
+
+            PBDSegment<M> oldSegment = m_segment;
+            m_segment = entry.getValue();
+            if (deleteCurrent) {
+                deleteSegmentsBefore(m_segment, 1);
+            } else {
+                deleteSegmentsBefore(oldSegment, 1);
+            }
+
+            return true;
         }
 
         /**
@@ -320,7 +346,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return maxBytes - diff;
                 }
 
-                skipToNextSegment();
+                skipToNextSegment(true);
                 return 0;
             }
         }
@@ -1228,6 +1254,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         return offer(object, -1, -1);
     }
 
+    @Override
     public synchronized int offer(BBContainer object, long startId, long endId) throws IOException {
         assertions();
         if (m_closed) {
