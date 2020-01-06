@@ -35,8 +35,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.ConnectionLossException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -45,6 +47,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -124,6 +127,52 @@ public class SynchronizedStatesManager {
 
     protected String getMemberId() {
         return m_memberId;
+    }
+
+    protected abstract class ZKAsyncCreateHandler implements AsyncCallback.StringCallback, Runnable {
+        KeeperException.Code m_resultCode;
+        String m_resultString;
+
+        ZKAsyncCreateHandler(String path, byte[] data, CreateMode createMode) {
+            m_zk.create(path, data,  Ids.OPEN_ACL_UNSAFE, createMode, this, null);
+        }
+        @Override
+        public void processResult(int rc, String path, Object ctx, String name) {
+            try {
+                m_resultCode = KeeperException.Code.get(rc);
+                if (m_resultCode == KeeperException.Code.OK) {
+                    m_resultString = name;
+                }
+                if (!m_done.get()) {
+                    // Will execute the specialized implementation of Run()
+                    m_shared_es.submit(this);
+                }
+            } catch (RejectedExecutionException e) {
+            }
+        }
+    }
+
+    protected abstract class ZKAsyncChildrenHandler implements AsyncCallback.ChildrenCallback, Runnable {
+        KeeperException.Code m_resultCode;
+        List<String> m_resultChildren;
+
+        ZKAsyncChildrenHandler(String path, Watcher childrenWatcher) {
+            m_zk.getChildren(path, childrenWatcher, this, null);
+        }
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            try {
+                m_resultCode = KeeperException.Code.get(rc);
+                if (m_resultCode == KeeperException.Code.OK) {
+                    m_resultChildren = children;
+                }
+                if (!m_done.get()) {
+                    // Will execute the specialized implementation of Run()
+                    m_shared_es.submit(this);
+                }
+            } catch (RejectedExecutionException e) {
+            }
+        }
     }
 
     /*
@@ -267,6 +316,13 @@ public class SynchronizedStatesManager {
             m_mutex.unlock();
         }
 
+        class AsyncSequencedExecutionHandler {
+            final ListenableFuture m_finshed;
+            AsyncSequencedExecutionHandler(ListenableFuture finished) {
+                m_finshed = finished;
+            }
+        }
+
         private class LockWatcher implements Watcher {
 
             @Override
@@ -387,10 +443,87 @@ public class SynchronizedStatesManager {
          */
         protected abstract ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim);
 
+        private class StateMachineInitializer {
+            Set<String> m_startingMemberSet;
+
+            private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
+                if (code == KeeperException.Code.SESSIONEXPIRED) {
+                    // lost the full connection. some test cases do this...
+                    // means zk shutdown without the elector being shutdown.
+                    // ignore.
+                    m_done.set(true);
+                    return false;
+                }
+                else if (code == KeeperException.Code.CONNECTIONLOSS) {
+                    // lost the full connection. some test cases do this...
+                    // means shutdown without the elector being
+                    // shutdown; ignore.
+                    m_done.set(true);
+                    return false;
+                }
+                return true;
+            }
+
+            public StateMachineInitializer(Set<String> knownMembers) {
+                m_startingMemberSet = knownMembers;
+            }
+
+            public void startInitialization() {
+                new ZKAsyncCreateHandler(m_statePath, null, CreateMode.PERSISTENT) {
+                    @Override
+                    public void run() {
+                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                            addLockPath();
+                        }
+                    }
+                };
+            }
+
+            private void addLockPath() {
+                new ZKAsyncCreateHandler(m_lockPath, null, CreateMode.PERSISTENT) {
+                    @Override
+                    public void run() {
+                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                            addBarrierParticipantPath();
+                        }
+                    }
+                };
+            }
+
+            private void addBarrierParticipantPath() {
+                new ZKAsyncCreateHandler(m_barrierParticipantsPath, null, CreateMode.PERSISTENT) {
+                    @Override
+                    public void run() {
+                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                            try {
+                                initializeStateMachine(m_startingMemberSet);
+                            } catch (KeeperException.SessionExpiredException e) {
+                                // lost the full connection. some test cases do this...
+                                // means zk shutdown without the elector being shutdown.
+                                // ignore.
+                                m_done.set(true);
+                            } catch (KeeperException.ConnectionLossException e) {
+                                // lost the full connection. some test cases do this...
+                                // means shutdown without the elector being
+                                // shutdown; ignore.
+                                m_done.set(true);
+                            } catch (InterruptedException e) {
+                                m_done.set(true);
+                            } catch (Exception e) {
+                                org.voltdb.VoltDB.crashLocalVoltDB(
+                                    "Unexpected failure in initializeInstances.", true, e);
+                                m_done.set(true);
+                            }
+                        }
+                    }
+                };
+            }
+        }
+
+        private StateMachineInitializer createInitializer(Set<String> knownMembers) {
+            return new StateMachineInitializer(knownMembers);
+        }
         private void initializeStateMachine(Set<String> knownMembers) throws KeeperException, InterruptedException {
-            addIfMissing(m_statePath, CreateMode.PERSISTENT, null);
-            addIfMissing(m_lockPath, CreateMode.PERSISTENT, null);
-            addIfMissing(m_barrierParticipantsPath, CreateMode.PERSISTENT, null);
             lockLocalState();
             // Make sure the child count is correct so that an init does not race with a released lock where the
             // results have not been processed yet. If it is non-zero, it means results still need to be collected
@@ -2003,31 +2136,37 @@ public class SynchronizedStatesManager {
     private final MembershipWatcher m_membershipWatcher = new MembershipWatcher();
 
     private final Runnable initializeInstances = new Runnable() {
-        @Override
-        public void run() {
-            try {
-                byte[] expectedInstances = m_zk.getData(m_stateMachineRoot, false, null);
-                assert(m_registeredStateMachineInstances == ByteBuffer.wrap(expectedInstances).getInt());
-                // First become a member of the community
-                addIfMissing(m_stateMachineMemberPath, CreateMode.PERSISTENT, null);
-                // This could fail because of an old ephemeral that has not aged out yet but assume this does not happen
-                addIfMissing(ZKUtil.joinZKPath(m_stateMachineMemberPath, m_memberId), CreateMode.EPHEMERAL, null);
-
-                m_groupMembers = ImmutableSet.copyOf(m_zk.getChildren(m_stateMachineMemberPath, m_membershipWatcher));
-                // Then initialize each instance
-                for (StateMachineInstance instance : m_registeredStateMachines) {
-                    instance.initializeStateMachine(m_groupMembers);
-                }
-            } catch (KeeperException.SessionExpiredException e) {
+        private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
+            if (code == KeeperException.Code.SESSIONEXPIRED) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 m_done.set(true);
-            } catch (KeeperException.ConnectionLossException e) {
+                return false;
+            }
+            else if (code == KeeperException.Code.CONNECTIONLOSS) {
                 // lost the full connection. some test cases do this...
                 // means shutdown without the elector being
                 // shutdown; ignore.
                 m_done.set(true);
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public void run() {
+            try {
+                assert(m_registeredStateMachineInstances == ByteBuffer.wrap(m_zk.getData(m_stateMachineRoot, false, null)).getInt());
+                // First become a member of the community
+                new ZKAsyncCreateHandler(m_stateMachineMemberPath, null, CreateMode.PERSISTENT) {
+                    @Override
+                    public void run() {
+                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                            addMemberIdIfMissing();
+                        }
+                    }
+                };
             } catch (InterruptedException e) {
                 m_done.set(true);
             } catch (Exception e) {
@@ -2035,6 +2174,36 @@ public class SynchronizedStatesManager {
                         "Unexpected failure in initializeInstances.", true, e);
                 m_done.set(true);
             }
+        }
+
+        private void addMemberIdIfMissing() {
+            // This could fail because of an old ephemeral that has not aged out yet but assume this does not happen
+            new ZKAsyncCreateHandler(ZKUtil.joinZKPath(m_stateMachineMemberPath, m_memberId),
+                    null, CreateMode.EPHEMERAL) {
+                @Override
+                public void run() {
+                    if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        setInitialGroupMembers();
+                    }
+                }
+            };
+        }
+
+        private void setInitialGroupMembers() {
+            new ZKAsyncChildrenHandler(m_stateMachineMemberPath, m_membershipWatcher) {
+                @Override
+                public void run() {
+                    if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        m_groupMembers = ImmutableSet.copyOf(m_resultChildren);
+
+                        // Then initialize each instance
+                        for (StateMachineInstance instance : m_registeredStateMachines) {
+                            StateMachineInstance.StateMachineInitializer init = instance.createInitializer(m_groupMembers);
+                            init.startInitialization();
+                        }
+                    }
+                }
+            };
         }
     };
 
