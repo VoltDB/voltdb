@@ -1477,6 +1477,7 @@ public abstract class CatalogUtil {
 
         setSystemSettings(deployment, catDeploy);
         setThreadPools(deployment, catDeploy);
+        setSchemaRegistry(deployment, catDeploy);
 
         catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
         catCluster.setGlobalflushinterval(deployment.getSystemsettings().getFlushinterval().getMinimum());
@@ -1526,6 +1527,10 @@ public abstract class CatalogUtil {
             // TODO: thread pool size upper-bound?
             catalogThreadPool.setSize(threadPool.getSize());
         }
+    }
+
+    private static void setSchemaRegistry(DeploymentType deployment, Deployment catDeployment) {
+        catDeployment.setSchemaregistryurl(deployment.getSchemaregistryurl());
     }
 
     public static void validateDirectory(String type, File path) {

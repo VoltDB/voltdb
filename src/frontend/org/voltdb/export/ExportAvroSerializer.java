@@ -47,8 +47,7 @@ public class ExportAvroSerializer {
 
     /**
      * Converting {@link ExportRow} to Avro format byte array as well as register the schema
-     * in the schema registry. Also responsible for handling the change of the
-     * {@code SchemaRegistryUrl} in the deployment file.
+     * in the schema registry.
      * @param rd
      * @param topic
      * @return The serialize byte array in Avro format.
@@ -56,22 +55,27 @@ public class ExportAvroSerializer {
     public byte[] serialize(ExportRow rd, String topic) {
         GenericRecord avroRecord = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,
                 null, rd.values);
-        DeploymentType deploymentType = VoltDB.instance().getCatalogContext().getDeployment();
-        // update the serializer config if the schema_register_url in the deployment file changes
-        if (!Objects.equals(m_configMap.get(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG),
-                deploymentType.getSchemaRegistryUrl())) {
-            m_configMap = buildConfigMap();
-            m_serializer.configure(m_configMap, false);
-        }
         return m_serializer.serialize(topic, null, avroRecord);
     }
 
     private Map<String, String> buildConfigMap() {
         Map<String, String> configMap = new HashMap<>();
         DeploymentType deploymentType = VoltDB.instance().getCatalogContext().getDeployment();
-        if (deploymentType.getSchemaRegistryUrl() != null) {
-            configMap.put(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, deploymentType.getSchemaRegistryUrl());
+        if (deploymentType.getSchemaregistryurl() != null) {
+            configMap.put(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, deploymentType.getSchemaregistryurl());
         }
         return configMap;
+    }
+
+    /**
+     * Handling the change of the {@code SchemaRegistryUrl} in the deployment file.
+     */
+    public void updateConfig() {
+        String url = VoltDB.instance().getCatalogContext().getDeployment().getSchemaregistryurl();
+        // update the serializer config if the schema_register_url in the deployment file changes
+        if (!Objects.equals(m_configMap.get(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG), url)) {
+            m_configMap = buildConfigMap();
+            m_serializer.configure(m_configMap, false);
+        }
     }
 }
