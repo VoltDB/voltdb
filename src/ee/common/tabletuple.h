@@ -137,6 +137,14 @@ public:
         m_data = reinterpret_cast<char*> (address);
     }
 
+    /**
+     * Set the tuple to point toward a given address and initialize the tuple header to be used as a new tuple
+     */
+    inline void moveAndInitialize(void *address) {
+        move(address);
+        resetHeader();
+    }
+
     inline void moveNoHeader(void *address) {
         vassert(m_schema);
         // isActive() and all the other methods expect a header
@@ -779,8 +787,7 @@ public:
     void allocateActiveTuple() {
         char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(
                     m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
-        m_tuple.move(storage);
-        m_tuple.resetHeader();
+        m_tuple.moveAndInitialize(storage);
         m_tuple.setActiveTrue();
         m_tuple.setInlinedDataIsVolatileTrue();
     }
