@@ -26,7 +26,8 @@
 #include "storage/TableTupleAllocator.hpp"
 #include <cstdio>
 #include <cstring>
-#include <iostream>
+#include <array>
+
 
 using namespace voltdb::storage;
 using namespace std;
@@ -292,7 +293,9 @@ void testCompactingChunks() {
         for(int j = 0; j < NumTuples / AllocsPerChunk; ++j) {      // on each chunk, free from its tail
             for(int i = AllocsPerChunk - 1; i >= 0; --i) {
                 auto index = j * AllocsPerChunk + i;
-                assert(addresses[index] == alloc.free(addresses[index]));
+                if (addresses[index] != alloc.free(addresses[index])) {
+                    assert(false);
+                }
                 // skip content check on i == 0, since OS has already claimed the chunk upon free() call
                 assert(i == 0 || Gen::same(addresses[index], index));
             }
@@ -317,7 +320,9 @@ void testCompactingChunks() {
         for(i = 0; i < NumTuples / 2; ++i, ++j) {
             auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
                  indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-            assert(addresses[chunkful + indexInsideChunk] == alloc.free(addresses[NumTuples - 1 - i]));
+            if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples - 1 - i])) {
+                assert(false);
+            }
         }
         // 2nd half
         i = 0;
@@ -326,7 +331,9 @@ void testCompactingChunks() {
         for(i = 0; i < NumTuples / 4; ++i, ++j) {
             auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
                  indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-            assert(addresses[chunkful + indexInsideChunk] == alloc.free(addresses[NumTuples / 2 - 1 - i]));
+            if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples / 2 - 1 - i])) {
+                assert(false);
+            }
         }
         // free them all! See note on IterableTableTupleChunks on
         // why we need a loop of calls to iterate through.
@@ -622,11 +629,11 @@ void testTxnHook() {
      */
     using InsertionTag = NthBitChecker<7>;
     using DeletionUpdateTag = NthBitChecker<0>;
-    InsertionTag const insertionTag;
-    DeletionUpdateTag const deletionUpdateTag;
+    InsertionTag const insertionTag{};
+    DeletionUpdateTag const deletionUpdateTag{};
 
     using Gen = UnmaskedStringGen<tuple<InsertionTag, DeletionUpdateTag>>;
-    Gen gen;
+    Gen gen{};
     constexpr auto const InsertTuples = 256lu;                   // # tuples to be inserted/appended since snapshot
 
     array<void*, NumTuples + InsertTuples> addresses;

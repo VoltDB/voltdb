@@ -515,12 +515,13 @@ namespace voltdb {
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
                     Chunks const, Chunks>::type>::type;
-                iterator_type(container_type);
-                iterator_type(iterator_type const&) = default;
-                iterator_type(iterator_type&&) = default;
+
                 void advance();
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
+                iterator_type(container_type);
+                iterator_type(iterator_type const&) = default;
+                iterator_type(iterator_type&&) = default;
                 static iterator_type begin(container_type);
                 static iterator_type end(container_type);
                 bool operator==(iterator_type const&) const noexcept;
@@ -566,10 +567,10 @@ namespace voltdb {
                 // determined at run-time via history_type object
                 using cb_type = function<value_type(value_type)> const;
                 using container_type = typename super::container_type;
-                iterator_cb_type(container_type, cb_type);
                 cb_type m_cb;
             public:
                 value_type operator*();                // NOTE: return type no longer a reference
+                iterator_cb_type(container_type, cb_type);
                 static iterator_cb_type begin(container_type, cb_type);
                 static iterator_cb_type end(container_type, cb_type);
             };
@@ -585,12 +586,12 @@ namespace voltdb {
                 static time_traveling_iterator_type begin(container_type, history_type);
                 static time_traveling_iterator_type end(container_type, history_type);
                 value_type operator*() noexcept;
+                time_traveling_iterator_type(container_type, history_type);
                 bool drained() const noexcept;
             private:
                 pair<bool, function<void const*()>> const m_extendingCb;
                 bool m_extending;
                 void const* m_extendingPtr;
-                time_traveling_iterator_type(container_type, history_type);
                 void advance();
             };
             template<typename Hook>
