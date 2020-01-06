@@ -22,6 +22,18 @@
 namespace voltdb {
 namespace kipling {
 
+GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId, int32_t sessionTimeout,
+        int32_t rebalanceTimeout, const NValue& instanceId, const NValue& protocolMetadata,
+        const NValue& assignments) :
+        GroupOrmBase(tables, groupId), m_memberId(memberId) {
+    setSchema(getTable()->schema());
+
+    std::vector<NValue> values = { groupId, memberId, ValueFactory::getIntegerValue(sessionTimeout),
+            ValueFactory::getIntegerValue(rebalanceTimeout), instanceId, protocolMetadata, assignments };
+
+    setNValues(values);
+}
+
 std::vector<GroupMember*> GroupMember::loadMembers(const GroupTables& tables, const NValue& groupId) {
     PersistentTable* table = tables.getGroupMemberTable();
     TableIndex* index = table->index(GroupMemberTable::indexName);
@@ -43,131 +55,54 @@ std::vector<GroupMember*> GroupMember::loadMembers(const GroupTables& tables, co
     return members;
 }
 
-GroupMember::GroupMember(const GroupTables& tables, const NValue &groupId) :
-        GroupOrmBase(tables, groupId), m_memberId(generateMemberId()) {
+GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId) :
+        GroupOrmBase(tables, groupId), m_memberId(memberId) {
 
     setSchema(getTable()->schema());
-
-    initializeValues(-1, -1, ValueFactory::getNullStringValue());
 }
 
-void GroupMember::initializeValues(int32_t sessionTimeout, int32_t rebalanceTeimout, const NValue& instanceId) {
-    std::vector<NValue> values({
-           getGroupId(),
-           getMemberId(),
-           ValueFactory::getIntegerValue(sessionTimeout),
-           ValueFactory::getIntegerValue(rebalanceTeimout),
-           instanceId,
-           ValueFactory::getNullBinaryValue(),
-           ValueFactory::getSmallIntValue(0)
-       });
-
-       setNValues(values);
+void GroupMember::update(int32_t sessionTimeout, int32_t rebalanceTimeout, const NValue& instanceId,
+        const NValue& protocolMetadata, const NValue& assignments) {
+    update(ValueFactory::getIntegerValue(sessionTimeout), ValueFactory::getIntegerValue(rebalanceTimeout), instanceId,
+            protocolMetadata, assignments);
 }
 
-bool GroupMember::update(const JoinGroupRequest& request) {
-    bool updated = false;
+void GroupMember::update(const NValue& sessionTimeout, const NValue& rebalanceTimeout, const NValue& instanceId,
+        const NValue& protocolMetadata, const NValue& assignments) {
+    if (isInTable()) {
+        std::vector<NValue> values = { sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments };
 
-    if (isDeleted()) {
-        initializeValues(request.sessionTimeoutMs(), request.rebalanceTimeoutMs(), request.groupInstanceId());
-        updated = true;
+        setNValues(values, GroupMemberTable::Column::SESSION_TIMEOUT);
     } else {
-        if (getSessionTimeout() != request.sessionTimeoutMs()) {
-            setSessionTimeout(request.sessionTimeoutMs());
-            updated = true;
-        }
-        if (getRebalanceTimeout() != request.rebalanceTimeoutMs()) {
-            setRebalanceTimeout(request.rebalanceTimeoutMs());
-            updated = true;
-        }
-        if (getInstanceId() != request.groupInstanceId()) {
-            setInstanceId(request.groupInstanceId());
-            updated = true;
-        }
-    }
+        std::vector<NValue> values = { getGroupId(), getMemberId(), sessionTimeout, rebalanceTimeout, instanceId,
+                protocolMetadata, assignments };
 
-    // Update protocols
-    loadProtocolsIfNecessary();
-
-    // List of current non deleted protocols so we can detect which ones need to be deleted
-    std::unordered_set<NValue> currentProtocolNames;
-    for (auto iterator = m_protocols.begin(); iterator != m_protocols.end(); ++iterator) {
-        if (!iterator->second->isDeleted()) {
-            currentProtocolNames.insert(iterator->first);
-        }
-    }
-
-    // Update or insert protocols from the request
-    const std::vector<JoinGroupProtocol>& updatedProtocols = request.protocols();
-    for (int i = 0; i < updatedProtocols.size(); ++i) {
-        const JoinGroupProtocol& updatedProtocol = updatedProtocols[i];
-        GroupMemberProtocol* protocol = getProtocol(updatedProtocol.name());
-        if (protocol == nullptr) {
-            GroupMemberProtocol *newProtocol = new GroupMemberProtocol(m_tables, getGroupId(), getMemberId(), i,
-                    updatedProtocol.name(), updatedProtocol.metadata());
-            m_protocols[updatedProtocol.name()].reset(newProtocol);
-            updated = true;
-        } else {
-            currentProtocolNames.erase(protocol->getName());
-            updated |= protocol->update(i, updatedProtocol);
-        }
-    }
-
-    for (auto protocolName : currentProtocolNames) {
-        m_protocols[protocolName]->markForDelete();
-        updated = true;
-    }
-
-    return updated;
-}
-
-GroupMemberProtocol* GroupMember::getProtocol(const NValue& protocolName) {
-    loadProtocolsIfNecessary();
-
-    auto entry = m_protocols.find(protocolName);
-    if (entry != m_protocols.end()) {
-        return entry->second.get();
-    }
-    return nullptr;
-}
-
-std::vector<GroupMemberProtocol*> GroupMember::getProtocols(bool includeDeleted) {
-    loadProtocolsIfNecessary();
-
-    std::vector<GroupMemberProtocol*> result;
-
-    for (auto iterator = m_protocols.begin(); iterator != m_protocols.end(); ++iterator) {
-        if (includeDeleted || !iterator->second->isDeleted()) {
-            result.push_back(iterator->second.get());
-        }
-    }
-
-    return result;
-}
-
-void GroupMember::loadProtocolsIfNecessary() {
-    if (isInTable() && m_protocols.empty()) {
-        for (auto protocol : GroupMemberProtocol::loadProtocols(m_tables, getGroupId(), getMemberId())) {
-            m_protocols[protocol->getName()].reset(protocol);
-        }
+        setNValues(values);
     }
 }
 
-void GroupMember::markForDelete() {
-    loadProtocolsIfNecessary();
-    GroupOrmBase::markForDelete();
+void GroupMember::update(SerializeInputBE& updateIn) {
+    NValue sessionTimeout = ValueFactory::getIntegerValue(updateIn.readInt());
+    NValue rebalanceTimeout = ValueFactory::getIntegerValue(updateIn.readInt());
+    NValue instanceId = readString(updateIn);
+    NValue protocolMetadata = readBytes(updateIn);
+    NValue assignments = readBytes(updateIn);
 
-    for (auto iterator = m_protocols.begin(); iterator != m_protocols.end(); ++iterator) {
-        iterator->second->markForDelete();
-    }
+    update(sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments);
 }
 
-void GroupMember::commit(int64_t timestamp) {
-    GroupOrmBase::commit(timestamp);
+int32_t GroupMember::serializedSize() {
+    return getMemberId().serializedSize() + sizeof(int32_t) * 2 + getInstanceId().serializedSize()
+            + getProtocolMetadata().serializedSize() + getAssignments().serializedSize();
+}
 
-    for (auto iterator = m_protocols.begin(); iterator != m_protocols.end(); ++iterator) {
-        iterator->second->commit(timestamp);
-    }
+void GroupMember::serialize(SerializeOutput& out) {
+    getMemberId().serializeTo(out);
+    out.writeInt(getSessionTimeout());
+    out.writeInt(getRebalanceTimeout());
+    getInstanceId().serializeTo(out);
+    getProtocolMetadata().serializeTo(out);
+    getAssignments().serializeTo(out);
 }
 
 bool GroupMember::equalDeleted(const GroupOrmBase& other) const {

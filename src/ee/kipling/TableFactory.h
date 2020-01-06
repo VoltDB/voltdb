@@ -27,7 +27,7 @@ struct GroupTable {
     static const std::string indexName;
 
     enum class Column : int8_t {
-        ID = 0, COMMIT_TIMESTAMP, GENERATION, STATE, LEADER, PROTOCOL
+        ID = 0, COMMIT_TIMESTAMP, GENERATION, LEADER, PROTOCOL
     };
 
     enum class IndexColumn : int8_t {
@@ -40,24 +40,11 @@ struct GroupMemberTable {
     static const std::string indexName;
 
     enum class Column : int8_t {
-        GROUP_ID = 0, MEMBER_ID, SESSION_TIMEOUT, REBALANCE_TIMEOUT, INSTANCE_ID, ASSIGNMENTS, FLAGS
+        GROUP_ID = 0, MEMBER_ID, SESSION_TIMEOUT, REBALANCE_TIMEOUT, INSTANCE_ID, PROTOCOL_METADATA, ASSIGNMENTS
     };
 
     enum class IndexColumn : int8_t {
         GROUP_ID = 0
-    };
-};
-
-struct GroupMemberProtocolTable {
-    static const std::string name;
-    static const std::string indexName;
-
-    enum class Column : int8_t {
-        GROUP_ID = 0, MEMBER_ID, INDEX, NAME, METADATA
-    };
-
-    enum class IndexColumn : int8_t {
-        GROUP_ID = 0, MEMBER_ID
     };
 };
 
@@ -81,8 +68,6 @@ public:
     static PersistentTable* createGroup(const SystemTableFactory &factory);
     /* Create a new PersistentTable for kipling group members */
     static PersistentTable* createGroupMember(const SystemTableFactory &factory);
-    /* Create a new PersistentTable for kipling group member protocols */
-    static PersistentTable* createGroupMemberProtocol(const SystemTableFactory &factory);
     /* Create a new PersistentTable for kipling group offsets */
     static PersistentTable* createGroupOffset(const SystemTableFactory &factory);
 };

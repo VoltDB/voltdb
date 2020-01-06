@@ -21,49 +21,10 @@
 #include <string>
 
 #include "common/serializeio.h"
-#include "kipling/messages/Error.h"
+#include "kipling/messages/CheckedSerializeInput.h"
 #include "kipling/messages/Message.h"
 
 namespace voltdb { namespace kipling {
-
-/**
- * Request for which partitions within a topic are being requested
- */
-class OffsetFetchRequestTopic: protected RequestComponent {
-
-public:
-    OffsetFetchRequestTopic(const int16_t version, SerializeInputBE &request);
-
-    inline const NValue& topic() const {
-        return m_topic;
-    }
-
-    inline const std::vector<int32_t>& partitions() const {
-        return m_partitions;
-    }
-
-private:
-    const NValue m_topic;
-    std::vector<int32_t> m_partitions;
-};
-
-/**
- * Request for fetching specific topic partition offsets for a group
- */
-class OffsetFetchRequest: public GroupRequest {
-
-public:
-    OffsetFetchRequest(const int16_t version, const NValue& groupId, SerializeInputBE &request);
-
-    inline const std::vector<OffsetFetchRequestTopic>& topics() const {
-        return m_topics;
-    }
-
-private:
-    std::vector<OffsetFetchRequestTopic> m_topics;
-};
-
-// Response classes
 
 /**
  * Response to a specific topic partition offset fetch request
@@ -75,8 +36,10 @@ public:
             const NValue& metadata) :
             m_partitionIndex(partitionIndex), m_offset(offset), m_leaderEpoch(leaderEpoch), m_metadata(metadata) {}
 
-    OffsetFetchResponsePartition(int32_t partitionIndex, Error error) :
-            m_partitionIndex(partitionIndex), m_error(error) {}
+    OffsetFetchResponsePartition(int32_t partitionIndex) :
+            m_partitionIndex(partitionIndex) {}
+
+    OffsetFetchResponsePartition(int16_t version, CheckedSerializeInput& in);
 
     void write(const int16_t version, SerializeOutput &out) const override;
 
@@ -96,10 +59,6 @@ public:
         return m_metadata;
     }
 
-    inline const Error error() const {
-        return m_error;
-    }
-
 private:
     // Partition index/id
     const int32_t m_partitionIndex;
@@ -109,14 +68,17 @@ private:
     int32_t m_leaderEpoch = 0;
     // Metadata associated with the offset
     NValue m_metadata;
-    // Error code for this individual partition
-    Error m_error = Error::NONE;
 };
 
+/**
+ * Response to all partitions requested in a topic
+ */
 class OffsetFetchResponseTopic: protected ResponseComponent {
 
 public:
     OffsetFetchResponseTopic(const NValue& topic) : m_topic(topic) {}
+
+    OffsetFetchResponseTopic(int16_t version, CheckedSerializeInput& in);
 
     void write(const int16_t version, SerializeOutput &out) const override;
 
@@ -144,10 +106,12 @@ private:
 /*
  * Response to OffsetFetchRequest
  */
-class OffsetFetchResponse: public Response<OffsetFetchResponse> {
+class OffsetFetchResponse: public Response {
 
 public:
-    void write(const int16_t version, SerializeOutput &out) const override;
+    OffsetFetchResponse() = default;
+
+    OffsetFetchResponse(int16_t version, CheckedSerializeInput& in);
 
     inline const std::vector<OffsetFetchResponseTopic>& topics() const {
         return m_topics;
@@ -158,6 +122,12 @@ public:
         m_topics.emplace_back(std::forward<Args>(args)...);
         return m_topics.back();
     }
+
+    void write(const int16_t version, SerializeOutput& out) const override;
+
+protected:
+
+    int16_t minThrottleVersion() const override { return 3; }
 
 private:
     // Per topic responses

@@ -16,12 +16,10 @@
  */
 
 #pragma once
-#include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
+#include <functional>
 
-#include "kipling/messages/JoinGroup.h"
+#include "kipling/TableFactory.h"
 #include "kipling/orm/GroupOrmBase.h"
-#include "kipling/orm/GroupMemberProtocol.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -34,12 +32,9 @@ class GroupMember: public GroupOrmBase {
     friend class Group;
 
 public:
-    /**
-     * Update this group member with information from a join group request
-     * @param request: JoinGroupRequest with member information
-     * @return true if this or any protocols were updated
-     */
-    bool update(const JoinGroupRequest& request);
+    GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId, int32_t sessionTimeout,
+            int32_t rebalanceTimeout, const NValue& instanceId, const NValue& protocolMetadata,
+            const NValue& assignments);
 
     /**
      * @return the ID of this group member. Type VARCHAR
@@ -70,31 +65,24 @@ public:
     }
 
     /**
+     * @return the members metadata for the selected assignment protocol
+     */
+    const NValue getProtocolMetadata() const {
+        return getNValue(GroupMemberTable::Column::PROTOCOL_METADATA);
+    }
+
+    /**
      * @return the assignments for this group member
      */
     const NValue getAssignments() const {
         return getNValue(GroupMemberTable::Column::ASSIGNMENTS);
     }
 
-    void setAssignments(const NValue& assignments) {
-        setNValue(GroupMemberTable::Column::ASSIGNMENTS, assignments);
-    }
-
     /**
-     * Delete this group member and all protocols which are associated with this member
+     * Update used by tests to set all fields in this member
      */
-    void markForDelete() override;
-
-    /**
-     * @param protocolName: Name of protocol to return
-     * @return the protocol with the given name or nullptr if the protocol does not exist
-     */
-    GroupMemberProtocol* getProtocol(const NValue& protocolName);
-
-    /**
-     * @param includeDeleted: If true then all protocols including deleted protocols are returned. Default false
-     */
-    std::vector<GroupMemberProtocol*> getProtocols(bool includeDeleted = false);
+    void update(int32_t sessionTimeout, int32_t rebalanceTimeout, const NValue& instanceId,
+            const NValue& protocolMetadata, const NValue& assignments);
 
 protected:
     /**
@@ -102,59 +90,38 @@ protected:
      */
     static std::vector<GroupMember*> loadMembers(const GroupTables& tables, const NValue& groupId);
 
-    GroupMember(const GroupTables& tables, const NValue& groupId);
+    GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId);
 
-    void commit(int64_t timestamp) override;
+    /**
+     * Update this group member with information from a join group request
+     * @param updateIn: SerializeInputBE with member information
+     */
+    void update(SerializeInputBE& updateIn);
+
+    /**
+     * Size of this group member when serialized
+     */
+    int32_t serializedSize();
+
+    /**
+     * Serialize group member to out
+     */
+    void serialize(SerializeOutput& out);
 
     bool equalDeleted(const GroupOrmBase& other) const override;
 
     PersistentTable* getTable() const override { return m_tables.getGroupMemberTable(); }
 
 private:
-    /**
-     * Generate a new member ID from a UUID as a string
-     */
-    static NValue generateMemberId() {
-        boost::uuids::random_generator generator;
-        boost::uuids::uuid memberUuid(generator());
-        std::string memberId = boost::uuids::to_string(memberUuid);
-        return ValueFactory::getTempStringValue(memberId);
-    }
 
     GroupMember(const GroupTables& tables, TableTuple& original, const NValue& groupId) :
         GroupOrmBase(tables, original, groupId), m_memberId(getNValue(GroupMemberTable::Column::MEMBER_ID)) {}
 
-    void initializeValues(int32_t sessionTimeout, int32_t rebalanceTeimout, const NValue& instanceId);
-
-    void setSessionTimeout(int32_t timeout) {
-        setNValue(GroupMemberTable::Column::SESSION_TIMEOUT, ValueFactory::getIntegerValue(timeout));
-    }
-
-    void setRebalanceTimeout(int32_t timeout) {
-        setNValue(GroupMemberTable::Column::REBALANCE_TIMEOUT, ValueFactory::getIntegerValue(timeout));
-    }
-
-    void setInstanceId(const NValue& instanceId) {
-        setNValue(GroupMemberTable::Column::INSTANCE_ID, instanceId);
-    }
-
-    const int16_t getFlags() const {
-        return ValuePeeker::peekSmallInt(getNValue(GroupMemberTable::Column::FLAGS));
-    }
-
-    void setFlags(int16_t flags) {
-        setNValue(GroupMemberTable::Column::FLAGS, ValueFactory::getSmallIntValue(flags));
-    }
-
-    /**
-     * Load all assignment protocols supported by this member if not already loaded
-     */
-    void loadProtocolsIfNecessary();
+    void update(const NValue& sessionTimeout, const NValue& rebalanceTimeout, const NValue& instanceId,
+            const NValue& protocolMetadata, const NValue& assignments);
 
     // this group members ID. Type VARCHAR
     const NValue m_memberId;
-    // map from protocol name to protocol object supported by this group member
-    std::unordered_map<NValue, std::unique_ptr<GroupMemberProtocol>> m_protocols;
 };
 
 } /* namespace kipling */

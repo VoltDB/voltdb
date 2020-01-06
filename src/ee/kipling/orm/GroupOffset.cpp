@@ -22,6 +22,31 @@
 namespace voltdb {
 namespace kipling {
 
+void GroupOffset::visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(GroupOffset&)> visitor) {
+    PersistentTable* table = tables.getGroupOffsetTable();
+    TableIndex *index = table->primaryKeyIndex();
+
+    TableTuple searchKey(index->getKeySchema());
+    char data[searchKey.tupleLength()];
+    searchKey.move(data);
+    searchKey.setAllNulls();
+
+    searchKey.setNValue(static_cast<int32_t>(GroupOffsetTable::IndexColumn::GROUP_ID), groupId);
+
+    IndexCursor cursor(table->schema());
+    index->moveToKeyOrGreater(&searchKey, cursor);
+
+    TableTuple next;
+    while (!(next = index->nextValue(cursor)).isNullTuple()) {
+        if (next.getNValue(static_cast<int32_t>(GroupOffsetTable::Column::GROUP_ID)) != groupId) {
+            break;
+        }
+
+        GroupOffset offset(tables, next, groupId);
+        visitor(offset);
+    }
+}
+
 GroupOffset::GroupOffset(const GroupTables& tables, const NValue& groupId, const NValue& topic, int32_t partition) :
     GroupOrmBase(tables, groupId), m_topic(topic), m_partition(partition) {
     TableIndex *index = getTable()->primaryKeyIndex();
@@ -39,6 +64,10 @@ GroupOffset::GroupOffset(const GroupTables& tables, const NValue& groupId, const
     index->moveToKey(&searchKey, cursor);
     setTableTuple(cursor.m_match);
 }
+
+GroupOffset::GroupOffset(const GroupTables& tables, TableTuple& tuple, const NValue& groupId) :
+        GroupOrmBase(tables, tuple, groupId), m_topic(getNValue(GroupOffsetTable::Column::TOPIC)),
+        m_partition(ValuePeeker::peekInteger(getNValue(GroupOffsetTable::Column::PARTITION))) {}
 
 void GroupOffset::update(const OffsetCommitRequestPartition& request) {
     vassert(request.partitionIndex() == getPartition());

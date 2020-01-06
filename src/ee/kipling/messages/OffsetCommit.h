@@ -21,24 +21,26 @@
 #include <string>
 
 #include "common/serializeio.h"
-#include "kipling/messages/Error.h"
+#include "kipling/messages/CheckedSerializeInput.h"
 #include "kipling/messages/Message.h"
+
+#define KIPLING_ERROR_NONE 0
 
 namespace voltdb { namespace kipling {
 
 /**
  * Request class for committing an offset for a partition
  */
-class OffsetCommitRequestPartition: protected RequestComponent {
+class OffsetCommitRequestPartition {
 
 public:
-    OffsetCommitRequestPartition(const int16_t version, SerializeInputBE &request);
+    OffsetCommitRequestPartition(const int16_t version, CheckedSerializeInput& request);
 
     // Construct a request by hand. Only really used by tests
-    OffsetCommitRequestPartition(const int16_t version, int32_t partitionIndex, int64_t offset, int32_t leaderEpoch,
-            const NValue &metadata) :
+    OffsetCommitRequestPartition(int32_t partitionIndex, int64_t offset, int32_t leaderEpoch,
+            const std::string& metadata) :
             m_partitionIndex(partitionIndex), m_offset(offset), m_leaderEpoch(leaderEpoch), m_timestamp(-1),
-            m_metadata(metadata) {}
+            m_metadata(ValueFactory::getTempStringValue(metadata)) {}
 
     inline const int32_t partitionIndex() const {
         return m_partitionIndex;
@@ -52,7 +54,7 @@ public:
         return m_leaderEpoch;
     }
 
-    inline const int32_t timestamp() const {
+    inline const int64_t timestamp() const {
         return m_timestamp;
     }
 
@@ -73,65 +75,6 @@ private:
     NValue m_metadata;
 };
 
-/**
- * Request class for committing offsets for partitions in a single topic
- */
-class OffsetCommitRequestTopic: protected RequestComponent {
-
-public:
-    OffsetCommitRequestTopic(const int16_t version, SerializeInputBE &request);
-
-    inline const NValue& topic() const {
-        return m_topic;
-    }
-
-    inline const std::vector<OffsetCommitRequestPartition>& partitions() const {
-        return m_partitions;
-    }
-
-private:
-    // Name of topic
-    const NValue m_topic;
-    // List of partition offsets to commit
-    std::vector<OffsetCommitRequestPartition> m_partitions;
-};
-
-/**
- * Request class for committing offsets for a set of topic and partitions
- */
-
-class OffsetCommitRequest: public GroupRequest {
-
-public:
-    OffsetCommitRequest(const int16_t version, const NValue& groupId, SerializeInputBE &request);
-
-    inline const int32_t generationId() const {
-        return m_generationId;
-    }
-
-    inline const NValue& memberId() const {
-        return m_memberId;
-    }
-
-    inline const NValue& groupInstanceId() const {
-        return m_groupInstanceId;
-    }
-
-    inline const std::vector<OffsetCommitRequestTopic>& topics() {
-        return m_topics;
-    }
-
-private:
-    // Generation ID of the group
-    int32_t m_generationId = -1;
-    // ID of the member committing the offsets
-    NValue m_memberId;
-    // Group instance ID of the member committing the offsets of exists
-    NValue m_groupInstanceId;
-    // Topics which have offsets to commit
-    std::vector<OffsetCommitRequestTopic> m_topics;
-};
-
 // Response classes
 
 /**
@@ -140,11 +83,8 @@ private:
 class OffsetCommitResponsePartition: protected ResponseComponent {
 
 public:
-    OffsetCommitResponsePartition(int32_t partitionIndex, Error error) :
-            m_partitionIndex(partitionIndex), m_error(error) {}
-
     OffsetCommitResponsePartition(int32_t partitionIndex) :
-                m_partitionIndex(partitionIndex), m_error(Error::NONE) {}
+            m_partitionIndex(partitionIndex) {}
 
     void write(const int16_t version, SerializeOutput &out) const override;
 
@@ -152,13 +92,8 @@ public:
         return m_partitionIndex;
     }
 
-    inline const Error error() const {
-        return m_error;
-    }
-
 private:
     const int32_t m_partitionIndex;
-    const Error m_error;
 };
 
 /*
@@ -195,19 +130,10 @@ private:
 /*
  * Response to OffsetCommitRequest this does not extend Response because it does not have an Error code
  */
-class OffsetCommitResponse: protected ResponseComponent {
+class OffsetCommitResponse: public Response {
 
 public:
-    void write(const int16_t version, SerializeOutput &out) const override;
-
-    inline const int32_t throttleTimeMs() const {
-        return m_throttleTimeMs;
-    }
-
-    inline OffsetCommitResponse& throttleTimeMs(int32_t thottleTimeMs) {
-        m_throttleTimeMs = thottleTimeMs;
-        return *this;
-    }
+    OffsetCommitResponse() = default;
 
     inline const std::vector<OffsetCommitResponseTopic>& topics() const {
         return m_topics;
@@ -219,8 +145,12 @@ public:
         return m_topics.back();
     }
 
+    void write(const int16_t version, SerializeOutput& out) const override;
+
+protected:
+    int16_t minThrottleVersion() const override { return 3; }
+
 private:
-    int32_t m_throttleTimeMs = 0;
     // Per topic responses
     std::vector<OffsetCommitResponseTopic> m_topics;
 };

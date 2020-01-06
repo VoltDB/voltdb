@@ -63,13 +63,12 @@ TEST_F(KiplingTableFactoryTest, KiplingGroup) {
     EXPECT_TRUE(table);
     EXPECT_EQ(GroupTable::name, table->name());
     EXPECT_EQ(0, table->partitionColumn());
-    EXPECT_EQ(6, table->schema()->columnCount());
+    EXPECT_EQ(5, table->schema()->columnCount());
 
     const TupleSchema* schema = table->schema();
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupTable::Column::ID));
     EXPECT_EQ(ValueType::tTIMESTAMP, columnType(schema, GroupTable::Column::COMMIT_TIMESTAMP));
     EXPECT_EQ(ValueType::tINTEGER, columnType(schema, GroupTable::Column::GENERATION));
-    EXPECT_EQ(ValueType::tTINYINT, columnType(schema, GroupTable::Column::STATE));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupTable::Column::LEADER));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupTable::Column::PROTOCOL));
 
@@ -96,40 +95,14 @@ TEST_F(KiplingTableFactoryTest, KiplingGroupMember) {
     EXPECT_EQ(ValueType::tINTEGER, columnType(schema, GroupMemberTable::Column::SESSION_TIMEOUT));
     EXPECT_EQ(ValueType::tINTEGER, columnType(schema, GroupMemberTable::Column::REBALANCE_TIMEOUT));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::INSTANCE_ID));
+    EXPECT_EQ(ValueType::tVARBINARY, columnType(schema, GroupMemberTable::Column::PROTOCOL_METADATA));
     EXPECT_EQ(ValueType::tVARBINARY, columnType(schema, GroupMemberTable::Column::ASSIGNMENTS));
-    EXPECT_EQ(ValueType::tSMALLINT, columnType(schema, GroupMemberTable::Column::FLAGS));
 
     TableIndex *index = table->index(GroupMemberTable::indexName);
     EXPECT_TRUE(index);
     EXPECT_FALSE(table->primaryKeyIndex());
     EXPECT_EQ(1, index->getColumnIndices().size());
     EXPECT_EQ(static_cast<int>(GroupMemberTable::Column::GROUP_ID), index->getColumnIndices()[0]);
-
-    delete table;
-}
-
-TEST_F(KiplingTableFactoryTest, KiplingGroupMemberProtocol) {
-    PersistentTable *table = m_factory.create(SystemTableId::KIPLING_GROUP_MEMBER_PROTOCOL);
-
-    EXPECT_TRUE(table);
-    EXPECT_EQ(GroupMemberProtocolTable::name, table->name());
-    EXPECT_EQ(0, table->partitionColumn());
-    EXPECT_EQ(5, table->schema()->columnCount());
-
-    const TupleSchema* schema = table->schema();
-    EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberProtocolTable::Column::GROUP_ID));
-    EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberProtocolTable::Column::MEMBER_ID));
-    EXPECT_EQ(ValueType::tSMALLINT, columnType(schema, GroupMemberProtocolTable::Column::INDEX));
-    EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberProtocolTable::Column::NAME));
-    EXPECT_EQ(ValueType::tVARBINARY, columnType(schema, GroupMemberProtocolTable::Column::METADATA));
-
-    TableIndex *index = table->index(GroupMemberProtocolTable::indexName);
-    EXPECT_TRUE(index);
-    EXPECT_FALSE(table->primaryKeyIndex());
-    EXPECT_EQ(2, index->getColumnIndices().size());
-    EXPECT_EQ(static_cast<int>(GroupMemberProtocolTable::Column::GROUP_ID), index->getColumnIndices()[0]);
-    EXPECT_EQ(static_cast<int>(GroupMemberProtocolTable::Column::MEMBER_ID), index->getColumnIndices()[1]);
-
 
     delete table;
 }

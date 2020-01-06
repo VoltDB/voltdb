@@ -28,25 +28,22 @@ const std::string GroupTable::indexName = GroupTable::name + "_pkey";
 const std::string GroupMemberTable::name = "_kipling_group_member";
 const std::string GroupMemberTable::indexName = GroupMemberTable::name + "_index";
 
-const std::string GroupMemberProtocolTable::name = "_kipling_group_member_protocol";
-const std::string GroupMemberProtocolTable::indexName = GroupMemberProtocolTable::name + "_pkey";
-
 const std::string GroupOffsetTable::name = "_kipling_group_offset";
 const std::string GroupOffsetTable::indexName = GroupOffsetTable::name + "_pkey";
 
 /*
  * Create a table for tracking kipling groups equivalent to
- * CREATE TABLE _kipling_group (id VARCHAR(256 BYTES) NOT NULL, generation INTEGER NOT NULL, state TINYINT NOT NULL,
- *     leader VARCHAR(36 BYTES) NOT NULL, protocol VARCHAR(256 BYTES), PRIMARY KEY (id));
+ * CREATE TABLE _kipling_group (id VARCHAR(256 BYTES) NOT NULL, generation INTEGER NOT NULL,
+ *     leader VARCHAR(36 BYTES) NOT NULL, protocol VARCHAR(256 BYTES) NOT NULL, PRIMARY KEY (id));
  * PARTITION TABLE kipling_group ON COLUMN id;
  */
 PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
-    std::vector<std::string> columnNames = { "id", "update_timestamp", "generation", "state", "leader", "protocol" };
+    std::vector<std::string> columnNames = { "id", "update_timestamp", "generation", "leader", "protocol" };
     std::vector<ValueType> columnTypes = { ValueType::tVARCHAR, ValueType::tTIMESTAMP, ValueType::tINTEGER,
-            ValueType::tTINYINT, ValueType::tVARCHAR, ValueType::tVARCHAR };
-    std::vector<int32_t> columnSizes = { 256, 0, 0, 0, 36, 256 };
-    std::vector<bool> allowNull = { false, false, false, false, true, true };
-    std::vector<bool> columnInBytes = { true, false, false, false, true, true };
+            ValueType::tVARCHAR, ValueType::tVARCHAR };
+    std::vector<int32_t> columnSizes = { 256, 0, 0, 36, 256 };
+    std::vector<bool> allowNull = { false, false, false, true, true };
+    std::vector<bool> columnInBytes = { true, false, false, true, true };
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
     std::vector<int32_t> pkeyColumns = { static_cast<int32_t>(GroupTable::Column::ID) };
@@ -59,47 +56,24 @@ PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
 /*
  * Create a table for tracking kipling group members equivalent to
  * CREATE TABLE _kipling_group_member (group_id VARCHAR(256 BYTES) NOT NULL, id VARCHAR(36 BYTES) NOT NULL,
- *     session_timeout BIGINT NOT NULL, instance_id VARCHAR(256 BYTES), assignments VARBINARY(1048576),
- *     PRIMARY KEY (group_id, id));
+ *     session_timeout INTEGER NOT NULL, rebalance_timeout INTEGER NOT NULL, instance_id VARCHAR(256 BYTES),
+ *     protocol_metadata VARBINARY(1048576) NOT NULL, assignments VARBINARY(1048576) NOT NULL);
  * PARTITION TABLE kipling_group_member ON COLUMN group_id;
  */
 PersistentTable* TableFactory::createGroupMember(const SystemTableFactory &factory) {
     std::vector<std::string> columnNames = { "group_id", "id", "session_timeout", "rebalance_timeout", "instance_id",
-            "assignments", "flags" };
+            "protocol_metadata", "assignments" };
     std::vector<ValueType> columnTypes = { ValueType::tVARCHAR, ValueType::tVARCHAR, ValueType::tINTEGER,
-            ValueType::tINTEGER, ValueType::tVARCHAR, ValueType::tVARBINARY, ValueType::tSMALLINT };
-    std::vector<int32_t> columnSizes = { 256, 36, 0, 0, 256, 1048576, 0 };
-    std::vector<bool> allowNull = { false, false, false, false, true, true, false };
-    std::vector<bool> columnInBytes = { true, true, false, false, true, true, false };
+            ValueType::tINTEGER, ValueType::tVARCHAR, ValueType::tVARBINARY, ValueType::tVARBINARY };
+    std::vector<int32_t> columnSizes = { 256, 36, 0, 0, 256, 1048576, 1048576 };
+    std::vector<bool> allowNull = { false, false, false, false, true, false, false };
+    std::vector<bool> columnInBytes = { true, true, false, false, true, true, true };
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
     std::vector<int32_t> indexColumns = { static_cast<int32_t>(GroupMemberTable::Column::GROUP_ID) };
 
     PersistentTable* table = factory.createTable(GroupMemberTable::name, schema, columnNames, 0);
     factory.addIndex(table, GroupMemberTable::indexName, indexColumns, false);
-    return table;
-}
-
-/*
- * Create a table for tracking kipling registered protocols per member per group equivalent to
- * CREATE TABLE _kipling_group_member_protocol (group_id VARCHAR(256 BYTES) NOT NULL, id VARCHAR(36 BYTES) NOT NULL,
- *     protocol VARCHAR(256 BYTES) NOT NULL, metadata VARBINARY(1048576) NOT NULL, PRIMARY KEY (group_id, id, protocol));
- * PARTITION TABLE kipling_group_member_protocol ON COLUMN group_id;
- */
-PersistentTable* TableFactory::createGroupMemberProtocol(const SystemTableFactory &factory) {
-    std::vector<std::string> columnNames = { "group_id", "id", "index", "protocol", "metadata" };
-    std::vector<ValueType> columnTypes = { ValueType::tVARCHAR, ValueType::tVARCHAR, ValueType::tSMALLINT,
-            ValueType::tVARCHAR, ValueType::tVARBINARY };
-    std::vector<int32_t> columnSizes = { 256, 36, 0, 256, 1048576 };
-    std::vector<bool> allowNull = { false, false, false, false, false };
-    std::vector<bool> columnInBytes = { true, true, false, true, true };
-
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);
-    std::vector<int32_t> indexColumns = { static_cast<int32_t>(GroupMemberProtocolTable::Column::GROUP_ID),
-            static_cast<int32_t>(GroupMemberProtocolTable::Column::MEMBER_ID) };
-
-    PersistentTable* table = factory.createTable(GroupMemberProtocolTable::name, schema, columnNames, 0);
-    factory.addIndex(table, GroupMemberProtocolTable::indexName, indexColumns, false);
     return table;
 }
 
