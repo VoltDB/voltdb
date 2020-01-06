@@ -248,8 +248,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             }
         }
 
-        tuple->move(retval.first);
-        tuple->resetHeader();
+        tuple->moveAndInitialize(retval.first);
         ++m_tupleCount;
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
@@ -285,8 +284,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         }
     }
 
-    tuple->move(retval.first);
-    tuple->resetHeader();
+    tuple->moveAndInitialize(retval.first);
     ++m_tupleCount;
     if (block->hasFreeTuples()) {
         m_blocksWithSpace.insert(block);
