@@ -191,25 +191,6 @@ namespace voltdb {
         };
 
         /**
-         * One-way rw access: head -> queue; tail -> stack
-         */
-        template<typename Chunk, shrink_direction dir>
-        class LinearizedChunks : private ChunkList<Chunk> {
-            using super = ChunkList<Chunk>;
-        public:
-            using iterator = typename super::iterator;
-            using const_iterator = typename super::const_iterator;
-            using reference = typename super::reference;
-            using const_reference = typename super::const_reference;
-            void emplace(super&, iterator const&) noexcept;
-            reference top();
-            const_reference top() const;
-            void pop();
-            using super::clear;
-            using super::empty;
-        };
-
-        /**
          * Note that a NonCompactingChunks organizes chunks in a
          * singly-linked-list, meaning that the iteration order
          * is (almost) always different from allocation order.
@@ -249,7 +230,6 @@ namespace voltdb {
             void* allocate();
             void free(void*);
             void tryFree(void*);                       // not an error if addr not found
-            pair<bool, function<void*()>> extendedIterator() const noexcept;     // dummy, see CompactingChunks
             using list_type = ChunkList<Chunk>;
             using list_type::empty; using list_type::clear;
         };
@@ -276,21 +256,61 @@ namespace voltdb {
         };
 
         /**
+         * The snapshot iterator, i.e.
+         * time_traveling_iterator_type, need to access
+         * deceased chunks in txn view in the txn order at
+         * the time those chunks were alive. These functions
+         * extend normal iterator to "splice" deceased chunks
+         * (and allocations) for TxnPreHook to extrapolate.
+         */
+        class ExtendedIterator final {
+            using iterator_type = function<void const*()>;
+            bool const m_shrinkFromHead;
+            iterator_type const m_iter;
+        public:
+            ExtendedIterator(bool, iterator_type const&&) noexcept;
+            bool shrinkFromHead() const noexcept;
+            void const* operator()() const noexcept;
+        };
+
+        /**
          * Shrink-directional-dependent book-keeping
          */
         template<shrink_direction dir> class CompactingStorageTrait {
             using list_type = ChunkList<CompactingChunk>;
             using iterator = typename list_type::iterator;
-            struct LinearizedChunks : private list_type {
+            /**
+             * Linearized access order depending on shrink
+             * direction, to ensure that chunks are accessed in
+             * snapshot view the same order as they appear in txn
+             * view when snapshot started.
+             */
+            class LinearizedChunks : private list_type {
                 using const_iterator = typename list_type::const_iterator;
                 using reference = typename list_type::reference;
                 using const_reference = typename list_type::const_reference;
-                using list_type::clear;
+                using iterator_type = function<void const*()>;
                 using list_type::empty;
-                void emplace(list_type&, typename list_type::iterator const&) noexcept;
+                using list_type::cbegin; using list_type::cend;
                 reference top();
                 const_reference top() const;
                 void pop();
+                void const* extendedIteratorHelper();
+                class ConstExtendedIteratorHelper {    // Serves for const iterator on snapshot view: in effect only used by test
+                    LinearizedChunks const& m_cont;    // since we always release releaseable chunks as we go in actual iterator.
+                    mutable const_iterator m_iter{};
+                    mutable void const* m_val = nullptr;
+                    mutable bool m_started = false;
+                public:
+                    ConstExtendedIteratorHelper(LinearizedChunks const&) noexcept;
+                    void const* operator()() const;
+                    void reset() const noexcept;       // since each CompactingStorageTrait has a single instance of LinearizedChunks,
+                } m_iterHelper{*this};                 // which has a single instance of ConstExtendedIteratorHelper, using two const_iterator
+            public:                                    // (of snapshot view) at the same time will be a trouble bc. m_started and reset().
+                void emplace(list_type&, typename list_type::iterator const&) noexcept;
+                iterator_type iterator() noexcept;
+                iterator_type iterator() const noexcept;
+                using list_type::clear;
             } m_unreleased{};
             list_type* m_storage = nullptr;
             bool m_inSnapshot = false;
@@ -305,20 +325,8 @@ namespace voltdb {
              * operates on the level of list iterator, not void*.
              */
             void released(iterator);
-            /**
-             * The snapshot iterator, i.e.
-             * time_traveling_iterator_type, need to access
-             * deceased chunks in txn view in the txn order at
-             * the time those chunks were alive. These functions
-             * extend normal iterator to "splice" deceased chunks
-             * (and allocations) for TxnPreHook to extrapolate.
-             *
-             * \return Should the exended part be used before
-             * normal iterator or not?; and the extended iterator
-             * as a function.
-             */
-            pair<bool, function<void const*()>> extendedIterator() noexcept;
-            pair<bool, function<void const*()>> extendedIterator() const noexcept;
+            ExtendedIterator operator()() noexcept;
+            ExtendedIterator operator()() const noexcept;
         };
 
         /**
@@ -328,13 +336,12 @@ namespace voltdb {
          * the non-empty allocation from the head to freed space.
          */
         template<shrink_direction dir>
-        class CompactingChunks : private ChunkList<CompactingChunk>, CompactingStorageTrait<dir> {
+        class CompactingChunks : private ChunkList<CompactingChunk>, private CompactingStorageTrait<dir> {
             using list_type = ChunkList<CompactingChunk>;
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
 
             using super1 = ChunkList<CompactingChunk>;
             using super2 = CompactingStorageTrait<dir>;
-            using super1::empty;
             size_t const m_tupleSize;
 
             CompactingChunks(CompactingChunks const&) = delete;
@@ -361,6 +368,7 @@ namespace voltdb {
             // details.
             void* free(void*);
             void snapshot(bool);                       // client need to notify allocator
+            using super1::empty;
         };
 
         struct BaseHistoryRetainTrait {
@@ -508,7 +516,6 @@ namespace voltdb {
                          typename Chunks::list_type::iterator>::type m_iter;
             protected:
                 using value_type = typename super::value_type;
-                using reference = typename super::reference;
                 using Compactible = Compact;
                 value_type m_cursor;
                 // ctor arg type
@@ -531,7 +538,7 @@ namespace voltdb {
                 bool drained() const noexcept;
                 iterator_type& operator++();           // prefix
                 iterator_type operator++(int);         // postfix
-                reference operator*() noexcept;        // ideally this should be const method for const iterator; but that would require class specialization...
+                value_type operator*() noexcept;// ideally this should be const method for const iterator; but that would require class specialization...
             };
             /**
              * Iterators used by transaction
@@ -569,7 +576,7 @@ namespace voltdb {
                 using container_type = typename super::container_type;
                 cb_type m_cb;
             public:
-                value_type operator*();                // NOTE: return type no longer a reference
+                value_type operator*() noexcept;
                 iterator_cb_type(container_type, cb_type);
                 static iterator_cb_type begin(container_type, cb_type);
                 static iterator_cb_type end(container_type, cb_type);
@@ -580,19 +587,20 @@ namespace voltdb {
                 using super = iterator_cb_type<perm>;
                 using history_type = typename add_lvalue_reference<typename conditional<
                     perm == iterator_permission_type::ro, Hook const, Hook>::type>::type;
+                ExtendedIterator const m_extendingCb;
+                void const* m_extendingPtr;
+                void advance();
             public:
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 static time_traveling_iterator_type begin(container_type, history_type);
                 static time_traveling_iterator_type end(container_type, history_type);
                 value_type operator*() noexcept;
-                time_traveling_iterator_type(container_type, history_type);
                 bool drained() const noexcept;
+                time_traveling_iterator_type& operator++();           // Need to redefine/shadow, since the polymorphism is meant to be used statically
+                time_traveling_iterator_type operator++(int);
             private:
-                pair<bool, function<void const*()>> const m_extendingCb;
-                bool m_extending;
-                void const* m_extendingPtr;
-                void advance();
+                time_traveling_iterator_type(container_type, history_type);
             };
             template<typename Hook>
             using iterator_cb = time_traveling_iterator_type<Hook, iterator_permission_type::rw>;

@@ -256,11 +256,22 @@ template<> struct InsertionPos<shrink_direction::tail> {
     }
 };
 
+inline ExtendedIterator::ExtendedIterator(bool fromHead, typename ExtendedIterator::iterator_type const&& iter) noexcept :
+    m_shrinkFromHead(fromHead), m_iter(iter) {}
+
+inline bool ExtendedIterator::shrinkFromHead() const noexcept {
+    return m_shrinkFromHead;
+}
+
+inline void const* ExtendedIterator::operator()() const noexcept {
+    return m_iter();
+}
+
 template<shrink_direction dir> inline void
 CompactingStorageTrait<dir>::LinearizedChunks::emplace(
         typename CompactingStorageTrait<dir>::list_type& o,
         typename CompactingStorageTrait<dir>::list_type::iterator const& it) noexcept {
-    constexpr static InsertionPos<dir> const insertion {};
+    constexpr static InsertionPos<dir> const insertion{};
     list_type::splice(insertion(*this), o, it);
 }
 
@@ -276,6 +287,60 @@ CompactingStorageTrait<dir>::LinearizedChunks::top() const {
 
 template<shrink_direction dir> inline void CompactingStorageTrait<dir>::LinearizedChunks::pop() {
     list_type::erase(list_type::begin());
+}
+
+template<shrink_direction dir> inline
+CompactingStorageTrait<dir>::LinearizedChunks::ConstExtendedIteratorHelper::ConstExtendedIteratorHelper(
+       typename CompactingStorageTrait<dir>::LinearizedChunks const& c) noexcept : m_cont(c) {}
+
+template<shrink_direction dir> inline void
+CompactingStorageTrait<dir>::LinearizedChunks::ConstExtendedIteratorHelper::reset() const noexcept {
+    m_started = false;
+}
+
+template<shrink_direction dir> inline void const*
+CompactingStorageTrait<dir>::LinearizedChunks::ConstExtendedIteratorHelper::operator()() const {
+    if (! m_started) {
+        m_started = true;
+        m_iter = m_cont.cbegin();
+        return m_val = m_iter->begin();
+    } else if (m_iter == m_cont.cend()) {
+        return nullptr;
+    } else if (m_val == nullptr) {
+        return m_val = m_iter->begin();
+    } else {
+        reinterpret_cast<char const*&>(m_val) += m_iter->tupleSize();
+        return m_val >= m_iter->end() ?    // ugly cross-border adjustment
+            (++m_iter == m_cont.cend() ? nullptr : (m_val = m_iter->begin())) :
+            m_val;
+    }
+}
+
+template<shrink_direction dir> inline void const*
+CompactingStorageTrait<dir>::LinearizedChunks::extendedIteratorHelper() {
+    if (! empty()) {
+        auto* r = top().allocate();       // NOTE: we are not really allocating here; what we are
+        if (r == nullptr) {                    // doing is iterating through the chunk holding tuple values
+            pop();                        // that are invisible to txn, but visible to snapshot.
+            return extendedIteratorHelper();
+        } else {
+            return r;
+        }
+    } else {
+        return nullptr;
+    }
+}
+
+// Helper of destructuring iterator
+template<shrink_direction dir> inline typename CompactingStorageTrait<dir>::LinearizedChunks::iterator_type
+CompactingStorageTrait<dir>::LinearizedChunks::iterator() noexcept {
+    return [this]() { return extendedIteratorHelper(); };
+}
+
+template<shrink_direction dir> inline typename CompactingStorageTrait<dir>::LinearizedChunks::iterator_type
+CompactingStorageTrait<dir>::LinearizedChunks::iterator() const noexcept {
+    m_iterHelper.reset();
+    return [this]() { return this->m_iterHelper(); };
 }
 
 template<typename C, typename E>
@@ -377,31 +442,14 @@ template<shrink_direction dir> inline void CompactingStorageTrait<dir>::released
     }
 }
 
-template<typename T>
-void const* extendedIteratorHelper(T& cont) noexcept {
-    if (cont.empty()) {
-        return nullptr;
-    } else {
-        auto* r = cont.top().next();
-        if (r == nullptr) {
-            cont.pop();
-            return extendedIteratorHelper(cont);
-        } else {
-            return r;
-        }
-    }
+template<shrink_direction dir> inline ExtendedIterator
+CompactingStorageTrait<dir>::operator()() noexcept {
+    return {dir == shrink_direction::head, m_unreleased.iterator()};
 }
 
-template<shrink_direction dir> inline pair<bool, function<void const*()>>
-CompactingStorageTrait<dir>::extendedIterator() noexcept {
-    return {dir == shrink_direction::head, [this](){
-        return extendedIteratorHelper(this->m_unreleased);
-    }};
-}
-
-template<shrink_direction dir> inline pair<bool, function<void const*()>>
-CompactingStorageTrait<dir>::extendedIterator() const noexcept {
-    return {dir == shrink_direction::head, {}};                        // TODO
+template<shrink_direction dir> inline ExtendedIterator
+CompactingStorageTrait<dir>::operator()() const noexcept {
+    return {dir == shrink_direction::head, m_unreleased.iterator()};
 }
 
 template<shrink_direction dir>
@@ -453,7 +501,7 @@ template<> struct CompactingChunksIgnorableFree<shrink_direction::tail> {
 };
 
 template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
-    static CompactingChunksIgnorableFree<dir> const ignored {};
+    static CompactingChunksIgnorableFree<dir> const ignored{};
     auto* pos = find(dst);                 // binary search
     if (pos == nullptr) {
         if (ignored(*this, dst)) {
@@ -549,30 +597,32 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view, 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view, typename Comp>
 void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view, Comp>::advance() {
-    // Need to maintain invariant that m_cursor is nullptr iff
-    // iterator points to end().
-    bool finished = true;
-    // we need to check emptyness since iterator could be
-    // invalidated when non-lazily releasing the only available chunk.
-    if (! m_storage.empty() && m_iter != m_storage.end()) {
-        const_cast<void*&>(m_cursor) =
-            reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-        if (m_cursor < m_iter->next()) {
-            finished = false;              // within chunk
-        } else {
-            ++m_iter;                      // cross chunk
-            if (m_iter != m_storage.end()) {
-                const_cast<void*&>(m_cursor) = const_cast<void*>(m_iter->begin());
-                finished = false;
+    if (! drained()) {
+        // Need to maintain invariant that m_cursor is nullptr iff
+        // iterator points to end().
+        bool finished = true;
+        // we need to check emptyness since iterator could be
+        // invalidated when non-lazily releasing the only available chunk.
+        if (! m_storage.empty() && m_iter != m_storage.end()) {
+            const_cast<void*&>(m_cursor) =
+                reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
+            if (m_cursor < m_iter->next()) {
+                finished = false;              // within chunk
             } else {
-                const_cast<void*&>(m_cursor) = nullptr;
+                ++m_iter;                      // cross chunk
+                if (m_iter != m_storage.end()) {
+                    const_cast<void*&>(m_cursor) = const_cast<void*>(m_iter->begin());
+                    finished = false;
+                } else {
+                    const_cast<void*&>(m_cursor) = nullptr;
+                }
             }
+        } else {
+            const_cast<void*&>(m_cursor) = nullptr;
         }
-    } else {
-        const_cast<void*&>(m_cursor) = nullptr;
-    }
-    if (! finished && ! s_tagger(m_cursor)) {
-        advance();                         // skip current cursor
+        if (! finished && ! s_tagger(m_cursor)) {
+            advance();                         // skip current cursor
+        }
     }
 }
 
@@ -595,7 +645,7 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view, Comp>::opera
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view, typename Comp>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view, Comp>::reference
+inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view, Comp>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view, Comp>::operator*() noexcept {
     return m_cursor;
 }
@@ -652,7 +702,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::iterato
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::value_type
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::operator*() {
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::operator*() noexcept {
     return m_cb(super::operator*());
 }
 
@@ -685,9 +735,8 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Ho
                 using type = typename super::value_type;
                 return const_cast<type>(h.reverted(const_cast<type>(c)));
             }),
-    m_extendingCb(c.extendedIterator()),
-    m_extending(m_extendingCb.first),
-    m_extendingPtr(m_extending ? m_extendingCb.second() : nullptr){}
+    m_extendingCb(c()),
+    m_extendingPtr(m_extendingCb.shrinkFromHead() ? m_extendingCb() : nullptr) { }
 
 template<typename Chunks, typename Tag, typename E>
 template<typename Hook, iterator_permission_type perm>
@@ -698,18 +747,34 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_ty
 template<typename Chunks, typename Tag, typename E>
 template<typename Hook, iterator_permission_type perm>
 inline void IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::advance() {
-    if (m_extending) {
-        m_extendingPtr = m_extendingCb.second();
-        if (m_extendingPtr == nullptr) {
-            m_extending = false;
-        }
-    } else {
-        super::advance();
-        if (super::m_cursor == nullptr && ! m_extendingCb.first) {            // tail compacting: point to deceased chunks
-            m_extendingPtr = m_extendingCb.second();
-            m_extending = m_extendingPtr != nullptr;
+    if (! drained()) {
+        if (m_extendingPtr != nullptr) {
+            m_extendingPtr = m_extendingCb();
+        } else {
+            super::advance();
+            if (super::m_cursor == nullptr && ! m_extendingCb.shrinkFromHead()) {
+                // tail compacting: point to deceased chunks
+                m_extendingPtr = m_extendingCb();
+            }
         }
     }
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<typename Hook, iterator_permission_type perm> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>&
+IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator++() {
+    advance();
+    return *this;
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<typename Hook, iterator_permission_type perm> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>
+IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator++(int) {
+    decltype(*this) copy(*this);
+    advance();
+    return copy;
 }
 
 template<typename Chunks, typename Tag, typename E>

@@ -24,6 +24,7 @@
 #include "harness.h"
 #include "common/debuglog.h"
 #include "storage/TableTupleAllocator.hpp"
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <array>
@@ -112,32 +113,32 @@ public:
 
 using TableTupleAllocatorTest = Test;
 
-//TEST_F(TableTupleAllocatorTest, HelloWorld) {
-//    // Test on StringGen test util
-//    /*
-//    StringGen<16> gen;
-//    for(auto c = 0; c < 500; ++c) {
-//        cout<<c<<": "<<StringGen<16>::hex(gen.get());
-//    }
-//    */
-//    // Test on LRU src util
-//    voltdb::LRU<10, int, int> lru;
-//    for(int i = 0; i < 10; ++i) {
-//        ASSERT_FALSE(lru.get(i));
-//        lru.add(i, i);
-//        ASSERT_EQ(*lru.get(i), i);
-//    }
-//    for(int i = 10; i < 20; ++i) {
-//        ASSERT_FALSE(lru.get(i));
-//        ASSERT_TRUE(lru.get(i - 10));
-//        lru.add(i, i);
-//        ASSERT_EQ(*lru.get(i), i);
-//        ASSERT_FALSE(lru.get(i - 10));
-//    }
-//    for(int i = 10; i < 20; ++i) {
-//        ASSERT_EQ(*lru.get(i), i);
-//    }
-//}
+TEST_F(TableTupleAllocatorTest, HelloWorld) {
+    // Test on StringGen test util
+    /*
+    StringGen<16> gen;
+    for(auto c = 0; c < 500; ++c) {
+        cout<<c<<": "<<StringGen<16>::hex(gen.get());
+    }
+    */
+    // Test on LRU src util
+    voltdb::LRU<10, int, int> lru;
+    for(int i = 0; i < 10; ++i) {
+        ASSERT_FALSE(lru.get(i));
+        lru.add(i, i);
+        ASSERT_EQ(*lru.get(i), i);
+    }
+    for(int i = 10; i < 20; ++i) {
+        ASSERT_FALSE(lru.get(i));
+        ASSERT_TRUE(lru.get(i - 10));
+        lru.add(i, i);
+        ASSERT_EQ(*lru.get(i), i);
+        ASSERT_FALSE(lru.get(i - 10));
+    }
+    for(int i = 10; i < 20; ++i) {
+        ASSERT_EQ(*lru.get(i), i);
+    }
+}
 
 constexpr size_t TupleSize = 16;       // bytes per allocation
 constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHolder::chunkSize()
@@ -253,17 +254,17 @@ void testIteratorOfNonCompactingChunks() {
             alloc, [&alloc, &i](void* p) { alloc.free(p); ++i; });*/
 }
 
-//TEST_F(TableTupleAllocatorTest, TestNonCompactingChunks) {
-//    for (size_t outOfOrder = 5; outOfOrder < 10; ++outOfOrder) {
-//        testNonCompactingChunks<NonCompactingChunks<EagerNonCompactingChunk>>(outOfOrder);
-//        testNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>(outOfOrder);
-//    }
-//}
-//
-//TEST_F(TableTupleAllocatorTest, TestIteratorOfNonCompactingChunks) {
-//    testIteratorOfNonCompactingChunks<NonCompactingChunks<EagerNonCompactingChunk>>();
-//    testIteratorOfNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>();
-//}
+TEST_F(TableTupleAllocatorTest, TestNonCompactingChunks) {
+    for (size_t outOfOrder = 5; outOfOrder < 10; ++outOfOrder) {
+        testNonCompactingChunks<NonCompactingChunks<EagerNonCompactingChunk>>(outOfOrder);
+        testNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>(outOfOrder);
+    }
+}
+
+TEST_F(TableTupleAllocatorTest, TestIteratorOfNonCompactingChunks) {
+    testIteratorOfNonCompactingChunks<NonCompactingChunks<EagerNonCompactingChunk>>();
+    testIteratorOfNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>();
+}
 
 template<typename Chunks>
 void testCompactingChunks() {
@@ -481,17 +482,17 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
     }
 }
 
-//TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
-//    testCompactingChunks<CompactingChunks<shrink_direction::head>>();
-//    testCompactingChunks<CompactingChunks<shrink_direction::tail>>();
-//    for (auto skipped = 8lu; skipped < 64; skipped += 8) {
-//        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 3>(skipped);
-//        testCustomizedIterator<CompactingChunks<shrink_direction::tail>, 3>(skipped);
-//        testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
-//        testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
-//        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 6>(skipped);       // a different mask
-//    }
-//}
+TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
+    testCompactingChunks<CompactingChunks<shrink_direction::head>>();
+    testCompactingChunks<CompactingChunks<shrink_direction::tail>>();
+    for (auto skipped = 8lu; skipped < 64; skipped += 8) {
+        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 3>(skipped);
+        testCustomizedIterator<CompactingChunks<shrink_direction::tail>, 3>(skipped);
+        testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
+        testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
+        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 6>(skipped);       // a different mask
+    }
+}
 
 template<typename Chunks, size_t NthBit>
 void testCustomizedIteratorCB() {
@@ -547,12 +548,12 @@ void testCustomizedIteratorCB() {
 // iterator that could either change its content (i.e. non-const
 // iterator), or that could provide a masked version of content
 // without changing its content (i.e. const iterator)
-//TEST_F(TableTupleAllocatorTest, TestIteratorCB) {
-//    testCustomizedIteratorCB<NonCompactingChunks<EagerNonCompactingChunk>, 0>();
-//    testCustomizedIteratorCB<NonCompactingChunks<LazyNonCompactingChunk>, 1>();
-//    testCustomizedIteratorCB<CompactingChunks<shrink_direction::head>, 2>();
-//    testCustomizedIteratorCB<CompactingChunks<shrink_direction::tail>, 3>();
-//}
+TEST_F(TableTupleAllocatorTest, TestIteratorCB) {
+    testCustomizedIteratorCB<NonCompactingChunks<EagerNonCompactingChunk>, 0>();
+    testCustomizedIteratorCB<NonCompactingChunks<LazyNonCompactingChunk>, 1>();
+    testCustomizedIteratorCB<CompactingChunks<shrink_direction::head>, 2>();
+    testCustomizedIteratorCB<CompactingChunks<shrink_direction::tail>, 3>();
+}
 
 // expression template used to apply variadic NthBitChecker
 template<typename Tuple, size_t N> struct Apply {
@@ -664,11 +665,11 @@ void testTxnHook() {
     using snapshot_iterator = typename
         IterableTableTupleChunks<DataAlloc, truth>::template
         time_traveling_iterator_type<TxnPreHook<HookAlloc, RetainTrait>, iterator_permission_type::rw>;
-    using snapshot_iterator = typename
+    using const_snapshot_iterator = typename
         IterableTableTupleChunks<DataAlloc, truth>::template
-        time_traveling_iterator_type<TxnPreHook<HookAlloc, RetainTrait>, iterator_permission_type::rw>;
+        time_traveling_iterator_type<TxnPreHook<HookAlloc, RetainTrait>, iterator_permission_type::ro>;
     i = 0;
-    for_each<snapshot_iterator>(alloc,
+    fold<const_snapshot_iterator>(alloc_cref,
             [&insertionTag, &deletionUpdateTag, &hook, &i, &gen](void const* p) {
                 if (p != nullptr) {                            // see document on iterator_cb_type for why client needs to do the checking
                     assert(! insertionTag(p));
@@ -699,13 +700,10 @@ void testTxnHook() {
         DeletionUpdateTag::reset(dst);   // NOTE: sequencing this before the hook would cause std::stack<void*> default ctor to crash in GLIBC++7 (~L94 of TableTupleAllocator.h), in /usr/include/c++/7/ext/new_allocator.h
     }
     i = 0;
-    for_each<snapshot_iterator>(alloc,
+    fold<const_snapshot_iterator>(alloc_cref,
             [&insertionTag, &i, &gen](void const* p) {
                 if (p != nullptr) {
                     assert(! insertionTag(p));
-                    if (! gen.same(p, i)) {
-                        putchar('?');
-                    }
                     assert(gen.same(p, i));                    // snapshot sees no delete changes
                     ++i;
                 }
@@ -729,7 +727,7 @@ void testTxnHook() {
         DeletionUpdateTag::reset(addresses[i]);
     }
     i = 0;
-    for_each<snapshot_iterator>(alloc,
+    fold<const_snapshot_iterator>(alloc_cref,
             [&insertionTag, &i, &gen](void const* p) {
                 if (p != nullptr) {
                     assert(! insertionTag(p));
@@ -766,7 +764,7 @@ template<typename Alloc1> struct TestChain1 {
     static constexpr TestChain2<Alloc1, CompactingChunks<shrink_direction::head>> const sChain2{};
     void operator()() const {
         sChain1();
-        //sChain2();
+        sChain2();
     }
 };
 
@@ -780,11 +778,8 @@ struct TestChain {
 };
 
 TEST_F(TableTupleAllocatorTest, TestTxnHook) {
-//    TestChain tst;
-//    tst();
-    testTxnHook<NonCompactingChunks<EagerNonCompactingChunk>,      // TODO
-        CompactingChunks<shrink_direction::head>,
-        HistoryRetainTrait<gc_policy::never>>();
+    TestChain tst;
+    tst();
 }
 
 int main() {
