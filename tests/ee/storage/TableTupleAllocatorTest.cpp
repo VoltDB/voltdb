@@ -27,7 +27,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
-#include <array>
+#include <random>
 
 
 using namespace voltdb::storage;
@@ -642,8 +642,8 @@ void testTxnHook() {
     for(i = 0; i < NumTuples; ++i) {                     // the later appended ones will later be marked as inserted after starting snapshot
         addresses[i] = gen.fill(alloc.allocate());
     }
-    hook.start();                                              // recording started
-    alloc.snapshot(true);                                      // don't forget to notify allocator, too
+    hook.freeze();                                       // recording started
+    alloc.freeze();                                      // don't forget to notify allocator, too
     // mark last 256 insertions as inserted after snapshot
     // started
     for (i = NumTuples; i < NumTuples + InsertTuples; ++i) {
@@ -663,11 +663,9 @@ void testTxnHook() {
             });
     assert(i == NumTuples + InsertTuples);
     using snapshot_iterator = typename
-        IterableTableTupleChunks<DataAlloc, truth>::template
-        time_traveling_iterator_type<TxnPreHook<HookAlloc, RetainTrait>, iterator_permission_type::rw>;
+        IterableTableTupleChunks<DataAlloc, truth>::template iterator_cb<TxnPreHook<HookAlloc, RetainTrait>>;
     using const_snapshot_iterator = typename
-        IterableTableTupleChunks<DataAlloc, truth>::template
-        time_traveling_iterator_type<TxnPreHook<HookAlloc, RetainTrait>, iterator_permission_type::ro>;
+        IterableTableTupleChunks<DataAlloc, truth>::template const_iterator_cb<TxnPreHook<HookAlloc, RetainTrait>>;
     i = 0;
     fold<const_snapshot_iterator>(alloc_cref,
             [&insertionTag, &deletionUpdateTag, &hook, &i, &gen](void const* p) {
@@ -746,31 +744,28 @@ void testTxnHook() {
             [&hook](void const* p) {
                 hook.release(p);
             }, hook);
-    hook.stop();
-    alloc.snapshot(false);
+    hook.thaw();
+    alloc.thaw();
 }
 
-// Helpers for TestTxnHook testcase
-template<typename Alloc1, typename Alloc2> struct TestChain2 {
-    void operator()() const {
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::never>>();
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::always>>();
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::batched>>();
-    }
-};
-
-template<typename Alloc1> struct TestChain1 {
-    static constexpr TestChain2<Alloc1, CompactingChunks<shrink_direction::tail>> const sChain1{};
-    static constexpr TestChain2<Alloc1, CompactingChunks<shrink_direction::head>> const sChain2{};
-    void operator()() const {
-        sChain1();
-        sChain2();
-    }
-};
-
-struct TestChain {
-    static constexpr TestChain1<NonCompactingChunks<EagerNonCompactingChunk>> const sChain1{};
-    static constexpr TestChain1<NonCompactingChunks<LazyNonCompactingChunk>> const sChain2{};
+struct TestTxnHook {
+    template<typename Alloc1> struct TestTxnHook1 {
+        template<typename Alloc2> struct TestTxnHook2 {
+            void operator()() const {
+                testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::never>>();
+                testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::always>>();
+                testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::batched>>();
+            }
+        };
+        static constexpr TestTxnHook2<CompactingChunks<shrink_direction::tail>> const sChain1{};
+        static constexpr TestTxnHook2<CompactingChunks<shrink_direction::head>> const sChain2{};
+        void operator()() const {
+            sChain1();
+            sChain2();
+        }
+    };
+    static constexpr TestTxnHook1<NonCompactingChunks<EagerNonCompactingChunk>> const sChain1{};
+    static constexpr TestTxnHook1<NonCompactingChunks<LazyNonCompactingChunk>> const sChain2{};
     void operator()() const {
         sChain1();
         sChain2();
@@ -778,8 +773,172 @@ struct TestChain {
 };
 
 TEST_F(TableTupleAllocatorTest, TestTxnHook) {
-    TestChain tst;
+    TestTxnHook tst;
     tst();
+}
+
+/**
+ * Test of HookedCompactingChunks using its RW iterator that
+ * effects (GC) as snapshot process continues.
+ */
+template<typename Chunk, gc_policy pol, shrink_direction dir>
+void testHookedCompactingChunks() {
+    using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<CompactingChunks<dir>, Hook>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, NumTuples>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    auto const& alloc_cref = alloc;
+    addresses_type addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.insert(gen.get());
+    }
+    alloc.freeze();
+    using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
+    using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
+    using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
+    auto const verify_snapshot_const = [&alloc_cref]() {
+        size_t i = 0;
+        fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
+            assert(p == nullptr || Gen::same(p, i++));
+        });
+        assert(i == NumTuples);
+    };
+    // baseline test on hooked compacting chunks: snapshot view == txn view
+    i = 0;
+    for_each<snapshot_iterator>(alloc, [&i](void const* p) { assert(Gen::same(p, i++)); });
+    assert(i == NumTuples);
+    i = 0;
+    fold<const_iterator>(alloc_cref, [&i](void const* p) { assert(Gen::same(p, i++)); });
+    assert(i == NumTuples);
+    // Operations during snapshot. The indexes used in each step
+    // are absolute.
+    // 1. Update: record 200-1200 <= 2200-3200
+    // 2. Delete: record 100 - 900
+    // 3. Insert: 500 records
+    // 4. Update: 2000 - 2200 <= 0 - 200
+    // 5. Delete: 3099 - 3599
+    // 6. Randomized 5,000 operations
+
+    // Step 1: update
+    for (i = 200; i < 1200; ++i) {
+        alloc.update(const_cast<void*>(addresses[i]), addresses[i + 2000]);
+    }
+    verify_snapshot_const();
+
+    // Step 2: deletion
+    for (i = 100; i < 900; ++i) {
+        alloc.remove(const_cast<void*>(addresses[i]));
+    }
+    verify_snapshot_const();
+
+    // Step 3: insertion
+    for (i = 0; i < 500; ++i) {
+        alloc.insert(gen.get());
+    }
+    verify_snapshot_const();
+
+    // Step 4: update
+    for (i = 0; i < 200; ++i) {
+        alloc.update(const_cast<void*>(addresses[i + 2000]), addresses[i]);
+    }
+    verify_snapshot_const();
+
+    // Step 5: deletion
+    for (i = 3099; i < 3599; ++i) {                            // TODO: this is problematic by this changeset alone
+        alloc.remove(const_cast<void*>(addresses[i]));
+    }
+    verify_snapshot_const();
+
+    // Step 6: randomized operations
+    vector<void const*> latest;
+    latest.reserve(NumTuples);
+    fold<const_iterator>(alloc_cref, [&latest](void const* p) { latest.emplace_back(p); });
+    random_device rd; mt19937 rgen(rd());
+    uniform_int_distribution<size_t> range(0, latest.size() - 1), changeTypes(0, 2);
+    void const* p1 = nullptr;
+    size_t ins = 0, del = 0, update = 0;
+    for (i = 0; i < 8000;) {
+        size_t i1, i2;
+        switch(changeTypes(rgen)) {
+            case 0:                                            // insertion
+                p1 = alloc.insert(gen.get());
+                ++ins;
+                break;
+            case 1:                                            // deletion
+                i1 = range(rgen);
+                if (latest[i1] == nullptr) {
+                    continue;
+                } else {
+                    try {
+                        alloc.remove(const_cast<void*>(latest[i1]));
+                        latest[i1] = p1;
+                        p1 = nullptr;
+                        ++del;
+                    } catch (range_error const&) {                 // if we tried to delete a non-existent address, pick another option
+                        continue;
+                    }
+                    break;
+                }
+            case 2:                                            // update
+            default:;
+                i1 = range(rgen); i2 = range(rgen);
+                if (i1 == i2 || latest[i1] == nullptr || latest[i2] == nullptr) {
+                    continue;
+                } else {
+                    alloc.update(const_cast<void*>(latest[i2]), latest[i1]);
+                    latest[i2] = p1;
+                    p1 = nullptr;
+                    ++update;
+                }
+        }
+        ++i;
+    }
+    verify_snapshot_const();
+    // simulates actual snapshot process: memory clean up as we go
+    i = 0;
+    for_each<snapshot_iterator>(alloc, [&alloc, &i](void const* p) {
+                if (p != nullptr) {
+                    assert(Gen::same(p, i++));
+                    alloc.release(p);                          // snapshot of the tuple finished
+                }
+            });
+    assert(i == NumTuples);
+    alloc.thaw();
+}
+
+struct TestHookedCompactingChunks {
+    template<typename Chunks> struct TestHookedCompactingChunks1 {
+        template<gc_policy pol> struct TestHookedCompactingChunks2 {
+            inline void operator()() const {
+                testHookedCompactingChunks<Chunks, pol, shrink_direction::head>();
+//                testHookedCompactingChunks<Chunks, pol, shrink_direction::tail>(); TODO
+            }
+        };
+        static constexpr TestHookedCompactingChunks2<gc_policy::never> const s1{};
+        static constexpr TestHookedCompactingChunks2<gc_policy::always> const s2{};
+        static constexpr TestHookedCompactingChunks2<gc_policy::batched> const s3{};
+        inline void operator()() const {
+            s1();
+            s2();
+            s3();
+        }
+    };
+    static constexpr TestHookedCompactingChunks1<EagerNonCompactingChunk> const s1{};
+    static constexpr TestHookedCompactingChunks1<LazyNonCompactingChunk> const s2{};
+    inline void operator()() const {
+        s1();
+        s2();
+    }
+};
+
+TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
+    TestHookedCompactingChunks t;
+    t();
+//    testHookedCompactingChunks<EagerNonCompactingChunk, gc_policy::never, shrink_direction::tail>();
 }
 
 int main() {
