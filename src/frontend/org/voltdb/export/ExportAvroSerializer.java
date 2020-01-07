@@ -17,15 +17,26 @@
 
 package org.voltdb.export;
 
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.kafka.common.errors.SerializationException;
 import org.voltdb.VoltDB;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -34,48 +45,74 @@ import java.util.Objects;
  * register the schema in the schema registry.
  */
 public class ExportAvroSerializer {
-    private final AvroDecoder m_decoder;
-    private final KafkaAvroSerializer m_serializer;
-    private Map<String, String> m_configMap;
+    private final Map<String, AvroDecoder> m_decoderMap = new HashMap<>(); // (topic -> decoder) mapping
+
+    private static String s_schemaRegistryUrl;
+    private static SchemaRegistryClient s_schemaRegistryClient;
+    private static final EncoderFactory s_encoderFactory = EncoderFactory.get();
 
     public ExportAvroSerializer() {
-        m_decoder = new AvroDecoder.Builder().build();
-        m_serializer = new KafkaAvroSerializer();
-        m_configMap = buildConfigMap();
-        m_serializer.configure(m_configMap, false);
+        updateConfig();
     }
 
     /**
      * Converting {@link ExportRow} to Avro format byte array as well as register the schema
      * in the schema registry.
-     * @param rd
+     *
+     * @param exportRow
      * @param topic
      * @return The serialize byte array in Avro format.
      */
-    public byte[] serialize(ExportRow rd, String topic) {
-        GenericRecord avroRecord = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,
-                null, rd.values);
-        return m_serializer.serialize(topic, null, avroRecord);
+    public byte[] serialize(ExportRow exportRow, String topic) {
+        // The schema cache operations are idempotent (every generation has the same schema),
+        // so the race condition is harmless.
+        AvroDecoder decoder = m_decoderMap.computeIfAbsent(topic, k -> new AvroDecoder.Builder().build());
+        GenericRecord avroRecord = decoder.decode(exportRow.generation, exportRow.tableName, exportRow.types,
+                exportRow.names, null, exportRow.values);
+
+        return serialize(topic, avroRecord);
     }
 
-    private Map<String, String> buildConfigMap() {
-        Map<String, String> configMap = new HashMap<>();
-        DeploymentType deploymentType = VoltDB.instance().getCatalogContext().getDeployment();
-        if (deploymentType.getSchemaregistryurl() != null) {
-            configMap.put(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, deploymentType.getSchemaregistryurl());
+    private byte[] serialize(String topic, GenericRecord avroRecord) {
+        if (avroRecord == null) {
+            return null;
         }
-        return configMap;
+        topic += "-value";
+        Schema schema = avroRecord.getSchema();
+        try {
+            // register the schema if not registered, return the schema id.
+            int schemaId = s_schemaRegistryClient.register(topic, schema);
+            // serialize to bytes
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            out.write(0);
+            out.write(ByteBuffer.allocate(4).putInt(schemaId).array());
+            BinaryEncoder encoder = s_encoderFactory.directBinaryEncoder(out, null);
+            DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
+
+            writer.write(avroRecord, encoder);
+            encoder.flush();
+
+            byte[] bytes = out.toByteArray();
+            out.close();
+            return bytes;
+        } catch (IOException e) {
+            throw new SerializationException("Error serializing Avro message", e);
+        } catch (RestClientException e) {
+            throw new SerializationException("Error registering Avro schema: " + schema, e);
+        }
     }
 
     /**
      * Handling the change of the {@code SchemaRegistryUrl} in the deployment file.
      */
-    public void updateConfig() {
-        String url = VoltDB.instance().getCatalogContext().getDeployment().getSchemaregistryurl();
+    public synchronized void updateConfig() {
+        String url = VoltDB.instance().getCatalogContext().getDeployment().getSchemaregistryurl().trim();
         // update the serializer config if the schema_register_url in the deployment file changes
-        if (!Objects.equals(m_configMap.get(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG), url)) {
-            m_configMap = buildConfigMap();
-            m_serializer.configure(m_configMap, false);
+        if (!Objects.equals(s_schemaRegistryUrl, url)) {
+            s_schemaRegistryUrl = url;
+            List<String> baseUrls = Arrays.asList(url.split(","));
+            // create a new s_schemaRegistryClient when we have a update on the url, since the cache is outdated
+            s_schemaRegistryClient = new CachedSchemaRegistryClient(baseUrls, 10000);
         }
     }
 }
