@@ -33,6 +33,7 @@ import java.io.IOException;
 
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
+import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -1020,15 +1021,23 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 "PARTITION TABLE TT ON COLUMN PID;\n");
 
         builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(true, true, 2, 2, 64);
+        }
+        LocalCluster lc = new LocalCluster("updateclasses.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        boolean success = lc.compile(builder);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
 
         try {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
-            startSystem(config);
+            lc.startUp();
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("", lc.port(0));
 
             ClientResponse resp;
 
@@ -1064,6 +1073,16 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
+            if (MiscUtils.isPro()) {
+                // Shutdown then recover the cluster
+                lc.shutDown();
+                m_client.close();
+                lc.startUp(false);
+
+                m_client = ClientFactory.createClient();
+                m_client.createConnection("", lc.port(0));
+            }
+
             // run with a new query without problems
             resp = m_client.callProcedure("TestProcedure", "12345", "boston");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -1079,7 +1098,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             }
         }
         finally {
-            teardownSystem();
+            lc.shutDown();
+            stopClient();
         }
     }
 }
