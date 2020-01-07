@@ -46,6 +46,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 
+import com.google.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
@@ -203,6 +204,7 @@ public class SynchronizedStatesManager {
         private ByteBuffer m_pendingProposal = null;
         private REQUEST_TYPE m_currentRequestType = REQUEST_TYPE.INITIALIZING;
         private int m_currentParticipants = 0;
+        private volatile List<String> m_lastParticipantsList = null;
         private Set<String> m_memberResults = null;
         private int m_lastProposalVersion = 0;
 
@@ -395,7 +397,8 @@ public class SynchronizedStatesManager {
             // Make sure the child count is correct so that an init does not race with a released lock where the
             // results have not been processed yet. If it is non-zero, it means results still need to be collected
             // by some nodes even if the distributed lock list is empty.
-            m_currentParticipants = m_zk.getChildren(m_barrierParticipantsPath, null).size();
+            m_lastParticipantsList = m_zk.getChildren(m_barrierParticipantsPath, null);
+            m_currentParticipants = m_lastParticipantsList.size();
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
@@ -604,7 +607,8 @@ public class SynchronizedStatesManager {
         private void checkForBarrierParticipantsChange() {
             assert(debugIsLocalStateLocked());
             try {
-                int newParticipantCnt = m_zk.getChildren(m_barrierParticipantsPath, m_barrierParticipantsWatcher).size();
+                m_lastParticipantsList = m_zk.getChildren(m_barrierParticipantsPath, m_barrierParticipantsWatcher);
+                int newParticipantCnt = m_lastParticipantsList.size();
                 Stat nodeStat = new Stat();
                 // inspect the m_barrierResultsPath and get the new and old states and version
                 // At some point this can be optimized to not examine the proposal all the time
@@ -644,7 +648,8 @@ public class SynchronizedStatesManager {
                             else {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
-                                m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                                String why = "answering to proposal v " + proposalVersion;
+                                m_zk.create(m_myParticipantPath, why.getBytes(Charsets.UTF_8), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                                 // increment the participant count by 1, so that lock notifications can be correctly guarded
                                 m_currentParticipants += 1;
 
@@ -1256,9 +1261,34 @@ public class SynchronizedStatesManager {
             }
         }
 
+        private void checkParticipants(int nParts) {
+            try {
+                m_log.error("XXX Found " + nParts + " participants!! Last: " + m_lastParticipantsList);
+                List<String> curParticipantsList = m_zk.getChildren(m_barrierParticipantsPath, null);
+                m_log.error("XXX Current proposal: " + m_lastProposalVersion + ", participants: " + curParticipantsList);
+                for (String part : curParticipantsList) {
+                    byte[] data = m_zk.getData(ZKUtil.joinZKPath(m_barrierParticipantsPath, part),
+                            null, null);
+                    if (data == null) {
+                        m_log.error("XXX No data for: " + part);
+                    }
+                    else {
+                        String str = new String(data, Charsets.UTF_8);
+                        m_log.error("XXX Data for: " + part + " = " + str);
+                    }
+                }
+            }
+            catch (Exception ex) {
+                m_log.error("XXX Failed to get current participants", ex);
+            }
+            org.voltdb.VoltDB.crashLocalVoltDB("XXX Unexpected participants: " + nParts, false, null);
+        }
+
         private int wakeCommunityWithProposal(byte[] proposal) {
             assert(m_holdingDistributedLock);
-            assert(m_currentParticipants == 0);
+            if (m_currentParticipants != 0) {
+                checkParticipants(m_currentParticipants);
+            }
             int newProposalVersion = -1;
             try {
                 List<String> results = m_zk.getChildren(m_barrierResultsPath, false);
@@ -1274,7 +1304,8 @@ public class SynchronizedStatesManager {
                     }
                 }
                 Stat newProposalStat = m_zk.setData(m_barrierResultsPath, proposal, -1);
-                m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                String why = "initiating proposal v " + newProposalStat.getVersion();
+                m_zk.create(m_myParticipantPath, why.getBytes(Charsets.UTF_8), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                 newProposalVersion = newProposalStat.getVersion();
                 // force the participant count to be 1, so that lock notifications can be correctly guarded
                 m_currentParticipants = 1;
@@ -1483,7 +1514,9 @@ public class SynchronizedStatesManager {
 
         private void notifyDistributedLockWaiter() {
             assert(debugIsLocalStateLocked());
-            assert(m_currentParticipants == 0);
+            if (m_currentParticipants != 0) {
+                checkParticipants(m_currentParticipants);
+            }
             m_holdingDistributedLock = true;
             if (m_membershipChangePending) {
                 getLatestMembership();
