@@ -527,7 +527,7 @@ public class Benchmark {
         }
         return partitionCount;
     }
-    
+
     private void reportTaskStats() {
         ClientResponse cr = null;
         try {
@@ -545,11 +545,11 @@ public class Benchmark {
         // try {
         long failures = 0;
         VoltTable t = cr.getResults()[0];
-        log.info(String.format("%15s%15s%15s%15s", 
+        log.info(String.format("%15s%15s%15s%15s",
                 "TASK NAME", "PARTITION ID", "INVOCATIONS", "FAILURES"));
         while (t.advanceRow()) {
             long f = t.getLong("PROCEDURE_FAILURES");
-            log.info(String.format("%15s%15s%15s%15s",                    
+            log.info(String.format("%15s%15s%15s%15s",
                     t.getString("TASK_NAME"), t.getLong("PARTITION_ID"), t.getLong("SCHEDULER_INVOCATIONS"), f));
             if (f > 0)
                 failures += f;
