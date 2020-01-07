@@ -36,6 +36,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
+import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
