@@ -359,7 +359,7 @@ public class SQLCommand {
         // SHOW or LIST <blah> statement
         String subcommand = SQLParser.parseShowStatementSubcommand(line);
         if (subcommand != null) {
-            switch (subcommand) {
+            switch (subcommand.toLowerCase()) {
                 case "proc":
                 case "procedures":
                     execListProcedures();
@@ -373,10 +373,17 @@ public class SQLCommand {
                 case "classes":
                     execListClasses();
                     break;
+                /*
+                * This undocumented argument, CONFIG, is broken: returns an error that
+                * @SystemCatalog has no selector CONFIGURATION.
+                * Commenting out for now.
+
                 case "config":
                 case "configuration":
                     execListConfigurations();
                     break;
+                */
+                
             case "tasks":
                     executeListTasks();
                     break;
@@ -385,7 +392,7 @@ public class SQLCommand {
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + subcommand + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are proc, procedures, tables, classes or schedules.");
+                            "The valid SHOW command completions are classes, proc, procedures, tables, or tasks.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
