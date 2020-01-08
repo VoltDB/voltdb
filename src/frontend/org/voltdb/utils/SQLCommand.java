@@ -392,7 +392,7 @@ public class SQLCommand {
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + subcommand + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are classes, proc, procedures, tables, or tasks.");
+                            "The valid SHOW command completions are classes, procedures, tables, or tasks.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
