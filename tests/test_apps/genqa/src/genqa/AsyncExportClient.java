@@ -558,11 +558,13 @@ public class AsyncExportClient
                 // do some sanity checks on the counts...
                 long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
                 if (table_with_metadata_count != meta_data_expected) {
-                    System.err.println("Metadata counts don't match with table count: " + table_with_metadata_count);
+                    System.err.println("Metadata expected " + meta_data_expected +
+                        " count does not match with table count: " + table_with_metadata_count);
                 }
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
-                    System.err.println("Insert and delete counts don't match export table count: " + export_table_count);
+                    System.err.println("Insert and delete count " + export_table_expected +
+                        " does not match export table count: " + export_table_count);
                 }
 
             }
