@@ -599,9 +599,13 @@ final class RelDistributionUtils {
                             // join condition might be false (TestBooleanLiteralsSuite)
                             return new JoinState(true, srcLitera, combinedPartColumns);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
-                            // if outer and inner both have partitioning key they better match
-                            if (outerHasPartitionKey && innerHasPartitionKey &&
-                                    !outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) {
+                            // if outer and / or inner  has partitioning key they better match
+                            // because the join's condition is a LITERAL and doesn't have an equality expression
+                            // involving partitioning columns
+                            if ((outerHasPartitionKey &&
+                                    !outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) ||
+                                    (innerHasPartitionKey &&
+                                            !innerDist.getPartitionEqualValue().equals(outerDist.getPartitionEqualValue()))) {
                                 throw new PlanningErrorException("SQL error while compiling query: " +
                                         "Outer and inner statements use conflicting partitioned table filters.");
                             }

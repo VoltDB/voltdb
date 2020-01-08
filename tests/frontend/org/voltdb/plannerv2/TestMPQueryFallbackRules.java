@@ -225,6 +225,19 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testOuterJoinPartitionedTableWithSort() {
+        m_tester.sql("select p1.i from r1 full join p1 on p1.si = r1.i order by p1.i")
+        .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
+                    "  VoltLogicalCalc(expr#0..2=[{inputs}], I0=[$t1])\n" +
+                    "    VoltLogicalJoin(condition=[=($2, $0)], joinType=[full])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "      VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
+                    "          VoltLogicalTableScan(table=[[public, P1]])\n")
+        .pass();
+    }
+
     public void testJoinPartitionedTable() {
         // Two partitioned table joined that results in SP
         m_tester.sql("select P1.i, P2.v FROM P1, P2 " +
@@ -454,7 +467,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where P1.si > 4 and R3.vc <> 'foo'").fail();
+                "R3 on R2.v = R3.vc where P1.si > 4 and R3.vc <> 'foo'").pass();
 
         m_tester.sql("select P1.i from P1 inner join " +
                 "P2  on P1.si = P2.i inner join " +
@@ -466,7 +479,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
-                "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6").fail();
+                "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6").pass();
 
         m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i AND P1.i = 4 inner join " +
@@ -488,8 +501,14 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
                 "P1.i = 0 AND P2.i = 0 OR P3.i = 0").fail();
 
-        m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
-                "P2.i = 0 AND P3.i = 0").fail();
+        m_tester.sql("select P1.si, P2.si FROM P1 full join P2 on " +
+                "P2.i = 0 ").fail();
+
+        m_tester.sql("select P1.si, P2.si FROM P1, P2 WHERE P2.i = 0 ").fail();
+
+        m_tester.sql("select P1.si, P2.si FROM P2, P1 WHERE P2.i = 0 ").fail();
+
+        m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE P2.i = 0 AND P3.i = 0").fail();
 
 
         m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
@@ -842,6 +861,20 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "        VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "    VoltLogicalCalc(expr#0..2=[{inputs}], II=[$t2])\n" +
                     "      VoltLogicalTableScan(table=[[public, R3]])\n")
+        .pass();
+
+        // Same as above but with added ORDER BY
+        m_tester.sql("select I from R1 union (select I from P1 except select II from R3) order by 1")
+        .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
+                    "  VoltLogicalUnion(all=[false])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalMinus(all=[false])\n" +
+                    "      VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, P1]])\n" +
+                    "      VoltLogicalCalc(expr#0..2=[{inputs}], II=[$t2])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R3]])\n")
         .pass();
 
         // Two partitioned tables, one has an equality filter based on its partitioning column.

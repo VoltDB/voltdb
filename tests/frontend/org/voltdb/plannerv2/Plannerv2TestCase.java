@@ -36,6 +36,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
+import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.CompiledPlan;
@@ -251,6 +252,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
         @Override public void pass() throws AssertionError {
             super.pass();
+            final RelDistribution distribution = transform();
             if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
                 anyMatch(m_expectedTransforms, actualTransform);
@@ -261,6 +263,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void fail() {
             super.pass();
             try {
+                final RelDistribution distribution = transform();
                 if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
                     String actualTransform = RelOptUtil.toString(m_transformedNode);
                     anyMatch(m_expectedTransforms, actualTransform);
