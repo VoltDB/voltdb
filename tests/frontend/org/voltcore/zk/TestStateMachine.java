@@ -1996,6 +1996,7 @@ public class TestStateMachine extends ZKTestBase {
     public void testResetIfExceptionInStaleTaskRequestNotification() {
         log.info("Starting testResetIfExceptionInStaleTaskRequestNotification");
 
+        // Remove the pre-staged machines because they did not have broken state machines
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
         }

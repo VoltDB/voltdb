@@ -32,13 +32,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.KeeperException.ConnectionLossException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -47,13 +47,13 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /*
  * This state machine coexists with other SynchronizedStateManagers by using different branches of the
@@ -103,6 +103,7 @@ public class SynchronizedStatesManager {
     private int m_resetLimit;
     private final int m_resetAllowance; // number of resets allowed within a reset clear threshold duration
     private long m_lastResetTimeInMillis = -1L;
+    private SettableFuture<Boolean> m_initComplete;
 
     private static final long RESET_CLEAR_THRESHOLD = TimeUnit.DAYS.toMillis(1);
 
@@ -231,6 +232,14 @@ public class SynchronizedStatesManager {
      *    task results have processed the previous outcome
      */
 
+    /**
+     * @author wweiss
+     *
+     */
+    /**
+     * @author wweiss
+     *
+     */
     public abstract class StateMachineInstance {
         protected String m_stateMachineId;
         private final String m_stateMachineName;
@@ -413,26 +422,54 @@ public class SynchronizedStatesManager {
             }
         }
 
+        private void setRequestedInitialState(ByteBuffer requestedInitialState) {
+            assert(requestedInitialState != null);
+            assert(requestedInitialState.remaining() < Short.MAX_VALUE);
+            m_requestedInitialState = requestedInitialState;
+        }
 
+        /**
+         * This method is called to register new StateMachine instances with the SSM. The SSM will start the
+         * full initialization (join the community) when the correct number of instances have registered. If
+         * this registration is the last instance, the method will wait until the initialization has been
+         * completed. However, if this is not the last instance it will return immediately. This is generally
+         * not an issue because callback will be generated to {@link setInitialState} when each StateMachine
+         * knows the current state from the Quorum. When the registering object wants to directly wait on a
+         * {@link Future}, the method {@link registerStateMachineWithManagerAsync} should be used instead.
+         * @param requestedInitialState
+         * @throws InterruptedException
+         */
         public void registerStateMachineWithManager(ByteBuffer requestedInitialState) throws InterruptedException {
-            ListenableFuture<?> initComplete = registerStateMachineWithManagerAsync(requestedInitialState);
+            setRequestedInitialState(requestedInitialState);
+            ListenableFuture<Boolean> initComplete = registerStateMachine(this, false);
             if (initComplete == null) {
                 return;
             }
             try {
-                initComplete.get();
+                Boolean initSuccussful = initComplete.get();
+                assert(initSuccussful);
             }
             catch (ExecutionException e) {
-                Throwables.propagate(e.getCause());
+                Throwables.throwIfUnchecked(e);
+                throw new RuntimeException(e.getCause());
             }
         }
 
-        public ListenableFuture<?> registerStateMachineWithManagerAsync(ByteBuffer requestedInitialState) throws InterruptedException {
-            assert(requestedInitialState != null);
-            assert(requestedInitialState.remaining() < Short.MAX_VALUE);
-            m_requestedInitialState = requestedInitialState;
-
-            return registerStateMachineAsync(this);
+        /**
+         * This method is called to register new StateMachine instances with the SSM. The SSM will start the
+         * full initialization (join the community) when the correct number of instances have registered. This
+         * method will always return immediately with a {@link Future} that can be used to determine when the
+         * SSM has completed registration. Note that it is not necessary to wait for initialization to complete
+         * since the SSM will also execute a callback to {@link setInitialState} when each StateMachine knows
+         * the current state from the Quorum.
+         * @param requestedInitialState
+         * @throws InterruptedException
+         * @return a Future indicating when the initialization is complete and a Boolean indication that the
+         *         initialization was successful
+         */
+        public ListenableFuture<Boolean> registerStateMachineWithManagerAsync(ByteBuffer requestedInitialState) throws InterruptedException {
+            setRequestedInitialState(requestedInitialState);
+            return registerStateMachine(this, true);
         }
 
         /**
@@ -443,8 +480,10 @@ public class SynchronizedStatesManager {
          */
         protected abstract ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim);
 
-        private class StateMachineInitializer {
-            Set<String> m_startingMemberSet;
+        private class AsyncStateMachineInitializer {
+            final AtomicInteger m_pendingStateMachineInits;
+            final SettableFuture<Boolean> m_initComplete;
+            final Set<String> m_startingMemberSet;
 
             private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
                 if (code == KeeperException.Code.SESSIONEXPIRED) {
@@ -464,7 +503,10 @@ public class SynchronizedStatesManager {
                 return true;
             }
 
-            public StateMachineInitializer(Set<String> knownMembers) {
+            public AsyncStateMachineInitializer(final AtomicInteger pendingStateMachineInits,
+                    final SettableFuture<Boolean> initComplete, Set<String> knownMembers) {
+                m_pendingStateMachineInits = pendingStateMachineInits;
+                m_initComplete = initComplete;
                 m_startingMemberSet = knownMembers;
             }
 
@@ -497,33 +539,49 @@ public class SynchronizedStatesManager {
                         if (checkForCommonKeeperExceptions(m_resultCode)) {
                             try {
                                 initializeStateMachine(m_startingMemberSet);
+                                if (m_pendingStateMachineInits.decrementAndGet() == 0) {
+                                    m_initComplete.set(true);
+                                }
                             } catch (KeeperException.SessionExpiredException e) {
                                 // lost the full connection. some test cases do this...
                                 // means zk shutdown without the elector being shutdown.
                                 // ignore.
                                 m_done.set(true);
+                                m_initComplete.set(false);
                             } catch (KeeperException.ConnectionLossException e) {
                                 // lost the full connection. some test cases do this...
                                 // means shutdown without the elector being
                                 // shutdown; ignore.
                                 m_done.set(true);
+                                m_initComplete.set(false);
                             } catch (InterruptedException e) {
                                 m_done.set(true);
                             } catch (Exception e) {
                                 org.voltdb.VoltDB.crashLocalVoltDB(
                                     "Unexpected failure in initializeInstances.", true, e);
                                 m_done.set(true);
+                                m_initComplete.set(false);
                             }
                         }
                     }
                 };
             }
+        };
+
+        private AsyncStateMachineInitializer createAsyncInitializer(final AtomicInteger pendingStateMachineInits,
+                final SettableFuture<Boolean> initComplete, final Set<String> knownMembers) {
+            return new AsyncStateMachineInitializer(pendingStateMachineInits, initComplete, knownMembers);
         }
 
-        private StateMachineInitializer createInitializer(Set<String> knownMembers) {
-            return new StateMachineInitializer(knownMembers);
-        }
-        private void initializeStateMachine(Set<String> knownMembers) throws KeeperException, InterruptedException {
+        private void syncStateMachineInitialize(final Set<String> knownMembers) throws KeeperException, InterruptedException {
+            addIfMissing(m_statePath, CreateMode.PERSISTENT, null);
+            addIfMissing(m_lockPath, CreateMode.PERSISTENT, null);
+            addIfMissing(m_barrierParticipantsPath, CreateMode.PERSISTENT, null);
+            initializeStateMachine(knownMembers);
+        };
+
+        private void initializeStateMachine(Set<String> knownMembers)
+                throws KeeperException, InterruptedException {
             lockLocalState();
             // Make sure the child count is correct so that an init does not race with a released lock where the
             // results have not been processed yet. If it is non-zero, it means results still need to be collected
@@ -2064,7 +2122,8 @@ public class SynchronizedStatesManager {
             disableComplete.get();
         }
         catch (ExecutionException e) {
-            Throwables.propagate(e.getCause());
+            Throwables.throwIfUnchecked(e);
+            throw new RuntimeException(e.getCause());
         }
 
     }
@@ -2135,13 +2194,21 @@ public class SynchronizedStatesManager {
 
     private final MembershipWatcher m_membershipWatcher = new MembershipWatcher();
 
-    private final Runnable initializeInstances = new Runnable() {
+    private class AsyncSSMInitializer implements Runnable {
+        final AtomicInteger m_pendingStateMachineInits;
+
+        public AsyncSSMInitializer() {
+            assert(m_initComplete != null && !m_initComplete.isDone());
+            m_pendingStateMachineInits = new AtomicInteger(m_registeredStateMachineInstances);
+        }
+
         private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
             if (code == KeeperException.Code.SESSIONEXPIRED) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 m_done.set(true);
+                m_initComplete.set(false);
                 return false;
             }
             else if (code == KeeperException.Code.CONNECTIONLOSS) {
@@ -2149,6 +2216,7 @@ public class SynchronizedStatesManager {
                 // means shutdown without the elector being
                 // shutdown; ignore.
                 m_done.set(true);
+                m_initComplete.set(false);
                 return false;
             }
             return true;
@@ -2169,10 +2237,12 @@ public class SynchronizedStatesManager {
                 };
             } catch (InterruptedException e) {
                 m_done.set(true);
+                m_initComplete.set(false);
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unexpected failure in initializeInstances.", true, e);
                 m_done.set(true);
+                m_initComplete.set(false);
             }
         }
 
@@ -2198,7 +2268,8 @@ public class SynchronizedStatesManager {
 
                         // Then initialize each instance
                         for (StateMachineInstance instance : m_registeredStateMachines) {
-                            StateMachineInstance.StateMachineInitializer init = instance.createInitializer(m_groupMembers);
+                            StateMachineInstance.AsyncStateMachineInitializer init = instance.createAsyncInitializer(
+                                    m_pendingStateMachineInits, m_initComplete, m_groupMembers);
                             init.startInitialization();
                         }
                     }
@@ -2207,11 +2278,44 @@ public class SynchronizedStatesManager {
         }
     };
 
-    private synchronized ListenableFuture<?> registerStateMachineAsync(StateMachineInstance machine) throws InterruptedException {
+    void syncSSMInitialize() {
+        try {
+            // First become a member of the community
+            addIfMissing(m_stateMachineMemberPath, CreateMode.PERSISTENT, null);
+            // This could fail because of an old ephemeral that has not aged out yet but assume this does not happen
+            addIfMissing(ZKUtil.joinZKPath(m_stateMachineMemberPath, m_memberId), CreateMode.EPHEMERAL, null);
+
+            m_groupMembers = ImmutableSet.copyOf(m_zk.getChildren(m_stateMachineMemberPath, m_membershipWatcher));
+            // Then initialize each instance
+            for (StateMachineInstance instance : m_registeredStateMachines) {
+                instance.syncStateMachineInitialize(m_groupMembers);
+            }
+        } catch (KeeperException.SessionExpiredException e) {
+            // lost the full connection. some test cases do this...
+            // means zk shutdown without the elector being shutdown.
+            // ignore.
+            m_done.set(true);
+        } catch (KeeperException.ConnectionLossException e) {
+            // lost the full connection. some test cases do this...
+            // means shutdown without the elector being
+            // shutdown; ignore.
+            m_done.set(true);
+        } catch (InterruptedException e) {
+            m_done.set(true);
+        } catch (Exception e) {
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    "Unexpected failure in initializeInstances.", true, e);
+            m_done.set(true);
+        }
+    }
+
+    private synchronized ListenableFuture<Boolean> registerStateMachine(StateMachineInstance machine, boolean asyncRequested) throws InterruptedException {
         assert(m_registeredStateMachineInstances < m_registeredStateMachines.length);
-        ListenableFuture<?> initComplete = null;
 
         m_registeredStateMachines[m_registeredStateMachineInstances] = (machine);
+        if (m_registeredStateMachineInstances == 0) {
+            m_initComplete = SettableFuture.create();
+        }
         ++m_registeredStateMachineInstances;
         if (m_registeredStateMachineInstances == m_registeredStateMachines.length) {
             if (machine.m_log.isDebugEnabled()) {
@@ -2226,9 +2330,10 @@ public class SynchronizedStatesManager {
             }
             // Do all the initialization and notifications on the executor to avoid a race with
             // the group membership changes
-            initComplete = m_shared_es.submit(initializeInstances);
+            m_shared_es.submit(new AsyncSSMInitializer());
+            return m_initComplete;
         }
-        return initComplete;
+        return asyncRequested ? m_initComplete : null;
     }
 
     private class CallbackExceptionHandler implements Runnable {
@@ -2272,7 +2377,7 @@ public class SynchronizedStatesManager {
                 }
                 m_done.set(false);
 
-                initializeInstances.run();
+                syncSSMInitialize();
             }
         }
     }
