@@ -126,6 +126,8 @@ public class VoltRelUtil {
             SendPlanNode fragmentSend = new SendPlanNode();
             fragmentSend.addAndLinkChild(root);
             root = new ReceivePlanNode();
+            root.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(rel.getRowType(), 0));
+            root.setHaveSignificantOutputSchema(true);
             root.addAndLinkChild(fragmentSend);
         }
         // Add final Send node to be the root

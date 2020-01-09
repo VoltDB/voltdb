@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
@@ -68,6 +69,8 @@ public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
         final SendPlanNode spn = new SendPlanNode();
         spn.addAndLinkChild(child);
         final ReceivePlanNode rpn = new ReceivePlanNode();
+        rpn.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(getRowType(), 0));
+        rpn.setHaveSignificantOutputSchema(true);
         rpn.addAndLinkChild(spn);
         return rpn;
     }
