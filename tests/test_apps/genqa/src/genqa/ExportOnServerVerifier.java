@@ -173,7 +173,7 @@ public class ExportOnServerVerifier {
         return columnCount+1;
     }
 
-    boolean verifySetup( String [] args) throws Exception
+    void verifySetup( String [] args) throws Exception
     {
         String remoteHosts[] = args[0].split(",");
         final String homeDir = System.getProperty("user.home");
@@ -277,13 +277,6 @@ public class ExportOnServerVerifier {
                 rh.channel.mkdir(rh.path);
             }
         }
-
-        boolean skinny = false;
-        if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
-            skinny = Boolean.parseBoolean(args[3].trim().toLowerCase());
-        }
-
-        return skinny;
     }
 
     /**
@@ -582,159 +575,6 @@ public class ExportOnServerVerifier {
                                 new GZIPOutputStream(
                                         new FileOutputStream(fh), 16384)));
         return out;
-    }
-
-    /**
-     * Verifies the skinny version of the exported table. By skinny it means that it contains the
-     * bare minimum of columns (just enough for the purpose of transaction verification)
-     *
-     * @throws Exception
-     */
-    void verifySkinny() throws Exception
-    {
-
-        long ttlVerified = 0;
-
-        //checkForMoreExportFiles();
-        Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
-        BufferedReader csv = csvPair.getFirst();
-
-        //checkForMoreClientFiles();
-        String row;
-        long [] rowValues = new long [8]; // [6] txnId [7] rowId
-        boolean quit = false;
-        boolean more_rows = true;
-        boolean more_txnids = true;
-        boolean expect_export_eof = false;
-        int emptyRemovalCycles = 0;
-
-        try (
-                PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
-                PrintWriter vfout = gzipWriterTo("verified-exported-transactions.gz")
-        ) {
-            while (!quit)
-            {
-                markCheckedUpTo();
-                int dcount = 0;
-                while ((dcount < 50000 || !more_txnids) && more_rows)
-                {
-                    row = csv.readLine();
-                    if (row == null)
-                    {
-                        expect_export_eof = false;
-                        csvPair.getSecond().run();
-                        csvPair = openNextExportFile();
-                        if (csvPair == null)
-                        {
-                            log.info("No more export rows");
-                            more_rows = false;
-                            break;
-                        }
-                        else
-                        {
-                            csv = csvPair.getFirst();
-                            row = csv.readLine();
-                        }
-                    }
-                    else if (expect_export_eof)
-                    {
-                        throw new ValidationErr("previously logged row had unexpected number of columns");
-                    }
-
-                    int columnCount = splitCSV(row, rowValues);
-                    expect_export_eof = columnCount < rowValues.length;
-                    dcount++;
-
-                    if (expect_export_eof) {
-                        log.error(
-                                "ERROR: Unexpected number of columns for the following row:\n\t" +
-                                 row
-                                 );
-                        continue;
-                    }
-                    /*
-                     * client dude has only confirmed tx id, on asynch writer exceptions we
-                     * writer row id for which we don't have confirmed commit, and thus use
-                     * rows' own tx id for verification
-                     */
-                    if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
-                        log.info("Verified " + ttlVerified + " rows.");
-                    }
-
-                    int partition =  Integer.MAX_VALUE;
-                    if (rowValues[3] < Integer.MAX_VALUE)
-                    {
-                        partition = (int)rowValues[3];
-                    }
-                    long rowTxnId = rowValues[6];
-                    long rowId = rowValues[7];
-
-                    if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                        log.info("ERROR: mismatched exported partition for txid " + rowTxnId +
-                                ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
-                                ", while export record says " + partition);
-                        partition = TxnEgo.getPartitionId(rowTxnId);
-                    }
-
-                    txout.printf("%d:%d\n", rowTxnId, rowId);
-
-                    if (! m_rowTxnIds.containsKey(partition)) {
-                        log.error("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
-                        continue;
-                    }
-
-                    Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
-                    if (previous != null)
-                    {
-                        log.info("WARN Duplicate TXN ID in export stream: " + rowTxnId);
-                    }
-                    else
-                    {
-                        //System.out.println("Added txnId: " + rowTxnId + " to outstanding export");
-                    }
-                }
-
-                log.info("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
-
-                determineReadUpToCounters();
-                dcount = m_clientOverFlow.size();
-                processClientIdOverFlow();
-
-                log.info("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
-                log.info("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
-
-                more_txnids = readEnoughClientRecords();
-                if (!more_txnids) {
-                    log.info("No more client txn IDs");
-                }
-
-                if (matchClientTxnIds(vfout))
-                {
-                    emptyRemovalCycles = 0;
-                }
-                else if (++emptyRemovalCycles >= 20)
-                {
-                    log.info("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
-                    dumpUnmatchedSituation();
-                    System.exit(1);
-                }
-
-                printTxCountByPartition();
-
-                if (!more_rows || !more_txnids)
-                {
-                    if (more_rows && ! m_clientTxnIds.isEmpty())
-                    {
-                        quit = false;
-                    }
-                    else
-                    {
-                        quit = true;
-                    }
-                }
-            }
-        }
-
     }
 
     private void printTxCountByPartition() {
@@ -1655,10 +1495,8 @@ public class ExportOnServerVerifier {
         ExportOnServerVerifier verifier = new ExportOnServerVerifier();
         try
         {
-            boolean skinny = verifier.verifySetup(args);
-
-            if (skinny) verifier.verifySkinny();
-            else verifier.verifyFat();
+            verifier.verifySetup(args);
+            verifier.verifyFat();
 
             if (verifier.m_clientTxnIds.size() > 0)
             {

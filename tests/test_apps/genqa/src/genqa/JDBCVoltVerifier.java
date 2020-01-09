@@ -65,7 +65,6 @@ public class JDBCVoltVerifier {
             "EXPORT_DONE_TABLE_JDBC",
             "EXPORT_PARTITIONED_TABLE_JDBC",
             "EXPORT_REPLICATED_TABLE_JDBC",
-            "EXPORT_SKINNY_PARTITIONED_TABLE_JDBC"
         };
 
         for (String t: verticaTables) {
