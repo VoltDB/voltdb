@@ -383,7 +383,7 @@ public class SQLCommand {
                     execListConfigurations();
                     break;
                 */
-                
+
             case "tasks":
                     executeListTasks();
                     break;
