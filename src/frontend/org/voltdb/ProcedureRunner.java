@@ -1229,7 +1229,7 @@ public class ProcedureRunner {
                 e = e.getCause();
             }
         } else {
-            msg.append("UNEXPECTED FAILURE:");
+            msg.append("UNEXPECTED FAILURE:" + e.getMessage());
             expected_failure = false;
         }
 
@@ -1255,23 +1255,12 @@ public class ProcedureRunner {
             }
         }
 
-        // If the error is something we know can happen as part of normal operation,
-        // reduce the verbosity.
-        // Otherwise, generate more output for debuggability
-        if (expected_failure) {
-            for (StackTraceElement ste : e.getStackTrace()) {
-                if (isProcedureStackTraceElement(procedureName, ste)) {
-                    msg.append("\n    at ");
-                    msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-                    msg.append("(").append(ste.getFileName()).append(":");
-                    msg.append(ste.getLineNumber()).append(")");
-                }
-            }
-        } else {
+        if (log.isDebugEnabled()) {
+            log.debug(msg);
             Writer result = new StringWriter();
             PrintWriter pw = new PrintWriter(result);
             e.printStackTrace(pw);
-            msg.append(" ").append(result.toString());
+            log.debug(result.toString());
         }
 
         return getErrorResponse(status, appStatus, appStatusString, msg.toString(),
