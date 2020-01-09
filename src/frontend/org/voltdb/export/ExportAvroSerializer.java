@@ -77,7 +77,7 @@ public class ExportAvroSerializer {
         if (avroRecord == null) {
             return null;
         }
-        topic += "-value";
+        topic = "kipling" + topic + "-value";
         Schema schema = avroRecord.getSchema();
         try {
             // register the schema if not registered, return the schema id.
@@ -100,6 +100,10 @@ public class ExportAvroSerializer {
         } catch (RestClientException e) {
             throw new SerializationException("Error registering Avro schema: " + schema, e);
         }
+    }
+
+    public void dropTopic(String topicName) {
+        m_decoderMap.remove(topicName);
     }
 
     /**
