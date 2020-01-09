@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -96,6 +97,8 @@ public class VoltZK {
         OTHER
     }
     public static final String mailboxes = "/db/mailboxes";
+
+    public static final String clientInterfaceMailboxes = "/db/cl_mailboxes";
 
     // snapshot and command log
     public static final String completed_snapshots = "/db/completed_snapshots";
@@ -244,7 +247,6 @@ public class VoltZK {
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
-            mailboxes,
             cluster_metadata,
             drConsumerPartitionMigration,
             operationMode,
@@ -263,7 +265,8 @@ public class VoltZK {
             host_ids_be_stopped,
             actionLock,
             hashMismatchedReplicas,
-            catalogbytes
+            catalogbytes,
+            clientInterfaceMailboxes
     };
 
     /**
@@ -726,5 +729,26 @@ public class VoltZK {
             VoltDB.crashLocalVoltDB("Unable to read hash mismatched sites.", true, e);
         }
         return false;
+    }
+
+    public static void addClientInterfaceMailbox(ZooKeeper zk, long hsid) {
+        String path = ZKUtil.joinZKPath(clientInterfaceMailboxes, Long.toString(hsid));
+        try {
+            zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (KeeperException.NoNodeException e) {
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to add client interface mailbox", true, e);
+        }
+    }
+
+    public static Set<Long> getClientInterfaceMailboxes(ZooKeeper zk) {
+        try {
+            List<String> clMailboxes = zk.getChildren(clientInterfaceMailboxes, false);
+            Set<Long> mailboxes = clMailboxes.stream().map(Long::valueOf).collect(Collectors.toSet());
+            return mailboxes;
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to read client interface mailbxoes.", true, e);
+        }
+        return null;
     }
 }
