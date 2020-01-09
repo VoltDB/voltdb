@@ -306,28 +306,11 @@ CREATE STREAM export_replicated_table_foo EXPORT TO TARGET foo
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
-(
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
-);
-
 CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
-
-
-CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid EXPORT TO TARGET default2
-(
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
-);
-
-
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
 -- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
@@ -345,9 +328,6 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
-
--- CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition;
--- CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table2 COLUMN rowid PARAMETER 0 FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
 
 -- Export Table with extra Geo columns
 CREATE TABLE export_geo_partitioned_table EXPORT TO TARGET abc ON insert, delete, update
