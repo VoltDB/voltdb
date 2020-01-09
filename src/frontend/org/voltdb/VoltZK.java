@@ -42,10 +42,9 @@ import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 import com.google_voltpatches.common.base.Charsets;
-
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -263,7 +262,8 @@ public class VoltZK {
             request_truncation_snapshot,
             host_ids_be_stopped,
             actionLock,
-            hashMismatchedReplicas
+            hashMismatchedReplicas,
+            catalogbytes
     };
 
     /**

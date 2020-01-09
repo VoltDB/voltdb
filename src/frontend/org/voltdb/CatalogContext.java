@@ -67,7 +67,6 @@ public class CatalogContext {
     public static class CatalogInfo {
         public InMemoryJarfile m_jarfile;
         public final long m_catalogCRC;
-        public final byte[] m_catalogBytes;
         public final byte[] m_catalogHash;
         public final byte[] m_deploymentBytes;
         public final byte[] m_deploymentHash;
@@ -84,7 +83,6 @@ public class CatalogContext {
             }
 
             try {
-                m_catalogBytes = catalogBytes;
                 m_jarfile = new InMemoryJarfile(catalogBytes);
                 m_catalogCRC = m_jarfile.getCRC();
             }
@@ -275,30 +273,13 @@ public class CatalogContext {
 
     public CatalogContext update(
             boolean isForReplay,
-            String diffCommands,
+            Catalog newCatalog,
             long genId,
-            byte[] catalogBytes,
-            byte[] catalogBytesHash,
-            byte[] deploymentBytes,
+            CatalogInfo catalogInfo,
             HostMessenger messenger,
             boolean hasSchemaChange) {
-        Catalog newCatalog = null;
-        assert(catalogBytes != null);
-
-        // using the prepared catalog information if prepared
-        CatalogInfo catalogInfo = null;
-        if (isForReplay) {
-            byte[] depbytes = deploymentBytes;
-            if (depbytes == null) {
-                depbytes = m_catalogInfo.m_deploymentBytes;
-            }
-            catalogInfo = new CatalogInfo(catalogBytes, catalogBytesHash, depbytes);
-
-            newCatalog = getNewCatalog(diffCommands);
-        } else {
-            catalogInfo = m_preparedCatalogInfo;
-            newCatalog = catalogInfo.m_catalog;
-        }
+        assert(newCatalog != null);
+        assert(catalogInfo != null);
 
         CatalogContext retval =
             new CatalogContext(

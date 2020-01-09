@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,8 +43,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
@@ -52,7 +53,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportManagerInterface;
-import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -62,11 +62,14 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ProClass;
+
+import com.google_voltpatches.common.io.ByteStreams;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -260,7 +263,33 @@ public class Inits {
     {
         assert (catalogUrl != null);
 
-        final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
+        InputStream fin = null;
+        try {
+            URL url = new URL(catalogUrl);
+            fin = url.openStream();
+        } catch (MalformedURLException ex) {
+            // Invalid URL. Try as a file.
+            fin = new FileInputStream(catalogUrl);
+        }
+        try {
+            return ByteStreams.toByteArray(fin);
+        } finally {
+            fin.close();
+        }
+    }
+
+    /**
+     * Read catalog bytes from URL in chunks, each chunk is less than 52MB
+     *
+     * @param catalogUrl
+     * @return catalog bytes
+     * @throws IOException
+     */
+    private static SegmentedCatalog readCatalogInChunks(String catalogUrl, byte[] deploymentBytes) throws IOException
+    {
+        assert (catalogUrl != null);
+
+        List<ByteBuffer> chunks = new ArrayList<ByteBuffer>();
 
         InputStream fin = null;
         try {
@@ -270,19 +299,32 @@ public class Inits {
             // Invalid URL. Try as a file.
             fin = new FileInputStream(catalogUrl);
         }
-        byte[] buffer = new byte[MAX_CATALOG_SIZE];
+        byte[] buffer = new byte[CatalogUtil.MAX_CATALOG_CHUNK_SIZE];
         int readBytes = 0;
-        int totalBytes = 0;
+        // Reserve the header space for first buffer
+        int chunkOffset = CatalogUtil.CATALOG_BUFFER_HEADER;
+        // Copy deployment bytes into first buffer (deployment file is small enough to fit in a buffer)
+        System.arraycopy(deploymentBytes, 0, buffer, chunkOffset, deploymentBytes.length);
+        chunkOffset += deploymentBytes.length;
+        int totalCatalogBytes = 0;
         try {
             while (readBytes >= 0) {
-                totalBytes += readBytes;
-                readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                chunkOffset += readBytes;
+                totalCatalogBytes += readBytes;
+                if (chunkOffset == buffer.length) {
+                    chunkOffset = 0;
+                    chunks.add(ByteBuffer.wrap(buffer));
+                    buffer = new byte[CatalogUtil.MAX_CATALOG_CHUNK_SIZE];
+                }
+                readBytes = fin.read(buffer, chunkOffset, buffer.length - chunkOffset);
             }
         } finally {
             fin.close();
         }
+        byte[] lastBuffer = Arrays.copyOf(buffer, chunkOffset);
+        chunks.add(ByteBuffer.wrap(lastBuffer));
 
-        return Arrays.copyOf(buffer, totalBytes);
+        return new SegmentedCatalog(chunks, deploymentBytes.length, totalCatalogBytes, new byte[] {0});
     }
 
     private static File createEmptyStartupJarFile(String drRole){
@@ -315,8 +357,11 @@ public class Inits {
                         m_rvdb.m_pathToStartupCatalog = Inits.createEmptyStartupJarFile(drRole).getAbsolutePath();
                     }
 
+                    // Need to get the deployment bytes from the starter catalog context
+                    byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
+
                     // Get the catalog bytes and byte count.
-                    byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
+                    SegmentedCatalog catalogAndDeployment = readCatalogInChunks(m_rvdb.m_pathToStartupCatalog, deploymentBytes);
 
                     //Export needs a cluster global unique id for the initial catalog version
                     long exportInitialGenerationUniqueId =
@@ -324,19 +369,15 @@ public class Inits {
                                     System.currentTimeMillis(),
                                     0,
                                     MpInitiator.MP_INIT_PID);
-                    hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-
-                    // Need to get the deployment bytes from the starter catalog context
-                    byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, // Initial version
                             exportInitialGenerationUniqueId,
-                            catalogBytes,
-                            null,
-                            deploymentBytes);
+                            catalogAndDeployment,
+                            ZKCatalogStatus.COMPLETE,
+                            -1); // dummy txnId
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -359,6 +400,7 @@ public class Inits {
         @Override
         public void run() {
             CatalogAndDeployment catalogStuff = null;
+            hostLog.info("LoadCatalog");
             do {
                 try {
                     catalogStuff = CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
@@ -384,7 +426,15 @@ public class Inits {
                 } catch (IOException e){
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
-                if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
+                InMemoryJarfile remoteNodeCatalog = null;
+                try {
+                    // Compute the remote catalog hash,
+                    remoteNodeCatalog = new InMemoryJarfile(catalogStuff.catalogBytes);
+                }
+                catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Failed to load remote schema: " + e.getMessage(), false, e);
+                }
+                if (!Arrays.equals(remoteNodeCatalog.getSha1Hash(), thisNodeCatalog.getSha1Hash())) {
                     VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
                 }
             }
@@ -479,6 +529,7 @@ public class Inits {
 
         @Override
         public void run() {
+            hostLog.info("LoadCatalog");
             final org.voltdb.catalog.CommandLog logConfig = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
             assert logConfig != null;
 
