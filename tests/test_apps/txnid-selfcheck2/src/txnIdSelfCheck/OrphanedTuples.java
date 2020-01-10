@@ -47,7 +47,7 @@ import org.voltdb.task.TaskValidationErrors;
  * Task for polling the EXPORT statistics and reporting when disabled export streams have pending tuple counts.
  * Example task creation:
  *
- * CREATE TASK orphaned_tuples ON SCHEDULE EVERY 5 MINUTES
+ * CREATE TASK orphaned_tuples ON SCHEDULE EVERY 1 MINUTES
  *     PROCEDURE FROM CLASS voltdb.tasks.OrphanedTuples
  *     ON ERROR LOG;
  */

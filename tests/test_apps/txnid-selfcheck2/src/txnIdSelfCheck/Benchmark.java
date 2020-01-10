@@ -513,17 +513,15 @@ public class Benchmark {
 
         if (cr.getStatus() != ClientResponse.SUCCESS) {
             log.error("Failed to call Statistics proc at startup. Exiting.");
-            log.error(((ClientResponseImpl) cr).toJSONString());
             printJStack();
-            System.exit(-1);
+            hardStop(((ClientResponseImpl) cr).toJSONString());
         }
 
         VoltTable t = cr.getResults()[0];
         partitionCount = (int) t.fetchRow(0).getLong(3);
         log.info("unique partition count is " + partitionCount);
         if (partitionCount <= 0) {
-            log.error("partition count is zero");
-            System.exit(-1);
+            hardStop("partition count is zero");
         }
         return partitionCount;
     }
@@ -533,14 +531,13 @@ public class Benchmark {
         try {
            cr = client.callProcedure("@Statistics", "TASK", 0);
         } catch (Exception e) {
-            log.error(e.getStackTrace());
+            log.error("Fetching TASK statistics failed:", e);
         }
 
         if (cr.getStatus() != ClientResponse.SUCCESS) {
             log.error("Failed to call Statistics proc at startup. Exiting.");
-            log.error(((ClientResponseImpl) cr).toJSONString());
             printJStack();
-            System.exit(-1);
+            hardStop(((ClientResponseImpl) cr).toJSONString());
         }
         // try {
         long failures = 0;
@@ -555,13 +552,8 @@ public class Benchmark {
                 failures += f;
         }
         if (failures > 0) {
-            log.error(failures + " unexpected TASK failures");
-            System.exit(-1);
+            hardStop(failures + " unexpected TASK failures");
         }
-        // } catch (Exception e) {
-            // log.error(e.getStackTrace());
-            // System.exit(-11);
-        // }
     }
 
     private byte reportDeadThread(Thread th) {
@@ -577,9 +569,8 @@ public class Benchmark {
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread th, Throwable ex) {
-        log.error("Uncaught exception: " + ex.getMessage(), ex);
         printJStack();
-        System.exit(-1);
+        log.error("Uncaught exception: " + ex.getMessage(), ex);
         }
     };
 
@@ -647,9 +638,8 @@ public class Benchmark {
             ClientResponse cr = TxnId2Utils.doProcCall(client, "Summarize_Replica", config.threadoffset, config.threads);
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
-                log.error(((ClientResponseImpl) cr).toJSONString());
                 printJStack();
-                System.exit(-1);
+                hardStop(((ClientResponseImpl) cr).toJSONString());
             }
 
             // successfully called summarize
@@ -662,9 +652,8 @@ public class Benchmark {
             log.info("UPDATES RUN AGAINST THIS DB TO DATE: " + count);
         } catch (ProcCallException e) {
             log.error("Failed to call Summarize proc at startup. Exiting.", e);
-            log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
             printJStack();
-            System.exit(-1);
+            hardStop(((ClientResponseImpl) e.getClientResponse()).toJSONString());
         }
 
         clientThreads = new ArrayList<ClientThread>();
