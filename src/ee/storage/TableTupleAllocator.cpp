@@ -617,7 +617,7 @@ struct CrossChunkPred<Chunks, Iter, integral_constant<Compactibility, Compactibi
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view, typename Comp>
 void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view, Comp>::advance() {
-    static constexpr CrossChunkPred<list_type, decltype(m_iter), Comp, view> const crossp;
+    static constexpr CrossChunkPred<list_type, decltype(m_iter), Comp, view> const crossp {};
     if (! drained()) {
         // Need to maintain invariant that m_cursor is nullptr iff
         // iterator points to end().
