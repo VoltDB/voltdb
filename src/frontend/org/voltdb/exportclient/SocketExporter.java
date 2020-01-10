@@ -255,6 +255,9 @@ public class SocketExporter extends ExportClientBase {
                     m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
                     throw new RestartBlockException(true);
                 }
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug(m_source.tableName + ":P" + m_source.partitionId + " sending seqNum: " + rd.values[2]);
+                }
                 String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
