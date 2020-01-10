@@ -466,6 +466,8 @@ CREATE TABLE taskr
 , CONSTRAINT PK_id_taskr PRIMARY KEY (p,id)
 );
 
+-- Custom task checks for streams with pending rows but not enabled
+CREATE TASK orphaned_tuples ON SCHEDULE EVERY 1 MINUTES PROCEDURE FROM CLASS txnIdSelfCheck.OrphanedTuples ON ERROR LOG;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;

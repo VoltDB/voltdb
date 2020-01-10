@@ -513,19 +513,47 @@ public class Benchmark {
 
         if (cr.getStatus() != ClientResponse.SUCCESS) {
             log.error("Failed to call Statistics proc at startup. Exiting.");
-            log.error(((ClientResponseImpl) cr).toJSONString());
             printJStack();
-            System.exit(-1);
+            hardStop(((ClientResponseImpl) cr).toJSONString());
         }
 
         VoltTable t = cr.getResults()[0];
         partitionCount = (int) t.fetchRow(0).getLong(3);
         log.info("unique partition count is " + partitionCount);
         if (partitionCount <= 0) {
-            log.error("partition count is zero");
-            System.exit(-1);
+            hardStop("partition count is zero");
         }
         return partitionCount;
+    }
+
+    private void reportTaskStats() {
+        ClientResponse cr = null;
+        try {
+           cr = client.callProcedure("@Statistics", "TASK", 0);
+        } catch (Exception e) {
+            log.error("Fetching TASK statistics failed:", e);
+        }
+
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            log.error("Failed to call Statistics proc at startup. Exiting.");
+            printJStack();
+            hardStop(((ClientResponseImpl) cr).toJSONString());
+        }
+        // try {
+        long failures = 0;
+        VoltTable t = cr.getResults()[0];
+        log.info(String.format("%15s%15s%15s%15s",
+                "TASK NAME", "PARTITION ID", "INVOCATIONS", "FAILURES"));
+        while (t.advanceRow()) {
+            long f = t.getLong("PROCEDURE_FAILURES");
+            log.info(String.format("%15s%15s%15s%15s",
+                    t.getString("TASK_NAME"), t.getLong("PARTITION_ID"), t.getLong("SCHEDULER_INVOCATIONS"), f));
+            if (f > 0)
+                failures += f;
+        }
+        if (failures > 0) {
+            hardStop(failures + " unexpected TASK failures");
+        }
     }
 
     private byte reportDeadThread(Thread th) {
@@ -541,9 +569,8 @@ public class Benchmark {
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread th, Throwable ex) {
-        log.error("Uncaught exception: " + ex.getMessage(), ex);
         printJStack();
-        System.exit(-1);
+        log.error("Uncaught exception: " + ex.getMessage(), ex);
         }
     };
 
@@ -611,9 +638,8 @@ public class Benchmark {
             ClientResponse cr = TxnId2Utils.doProcCall(client, "Summarize_Replica", config.threadoffset, config.threads);
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
-                log.error(((ClientResponseImpl) cr).toJSONString());
                 printJStack();
-                System.exit(-1);
+                hardStop(((ClientResponseImpl) cr).toJSONString());
             }
 
             // successfully called summarize
@@ -626,9 +652,8 @@ public class Benchmark {
             log.info("UPDATES RUN AGAINST THIS DB TO DATE: " + count);
         } catch (ProcCallException e) {
             log.error("Failed to call Summarize proc at startup. Exiting.", e);
-            log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
             printJStack();
-            System.exit(-1);
+            hardStop(((ClientResponseImpl) e.getClientResponse()).toJSONString());
         }
 
         clientThreads = new ArrayList<ClientThread>();
@@ -931,6 +956,13 @@ public class Benchmark {
                 }
                 */
                 // cancel periodic stats printing
+
+                /** **/
+                log.info("\n+++ Calling reportTaskStats\n");
+                if (replTasklt != null || partTasklt != null) {
+                    reportTaskStats();
+                }
+
                 timer.cancel();
                 checkpointTimer.cancel();
                 /*
