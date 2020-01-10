@@ -23,7 +23,7 @@
 
 package org.voltdb.export;
 
-import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -33,6 +33,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -144,6 +145,14 @@ public class SocketExportTestServer extends Thread {
             }
         }
         System.out.println("Seen Id size is: " + m_seenIds.size() + " expected:" + expsize + " Passed: " + passed);
+        if (!passed) { // Write more debug info if it failed
+            long total = 0;
+            for (AtomicLong al : m_seenIds.values()) {
+                total += al.longValue();
+            }
+            System.out.println("Found total from values: " + total);
+            System.out.println("keys: " + new TreeSet<Long>(m_seenIds.keySet()));
+        }
         assertTrue(passed);
     }
 
