@@ -285,7 +285,7 @@ public class ExportBenchmark {
                 break;
             }
             if (ctime - st > (3 * 60 * 1000)) {
-                log.info(stats);
+                // log.info(stats);
                 st = System.currentTimeMillis();
             }
             long ts = 0;
@@ -297,7 +297,7 @@ public class ExportBenchmark {
                 }
                 if (0 != stats.getLong("TUPLE_PENDING")) {
                     passedThisTime = false;
-                    log.info("Table " + stats.getString("SOURCE") + "/" + stats.getString("TARGET") + ": Partition Not Zero... Pending: " + stats.getLong("TUPLE_PENDING"));
+                    // log.info("Table " + stats.getString("SOURCE") + "/" + stats.getString("TARGET") + ": Partition Not Zero... Pending: " + stats.getLong("TUPLE_PENDING"));
                     break;
                 }
             }
@@ -316,7 +316,7 @@ public class ExportBenchmark {
             Thread.sleep(5000);
         }
         log.info("Passed is: " + passed);
-        log.info(stats);
+        // log.info(stats);
         return passed;
     }
 
