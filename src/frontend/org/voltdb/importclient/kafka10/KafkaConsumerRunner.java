@@ -164,8 +164,17 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 if (startOffset > -1L) {
                     commitTracker.resetTo(startOffset);
                 }
+            } catch (WakeupException we) {
+                if (m_done.get()) {
+                    return;
+                }
             } catch (KafkaException e) {
-                LOGGER.error("Failed to read committed offsets for group " + m_config.getGroupId() + partition + " " + e.getMessage());
+                if (m_done.get()) {
+                    LOGGER.info("Failed to read committed offsets for group " + m_config.getGroupId() + partition + " "
+                            + e);
+                } else {
+                    LOGGER.error("Failed to read committed offsets for group " + m_config.getGroupId() + partition, e);
+                }
             }
             lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
             m_pauseOffsets.put(partition, new AtomicLong(-1));

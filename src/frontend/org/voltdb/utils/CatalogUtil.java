@@ -35,6 +35,8 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -70,19 +72,24 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
 import org.voltdb.CatalogContext;
 import org.voltdb.DefaultProcedureManager;
 import org.voltdb.HealthMonitor;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB;
@@ -227,7 +234,13 @@ public abstract class CatalogUtil {
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
-
+    // 52mb - 4k, leave space for zookeeper header
+    public static final int MAX_CATALOG_CHUNK_SIZE = VoltPort.MAX_MESSAGE_LENGTH - 4 * 1024;
+    public static final int CATALOG_BUFFER_HEADER = 4 +  // version number
+                                                    8 +  // generation Id
+                                                    4 +  // deployment bytes length
+                                                    4 +  // catalog bytes length
+                                                    20;  // catalog SHA-1 hash
     static {
         try {
             // This schema shot the sheriff.
@@ -2602,42 +2615,23 @@ public abstract class CatalogUtil {
         return hash;
     }
 
-    private static ByteBuffer makeCatalogAndDeploymentBytes(
+    private static void makeCatalogHeader(
+                SegmentedCatalog catalogAndDeployment,
                 int version,
-                long genId,
-                byte[] catalogBytes,
-                byte[] catalogHash,
-                byte[] deploymentBytes)
+                long genId)
     {
-        ByteBuffer versionAndBytes =
-            ByteBuffer.allocate(
-                    4 +  // version number
-                    8 +  // generation Id
-                    4 +  // catalog bytes length
-                    catalogBytes.length +
-                    20 + // catalog SHA-1 hash
-                    4 +  // deployment bytes length
-                    deploymentBytes.length
-                    );
-
-        if (catalogHash == null) {
-            try {
-                catalogHash = (new InMemoryJarfile(catalogBytes)).getSha1Hash();
-            }
-            catch (IOException ioe) {
-                VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
-                        true, ioe);
-            }
+        // Skip empty catalog
+        if (catalogAndDeployment.m_data == null || catalogAndDeployment.m_data.isEmpty()) {
+            return;
         }
-
-        versionAndBytes.putInt(version);
-        versionAndBytes.putLong(genId);
-        versionAndBytes.putInt(catalogBytes.length);
-        versionAndBytes.put(catalogBytes);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.putInt(deploymentBytes.length);
-        versionAndBytes.put(deploymentBytes);
-        return versionAndBytes;
+        ByteBuffer buf = catalogAndDeployment.m_data.get(0);
+        buf.position(0);
+        buf.putInt(version);
+        buf.putLong(genId);
+        buf.putInt(catalogAndDeployment.m_deploymentLength);
+        buf.putInt(catalogAndDeployment.m_catalogLength);
+        buf.put(catalogAndDeployment.m_catalogHash);
+        buf.position(0);
     }
 
     /**
@@ -2645,35 +2639,164 @@ public abstract class CatalogUtil {
      *  to ZK.  Used during the initial cluster deployment discovery and
      *  distribution.
      */
-    public static void writeCatalogToZK(ZooKeeper zk,
-                                        long genId,
-                                        byte[] catalogBytes,
-                                        byte[] catalogHash,
-                                        byte[] deploymentBytes)
+    public static void writeDeploymentToZK(ZooKeeper zk,
+                                           long genId,
+                                           SegmentedCatalog catalogAndDeployment,
+                                           ZKCatalogStatus catalogStatus,
+                                           long txnId)
         throws KeeperException, InterruptedException
     {
         // use default version 0 as start
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
-                catalogBytes, catalogHash, deploymentBytes);
-        zk.create(VoltZK.catalogbytes,
-                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        makeCatalogHeader(catalogAndDeployment, 0, genId);
+        String path = VoltZK.catalogbytes + "/" + 0;
+        ByteBuffer buffer = ByteBuffer.allocate(13);// flag (byte:1) + expected data node count (int:4) + txnId (long:8)
+        buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
+        buffer.putInt(catalogAndDeployment.m_data.size());
+        buffer.putLong(txnId);
+        zk.create(path, buffer.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        for (ByteBuffer chunk : catalogAndDeployment.m_data) {
+            zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT_SEQUENTIAL);
+        }
+        if (catalogStatus == ZKCatalogStatus.COMPLETE) {
+            // mark the version node complete if requested
+            buffer.position(0);
+            buffer.put((byte)catalogStatus.ordinal());
+            zk.setData(path, buffer.array(), -1);
+        }
     }
 
     /**
-     * Update the catalog/deployment contained in ZK.  Someone somewhere must have
-     * called writeCatalogToZK earlier in order to create the ZK node.
+     * Update the catalog/deployment contained in ZK. If the catalog/deployment is larger than
+     * single ZK node size limit, break the object into multiple ZK nodes under the version
+     * directory.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
                                         int version,
                                         long genId,
-                                        byte[] catalogBytes,
-                                        byte[] catalogHash,
-                                        byte[] deploymentBytes)
+                                        SegmentedCatalog catalogAndDeployment,
+                                        ZKCatalogStatus catalogStatus,
+                                        long txnId)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(version, genId,
-                catalogBytes, catalogHash, deploymentBytes);
-        zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
+        assert (catalogAndDeployment != null);
+
+        makeCatalogHeader(catalogAndDeployment, version, genId);
+        String path = VoltZK.catalogbytes + "/" + version;
+        ByteBuffer buffer = ByteBuffer.allocate(13);// flag (byte:1) + expected node count (int:4) + txnId (long:8)
+        buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
+        buffer.putInt(catalogAndDeployment.m_data.size());
+        buffer.putLong(txnId);
+        Stat stat = null;
+        try {
+            zk.create(path, buffer.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            // mark the version as incomplete
+            stat = zk.exists(path, false);
+            stat = zk.setData(path, buffer.array(), stat.getVersion());
+            // Clear children nodes if version dir already exists
+            List<String> children = zk.getChildren(path, false);
+            for (String child : children) {
+                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(path, child));
+            }
+        }
+        for (ByteBuffer chunk : catalogAndDeployment.m_data) {
+            zk.create(ZKUtil.joinZKPath(path, "part_"), chunk.array(), Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT_SEQUENTIAL);
+        }
+
+        if (catalogStatus == ZKCatalogStatus.COMPLETE) {
+            // mark the version node complete if requested
+            buffer.position(0);
+            buffer.put((byte)catalogStatus.ordinal());
+            zk.setData(path, buffer.array(), stat == null ? -1 : stat.getVersion());
+
+            // delete all previous versions
+            List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+            for (String child : children) {
+                int priorVersion = Integer.parseInt(child);
+                if (priorVersion < version) {
+                    ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+                }
+            }
+        }
+    }
+
+    public static void publishCatalog(ZooKeeper zk, int version) throws KeeperException, InterruptedException {
+        String path = VoltZK.catalogbytes + "/" + version;
+        Stat stat = new Stat();
+        byte[] data = zk.getData(path, false, stat);
+        ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int) + txnId (long)
+        byte status = buffer.get();
+        assert (status == (byte)ZKCatalogStatus.PENDING.ordinal());
+        int catalogSegmentCount = buffer.getInt();
+        // Rewrite the flag
+        buffer.position(0);
+        buffer.put((byte)ZKCatalogStatus.COMPLETE.ordinal());
+        buffer.putInt(catalogSegmentCount);
+        zk.setData(path, buffer.array(), stat.getVersion());
+
+        // delete all previous versions
+        List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+        for (String child : children) {
+            int priorVersion = Integer.parseInt(child);
+            if (priorVersion < version) {
+                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+            }
+        }
+    }
+
+    public static void stageCatalogToZK(ZooKeeper zk, int version, long genId, long txnId, SegmentedCatalog catalogAndDeployment)
+            throws KeeperException, InterruptedException {
+        updateCatalogToZK(zk, version, genId, catalogAndDeployment, ZKCatalogStatus.PENDING, txnId);
+    }
+
+    public static class SegmentedCatalog {
+        public final List<ByteBuffer> m_data;
+        public final int m_deploymentLength;
+        public final int m_catalogLength;
+        public final byte[] m_catalogHash;
+
+        public SegmentedCatalog(List<ByteBuffer> data, int deploymentSize, int catalogSize, byte[] catalogHash) {
+            m_data = data;
+            m_deploymentLength = deploymentSize;
+            m_catalogLength = catalogSize;
+            m_catalogHash = catalogHash;
+
+        }
+
+        public static SegmentedCatalog create(byte[] catalogBytes, byte[] catalogHash, byte[] deploymentBytes) {
+            List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
+            // Reserve the header space for first buffer
+            int chunkOffset = CATALOG_BUFFER_HEADER;
+            int totalBytes = catalogBytes.length + deploymentBytes.length + CATALOG_BUFFER_HEADER;
+            int bufferSize = Math.min(MAX_CATALOG_CHUNK_SIZE, totalBytes);
+            byte[] buffer = new byte[bufferSize];
+            buffers.add(ByteBuffer.wrap(buffer));
+            // Copy deployment bytes into first buffer (deployment file is small enough to fit in a buffer)
+            System.arraycopy(deploymentBytes, 0, buffer, chunkOffset, deploymentBytes.length);
+            chunkOffset += deploymentBytes.length;
+
+            // Wrap catalog bytes into ByteBuffers
+            int remaining = catalogBytes.length;
+            int catalogOffset = 0;
+            while (remaining > 0) {
+                // The first buffer is tricky to fill
+                int copyLength = Math.min(MAX_CATALOG_CHUNK_SIZE - chunkOffset, remaining);
+                System.arraycopy(catalogBytes, catalogOffset, buffer, chunkOffset, copyLength);
+                catalogOffset += copyLength;
+                chunkOffset += copyLength;
+                remaining -= copyLength;
+                if (remaining > 0) {
+                    bufferSize = Math.min(MAX_CATALOG_CHUNK_SIZE, remaining);
+                    buffer = new byte[bufferSize];
+                    buffers.add(ByteBuffer.wrap(buffer));
+                    chunkOffset = 0;
+                }
+            }
+
+            return new SegmentedCatalog(buffers, deploymentBytes.length, catalogBytes.length, catalogHash);
+        }
     }
 
     public static class CatalogAndDeployment {
@@ -2708,6 +2831,114 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Find the latest catalog version stored under /db/catalogbytes ZK directory, the qualified version's
+     * catalog status must meet the value specified by {@code expectedFlag}. If {@code expectedFlag} is
+     * {@code null}, the highest catalog version stored in ZK will be returned, no matter what the status it is.
+     * @param zk
+     * @param expectedFlag  {@code Complete}, {@code Pending} or {@code null}
+     * @param expectedTxnId Ignore the check if {@code expectedTxnId} is -1
+     * @return catalog version
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    private static Pair<String, Integer> findLatestViableCatalog( ZooKeeper zk,
+                                                                  ZKCatalogStatus expectedFlag,
+                                                                  long expectedTxnId)
+            throws KeeperException, InterruptedException {
+        List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+        // sort in natural order
+        Collections.sort(children, new Comparator<String>() {
+            public int compare(String o1, String o2) {
+                return Integer.valueOf(o1) - Integer.valueOf(o2);
+            }
+        });
+        // find the latest version node that meets given requirements
+        for (int i = children.size() - 1; i >= 0; i--) {
+            String catalogPath = ZKUtil.joinZKPath(VoltZK.catalogbytes, children.get(i));
+            byte[] data = zk.getData(catalogPath, false, null);
+            ByteBuffer buffer = ByteBuffer.wrap(data);
+            byte flag = buffer.get();
+            if (expectedFlag != null && flag != (byte)expectedFlag.ordinal()) {
+                continue;
+            }
+            int catalogSegmentCount = buffer.getInt();
+            long txnId = buffer.getLong();
+            // In command log replay, only one node uploads the staging catalog bytes to ZK,
+            // rest of nodes use expectedTxnId to match the data.
+            if (expectedTxnId != -1 && txnId != expectedTxnId) {
+                continue;
+            }
+            return new Pair<>(catalogPath, catalogSegmentCount);
+        }
+        return null;
+    }
+
+    private static CatalogAndDeployment readCatalogData(ZooKeeper zk, String catalogPath, int expectedCount)
+            throws KeeperException, InterruptedException {
+        int deploymentBytesRead = 0;
+        int catalogBytesRead = 0;
+        byte[] catalogBytes = null;
+        byte[] deploymentBytes = null;
+        // header fields
+        int version = 0;
+        long genId = 0L;
+        int deploymentLength = 0;
+        int catalogLength = 0;
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+
+        List<String> catalogNodes = zk.getChildren(catalogPath, false);
+        // updateCatalogToZK may delete the zk nodes while load catalog
+        // spin loop reading it during initialization.
+        if (catalogNodes.isEmpty()) {
+            return null;
+        }
+        Collections.sort(catalogNodes);
+        if (expectedCount != catalogNodes.size()) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("expected zk catalog node count: " + expectedCount +
+                        ", actual: " + catalogNodes.size());
+            }
+            return null;
+        }
+
+        for (int j = 0; j < catalogNodes.size(); j++) {
+            ByteBuffer catalogDeploymentBytes =
+                    ByteBuffer.wrap(zk.getData(ZKUtil.joinZKPath(catalogPath, catalogNodes.get(j)), false, null));
+            if (j == 0) {
+                // first node, get the meta data.
+                version = catalogDeploymentBytes.getInt();
+                genId = catalogDeploymentBytes.getLong();
+                deploymentLength = catalogDeploymentBytes.getInt();
+                catalogLength = catalogDeploymentBytes.getInt();
+                catalogDeploymentBytes.get(catalogHash);
+                deploymentBytes = new byte[deploymentLength];
+                catalogBytes = new byte[catalogLength];
+                // Get deployment bytes first
+                deploymentBytesRead =
+                        readBuffer(catalogDeploymentBytes, deploymentBytes, deploymentBytesRead, deploymentLength - deploymentBytesRead);
+                // If there is still space remaining...get the catalog
+                if (catalogDeploymentBytes.hasRemaining()) {
+                    catalogBytesRead =
+                            readBuffer(catalogDeploymentBytes, catalogBytes, catalogBytesRead, catalogLength - catalogBytesRead);
+                }
+                catalogDeploymentBytes = null;
+                continue;
+            }
+            // Rest of nodes, get remaining data.
+            if (deploymentBytesRead < deploymentLength) {
+                deploymentBytesRead +=
+                        readBuffer(catalogDeploymentBytes, deploymentBytes, deploymentBytesRead, deploymentLength - deploymentBytesRead);
+            }
+            if (catalogDeploymentBytes.hasRemaining() && catalogBytesRead < catalogLength) {
+                catalogBytesRead += readBuffer(catalogDeploymentBytes, catalogBytes, catalogBytesRead, catalogLength - catalogBytesRead);
+            }
+            catalogDeploymentBytes = null;
+        }
+        assert (deploymentBytesRead == deploymentLength && catalogBytesRead == catalogLength);
+        return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
+    }
+
+    /**
      * Retrieve the catalog and deployment configuration from zookeeper.
      * NOTE: In general, people who want the catalog and/or deployment should
      * be getting it from the current CatalogContext, available from
@@ -2716,21 +2947,93 @@ public abstract class CatalogUtil {
      */
     public static CatalogAndDeployment getCatalogFromZK(ZooKeeper zk)
             throws KeeperException, InterruptedException {
-        ByteBuffer catalogDeploymentBytes =
-                ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
-        int version = catalogDeploymentBytes.getInt();
-        long genId = catalogDeploymentBytes.getLong();
-        int catalogLength = catalogDeploymentBytes.getInt();
-        byte[] catalogBytes = new byte[catalogLength];
-        catalogDeploymentBytes.get(catalogBytes);
-        byte[] catalogHash = new byte[20]; // sha-1 hash size
-        catalogDeploymentBytes.get(catalogHash);
-        int deploymentLength = catalogDeploymentBytes.getInt();
-        byte[] deploymentBytes = new byte[deploymentLength];
-        catalogDeploymentBytes.get(deploymentBytes);
-        catalogDeploymentBytes = null;
 
-        return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
+        // read the catalog from given version
+        Pair<String, Integer> latestCatalog = findLatestViableCatalog(zk, ZKCatalogStatus.COMPLETE, -1);
+        if (latestCatalog == null) {
+            return null;
+        }
+        return readCatalogData(zk, latestCatalog.getFirst(), latestCatalog.getSecond());
+    }
+
+    /**
+     * Retrieve an unpublished catalog and deployment configuration from zookeeper.
+     * This is primarily used by @VerifyCatalogAndWriteJar and @UpdateCore to pass
+     * large bytes through zookeeper network.
+     * @param zk
+     * @param catalogVersion
+     * @return
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public static CatalogAndDeployment getStagingCatalogFromZK(ZooKeeper zk, int catalogVersion)
+            throws KeeperException, InterruptedException {
+        String catalogPath = VoltZK.catalogbytes + "/" + catalogVersion;
+        byte[] data = null;
+        try {
+            data = zk.getData(catalogPath, false, null);
+        } catch (KeeperException.NoNodeException e) {
+            return null;
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        byte flag = buffer.get();
+        if (flag != (byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal()) {
+            return null;
+        }
+        int catalogSegmentCount = buffer.getInt();
+        return readCatalogData(zk, catalogPath, catalogSegmentCount);
+    }
+
+    private static int readBuffer(ByteBuffer buffer, byte[] src, int offset, int length) {
+        int toRead = Math.min(length, buffer.remaining());
+        buffer.get(src, offset, toRead);
+        return toRead;
+    }
+
+    public static void copyUACParameters(StoredProcedureInvocation invocation, Object[] params) {
+        int catalogVersion = (int)params[1];
+        CatalogAndDeployment cad = null;
+        try {
+            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion + 1);
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Fail to get catalog bytes while processing catalog update", true, null);
+        }
+        invocation.setParams(params[0],             // diff commands
+                             params[1],             // expected catalog version
+                             params[2],             // gen id
+                             cad.catalogBytes,
+                             params[3],             // catalog hash
+                             cad.deploymentBytes,
+                             params[4],             // deployment hash
+                             params[5],             // work with elastic
+                             params[6],             // tables must be empty
+                             params[7],             // reasons for empty tables
+                             params[8],             // requiresSnapshotIsolation
+                             params[9],             // requireCatalogDiffCmdsApplyToEE
+                             params[10],            // hasSchemaChange
+                             params[11],            // requiresNewExportGeneration
+                             params[12]);           // hasSecurityUserChange
+    }
+
+    public static Pair<Integer, Boolean> getMatchingOrHighestCatalogVersionNumber(ZooKeeper zk, long txnId) {
+        Pair<String, Integer> catalogPair = null;
+        boolean match = true;
+        try {
+            // First see if somebody created the version node for us
+            catalogPair = findLatestViableCatalog(zk, null, txnId);
+            // If not find the highest catalog version node
+            if (catalogPair == null) {
+                match = false;
+                catalogPair = findLatestViableCatalog(zk, null, -1);
+            }
+        } catch (KeeperException | InterruptedException ignore) {}
+        if (catalogPair != null) {
+            // Split the version number part from /db/catalogbytes/<version>
+            String version = catalogPair.getFirst().substring(catalogPair.getFirst().lastIndexOf('/') + 1);
+            return new Pair<>(Integer.parseInt(version), match);
+        } else {
+           return new Pair<>(VoltDB.instance().getCatalogContext().catalogVersion, match);
+        }
     }
 
     /**
