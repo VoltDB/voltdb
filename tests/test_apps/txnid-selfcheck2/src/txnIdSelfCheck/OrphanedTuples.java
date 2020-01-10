@@ -48,7 +48,7 @@ import org.voltdb.task.TaskValidationErrors;
  * Example task creation:
  *
  * CREATE TASK orphaned_tuples ON SCHEDULE EVERY 1 MINUTES
- *     PROCEDURE FROM CLASS voltdb.tasks.OrphanedTuples
+ *     PROCEDURE FROM CLASS txnIdSelfCheck.OrphanedTuples
  *     ON ERROR LOG;
  */
 public class OrphanedTuples implements ActionGenerator {
