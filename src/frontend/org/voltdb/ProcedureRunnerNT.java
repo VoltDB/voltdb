@@ -267,7 +267,7 @@ public class ProcedureRunnerNT {
         Set<Long> hsids;
         synchronized(m_allHostCallbackLock) {
             // collect the set of live client interface mailbox ids
-            hsids = VoltZK.getClientInterfaceMailboxes(VoltDB.instance().getHostMessenger().getZK());
+            hsids = VoltZK.getMailBoxesForNT(VoltDB.instance().getHostMessenger().getZK());
             m_outstandingAllHostProcedureHostIds =
                     hsids.stream().map(hsid->CoreUtils.getHostIdFromHSId(hsid)).collect(Collectors.toSet());
         }

@@ -1295,7 +1295,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .clientInterfaceHandleManagerMap(m_cihm)
                 .siteId(m_siteId)
                 .build();
-        VoltZK.addClientInterfaceMailbox(m_zk, m_siteId);
+        // add client interface mailbox id to ZK for NT proc
+        VoltZK.registerMailBoxForNT(m_zk, m_siteId);
     }
 
     private InternalClientResponseAdapter createInternalAdapter(int pid) {
