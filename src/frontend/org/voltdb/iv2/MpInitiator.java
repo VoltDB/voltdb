@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -33,14 +34,19 @@ import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -51,6 +57,27 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
+    LeaderCache.Callback m_replicaRemovalHandler = new LeaderCache.Callback() {
+        @Override
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
+            if (cache == null || cache.isEmpty()) {
+                return;
+            }
+            if (m_replicaRemovalInvoked.compareAndSet(false, true)) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Replica removal started.");
+                }
+                RealVoltDB db = (RealVoltDB) VoltDB.instance();
+                m_scheduler.updateBuddyHSIds(db.getLeaderSites());
+                m_initiatorMailbox.send(CoreUtils.getHSIdFromHostAndSite(
+                        m_messenger.getHostId(), HostMessenger.CLIENT_INTERFACE_SITE_ID),
+                        new HashMismatchMessage());
+            }
+        }
+    };
+
+    LeaderCache m_replicaRemovalCache;
+    private AtomicBoolean m_replicaRemovalInvoked = new AtomicBoolean(false);
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
     {
         super(VoltZK.iv2mpi,
@@ -100,6 +127,9 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+
+        m_replicaRemovalCache = new LeaderCache(m_messenger.getZK(), "MpInitiator-replicas-removal",
+                VoltZK.hashMismatchedReplicas, m_replicaRemovalHandler);
     }
 
     @Override
@@ -178,6 +208,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(), "MpInitiator", m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     TTLManager.instance().scheduleTTLTasks();
+                    m_replicaRemovalCache.start(true);
                 }
                 else {
                     // The only known reason to fail is a failed replica during

@@ -681,4 +681,11 @@ public class ExportManager implements ExportManagerInterface
             m_allowCatalogUpdate.release();
         }
     }
+
+    @Override
+    public synchronized void releaseResources(List<Integer> removedPartitions) {
+        if (m_generation.get() != null) {
+            m_generation.get().closeDataSources(removedPartitions);
+         }
+    }
 }

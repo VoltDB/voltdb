@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -95,6 +96,7 @@ import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.HashMismatchMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -111,7 +113,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
 
@@ -226,6 +227,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final InvocationDispatcher m_dispatcher;
 
     private ScheduledExecutorService m_migratePartitionLeaderExecutor;
+    private ScheduledExecutorService m_replicaRemovalExecutor;
     private Object m_lock = new Object();
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -1262,6 +1264,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 } else if (message instanceof SiteFailureForwardMessage) {
                     SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;
                     m_messenger.notifyOfHostDown(CoreUtils.getHostIdFromHSId(msg.m_reportingHSId));
+                } else if (message instanceof HashMismatchMessage) {
+                    processReplicaRemovalTask((HashMismatchMessage)message);
                 } else {
                     // m_d is for test only
                     m_d.offer(message);
@@ -1751,6 +1755,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_migratePartitionLeaderExecutor != null) {
             m_migratePartitionLeaderExecutor.shutdown();
         }
+        if (m_replicaRemovalExecutor != null) {
+            m_replicaRemovalExecutor.shutdown();
+            m_replicaRemovalExecutor = null;
+        }
         m_notifier.shutdown();
     }
 
@@ -2201,9 +2209,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (m_migratePartitionLeaderExecutor != null ) {
                 m_migratePartitionLeaderExecutor.shutdown();
                 m_migratePartitionLeaderExecutor = null;
+                hostLog.info("MigratePartitionLeader task is stopped.");
             }
         }
-        hostLog.info("MigratePartitionLeader task is stopped.");
     }
 
     /**Move partition leader from one host to another.
@@ -2422,5 +2430,99 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }
+    }
+
+    void processReplicaRemovalTask(HashMismatchMessage message) {
+        final RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        if (db.rejoining() || db.isJoining()) {
+            VoltDB.crashLocalVoltDB("Hash mismatch found before this node could finish " + (db.rejoining() ? "rejoin" : "join") +
+                    "As a result, the rejoin operation has been canceled.");
+            return;
+        }
+        // Only work on MPI host
+        if (db.m_leaderAppointer == null || !db.m_leaderAppointer.isLeader()) {
+            return;
+        }
+
+        synchronized(m_lock) {
+            if (m_replicaRemovalExecutor == null) {
+                m_replicaRemovalExecutor = Executors.newSingleThreadScheduledExecutor(
+                        CoreUtils.getThreadFactory("ReplicaRemoval"));
+            }
+            if (message.isReschedule()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("@StopReplicas is blocked, reshcheduled.");
+                }
+                m_replicaRemovalExecutor.schedule(() -> {
+                    if (!decommissionReplicas()) {
+                        m_mailbox.deliver(new HashMismatchMessage(true));
+                    }
+                }, 2, TimeUnit.SECONDS);
+            } else {
+                m_replicaRemovalExecutor.submit(() -> {
+                    if (!decommissionReplicas()) {
+                        m_mailbox.deliver(new HashMismatchMessage(true));
+                    }
+                });
+            }
+        }
+    }
+
+    private boolean decommissionReplicas() {
+        try {
+            // Sanity check, if no mismatched sites are registered or have been removed on ZK, no OP.
+            if (!VoltZK.hasHashMismatchedSite(m_zk)) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Skip @StopReplicas, no hash mismatch sites are found.");
+                }
+                return true;
+            }
+            String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress,
+                    CreateMode.EPHEMERAL, tmLog, "remove replicas");
+            if (errorMessage != null) {
+                tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+                // If rejoining is progress, send a message to the rejoining node and shutdown it down
+                if (VoltZK.zkNodeExists(m_zk, VoltZK.rejoinInProgress)) {
+                    RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
+                    Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
+                    m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(Collections.max(liveHids), HostMessenger.CLIENT_INTERFACE_SITE_ID), new HashMismatchMessage());
+                }
+                return false;
+            }
+            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+            final String procedureName = "@StopReplicas";
+            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(procedureName);
+            spi.setParams();
+            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            if (spi.getSerializedParams() == null) {
+                spi = MiscUtils.roundTripForCL(spi);
+            }
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Invoke @StopReplicas");
+            }
+            synchronized (m_executeTaskAdpater) {
+                if (createTransaction(m_executeTaskAdpater.connectionId(),
+                        spi,
+                        procedureConfig.getReadonly(),
+                        procedureConfig.getSinglepartition(),
+                        procedureConfig.getEverysite(),
+                        MpInitiator.MP_INIT_PID,
+                        spi.getSerializedSize(),
+                        System.nanoTime()) != CreateTransactionResult.SUCCESS) {
+                    tmLog.warn("Failed to start transaction for @StopReplicas");
+                    return false;
+                }
+            }
+            final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
+            ClientResponse resp = cb.getResponse(timeoutMS);
+            return (resp.getStatus() == ClientResponse.SUCCESS);
+        } catch (Exception e) {
+            tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
+        } finally {
+            VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
+        }
+        return false;
     }
 }

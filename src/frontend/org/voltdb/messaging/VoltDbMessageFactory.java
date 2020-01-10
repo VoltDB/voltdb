@@ -55,6 +55,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte Migrate_Partition_Leader_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 29;
     final public static byte FLUSH_RO_TXN_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 30;
     final public static byte START_TASKS_ID = VOLTCORE_MESSAGE_ID_MAX + 31;
+    final public static byte HASH_MISMATCH_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 32;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -157,6 +158,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case START_TASKS_ID:
             message = new EnableTasksOnPartitionsMessage();
+            break;
+        case HASH_MISMATCH_MESSAGE_ID:
+            message = new HashMismatchMessage();
             break;
         default:
             message = null;

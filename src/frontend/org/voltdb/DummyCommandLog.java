@@ -17,13 +17,14 @@
 
 package org.voltdb;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -99,5 +100,18 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void registerDurabilityListener(DurabilityListener durabilityListener) {
+    }
+
+    @Override
+    public SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId, int partitionId, long spHandle,
+            LogEntryType entryType) {
+        return null;
+    }
+
+    public void notifyDecommissionPartitions(List<Integer> partitions) {
+    }
+
+    public ImmutableSet<Integer> getDecommissionedPartitions() {
+        return null;
     }
 }

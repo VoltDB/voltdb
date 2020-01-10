@@ -345,7 +345,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params) {
     if (m_numOfSearchkeys != 0) {
         // Deal with multi-map
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
+                   static_cast<int>(localLookupType), activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == IndexLookupType::Greater) {
                 rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);

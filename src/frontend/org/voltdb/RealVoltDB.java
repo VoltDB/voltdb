@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
@@ -77,7 +78,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import java.util.stream.Collectors;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -118,6 +119,8 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ZKCatalogStatus;
+import org.voltdb.CatalogContext.CatalogInfo;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
@@ -197,6 +200,7 @@ import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
@@ -384,7 +388,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
@@ -456,6 +459,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
+
+    private volatile boolean m_isMasterOnly = false;
+
     private volatile OperationMode m_startMode = OperationMode.RUNNING;
 
     volatile String m_localMetadata = "";
@@ -1825,6 +1831,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (failedHosts.isEmpty()) {
                     return;
                 }
+
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
@@ -2405,8 +2412,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * This host can be a leader if partition 0 is on it or it is in the same partition group as a node which has
-     * partition 0. This is because the partition group with partition 0 can never be removed by elastic remove.
+     * This host can be a leader if partition 0 is on it.
+     * This is because the partition group with partition 0 can never be removed by elastic remove.
+     * In the master only mode, this also guarantee the MPI host will always have viable site to do borrow task.
      *
      * @param partitions          {@link List} of partitions on this host
      * @param partitionGroupPeers {@link List} of hostIds which are in the same partition group as this host
@@ -2415,15 +2423,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     private boolean determineIfEligibleAsLeader(Collection<Integer> partitions, Set<Integer> partitionGroupPeers,
             AbstractTopology topology) {
-        if (partitions.contains(Integer.valueOf(0))) {
-            return true;
-        }
-        for (Integer host : topology.getHostIdList(0)) {
-            if (partitionGroupPeers.contains(host)) {
-                return true;
-            }
-        }
-        return false;
+        return partitions.contains(0);
     }
 
     /**
@@ -2645,20 +2645,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             DeploymentType deployment = null;
             try {
+                // Found local deployment file
                 if (deploymentBytes != null) {
-                    CatalogUtil.writeCatalogToZK(zk,
+                    CatalogUtil.writeDeploymentToZK(zk,
                             0L,
-                            new byte[] {},  // spin loop in Inits.LoadCatalog.run() needs
-                                            // this to be of zero length until we have a real catalog.
-                            null,
-                            deploymentBytes);
+                            SegmentedCatalog.create(new byte[0], new byte[]{0}, deploymentBytes),
+                            ZKCatalogStatus.COMPLETE,
+                            -1);//dummy txnId
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {
+                    // Didn't find local deployment file
                     CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
                     deploymentBytes = catalogStuff.deploymentBytes;
                 }
             } catch (KeeperException.NodeExistsException e) {
-                CatalogAndDeployment catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                CatalogAndDeployment catalogStuff;
+                do {
+                    catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                } while (catalogStuff == null);
                 byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
                 if (deploymentBytesTemp != null) {
                     //Check hash if its a supplied deployment on command line.
@@ -3936,30 +3940,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
-                byte[] newCatalogBytes = null;
-                byte[] catalogBytesHash = null;
-                byte[] deploymentBytes = null;
+                CatalogInfo catalogInfo = null;
+                Catalog newCatalog = null;
+                CatalogContext ctx = VoltDB.instance().getCatalogContext();
                 if (isForReplay) {
                     try {
                         CatalogAndDeployment catalogStuff =
                                 CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                        newCatalogBytes = catalogStuff.catalogBytes;
-                        catalogBytesHash = catalogStuff.catalogHash;
-                        deploymentBytes = catalogStuff.deploymentBytes;
+                        byte[] depbytes = catalogStuff.deploymentBytes;
+                        if (depbytes == null) {
+                            depbytes = ctx.m_catalogInfo.m_deploymentBytes;
+                        }
+                        catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
+                        newCatalog = ctx.getNewCatalog(diffCommands);
                     } catch (Exception e) {
                         // impossible to hit, log for debug purpose
-                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes);
+                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
                         throw new RuntimeException("Error reading catalog from zookeeper");
                     }
                 } else {
-                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
                     if (ctx.m_preparedCatalogInfo == null) {
                         // impossible to hit, log for debug purpose
                         throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
                     }
-                    newCatalogBytes = ctx.m_preparedCatalogInfo.m_catalogBytes;
-                    catalogBytesHash = ctx.m_preparedCatalogInfo.m_catalogHash;
-                    deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
+                    // using the prepared catalog information if prepared
+                    catalogInfo = ctx.m_preparedCatalogInfo;
+                    newCatalog = catalogInfo.m_catalog;
                 }
 
                 byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
@@ -3967,11 +3973,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext = m_catalogContext.update(isForReplay,
-                                                           diffCommands,
+                                                           newCatalog,
                                                            genId,
-                                                           newCatalogBytes,
-                                                           catalogBytesHash,
-                                                           deploymentBytes,
+                                                           catalogInfo,
                                                            m_messenger,
                                                            hasSchemaChange);
 
@@ -4849,8 +4853,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     public ExecutionEngine debugGetSpiedEE(int partitionId) {
         if (m_config.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
-            BaseInitiator init = (BaseInitiator)m_iv2Initiators.get(partitionId);
-            return init.debugGetSpiedEE();
+            Initiator init = m_iv2Initiators.get(partitionId);
+            return ((BaseInitiator<?>)init).debugGetSpiedEE();
         }
         else {
             return null;
@@ -5239,6 +5243,79 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
         }
+    }
+
+    @Override
+    public boolean isMasterOnly() {
+        return m_isMasterOnly;
+    }
+
+    @Override
+    public void setMasterOnly() {
+        m_isMasterOnly = true;
+    }
+
+    public void cleanupBackLogsOnDecommisionedReplicas(int executorPartition) {
+        // execute on the lowest master site only
+        if (executorPartition == getLowestLeaderPartitionId()) {
+            m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID &&
+                    ((SpInitiator)p).getServiceState().isRemoved())
+            .forEach(s -> ((SpInitiator)s).getScheduler().cleanupTransactionBacklogs());
+        }
+    }
+
+    private int getLowestLeaderPartitionId(){
+        List<Integer> leaderPartitions = getLeaderPartitionIds();
+        return leaderPartitions.isEmpty() ? -1 : leaderPartitions.iterator().next();
+    }
+
+    public List<Integer> getLeaderPartitionIds(){
+        return m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && ((SpInitiator) p).isLeader())
+                .map(Initiator::getPartitionId).collect(Collectors.toList());
+    }
+
+    public List<Integer> getNonLeaderPartitionIds(){
+        return m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && !((SpInitiator) p).isLeader())
+                .map(Initiator::getPartitionId).collect(Collectors.toList());
+    }
+
+    public List<Long> getLeaderSites() {
+        return  m_iv2Initiators.values().stream().filter(p -> p.getPartitionId() != MpInitiator.MP_INIT_PID && ((SpInitiator) p).isLeader())
+                .map(Initiator::getInitiatorHSId).collect(Collectors.toList());
+    }
+
+    public void processReplicaDecommission(int leaderCount) {
+        synchronized(m_catalogUpdateLock) {
+            setMasterOnly();
+            if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
+                NavigableMap<String, String> settings = m_nodeSettings.asMap();
+                ImmutableMap<String, String> newSettings = new ImmutableMap.Builder<String, String>()
+                        .putAll(new HashMap<String, String>() {
+                            private static final long serialVersionUID = 1L; {
+                                putAll(settings);
+                                put(NodeSettings.LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(leaderCount));
+                            }}).build();
+                // update active site count
+                m_nodeSettings = NodeSettings.create(newSettings);
+                m_nodeSettings.store();
+                m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
+                hostLog.info("Update local active site count to :" + leaderCount);
+
+                // release export resources
+                ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionIds());
+                if (m_commandLog != null) {
+                    m_commandLog.notifyDecommissionPartitions(getNonLeaderPartitionIds());
+                }
+            }
+        }
+    }
+
+    public boolean isPartitionDecommissioned(int partitionId) {
+        if (partitionId != MpInitiator.MP_INIT_PID) {
+            SpInitiator init = (SpInitiator)m_iv2Initiators.get(partitionId);
+            return (init != null && !(init.getServiceState().isNormal()));
+        }
+        return false;
     }
 }
 

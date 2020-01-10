@@ -360,4 +360,7 @@ public interface VoltDBInterface
      * notify surviving node upon shutting itself down
      */
     public void notifyOfShutdown();
+
+    boolean isMasterOnly();
+    void setMasterOnly();
 }

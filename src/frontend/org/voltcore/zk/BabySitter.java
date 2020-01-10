@@ -24,7 +24,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -33,7 +32,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -55,8 +53,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
  */
 public class BabySitter
 {
-    private static final VoltLogger repairLog = new VoltLogger("REPAIR");
-
     private final String m_dir; // the directory to monitor
     private final Callback m_cb; // the callback when children change
     private final ZooKeeper m_zk;
@@ -92,12 +88,7 @@ public class BabySitter
     {
         m_shutdown.set(true);
         if (m_isExecutorServiceLocal) {
-            try {
-                m_es.shutdown();
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                repairLog.warn("Unexpected interrupted exception", e);
-            }
+            m_es.shutdownNow();
         }
     }
 
