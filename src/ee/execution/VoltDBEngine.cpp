@@ -277,7 +277,10 @@ VoltDBEngine::~VoltDBEngine() {
 
         delete m_executorContext;
 
-        delete m_drReplicatedStream;
+        if (isLowestSite()) {
+            delete s_drReplicatedStream;
+            s_drReplicatedStream = nullptr;
+        }
         delete m_drStream;
     } else {
         delete m_executorContext;
