@@ -36,7 +36,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj log build debugoutput $APPNAME.jar $APPNAME-alt.jar $APPNAME-noexport.jar voltdbroot
+    rm -rf obj log build debugoutput $APPNAME.jar $APPNAME-alt.jar $APPNAME-big-*.jar dummy.jar $APPNAME-noexport.jar voltdbroot
 }
 
 # remove everything from "clean" as well as the jarfiles
@@ -48,16 +48,17 @@ function cleanall() {
 function jars() {
     ant
     alt-jars
+    big-jars
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
     if [ ! -e txnid.jar ]; then
-        jars;
+        jars
     fi
 }
 
-# create an alternate jar that is functionaly equivilent
+# create an alternate jar that is functionally equivalent
 # but has a different checksum
 function alt-jars() {
     if [ -e txnid.jar ]; then
@@ -66,7 +67,7 @@ function alt-jars() {
     # src/txnIdSelfCheck/procedures/
     cp src/txnIdSelfCheck/procedures/ReadSP.java src/txnIdSelfCheck/procedures/ReadSP.java.orig
     cp src/txnIdSelfCheck/procedures/UpdateBaseProc.java src/txnIdSelfCheck/procedures/UpdateBaseProc.java.orig
-    sed -i  's/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc limit 1000000/' src/txnIdSelfCheck/procedures/ReadSP.java
+    sed -i 's/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc limit 1000000/' src/txnIdSelfCheck/procedures/ReadSP.java
     sed -i 's/SELECT count(\*) FROM dimension where cid = ?/SELECT count(\*) FROM dimension where cid = ? limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
     sed -i 's/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
     sed -i 's/SELECT \* FROM partview WHERE cid=? ORDER BY cid DESC/SELECT \* FROM partview WHERE cid=? ORDER BY cid DESC limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
@@ -83,14 +84,44 @@ function alt-jars() {
     mv txnid-orig.jar txnid.jar
     mv src/txnIdSelfCheck/procedures/ReadSP.java.orig src/txnIdSelfCheck/procedures/ReadSP.java
     mv src/txnIdSelfCheck/procedures/UpdateBaseProc.java.orig src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+}
 
+# create alternate jars that are functionally equivalent but
+# each includes some very large files (> 30Mb, but < 50Mb)
+function big-jars() {
+    # find the voltdb-X.X.jar file
+    JAR_NAME=`ls $VOLTDB_VOLTDB | grep .jar | grep -v client`
+    VOLTDB_JAR=$VOLTDB_VOLTDB/$JAR_NAME
+
+    # compile the program used to create large files
+    if [[ ! -d "obj" ]]; then
+        mkdir obj
+    fi
+    javac -cp $VOLTDB_JAR -d obj src/largejar/CreateLargeFiles.java
+
+    # create large (random) text files
+    java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text1.txt
+    java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text2.txt
+    java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text3.txt
+    java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text4.txt
+
+    # make copies of the standard txnid.jar, and add a different large text
+    # file to each one
+    cp txnid.jar txnid-big-text1.jar
+    cp txnid.jar txnid-big-text2.jar
+    cp txnid.jar txnid-big-text3.jar
+    cp txnid.jar txnid-big-text4.jar
+    jar uvf txnid-big-text1.jar obj/large-random-text1.txt
+    jar uvf txnid-big-text2.jar obj/large-random-text2.txt
+    jar uvf txnid-big-text3.jar obj/large-random-text3.txt
+    jar uvf txnid-big-text4.jar obj/large-random-text4.txt
 }
 
 # run the voltdb server locally
 function server() {
     jars-ifneeded
     # run the server
-    $VOLTDB init -C deployment.xml
+    $VOLTDB init -C deployment.xml --force
     $VOLTDB start -l $LICENSE -H $HOST
 }
 
@@ -136,7 +167,7 @@ function init() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|init|server|async-benchmark|async-benchmark-help}"
+    echo "Usage: ./run.sh {clean|jars|server|init|async-benchmark|async-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
