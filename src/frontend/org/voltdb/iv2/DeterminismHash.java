@@ -57,6 +57,8 @@ public class DeterminismHash {
 
     public final static int MAX_HASHES_COUNT = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 32) * 2;
 
+    public final static int HASH_EQUAL = Integer.MIN_VALUE;
+    public final static int HASH_CATALOG_VERSION_MISMATCH = Integer.MAX_VALUE - 1;
     public final static int HASH_NOT_INCLUDE = Integer.MAX_VALUE;
 
     int m_catalogVersion = 0;
@@ -120,7 +122,10 @@ public class DeterminismHash {
 
         // Compare total checksum first
         if (leftHashes[0] == rightHashes[0]) {
-            return -1;
+            return HASH_EQUAL;
+        }
+        if (leftHashes[1] != rightHashes[1]) {
+            return HASH_CATALOG_VERSION_MISMATCH;
         }
         int includedHashLeft = Math.min(leftHashes[2], MAX_HASHES_COUNT);
         int includedHashRight = Math.min(rightHashes[2], MAX_HASHES_COUNT);

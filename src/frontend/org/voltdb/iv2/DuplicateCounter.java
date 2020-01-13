@@ -192,7 +192,11 @@ public class DuplicateCounter
                                     TxnEgo.getPartitionId(m_txnId),
                                     CoreUtils.getHostIdFromHSId(m_leaderHSID), CoreUtils.getHostIdFromHSId(replicaHSID),
                                     m_status));
-        if (misMatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
+        if (misMatchPos == DeterminismHash.HASH_CATALOG_VERSION_MISMATCH) {
+            sb.append("Hash mismatch happened because catalog version differed between leader and replica.").
+                    append(" Catalog version from leader:").append(m_responseHashes[1]).
+                    append(" Catalog version from replica:").append(hashes[1]);
+        } else if (misMatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
             sb.append("Hash mismatch happened after ").append(DeterminismHash.MAX_HASHES_COUNT / 2 - DeterminismHash.HEADER_OFFSET + 1).append(" statements.\n").
                     append("For debugging purposes, use VOLTDB_OPTS=\"-DMAX_STATEMENTS_WITH_DETAIL=<hashcount>\" to set to a higher value, it could impact performance.");
         } else if (misMatchPos >= 0) {
@@ -270,7 +274,7 @@ public class DuplicateCounter
                     tmLog.error("Procedure status from leader is: " + (m_statusString == null ? "Success" : m_statusString) + ", while from replica: " + (statusString == null ? "Success" : statusString));
                     logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos, message.m_sourceHSId);
                     return HashResult.ABORT;
-                } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
+                } else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) != DeterminismHash.HASH_EQUAL) {
                     tmLog.error(MISMATCH_MSG);
                     logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos, message.m_sourceHSId);
                     return HashResult.MISMATCH;
@@ -350,7 +354,7 @@ public class DuplicateCounter
             int pos = -1;
             // Response hashes can be null from dummy or failed transaction responses.
             if (m_responseHashes != null && res.hashes != null &&
-                    (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) >= 0) {
+                    (pos = DeterminismHash.compareHashes(leaderResponse.hashes, res.hashes)) != DeterminismHash.HASH_EQUAL) {
                 if (!misMatchLogged) {
                     tmLog.error(MISMATCH_MSG);
                     logRelevantMismatchInformation("HASH MISMATCH", res.hashes, null, pos, entry.getKey());
