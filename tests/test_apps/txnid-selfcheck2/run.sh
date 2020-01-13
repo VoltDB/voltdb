@@ -98,12 +98,22 @@ function big-jars() {
         mkdir obj
     fi
     javac -cp $VOLTDB_JAR -d obj src/largejar/CreateLargeFiles.java
+    # stop if compilation fails
+    if [ $? != 0 ]; then
+        echo -e "Compilation failed, with:\nVOLTDB_VOLTDB: $VOLTDB_VOLTDB"
+        echo -e "JAR_NAME     : $JAR_NAME\nVOLTDB_JAR   : $VOLTDB_JAR"
+        exit 9
+    fi
 
     # create large (random) text files
     java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text1.txt
+    if [ $? != 0 ]; then exit 1; fi
     java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text2.txt
+    if [ $? != 0 ]; then exit 2; fi
     java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text3.txt
+    if [ $? != 0 ]; then exit 3; fi
     java -cp obj:$VOLT_JAR largejar.CreateLargeFiles -o obj/large-random-text4.txt
+    if [ $? != 0 ]; then exit 4; fi
 
     # make copies of the standard txnid.jar, and add a different large text
     # file to each one
@@ -112,9 +122,13 @@ function big-jars() {
     cp txnid.jar txnid-big-text3.jar
     cp txnid.jar txnid-big-text4.jar
     jar uvf txnid-big-text1.jar obj/large-random-text1.txt
+    if [ $? != 0 ]; then exit 5; fi
     jar uvf txnid-big-text2.jar obj/large-random-text2.txt
+    if [ $? != 0 ]; then exit 6; fi
     jar uvf txnid-big-text3.jar obj/large-random-text3.txt
+    if [ $? != 0 ]; then exit 7; fi
     jar uvf txnid-big-text4.jar obj/large-random-text4.txt
+    if [ $? != 0 ]; then exit 8; fi
 }
 
 # run the voltdb server locally
