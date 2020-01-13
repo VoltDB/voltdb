@@ -104,6 +104,8 @@ public class SynchronizedStatesManager {
     private final int m_resetAllowance; // number of resets allowed within a reset clear threshold duration
     private long m_lastResetTimeInMillis = -1L;
     private SettableFuture<Boolean> m_initComplete;
+    // Log for global events that happen outside individual state machines
+    private static final VoltLogger ssmLog = new VoltLogger("SSM");
 
     private static final long RESET_CLEAR_THRESHOLD = TimeUnit.DAYS.toMillis(1);
 
@@ -149,6 +151,7 @@ public class SynchronizedStatesManager {
                     m_shared_es.submit(this);
                 }
             } catch (RejectedExecutionException e) {
+                ssmLog.warn("Async initialization of ZK directory for SSM was rejected by the SSM Thread: " + path);
             }
         }
     }
@@ -172,6 +175,7 @@ public class SynchronizedStatesManager {
                     m_shared_es.submit(this);
                 }
             } catch (RejectedExecutionException e) {
+                ssmLog.warn("Async getChildren for SSM was rejected by the SSM Thread: " + path);
             }
         }
     }
@@ -230,15 +234,6 @@ public class SynchronizedStatesManager {
      *    lock node AND all ephemeral nodes under the BARRIER_PARTICIPANTS node are gone,
      *    indicating that all members waiting on the outcome of the last state change or
      *    task results have processed the previous outcome
-     */
-
-    /**
-     * @author wweiss
-     *
-     */
-    /**
-     * @author wweiss
-     *
      */
     public abstract class StateMachineInstance {
         protected String m_stateMachineId;
@@ -325,13 +320,6 @@ public class SynchronizedStatesManager {
             m_mutex.unlock();
         }
 
-        class AsyncSequencedExecutionHandler {
-            final ListenableFuture m_finshed;
-            AsyncSequencedExecutionHandler(ListenableFuture finished) {
-                m_finshed = finished;
-            }
-        }
-
         private class LockWatcher implements Watcher {
 
             @Override
@@ -356,6 +344,7 @@ public class SynchronizedStatesManager {
                         m_shared_es.submit(HandlerForBarrierParticipantsEvent);
                     }
                 } catch (RejectedExecutionException e) {
+                    ssmLog.warn("ZK watch of Participant Barrier was rejected by the SSM Thread");
                 }
             }
         }
@@ -383,6 +372,7 @@ public class SynchronizedStatesManager {
                         m_shared_es.submit(HandlerForBarrierResultsEvent);
                     }
                 } catch (RejectedExecutionException e) {
+                    ssmLog.warn("ZK watch of Result Barrier was rejected by the SSM Thread");
                 }
             }
         };
@@ -446,8 +436,8 @@ public class SynchronizedStatesManager {
                 return;
             }
             try {
-                Boolean initSuccussful = initComplete.get();
-                assert(initSuccussful);
+                Boolean initSuccessful = initComplete.get();
+                assert(initSuccessful);
             }
             catch (ExecutionException e) {
                 Throwables.throwIfUnchecked(e);
@@ -482,31 +472,28 @@ public class SynchronizedStatesManager {
 
         private class AsyncStateMachineInitializer {
             final AtomicInteger m_pendingStateMachineInits;
-            final SettableFuture<Boolean> m_initComplete;
             final Set<String> m_startingMemberSet;
 
-            private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
-                if (code == KeeperException.Code.SESSIONEXPIRED) {
+            private void initializationFailed() {
+                m_done.set(true);
+                m_initComplete.set(false);
+            }
+
+            private boolean noCommonKeeperExceptions(KeeperException.Code code) {
+                if (code == KeeperException.Code.SESSIONEXPIRED ||
+                        code == KeeperException.Code.CONNECTIONLOSS) {
                     // lost the full connection. some test cases do this...
                     // means zk shutdown without the elector being shutdown.
                     // ignore.
-                    m_done.set(true);
-                    return false;
-                }
-                else if (code == KeeperException.Code.CONNECTIONLOSS) {
-                    // lost the full connection. some test cases do this...
-                    // means shutdown without the elector being
-                    // shutdown; ignore.
-                    m_done.set(true);
+                    initializationFailed();
                     return false;
                 }
                 return true;
             }
 
             public AsyncStateMachineInitializer(final AtomicInteger pendingStateMachineInits,
-                    final SettableFuture<Boolean> initComplete, Set<String> knownMembers) {
+                    Set<String> knownMembers) {
                 m_pendingStateMachineInits = pendingStateMachineInits;
-                m_initComplete = initComplete;
                 m_startingMemberSet = knownMembers;
             }
 
@@ -514,7 +501,7 @@ public class SynchronizedStatesManager {
                 new ZKAsyncCreateHandler(m_statePath, null, CreateMode.PERSISTENT) {
                     @Override
                     public void run() {
-                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        if (noCommonKeeperExceptions(m_resultCode)) {
                             addLockPath();
                         }
                     }
@@ -525,7 +512,7 @@ public class SynchronizedStatesManager {
                 new ZKAsyncCreateHandler(m_lockPath, null, CreateMode.PERSISTENT) {
                     @Override
                     public void run() {
-                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        if (noCommonKeeperExceptions(m_resultCode)) {
                             addBarrierParticipantPath();
                         }
                     }
@@ -536,31 +523,23 @@ public class SynchronizedStatesManager {
                 new ZKAsyncCreateHandler(m_barrierParticipantsPath, null, CreateMode.PERSISTENT) {
                     @Override
                     public void run() {
-                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        if (noCommonKeeperExceptions(m_resultCode)) {
                             try {
                                 initializeStateMachine(m_startingMemberSet);
                                 if (m_pendingStateMachineInits.decrementAndGet() == 0) {
                                     m_initComplete.set(true);
                                 }
-                            } catch (KeeperException.SessionExpiredException e) {
+                            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                                 // lost the full connection. some test cases do this...
                                 // means zk shutdown without the elector being shutdown.
                                 // ignore.
-                                m_done.set(true);
-                                m_initComplete.set(false);
-                            } catch (KeeperException.ConnectionLossException e) {
-                                // lost the full connection. some test cases do this...
-                                // means shutdown without the elector being
-                                // shutdown; ignore.
-                                m_done.set(true);
-                                m_initComplete.set(false);
+                                initializationFailed();
                             } catch (InterruptedException e) {
-                                m_done.set(true);
+                                initializationFailed();
                             } catch (Exception e) {
                                 org.voltdb.VoltDB.crashLocalVoltDB(
                                     "Unexpected failure in initializeInstances.", true, e);
-                                m_done.set(true);
-                                m_initComplete.set(false);
+                                initializationFailed();
                             }
                         }
                     }
@@ -569,8 +548,8 @@ public class SynchronizedStatesManager {
         };
 
         private AsyncStateMachineInitializer createAsyncInitializer(final AtomicInteger pendingStateMachineInits,
-                final SettableFuture<Boolean> initComplete, final Set<String> knownMembers) {
-            return new AsyncStateMachineInitializer(pendingStateMachineInits, initComplete, knownMembers);
+                final Set<String> knownMembers) {
+            return new AsyncStateMachineInitializer(pendingStateMachineInits, knownMembers);
         }
 
         private void syncStateMachineInitialize(final Set<String> knownMembers) throws KeeperException, InterruptedException {
@@ -2137,14 +2116,10 @@ public class SynchronizedStatesManager {
                     stateMachine.disableMembership();
                 }
                 m_zk.delete(ZKUtil.joinZKPath(m_stateMachineMemberPath, m_memberId), -1);
-            } catch (KeeperException.SessionExpiredException e) {
+            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
-            } catch (KeeperException.ConnectionLossException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdown without the elector being
-                // shutdown; ignore.
             } catch (KeeperException.NoNodeException e) {
                 // FIXME: need to investigate why this happens on multinode shutdown
             } catch (InterruptedException e) {
@@ -2160,11 +2135,7 @@ public class SynchronizedStatesManager {
         public void run() {
             try {
                 checkForMembershipChanges();
-            } catch (KeeperException.SessionExpiredException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdown without the elector being
-                // shutdown; ignore.
-            } catch (KeeperException.ConnectionLossException e) {
+            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdown without the elector being
                 // shutdown; ignore.
@@ -2188,6 +2159,7 @@ public class SynchronizedStatesManager {
                     m_shared_es.submit(membershipEventHandler);
                 }
             } catch (RejectedExecutionException e) {
+                ssmLog.warn("ZK watch of Membership change was rejected by the SSM Thread");
             }
         }
     }
@@ -2202,21 +2174,18 @@ public class SynchronizedStatesManager {
             m_pendingStateMachineInits = new AtomicInteger(m_registeredStateMachineInstances);
         }
 
-        private boolean checkForCommonKeeperExceptions(KeeperException.Code code) {
-            if (code == KeeperException.Code.SESSIONEXPIRED) {
+        private void initializationFailed() {
+            m_done.set(true);
+            m_initComplete.set(false);
+        }
+
+        private boolean noCommonKeeperExceptions(KeeperException.Code code) {
+            if (code == KeeperException.Code.SESSIONEXPIRED ||
+                    code == KeeperException.Code.CONNECTIONLOSS) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
-                m_done.set(true);
-                m_initComplete.set(false);
-                return false;
-            }
-            else if (code == KeeperException.Code.CONNECTIONLOSS) {
-                // lost the full connection. some test cases do this...
-                // means shutdown without the elector being
-                // shutdown; ignore.
-                m_done.set(true);
-                m_initComplete.set(false);
+                initializationFailed();
                 return false;
             }
             return true;
@@ -2230,19 +2199,17 @@ public class SynchronizedStatesManager {
                 new ZKAsyncCreateHandler(m_stateMachineMemberPath, null, CreateMode.PERSISTENT) {
                     @Override
                     public void run() {
-                        if (checkForCommonKeeperExceptions(m_resultCode)) {
+                        if (noCommonKeeperExceptions(m_resultCode)) {
                             addMemberIdIfMissing();
                         }
                     }
                 };
             } catch (InterruptedException e) {
-                m_done.set(true);
-                m_initComplete.set(false);
+                initializationFailed();
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unexpected failure in initializeInstances.", true, e);
-                m_done.set(true);
-                m_initComplete.set(false);
+                initializationFailed();
             }
         }
 
@@ -2252,7 +2219,7 @@ public class SynchronizedStatesManager {
                     null, CreateMode.EPHEMERAL) {
                 @Override
                 public void run() {
-                    if (checkForCommonKeeperExceptions(m_resultCode)) {
+                    if (noCommonKeeperExceptions(m_resultCode)) {
                         setInitialGroupMembers();
                     }
                 }
@@ -2263,13 +2230,13 @@ public class SynchronizedStatesManager {
             new ZKAsyncChildrenHandler(m_stateMachineMemberPath, m_membershipWatcher) {
                 @Override
                 public void run() {
-                    if (checkForCommonKeeperExceptions(m_resultCode)) {
+                    if (noCommonKeeperExceptions(m_resultCode)) {
                         m_groupMembers = ImmutableSet.copyOf(m_resultChildren);
 
                         // Then initialize each instance
                         for (StateMachineInstance instance : m_registeredStateMachines) {
                             StateMachineInstance.AsyncStateMachineInitializer init = instance.createAsyncInitializer(
-                                    m_pendingStateMachineInits, m_initComplete, m_groupMembers);
+                                    m_pendingStateMachineInits, m_groupMembers);
                             init.startInitialization();
                         }
                     }
@@ -2278,6 +2245,12 @@ public class SynchronizedStatesManager {
         }
     };
 
+    // During normal initialization the ZK tree can be set up for each statemachine asynchronously.
+    // However, after a unexpected failure such as a fault inside a callback, the whole the SSM needs to
+    // be locked down and reinitialized in a single blocking action so we will do all the ZK work
+    // synchronously on the SSM thread and block all other SSM state machines.
+    // TODO: See if it is possible to do this work asynchronously so other SSMs like DR are not blocked
+    //       by a reset of a given Export SSM.
     void syncSSMInitialize() {
         try {
             // First become a member of the community
@@ -2290,15 +2263,10 @@ public class SynchronizedStatesManager {
             for (StateMachineInstance instance : m_registeredStateMachines) {
                 instance.syncStateMachineInitialize(m_groupMembers);
             }
-        } catch (KeeperException.SessionExpiredException e) {
+        } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
             // lost the full connection. some test cases do this...
             // means zk shutdown without the elector being shutdown.
             // ignore.
-            m_done.set(true);
-        } catch (KeeperException.ConnectionLossException e) {
-            // lost the full connection. some test cases do this...
-            // means shutdown without the elector being
-            // shutdown; ignore.
             m_done.set(true);
         } catch (InterruptedException e) {
             m_done.set(true);
