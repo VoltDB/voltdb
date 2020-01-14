@@ -249,7 +249,8 @@ public final class TaskManager {
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> start(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader) {
         return execute(() -> {
             if (m_managerState != ManagerState.SHUTDOWN) {
@@ -263,7 +264,7 @@ public final class TaskManager {
             // Create a dummy stats source so something is always reported
             TaskStatsSource.createDummy().register(m_statsAgent);
 
-            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
+            return processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -287,12 +288,13 @@ public final class TaskManager {
      * @param classLoader   {@link ClassLoader} to use to load configured classes
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> promoteToLeader(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader) {
         log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
             m_leader = true;
-            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
+            return processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -318,7 +320,8 @@ public final class TaskManager {
      * @param classesUpdated If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> processUpdate(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> processUpdate(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader, boolean classesUpdated) {
         return execute(
                 () -> processCatalogInline(configuration, tasks, authSystem, classLoader, classesUpdated));
@@ -719,13 +722,15 @@ public final class TaskManager {
      * @param authSystem     Current {@link AuthSystem} for the system
      * @param classLoader    {@link ClassLoader} to use to load classes
      * @param classesUpdated Should be {@code true} if any custom classes were modified
+     * @return Map of task to boolean indicating if it was created or deleted. True: added, False: removed
      */
-    private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
-            ClassLoader classLoader, boolean classesUpdated) {
+    private Map<String, Boolean> processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
         if (m_managerState == ManagerState.SHUTDOWN) {
-            return;
+            return Collections.emptyMap();
         }
 
+        Map<String, Boolean> modifications = new HashMap<>();
         m_managerState = m_readOnlySupplier.getAsBoolean() ? ManagerState.READONLY : ManagerState.RUNNING;
 
         Map<String, TaskHandler> newHandlers = new HashMap<>();
@@ -828,6 +833,7 @@ public final class TaskManager {
                 default:
                     throw new IllegalArgumentException("Unsupported run location: " + task.getScope());
                 }
+                modifications.put(task.getName(), Boolean.TRUE);
                 newHandlers.put(task.getName(), definition);
             }
         }
@@ -835,6 +841,7 @@ public final class TaskManager {
         // Cancel all removed schedules
         for (TaskHandler handler : m_handlers.values()) {
             handler.cancel();
+            modifications.put(handler.m_definition.getName(), Boolean.FALSE);
         }
 
         // Set the dynamic thread counts based on whether or not schedules exist and partition counts
@@ -847,6 +854,7 @@ public final class TaskManager {
         }
 
         m_handlers = newHandlers;
+        return modifications;
     }
 
     private int getThreadPoolSize(TaskSettingsType configuration, boolean getHost) {
