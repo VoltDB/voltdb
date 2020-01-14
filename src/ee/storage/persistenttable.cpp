@@ -112,7 +112,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_purgeExecutorVector()
     , m_views()
     , m_stats(this)
-    , m_dataStorage()
     , m_blocksNotPendingSnapshotLoad()
     , m_blocksPendingSnapshotLoad()
     , m_blocksNotPendingSnapshot()
@@ -159,7 +158,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 
     using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>,
                TxnPreHook<NonCompactingChunks<LazyNonCompactingChunk>, HistoryRetainTrait<gc_policy::batched>>>;
-    m_dataStorage.reset(new Alloc(schema->tupleLength() + TUPLE_HEADER_SIZE));
 
     // Also clear some used block state. this structure doesn't have
     // an block ownership semantics - it's just a cache. I think.
@@ -790,15 +788,9 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-//    TableTuple target(m_schema);
-//    nextFreeTuple(&target);
-//    //
-//    // Then copy the source into the target
-//    //
-//    target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
-    TableTuple* target = const_cast<TableTuple *> (reinterpret_cast <TableTuple const*> (m_dataStorage->insert(&source)));
-    vassert(memcmp(&source, target, m_schema->tupleLength() + TUPLE_HEADER_SIZE)==0);
+    TableTuple* target = const_cast<TableTuple *> (reinterpret_cast <TableTuple const*> (m_dataStorage.insert(&source)));
+    target->copyForPersistentInsert(source);
     try {
         insertTupleCommon(source, *target, fallible);
     } catch (TupleStreamException const& e) {

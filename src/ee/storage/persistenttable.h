@@ -793,7 +793,7 @@ private:
     // STORAGE TRACKING
     using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>,
             TxnPreHook<NonCompactingChunks<LazyNonCompactingChunk>, HistoryRetainTrait<gc_policy::batched>>>;
-    unique_ptr<Alloc> m_dataStorage;
+    Alloc m_dataStorage{sizeof(TableTuple)};
 
     // Map from load to the blocks with level of load
     TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
