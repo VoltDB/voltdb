@@ -1934,7 +1934,7 @@ public final class TaskManager {
         @Override
         public boolean doHashesMatch(SchedulerFactory other) {
             if (getClass() != other.getClass()) {
-                ;
+                return false;
             }
             CompositeSchedulerFactory otherFactory = (CompositeSchedulerFactory) other;
             return m_actionGeneratorFactory.doHashesMatch(otherFactory.m_actionGeneratorFactory)
