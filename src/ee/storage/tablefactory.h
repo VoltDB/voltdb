@@ -79,12 +79,12 @@ public:
         const std::vector<std::string> &columnNames, char *signature, bool tableIsMaterialized = false,
         int partitionColumn = 0, // defaults provided for ease of testing.
         TableType tableType = PERSISTENT, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95, bool drEnabled = false, bool isReplicated = false);
+        bool drEnabled = false, bool isReplicated = false);
 
     static StreamedTable* getStreamedTableForTest(
             voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,
             const std::vector<std::string> &columnNames, ExportTupleStream* mockWrapper = NULL,
-            bool exportEnabled = false, int32_t compactionThreshold = 95);
+            bool exportEnabled = false);
 
     /**
      * Creates an empty temp table with given name and columns.
@@ -119,8 +119,7 @@ public:
 
 private:
     static void initCommon(voltdb::CatalogId databaseId, Table *table, const std::string &name,
-            TupleSchema *schema, const std::vector<std::string> &columnNames, const bool ownsTupleSchema,
-            const int32_t compactionThreshold = 95);
+            TupleSchema *schema, const std::vector<std::string> &columnNames, const bool ownsTupleSchema);
 
     static void configureStats(char const* name, TableStats *tableStats);
 };

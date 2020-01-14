@@ -515,6 +515,7 @@ private:
 
     inline void setActiveFalse() {
         // treat the first "value" as a boolean flag
+        vassert(m_data);
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
     }
 

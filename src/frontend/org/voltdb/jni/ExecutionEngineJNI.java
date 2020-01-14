@@ -66,16 +66,6 @@ import org.voltdb.utils.SerializationHelper;
  */
 public class ExecutionEngineJNI extends ExecutionEngine {
 
-    /*
-     * Threshold of fullness where the EE will start compacting a table's blocks together
-     * to free memory and return to the OS. Block will always be freed if they are emptied
-     * and since rows are fixed size for a table they are always available for reuse.
-     *
-     * Valid values are 0-99, where 0 disables compaction completely and 99 compacts the table
-     * if it is even 1% empty.
-     */
-    public static final int EE_COMPACTION_THRESHOLD;
-
     private static final boolean HOST_TRACE_ENABLED;
 
     // Size of the parameter set buffer and the per-fragment stats buffer.
@@ -83,10 +73,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private static final int smallBufferSize = 256 * 1024;
 
     static {
-        EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
-        if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
-            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
-        }
         HOST_TRACE_ENABLED = LOG.isTraceEnabled();
     }
 
@@ -185,8 +171,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     drClusterId,
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
-                    isLowestSiteId,
-                    EE_COMPACTION_THRESHOLD);
+                    isLowestSiteId);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);

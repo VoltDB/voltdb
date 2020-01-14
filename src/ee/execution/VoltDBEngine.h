@@ -147,8 +147,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t drClusterId,
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
-                        bool isLowestSiteId,
-                        int32_t compactionThreshold = 95);
+                        bool isLowestSiteId);
         virtual ~VoltDBEngine();
 
         bool decommission(bool remove, bool promote, int newSitePerHost);
@@ -853,8 +852,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // For data from engine that must be shared/distributed to
         // other components. (Components MUST NOT depend on VoltDBEngine.h).
         ExecutorContext* m_executorContext = nullptr;
-
-        int32_t m_compactionThreshold;
 
         /*
          * DR conflict streamed tables

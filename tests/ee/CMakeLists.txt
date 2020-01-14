@@ -121,7 +121,6 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   plannodes/PlanNodeFragmentTest
   plannodes/PlanNodeUtilTest
   plannodes/WindowFunctionPlanNodeTest
-  storage/CompactionTest
   storage/constraint_test
   storage/CopyOnWriteTest
   storage/DRTupleStream_test

@@ -64,6 +64,7 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/tableiterator.h"
 #include "storage/TableStreamerInterface.h"
+#include "storage/TableTupleAllocator.hpp"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
 #include "storage/streamedtable.h"
@@ -73,12 +74,9 @@
 #include <map>
 #include <set>
 
-
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithMigratingRows;
-class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
 
+using namespace voltdb::storage;
 namespace catalog {
 class MaterializedViewInfo;
 }
@@ -210,9 +208,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class TableFactory;
     friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
-    friend class ::CompactionTest_BasicCompaction;
-    friend class ::CompactionTest_CompactionWithMigratingRows;
-    friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
     friend class ScopedDeltaTableContext;
@@ -225,8 +220,7 @@ private:
 
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
-            bool ownsTupleSchema,
-            int32_t compactionThreshold = 95);
+            bool ownsTupleSchema);
     void rollbackIndexChanges(TableTuple* tuple, int upto);
 
 public:
@@ -245,9 +239,6 @@ public:
     }
 
     void notifyQuantumRelease() {
-        if (compactionPredicate()) {
-            doForcedCompaction();
-        }
     }
 
     // Return a table iterator by reference
@@ -653,10 +644,6 @@ private:
 
     void nextFreeTuple(TableTuple* tuple);
 
-    bool doCompactionWithinSubset(TBBucketPtrVector* bucketVector);
-
-    bool doForcedCompaction();  // Returns true if a compaction was performed
-
     void insertIntoAllIndexes(TableTuple* tuple);
 
     void deleteFromAllIndexes(TableTuple* tuple);
@@ -804,6 +791,9 @@ private:
     PersistentTableStats m_stats;
 
     // STORAGE TRACKING
+    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>,
+            TxnPreHook<NonCompactingChunks<LazyNonCompactingChunk>, HistoryRetainTrait<gc_policy::batched>>>;
+    unique_ptr<Alloc> m_dataStorage;
 
     // Map from load to the blocks with level of load
     TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
@@ -822,8 +812,6 @@ private:
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
-
-    int m_failedCompactionCount;
 
     // This is a testability feature not intended for use in product logic.
     int m_invisibleTuplesPendingDeleteCount;
