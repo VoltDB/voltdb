@@ -157,7 +157,7 @@ public class SynchronizedStatesManager {
     }
 
     protected abstract class ZKAsyncChildrenHandler implements AsyncCallback.ChildrenCallback, Runnable {
-        KeeperException.Code m_resultCode;
+        KeeperException.Code m_resultCode; // should be either OK or NONODE
         List<String> m_resultChildren;
 
         ZKAsyncChildrenHandler(String path, Watcher childrenWatcher) {
@@ -169,6 +169,11 @@ public class SynchronizedStatesManager {
                 m_resultCode = KeeperException.Code.get(rc);
                 if (m_resultCode == KeeperException.Code.OK) {
                     m_resultChildren = children;
+                }
+                else {
+                    assert(m_resultCode == KeeperException.Code.NONODE ||
+                            m_resultCode == KeeperException.Code.CONNECTIONLOSS ||
+                            m_resultCode == KeeperException.Code.SESSIONEXPIRED);
                 }
                 if (!m_done.get()) {
                     // Will execute the specialized implementation of Run()
@@ -487,6 +492,11 @@ public class SynchronizedStatesManager {
                     // ignore.
                     initializationFailed();
                     return false;
+                }
+                else if (code != KeeperException.Code.NODEEXISTS && code != KeeperException.Code.OK) {
+                    org.voltdb.VoltDB.crashLocalVoltDB(
+                            "Unexpected failure (" + code.name() + ") in ZooKeeper while initializeInstances.",
+                            true, null);
                 }
                 return true;
             }
@@ -2188,6 +2198,11 @@ public class SynchronizedStatesManager {
                 initializationFailed();
                 return false;
             }
+            else if (code != KeeperException.Code.NODEEXISTS && code != KeeperException.Code.OK) {
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Unexpected failure (" + code.name() + ") in ZooKeeper while initializeInstances.",
+                        true, null);
+            }
             return true;
         }
 
@@ -2209,7 +2224,6 @@ public class SynchronizedStatesManager {
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unexpected failure in initializeInstances.", true, e);
-                initializationFailed();
             }
         }
 
@@ -2273,7 +2287,6 @@ public class SynchronizedStatesManager {
         } catch (Exception e) {
             org.voltdb.VoltDB.crashLocalVoltDB(
                     "Unexpected failure in initializeInstances.", true, e);
-            m_done.set(true);
         }
     }
 

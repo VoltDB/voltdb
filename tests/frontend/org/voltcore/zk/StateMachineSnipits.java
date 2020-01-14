@@ -815,7 +815,7 @@ public class StateMachineSnipits extends ZKTestBase {
     }
 
     @Test
-    public void testStateChangeExample() {
+    public void testStateChangeExample() throws InterruptedException, ExecutionException {
         byte[] byteStates = new byte[] {5, 23, 54, 92, 118, 122};
         short[] shortStates = new short[] {5000, 6000, 7000, 8000, 9000, 10000};
 
@@ -832,73 +832,60 @@ public class StateMachineSnipits extends ZKTestBase {
         // This manager is named manager2 and it expects 2 state machine instance.s
         SynchronizedStatesManager ssmC1M2 = addStateMachineManagerFor(2, "COMMUNITY1", "manager2", 2);
 
-        try {
-            // Initialize ssmC1M1 with a byte (with 5) and short (with 7000) state machine
-            ByteStateChanger bC1M1 = new ByteStateChanger(ssmC1M1, "byteMachine", byteStates[0]);
-            ShortStateChanger sC1M1 = new ShortStateChanger(ssmC1M1, "shortMachine", shortStates[2]);
-            ListenableFuture<Boolean> bc1m1Ready = bC1M1.startAsync();
-            ListenableFuture<Boolean> sc1m1Ready = sC1M1.startAsync();
-            // This should be the same future because they share the same SSM
-            assertEquals(bc1m1Ready, sc1m1Ready);
-            while (!bC1M1.isInitialized() && !sC1M1.isInitialized()) {
-                Thread.yield();
-            }
-            try {
-                bc1m1Ready.get();
-            }
-            catch (ExecutionException e) {
-                fail();
-            }
-            assertTrue(bC1M1.m_currentState == byteStates[0]);
-            assertTrue(sC1M1.m_currentState == shortStates[2]);
-
-            // Initialize ssmC2M1 with a short state machine that will not participate in the same domain as sC1M1
-            ShortStateChanger sC2M1 = new ShortStateChanger(ssmC2M1, "shortMachine", shortStates[1]);
-            sC2M1.start();
-            while (!sC2M1.isInitialized()) {
-                Thread.yield();
-            }
-            assertTrue(sC2M1.m_currentState == shortStates[1]);
-
-            // Initialize ssmC2M2 with a short state machine that will not participate in the same domain as sC1M1
-            ShortStateChanger sC2M2 = new ShortStateChanger(ssmC2M2, "shortMachine", shortStates[3]);
-            sC2M2.start();
-            while (!sC2M2.isInitialized()) {
-                Thread.yield();
-            }
-            assertTrue(sC2M2.m_currentState == sC2M1.m_currentState && sC2M2.m_currentState == shortStates[1]);
-
-            // Change the state of sC2M2 and verify it is changed in sC2M1
-            sC2M2.changeState(shortStates[0]);
-            while (sC2M2.changeStillPending() && sC2M2.getState() != sC2M1.getState()) {
-                Thread.yield();
-            }
-            assertFalse(sC2M2.getState() == sC1M1.getState());
-
-            // Now we will add the byte and short state machines to synchronize with bC1M1 and sC1M1 respectively
-            ByteStateChanger bC1M2 = new ByteStateChanger(ssmC1M2, "byteMachine", byteStates[4]);
-            ShortStateChanger sC1M3 = new ShortStateChanger(ssmC1M2, "shortMachine", shortStates[4]);
-            ListenableFuture<Boolean> bc1m2Ready = bC1M2.startAsync();
-            // The first statemachine was started Asynchronously and this one is started Synchronously
-            sC1M3.start();
-            while (!bC1M2.isInitialized() && !sC1M3.isInitialized()) {
-                Thread.yield();
-            }
-            assertTrue(bc1m2Ready.get() != null && bc1m2Ready.isDone());
-            assertTrue(bC1M2.getState() == byteStates[0] && sC1M3.getState() == shortStates[2]);
-
-            // Make 2 state changes in a row from 2 different members and verify the final state is the last one
-            bC1M2.changeState(byteStates[0]);
-            bC1M1.changeState(byteStates[4]);
-            while (bC1M1.changeStillPending() && bC1M1.getState() == bC1M2.getState()) {
-                Thread.yield();
-            }
+        // Initialize ssmC1M1 with a byte (with 5) and short (with 7000) state machine
+        ByteStateChanger bC1M1 = new ByteStateChanger(ssmC1M1, "byteMachine", byteStates[0]);
+        ShortStateChanger sC1M1 = new ShortStateChanger(ssmC1M1, "shortMachine", shortStates[2]);
+        ListenableFuture<Boolean> bc1m1Ready = bC1M1.startAsync();
+        ListenableFuture<Boolean> sc1m1Ready = sC1M1.startAsync();
+        // This should be the same future because they share the same SSM
+        assertEquals(bc1m1Ready, sc1m1Ready);
+        while (!bC1M1.isInitialized() && !sC1M1.isInitialized()) {
+            Thread.yield();
         }
-        catch (InterruptedException e) {
-            fail();
+        bc1m1Ready.get();
+        assertTrue(bC1M1.m_currentState == byteStates[0]);
+        assertTrue(sC1M1.m_currentState == shortStates[2]);
+
+        // Initialize ssmC2M1 with a short state machine that will not participate in the same domain as sC1M1
+        ShortStateChanger sC2M1 = new ShortStateChanger(ssmC2M1, "shortMachine", shortStates[1]);
+        sC2M1.start();
+        while (!sC2M1.isInitialized()) {
+            Thread.yield();
         }
-        catch (ExecutionException e) {
-            fail();
+        assertTrue(sC2M1.m_currentState == shortStates[1]);
+
+        // Initialize ssmC2M2 with a short state machine that will not participate in the same domain as sC1M1
+        ShortStateChanger sC2M2 = new ShortStateChanger(ssmC2M2, "shortMachine", shortStates[3]);
+        sC2M2.start();
+        while (!sC2M2.isInitialized()) {
+            Thread.yield();
+        }
+        assertTrue(sC2M2.m_currentState == sC2M1.m_currentState && sC2M2.m_currentState == shortStates[1]);
+
+        // Change the state of sC2M2 and verify it is changed in sC2M1
+        sC2M2.changeState(shortStates[0]);
+        while (sC2M2.changeStillPending() && sC2M2.getState() != sC2M1.getState()) {
+            Thread.yield();
+        }
+        assertFalse(sC2M2.getState() == sC1M1.getState());
+
+        // Now we will add the byte and short state machines to synchronize with bC1M1 and sC1M1 respectively
+        ByteStateChanger bC1M2 = new ByteStateChanger(ssmC1M2, "byteMachine", byteStates[4]);
+        ShortStateChanger sC1M3 = new ShortStateChanger(ssmC1M2, "shortMachine", shortStates[4]);
+        ListenableFuture<Boolean> bc1m2Ready = bC1M2.startAsync();
+        // The first statemachine was started Asynchronously and this one is started Synchronously
+        sC1M3.start();
+        while (!bC1M2.isInitialized() && !sC1M3.isInitialized()) {
+            Thread.yield();
+        }
+        assertTrue(bc1m2Ready.get() != null && bc1m2Ready.isDone());
+        assertTrue(bC1M2.getState() == byteStates[0] && sC1M3.getState() == shortStates[2]);
+
+        // Make 2 state changes in a row from 2 different members and verify the final state is the last one
+        bC1M2.changeState(byteStates[0]);
+        bC1M1.changeState(byteStates[4]);
+        while (bC1M1.changeStillPending() && bC1M1.getState() == bC1M2.getState()) {
+            Thread.yield();
         }
     }
 
