@@ -35,17 +35,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Serializer for converting {@link ExportRow} to Avro format byte array as well as
  * register the schema in the schema registry.
  */
 public class ExportAvroSerializer {
-    private final Map<String, AvroDecoder> m_decoderMap = new HashMap<>(); // (topic -> decoder) mapping
+    private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>(); // (topic -> decoder) mapping
 
     private static String s_schemaRegistryUrl;
     private static SchemaRegistryClient s_schemaRegistryClient;
@@ -64,8 +64,6 @@ public class ExportAvroSerializer {
      * @return The serialize byte array in Avro format.
      */
     public byte[] serialize(ExportRow exportRow, String topic) {
-        // The schema cache operations are idempotent (every generation has the same schema),
-        // so the race condition is harmless.
         AvroDecoder decoder = m_decoderMap.computeIfAbsent(topic, k -> new AvroDecoder.Builder().build());
         GenericRecord avroRecord = decoder.decode(exportRow.generation, exportRow.tableName, exportRow.types,
                 exportRow.names, null, exportRow.values);
