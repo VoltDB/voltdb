@@ -76,7 +76,6 @@
 
 class CopyOnWriteTest;
 
-using namespace voltdb::storage;
 namespace catalog {
 class MaterializedViewInfo;
 }
@@ -224,7 +223,21 @@ private:
     void rollbackIndexChanges(TableTuple* tuple, int upto);
 
 public:
+    using Alloc = storage::HookedCompactingChunks<
+        storage::CompactingChunks<storage::shrink_direction::head>,
+            storage::TxnPreHook<storage::NonCompactingChunks<storage::LazyNonCompactingChunk>,
+                storage::HistoryRetainTrait<storage::gc_policy::batched>>>;
+    using txn_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::iterator;
+    using txn_const_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::const_iterator;
     virtual ~PersistentTable();
+    Alloc& allocator() noexcept {
+        vassert(m_dataStorage);
+        return *m_dataStorage;
+    }
+    Alloc const& allocator() const noexcept {
+        vassert(m_dataStorage);
+        return *m_dataStorage;
+    }
 
     int64_t occupiedTupleMemory() const {
         return m_tupleCount * m_tempTuple.tupleLength();
@@ -791,9 +804,7 @@ private:
     PersistentTableStats m_stats;
 
     // STORAGE TRACKING
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>,
-            TxnPreHook<NonCompactingChunks<LazyNonCompactingChunk>, HistoryRetainTrait<gc_policy::batched>>>;
-    Alloc m_dataStorage{sizeof(TableTuple)};
+    std::unique_ptr<Alloc> m_dataStorage;
 
     // Map from load to the blocks with level of load
     TBBucketPtrVector m_blocksNotPendingSnapshotLoad;

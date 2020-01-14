@@ -128,12 +128,7 @@ public:
      * backing store
      */
     inline void move(void *address) {
-#ifndef  NDEBUG
-        if (m_schema == NULL && address != NULL) {
-            StackTrace::printStackTrace();
-        }
-#endif
-        vassert(m_schema != NULL || address == NULL);
+        vassert(m_schema != nullptr || address == nullptr);
         m_data = reinterpret_cast<char*> (address);
     }
 
@@ -155,7 +150,7 @@ public:
     }
 
     /** Get the address of this tuple in the table's backing store */
-    inline char* address() const {
+    inline char* const& address() const {
         return m_data;
     }
 

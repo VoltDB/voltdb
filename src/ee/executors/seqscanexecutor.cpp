@@ -57,8 +57,7 @@
 using namespace voltdb;
 
 bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                             const ExecutorVector& executorVector)
-{
+                             const ExecutorVector& executorVector) {
     VOLT_TRACE("init SeqScan Executor");
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
@@ -94,16 +93,14 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
         // TODO: can this optimization be performed for CTE scans?
         if (m_insertExec) {
             setDMLCountOutputTable(executorVector.limits());
-        }
-        else {
+        } else {
             // Create output table based on output schema from the plan.
             std::string temp_name = (node->isSubqueryScan()) ?
                 node->getChildren()[0]->getOutputTable()->name():
                 node->getTargetTableName();
             setTempOutputTable(executorVector, temp_name);
         }
-    }
-    else {
+    } else {
         // Otherwise create a new temp table that mirrors the output
         // schema specified in the plan (which should mirror the
         // output schema for any inlined projection)
@@ -131,11 +128,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         input_table = ec->getCommonTable(node->getTargetTableName(),
                                          node->getCteStmtId());
-    }
-    else if (node->isSubqueryScan()) {
+    } else if (node->isSubqueryScan()) {
         input_table = node->getChildren()[0]->getOutputTable();
-    }
-    else {
+    } else {
         vassert(node->isPersistentTableScan());
         input_table = node->getTargetTable();
     }
@@ -181,19 +176,17 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     if (node->getPredicate() != NULL || projectionNode != NULL ||
         limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
-        node->isCteScan())
-    {
+        node->isCteScan()) {
         //
         // Just walk through the table using our iterator and apply
         // the predicate to each tuple. For each tuple that satisfies
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+//        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
-        if (predicate)
-        {
+        if (predicate) {
             VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
@@ -216,8 +209,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             if (m_aggExec != NULL) {
                 temp_tuple = m_aggExec->p_execute_init(params, &pmp,
                         inputSchema, m_tmpOutputTable, &postfilter);
-            }
-            else {
+            } else {
                 // We may actually find out during initialization
                 // that we are done.  The p_execute_init operation
                 // will tell us by returning false if so.  See the
@@ -246,55 +238,52 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                           ? (temp_tuple.getSchema()->columnCount() == projectionNode->getOutputColumnExpressions().size())
                           : true);
             }
-        }
-        else {
+        } else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
+        int tuple_ctr = 0;
+        storage::until<PersistentTable::txn_iterator>(
+                dynamic_cast<PersistentTable*>(input_table)->allocator(),      // TODO: not always a persistent table
+                [this, &input_table, &temp_tuple, &tuple_ctr, &pmp, &postfilter, &projectionNode, num_of_columns] (void* p) {
+                    if (postfilter.isUnderLimit()) {
+                        auto* tuple = reinterpret_cast<TableTuple*>(p);
+                        VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", tuple,
+                                   tuple->debug(input_table->name()).c_str(),
+                                   ++tuple_ctr, input_table->activeTupleCount());
+                        pmp.countdownProgress();
 
-        while (postfilter.isUnderLimit() && iterator.next(tuple))
-        {
-#if   defined(VOLT_TRACE_ENABLED)
-            int tuple_ctr = 0;
-#endif
-            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(input_table->name()).c_str(),
-                       ++tuple_ctr,
-                       (int)input_table->activeTupleCount());
-            pmp.countdownProgress();
-
-            //
-            // For each tuple we need to evaluate it against our predicate and limit/offset
-            //
-            if (postfilter.eval(&tuple, NULL))
-            {
-                //
-                // Nested Projection
-                // Project (or replace) values from input tuple
-                //
-                if (projectionNode != NULL)
-                {
-                    VOLT_TRACE("inline projection...");
-                    // Project the scanned table row onto
-                    // the columns of the select list in the
-                    // select statement.
-                    for (int ctr = 0; ctr < num_of_columns; ctr++) {
-                        NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
-                        temp_tuple.setNValue(ctr, value);
+                        //
+                        // For each tuple we need to evaluate it against our predicate and limit/offset
+                        //
+                        if (postfilter.eval(tuple, nullptr)) {
+                            //
+                            // Nested Projection
+                            // Project (or replace) values from input tuple
+                            //
+                            if (projectionNode != nullptr) {
+                                VOLT_TRACE("inline projection...");
+                                // Project the scanned table row onto
+                                // the columns of the select list in the
+                                // select statement.
+                                for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                                    NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(tuple, nullptr);
+                                    temp_tuple.setNValue(ctr, value);
+                                }
+                                this->outputTuple(temp_tuple);
+                            } else {
+                                this->outputTuple(*tuple);
+                            }
+                            pmp.countdownProgress();
+                        }
+                        return false;
+                    } else {
+                        return true;
                     }
-                    outputTuple(temp_tuple);
-                }
-                else
-                {
-                    outputTuple(tuple);
-                }
-                pmp.countdownProgress();
-            }
-        } // end while we have more tuples to scan
+                });
 
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
-        }
-        else if (m_insertExec != NULL) {
+        } else if (m_insertExec != NULL) {
             m_insertExec->p_execute_finish();
         }
     }
@@ -315,15 +304,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 void SeqScanExecutor::outputTuple(TableTuple& tuple) {
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_tuple(tuple);
-        return;
-    }
-    else if (m_insertExec != NULL) {
+    } else if (m_insertExec != NULL) {
         m_insertExec->p_execute_tuple(tuple);
-        return;
+    } else { // Insert the tuple into our output table
+        vassert(m_tmpOutputTable);
+        m_tmpOutputTable->insertTempTuple(tuple);
     }
-    //
-    // Insert the tuple into our output table
-    //
-    vassert(m_tmpOutputTable);
-    m_tmpOutputTable->insertTempTuple(tuple);
 }

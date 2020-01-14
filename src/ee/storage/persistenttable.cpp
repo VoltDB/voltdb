@@ -149,15 +149,16 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     vassert(schema != NULL);
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema);
+    // NOTE: we embed m_data pointer immediately after the
+    // boundary of TableTuple, so that there is no extra Pool
+    // that stores non-inlined tuple data.
+    m_dataStorage.reset(new Alloc{sizeof(TableTuple) + schema->tupleLength() + TUPLE_HEADER_SIZE});
 
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
         m_allowNulls[i] = columnInfo->allowNull;
     }
-
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>,
-               TxnPreHook<NonCompactingChunks<LazyNonCompactingChunk>, HistoryRetainTrait<gc_policy::batched>>>;
 
     // Also clear some used block state. this structure doesn't have
     // an block ownership semantics - it's just a cache. I think.
@@ -789,7 +790,12 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     // grab a tuple at the end of our chunk of memory
     //
 
-    TableTuple* target = const_cast<TableTuple *> (reinterpret_cast <TableTuple const*> (m_dataStorage.insert(&source)));
+    // NOTE: we are actually copying from memory beyond source,
+    // bc. how the TableTuple inlined data content (that m_data points
+    // to) is constructed in the Alloc. This is one hacky way to
+    // do it!!
+    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(m_dataStorage->insert(&source)));
+    target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));       // table tuple layout: m_data points directly beyond storage of TableTuple object
     target->copyForPersistentInsert(source);
     try {
         insertTupleCommon(source, *target, fallible);
