@@ -569,7 +569,9 @@ public final class TaskManager {
         try {
             constructor = (Constructor<T>) initializableClass.getConstructor();
         } catch (NoSuchMethodException e) {
-            return Pair.of(String.format("Class should have a public no argument constructor: %s", className), null);
+            return Pair.of(
+                    String.format("Class %s should be static and have a public no argument constructor", className),
+                    null);
         }
         Method initMethod = null;
         for (Method method : initializableClass.getMethods()) {
@@ -589,33 +591,42 @@ public final class TaskManager {
             parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
         } else {
             if (initMethod.getReturnType() != void.class) {
-                return Pair.of(String.format("Class initialization method is not void: %s", className), null);
+                return Pair.of(String.format("Class %s initialization method is not void", className), null);
             }
 
             Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
             takesHelper = TaskHelper.class.isAssignableFrom(initMethodParamTypes[0]);
 
-            int actualParamCount = initializerParameters.size() + (takesHelper ? 1 : 0);
+            int paramCountModifier = takesHelper ? 1 : 0;
+            int actualParamCount = initializerParameters.size() + paramCountModifier;
+            // If var arg this is the number of parameters not including the varArg parameter else Integer.MAX_VALUE
             int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
                     : Integer.MAX_VALUE;
             if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
-                return Pair.of(String.format(
-                        "Class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                        className, initMethod.getParameterCount(), initializerParameters.size()), null);
+                StringBuilder sb = new StringBuilder("Class ").append(className).append(" requires ");
+
+                if (minVarArgParamCount < Integer.MAX_VALUE) {
+                    sb.append("a minimum of ").append(minVarArgParamCount - paramCountModifier);
+                } else {
+                    sb.append(initMethod.getParameterCount() - paramCountModifier);
+                }
+
+                sb.append(" parameter(s). ").append(initializerParameters.size()).append(" parameter(s) provided");
+
+                return Pair.of(sb.toString(), null);
             }
 
             if (actualParamCount == 0) {
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
                 parameters = new Object[initMethod.getParameterCount()];
-                int indexOffset = takesHelper ? 1 : 0;
                 String[] varArgParams = null;
                 if (minVarArgParamCount < Integer.MAX_VALUE) {
                     varArgParams = new String[actualParamCount - minVarArgParamCount];
                     parameters[parameters.length - 1] = varArgParams;
                 }
                 for (TaskParameter sp : initializerParameters) {
-                    int index = sp.getIndex() + indexOffset;
+                    int index = sp.getIndex() + paramCountModifier;
                     if (index < minVarArgParamCount) {
                         try {
                             parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
