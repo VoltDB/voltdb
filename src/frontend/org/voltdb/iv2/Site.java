@@ -347,7 +347,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         /*
          * Expensive to compute, memoize it
          */
-        // private Boolean m_isLowestSiteId = null;
         // for initialization time
         @Override
         public boolean isLowestSiteId() {
