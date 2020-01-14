@@ -318,6 +318,8 @@ public class PlannerTool {
                 task.getParsedQuery());
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
+        core.setPartitioningParamValue(plan.getPartitioningValue());
+
         // TODO Calcite ready: enable when we are ready
         throw new PlannerFallbackException("planSqlCalcite not ready");
         // return new AdHocPlannedStatement(plan, core);

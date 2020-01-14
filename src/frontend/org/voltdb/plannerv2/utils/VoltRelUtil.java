@@ -146,9 +146,11 @@ public class VoltRelUtil {
                 postPlannerVisitor.isOrderDeterministic(),  // is order deterministic
                 null); // no details on determinism
 
-        compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
+        compiledPlan.setStatementPartitioning(StatementPartitioning.inferPartitioning());
 
         compiledPlan.setParameters(postPlannerVisitor.getParameterValueExpressions());
+
+        compiledPlan.setPartitioningValue(VoltRexUtil.extractPartitioningValue(rootDist));
 
         return compiledPlan;
     }
@@ -199,5 +201,4 @@ public class VoltRelUtil {
         }
         return Optional.of(fragmentLimit);
     }
-
 }
