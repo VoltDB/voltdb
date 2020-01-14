@@ -982,12 +982,12 @@ public class TestTaskManager {
         @Override
         public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.procedureCall(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
         public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.procedureCall(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
         @Override
@@ -1004,12 +1004,12 @@ public class TestTaskManager {
         @Override
         public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.procedureCall(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
 
         public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createProcedure(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
+            return ScheduledAction.procedureCall(100, TimeUnit.MICROSECONDS, this::getNextAction, PROCEDURE_NAME);
         }
     }
 
@@ -1025,8 +1025,8 @@ public class TestTaskManager {
         public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
             return ++m_runCount < m_maxRunCount
-                    ? ScheduledAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
-                    : ScheduledAction.createExit(null);
+                    ? ScheduledAction.callback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : ScheduledAction.exit(null);
         }
 
         public ScheduledAction getNextAction(ActionResult previousProcedureRun) {
@@ -1034,8 +1034,8 @@ public class TestTaskManager {
             s_postRunActionSchedulerCallCount.getAndIncrement();
 
             return ++m_runCount < m_maxRunCount
-                    ? ScheduledAction.createCallback(100, TimeUnit.MICROSECONDS, this::getNextAction)
-                    : ScheduledAction.createExit(null);
+                    ? ScheduledAction.callback(100, TimeUnit.MICROSECONDS, this::getNextAction)
+                    : ScheduledAction.exit(null);
         }
     }
 
@@ -1091,13 +1091,13 @@ public class TestTaskManager {
         @Override
         public Action getFirstAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return Action.createProcedure(this::getNextAction, PROCEDURE_NAME);
+            return Action.procedureCall(this::getNextAction, PROCEDURE_NAME);
         }
 
         private Action getNextAction(ActionResult result) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return (++m_count & 0x1) == 0 ? Action.createProcedure(this::getNextAction, PROCEDURE_NAME)
-                    : Action.createCallback(this::getNextAction);
+            return (++m_count & 0x1) == 0 ? Action.procedureCall(this::getNextAction, PROCEDURE_NAME)
+                    : Action.callback(this::getNextAction);
         }
     }
 
@@ -1105,12 +1105,12 @@ public class TestTaskManager {
         @Override
         public ScheduledAction getFirstScheduledAction() {
             s_firstActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+            return ScheduledAction.callback(10, TimeUnit.MICROSECONDS, this::getNextAction);
         }
 
         private ScheduledAction getNextAction(ActionResult result) {
             s_postRunActionSchedulerCallCount.getAndIncrement();
-            return ScheduledAction.createCallback(10, TimeUnit.MICROSECONDS, this::getNextAction);
+            return ScheduledAction.callback(10, TimeUnit.MICROSECONDS, this::getNextAction);
         }
 
         @Override

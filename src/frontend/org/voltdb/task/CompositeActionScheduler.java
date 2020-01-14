@@ -35,9 +35,9 @@ final class CompositeActionScheduler implements ActionScheduler {
     public ScheduledAction getFirstScheduledAction() {
         Action action = m_actionGenerator.getFirstAction();
         if (action.getType().isStop()) {
-            return ScheduledAction.createStop(action);
+            return ScheduledAction.of(action);
         }
-        return ScheduledAction.create(m_intervalGenerator.getFirstInterval(), action);
+        return ScheduledAction.of(m_intervalGenerator.getFirstInterval(), action);
     }
 
     @Override
