@@ -62,8 +62,7 @@ public:
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
-                             true,  // this is the loweest SiteId/PartitionId
-                             95);   // compaction threshold
+                             true); // this is the loweest SiteId/PartitionId
         m_engine->setUndoToken(m_undoToken);
     }
     ~PersistentTableTest()

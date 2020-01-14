@@ -390,10 +390,6 @@ public:
         }
     }
 
-    bool doForcedCompaction(PersistentTable *table) {
-        return table->doForcedCompaction();
-    }
-
     void checkTuples(size_t tupleCount, const T_ValueSet& expected, const T_ValueSet& received) {
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
@@ -1697,7 +1693,6 @@ public:
             for (size_t i = 0; i < churn; i++) {
                 m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
             }
-            m_test.doForcedCompaction(m_test.m_table);
             // Re-insert the same number of tuples.
             for (size_t i = 0; i < churn; i++) {
                 m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);

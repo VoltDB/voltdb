@@ -478,15 +478,6 @@ TEST_F(CoveringCellIndexTest, TableCompaction) {
     int numTuples = table->visibleTupleCount();
     deleteSomeRecords(table.get(), numTuples, numTuples * 0.99);
 
-#ifndef MEMCHECK
-    ASSERT_TRUE(table->doForcedCompaction());
-#else
-        // This returns a boolean indicating if compaction was done.
-        // MEMCHECK mode limits table blocks to one tuple for block, so
-        // compaction won't occur.  Too bad.
-        ASSERT_FALSE(table->doForcedCompaction());
-#endif
-
     std::string msg;
     ASSERT_TRUE_WITH_MESSAGE(ccIndex->checkValidityForTest(table.get(), &msg), msg.c_str());
 

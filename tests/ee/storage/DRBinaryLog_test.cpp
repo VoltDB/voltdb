@@ -355,7 +355,7 @@ public:
                                                                                                              false, -1,
                                                                                                              PERSISTENT, 0,
                                                                                                              INT_MAX,
-                                                                                                             95, true,
+                                                                                                             true,
                                                                                                              true));
         }
 
@@ -377,7 +377,7 @@ public:
                                                                                                                    false, -1,
                                                                                                                    PERSISTENT, 0,
                                                                                                                    INT_MAX,
-                                                                                                                   95, false,
+                                                                                                                   false,
                                                                                                                    true));
         }
         m_table->setDR(true);

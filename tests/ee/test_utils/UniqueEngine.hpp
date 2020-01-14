@@ -80,8 +80,7 @@ private:
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              tempTableMemoryLimitInBytes,
-                             true, // this is lowest site/engineId
-                             95);   // compaction threshold
+                             true); // this is lowest site/engineId
         m_engine->setUndoToken(0);
     }
     UniqueEngine()
