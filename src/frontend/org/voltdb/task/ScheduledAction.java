@@ -41,8 +41,8 @@ public class ScheduledAction {
      * @param action Base {@link Action} to get type and message from
      * @return A new {@link ScheduledAction} derived from {@code action}
      */
-    public static ScheduledAction createStop(Action action) {
-        if (!action.getType().isStop()) {
+    public static ScheduledAction of(Action action) {
+        if (!requireNonNull(action, "action").getType().isStop()) {
             throw new IllegalArgumentException("Action type must be stop");
         }
 
@@ -57,17 +57,18 @@ public class ScheduledAction {
      * @param action   To be performed after {@code interval}
      * @return A new {@link ScheduledAction} from combining {@code interval} and {@code action}
      */
-    public static ScheduledAction create(Interval interval, Action action) {
-        if (action.getType().isStop()) {
+    public static ScheduledAction of(Interval interval, Action action) {
+        requireNonNull(interval, "interval");
+        if (requireNonNull(action, "action").getType().isStop()) {
             throw new IllegalArgumentException("Action type cannot be stop");
         }
 
         return new ScheduledAction(interval.getInterval(TimeUnit.NANOSECONDS), action, r -> {
             Action nextAction = action.getCallback().apply(r);
             if (nextAction.getType().isStop()) {
-                return createStop(nextAction);
+                return of(nextAction);
             }
-            return create(interval.getCallback().apply(r), nextAction);
+            return of(interval.getCallback().apply(r), nextAction);
         });
     }
 
@@ -80,7 +81,7 @@ public class ScheduledAction {
      * @param statusMessage To log indicating the details of the error. May be {@code null}
      * @return A new {@link ActionType#ERROR} instance of {@link ScheduledAction}
      */
-    public static ScheduledAction createError(String statusMessage) {
+    public static ScheduledAction error(String statusMessage) {
         return new ScheduledAction(-1, new ActionDescription(ActionType.ERROR, statusMessage, null), null);
     }
 
@@ -93,7 +94,7 @@ public class ScheduledAction {
      * @param statusMessage To log indicating the details of the error. May be {@code null}
      * @return A new {@link ActionType#EXIT} instance of {@link ScheduledAction}
      */
-    public static ScheduledAction createExit(String statusMessage) {
+    public static ScheduledAction exit(String statusMessage) {
         return new ScheduledAction(-1, new ActionDescription(ActionType.EXIT, statusMessage, null), null);
     }
 
@@ -107,12 +108,12 @@ public class ScheduledAction {
      * @param procedureParameters To pass to procedure during execution
      * @return A new {@link ActionType#PROCEDURE} instance of {@link ScheduledAction}
      */
-    public static ScheduledAction createProcedure(long interval, TimeUnit timeUnit,
+    public static ScheduledAction procedureCall(long interval, TimeUnit timeUnit,
             Function<ActionResult, ScheduledAction> callback, String procedure, Object... procedureParameters) {
-        return new ScheduledAction(interval, timeUnit,
-                new ActionDescription(ActionType.PROCEDURE, null, requireNonNull(procedure),
-                        requireNonNull(procedureParameters)),
-                requireNonNull(callback));
+        return new ScheduledAction(interval, requireNonNull(timeUnit, "timeUnit"),
+                new ActionDescription(ActionType.PROCEDURE, null, requireNonNull(procedure, "procedure"),
+                        requireNonNull(procedureParameters, "procedureParameters")),
+                requireNonNull(callback, "callback"));
     }
 
     /**
@@ -125,10 +126,10 @@ public class ScheduledAction {
      * @param callback That is invoked after {@code interval} has passed
      * @return A new {@link ActionType#CALLBACK} instance of {@link ScheduledAction}
      */
-    public static ScheduledAction createCallback(long interval, TimeUnit timeUnit,
+    public static ScheduledAction callback(long interval, TimeUnit timeUnit,
             Function<ActionResult, ScheduledAction> callback) {
-        return new ScheduledAction(interval, timeUnit, new ActionDescription(ActionType.CALLBACK, null, null),
-        requireNonNull(callback));
+        return new ScheduledAction(interval, requireNonNull(timeUnit, "timeUnit"),
+                new ActionDescription(ActionType.CALLBACK, null, null), requireNonNull(callback, "callback"));
     }
 
     private ScheduledAction(long interval, TimeUnit timeUnit, ActionDescription action,

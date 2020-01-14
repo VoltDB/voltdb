@@ -35,6 +35,6 @@ import org.voltdb.task.TestTasksEnd2End;
 public class CustomTestActionScheduler implements ActionScheduler {
     @Override
     public ScheduledAction getFirstScheduledAction() {
-        return ScheduledAction.createCallback(5, TimeUnit.SECONDS, r -> getFirstScheduledAction());
+        return ScheduledAction.callback(5, TimeUnit.SECONDS, r -> getFirstScheduledAction());
     }
 }

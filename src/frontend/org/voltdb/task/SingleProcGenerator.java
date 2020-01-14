@@ -32,7 +32,7 @@ public final class SingleProcGenerator implements ActionGenerator {
     }
 
     public void initialize(TaskHelper helper, String procedure, Object... procedureParameters) {
-        m_action = Action.createProcedure(r -> m_action, procedure, procedureParameters);
+        m_action = Action.procedureCall(r -> m_action, procedure, procedureParameters);
         m_isReadOnly = helper.isProcedureReadOnly(procedure);
     }
 
