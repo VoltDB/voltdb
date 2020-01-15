@@ -533,7 +533,7 @@ public class AsyncExportClient
 
             // 2. Print TABLE EXPORT stats if that's configured
             if (config.usetableexport) {
-		log.info(
+                log.info(
                     String.format(
                         "-------------------------------------------------------------------------------------\n"
                       + " Table/Export Results\n"
@@ -560,7 +560,7 @@ public class AsyncExportClient
                 // do some sanity checks on the counts...
                 long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
                 if (table_with_metadata_count != meta_data_expected) {
-                    System.err.println("Metadata expected " + meta_data_expected +
+                    System.err.println("ERROR: Metadata expected " + meta_data_expected +
                         " count does not match with table count: " + table_with_metadata_count + "\n");
                 }
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
