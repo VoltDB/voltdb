@@ -78,7 +78,7 @@ public class TaskLoader extends BenchmarkThread {
     }
 
     void shutdown() {
-        log.debug("+++ In TaskLoader shutdown method");
+        // log.debug("+++ In TaskLoader shutdown method");
         m_shouldContinue.set(false);
         log.info("TaskLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: "
                 + rowsLoaded.get() + " deletes remaining: " + deletesRemaining);
@@ -142,13 +142,14 @@ public class TaskLoader extends BenchmarkThread {
                     Map<String, Object> stats;
                     try {
                         stats = getStats(tableName);
+                        //log.info("+++ TASK STATS: " + stats);
                     } catch (ProcCallException e) {
                         // retry
                         continue;
                     }
                     if (response.getStatus() == ClientResponse.SUCCESS) {
                         long unDeletedRows = response.getResults()[0].asScalarLong();
-                        log.debug("+++ " + tableName + " rows: " + unDeletedRows);
+                        // log.debug("+++ " + tableName + " rows: " + unDeletedRows);
                         // Object rows_left = (type == "TTL") ? stats.get("ROWS_LEFT") :
                         // stats.get("TUPLE_PENDING");
                         log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted/migrated:"
@@ -201,7 +202,8 @@ public class TaskLoader extends BenchmarkThread {
             }
 
             VoltTable t = cr.getResults()[0];
-            System.out.println(t.toFormattedString());
+            // log.info("+++ Stats:");
+            // log.info(t.toFormattedString());
             t.resetRowPosition();
             stats.put("TABLE", tableName);
             /*
@@ -299,7 +301,7 @@ public class TaskLoader extends BenchmarkThread {
             int retries = TWELVE;
             while (rowRemaining != 0) {
                 rowRemaining = monitor.getRemainingRowCount(tableName);
-                log.debug("+++ Waiting for table to drain. Retry " + retries + ", rows remaining: " + rowRemaining);
+                // log.debug("+++ Waiting for table to drain. Retry " + retries + ", rows remaining: " + rowRemaining);
 
                 if (rowRemaining == 0) {
                     break;

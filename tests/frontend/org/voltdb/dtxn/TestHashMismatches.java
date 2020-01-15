@@ -42,9 +42,12 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.iv2.DuplicateCounter;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
@@ -78,6 +81,8 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     final int kfactor = 1;
     static String expectedLogMessage = "Hash mismatch";
     static String expectHashDetectionMessage = "Hash mismatch is detected";
+    static String expectedHashNotIncludeMessage = "after " + (DeterminismHash.MAX_HASHES_COUNT / 2 - DeterminismHash.HEADER_OFFSET + 1) + " statements";
+    static String expectedSysProcMessage = "is system procedure. Please Contact VoltDB Support.";
 
     LocalCluster createCluster(String method) throws IOException {
         return createCluster(method, kfactor, hostCount, sitesPerHost);
@@ -101,6 +106,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             builder.addProcedure(NonDeterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(Deterministic_RO_SP.class, "kv.key: 0");
             builder.addProcedure(NonDeterministic_RO_MP.class);
+            builder.addProcedure(Deterministic_RO_MP.class);
             server = new LocalCluster(method + ".jar", sph, hostcount, k, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
             server.setCallingClassName(method);
@@ -113,6 +119,12 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             List<String> logSearchPatterns = new ArrayList<>(1);
             logSearchPatterns.add(expectedLogMessage);
             logSearchPatterns.add(expectHashDetectionMessage);
+            logSearchPatterns.add(DuplicateCounter.FAIL_MSG);
+            logSearchPatterns.add(DuplicateCounter.MISMATCH_MSG);
+            logSearchPatterns.add(CatalogUtil.MISMATCHED_STATEMENTS);
+            logSearchPatterns.add(CatalogUtil.MISMATCHED_PARAMETERS);
+            logSearchPatterns.add(expectedHashNotIncludeMessage);
+            logSearchPatterns.add(expectedSysProcMessage);
             server.setLogSearchPatterns(logSearchPatterns);
 
             client = ClientFactory.createClient();
@@ -156,6 +168,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     0,
                     0,
                     NonDeterministicSPProc.MISMATCH_INSERTION);
+            assertTrue(server.anyHostHasLogMessage(CatalogUtil.MISMATCHED_PARAMETERS));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();
@@ -193,22 +206,27 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         }
     }
 
+    // This test seems has no meaning.
+    // Volt should be able to detect hash mismatch at insertion, not reply on a later
+    // deterministic proc to bail out.
+    // It was passing because the deterministic proc was not defined.
     /**
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
+    /*
     @Test(timeout = 60_000)
     public void testDeterministicProc() throws Exception {
         LocalCluster server = createCluster("testDeterministicProc");
         try {
             insertMoreNormalData(1, 100);
-            client.callProcedure("Deterministic_RO_MP", 0);
+            client.callProcedure("Deterministic_RO_MP");
             fail("Deterministic procedure succeeded for non-deterministic results?");
         } catch (ProcCallException e) {
-            // I don't quite understand what it try to test for.
+            e.printStackTrace();
         } finally {
             shutDown(server);
         }
-    }
+    }*/
 
     /**
      * Test that different whitespace fails the determinism CRC check on SQL
@@ -222,6 +240,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     0,
                     0,
                     NonDeterministicSPProc.MISMATCH_WHITESPACE_IN_SQL);
+            assertTrue(server.anyHostHasLogMessage(CatalogUtil.MISMATCHED_STATEMENTS));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();
@@ -261,6 +280,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     1234, //not use
                     999,
                     NonDeterministicSPProc.MULTI_STATEMENT_MISMATCH);
+            assertTrue(server.anyHostHasLogMessage(expectedHashNotIncludeMessage));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();
@@ -299,6 +319,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     1234, //not use
                     999,
                     NonDeterministicSPProc.PARTIAL_STATEMENT_MISMATCH);
+            assertTrue(server.anyHostHasLogMessage(CatalogUtil.MISMATCHED_PARAMETERS));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();
@@ -328,6 +349,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     1234,
                     999,
                     NonDeterministicSPProc.TXN_ABORT);
+            assertTrue(server.anyHostHasLogMessage(DuplicateCounter.FAIL_MSG));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();

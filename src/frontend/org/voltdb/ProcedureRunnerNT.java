@@ -27,9 +27,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.network.Connection;
@@ -264,14 +264,12 @@ public class ProcedureRunnerNT {
 
         // hold this lock while getting the count of live nodes
         // also held when
-        long[] hsids;
+        Set<Long> hsids;
         synchronized(m_allHostCallbackLock) {
             // collect the set of live client interface mailbox ids
-            m_outstandingAllHostProcedureHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
-            // convert host ids to hsids
-            hsids = m_outstandingAllHostProcedureHostIds.stream()
-                    .mapToLong(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                    .toArray();
+            hsids = VoltZK.getMailBoxesForNT(VoltDB.instance().getHostMessenger().getZK());
+            m_outstandingAllHostProcedureHostIds =
+                    hsids.stream().map(hsid->CoreUtils.getHostIdFromHSId(hsid)).collect(Collectors.toSet());
         }
 
         // send the invocation to all live nodes

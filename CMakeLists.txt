@@ -315,9 +315,8 @@ ExternalProject_Add(crypto
   DOWNLOAD_DIR ${VOLTDB_OPENSSL_BUILD_PREFIX}/src
   URL ${VOLTDB_OPENSSL_TARBALL}
   CONFIGURE_COMMAND ${VOLTDB_OPENSSL_SRC}/Configure --prefix=${VOLTDB_3PTY_INSTALL_PREFIX} ${VOLTDB_OPENSSL_TOKEN}
-  BUILD_COMMAND $(MAKE)
   BUILD_IN_SOURCE 1
-  INSTALL_COMMAND $(MAKE) install
+  INSTALL_COMMAND make install_sw
   )
 ExternalProject_get_property(crypto INSTALL_DIR)
 SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
@@ -359,8 +358,6 @@ ExternalProject_Add(pcre2
   DOWNLOAD_DIR ${VOLTDB_PCRE2_BUILD_PREFIX}/src
   URL ${VOLTDB_PCRE2_TARBALL}
   CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure --disable-shared --with-pic --prefix=${VOLTDB_3PTY_INSTALL_PREFIX}
-  BUILD_COMMAND $(MAKE)
-  INSTALL_COMMAND $(MAKE) install
   )
 
 ########################################################################
@@ -392,8 +389,6 @@ ExternalProject_Add(s2geo
   BINARY_DIR ${VOLTDB_S2GEO_OBJ}
   CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
   CMAKE_GENERATOR ${CMAKE_GENERATOR}
-  BUILD_COMMAND $(MAKE) all
-  INSTALL_COMMAND $(MAKE) install
   )
 ADD_DEPENDENCIES(s2geo crypto)
 ########################################################################
