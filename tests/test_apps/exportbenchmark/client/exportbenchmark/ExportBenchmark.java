@@ -295,11 +295,9 @@ public class ExportBenchmark {
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
                 log.info("Waited too long...");
-                log.info(stats);
                 break;
             }
             if (ctime - st > (3 * 60 * 1000)) {
-                // log.info(stats);
                 st = System.currentTimeMillis();
             }
             long ts = 0;
@@ -311,7 +309,6 @@ public class ExportBenchmark {
                 }
                 if (stats.getLong("TUPLE_PENDING") != 0) {
                     passedThisTime = false;
-                    // log.info("Table " + stats.getString("SOURCE") + "/" + stats.getString("TARGET") + ": Partition Not Zero... Pending: " + stats.getLong("TUPLE_PENDING"));
                     break;
                 }
             }
@@ -330,54 +327,49 @@ public class ExportBenchmark {
             Thread.sleep(5000);
         }
         log.info("Passed is: " + passed);
-        // log.info(stats);
         return passed;
     }
 
     public boolean waitTilTupleCountSettles(long insertCount) throws IOException, InterruptedException {
-    	/*
-    	 * There might be a delay between the completion of the last insert transaction and when
-    	 * stats register all tuples, that is TUPLE_COUNT = insert count
-    	 *
-    	 * Since at this point, all the stream/partitions are disabled, we have to be careful
-    	 * to count each partition for each table once.
-    	 */
-    	long st = System.currentTimeMillis();
-    	//Wait 10 mins only
-    	long end = st + (10 * 60 * 1000);
-    	while (true) {
+        /*
+         * There might be a delay between the completion of the last insert transaction and when
+         * stats register all tuples, that is TUPLE_COUNT = insert count
+         *
+         * Since at this point, all the stream/partitions are disabled, we have to be careful
+         * to count each partition for each table once.
+         */
+        long st = System.currentTimeMillis();
+        //Wait 10 mins only
+        long end = st + (10 * 60 * 1000);
+        while (true) {
             Map<String, Long> partitionMap = new HashMap<String, Long>();
-    		VoltTable stats = getExportStats();
-    		log.info("Stats: " + stats);
-    		long totalTupleCount = 0;
-    		while (stats.advanceRow()) {
+            VoltTable stats = getExportStats();
+            long totalTupleCount = 0;
+            while (stats.advanceRow()) {
                 long partitionid = stats.getLong("PARTITION_ID");
                 String source = stats.getString("SOURCE");
-    			Long tupleCount = stats.getLong("TUPLE_COUNT");
+                Long tupleCount = stats.getLong("TUPLE_COUNT");
                 String tablePart = source + "_" + partitionid;
-                log.info("tablePart: " + tablePart + ", tupleCount: " + tupleCount);
                 if (! partitionMap.containsKey(tablePart)) {
                     // only put this table+partition count in the map once
-                    log.info("Adding...");
-                    log.info("\ttablePart: " + tablePart + ", tupleCount: " + tupleCount);
-                    log.info("\ttotalTupleCount: " + totalTupleCount);
                     partitionMap.put(tablePart, tupleCount);
                     totalTupleCount += tupleCount;
                 }
-    		}
-    		log.info("+++ totalTupleCount: " + totalTupleCount + ", insertCount: " + insertCount);
-    		if (totalTupleCount == insertCount) {
-    			return true;
-    		}
-    		long ctime = System.currentTimeMillis();
-    		if (ctime > end) {
-    			log.info("Waited too long...");
-    			return false;
-    		}
-        	Thread.sleep(1000);
-    	}
+            }
+            if (totalTupleCount == insertCount) {
+                long settleTimeMillis = System.currentTimeMillis() - st;
+                log.info("TUPLE_COUNT settled in " + settleTimeMillis/1000.0 + " seconds");
+                return true;
+            }
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                log.info("Waited too long...");
+                return false;
+            }
+            Thread.sleep(1000);
+        }
     }
- 
+
     /**
      * Connect to a single server.
      *
