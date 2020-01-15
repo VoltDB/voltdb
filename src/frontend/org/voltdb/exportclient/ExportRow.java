@@ -111,15 +111,22 @@ public class ExportRow {
      * @throws IOException
      */
     public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, ByteBuffer bb) throws IOException {
-        final int partitionColIndex = bb.getInt();
-        final int columnCount = bb.getInt();
-        assert(columnCount <= DDLCompiler.MAX_COLUMNS);
-        boolean[] is_null = extractNullFlags(bb, columnCount);
-
-        assert(previous != null);
+        assert (previous != null);
         if (previous == null) {
             throw new IOException("Export block with no schema found without prior block with schema.");
         }
+
+        final int partitionColIndex = bb.getInt();
+        final int columnCount = bb.getInt();
+        assert(columnCount <= DDLCompiler.MAX_COLUMNS);
+        if (columnCount != previous.names.size()) {
+            throw new IOException(
+                    String.format("Read %d columns from row but expected %d columns: %s", columnCount,
+                            previous.names.size(), previous));
+        }
+
+        boolean[] is_null = extractNullFlags(bb, columnCount);
+
         final long generation = previous.generation;
         final String tableName = previous.tableName;
         final List<String> colNames = previous.names;
