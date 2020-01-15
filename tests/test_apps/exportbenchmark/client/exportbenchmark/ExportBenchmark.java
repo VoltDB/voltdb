@@ -338,7 +338,7 @@ public class ExportBenchmark {
     	/*
     	 * There might be a delay between the completion of the last insert transaction and when
     	 * stats register all tuples, that is TUPLE_COUNT = insert count
-    	 * 
+    	 *
     	 * Since at this point, all the stream/partitions are disabled, we have to be careful
     	 * to count each partition for each table once.
     	 */
@@ -377,7 +377,7 @@ public class ExportBenchmark {
         	Thread.sleep(1000);
     	}
     }
-    
+ 
     /**
      * Connect to a single server.
      *
