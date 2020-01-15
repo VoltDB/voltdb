@@ -67,11 +67,11 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     vassert(!node->isPersistentTableScan() || node->getTargetTable());
 
     // Subquery scans must have a child that produces the output to scan
-    vassert(!node->isSubqueryScan() || (node->getChildren().size() == 1));
+    vassert(! node->isSubqueryScan() || (node->getChildren().size() == 1));
 
     // In the case of CTE scans, we will resolve target table below.
-    vassert(!node->isCteScan() || (node->getChildren().size() == 0
-                                   && node->getTargetTable() == NULL));
+    vassert(! node->isCteScan() ||
+            (node->getChildren().empty() && node->getTargetTable() == nullptr));
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
@@ -79,7 +79,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
-    vassert(m_aggExec == NULL || m_insertExec == NULL);
+    vassert(m_aggExec == nullptr || m_insertExec == nullptr);
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -89,7 +89,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0 || node->isCteScan()) {
+    if (node->getPredicate() != nullptr || ! node->getInlinePlanNodes().empty() || node->isCteScan()) {
         // TODO: can this optimization be performed for CTE scans?
         if (m_insertExec) {
             setDMLCountOutputTable(executorVector.limits());
@@ -105,8 +105,8 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
         // schema specified in the plan (which should mirror the
         // output schema for any inlined projection)
         node->setOutputTable(node->isSubqueryScan() ?
-                             node->getChildren()[0]->getOutputTable() :
-                             node->getTargetTable());
+                node->getChildren()[0]->getOutputTable() :
+                node->getTargetTable());
     }
 
     return true;
@@ -123,7 +123,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         return true;
     }
 
-    Table* input_table = NULL;
+    Table* input_table = nullptr;
     if (node->isCteScan()) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         input_table = ec->getCommonTable(node->getTargetTableName(),
@@ -157,7 +157,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     int num_of_columns = -1;
     ProjectionPlanNode* projectionNode = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PlanNodeType::Projection));
-    if (projectionNode != NULL) {
+    if (projectionNode != nullptr) {
         num_of_columns = static_cast<int> (projectionNode->getOutputColumnExpressions().size());
     }
     //
@@ -174,8 +174,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // at the TargetTable. Therefore, there is nothing we more we need
     // to do here
     //
-    if (node->getPredicate() != NULL || projectionNode != NULL ||
-        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
+    if (node->getPredicate() != nullptr || projectionNode != nullptr ||
+        limit_node != nullptr || m_aggExec != nullptr || m_insertExec != nullptr ||
         node->isCteScan()) {
         //
         // Just walk through the table using our iterator and apply
@@ -183,7 +183,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-//        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate) {
@@ -201,12 +200,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
         vassert(m_tmpOutputTable);
-        if (m_aggExec != NULL || m_insertExec != NULL) {
+        if (m_aggExec != nullptr || m_insertExec != nullptr) {
             const TupleSchema * inputSchema = input_table->schema();
-            if (projectionNode != NULL) {
+            if (projectionNode != nullptr) {
                 inputSchema = projectionNode->getOutputTable()->schema();
             }
-            if (m_aggExec != NULL) {
+            if (m_aggExec != nullptr) {
                 temp_tuple = m_aggExec->p_execute_init(params, &pmp,
                         inputSchema, m_tmpOutputTable, &postfilter);
             } else {
@@ -234,7 +233,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 // We should have as many expressions in the
                 // projection node as there are columns in the
                 // input schema if there is an inline projection.
-                vassert(projectionNode != NULL
+                vassert(projectionNode != nullptr
                           ? (temp_tuple.getSchema()->columnCount() == projectionNode->getOutputColumnExpressions().size())
                           : true);
             }
@@ -242,11 +241,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
         int tuple_ctr = 0;
-        storage::until<PersistentTable::txn_iterator>(
-                dynamic_cast<PersistentTable*>(input_table)->allocator(),      // TODO: not always a persistent table
-                [this, &input_table, &temp_tuple, &tuple_ctr, &pmp, &postfilter, &projectionNode, num_of_columns] (void* p) {
+        storage::until<PersistentTable::txn_const_iterator>(
+                dynamic_cast<PersistentTable const*>(input_table)->allocator(),      // TODO: not always a persistent table
+                [this, &input_table, &temp_tuple, &tuple_ctr, &pmp, &postfilter, &projectionNode, num_of_columns]
+                (void const* p) {
                     if (postfilter.isUnderLimit()) {
-                        auto* tuple = reinterpret_cast<TableTuple*>(p);
+                        auto const* tuple = reinterpret_cast<TableTuple const*>(p);
                         VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", tuple,
                                    tuple->debug(input_table->name()).c_str(),
                                    ++tuple_ctr, input_table->activeTupleCount());
@@ -281,9 +281,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     }
                 });
 
-        if (m_aggExec != NULL) {
+        if (m_aggExec != nullptr) {
             m_aggExec->p_execute_finish();
-        } else if (m_insertExec != NULL) {
+        } else if (m_insertExec != nullptr) {
             m_insertExec->p_execute_finish();
         }
     }
@@ -301,10 +301,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
  * inline insert node.  If there is a limit or projection, this will have
  * been applied already.  So we don't really care about those here.
  */
-void SeqScanExecutor::outputTuple(TableTuple& tuple) {
-    if (m_aggExec != NULL) {
+void SeqScanExecutor::outputTuple(TableTuple const& tuple) {
+    if (m_aggExec != nullptr) {
         m_aggExec->p_execute_tuple(tuple);
-    } else if (m_insertExec != NULL) {
+    } else if (m_insertExec != nullptr) {
         m_insertExec->p_execute_tuple(tuple);
     } else { // Insert the tuple into our output table
         vassert(m_tmpOutputTable);

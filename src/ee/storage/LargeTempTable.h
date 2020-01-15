@@ -76,10 +76,10 @@ public:
     void deleteAllTempTuples() override;
 
     /** insert a tuple into this table */
-    bool insertTuple(TableTuple& tuple) override;
+    bool insertTuple(TableTuple const& tuple) override;
 
     /** insert a tuple into this table */
-    void insertTempTuple(TableTuple &source) override {
+    void insertTempTuple(TableTuple const& source) override {
         insertTuple(source);
     }
 

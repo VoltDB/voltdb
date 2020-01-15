@@ -134,7 +134,8 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
     throw SerializableEEException("May not use nextFreeTuple with streamed tables.");
 }
 
-void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream) {
+void StreamedTable::streamTuple(TableTuple const& source,
+        ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream) {
     if (m_executorContext->externalStreamsEnabled()) {
         int64_t currSequenceNo = ++m_sequenceNo;
         vassert(m_columnNames.size() == source.columnCount());
@@ -173,10 +174,9 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
     }
 }
 
-bool StreamedTable::insertTuple(TableTuple &source)
-{
+bool StreamedTable::insertTuple(TableTuple const& source) {
     // not null checks at first
-    FAIL_IF(!checkNulls(source)) {
+    FAIL_IF(! checkNulls(source)) {
         throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
     }
 

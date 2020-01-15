@@ -241,7 +241,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
     return rslt;
 }
 
-void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
+void InsertExecutor::p_execute_tuple_internal(TableTuple const& tuple) {
     const std::vector<int>& fieldMap = m_node->getFieldMap();
     std::size_t mapSize = fieldMap.size();
 
@@ -343,7 +343,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
     ++m_modifiedTuples;
 }
 
-void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
+void InsertExecutor::p_execute_tuple(TableTuple const& tuple) {
     // This should only be called from inlined insert executors because we have to change contexts every time
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
             m_replicatedTableOperation, m_engine->isLowestSite(),

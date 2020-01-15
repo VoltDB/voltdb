@@ -46,7 +46,7 @@ void LargeTempTable::getEmptyBlock() {
     m_blockIds.push_back(m_blockForWriting->id());
 }
 
-bool LargeTempTable::insertTuple(TableTuple& source) {
+bool LargeTempTable::insertTuple(TableTuple const& source) {
 
     if (m_blockForWriting == NULL) {
         if (! m_blockIds.empty()) {

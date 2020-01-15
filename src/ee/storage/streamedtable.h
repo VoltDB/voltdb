@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STREAMEDTABLE_H
-#define STREAMEDTABLE_H
+#pragma once
 
 #include <vector>
 
@@ -81,10 +80,11 @@ public:
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
-    void streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream = NULL);
-    virtual bool insertTuple(TableTuple &tuple);
+    void streamTuple(TableTuple const &source,
+            ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream = nullptr);
+    virtual bool insertTuple(TableTuple const& tuple);
 
-    virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
+    virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = nullptr);
     virtual void flushOldTuples(int64_t timeInMillis);
     void setGeneration(int64_t generation);
 
@@ -173,4 +173,3 @@ private:
 };
 
 }
-#endif

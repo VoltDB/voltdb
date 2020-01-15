@@ -68,10 +68,9 @@ size_t ExportTupleStream::appendTuple(
         int64_t spHandle,
         int64_t seqNo,
         int64_t uniqueId,
-        const TableTuple &tuple,
+        TableTuple const& tuple,
         int partitionColumn,
-        ExportTupleStream::STREAM_ROW_TYPE type)
-{
+        ExportTupleStream::STREAM_ROW_TYPE type) {
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
 

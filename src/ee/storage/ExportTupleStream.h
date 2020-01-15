@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EXPORTTUPLESTREAM_H_
-#define EXPORTTUPLESTREAM_H_
+#pragma once
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/StreamBlock.h"
@@ -94,7 +93,7 @@ public:
             int64_t spHandle,
             int64_t seqNo,
             int64_t uniqueId,
-            const TableTuple &tuple,
+            const TableTuple& tuple,
             int partitionColumn,
             ExportTupleStream::STREAM_ROW_TYPE type);
 
@@ -193,4 +192,3 @@ private:
 
 }
 
-#endif

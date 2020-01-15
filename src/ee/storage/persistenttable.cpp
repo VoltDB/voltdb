@@ -720,7 +720,7 @@ void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     }
 }
 
-void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
+void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool fallible) {
     // If the current table does not have a delta table, return.
     // If the current table has a delta table, but it is used by
     // a single table view during snapshot restore process, return.
@@ -763,12 +763,12 @@ TableTuple* PersistentTable::createTuple(TableTuple &source){
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
  */
-bool PersistentTable::insertTuple(TableTuple& source) {
+bool PersistentTable::insertTuple(TableTuple const& source) {
     insertPersistentTuple(source, true);
     return true;
 }
 
-void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
+void PersistentTable::insertPersistentTuple(TableTuple const& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
         std::ostringstream str;
         str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
@@ -791,7 +791,7 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     }
 }
 
-void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
+void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& target,
       bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     if (fallible) {
         // not null checks at first
@@ -899,7 +899,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     insertTupleIntoDeltaTable(source, fallible);
 }
 
-void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
+void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& target,
       bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
     doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);

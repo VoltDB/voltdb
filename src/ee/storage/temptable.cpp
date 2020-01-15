@@ -80,7 +80,7 @@ void TempTable::deleteAllTempTupleDeepCopies() {
     deleteAllTempTuples();
 }
 
-bool TempTable::insertTuple(TableTuple &source) {
+bool TempTable::insertTuple(TableTuple const& source) {
     insertTempTuple(source);
     return true;
 }

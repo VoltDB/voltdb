@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREABSTRACTEXPRESSION_H
-#define HSTOREABSTRACTEXPRESSION_H
+#pragma once
 
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
@@ -67,11 +66,26 @@ class TableTuple;
 // Base class for all expression nodes
 // ------------------------------------------------------------------
 class AbstractExpression {
+    static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
+    static const std::vector<AbstractExpression*> empty_expression;
+    bool initParamShortCircuits();
+  protected:
+    AbstractExpression *m_left, *m_right;
+    ExpressionType m_type;
+    bool m_hasParameter;
+    ValueType m_valueType;
+    int m_valueSize;
+    bool m_inBytes;
+
+    AbstractExpression();
+    AbstractExpression(ExpressionType type);
+    AbstractExpression(ExpressionType type, AbstractExpression *left, AbstractExpression *right);
   public:
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
-    virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
+    virtual NValue eval(const TableTuple *tuple1 = nullptr,
+            const TableTuple *tuple2 = nullptr) const = 0;
 
     /** return true if self or descendent should be substitute()'d */
     virtual bool hasParameter() const;
@@ -95,36 +109,30 @@ class AbstractExpression {
         return m_type;
     }
 
-    ValueType getValueType() const
-    {
+    ValueType getValueType() const {
         return m_valueType;
     }
 
-    int getValueSize() const
-    {
+    int getValueSize() const {
         return m_valueSize;
     }
 
-    bool getInBytes() const
-    {
+    bool getInBytes() const {
         return m_inBytes;
     }
 
     // These should really be part of the constructor, but plumbing
     // the type and size args through the whole of the expression world is
     // not something I'm doing right now.
-    void setValueType(ValueType type)
-    {
+    void setValueType(ValueType type) {
         m_valueType = type;
     }
 
-    void setInBytes(bool bytes)
-    {
+    void setInBytes(bool bytes) {
         m_inBytes = bytes;
     }
 
-    void setValueSize(int size)
-    {
+    void setValueSize(int size) {
         m_valueSize = size;
     }
 
@@ -140,27 +148,6 @@ class AbstractExpression {
        // Only FunctionExpression has children (as function arguments).
        return empty_expression;
     }
-
-  protected:
-    AbstractExpression();
-    AbstractExpression(ExpressionType type);
-    AbstractExpression(ExpressionType type,
-                       AbstractExpression *left,
-                       AbstractExpression *right);
-
-  private:
-    static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
-    static const std::vector<AbstractExpression*> empty_expression;
-    bool initParamShortCircuits();
-
-  protected:
-    AbstractExpression *m_left, *m_right;
-    ExpressionType m_type;
-    bool m_hasParameter;
-    ValueType m_valueType;
-    int m_valueSize;
-    bool m_inBytes;
 };
 
 }
-#endif

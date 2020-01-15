@@ -155,7 +155,7 @@ int Table::columnIndex(const std::string &name) const {
     return -1;
 }
 
-bool Table::checkNulls(TableTuple& tuple) const {
+bool Table::checkNulls(TableTuple const& tuple) const {
     vassert(m_columnCount == tuple.columnCount());
     for (int i = m_columnCount - 1; i >= 0; --i) {
         if (( ! m_allowNulls[i]) && tuple.isNull(i)) {

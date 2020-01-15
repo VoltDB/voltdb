@@ -288,7 +288,7 @@ public:
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool insertTuple(TableTuple& tuple);
+    virtual bool insertTuple(TableTuple const& tuple);
     // Optimized version of update that only updates specific indexes.
     // The caller knows which indexes MAY need to be updated.
     // Note that inside update tuple the order of sourceTuple and
@@ -336,7 +336,8 @@ public:
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple& target);
 
-    void insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit = false);
+    void insertPersistentTuple(TableTuple const& source,
+            bool fallible, bool ignoreTupleLimit = false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple& targetTupleToUpdate, TableTuple& sourceTupleWithNewValues) {
@@ -685,9 +686,11 @@ private:
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete= false);
+    void insertTupleCommon(TableTuple const& source, TableTuple& target,
+            bool fallible, bool shouldDRStream = true, bool delayTupleDelete= false);
 
-    void doInsertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
+    void doInsertTupleCommon(TableTuple const& source, TableTuple& target,
+            bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
 
     void insertTupleForUndo(char* tuple);
 
@@ -752,7 +755,7 @@ private:
 
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple& source, bool fallible);
+    void insertTupleIntoDeltaTable(TableTuple const& source, bool fallible);
 
     //
     // SWAP TABLE helpers

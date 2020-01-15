@@ -93,7 +93,7 @@ class TempTable : public AbstractTempTable {
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
-    virtual bool insertTuple(TableTuple &tuple);
+    virtual bool insertTuple(TableTuple const& tuple);
 
     void deleteAllTempTupleDeepCopies();
 
@@ -109,7 +109,7 @@ class TempTable : public AbstractTempTable {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    virtual void insertTempTuple(TableTuple &source);
+    virtual void insertTempTuple(TableTuple const& source);
 
     virtual void finishInserts() {}
 
@@ -188,7 +188,7 @@ inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *p
     target.setNonInlinedDataIsVolatileFalse();
 }
 
-inline void TempTable::insertTempTuple(TableTuple &source) {
+inline void TempTable::insertTempTuple(TableTuple const& source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or

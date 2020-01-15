@@ -118,7 +118,7 @@ class Table {
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
-    virtual bool insertTuple(TableTuple& tuple) = 0;
+    virtual bool insertTuple(TableTuple const& tuple) = 0;
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -319,7 +319,7 @@ protected:
 
     virtual void initializeWithColumns(TupleSchema* schema, std::vector<std::string> const& columnNames,
           bool ownsTupleSchema);
-    bool checkNulls(TableTuple& tuple) const;
+    bool checkNulls(TableTuple const& tuple) const;
 
     // ------------------------------------------------------------------
     // DATA

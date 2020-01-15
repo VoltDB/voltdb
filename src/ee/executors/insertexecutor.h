@@ -77,7 +77,7 @@ class InsertExecutor : public AbstractExecutor {
     /**
      * Insert a row into the target table and then count it.
      */
-    void p_execute_tuple(TableTuple &tuple);
+    void p_execute_tuple(TableTuple const& tuple);
 
     /**
      * After all the rows are inserted into the target table
@@ -135,7 +135,7 @@ class InsertExecutor : public AbstractExecutor {
     /**
      * Insert a row into the target table and then count it.
      */
-    void p_execute_tuple_internal(TableTuple &tuple);
+    void p_execute_tuple_internal(TableTuple const& tuple);
 
     /** A tuple with the target table's schema that is populated
      * with default values for each field. */

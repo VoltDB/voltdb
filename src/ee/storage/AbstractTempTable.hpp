@@ -56,7 +56,7 @@ namespace voltdb {
 class AbstractTempTable : public Table {
 public:
     /** insert a tuple */
-    virtual void insertTempTuple(TableTuple &source) = 0;
+    virtual void insertTempTuple(TableTuple const& source) = 0;
 
     /** Mark this table as no longer being inserted into */
     virtual void finishInserts() = 0;
@@ -83,9 +83,7 @@ public:
 
 protected:
     AbstractTempTable(int tableAllocationTargetSize)
-        : Table(tableAllocationTargetSize)
-    {
-    }
+        : Table(tableAllocationTargetSize) { }
 };
 
 }

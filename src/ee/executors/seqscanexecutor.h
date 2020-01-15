@@ -69,7 +69,7 @@ namespace voltdb {
          * inline insert or aggregate node, or it may send the
          * tuple to the output table.
          */
-        void outputTuple(TableTuple& tuple);
+        void outputTuple(TableTuple const&);
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node) {}
