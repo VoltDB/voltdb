@@ -513,7 +513,8 @@ public class AsyncExportClient
             // Now print application results:
 
             // 1. Tracking statistics
-            System.out.printf(
+            log.info(
+                String.format(
               "-------------------------------------------------------------------------------------\n"
             + " Benchmark Results\n"
             + "-------------------------------------------------------------------------------------\n\n"
@@ -524,7 +525,7 @@ public class AsyncExportClient
             + "-------------------------------------------------------------------------------------\n"
             , TrackingResults.get(0)+TrackingResults.get(1)
             , TrackingResults.get(0)
-            , TrackingResults.get(1)
+            , TrackingResults.get(1))
             );
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
                 log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
@@ -532,39 +533,40 @@ public class AsyncExportClient
 
             // 2. Print TABLE EXPORT stats if that's configured
             if (config.usetableexport) {
-                System.out.printf(
+		log.info(
+                    String.format(
                         "-------------------------------------------------------------------------------------\n"
                       + " Table/Export Results\n"
                       + "-------------------------------------------------------------------------------------\n\n"
                       + "A total of %d calls were received...\n"
                       + " - %,9d INSERT\n"
                       + " - %,9d DELETE\n"
-                      + " - %,9d UPDATE"
+                      + " - %,9d UPDATE (OLD)"
                       + "\n\n"
                       + "-------------------------------------------------------------------------------------\n"
                       , TrackingResults.get(0)+TrackingResults.get(1)
                       , TransactionCounts.get(INSERT)
                       , TransactionCounts.get(DELETE)
-                      , TransactionCounts.get(UPDATE_OLD)
+                      , TransactionCounts.get(UPDATE_OLD))
                       // old & new on each update so either = total updates, not the sum of the 2
                       // +TransactionCounts.get(UPDATE_NEW)
                       );
 
                 long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
-                System.out.println("EXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
+                log.info("\nEXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
                 long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
-                System.out.println("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
+                log.info("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
 
                 // do some sanity checks on the counts...
                 long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
                 if (table_with_metadata_count != meta_data_expected) {
                     System.err.println("Metadata expected " + meta_data_expected +
-                        " count does not match with table count: " + table_with_metadata_count);
+                        " count does not match with table count: " + table_with_metadata_count + "\n");
                 }
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
                     System.err.println("Insert and delete count " + export_table_expected +
-                        " does not match export table count: " + export_table_count);
+                        " does not match export table count: " + export_table_count + "\n");
                 }
 
             }
@@ -657,8 +659,8 @@ public class AsyncExportClient
             count = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
         }
         catch (Exception e) {
-            System.err.println("Exception in get_table_count: " + e);
-            System.err.println("SELECT COUNT from table " + sqlTable + " failed");
+            log.error("Exception in get_table_count: " + e);
+            log.error("SELECT COUNT from table " + sqlTable + " failed");
         }
         return count;
     }
