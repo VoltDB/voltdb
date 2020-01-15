@@ -14,19 +14,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef TUPLEITERATOR_H_
-#define TUPLEITERATOR_H_
+#pragma once
 #include "common/tabletuple.h"
 
 /**
  * Interface for iterators that return tuples.
  */
 namespace voltdb {
-class TupleIterator {
-public:
-    virtual bool next(TableTuple &out) = 0;
-    virtual ~TupleIterator() {}
-};
+    class TupleIterator {
+    public:
+        virtual bool next(TableTuple &out) = 0;
+        virtual ~TupleIterator() {}
+    };
 }
 
-#endif /* TUPLEITERATOR_H_ */

@@ -50,14 +50,7 @@
 
 namespace voltdb {
 
-TempTable::TempTable()
-    : AbstractTempTable(TABLE_BLOCKSIZE)
-    , m_data()
-    , m_limits(NULL)
-{
-}
-
-TempTable::~TempTable() {}
+TempTable::TempTable() : AbstractTempTable(TABLE_BLOCKSIZE) { }
 
 // ------------------------------------------------------------------
 // OPERATIONS
@@ -67,17 +60,16 @@ void TempTable::deleteAllTuples(bool, bool) {
 }
 
 void TempTable::deleteAllTempTupleDeepCopies() {
-    if (m_tupleCount == 0) {
-        return;
-    }
-    if (m_schema->getUninlinedObjectColumnCount() > 0) {
-        TableTuple target(m_schema);
-        TableIterator iter(this, m_data.begin(), false);
-        while (iter.next(target)) {
-            target.freeObjectColumns();
+    if (m_tupleCount != 0) {
+        if (m_schema->getUninlinedObjectColumnCount() > 0) {
+            TableTuple target(m_schema);
+            TableIterator iter(this, m_data.begin(), false);
+            while (iter.next(target)) {
+                target.freeObjectColumns();
+            }
         }
+        deleteAllTempTuples();
     }
-    deleteAllTempTuples();
 }
 
 bool TempTable::insertTuple(TableTuple const& source) {
@@ -89,12 +81,11 @@ std::string TempTable::tableType() const { return "TempTable"; }
 
 voltdb::TableStats* TempTable::getTableStats() { return NULL; }
 
-std::vector<uint64_t> TempTable::getBlockAddresses() const
-{
+std::vector<uint64_t> TempTable::getBlockAddresses() const {
     std::vector<uint64_t> blockAddresses;
     blockAddresses.reserve(m_data.size());
-    for (std::vector<TBPtr>::const_iterator iter = m_data.begin(); iter != m_data.end(); ++iter) {
-        blockAddresses.push_back((uint64_t) (*iter)->address());
+    for(auto const& p : m_data) {
+        blockAddresses.emplace_back(reinterpret_cast<uint64_t>(p->address()));
     }
     return blockAddresses;
 }

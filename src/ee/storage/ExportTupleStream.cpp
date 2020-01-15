@@ -44,8 +44,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
       m_committedSequenceNumber(0),
       m_flushPending(false),
       m_nextFlushStream(NULL),
-      m_prevFlushStream(NULL)
-{
+      m_prevFlushStream(NULL) {
     extendBufferChain(m_defaultCapacity);
 }
 
@@ -76,12 +75,10 @@ size_t ExportTupleStream::appendTuple(
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
-    {
+    if (spHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle);
     }
     m_openSpHandle = spHandle;
     m_openUniqueId = uniqueId;
@@ -149,8 +146,7 @@ size_t ExportTupleStream::appendTuple(
     return startingUso;
 }
 
-void ExportTupleStream::appendToList(ExportTupleStream** oldest, ExportTupleStream** newest)
-{
+void ExportTupleStream::appendToList(ExportTupleStream** oldest, ExportTupleStream** newest) {
     vassert(!m_prevFlushStream && !m_nextFlushStream);
     if (*oldest == NULL) {
         *oldest = this;
@@ -162,14 +158,12 @@ void ExportTupleStream::appendToList(ExportTupleStream** oldest, ExportTupleStre
     *newest = this;
 }
 
-void ExportTupleStream::stitchToNextNode(ExportTupleStream* next)
-{
+void ExportTupleStream::stitchToNextNode(ExportTupleStream* next) {
     m_nextFlushStream = next;
     next->m_prevFlushStream = this;
 }
 
-void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTail)
-{
+void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTail) {
     if (m_flushPending) {
         if (m_nextFlushStream) {
             // We are not at the tail so move this stream to the tail.
@@ -179,8 +173,7 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
                 m_prevFlushStream->m_nextFlushStream = m_nextFlushStream;
                 vassert(m_nextFlushStream->m_prevFlushStream == this);
                 m_nextFlushStream->m_prevFlushStream = m_prevFlushStream;
-            }
-            else {
+            } else {
                 // Remove myself from the beginning of the flush list
                 m_nextFlushStream->m_prevFlushStream = NULL;
                 *engine->getOldestExportStreamWithPendingRowsForAssignment() = m_nextFlushStream;
@@ -190,14 +183,12 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
                 vassert(m_prevFlushStream->m_nextFlushStream == NULL);
                 m_prevFlushStream->m_nextFlushStream = this;
                 *engine->getNewestExportStreamWithPendingRowsForAssignment() = this;
-            }
-            else {
+            } else {
                 m_prevFlushStream = NULL;
                 m_flushPending = false;
             }
             m_nextFlushStream = NULL;
-        }
-        else {
+        } else {
             // If this node is at the end of the list do nothing
             vassert(*engine->getNewestExportStreamWithPendingRowsForAssignment() == this);
             vassert(m_nextFlushStream == NULL);
@@ -216,21 +207,17 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
                 m_flushPending = false;
             }
         }
-    }
-    else {
-        if (moveToTail) {
-            appendToList(engine->getOldestExportStreamWithPendingRowsForAssignment(),
-                    engine->getNewestExportStreamWithPendingRowsForAssignment());
-            m_flushPending = true;
-        }
+    } else if (moveToTail) {
+        appendToList(engine->getOldestExportStreamWithPendingRowsForAssignment(),
+                engine->getNewestExportStreamWithPendingRowsForAssignment());
+        m_flushPending = true;
     }
 }
 
 /*
  * Handoff fully committed blocks to the top end.
  */
-void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId)
-{
+void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId) {
     vassert(currentSpHandle == m_openSpHandle && uniqueId == m_openUniqueId);
 
     if (m_uso != m_committedUso) {
@@ -276,15 +263,12 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 
 void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
-                    m_partitionId,
-                    m_tableName,
-                    block);
+                    m_partitionId, m_tableName, block);
 }
 
 void ExportTupleStream::pushEndOfStream() {
     ExecutorContext::getPhysicalTopend()->pushEndOfStream(
-                    m_partitionId,
-                    m_tableName);
+                    m_partitionId, m_tableName);
 }
 
 /*
@@ -293,8 +277,7 @@ void ExportTupleStream::pushEndOfStream() {
  * pending list for commit to operate against.
  */
 bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
-                                      int64_t lastCommittedSpHandle)
-{
+                                      int64_t lastCommittedSpHandle) {
     // negative timeInMillis instructs a mandatory flush
     vassert(timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));
     if (!m_currBlock || m_currBlock->lastSequenceNumber() > m_committedSequenceNumber) {

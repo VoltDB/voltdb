@@ -85,7 +85,7 @@ class TempTable : public AbstractTempTable {
         return TableIterator(this, m_data.begin(), true);
     }
 
-    virtual ~TempTable();
+    virtual ~TempTable() {}
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
@@ -127,7 +127,7 @@ class TempTable : public AbstractTempTable {
     // UTILITIY
     // ------------------------------------------------------------------
     virtual std::string tableType() const;
-    virtual voltdb::TableStats* getTableStats();
+    virtual TableStats* getTableStats();
     virtual const TempTableLimits* getTempTableLimits() const {
         return m_limits;
     }
@@ -164,10 +164,10 @@ class TempTable : public AbstractTempTable {
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    std::vector<TBPtr> m_data;
+    std::vector<TBPtr> m_data{};
 
     // ptr to global integer tracking temp table memory allocated per frag
-    TempTableLimits* m_limits;
+    TempTableLimits* m_limits = nullptr;
 };
 
 inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
