@@ -159,30 +159,17 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
         m_allowNulls[i] = columnInfo->allowNull;
     }
-
-    // Also clear some used block state. this structure doesn't have
-    // an block ownership semantics - it's just a cache. I think.
-    m_blocksWithSpace.clear();
-
-    // note that any allocated memory in m_data is left alone
-    // as is m_allocatedTuples
-    m_data.clear();
 }
 
 PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
-    for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
-        m_blocksNotPendingSnapshotLoad[ii]->clear();
-        m_blocksPendingSnapshotLoad[ii]->clear();
-    }
 
     // delete all tuples to free strings
-    TableIterator ti(this, m_data.begin());
-    TableTuple tuple(m_schema);
-    while (ti.next(tuple)) {
-        tuple.freeObjectColumns();
-        tuple.setActiveFalse();
-    }
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),[](void* p) {
+        auto* tuple = reinterpret_cast<TableTuple*>(p);
+        tuple->freeObjectColumns();
+        tuple->setActiveFalse();
+    });
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -742,24 +729,22 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
     }
 
     // If the delta table has data in it, delete the data first.
-    if (! m_deltaTable->isPersistentTableEmpty()) {
-        TableIterator ti(m_deltaTable, m_deltaTable->m_data.begin());
-        TableTuple tuple(m_deltaTable->m_schema);
-        ti.next(tuple);
-        m_deltaTable->deleteTuple(tuple, fallible);
+    if (!m_deltaTable->isPersistentTableEmpty()) {
+       storage::for_each<PersistentTable::txn_iterator>(dynamic_cast<PersistentTable*>(m_deltaTable)->allocator(),
+                      [this, fallible](void* p) {
+             auto* inputTuple = reinterpret_cast<TableTuple*>(p);
+             m_deltaTable->deleteTuple(*inputTuple, fallible);
+        });
     }
 
-    TableTuple targetForDelta(m_deltaTable->m_schema);
-    m_deltaTable->nextFreeTuple(&targetForDelta);
-    targetForDelta.copyForPersistentInsert(source);
-
+    TableTuple* targetForDelta = m_deltaTable->createTuple(source);
     try {
-        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
+        m_deltaTable->insertTupleCommon(source, *targetForDelta, fallible);
     } catch (ConstraintFailureException const& e) {
-        m_deltaTable->deleteTupleStorage(targetForDelta);
+        m_deltaTable->deleteTupleStorage(*targetForDelta);
         throw;
     } catch (TupleStreamException const& e) {
-        m_deltaTable->deleteTupleStorage(targetForDelta);
+        m_deltaTable->deleteTupleStorage(*targetForDelta);
         throw;
     }
     // TODO: we do not catch other types of exceptions, such as
@@ -768,6 +753,12 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
     // daring and likely not correct.
 }
 
+TableTuple* PersistentTable::createTuple(TableTuple &source){
+    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(m_dataStorage->insert(&source)));
+    target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));
+    target->copyForPersistentInsert(source);
+    return target;
+}
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
@@ -784,19 +775,11 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
         throw ConstraintFailureException(this, source, str.str());
     }
 
-    //
-    // First get the next free tuple
-    // This will either give us one from the free slot list, or
-    // grab a tuple at the end of our chunk of memory
-    //
-
     // NOTE: we are actually copying from memory beyond source,
     // bc. how the TableTuple inlined data content (that m_data points
     // to) is constructed in the Alloc. This is one hacky way to
     // do it!!
-    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(m_dataStorage->insert(&source)));
-    target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));       // table tuple layout: m_data points directly beyond storage of TableTuple object
-    target->copyForPersistentInsert(source);
+    TableTuple* target = m_deltaTable->createTuple(source);
     try {
         insertTupleCommon(source, *target, fallible);
     } catch (TupleStreamException const& e) {
@@ -806,11 +789,6 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
         deleteTupleStorage(*target); // also frees object columns
         throw;
     }
-
-    // TODO: we do not catch other types of exceptions, such as
-    // SQLException, etc. The assumption we held that no other
-    // exceptions should be thrown in the try-block is pretty
-    // daring and likely not correct.
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
