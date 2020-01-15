@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREINSERTNODE_H
-#define HSTOREINSERTNODE_H
+#pragma once
 
 #include <sstream>
 #include <vector>
@@ -91,7 +90,7 @@ public:
     const std::vector<int>& getFieldMap() const { return m_fieldMap; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
 private:
     bool m_multiPartition;
@@ -102,4 +101,3 @@ private:
 
 } // namespace voltdb
 
-#endif

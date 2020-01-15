@@ -96,7 +96,7 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     return buffer.str();
 }
 
-void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();

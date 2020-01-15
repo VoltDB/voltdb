@@ -95,7 +95,7 @@ public:
         return m_skip_null_predicate.get();
     }
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     // This is the id of the index to reference during execution
     std::string m_target_index_name;

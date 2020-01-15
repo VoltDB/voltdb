@@ -52,7 +52,7 @@
 namespace voltdb {
 
 class LimitPlanNode : public AbstractPlanNode {
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
     int limit = -1;
     int offset = 0;
     int limitParamIdx = -1;

@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREPROJECTIONNODE_H
-#define HSTOREPROJECTIONNODE_H
+#pragma once
 
 #include "plannodes/abstractplannode.h"
 
@@ -82,7 +81,7 @@ public:
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
     //
     // The node must define what the columns in the output table are
     // going to look like
@@ -103,4 +102,3 @@ protected:
 
 } // namespace voltdb
 
-#endif

@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREMATERIALIZENODE_H
-#define HSTOREMATERIALIZENODE_H
+#pragma once
 
 #include "projectionnode.h"
 
@@ -77,10 +76,9 @@ public:
 
     bool isBatched() const { return m_batched; }
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
     bool m_batched;
 };
 
 } // namespace voltdb
 
-#endif

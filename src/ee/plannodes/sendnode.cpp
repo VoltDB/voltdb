@@ -53,13 +53,12 @@ SendPlanNode::~SendPlanNode() { }
 
 PlanNodeType SendPlanNode::getPlanNodeType() const { return PlanNodeType::Send; }
 
-std::string SendPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string SendPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "SendNode\n";
     return (buffer.str());
 }
 
-void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+void SendPlanNode::loadFromJSONObject(PlannerDomValue const& obj) { }
 
 } // namespace voltdb

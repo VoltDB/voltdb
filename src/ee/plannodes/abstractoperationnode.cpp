@@ -64,8 +64,7 @@ std::string AbstractOperationPlanNode::debugInfo(const std::string &spacer) cons
     return buffer.str();
 }
 
-void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
     VoltDBEngine* engine = ExecutorContext::getEngine();
     m_tcd = engine->getTableDelegate(m_target_table_name);

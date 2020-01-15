@@ -43,15 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENESTLOOPNODE_H
-#define HSTORENESTLOOPNODE_H
+#pragma once
 
 #include "abstractjoinnode.h"
 
 namespace voltdb {
 
-class NestLoopPlanNode : public AbstractJoinPlanNode
-{
+class NestLoopPlanNode : public AbstractJoinPlanNode {
 public:
     NestLoopPlanNode() { }
     ~NestLoopPlanNode();
@@ -60,4 +58,3 @@ public:
 
 } // namespace voltdb
 
-#endif

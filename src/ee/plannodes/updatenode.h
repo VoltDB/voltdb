@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREUPDATENODE_H
-#define HSTOREUPDATENODE_H
+#pragma once
 
 #include "abstractoperationnode.h"
 
@@ -61,11 +60,10 @@ public:
     bool doesUpdateIndexes() { return m_updatesIndexes; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     bool m_updatesIndexes;
 };
 
 } // namespace voltdb
 
-#endif

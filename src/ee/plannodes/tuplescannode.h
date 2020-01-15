@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETUPLESCANNODE_H
-#define HSTORETUPLESCANNODE_H
+#pragma once
 
 #include "abstractscannode.h"
 
@@ -59,32 +58,27 @@ class AbstractExpression;
  */
 class TupleScanPlanNode : public AbstractScanPlanNode {
 public:
-    TupleScanPlanNode() :
-        m_paramIdxs()
-    {
+    TupleScanPlanNode() {
         m_scanType = SUBQUERY_SCAN;
     }
 
-    PlanNodeType getPlanNodeType() const
-    {
+    PlanNodeType getPlanNodeType() const {
         return PlanNodeType::TupleScan;
     }
 
-    const std::vector<int>& getParamIdxs() const
-    {
+    const std::vector<int>& getParamIdxs() const {
         return m_paramIdxs;
     }
 
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
 private:
-    std::vector<int> m_paramIdxs;
+    std::vector<int> m_paramIdxs{};
 
 };
 
 }
 
-#endif

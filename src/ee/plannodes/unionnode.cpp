@@ -58,7 +58,7 @@ std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
     return buffer.str();
 }
 
-void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void UnionPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;

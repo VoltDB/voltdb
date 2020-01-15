@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESENDNODE_H
-#define HSTORESENDNODE_H
+#pragma once
 
 #include "abstractplannode.h"
 
@@ -63,9 +62,8 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 };
 
 } // namespace voltdb
 
-#endif

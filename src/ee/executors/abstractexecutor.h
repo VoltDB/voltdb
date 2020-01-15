@@ -86,10 +86,10 @@ class AbstractExecutor {
     /**
      * Returns the plannode that generated this executor.
      */
-    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
-    inline const AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
+    AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+    const AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
 
-    inline void cleanupTempOutputTable() {
+    void cleanupTempOutputTable() {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
             m_tmpOutputTable->deleteAllTempTuples();
@@ -100,15 +100,15 @@ class AbstractExecutor {
         // LEAVE as blank on purpose
     }
 
-    inline bool outputTempTableIsEmpty() const {
-        if (m_tmpOutputTable != NULL) {
+    bool outputTempTableIsEmpty() const {
+        if (m_tmpOutputTable != nullptr) {
             return m_tmpOutputTable->activeTupleCount() == 0;
         } else {
             return true;
         }
     }
 
-    inline void disableReplicatedFlag() {
+    void disableReplicatedFlag() {
         m_replicatedTableOperation = false;
     }
 
@@ -142,7 +142,7 @@ class AbstractExecutor {
      * Set up a multi-column temporary output table for those executors that require one.
      * Called from p_init.
      */
-    void setTempOutputTable(const ExecutorVector& executorVector, const std::string tempTableName="temp");
+    void setTempOutputTable(const ExecutorVector& executorVector, const std::string& tempTableName="temp");
 
     /**
      * Set up a single-column temporary output table for DML executors that require one to return their counts.
@@ -180,7 +180,7 @@ inline bool AbstractExecutor::execute(const NValueArray& params) {
     size_t inputTableCount = planNode->getInputTableCount();
     for (size_t i = 0; i < inputTableCount; ++i) {
         AbstractTempTable *table = dynamic_cast<AbstractTempTable*>(planNode->getInputTable(i));
-        if (table != NULL && m_tmpOutputTable != table) {
+        if (table != nullptr && m_tmpOutputTable != table) {
             // For simple no-op sequential scan nodes, sometimes the
             // input table and output table are the same table, hence
             // the check above.

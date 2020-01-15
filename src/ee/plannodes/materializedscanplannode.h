@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MATERIALIZEDSCANPLANNODE_H
-#define MATERIALIZEDSCANPLANNODE_H
+#pragma once
 
 #include "abstractplannode.h"
 
@@ -43,7 +42,7 @@ public:
     SortDirectionType getSortDirection() const { return m_sortDirection; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     // It doesn't matter what kind of expression this is,
     // so long as eval() returns an NValue array as opposed
@@ -54,4 +53,3 @@ protected:
 
 } // namespace voltdb
 
-#endif // MATERIALIZEDSCANPLANNODE_H

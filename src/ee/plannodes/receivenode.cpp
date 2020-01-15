@@ -51,15 +51,13 @@ namespace voltdb {
 
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PlanNodeType::Receive; }
 
-std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
-{
+std::string ReceivePlanNode::debugInfo(const std::string& spacer) const {
     std::ostringstream buffer;
     AbstractReceivePlanNode::schemaDebugInfo(buffer, getOutputSchema(), "Incoming", spacer);
     return buffer.str();
 }
 
-void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
 }
 
 

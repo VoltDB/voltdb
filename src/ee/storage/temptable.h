@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETEMPTABLE_H
-#define HSTORETEMPTABLE_H
+#pragma once
 
 #include "common/tabletuple.h"
 #include "common/ThreadLocalPool.h"
@@ -279,4 +278,3 @@ inline void TempTable::freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlo
 
 }
 
-#endif

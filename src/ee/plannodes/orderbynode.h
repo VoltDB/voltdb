@@ -42,15 +42,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef HSTOREORDERBYNODE_H
-#define HSTOREORDERBYNODE_H
+#pragma once
 
 #include "abstractplannode.h"
 
 namespace voltdb {
 
-class OrderByPlanNode : public AbstractPlanNode
-{
+class OrderByPlanNode : public AbstractPlanNode {
 public:
     OrderByPlanNode()
         : m_sortExpressions()
@@ -66,7 +64,7 @@ public:
     const std::vector<SortDirectionType>& getSortDirections() const { return m_sortDirections; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     OwningExpressionVector m_sortExpressions;
     /**
@@ -79,4 +77,3 @@ protected:
 
 } // namespace voltdb
 
-#endif

@@ -48,8 +48,7 @@ namespace voltdb {
 
 PlanNodeType InsertPlanNode::getPlanNodeType() const { return PlanNodeType::Insert; }
 
-void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void InsertPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
     m_multiPartition = obj.valueForKey("MULTI_PARTITION").asBool();
     if (obj.hasNonNullKey("FIELD_MAP")) {

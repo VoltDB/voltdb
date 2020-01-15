@@ -62,7 +62,7 @@ std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
     return buffer.str();
 }
 
-void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
     bool containsType = false;
     bool containsOutputColumn = false;

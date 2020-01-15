@@ -107,7 +107,7 @@ public:
     void collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     std::vector<ExpressionType> m_aggregates;
     std::vector<int> m_aggregateIds;

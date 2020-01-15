@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HSTORETABLECOUNTNODE_H
-#define HSTORETABLECOUNTNODE_H
+#pragma once
 
 #include "abstractscannode.h"
 
@@ -35,4 +34,3 @@ public:
 
 } // namespace voltdb
 
-#endif

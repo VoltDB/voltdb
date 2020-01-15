@@ -60,8 +60,7 @@ std::string MaterializePlanNode::debugInfo(const std::string &spacer) const
     return (buffer.str());
 }
 
-void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void MaterializePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     ProjectionPlanNode::loadFromJSONObject(obj);
     m_batched = obj.valueForKey("BATCHED").asBool();
 }

@@ -50,43 +50,39 @@
 
 namespace voltdb {
 
-AbstractScanPlanNode::~AbstractScanPlanNode() { }
-
-Table* AbstractScanPlanNode::getTargetTable() const
-{
-    if (m_tcd == NULL) {
-        return NULL;
+Table* AbstractScanPlanNode::getTargetTable() const {
+    if (m_tcd == nullptr) {
+        return nullptr;
+    } else {
+        return m_tcd->getTable();
     }
-    return m_tcd->getTable();
 }
 
-std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "TargetTable[" << m_target_table_name << "], scanType[";
     switch (m_scanType) {
-    case SUBQUERY_SCAN:
-        buffer << "SUBQUERY_SCAN";
-        break;
-    case PERSISTENT_TABLE_SCAN:
-        buffer << "PERSISTENT_TABLE_SCAN";
-        break;
-    case CTE_SCAN:
-        buffer << "CTE_SCAN";
-        break;
-    case INVALID_SCAN:
-        buffer << "INVALID_SCAN";
-        break;
-    default:
-        buffer << "<<unknown scan type>>";
-        break;
+        case SUBQUERY_SCAN:
+            buffer << "SUBQUERY_SCAN";
+            break;
+        case PERSISTENT_TABLE_SCAN:
+            buffer << "PERSISTENT_TABLE_SCAN";
+            break;
+        case CTE_SCAN:
+            buffer << "CTE_SCAN";
+            break;
+        case INVALID_SCAN:
+            buffer << "INVALID_SCAN";
+            break;
+        default:
+            buffer << "<<unknown scan type>>";
+            break;
     }
     buffer << "]\n";
     return buffer.str();
 }
 
-void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 
     m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
@@ -96,22 +92,20 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
         m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
     }
 
-    m_tcd = NULL;
+    m_tcd = nullptr;
     m_cteStmtId = -1;
     if (obj.hasKey("CTE_STMT_ID")) {
         m_cteStmtId = obj.valueForKey("CTE_STMT_ID").asInt();
         if (m_cteStmtId > -1) {
             m_scanType = CTE_SCAN;
         }
-    }
-    else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
+    } else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
         m_scanType = SUBQUERY_SCAN;
-    }
-    else {
+    } else {
         m_scanType = PERSISTENT_TABLE_SCAN;
         VoltDBEngine* engine = ExecutorContext::getEngine();
         m_tcd = engine->getTableDelegate(m_target_table_name);
-        if ( ! m_tcd) {
+        if (! m_tcd) {
             VOLT_ERROR("Failed to retrieve target table from execution engine for PlanNode '%s'",
                        debug().c_str());
             //TODO: throw something

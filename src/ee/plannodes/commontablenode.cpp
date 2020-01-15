@@ -49,7 +49,7 @@
 
 namespace voltdb {
 
-void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     if (obj.hasKey("RECURSIVE_STATEMENT_ID")) {
         m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
     }

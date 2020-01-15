@@ -76,7 +76,7 @@ std::string SwapTablesPlanNode::debugInfo(const std::string &spacer) const {
     return buffer.str();
 }
 
-void SwapTablesPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void SwapTablesPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
     m_otherTargetTableName = obj.valueForKey("OTHER_TARGET_TABLE_NAME").asStr();
     loadStringArrayFromJSONObject("INDEXES", obj, m_theIndexes);

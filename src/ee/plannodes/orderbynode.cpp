@@ -52,12 +52,10 @@ OrderByPlanNode::~OrderByPlanNode() { }
 
 PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PlanNodeType::OrderBy; }
 
-std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
-{
+std::string OrderByPlanNode::debugInfo(const std::string& spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "SortColumns[" << m_sortExpressions.size() << "]\n";
-    for (int ctr = 0, cnt = (int)m_sortExpressions.size(); ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int)m_sortExpressions.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] "
                << m_sortExpressions[ctr]->debug()
                << "::" << m_sortDirections[ctr] << "\n";
@@ -65,8 +63,7 @@ std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
     return buffer.str();
 }
 
-void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void OrderByPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     loadSortListFromJSONObject(obj, &m_sortExpressions, &m_sortDirections);
 }
 

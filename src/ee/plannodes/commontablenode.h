@@ -97,7 +97,7 @@ public:
         return PlanNodeType::CommonTable;
     }
 
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    virtual void loadFromJSONObject(PlannerDomValue const& obj);
 
     virtual std::string debugInfo(const std::string& spacer) const;
 

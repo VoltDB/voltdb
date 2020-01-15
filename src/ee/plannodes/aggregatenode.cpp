@@ -86,8 +86,7 @@ std::string AggregatePlanNode::debugInfo(const std::string &spacer) const
     return buffer.str();
 }
 
-void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void AggregatePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
     for (int i = 0; i < aggregateColumnsArray.arrayLen(); i++) {
         PlannerDomValue aggregateColumnValue = aggregateColumnsArray.valueAtIndex(i);

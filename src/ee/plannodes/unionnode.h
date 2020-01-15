@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREUNIONNODE_H
-#define HSTOREUNIONNODE_H
+#pragma once
 
 #include "abstractplannode.h"
 
@@ -63,7 +62,7 @@ public:
     UnionType getUnionType() const { return m_unionType; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
 private:
    UnionType m_unionType;
@@ -71,4 +70,3 @@ private:
 
 } // namespace voltdb
 
-#endif

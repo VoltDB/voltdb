@@ -135,7 +135,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine, const ExecutorVector& executor
  * Called from p_init.
  */
 void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
-        const string tempTableName) {
+        const string& tempTableName) {
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     int column_count = schema->columnCount();
     std::vector<std::string> column_names(column_count);

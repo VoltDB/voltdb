@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREMERGERECEIVENODE_H
-#define HSTOREMERGERECEIVENODE_H
+#pragma once
 
 #include "abstractreceivenode.h"
 #include "SchemaColumn.h"
@@ -54,8 +53,7 @@
 
 namespace voltdb {
 
-class MergeReceivePlanNode : public AbstractReceivePlanNode
-{
+class MergeReceivePlanNode : public AbstractReceivePlanNode {
 public:
     MergeReceivePlanNode();
     ~MergeReceivePlanNode();
@@ -65,7 +63,7 @@ public:
     void setScratchTable(AbstractTempTable* table);
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
 private:
     // The schema is used to create a temp table to accumulate partitions results to be merged
@@ -79,4 +77,3 @@ private:
 
 } // namespace voltdb
 
-#endif

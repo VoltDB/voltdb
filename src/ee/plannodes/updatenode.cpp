@@ -48,8 +48,7 @@ namespace voltdb {
 
 PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PlanNodeType::Update; }
 
-void UpdatePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void UpdatePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
     m_updatesIndexes = obj.valueForKey("UPDATES_INDEXES").asBool();
 }

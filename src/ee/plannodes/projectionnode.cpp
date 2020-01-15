@@ -55,8 +55,7 @@ ProjectionPlanNode::~ProjectionPlanNode() { }
 
 PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PlanNodeType::Projection; }
 
-std::string ProjectionPlanNode::debugInfo(const string& spacer) const
-{
+std::string ProjectionPlanNode::debugInfo(const string& spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "Projection Output["
            << m_outputColumnNames.size() << "]:\n";
@@ -75,8 +74,7 @@ std::string ProjectionPlanNode::debugInfo(const string& spacer) const
     return buffer.str();
 }
 
-void ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void ProjectionPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
     for (int ii = 0; ii < outputSchema.size(); ii++) {
         SchemaColumn* outputColumn = outputSchema[ii];

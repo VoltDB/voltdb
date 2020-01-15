@@ -58,7 +58,7 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     return buffer.str();
 }
 
-void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string endTypeString = obj.valueForKey("END_TYPE").asStr();

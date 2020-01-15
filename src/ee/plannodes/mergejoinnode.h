@@ -57,7 +57,7 @@ public:
        return m_lessJoinPredicate.get();
     }
 private:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     // This is the predicate to figure out whether an outer tuple is LESS than a corresponding inner tuple
     boost::scoped_ptr<AbstractExpression> m_lessJoinPredicate;

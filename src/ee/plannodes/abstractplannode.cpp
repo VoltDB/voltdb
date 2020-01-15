@@ -55,12 +55,11 @@ namespace voltdb {
 AbstractPlanNode::AbstractPlanNode(): m_executor() {}
 
 AbstractPlanNode::~AbstractPlanNode() {
-    map<PlanNodeType, AbstractPlanNode*>::iterator iter;
-    for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++) {
-        delete (*iter).second;
+    for(auto& entry : m_inlineNodes) {
+        delete entry.second;
     }
-    for (int i = 0; i < m_outputSchema.size(); i++) {
-        delete m_outputSchema[i];
+    for(auto* entry : m_outputSchema) {
+        delete entry;
     }
 }
 
@@ -75,7 +74,7 @@ void AbstractPlanNode::addInlinePlanNode(AbstractPlanNode* inline_node) {
 AbstractPlanNode* AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const {
     map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup =
         m_inlineNodes.find(type);
-    AbstractPlanNode* ret = NULL;
+    AbstractPlanNode* ret = nullptr;
     if (lookup != m_inlineNodes.end()) {
         ret = lookup->second;
     } else {
@@ -143,12 +142,12 @@ const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const {
     // and cache any details pertinent to execute.
 
     const AbstractPlanNode* parent = this;
-    const AbstractPlanNode* schema_definer = NULL;
+    const AbstractPlanNode* schema_definer = nullptr;
     while (true) {
         // An inline child projection is an excellent place to find an output schema.
         if (parent->m_validOutputColumnCount == SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION) {
             schema_definer = parent->getInlinePlanNode(PlanNodeType::Projection);
-            DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != NULL),
+            DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != nullptr),
                     "Incorrect output schema source for plannode:\n" << debug(""));
             DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer->m_validOutputColumnCount >= 0),
                     "Missing output schema for inline projection:\n" << debug(""));
@@ -166,7 +165,7 @@ const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const {
 
             schema_definer = parent->m_children[0];
 
-            DEBUG_ASSERT_OR_THROW_OR_CRASH(schema_definer != NULL,
+            DEBUG_ASSERT_OR_THROW_OR_CRASH(schema_definer != nullptr,
                     "Incorrect output schema source for plannode:\n" << debug(""));
             if (schema_definer->m_validOutputColumnCount >= 0) {
                 return schema_definer->m_outputSchema;
@@ -208,10 +207,11 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColum
         columnInBytes.push_back(expr->getInBytes());
     }
 
-    TupleSchema* schema = TupleSchema::createTupleSchema(
+    return TupleSchema::createTupleSchema(
             columnTypes, columnSizes, columnAllowNull, columnInBytes);
-    return schema;
 }
+
+AbstractPlanNode::TableOwner::~TableOwner() { delete getTempTable(); }
 
 TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema() {
     // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
@@ -219,16 +219,15 @@ TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema() {
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
     vector<bool> columnInBytes(1, false);
-    TupleSchema* schema = TupleSchema::createTupleSchema(
+    return TupleSchema::createTupleSchema(
             columnTypes, columnSizes, columnAllowNull, columnInBytes);
-    return schema;
 }
 
 
 // ----------------------------------------------------
 //  Serialization Functions
 // ----------------------------------------------------
-std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
+std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomValue const& obj) {
 
     string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
     std::unique_ptr<AbstractPlanNode> node(
@@ -240,8 +239,7 @@ std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomVal
         PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
         for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
             PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-            auto newNode = fromJSONObject(inlineNodeObj);
-            node->addInlinePlanNode(newNode.release());
+            node->addInlinePlanNode(fromJSONObject(inlineNodeObj).release());
         }
     }
 
@@ -273,19 +271,18 @@ std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomVal
 }
 
 void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
-        PlannerDomValue obj, std::vector<int>& result) {
+        PlannerDomValue const& obj, std::vector<int>& result) {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue intArray = obj.valueForKey(label);
         int len = intArray.arrayLen();
         for (int i = 0; i < len; ++i) {
-            int const val = intArray.valueAtIndex(i).asInt();
-            result.emplace_back(val);
+            result.emplace_back(intArray.valueAtIndex(i).asInt());
         }
     }
 }
 
 void AbstractPlanNode::loadStringArrayFromJSONObject(
-      const char* label, PlannerDomValue obj, std::vector<std::string>& result) {
+      const char* label, PlannerDomValue const& obj, std::vector<std::string>& result) {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue stringArray = obj.valueForKey(label);
         int len = stringArray.arrayLen();
@@ -301,7 +298,7 @@ void AbstractPlanNode::loadStringArrayFromJSONObject(
 //   to indicate whether null values should be skipped for each search key column.
 // This function is used to deseralize that boolean vector. (ENG-11096)
 void AbstractPlanNode::loadBooleanArrayFromJSONObject(
-        const char* label, PlannerDomValue obj, std::vector<bool>& result) {
+        const char* label, PlannerDomValue const& obj, std::vector<bool>& result) {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue stringArray = obj.valueForKey(label);
         int len = stringArray.arrayLen();
@@ -311,11 +308,12 @@ void AbstractPlanNode::loadBooleanArrayFromJSONObject(
     }
 }
 
-AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label, PlannerDomValue obj) {
+AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(
+        const char* label, PlannerDomValue const& obj) {
     if (obj.hasNonNullKey(label)) {
         return AbstractExpression::buildExpressionTree(obj.valueForKey(label));
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -341,12 +339,11 @@ string AbstractPlanNode::debug(const string& spacer) const {
         buffer << info_spacer << "Inline Plannodes: "
                << m_inlineNodes.size() << "\n";
         string internal_spacer = info_spacer + "  ";
-        map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
-        for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
+        for(auto const& entry : m_inlineNodes) {
             buffer << info_spacer << "Inline "
-                   << planNodeToString(it->second->getPlanNodeType())
-                   << ":\n";
-            buffer << it->second->debugInfo(internal_spacer);
+                << planNodeToString(entry.second->getPlanNodeType())
+                << ":\n";
+            buffer << entry.second->debugInfo(internal_spacer);
         }
     }
     //
@@ -354,7 +351,7 @@ string AbstractPlanNode::debug(const string& spacer) const {
     //
     Table* outputTable = getOutputTable();
     buffer << info_spacer << "Output table:\n";
-    if (outputTable != NULL) {
+    if (outputTable != nullptr) {
         buffer << outputTable->debug(spacer + "  ");
     } else {
         buffer << "  " << info_spacer << "<NULL>\n";
@@ -365,10 +362,9 @@ string AbstractPlanNode::debug(const string& spacer) const {
     for (int i = 0; i < getInputTableCount(); ++i) {
         Table* inputTable = getInputTable(i);
         buffer << info_spacer << "Input table " << i << ":\n";
-        if (inputTable != NULL) {
+        if (inputTable != nullptr) {
             buffer << inputTable->debug(spacer + "  ");
-        }
-        else {
+        } else {
             buffer << "  " << info_spacer << "<NULL>\n";
         }
     }
@@ -385,15 +381,14 @@ string AbstractPlanNode::debug(const string& spacer) const {
 
 // AbstractPlanNode nested class methods
 
-Table* AbstractPlanNode::TableReference::getTable() const
-{
+Table* AbstractPlanNode::TableReference::getTable() const {
     if (m_tcd) {
         return m_tcd->getTable();
+    } else {
+        return m_tempTable;
     }
-    return m_tempTable;
 }
 
-AbstractPlanNode::TableOwner::~TableOwner() { delete getTempTable(); }
 
 AbstractPlanNode::OwningExpressionVector::~OwningExpressionVector() {
     size_t each = size();
@@ -403,9 +398,9 @@ AbstractPlanNode::OwningExpressionVector::~OwningExpressionVector() {
 }
 
 void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject(
-      const char* label, PlannerDomValue obj) {
+      const char* label, PlannerDomValue const& obj) {
     clear();
-    if ( ! obj.hasNonNullKey(label)) {
+    if (! obj.hasNonNullKey(label)) {
         return;
     }
     PlannerDomValue arrayObj = obj.valueForKey(label);
@@ -416,12 +411,14 @@ void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject
 }
 
 void AbstractPlanNode::loadSortListFromJSONObject(
-      PlannerDomValue obj, std::vector<AbstractExpression*>* sortExprs, std::vector<SortDirectionType>* sortDirs) {
+      PlannerDomValue const& obj,
+      std::vector<AbstractExpression*>* sortExprs,
+      std::vector<SortDirectionType>* sortDirs) {
     PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
     for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
         PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
-        bool hasDirection = (sortDirs == NULL), hasExpression = (sortExprs == NULL);
+        bool hasDirection = (sortDirs == nullptr), hasExpression = (sortExprs == nullptr);
 
         if (sortDirs && sortColumn.hasNonNullKey("SORT_DIRECTION")) {
             hasDirection = true;

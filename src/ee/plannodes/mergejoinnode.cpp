@@ -50,7 +50,7 @@ PlanNodeType MergeJoinPlanNode::getPlanNodeType() const {
    return PlanNodeType::MergeJoin;
 }
 
-void MergeJoinPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void MergeJoinPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractJoinPlanNode::loadFromJSONObject(obj);
     m_lessJoinPredicate.reset(loadExpressionFromJSONObject("LESS_JOIN_PREDICATE", obj));
 

@@ -48,8 +48,7 @@ namespace voltdb {
 
 PlanNodeType DeletePlanNode::getPlanNodeType() const { return PlanNodeType::Delete; }
 
-void DeletePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void DeletePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
     m_truncate = obj.valueForKey("TRUNCATE").asBool();
 }

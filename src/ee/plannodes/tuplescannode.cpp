@@ -49,21 +49,18 @@
 
 namespace voltdb {
 
-std::string TupleScanPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string TupleScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "Parameters: ";
-    for (size_t i = 0; i < m_paramIdxs.size(); ++i)
-    {
+    for (size_t i = 0; i < m_paramIdxs.size(); ++i) {
         buffer << m_paramIdxs[i] << ' ';
     }
     buffer << "\n" << m_predicate->debug(spacer);
     return buffer.str();
 }
 
-void TupleScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void TupleScanPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     PlannerDomValue params = obj.valueForKey("PARAM_IDX");

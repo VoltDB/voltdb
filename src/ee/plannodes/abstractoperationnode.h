@@ -72,7 +72,7 @@ protected:
         , m_target_table_name("NOT SPECIFIED")
     { }
 
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 
     // Target Table
     // These tables are different from the input and the output tables

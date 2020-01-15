@@ -43,23 +43,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORERECEIVENODE_H
-#define HSTORERECEIVENODE_H
+#pragma once
 
 #include "abstractreceivenode.h"
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractReceivePlanNode
-{
+class ReceivePlanNode : public AbstractReceivePlanNode {
 public:
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 };
 
 } // namespace voltdb
 
-#endif

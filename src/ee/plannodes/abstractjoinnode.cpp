@@ -47,23 +47,10 @@
 
 #include "common/TupleSchema.h"
 
-#include "boost/foreach.hpp"
-
 namespace voltdb {
 
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : m_preJoinPredicate()
-    , m_joinPredicate()
-    , m_wherePredicate()
-    , m_joinType(JOIN_TYPE_INVALID)
-    , m_outputSchemaPreAgg()
-    , m_tupleSchemaPreAgg(NULL)
-{
-}
-
-AbstractJoinPlanNode::~AbstractJoinPlanNode()
-{
-    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+AbstractJoinPlanNode::~AbstractJoinPlanNode() {
+    for(SchemaColumn* scol : m_outputSchemaPreAgg) {
         delete scol;
     }
 
@@ -73,7 +60,7 @@ AbstractJoinPlanNode::~AbstractJoinPlanNode()
 void AbstractJoinPlanNode::getOutputColumnExpressions(
         std::vector<AbstractExpression*>& outputExpressions) const {
     std::vector<SchemaColumn*> outputSchema;
-    if (m_outputSchemaPreAgg.size() > 0) {
+    if (! m_outputSchemaPreAgg.empty()) {
         outputSchema = m_outputSchemaPreAgg;
     } else {
         outputSchema = getOutputSchema();
@@ -85,31 +72,25 @@ void AbstractJoinPlanNode::getOutputColumnExpressions(
     }
 }
 
-std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
-{
+std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "JoinType[" << joinToString(m_joinType) << "]\n";
-    if (m_preJoinPredicate != NULL)
-    {
+    if (m_preJoinPredicate != nullptr) {
         buffer << spacer << "Pre-Join Predicate\n";
         buffer << m_preJoinPredicate->debug(spacer);
     }
-    if (m_joinPredicate != NULL)
-    {
+    if (m_joinPredicate != nullptr) {
         buffer << spacer << "Join Predicate\n";
         buffer << m_joinPredicate->debug(spacer);
     }
-    if (m_wherePredicate != NULL)
-    {
+    if (m_wherePredicate != nullptr) {
         buffer << spacer << "Where Predicate\n";
         buffer << m_wherePredicate->debug(spacer);
     }
     return (buffer.str());
 }
 
-void
-AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
     m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
@@ -120,13 +101,11 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
-            m_outputSchemaPreAgg.push_back(outputColumn);
+            m_outputSchemaPreAgg.emplace_back(new SchemaColumn(outputColumnValue, i));
         }
         m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
-    }
-    else {
-        m_tupleSchemaPreAgg = NULL;
+    } else {
+        m_tupleSchemaPreAgg = nullptr;
     }
 
 }

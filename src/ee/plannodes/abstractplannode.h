@@ -99,8 +99,10 @@ public:
     AbstractExecutor* getExecutor() const { return m_executor.get(); }
 
     class TableReference {
+        TableCatalogDelegate* m_tcd = nullptr;
+        AbstractTempTable* m_tempTable = nullptr;
     public:
-        TableReference() : m_tcd(NULL), m_tempTable(NULL) { }
+        TableReference() = default;
 
         Table* getTable() const;
 
@@ -108,30 +110,22 @@ public:
             return m_tempTable;
         }
 
-        void setTable(TableCatalogDelegate* tcd)
-        {
+        void setTable(TableCatalogDelegate* tcd) {
             vassert(! m_tcd);
             vassert(! m_tempTable);
             m_tcd = tcd;
         }
 
-        void setTable(AbstractTempTable* table)
-        {
+        void setTable(AbstractTempTable* table) {
             vassert(! m_tcd);
             vassert(! m_tempTable);
             m_tempTable = table;
         }
 
-        void clearTable()
-        {
+        void clearTable() {
             m_tcd = NULL;
             m_tempTable = NULL;
         }
-
-    private:
-
-        TableCatalogDelegate* m_tcd;
-        AbstractTempTable* m_tempTable;
     };
 
     // Adds cleanup behavior that only effects output temp tables.
@@ -197,7 +191,7 @@ public:
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------
-    static std::unique_ptr<AbstractPlanNode> fromJSONObject(PlannerDomValue obj);
+    static std::unique_ptr<AbstractPlanNode> fromJSONObject(PlannerDomValue const& obj);
 
     // Debugging convenience methods
     std::string debug() const;
@@ -210,9 +204,9 @@ public:
      * Load list of sort expressions and directions from a JSON object.
      * The pointers may be null if one of the vectors is not wanted.
      */
-    static void loadSortListFromJSONObject(PlannerDomValue obj,
-                                           std::vector<AbstractExpression*> *sortExprs,
-                                           std::vector<SortDirectionType>   *sortDirs);
+    static void loadSortListFromJSONObject(PlannerDomValue const& obj,
+            std::vector<AbstractExpression*> *sortExprs,
+            std::vector<SortDirectionType>   *sortDirs);
 
     // A simple method of managing the lifetime of AbstractExpressions referenced by
     // a vector that is never mutated once it is loaded.
@@ -223,32 +217,32 @@ public:
         // of any elements referenced by the _final_ state of the vector.
         ~OwningExpressionVector();
         void loadExpressionArrayFromJSONObject(const char* label,
-                                               PlannerDomValue obj);
+                                               PlannerDomValue const& obj);
     };
 
 protected:
     AbstractPlanNode();
 
-    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
+    virtual void loadFromJSONObject(PlannerDomValue const& obj) = 0;
 
     // Common code for use by the public generateTupleSchema() overload
     // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
     static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
 
     static void loadIntArrayFromJSONObject(const char* label,
-                                           PlannerDomValue obj,
+                                           PlannerDomValue const& obj,
                                            std::vector<int>& ary);
 
     static void loadStringArrayFromJSONObject(const char* label,
-                                              PlannerDomValue obj,
+                                              PlannerDomValue const& obj,
                                               std::vector<std::string>& ary);
 
     static void loadBooleanArrayFromJSONObject(const char* label,
-                                              PlannerDomValue obj,
+                                              PlannerDomValue const& obj,
                                               std::vector<bool>& ary);
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
-                                                            PlannerDomValue obj);
+                                                            PlannerDomValue const& obj);
 
     // Every PlanNode will have a unique id assigned to it at compile time
     int32_t m_planNodeId = -1;

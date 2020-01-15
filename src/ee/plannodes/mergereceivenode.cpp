@@ -68,8 +68,7 @@ void MergeReceivePlanNode::setScratchTable(AbstractTempTable* table) {
     m_scratchTable.setTable(table);
 }
 
-std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const
-{
+std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const {
     std::ostringstream buffer;
     if (m_outputSchemaPreAgg.empty()) {
         buffer << spacer << "Incoming Table effectively the same as Outgoing\n";
@@ -80,8 +79,7 @@ std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const
     return buffer.str();
 }
 
-void MergeReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void MergeReceivePlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     if (obj.hasNonNullKey("OUTPUT_SCHEMA_PRE_AGG")) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
         m_outputSchemaPreAgg.reserve(outputSchemaArray.arrayLen());
@@ -94,8 +92,7 @@ void MergeReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
     }
 }
 
-TupleSchema* MergeReceivePlanNode::allocateTupleSchemaPreAgg() const
-{
+TupleSchema* MergeReceivePlanNode::allocateTupleSchemaPreAgg() const {
     return AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
 }
 

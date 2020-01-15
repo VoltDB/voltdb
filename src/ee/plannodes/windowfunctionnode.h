@@ -14,8 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
-#define SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
+#pragma once
 #include "abstractplannode.h"
 
 namespace voltdb {
@@ -59,7 +58,7 @@ public:
 
     void collectOutputExpressions(std::vector<AbstractExpression *>&columnExpressions) const;
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
 private:
     std::vector<ExpressionType> m_aggregates;
     std::vector<int> m_aggregateOutputColumns;
@@ -72,4 +71,3 @@ private:
     OwningExpressionVector m_orderByExpressions;
 };
 }
-#endif /* SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_ */

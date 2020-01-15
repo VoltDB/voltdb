@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREDELETENODE_H
-#define HSTOREDELETENODE_H
+#pragma once
 
 #include "abstractoperationnode.h"
 
@@ -55,20 +54,14 @@ namespace voltdb {
  */
 class DeletePlanNode : public AbstractOperationPlanNode {
 public:
-    DeletePlanNode()
-        : m_truncate(false)
-    {
-    }
-
     PlanNodeType getPlanNodeType() const;
     bool getTruncate() const { return m_truncate; }
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const& obj);
     /** true if all tuples are deleted. */
-    bool m_truncate;
+    bool m_truncate = false;
 };
 
 } // namepace voltdb
 
-#endif

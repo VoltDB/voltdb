@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESWAPTABLESNODE_H
-#define HSTORESWAPTABLESNODE_H
+#pragma once
 
 #include "abstractoperationnode.h"
 
@@ -84,7 +83,7 @@ public:
     }
 
 protected:
-     virtual void loadFromJSONObject(PlannerDomValue obj);
+     virtual void loadFromJSONObject(PlannerDomValue const& obj);
 
      // Other Target Table
      // These tables are different from the input and the output tables
@@ -99,4 +98,3 @@ protected:
 
 } // namepace voltdb
 
-#endif

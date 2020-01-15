@@ -21,8 +21,7 @@
 
 namespace voltdb {
 
-MaterializedScanPlanNode::~MaterializedScanPlanNode()
-{
+MaterializedScanPlanNode::~MaterializedScanPlanNode() {
     delete m_tableRowsExpression;
 }
 
@@ -35,8 +34,7 @@ std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const
     return buffer.str();
 }
 
-void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
+void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
     vassert(!m_tableRowsExpression);
     m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);

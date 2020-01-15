@@ -43,19 +43,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREJOINNODE_H
-#define HSTOREJOINNODE_H
+#pragma once
 
 #include "abstractplannode.h"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
-class AbstractExpression;
-
-class AbstractJoinPlanNode : public AbstractPlanNode
-{
+class AbstractJoinPlanNode : public AbstractPlanNode {
 public:
-    AbstractJoinPlanNode();
+    AbstractJoinPlanNode() = default;
     ~AbstractJoinPlanNode();
     std::string debugInfo(const std::string& spacer) const;
 
@@ -67,32 +64,31 @@ public:
     void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const&);
 
     // This is the outer-table-only join expression. If the outer tuple fails it,
     // it may still be part of the result set (pending other filtering)
     // but can't be joined with any tuple from the inner table.
     // In a left outer join, the failed outer tuple STILL gets null-padded in the output table.
-    boost::scoped_ptr<AbstractExpression> m_preJoinPredicate;
+    std::unique_ptr<AbstractExpression> m_preJoinPredicate;
 
     // This is the predicate to figure out whether a joined tuple should
     // be put into the output table
-    boost::scoped_ptr<AbstractExpression> m_joinPredicate;
+    std::unique_ptr<AbstractExpression> m_joinPredicate;
 
     // The additional filtering criteria specified by the WHERE clause
     // in case of outer joins. The predicated is applied to the whole
     // joined tuple after it's assembled
-    boost::scoped_ptr<AbstractExpression> m_wherePredicate;
+    std::unique_ptr<AbstractExpression> m_wherePredicate;
 
     // Currently either inner or left outer.
-    JoinType m_joinType;
+    JoinType m_joinType = JOIN_TYPE_INVALID;
 
     // output schema pre inline aggregation
     std::vector<SchemaColumn*> m_outputSchemaPreAgg;
 
-    TupleSchema* m_tupleSchemaPreAgg;
+    TupleSchema* m_tupleSchemaPreAgg = nullptr;
 };
 
 } // namespace voltdb
 
-#endif

@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESEQSCANNODE_H
-#define HSTORESEQSCANNODE_H
+#pragma once
 
 #include "abstractscannode.h"
 
@@ -66,4 +65,3 @@ public:
 
 }
 
-#endif

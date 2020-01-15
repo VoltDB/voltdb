@@ -93,7 +93,7 @@ std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     return buffer.str();
 }
 
-void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void LimitPlanNode::loadFromJSONObject(PlannerDomValue const& obj) {
     limit = obj.valueForKey("LIMIT").asInt();
     offset = obj.valueForKey("OFFSET").asInt();
 

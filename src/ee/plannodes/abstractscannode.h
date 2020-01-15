@@ -43,21 +43,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESCANNODE_H
-#define HSTORESCANNODE_H
+#pragma once
 
 #include "abstractplannode.h"
-
 #include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
 class TableCatalogDelegate;
 
-class AbstractScanPlanNode : public AbstractPlanNode
-{
+class AbstractScanPlanNode : public AbstractPlanNode {
 public:
-    ~AbstractScanPlanNode();
+    ~AbstractScanPlanNode() {}
     std::string debugInfo(const std::string& spacer) const;
 
     /** Return the table to be scanned. */
@@ -79,16 +76,9 @@ public:
     bool isEmptyScan() const { return m_isEmptyScan; }
 
 protected:
-    AbstractScanPlanNode()
-        : m_target_table_name()
-        , m_tcd(NULL)
-        , m_predicate()
-        , m_scanType(INVALID_SCAN)
-        , m_isEmptyScan(false)
-    {
-    }
+    AbstractScanPlanNode() = default;
 
-    void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue const&);
 
     // Target Table
     // These tables are different from the input and the output tables
@@ -97,11 +87,11 @@ protected:
     // The results of the operations will be written to the the output table
     //
     std::string m_target_table_name;
-    TableCatalogDelegate* m_tcd;
+    TableCatalogDelegate* m_tcd = nullptr;
     //
     // This is the predicate used to filter out tuples during the scan
     //
-    boost::scoped_ptr<AbstractExpression> m_predicate;
+    std::unique_ptr<AbstractExpression> m_predicate{};
 
     enum ScanType {
         INVALID_SCAN,
@@ -110,13 +100,12 @@ protected:
         CTE_SCAN
     };
 
-    ScanType m_scanType;
+    ScanType m_scanType = INVALID_SCAN;
 
-    bool m_isEmptyScan;
+    bool m_isEmptyScan = false;
 
     int m_cteStmtId;
 };
 
 } // namespace voltdb
 
-#endif
