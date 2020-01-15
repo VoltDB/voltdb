@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -45,6 +46,7 @@ import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -95,7 +97,8 @@ public class VoltZK {
         ClientInterface, ExecutionSite, Initiator, StatsAgent,
         OTHER
     }
-    public static final String mailboxes = "/db/mailboxes";
+
+    public static final String nt_mailboxes = "/db/cl_mailboxes";
 
     // snapshot and command log
     public static final String completed_snapshots = "/db/completed_snapshots";
@@ -244,7 +247,6 @@ public class VoltZK {
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
-            mailboxes,
             cluster_metadata,
             drConsumerPartitionMigration,
             operationMode,
@@ -263,7 +265,8 @@ public class VoltZK {
             host_ids_be_stopped,
             actionLock,
             hashMismatchedReplicas,
-            catalogbytes
+            catalogbytes,
+            nt_mailboxes
     };
 
     /**
@@ -726,5 +729,26 @@ public class VoltZK {
             VoltDB.crashLocalVoltDB("Unable to read hash mismatched sites.", true, e);
         }
         return false;
+    }
+
+    public static void registerMailBoxForNT(ZooKeeper zk, long hsid) {
+        String path = ZKUtil.joinZKPath(nt_mailboxes, Long.toString(hsid));
+        try {
+            zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (KeeperException.NoNodeException e) {
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to add client interface mailbox", true, e);
+        }
+    }
+
+    public static Set<Long> getMailBoxesForNT(ZooKeeper zk) {
+        Set<Long> mailboxes = Sets.newHashSet();
+        try {
+            List<String> clMailboxes = zk.getChildren(nt_mailboxes, false);
+            mailboxes = clMailboxes.stream().map(Long::valueOf).collect(Collectors.toSet());
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to read client interface mailboxes.", true, e);
+        }
+        return mailboxes;
     }
 }

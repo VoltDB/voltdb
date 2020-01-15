@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
@@ -105,7 +106,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
         // needs to be a three long array to work
         int[] hashes = new int[] { (int) hash, 0, 0 };
 
-        return checkCommon(hashes, message.isRecovering(), message, false);
+        return checkCommon(hashes, message.isRecovering(), message, ClientResponse.SUCCESS, null);
     }
 
     @Override

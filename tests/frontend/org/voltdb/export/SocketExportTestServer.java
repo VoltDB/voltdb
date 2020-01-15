@@ -23,20 +23,24 @@
 
 package org.voltdb.export;
 
-import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.exportclient.SocketExporter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -144,6 +148,14 @@ public class SocketExportTestServer extends Thread {
             }
         }
         System.out.println("Seen Id size is: " + m_seenIds.size() + " expected:" + expsize + " Passed: " + passed);
+        if (!passed) { // Write more debug info if it failed
+            long total = 0;
+            for (AtomicLong al : m_seenIds.values()) {
+                total += al.longValue();
+            }
+            System.out.println("Found total from values: " + total);
+            System.out.println("keys: " + new TreeSet<Long>(m_seenIds.keySet()));
+        }
         assertTrue(passed);
     }
 
@@ -161,6 +173,7 @@ public class SocketExportTestServer extends Thread {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
+                OutputStream out = m_clientSocket.getOutputStream();
                 while (!m_closed) {
                     String line = in.readLine();
                     //You should convert your data to params here.
@@ -169,6 +182,12 @@ public class SocketExportTestServer extends Thread {
                     }
                     if (line == null) {
                         try { Thread.sleep(100); } catch(InterruptedException e) { }
+                        continue;
+                    }
+                    // handle sync_block message
+                    if (line.equals(SocketExporter.SYNC_BLOCK_MSG)) {
+                        out.write(48); // What we send doesn't matter. Send any byte as ack.
+                        out.flush();
                         continue;
                     }
                     String parts[] = m_parser.parseLine(line);
