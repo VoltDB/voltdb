@@ -542,7 +542,7 @@ namespace voltdb {
             protected:
                 using value_type = typename super::value_type;
                 value_type m_cursor;
-                bool* m_firstChunkToEnd = nullptr;        // if compacting from head with >1 chunks and snapshot has witnessed any deletes
+                bool* m_deletedSnapshot = nullptr;        // has any tuple deletion occurred during snapshot process?
                 // ctor arg type
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,

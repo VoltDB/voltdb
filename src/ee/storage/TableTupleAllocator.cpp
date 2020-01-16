@@ -605,26 +605,28 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 /**
  * Helper to check if the iterator needs to advance to next
  * chunk. The only special occasion is snapshot view of
- * head-compacting, when current chunk is not last chunk.
+ * head-compacting, when there are tuple deletions occurring
+ * during snapshot.
  */
 template<typename Chunks, typename Iter, iterator_view_type view, typename Comp>
-struct CrossChunkPred {
-    inline bool operator()(Chunks&, void const* cursor, Iter const& iter, bool const*) const noexcept {
-        return cursor >= iter->next();
+struct ChunkBoundary {
+    inline void const* operator()(Chunks&, Iter const& iter, bool const*) const noexcept {
+        return iter->next();
     }
 };
 
 template<typename Chunks, typename Iter>
-struct CrossChunkPred<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
-    inline bool operator()(Chunks& l, void const* cursor, Iter const& iter, bool const* flag) const noexcept {
-        return cursor >= (flag != nullptr && *flag && iter == l.begin() ? iter->end() : iter->next());
+struct ChunkBoundary<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
+    inline void const* operator()(Chunks& l, Iter const& iter, bool const* flag) const noexcept {
+        return flag != nullptr && *flag && iter == l.begin() ?
+            iter->end() : iter->next();
     }
 };
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advance() {
-    static constexpr CrossChunkPred<list_type, decltype(m_iter), view, typename Chunks::Compact> const crossp{};
+    static constexpr ChunkBoundary<list_type, decltype(m_iter), view, typename Chunks::Compact> const boundary{};
     if (! drained()) {
         // Need to maintain invariant that m_cursor is nullptr iff
         // iterator points to end().
@@ -634,7 +636,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         if (! m_storage.empty() && m_iter != m_storage.end()) {
             const_cast<void*&>(m_cursor) =
                 reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-            if (! crossp(m_storage, m_cursor, m_iter, m_firstChunkToEnd)) {
+            if (m_cursor < boundary(m_storage, m_iter, m_deletedSnapshot)) {
                 finished = false;              // within chunk
             } else {
                 ++m_iter;                      // cross chunk
@@ -762,8 +764,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Ho
     super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }),
     m_extendingCb(c()),
     m_extendingPtr(m_extendingCb.shrinkFromHead() ? m_extendingCb() : nullptr) {
-    h.bindDeleteFlag(super::m_firstChunkToEnd);                     // compacting from head and some chunks had been erased/sliced to snapshot TODO
-    *super::m_firstChunkToEnd |= m_extendingPtr != nullptr;
+    h.bindDeleteFlag(super::m_deletedSnapshot);                     // compacting from head and some chunks had been erased/sliced to snapshot TODO
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -1050,30 +1051,15 @@ inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* src, void const* 
     }
 }
 
-/**
- * Late binding for use of iterator_type::advance(), determining
- * the iterator behavior of first chunk. We only need to bind
- * when compacting from head.
- */
-template<typename Alloc> struct DeleteSetter {
-    inline constexpr void operator()(bool&) const noexcept {}
-};
-template<> struct DeleteSetter<CompactingChunks<shrink_direction::head>> {
-    inline constexpr void operator()(bool& s) const noexcept {
-        s = true;
-    }
-};
-
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src, void const* dst) {
-    static constexpr DeleteSetter<Alloc> const Deleter{};
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
         vassert(m_last != nullptr);
         m_changes.emplace(src, m_last);
         m_last = nullptr;
-        Deleter(m_hasDeletes);
+        m_hasDeletes = true;
     }
 }
 

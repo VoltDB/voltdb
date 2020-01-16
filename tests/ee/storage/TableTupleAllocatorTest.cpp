@@ -853,7 +853,7 @@ void testHookedCompactingChunks() {
     verify_snapshot_const();
 
     // Step 5: deletion
-    for (i = 3099; i < 3599; ++i) {                            // TODO: this is problematic by this changeset alone
+    for (i = 3099; i < 3599; ++i) {
         alloc.remove(const_cast<void*>(addresses[i]));
     }
     verify_snapshot_const();
@@ -952,11 +952,12 @@ TestHookedCompactingChunks1<LazyNonCompactingChunk> const TestHookedCompactingCh
 TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
     TestHookedCompactingChunks t;
     t();
-//    testHookedCompactingChunks<EagerNonCompactingChunk, gc_policy::never, shrink_direction::tail>();
 }
 
-// Simulates how MP execution works: interleaved snapshot
-// advancement with txn in progress
+/**
+ * Simulates how MP execution works: interleaved snapshot
+ * advancement with txn in progress.
+ */
 template<typename Chunk, gc_policy pol, shrink_direction dir>
 void testInterleavedCompactingChunks() {
     using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
@@ -976,10 +977,7 @@ void testInterleavedCompactingChunks() {
     using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
     using explicit_iterator_type = pair<size_t, snapshot_iterator>;
     explicit_iterator_type explicit_iter(0, snapshot_iterator::begin(alloc));
-    auto verify = [&addresses](explicit_iterator_type& iter) {
-        if (*iter.second != nullptr && ! Gen::same(*iter.second, iter.first)) {
-            putchar('f');
-        }
+    auto verify = [] (explicit_iterator_type& iter) {
         assert(*iter.second == nullptr || Gen::same(*iter.second, iter.first));
     };
     auto advance_verify = [&verify](explicit_iterator_type& iter) {     // returns false on draining
@@ -989,7 +987,6 @@ void testInterleavedCompactingChunks() {
         verify(iter);
         ++iter.first;
         ++iter.second;
-        printf("iter advances to %lu\n", iter.first);
         if (! iter.second.drained()) {
             verify(iter);
             return true;
@@ -1006,28 +1003,25 @@ void testInterleavedCompactingChunks() {
         return true;
     };
 
-    addresses_type latest(addresses);     // mutable copy
     random_device rd; mt19937 rgen(rd());
     uniform_int_distribution<size_t> range(0, NumTuples - 1), changeTypes(0, 2),
-        advanceTimes(0, 3);
+        advanceTimes(0, 4);
     void const* p1 = nullptr;
     for (i = 0; i < 8000;) {
         size_t i1, i2;
         switch(changeTypes(rgen)) {
             case 0:                                            // insertion
                 p1 = alloc.insert(gen.get());
-                puts("Insertion");
                 break;
             case 1:                                            // deletion
                 i1 = range(rgen);
-                if (latest[i1] == nullptr) {
+                if (addresses[i1] == nullptr) {
                     continue;
                 } else {
                     try {
-//                        alloc.remove(const_cast<void*>(latest[i1]));
-//                        latest[i1] = p1;
-//                        p1 = nullptr;
-                        printf("Deletion at %lu\n", i1);
+                        alloc.remove(const_cast<void*>(addresses[i1]));
+                        addresses[i1] = p1;
+                        p1 = nullptr;
                     } catch (range_error const&) {                 // if we tried to delete a non-existent address, pick another option
                         continue;
                     }
@@ -1036,13 +1030,12 @@ void testInterleavedCompactingChunks() {
             case 2:                                            // update
             default:;
                     i1 = range(rgen); i2 = range(rgen);
-                    if (i1 == i2 || latest[i1] == nullptr || latest[i2] == nullptr) {
+                    if (i1 == i2 || addresses[i1] == nullptr || addresses[i2] == nullptr) {
                         continue;
                     } else {
-                        alloc.update(const_cast<void*>(latest[i2]), latest[i1]);
-                        latest[i2] = p1;
+                        alloc.update(const_cast<void*>(addresses[i2]), addresses[i1]);
+                        addresses[i2] = p1;
                         p1 = nullptr;
-                        printf("Update at %lu -> %lu\n", i1, i2);
                     }
         }
         ++i;
@@ -1053,8 +1046,45 @@ void testInterleavedCompactingChunks() {
     alloc.thaw();
 }
 
+template<typename Chunks, gc_policy pol> struct TestInterleavedCompactingChunks2 {
+    inline void operator()() const {
+        for (size_t i = 0; i < 16; ++i) {                      // repeat randomized test
+            testInterleavedCompactingChunks<Chunks, pol, shrink_direction::head>();
+//            testInterleavedCompactingChunks<Chunks, pol, shrink_direction::tail>(); TODO
+        }
+    }
+};
+template<typename Chunks> struct TestInterleavedCompactingChunks1 {
+    static TestInterleavedCompactingChunks2<Chunks, gc_policy::never> const s1;
+    static TestInterleavedCompactingChunks2<Chunks, gc_policy::always> const s2;
+    static TestInterleavedCompactingChunks2<Chunks, gc_policy::batched> const s3;
+    inline void operator()() const {
+        s1();
+        s2();
+        s3();
+    }
+};
+template<typename Chunks>TestInterleavedCompactingChunks2<Chunks, gc_policy::never>
+const TestInterleavedCompactingChunks1<Chunks>::s1{};
+template<typename Chunks>TestInterleavedCompactingChunks2<Chunks, gc_policy::always>
+const TestInterleavedCompactingChunks1<Chunks>::s2{};
+template<typename Chunks>TestInterleavedCompactingChunks2<Chunks, gc_policy::batched>
+const TestInterleavedCompactingChunks1<Chunks>::s3{};
+
+struct TestInterleavedCompactingChunks {
+    static TestInterleavedCompactingChunks1<EagerNonCompactingChunk> const s1;
+    static TestInterleavedCompactingChunks1<LazyNonCompactingChunk> const s2;
+    inline void operator()() const {
+        s1();
+        s2();
+    }
+};
+TestInterleavedCompactingChunks1<EagerNonCompactingChunk> const TestInterleavedCompactingChunks::s1{};
+TestInterleavedCompactingChunks1<LazyNonCompactingChunk> const TestInterleavedCompactingChunks::s2{};
+
 TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
-    testInterleavedCompactingChunks<EagerNonCompactingChunk, gc_policy::never, shrink_direction::head>();
+    TestInterleavedCompactingChunks t;
+    t();
 }
 
 #endif
