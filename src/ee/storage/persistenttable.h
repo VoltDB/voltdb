@@ -114,7 +114,7 @@ public:
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
-    void deleteTupleStorage(TableTuple& tuple, TBPtr block = TBPtr(NULL));
+    void deleteTupleStorage(TableTuple& tuple);
 
     size_t getSnapshotPendingBlockCount() const;
     size_t getSnapshotPendingLoadBlockCount() const;
@@ -345,7 +345,7 @@ public:
         return true;
     }
 
-    TableTuple* createTuple(TableTuple &source);
+    TableTuple* createTuple(TableTuple const &source);
 
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.
@@ -709,7 +709,7 @@ private:
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple& tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock = false);
+    void deleteTupleStorage(TableTuple& tuple);
 
     /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -923,8 +923,8 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
     m_table.deleteTupleRelease(tuple);
 }
 
-inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple, TBPtr block) {
-    m_table.deleteTupleStorage(tuple, block);
+inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {
+    m_table.deleteTupleStorage(tuple);
 }
 
 inline size_t PersistentTableSurgeon::getSnapshotPendingBlockCount() const {
@@ -1071,7 +1071,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(ElasticIndexHashRange const& 
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, bool deleteLastEmptyBlock) {
+inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
     // May not delete an already deleted tuple.
     vassert(tuple.isActive());
 
@@ -1093,48 +1093,9 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
         --m_invisibleTuplesPendingDeleteCount;
     }
 
-    if (block.get() == NULL) {
-        block = findBlock(tuple.address(), m_data, m_tableAllocationSize);
-        if (block.get() == NULL) {
-            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
-    }
-
-    bool transitioningToBlockWithSpace = ! block->hasFreeTuples();
-
-    int retval = block->freeTuple(tuple.address());
-    if (retval != NO_NEW_BUCKET_INDEX) {
-        //Check if if the block is currently pending snapshot
-        if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
-        //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
-            //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
-            //do nothing, once the block is finished by the iterator, the iterator will return it
-        }
-    }
-
-    if (block->isEmpty()) {
-        if (m_data.size() > 1 || deleteLastEmptyBlock) {
-            // Release the empty block unless it's the only remaining block and caller has requested not to do so.
-            // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
-            m_data.erase(block->address());
-            m_blocksWithSpace.erase(block);
-        } else if (transitioningToBlockWithSpace) {
-           // In the unlikely event that tuplesPerBlock == 1
-           m_blocksWithSpace.insert(block);
-        }
-        m_blocksNotPendingSnapshot.erase(block);
-        vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-        //Eliminates circular reference
-        block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
-        m_blocksWithSpace.insert(block);
-    }
-}
+    // TO DO: Need update indexes here for the migrated tuple.
+    m_dataStorage->remove(&tuple);
+ }
 
 inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSize) {
     if (!blocks.empty()) {

@@ -113,20 +113,21 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 vassert(m_inputTable);
                 vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
                 vassert(targetTuple.columnCount() == targetTable->columnCount());
-
-                storage::for_each<PersistentTable::txn_iterator>(dynamic_cast<PersistentTable*>(m_inputTable)->allocator(),
-                       [this, &targetTuple, &targetTable](void* p) {
-                    auto* inputTuple = reinterpret_cast<TableTuple*>(p);
+                TableIterator inputIterator = m_inputTable->iterator();
+                while (inputIterator.next(m_inputTuple)) {
+                    //
                     // OPTIMIZATION: Single-Sited Query Plans
                     // If our beloved DeletePlanNode is apart of a single-site query plan,
                     // then the first column in the input table will be the address of a
                     // tuple on the target table that we will want to blow away. This saves
                     // us the trouble of having to do an index lookup
-                    void *targetAddress = inputTuple->getNValue(0).castAsAddress();
+                    //
+                    void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
                     targetTuple.move(targetAddress);
-                    targetTable->deleteTuple(targetTuple, true);
-                });
 
+                    // Delete from target table
+                    targetTable->deleteTuple(targetTuple, true);
+                }
                 modified_tuples = m_inputTable->tempTableTupleCount();
                 VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
                            (int)modified_tuples,

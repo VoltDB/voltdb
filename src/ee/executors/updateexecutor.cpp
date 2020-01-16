@@ -135,129 +135,94 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     vassert(targetTable);
 
+    TableTuple targetTuple = TableTuple(targetTable->schema());
+
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
     int64_t modified_tuples = 0;
-    vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+
+    {
+        vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(),
                 []() { s_modifiedTuples = -1l; });
-    if (possiblySynchronizedUseMpMemory.okToExecute()) {
-        // determine which indices are updated by this executor
-        // iterate through all target table indices and see if they contain
-        // columns mutated by this executor
-        //
-        // Shouldn't this be done in p_init?  See ticket ENG-8668.
-        std::vector<TableIndex*> indexesToUpdate;
-        for(auto* index : targetTable->allIndexes()) {
-            if (index->isMigratingIndex()) {
-                indexesToUpdate.push_back(index);
-            } else {
-                auto const indicesArray = index->getAllColumnIndices();
-                std::set<int> const colIndices(indicesArray.cbegin(), indicesArray.cend());
-                if (m_inputTargetMap.cend() !=
-                      std::find_if(m_inputTargetMap.cbegin(), m_inputTargetMap.cend(),
-                          [&colIndices](std::pair<int, int> const& col) {return colIndices.count(col.second);})) {
-                   indexesToUpdate.push_back(index);
-                }
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // determine which indices are updated by this executor
+            // iterate through all target table indices and see if they contain
+            // columns mutated by this executor
+            //
+            // Shouldn't this be done in p_init?  See ticket ENG-8668.
+            std::vector<TableIndex*> indexesToUpdate;
+            for(auto* index : targetTable->allIndexes()) {
+               if (index->isMigratingIndex()) {
+                  indexesToUpdate.push_back(index);
+               } else {
+                  auto const indicesArray = index->getAllColumnIndices();
+                  std::set<int> const colIndices(indicesArray.cbegin(), indicesArray.cend());
+                  if (m_inputTargetMap.cend() !=
+                        std::find_if(m_inputTargetMap.cbegin(), m_inputTargetMap.cend(),
+                           [&colIndices](std::pair<int, int> const& col) {return colIndices.count(col.second);})) {
+                     indexesToUpdate.push_back(index);
+                  }
+               }
             }
-        }
 
-        TableTuple targetTuple = TableTuple(targetTable->schema());
-        vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-        vassert(targetTuple.columnCount() == targetTable->columnCount());
+            vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+            vassert(targetTuple.columnCount() == targetTable->columnCount());
+            TableIterator input_iterator = m_inputTable->iterator();
+            while (input_iterator.next(m_inputTuple)) {
+                // The first column in the input table will be the address of a
+                // tuple to update in the target table.
+                targetTuple.move(m_inputTuple.getNValue(0).castAsAddress());
 
-        storage::for_each<PersistentTable::txn_iterator>(dynamic_cast<PersistentTable*>(m_inputTable)->allocator(),
-               [this, &targetTuple, &targetTable, &indexesToUpdate](void* p) {
-            auto* inputTuple = reinterpret_cast<TableTuple*>(p);
-            // The first column in the input table will be the address of a
-            // tuple to update in the target table.
-            VOLT_DEBUG("INPUT %s", inputTuple->debug("test").c_str());
-            targetTuple.move(inputTuple->getNValue(0).castAsAddress());
-            VOLT_DEBUG("Target %s", targetTuple.debug("test").c_str());
-            // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
-            // the values that we need to. The key thing to note here is that we
-            // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-            // we want to update). This ensures that if the input tuple is somehow
-            // bringing garbage with it, we're only going to copy what we really
-            // need to into the target tuple.
-            TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-            for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-                try {
-                    tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-                           inputTuple->getNValue(m_inputTargetMap[map_ctr].first));
-                } catch (SQLException& ex) {
-                    std::string errorMsg = ex.message()
-                                                 + " '" + targetTable->getColumnNames().at(m_inputTargetMap[map_ctr].second) + "'";
-                    throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
+                // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
+                // the values that we need to. The key thing to note here is that we
+                // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
+                // we want to update). This ensures that if the input tuple is somehow
+                // bringing garbage with it, we're only going to copy what we really
+                // need to into the target tuple.
+                //
+                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
+                    try {
+                        tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
+                                        m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+                    } catch (SQLException& ex) {
+                        std::string errorMsg = ex.message()
+                                + " '" + targetTable->getColumnNames().at(m_inputTargetMap[map_ctr].second) + "'";
+                        throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
+                    }
                 }
-             }
 
-            // if there is a partition column for the target table
-            if (m_partitionColumn != -1) {
-                // check for partition problems, get the value for the partition column
-                bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
-                if (!isLocal) {
-                    throw ConstraintFailureException(targetTable, tempTuple,
-                        "An update to a partitioning column triggered a partitioning error. "
-                        "Updating a partitioning column is not supported. Try delete followed by insert.");
-                 }
+                // if there is a partition column for the target table
+                if (m_partitionColumn != -1) {
+                    // check for partition problems
+                    // get the value for the partition column
+                    bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
+                    // if it doesn't map to this site
+                    if (!isLocal) {
+                        throw ConstraintFailureException(targetTable, tempTuple,
+                                "An update to a partitioning column triggered a partitioning error. "
+                                "Updating a partitioning column is not supported. Try delete followed by insert.");
+                    }
+                }
+                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple, indexesToUpdate);
             }
-            targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple, indexesToUpdate);
-        });
-
-//            TableIterator input_iterator = m_inputTable->iterator();
-//            while (input_iterator.next(m_inputTuple)) {
-//                // The first column in the input table will be the address of a
-//                // tuple to update in the target table.
-//                targetTuple.move(m_inputTuple.getNValue(0).castAsAddress());
-//
-//                // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
-//                // the values that we need to. The key thing to note here is that we
-//                // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-//                // we want to update). This ensures that if the input tuple is somehow
-//                // bringing garbage with it, we're only going to copy what we really
-//                // need to into the target tuple.
-//                //
-//                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-//                for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-//                    try {
-//                        tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-//                                        m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
-//                    } catch (SQLException& ex) {
-//                        std::string errorMsg = ex.message()
-//                                + " '" + targetTable->getColumnNames().at(m_inputTargetMap[map_ctr].second) + "'";
-//                        throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
-//                    }
-//                }
-//
-//                // if there is a partition column for the target table
-//                if (m_partitionColumn != -1) {
-//                    // check for partition problems
-//                    // get the value for the partition column
-//                    bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
-//                    // if it doesn't map to this site
-//                    if (!isLocal) {
-//                        throw ConstraintFailureException(targetTable, tempTuple,
-//                                "An update to a partitioning column triggered a partitioning error. "
-//                                "Updating a partitioning column is not supported. Try delete followed by insert.");
-//                    }
-//                }
-//                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple, indexesToUpdate);
-//            }
-        modified_tuples = m_inputTable->tempTableTupleCount();
-        if (m_replicatedTableOperation) {
-            s_modifiedTuples = modified_tuples;
-        }
-    } else if (s_modifiedTuples == -1) {
-        // An exception was thrown on the lowest site thread and we need to throw here as well so
-        // all threads are in the same state
-        throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
+            modified_tuples = m_inputTable->tempTableTupleCount();
+            if (m_replicatedTableOperation) {
+                s_modifiedTuples = modified_tuples;
+            }
+        } else {
+            if (s_modifiedTuples == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                throwSerializableTypedEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE,
                         "Replicated table update threw an unknown exception on other thread for table %s",
                         targetTable->name().c_str());
+            }
+        }
     }
-
     if (m_replicatedTableOperation) {
         // Use the static value assigned above to propagate the result to the other engines
         // that skipped the replicated table work

@@ -753,7 +753,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
     // daring and likely not correct.
 }
 
-TableTuple* PersistentTable::createTuple(TableTuple &source){
+TableTuple* PersistentTable::createTuple(TableTuple const &source){
     TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(m_dataStorage->insert(&source)));
     target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));
     target->copyForPersistentInsert(source);
@@ -779,7 +779,7 @@ void PersistentTable::insertPersistentTuple(TableTuple const& source, bool falli
     // bc. how the TableTuple inlined data content (that m_data points
     // to) is constructed in the Alloc. This is one hacky way to
     // do it!!
-    TableTuple* target = m_deltaTable->createTuple(source);
+    TableTuple* target = createTuple(source);
     try {
         insertTupleCommon(source, *target, fallible);
     } catch (TupleStreamException const& e) {
@@ -1374,7 +1374,7 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
 void PersistentTable::deleteTupleForSchemaChange(TableTuple& target) {
     TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
     // free object columns along with empty tuple block storage
-    deleteTupleStorage(target, block, true);
+    deleteTupleStorage(target);
 }
 
 /*

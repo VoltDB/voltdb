@@ -181,9 +181,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                  */
                 if (tuple.isPendingDelete()) {
                     vassert(!tuple.isPendingDeleteOnUndoRelease());
-                    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-                    //Save the extra lookup if possible
-                    m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
+                    m_surgeon.deleteTupleStorage(tuple);
                 }
 
                 /*
