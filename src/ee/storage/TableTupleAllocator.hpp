@@ -719,7 +719,7 @@ namespace voltdb {
          * converted to boolean, and loop exists when it evaluates to true.
          */
         template<typename iterator_type, typename Fun, typename Chunks,
-            typename = typename enable_if<is_chunks<Chunks>::value && ! iterator_type::constness::value && ! is_const<Chunks>::value>::type>
+            typename = typename enable_if<is_chunks<Chunks>::value && iterator_type::constness::value == is_const<Chunks>::value>::type>
         inline void until(Chunks& c, Fun&& f) {
             for (auto iter = iterator_type::begin(c); ! iter.drained();) {
                 auto* addr = *iter;
@@ -751,8 +751,8 @@ namespace voltdb {
 
         template<typename iterator_type, typename Fun, typename Chunks, typename... Args>
         inline void until(Chunks& c, Fun&& f, Args&&... args) {
-            static_assert(! iterator_type::constness::value && ! is_const<Chunks>::value,
-                    "until only applies to non-const iterators and non-const chunks");
+            static_assert(iterator_type::constness::value == is_const<Chunks>::value,
+                    "until(): constness of Chunks and iterator should be the same");
             for (auto iter = iterator_type::begin(c, forward<Args&&>(args)...); ! iter.drained();) {
                 auto* addr = *iter;
                 ++iter;
