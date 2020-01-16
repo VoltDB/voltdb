@@ -195,7 +195,6 @@ namespace voltdb {
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::empty;
             using super::front; using super::back;
-            using super::size;                         // need to check >1?
         };
 
         /**
@@ -432,6 +431,7 @@ namespace voltdb {
             map m_changes{};                // addr in persistent storage under change => addr storing before-change content
             set m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
+            bool m_hasDeletes = false;      // observer for iterator::advance()
             Alloc m_storage;
             void* m_last = nullptr;   // last allocation by copy(void const*);
             /**
@@ -451,7 +451,7 @@ namespace voltdb {
              *   the tuple that gets moved to the hole by deletion, and
              *   its content.
              */
-            void update(void const* src, void const* dst);         // src tuple from temp table written to dst in persistent storage
+            void update(void const* dst);                          // src tuple from temp table written to dst in persistent storage. src doesn't matter
             void insert(void const* src, void const* dst);         // same
             void remove(void const* src, void const* dst);         // src tuple is deleted, and tuple at dst gets moved to src
         public:
@@ -473,6 +473,10 @@ namespace voltdb {
             // Client is responsible to fill the buffer before
             // calling add() API.
             void copy(void const* prev);
+            // late binding needed as communication channel to iterator,
+            // see time_traveling_iterator_type and advance() for
+            // details.
+            void bindDeleteFlag(bool*&) const noexcept;
         };
 
         /**
@@ -538,7 +542,7 @@ namespace voltdb {
             protected:
                 using value_type = typename super::value_type;
                 value_type m_cursor;
-                bool m_firstChunkToEnd = false;        // if compacting from head with >1 chunks and snapshot has spliced chunks
+                bool* m_firstChunkToEnd = nullptr;        // if compacting from head with >1 chunks and snapshot has witnessed any deletes
                 // ctor arg type
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,

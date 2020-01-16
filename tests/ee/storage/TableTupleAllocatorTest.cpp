@@ -931,9 +931,13 @@ template<typename Chunks> struct TestHookedCompactingChunks1 {
         s3();
     }
 };
-template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::never> const TestHookedCompactingChunks1<Chunks>::s1{};
-template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::always> const TestHookedCompactingChunks1<Chunks>::s2{};
-template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::batched> const TestHookedCompactingChunks1<Chunks>::s3{};
+template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::never>
+const TestHookedCompactingChunks1<Chunks>::s1{};
+template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::always>
+const TestHookedCompactingChunks1<Chunks>::s2{};
+template<typename Chunks>TestHookedCompactingChunks2<Chunks, gc_policy::batched>
+const TestHookedCompactingChunks1<Chunks>::s3{};
+
 struct TestHookedCompactingChunks {
     static TestHookedCompactingChunks1<EagerNonCompactingChunk> const s1;
     static TestHookedCompactingChunks1<LazyNonCompactingChunk> const s2;
@@ -950,6 +954,109 @@ TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
     t();
 //    testHookedCompactingChunks<EagerNonCompactingChunk, gc_policy::never, shrink_direction::tail>();
 }
+
+// Simulates how MP execution works: interleaved snapshot
+// advancement with txn in progress
+template<typename Chunk, gc_policy pol, shrink_direction dir>
+void testInterleavedCompactingChunks() {
+    using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<CompactingChunks<dir>, Hook>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, NumTuples>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    addresses_type addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.insert(gen.get());
+    }
+    alloc.freeze();
+    using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
+    using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
+    using explicit_iterator_type = pair<size_t, snapshot_iterator>;
+    explicit_iterator_type explicit_iter(0, snapshot_iterator::begin(alloc));
+    auto verify = [&addresses](explicit_iterator_type& iter) {
+        if (*iter.second != nullptr && ! Gen::same(*iter.second, iter.first)) {
+            putchar('f');
+        }
+        assert(*iter.second == nullptr || Gen::same(*iter.second, iter.first));
+    };
+    auto advance_verify = [&verify](explicit_iterator_type& iter) {     // returns false on draining
+        if (iter.second.drained()) {
+            return false;
+        }
+        verify(iter);
+        ++iter.first;
+        ++iter.second;
+        printf("iter advances to %lu\n", iter.first);
+        if (! iter.second.drained()) {
+            verify(iter);
+            return true;
+        } else {
+            return false;
+        }
+    };
+    auto advances_verify = [&advance_verify] (explicit_iterator_type& iter, size_t advances) {
+        for (size_t i = 0; i < advances; ++i) {
+            if (! advance_verify(iter)) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    addresses_type latest(addresses);     // mutable copy
+    random_device rd; mt19937 rgen(rd());
+    uniform_int_distribution<size_t> range(0, NumTuples - 1), changeTypes(0, 2),
+        advanceTimes(0, 3);
+    void const* p1 = nullptr;
+    for (i = 0; i < 8000;) {
+        size_t i1, i2;
+        switch(changeTypes(rgen)) {
+            case 0:                                            // insertion
+                p1 = alloc.insert(gen.get());
+                puts("Insertion");
+                break;
+            case 1:                                            // deletion
+                i1 = range(rgen);
+                if (latest[i1] == nullptr) {
+                    continue;
+                } else {
+                    try {
+//                        alloc.remove(const_cast<void*>(latest[i1]));
+//                        latest[i1] = p1;
+//                        p1 = nullptr;
+                        printf("Deletion at %lu\n", i1);
+                    } catch (range_error const&) {                 // if we tried to delete a non-existent address, pick another option
+                        continue;
+                    }
+                    break;
+                }
+            case 2:                                            // update
+            default:;
+                    i1 = range(rgen); i2 = range(rgen);
+                    if (i1 == i2 || latest[i1] == nullptr || latest[i2] == nullptr) {
+                        continue;
+                    } else {
+                        alloc.update(const_cast<void*>(latest[i2]), latest[i1]);
+                        latest[i2] = p1;
+                        p1 = nullptr;
+                        printf("Update at %lu -> %lu\n", i1, i2);
+                    }
+        }
+        ++i;
+        if (! advances_verify(explicit_iter, advanceTimes(rgen))) {
+            break;                                             // verified all snapshot iterators
+        }
+    }
+    alloc.thaw();
+}
+
+TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
+    testInterleavedCompactingChunks<EagerNonCompactingChunk, gc_policy::never, shrink_direction::head>();
+}
+
 #endif
 
 int main() {

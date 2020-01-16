@@ -609,15 +609,15 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
  */
 template<typename Chunks, typename Iter, iterator_view_type view, typename Comp>
 struct CrossChunkPred {
-    inline bool operator()(Chunks&, void const* cursor, Iter const& iter, bool) const noexcept {
+    inline bool operator()(Chunks&, void const* cursor, Iter const& iter, bool const*) const noexcept {
         return cursor >= iter->next();
     }
 };
 
 template<typename Chunks, typename Iter>
 struct CrossChunkPred<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
-    inline bool operator()(Chunks& l, void const* cursor, Iter const& iter, bool flag) const noexcept {
-        return cursor >= (flag && iter == l.begin() && l.size() > 1 ? iter->end() : iter->next());
+    inline bool operator()(Chunks& l, void const* cursor, Iter const& iter, bool const* flag) const noexcept {
+        return cursor >= (flag != nullptr && *flag && iter == l.begin() ? iter->end() : iter->next());
     }
 };
 
@@ -762,7 +762,8 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Ho
     super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }),
     m_extendingCb(c()),
     m_extendingPtr(m_extendingCb.shrinkFromHead() ? m_extendingCb() : nullptr) {
-    super::m_firstChunkToEnd = m_extendingPtr != nullptr;                     // compacting from head and some chunks had been erased/sliced to snapshot
+    h.bindDeleteFlag(super::m_firstChunkToEnd);                     // compacting from head and some chunks had been erased/sliced to snapshot TODO
+    *super::m_firstChunkToEnd |= m_extendingPtr != nullptr;
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -974,6 +975,11 @@ inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
             }),
     m_storage(tupleSize) { }
 
+template<typename Alloc, typename Trait, typename C, typename E> inline void
+TxnPreHook<Alloc, Trait, C, E>::bindDeleteFlag(bool*& f) const noexcept {
+    f = const_cast<bool*>(&m_hasDeletes);
+}
+
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API essential
     if (m_last == nullptr) {
@@ -989,7 +995,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait
     if (m_recording) {
         switch (type) {
             case ChangeType::Update:
-                update(src, dst);
+                update(dst);
                 break;
             case ChangeType::Insertion:
                 insert(src, dst);
@@ -1012,7 +1018,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::thaw() {
         m_changes.clear();
         m_copied.clear();
         m_storage.clear();
-        m_recording = false;
+        m_hasDeletes = m_recording = false;
     }
 }
 
@@ -1026,7 +1032,7 @@ inline void* TxnPreHook<Alloc, Trait, C, E>::_copy(void const* src, bool) {
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* src, void const* dst) {
+inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* dst) {
     // src tuple from temp table written to dst in persistent storage
     if (m_recording && ! m_changes.count(dst)) {
         m_changes.emplace(dst, _copy(dst, false));
@@ -1044,14 +1050,30 @@ inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* src, void const* 
     }
 }
 
+/**
+ * Late binding for use of iterator_type::advance(), determining
+ * the iterator behavior of first chunk. We only need to bind
+ * when compacting from head.
+ */
+template<typename Alloc> struct DeleteSetter {
+    inline constexpr void operator()(bool&) const noexcept {}
+};
+template<> struct DeleteSetter<CompactingChunks<shrink_direction::head>> {
+    inline constexpr void operator()(bool& s) const noexcept {
+        s = true;
+    }
+};
+
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src, void const* dst) {
+    static constexpr DeleteSetter<Alloc> const Deleter{};
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
         vassert(m_last != nullptr);
         m_changes.emplace(src, m_last);
         m_last = nullptr;
+        Deleter(m_hasDeletes);
     }
 }
 
