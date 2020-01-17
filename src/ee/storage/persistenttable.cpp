@@ -1832,26 +1832,24 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
 }
 
 int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
-    TableIterator iter = iterator();
-
     int64_t mispartitionedRows = 0;
-
-    TableTuple tuple(schema());
-    while (iter.next(tuple)) {
-        int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
-        if (newPartitionId != partitionId) {
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),
+                           [this, &hashinator, &mispartitionedRows, partitionId](void* p) {
+       auto* tuple = reinterpret_cast<TableTuple*>(p);
+       int32_t newPartitionId = hashinator->hashinate(tuple->getNValue(m_partitionColumn));
+       if (newPartitionId != partitionId) {
             std::ostringstream buffer;
             buffer << "@ValidPartitioning found a mispartitioned row (hash: "
-                    << m_surgeon.generateTupleHash(tuple)
-                    << " should in "<< partitionId
-                    << ", but in " << newPartitionId << "):\n"
-                    << tuple.debug(name())
-                    << std::endl;
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
-                    buffer.str().c_str());
+                   << m_surgeon.generateTupleHash(*tuple)
+                   << " should in "<< partitionId
+                   << ", but in " << newPartitionId << "):\n"
+                   << tuple->debug(name())
+                   << std::endl;
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buffer.str().c_str());
             mispartitionedRows++;
-        }
-    }
+       }
+    });
+
     if (mispartitionedRows > 0) {
         std::ostringstream buffer;
         buffer << "Expected hashinator is "
@@ -1971,11 +1969,17 @@ void PersistentTable::addIndex(TableIndex* index) {
     vassert(!isExistingTableIndex(m_indexes, index));
 
     // fill the index with tuples... potentially the slow bit
-    TableTuple tuple(m_schema);
-    TableIterator iter = iterator();
-    while (iter.next(tuple)) {
-        index->addEntry(&tuple, NULL);
-    }
+//    TableTuple tuple(m_schema);
+//    TableIterator iter = iterator();
+//    while (iter.next(tuple)) {
+//        index->addEntry(&tuple, NULL);
+//    }
+
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),
+                         [this, &index](void* p) {
+          auto* inputTuple = reinterpret_cast<TableTuple*>(p);
+          index->addEntry(inputTuple, NULL);
+     });
 
     // add the index to the table
     if (index->isUniqueIndex()) {
