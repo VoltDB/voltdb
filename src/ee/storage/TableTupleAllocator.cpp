@@ -18,7 +18,6 @@
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
 #include <array>
-#include <numeric>
 
 using namespace voltdb;
 using namespace voltdb::storage;
@@ -374,7 +373,12 @@ inline void* NonCompactingChunks<C, E>::allocate() {
         r = iter->allocate();
     }
     vassert(r != nullptr);
+    ++m_allocs;
     return r;
+}
+
+template<typename C, typename E> inline size_t NonCompactingChunks<C, E>::size() const noexcept {
+    return m_allocs;
 }
 
 template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(void* src) {
@@ -393,6 +397,7 @@ template<typename C, typename E> inline bool NonCompactingChunks<C, E>::tryFree(
         if ((*p)->empty()) {
             list_type::erase(*p);              // immediate chunk removal
         }
+        --m_allocs;
     }
     return p != nullptr;
 }
@@ -469,18 +474,15 @@ inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept : m_tu
     trait::associate(this);
 }
 
-template<shrink_direction dir> inline
-size_t CompactingChunks<dir>::size() const noexcept {
-    return accumulate(begin(), end(), 0lu, [this](size_t acc, CompactingChunk const& c) {
-                return acc +
-                    (reinterpret_cast<char const*>(c.next()) - reinterpret_cast<char const*>(c.begin())) / this->tupleSize();
-            });
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::size() const noexcept {
+    return m_allocs;
 }
 
 template<shrink_direction dir> inline void* CompactingChunks<dir>::allocate() {
     if (empty() || back().full()) {                  // always allocates from tail
         emplace_back(m_tupleSize);
     }
+    ++m_allocs;
     return back().allocate();
 }
 
@@ -522,6 +524,7 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
     if (pos == nullptr) {
         if (ignored(*this, dst)) {
             // See document in method declaration why this is not an error.
+            --m_allocs;
             return nullptr;
         } else {
             snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(%p): invalid address.",
@@ -537,6 +540,7 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
             dst_iter->free(dst, src);        // memcpy()
         }
         trait::released(from_iter);
+        --m_allocs;
         return src;
     }
 }
