@@ -473,10 +473,7 @@ namespace voltdb {
             // Client is responsible to fill the buffer before
             // calling add() API.
             void copy(void const* prev);
-            // late binding needed as communication channel to iterator,
-            // see time_traveling_iterator_type and advance() for
-            // details.
-            void bindDeleteFlag(bool*&) const noexcept;
+            bool const& hasDeletes() const noexcept;
         };
 
         /**
@@ -523,6 +520,7 @@ namespace voltdb {
             typename = typename enable_if<is_class<Tag>::value && is_chunks<Chunks>::value>::type>
         struct IterableTableTupleChunks final {
             using iterator_value_type = void*;         // constness-independent type being iterated over
+            static constexpr bool const FALSE_VALUE = false;           // default binding to iterator_type::m_deletedSnapshot when  is ignored.
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
             template<iterator_permission_type perm, iterator_view_type vtype>
@@ -542,7 +540,7 @@ namespace voltdb {
             protected:
                 using value_type = typename super::value_type;
                 value_type m_cursor;
-                bool* m_deletedSnapshot = nullptr;        // has any tuple deletion occurred during snapshot process?
+                bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 // ctor arg type
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
@@ -551,7 +549,7 @@ namespace voltdb {
                 void advance();
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
-                iterator_type(container_type);
+                iterator_type(container_type, bool const& = FALSE_VALUE);
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 static iterator_type begin(container_type);
@@ -602,7 +600,7 @@ namespace voltdb {
                 cb_type m_cb;
             public:
                 value_type operator*() noexcept;
-                iterator_cb_type(container_type, cb_type);
+                iterator_cb_type(container_type, cb_type, bool const& = FALSE_VALUE);
                 static iterator_cb_type begin(container_type, cb_type);
                 static iterator_cb_type end(container_type, cb_type);
             };
