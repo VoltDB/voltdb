@@ -224,7 +224,7 @@ namespace voltdb {
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             size_t const m_tupleSize;
-
+            size_t m_allocs = 0;
             NonCompactingChunks(EagerNonCompactingChunk const&) = delete;
             NonCompactingChunks(NonCompactingChunks&&) = delete;
             NonCompactingChunks& operator=(NonCompactingChunks const&) = delete;
@@ -233,6 +233,7 @@ namespace voltdb {
             NonCompactingChunks(size_t) noexcept;
             ~NonCompactingChunks() = default;
             size_t tupleSize() const noexcept;
+            size_t size() const noexcept;
             void* allocate();
             void free(void*);
             bool tryFree(void*);                       // not an error if addr not found
@@ -346,6 +347,7 @@ namespace voltdb {
             using list_type = ChunkList<CompactingChunk>;
             using trait = CompactingStorageTrait<dir>;
             size_t const m_tupleSize;
+            size_t m_allocs = 0;
 
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
@@ -372,6 +374,7 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
+            size_t size() const noexcept;              // used for table count executor
             using trait::freeze; using trait::thaw;
             using list_type::empty;
         };

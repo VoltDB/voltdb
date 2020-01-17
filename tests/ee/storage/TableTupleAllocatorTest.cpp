@@ -190,6 +190,7 @@ void testIteratorOfNonCompactingChunks() {
     for(i = 0; i < NumTuples; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
     }
+    assert(alloc.size() == NumTuples);
     class Checker {
         size_t m_index = 0;                // Note that NonCompactingChunks uses singly-linked list
         map<void const*, size_t> m_remains;
@@ -242,6 +243,7 @@ void testIteratorOfNonCompactingChunks() {
         gen.fill(alloc.allocate());
     }
     assert(! alloc.empty());
+    assert(alloc.size() == NumTuples);
     i = 0;
     for_each<iterator>(alloc, [&alloc, &i](void* p) { alloc.free(p); ++i; });
     assert(i == NumTuples);
@@ -249,7 +251,6 @@ void testIteratorOfNonCompactingChunks() {
     // Iterating on empty chunks is a no-op
     for_each<iterator>(alloc, [&alloc, &i](void* p) { alloc.free(p); ++i; });
     assert(i == NumTuples);
-
     // expected compiler error: cannot mix const_iterator with non-const
     // lambda function. Uncomment next 2 lines to see
     /*for_each<typename IterableTableTupleChunks<Chunks, truth>::const_iterator>(
@@ -287,6 +288,7 @@ void testCompactingChunks() {
     fold<const_iterator>(alloc_cref,
             [&i, &addresses](void const* p) { assert(p == addresses[i++]); });
     assert(i == NumTuples);
+    assert(alloc_cref.size() == NumTuples);
     // testing compacting behavior
     // 1. free() call sequence that does not trigger compaction
     bool const shrinkFromHead = Chunks::Compact::value == Compactibility::head;
