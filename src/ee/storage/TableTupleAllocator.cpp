@@ -267,8 +267,9 @@ template<> struct InsertionPos<shrink_direction::tail> {
     }
 };
 
-inline ExtendedIterator::ExtendedIterator(bool fromHead, typename ExtendedIterator::iterator_type const&& iter) noexcept :
-    m_shrinkFromHead(fromHead), m_iter(iter) {}
+inline ExtendedIterator::ExtendedIterator(bool fromHead,
+        typename ExtendedIterator::iterator_type const&& iter) noexcept :
+m_shrinkFromHead(fromHead), m_iter(iter) {}
 
 inline bool ExtendedIterator::shrinkFromHead() const noexcept {
     return m_shrinkFromHead;
@@ -559,14 +560,17 @@ namespace voltdb { namespace storage {          // older GCC would warn in absen
 }}
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
+template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src):
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src,
+        bool const& f):
     m_offset(src.tupleSize()), m_storage(src),
     m_iter(m_storage.begin()),
-    m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())) {
+    m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())),
+    m_deletedSnapshot(f) {
     // paranoid check
     static_assert(is_reference<container_type>::value,
             "IterableTableTupleChunks::iterator_type::container_type is not a reference");
@@ -605,26 +609,27 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 /**
  * Helper to check if the iterator needs to advance to next
  * chunk. The only special occasion is snapshot view of
- * head-compacting, when current chunk is not last chunk.
+ * head-compacting, when there are tuple deletions occurring
+ * during snapshot.
  */
 template<typename Chunks, typename Iter, iterator_view_type view, typename Comp>
-struct CrossChunkPred {
-    inline bool operator()(Chunks&, void const* cursor, Iter const& iter, bool) const noexcept {
-        return cursor >= iter->next();
+struct ChunkBoundary {
+    inline void const* operator()(Chunks&, Iter const& iter, bool) const noexcept {
+        return iter->next();
     }
 };
 
 template<typename Chunks, typename Iter>
-struct CrossChunkPred<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
-    inline bool operator()(Chunks& l, void const* cursor, Iter const& iter, bool flag) const noexcept {
-        return cursor >= (flag && iter == l.begin() && l.size() > 1 ? iter->end() : iter->next());
+struct ChunkBoundary<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
+    inline void const* operator()(Chunks& l, Iter const& iter, bool flag) const noexcept {
+        return flag && iter == l.begin() ? iter->end() : iter->next();
     }
 };
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advance() {
-    static constexpr CrossChunkPred<list_type, decltype(m_iter), view, typename Chunks::Compact> const crossp{};
+    static constexpr ChunkBoundary<list_type, decltype(m_iter), view, typename Chunks::Compact> const boundary{};
     if (! drained()) {
         // Need to maintain invariant that m_cursor is nullptr iff
         // iterator points to end().
@@ -634,7 +639,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         if (! m_storage.empty() && m_iter != m_storage.end()) {
             const_cast<void*&>(m_cursor) =
                 reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-            if (! crossp(m_storage, m_cursor, m_iter, m_firstChunkToEnd)) {
+            if (m_cursor < boundary(m_storage, m_iter, m_deletedSnapshot)) {
                 finished = false;              // within chunk
             } else {
                 ++m_iter;                      // cross chunk
@@ -724,8 +729,9 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::iterator_cb_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::cb_type cb):
-    super(c), m_cb(cb) {}            // using snapshot view to set list iterator begin
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::cb_type cb,
+        bool const& f):
+    super(c, f), m_cb(cb) {}            // using snapshot view to set list iterator begin
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm>
@@ -759,10 +765,9 @@ template<typename Hook, iterator_permission_type perm>
 inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::container_type c,
         typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::history_type h) :
-    super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }),
+    super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }, h.hasDeletes()),
     m_extendingCb(c()),
     m_extendingPtr(m_extendingCb.shrinkFromHead() ? m_extendingCb() : nullptr) {
-    super::m_firstChunkToEnd = m_extendingPtr != nullptr;                     // compacting from head and some chunks had been erased/sliced to snapshot
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -974,6 +979,11 @@ inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
             }),
     m_storage(tupleSize) { }
 
+template<typename Alloc, typename Trait, typename C, typename E> inline bool const&
+TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
+    return m_hasDeletes;
+}
+
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API essential
     if (m_last == nullptr) {
@@ -989,7 +999,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait
     if (m_recording) {
         switch (type) {
             case ChangeType::Update:
-                update(src, dst);
+                update(dst);
                 break;
             case ChangeType::Insertion:
                 insert(src, dst);
@@ -1012,7 +1022,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::thaw() {
         m_changes.clear();
         m_copied.clear();
         m_storage.clear();
-        m_recording = false;
+        m_hasDeletes = m_recording = false;
     }
 }
 
@@ -1026,7 +1036,7 @@ inline void* TxnPreHook<Alloc, Trait, C, E>::_copy(void const* src, bool) {
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* src, void const* dst) {
+inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* dst) {
     // src tuple from temp table written to dst in persistent storage
     if (m_recording && ! m_changes.count(dst)) {
         m_changes.emplace(dst, _copy(dst, false));
@@ -1052,6 +1062,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src, void const* 
         vassert(m_last != nullptr);
         m_changes.emplace(src, m_last);
         m_last = nullptr;
+        m_hasDeletes = true;
     }
 }
 
