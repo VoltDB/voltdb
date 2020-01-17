@@ -560,6 +560,7 @@ namespace voltdb { namespace storage {          // older GCC would warn in absen
 }}
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
+template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>

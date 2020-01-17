@@ -520,7 +520,7 @@ namespace voltdb {
             typename = typename enable_if<is_class<Tag>::value && is_chunks<Chunks>::value>::type>
         struct IterableTableTupleChunks final {
             using iterator_value_type = void*;         // constness-independent type being iterated over
-            static constexpr bool const FALSE_VALUE = false;           // default binding to iterator_type::m_deletedSnapshot when  is ignored.
+            static bool const FALSE_VALUE;             // default binding to iterator_type::m_deletedSnapshot when  is ignored.
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
             template<iterator_permission_type perm, iterator_view_type vtype>
