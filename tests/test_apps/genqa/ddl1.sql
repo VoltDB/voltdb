@@ -274,22 +274,22 @@ CREATE TABLE export_mirror_replicated_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_done_table_kafka PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
+CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_rabbit PARTITION ON COLUMN txnid EXPORT TO TARGET rabbit_target
+CREATE STREAM export_done_table_rabbit EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_jdbc PARTITION ON COLUMN txnid EXPORT TO TARGET jdbc_target
+CREATE STREAM export_done_table_jdbc EXPORT TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_file PARTITION ON COLUMN txnid EXPORT TO TARGET file_target
+CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -504,13 +504,12 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
-CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
-CREATE PROCEDURE PARTITION ON TABLE export_done_table_kafka COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_loopback COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
 
@@ -585,12 +584,12 @@ CREATE TABLE export_geo_mirror_partitioned_table
 );
 PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_geo_done_table_kafka PARTITION ON COLUMN txnid EXPORT TO TARGET kafka_target
+CREATE STREAM export_geo_done_table_kafka EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_geo_done_table_jdbc PARTITION ON COLUMN txnid EXPORT TO TARGET jdbc_target
+CREATE STREAM export_geo_done_table_jdbc EXPORT TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
 );

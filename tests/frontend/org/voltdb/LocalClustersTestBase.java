@@ -266,6 +266,18 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         return pair;
     }
 
+    protected Pair<LocalCluster, Client> startCluster(int clusterId, boolean clearLocalDataDirectories,
+            boolean skipInit) throws IOException {
+        Pair<LocalCluster, Client> pair = CLUSTERS_AND_CLIENTS.get(clusterId);
+
+        LocalCluster lc = pair.getFirst();
+        lc.startUp(clearLocalDataDirectories, skipInit);
+
+        pair = Pair.of(lc, lc.createAdminClient(createClientConfig()));
+        CLUSTERS_AND_CLIENTS.set(clusterId, pair);
+        return pair;
+    }
+
     protected void addSchema(int partitionedTableCount, int replicatedTableCount, String[] streamTargets)
             throws Exception {
         String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, streamTargets);

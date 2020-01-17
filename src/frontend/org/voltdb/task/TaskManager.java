@@ -249,7 +249,8 @@ public final class TaskManager {
      *
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> start(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> start(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader) {
         return execute(() -> {
             if (m_managerState != ManagerState.SHUTDOWN) {
@@ -263,7 +264,7 @@ public final class TaskManager {
             // Create a dummy stats source so something is always reported
             TaskStatsSource.createDummy().register(m_statsAgent);
 
-            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
+            return processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -287,12 +288,13 @@ public final class TaskManager {
      * @param classLoader   {@link ClassLoader} to use to load configured classes
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> promoteToLeader(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> promoteToLeader(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader) {
         log.debug("MANAGER: Promoted as system leader");
         return execute(() -> {
             m_leader = true;
-            processCatalogInline(configuration, tasks, authSystem, classLoader, false);
+            return processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
     }
 
@@ -318,7 +320,8 @@ public final class TaskManager {
      * @param classesUpdated If {@code true} handle classes being updated in the system jar
      * @return {@link ListenableFuture} which will be completed once the async task completes
      */
-    ListenableFuture<?> processUpdate(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
+    ListenableFuture<Map<String, Boolean>> processUpdate(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem,
             ClassLoader classLoader, boolean classesUpdated) {
         return execute(
                 () -> processCatalogInline(configuration, tasks, authSystem, classLoader, classesUpdated));
@@ -569,7 +572,9 @@ public final class TaskManager {
         try {
             constructor = (Constructor<T>) initializableClass.getConstructor();
         } catch (NoSuchMethodException e) {
-            return Pair.of(String.format("Class should have a public no argument constructor: %s", className), null);
+            return Pair.of(
+                    String.format("Class %s should be static and have a public no argument constructor", className),
+                    null);
         }
         Method initMethod = null;
         for (Method method : initializableClass.getMethods()) {
@@ -589,33 +594,42 @@ public final class TaskManager {
             parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
         } else {
             if (initMethod.getReturnType() != void.class) {
-                return Pair.of(String.format("Class initialization method is not void: %s", className), null);
+                return Pair.of(String.format("Class %s initialization method is not void", className), null);
             }
 
             Class<?>[] initMethodParamTypes = initMethod.getParameterTypes();
             takesHelper = TaskHelper.class.isAssignableFrom(initMethodParamTypes[0]);
 
-            int actualParamCount = initializerParameters.size() + (takesHelper ? 1 : 0);
+            int paramCountModifier = takesHelper ? 1 : 0;
+            int actualParamCount = initializerParameters.size() + paramCountModifier;
+            // If var arg this is the number of parameters not including the varArg parameter else Integer.MAX_VALUE
             int minVarArgParamCount = isLastParamaterVarArgs(initMethod) ? initMethodParamTypes.length - 1
                     : Integer.MAX_VALUE;
             if (initMethodParamTypes.length != actualParamCount && minVarArgParamCount > actualParamCount) {
-                return Pair.of(String.format(
-                        "Class, %s, constructor paremeter count %d does not match provided parameter count %d",
-                        className, initMethod.getParameterCount(), initializerParameters.size()), null);
+                StringBuilder sb = new StringBuilder("Class ").append(className).append(" requires ");
+
+                if (minVarArgParamCount < Integer.MAX_VALUE) {
+                    sb.append("a minimum of ").append(minVarArgParamCount - paramCountModifier);
+                } else {
+                    sb.append(initMethod.getParameterCount() - paramCountModifier);
+                }
+
+                sb.append(" parameter(s). ").append(initializerParameters.size()).append(" parameter(s) provided");
+
+                return Pair.of(sb.toString(), null);
             }
 
             if (actualParamCount == 0) {
                 parameters = ArrayUtils.EMPTY_OBJECT_ARRAY;
             } else {
                 parameters = new Object[initMethod.getParameterCount()];
-                int indexOffset = takesHelper ? 1 : 0;
                 String[] varArgParams = null;
                 if (minVarArgParamCount < Integer.MAX_VALUE) {
                     varArgParams = new String[actualParamCount - minVarArgParamCount];
                     parameters[parameters.length - 1] = varArgParams;
                 }
                 for (TaskParameter sp : initializerParameters) {
-                    int index = sp.getIndex() + indexOffset;
+                    int index = sp.getIndex() + paramCountModifier;
                     if (index < minVarArgParamCount) {
                         try {
                             parameters[index] = ParameterConverter.tryToMakeCompatible(initMethodParamTypes[index],
@@ -708,13 +722,15 @@ public final class TaskManager {
      * @param authSystem     Current {@link AuthSystem} for the system
      * @param classLoader    {@link ClassLoader} to use to load classes
      * @param classesUpdated Should be {@code true} if any custom classes were modified
+     * @return Map of task to boolean indicating if it was created or deleted. True: added, False: removed
      */
-    private void processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks, AuthSystem authSystem,
-            ClassLoader classLoader, boolean classesUpdated) {
+    private Map<String, Boolean> processCatalogInline(TaskSettingsType configuration, Iterable<Task> tasks,
+            AuthSystem authSystem, ClassLoader classLoader, boolean classesUpdated) {
         if (m_managerState == ManagerState.SHUTDOWN) {
-            return;
+            return Collections.emptyMap();
         }
 
+        Map<String, Boolean> modifications = new HashMap<>();
         m_managerState = m_readOnlySupplier.getAsBoolean() ? ManagerState.READONLY : ManagerState.RUNNING;
 
         Map<String, TaskHandler> newHandlers = new HashMap<>();
@@ -817,6 +833,7 @@ public final class TaskManager {
                 default:
                     throw new IllegalArgumentException("Unsupported run location: " + task.getScope());
                 }
+                modifications.put(task.getName(), Boolean.TRUE);
                 newHandlers.put(task.getName(), definition);
             }
         }
@@ -824,6 +841,7 @@ public final class TaskManager {
         // Cancel all removed schedules
         for (TaskHandler handler : m_handlers.values()) {
             handler.cancel();
+            modifications.put(handler.m_definition.getName(), Boolean.FALSE);
         }
 
         // Set the dynamic thread counts based on whether or not schedules exist and partition counts
@@ -836,6 +854,7 @@ public final class TaskManager {
         }
 
         m_handlers = newHandlers;
+        return modifications;
     }
 
     private int getThreadPoolSize(TaskSettingsType configuration, boolean getHost) {
@@ -1923,7 +1942,7 @@ public final class TaskManager {
         @Override
         public boolean doHashesMatch(SchedulerFactory other) {
             if (getClass() != other.getClass()) {
-                ;
+                return false;
             }
             CompositeSchedulerFactory otherFactory = (CompositeSchedulerFactory) other;
             return m_actionGeneratorFactory.doHashesMatch(otherFactory.m_actionGeneratorFactory)

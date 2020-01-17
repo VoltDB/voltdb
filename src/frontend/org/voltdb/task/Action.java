@@ -36,7 +36,7 @@ public final class Action extends ActionDescription {
      * @param statusMessage To log indicating the details of the error. May be {@code null}
      * @return A new {@link ActionType#ERROR} instance of {@link Action}
      */
-    public static Action createError(String statusMessage) {
+    public static Action error(String statusMessage) {
         return new Action(ActionType.ERROR, statusMessage, null, null);
     }
 
@@ -48,7 +48,7 @@ public final class Action extends ActionDescription {
      * @param statusMessage To log indicating the details of the error. May be {@code null}
      * @return A new {@link ActionType#EXIT} instance of {@link Action}
      */
-    public static Action createExit(String statusMessage) {
+    public static Action exit(String statusMessage) {
         return new Action(ActionType.EXIT, statusMessage, null, null);
     }
 
@@ -60,10 +60,10 @@ public final class Action extends ActionDescription {
      * @param procedureParameters That are passed to procedure for execution
      * @return A new {@link ActionType#PROCEDURE} instance of {@link Action}
      */
-    public static Action createProcedure(Function<ActionResult, Action> callback, String procedure,
+    public static Action procedureCall(Function<ActionResult, Action> callback, String procedure,
             Object... procedureParameters) {
-        return new Action(ActionType.PROCEDURE, null, requireNonNull(callback),
-                requireNonNull(procedure), requireNonNull(procedureParameters));
+        return new Action(ActionType.PROCEDURE, null, requireNonNull(callback, "callback"),
+                requireNonNull(procedure, "procedure"), requireNonNull(procedureParameters, "procedureParameters"));
     }
 
     /**
@@ -73,8 +73,8 @@ public final class Action extends ActionDescription {
      * @param callback To be invoked for this action
      * @return A new {@link ActionType#CALLBACK} instance of {@link Action}
      */
-    public static Action createCallback(Function<ActionResult, Action> callback) {
-        return new Action(ActionType.CALLBACK, null, callback, null);
+    public static Action callback(Function<ActionResult, Action> callback) {
+        return new Action(ActionType.CALLBACK, null, requireNonNull(callback, "callback"), null);
     }
 
     private Action(ActionType type, String statusMessage, Function<ActionResult, Action> callback, String procedure,

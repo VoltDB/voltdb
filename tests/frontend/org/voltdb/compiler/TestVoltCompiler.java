@@ -127,6 +127,44 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
     }
 
+    public void testTableExportWithTTL() throws Exception {
+        String ddl = "create table foo EXPORT TO TARGET foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) \n" +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testTableExportWithTTL.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET bar ON INSERT,DELETE,UPDATE (a integer NOT NULL, b integer, PRIMARY KEY(a)) \n" +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testTableExportWithTTL.jar")));
+    }
+
+    public void testTableExportAndMigrate() throws Exception {
+        String ddl = "create table foo EXPORT TO TARGET foo MIGRATE TO TARGET bar (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testTableExportAndMigrate.jar")));
+
+        ddl = "create table foo MIGRATE TO TARGET bar EXPORT TO TARGET foo (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testTableExportAndMigrate.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo MIGRATE TO TARGET bar (a integer NOT NULL, b integer, PRIMARY KEY(a)) \n" +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testTableExportAndMigrate.jar")));
+
+        ddl = "create table foo MIGRATE TO TARGET bar EXPORT TO TARGET foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) \n" +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testTableExportAndMigrate.jar")));
+    }
+
     public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
                      "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a;\n" +

@@ -20,24 +20,21 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package genqa2.procedures;
+
+package org.voltdb.dtxn;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-public class JiggleExportGroupDoneTable extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
-    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
+public class Deterministic_RO_MP extends VoltProcedure {
 
-    public long run(long txid)
-    {
-        voltQueueSQL(export, txid);
-        voltQueueSQL(exportFoo, txid);
+    public static final SQLStmt sql = new SQLStmt("select * from kv");
 
-        // Execute last statement batch
-        voltExecuteSQL(true);
-
-        // Retun to caller
-        return txid;
+    public VoltTable run() {
+        voltQueueSQL(sql);
+        VoltTable[] ans = voltExecuteSQL(true);
+        return ans[0];
     }
 }

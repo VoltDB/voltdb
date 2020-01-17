@@ -60,7 +60,7 @@ public class OrphanedTuples implements ActionGenerator {
 
     @Override
     public Action getFirstAction() {
-        return Action.createProcedure(this::handleStatisticsResult, "@Statistics", "EXPORT", 0);
+        return Action.procedureCall(this::handleStatisticsResult, "@Statistics", "EXPORT", 0);
     }
 
     @Override
@@ -87,7 +87,7 @@ public class OrphanedTuples implements ActionGenerator {
             VoltTable stats = response.getResults()[0];
             processStats(stats);
         }
-        return Action.createProcedure(this::handleStatisticsResult, "@Statistics", "EXPORT", 0);
+        return Action.procedureCall(this::handleStatisticsResult, "@Statistics", "EXPORT", 0);
     }
 
     /**

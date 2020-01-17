@@ -281,6 +281,11 @@ public class CatalogContext {
         assert(newCatalog != null);
         assert(catalogInfo != null);
 
+        if (!isForReplay) {
+            catalogInfo = m_preparedCatalogInfo;
+            newCatalog = catalogInfo.m_catalog;
+        }
+
         CatalogContext retval =
             new CatalogContext(
                     newCatalog,

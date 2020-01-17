@@ -28,6 +28,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -38,6 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.exportclient.SocketExporter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -170,6 +173,7 @@ public class SocketExportTestServer extends Thread {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
+                OutputStream out = m_clientSocket.getOutputStream();
                 while (!m_closed) {
                     String line = in.readLine();
                     //You should convert your data to params here.
@@ -178,6 +182,12 @@ public class SocketExportTestServer extends Thread {
                     }
                     if (line == null) {
                         try { Thread.sleep(100); } catch(InterruptedException e) { }
+                        continue;
+                    }
+                    // handle sync_block message
+                    if (line.equals(SocketExporter.SYNC_BLOCK_MSG)) {
+                        out.write(48); // What we send doesn't matter. Send any byte as ack.
+                        out.flush();
                         continue;
                     }
                     String parts[] = m_parser.parseLine(line);

@@ -195,7 +195,6 @@ namespace voltdb {
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::empty;
             using super::front; using super::back;
-            using super::size;                         // need to check >1?
         };
 
         /**
@@ -435,6 +434,7 @@ namespace voltdb {
             map m_changes{};                // addr in persistent storage under change => addr storing before-change content
             set m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
+            bool m_hasDeletes = false;      // observer for iterator::advance()
             Alloc m_storage;
             void* m_last = nullptr;   // last allocation by copy(void const*);
             /**
@@ -454,7 +454,7 @@ namespace voltdb {
              *   the tuple that gets moved to the hole by deletion, and
              *   its content.
              */
-            void update(void const* src, void const* dst);         // src tuple from temp table written to dst in persistent storage
+            void update(void const* dst);                          // src tuple from temp table written to dst in persistent storage. src doesn't matter
             void insert(void const* src, void const* dst);         // same
             void remove(void const* src, void const* dst);         // src tuple is deleted, and tuple at dst gets moved to src
         public:
@@ -476,6 +476,7 @@ namespace voltdb {
             // Client is responsible to fill the buffer before
             // calling add() API.
             void copy(void const* prev);
+            bool const& hasDeletes() const noexcept;
         };
 
         /**
@@ -522,6 +523,7 @@ namespace voltdb {
             typename = typename enable_if<is_class<Tag>::value && is_chunks<Chunks>::value>::type>
         struct IterableTableTupleChunks final {
             using iterator_value_type = void*;         // constness-independent type being iterated over
+            static bool const FALSE_VALUE;             // default binding to iterator_type::m_deletedSnapshot when  is ignored.
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
             template<iterator_permission_type perm, iterator_view_type vtype>
@@ -541,7 +543,7 @@ namespace voltdb {
             protected:
                 using value_type = typename super::value_type;
                 value_type m_cursor;
-                bool m_firstChunkToEnd = false;        // if compacting from head with >1 chunks and snapshot has spliced chunks
+                bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 // ctor arg type
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
@@ -550,7 +552,7 @@ namespace voltdb {
                 void advance();
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
-                iterator_type(container_type);
+                iterator_type(container_type, bool const& = FALSE_VALUE);
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 static iterator_type begin(container_type);
@@ -601,7 +603,7 @@ namespace voltdb {
                 cb_type m_cb;
             public:
                 value_type operator*() noexcept;
-                iterator_cb_type(container_type, cb_type);
+                iterator_cb_type(container_type, cb_type, bool const& = FALSE_VALUE);
                 static iterator_cb_type begin(container_type, cb_type);
                 static iterator_cb_type end(container_type, cb_type);
             };
@@ -751,7 +753,7 @@ namespace voltdb {
         template<typename iterator_type, typename Fun, typename Chunks, typename... Args>
         inline void until(Chunks& c, Fun&& f, Args&&... args) {
             static_assert(iterator_type::constness::value == is_const<Chunks>::value,
-                    "until(): constness of Chunks and iterator should be the same.");
+                    "until(): constness of Chunks and iterator should be the same");
             for (auto iter = iterator_type::begin(c, forward<Args&&>(args)...); ! iter.drained();) {
                 auto* addr = *iter;
                 ++iter;

@@ -418,7 +418,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
         }
 
         public ScheduledAction getNextAction(ActionResult result) {
-            return ScheduledAction.createCallback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
+            return ScheduledAction.callback(m_delayMs, TimeUnit.MILLISECONDS, this::getNextAction)
                     .setStatusMessage(m_status);
         }
 
