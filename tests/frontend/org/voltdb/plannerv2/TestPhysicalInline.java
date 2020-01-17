@@ -318,4 +318,11 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testLimit1() {
+        m_tester.sql("select I from R1 limit ? offset ?")
+        .transform("VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], I=[$t0], limit=[?0], offset=[?1])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\",\"OFFSET\":0,\"LIMIT\":-1,\"OFFSET_PARAM_IDX\":1,\"LIMIT_PARAM_IDX\":0,\"LIMIT_EXPRESSION\":null}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[1,4],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
+
 }

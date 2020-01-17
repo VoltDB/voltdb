@@ -477,4 +477,13 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                 .transform("VoltPhysicalValues(tuples=[[]])\n")
                 .pass();
     }
+
+    public void testLimit1() {
+        m_tester.sql("select I from R1 limit ?")
+                .transform("VoltPhysicalLimit(limit=[?0], pusheddown=[false])\n" +
+                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                            "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
+
 }

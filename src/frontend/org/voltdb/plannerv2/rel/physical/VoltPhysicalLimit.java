@@ -105,13 +105,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        final LimitPlanNode lpn = new LimitPlanNode();
-        if (m_limit != null) {
-            lpn.setLimit(RexLiteral.intValue(m_limit));
-        }
-        if (m_offset != null) {
-            lpn.setOffset(RexLiteral.intValue(m_offset));
-        }
+        final LimitPlanNode lpn = toPlanNode(m_limit, m_offset);
 
         if (this.getInput() != null) {
             // Limit is not inlined
@@ -135,7 +129,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (offset != null) {
             if (offset instanceof RexDynamicParam) {
                 lpn.setOffset(0);
-                lpn.setOffsetParameterIndex(((RexDynamicParam) limit).getIndex());
+                lpn.setOffsetParameterIndex(((RexDynamicParam) offset).getIndex());
             } else {
                 lpn.setOffset(RexLiteral.intValue(offset));
             }
