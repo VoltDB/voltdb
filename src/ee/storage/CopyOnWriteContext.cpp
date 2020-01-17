@@ -205,74 +205,74 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
             m_iterator.reset(new TableIterator(m_backedUpTuples->iterator()));
         } else {
-            /*
-             * No more tuples in the temp table and had previously finished the
-             * persistent table.
-             */
-            size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
-            size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
-            if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
-
-                char message[1024 * 8];
-                snprintf(message, sizeof(message),
-                         "serializeMore(): tuple count > 0 after streaming:\n"
-                         "Table name: %s\n"
-                         "Table type: %s\n"
-                         "Original tuple count: %jd\n"
-                         "Active tuple count: %jd\n"
-                         "Remaining tuple count: %jd\n"
-                         "Pending block count: %jd\n"
-                         "Pending load block count: %jd\n"
-                         "Compacted block count: %jd\n"
-                         "Dirty insert count: %jd\n"
-                         "Dirty delete count: %jd\n"
-                         "Dirty update count: %jd\n"
-                         "Partition column: %d\n"
-                         "Skipped dirty rows: %d\n"
-                         "Skipped inactive rows: %d\n",
-                         table.name().c_str(),
-                         table.tableType().c_str(),
-                         (intmax_t)m_totalTuples,
-                         (intmax_t)table.activeTupleCount(),
-                         (intmax_t)m_tuplesRemaining,
-                         (intmax_t)allPendingCnt,
-                         (intmax_t)pendingLoadCnt,
-                         (intmax_t)m_blocksCompacted,
-                         (intmax_t)m_inserts,
-                         (intmax_t)m_deletes,
-                         (intmax_t)m_updates,
-                         table.partitionColumn(),
-                         m_skippedDirtyRows,
-                         m_skippedInactiveRows);
-                message[sizeof message - 1] = '\0';
-                // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
-                // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
-                // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
-                // at least returned it's currentBlock to the lists.
-                if (allPendingCnt > 0) {
-                    // We have orphaned or corrupted some tables. Let's make them pristine.
-                    TBMapI iter = m_surgeon.getData().begin();
-                    while (iter != m_surgeon.getData().end()) {
-                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
-                        iter++;
-                    }
-                }
-                if (!m_surgeon.blockCountConsistent()) {
-                    throwFatalException("%s", message);
-                }
-                else {
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
-                    m_tuplesRemaining = 0;
-                    outputStreams.close();
-                    for (size_t i = 0; i < outputStreams.size(); i++) {
-                        retPositions.push_back((int)outputStreams.at(i).position());
-                    }
-                    return TABLE_STREAM_SERIALIZATION_ERROR;
-                }
-            } else if (m_tuplesRemaining < 0)  {
-                // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
-                m_tuplesRemaining = 0;
-            }
+//            /*
+//             * No more tuples in the temp table and had previously finished the
+//             * persistent table.
+//             */
+//            size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
+//            size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
+//            if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
+//
+//                char message[1024 * 8];
+//                snprintf(message, sizeof(message),
+//                         "serializeMore(): tuple count > 0 after streaming:\n"
+//                         "Table name: %s\n"
+//                         "Table type: %s\n"
+//                         "Original tuple count: %jd\n"
+//                         "Active tuple count: %jd\n"
+//                         "Remaining tuple count: %jd\n"
+//                         "Pending block count: %jd\n"
+//                         "Pending load block count: %jd\n"
+//                         "Compacted block count: %jd\n"
+//                         "Dirty insert count: %jd\n"
+//                         "Dirty delete count: %jd\n"
+//                         "Dirty update count: %jd\n"
+//                         "Partition column: %d\n"
+//                         "Skipped dirty rows: %d\n"
+//                         "Skipped inactive rows: %d\n",
+//                         table.name().c_str(),
+//                         table.tableType().c_str(),
+//                         (intmax_t)m_totalTuples,
+//                         (intmax_t)table.activeTupleCount(),
+//                         (intmax_t)m_tuplesRemaining,
+//                         (intmax_t)allPendingCnt,
+//                         (intmax_t)pendingLoadCnt,
+//                         (intmax_t)m_blocksCompacted,
+//                         (intmax_t)m_inserts,
+//                         (intmax_t)m_deletes,
+//                         (intmax_t)m_updates,
+//                         table.partitionColumn(),
+//                         m_skippedDirtyRows,
+//                         m_skippedInactiveRows);
+//                message[sizeof message - 1] = '\0';
+//                // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
+//                // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
+//                // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
+//                // at least returned it's currentBlock to the lists.
+//                if (allPendingCnt > 0) {
+//                    // We have orphaned or corrupted some tables. Let's make them pristine.
+//                    TBMapI iter = m_surgeon.getData().begin();
+//                    while (iter != m_surgeon.getData().end()) {
+//                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
+//                        iter++;
+//                    }
+//                }
+//                if (!m_surgeon.blockCountConsistent()) {
+//                    throwFatalException("%s", message);
+//                }
+//                else {
+//                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+//                    m_tuplesRemaining = 0;
+//                    outputStreams.close();
+//                    for (size_t i = 0; i < outputStreams.size(); i++) {
+//                        retPositions.push_back((int)outputStreams.at(i).position());
+//                    }
+//                    return TABLE_STREAM_SERIALIZATION_ERROR;
+//                }
+//            } else if (m_tuplesRemaining < 0)  {
+//                // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
+//                m_tuplesRemaining = 0;
+//            }
         }
 
         // All tuples serialized, bail

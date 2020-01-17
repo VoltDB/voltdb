@@ -76,12 +76,6 @@ Table* TableFactory::getPersistentTable(
         stats = streamedTable->getTableStats();
     } else {
         stats = persistentTable->getTableStats();
-        // Allocate and assign the tuple storage block to the persistent table ahead of time instead
-        // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
-        // is to avoid allocation cost at time of tuple insertion
-        TBPtr block = persistentTable->allocateFirstBlock();
-        vassert(block->hasFreeTuples());
-        persistentTable->m_blocksWithSpace.insert(block);
     }
 
     // initialize stats for the table

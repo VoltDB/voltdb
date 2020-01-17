@@ -81,7 +81,6 @@ class MaterializedViewInfo;
 }
 
 namespace voltdb {
-class CoveringCellIndexTest_TableCompaction;
 class MaterializedViewTriggerForInsert;
 class MaterializedViewTriggerForWrite;
 class MaterializedViewHandler;
@@ -205,9 +204,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
-    friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
-    friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
     friend class ScopedDeltaTableContext;
 
@@ -255,17 +252,13 @@ public:
     void notifyQuantumRelease() {
     }
 
-    // Return a table iterator by reference
     TableIterator iterator() {
-        return TableIterator(this, m_data.begin());
+        throwFatalException("TableIterator is not applicable in PersistentTable");
     }
 
     TableIterator iteratorDeletingAsWeGo() {
-        // we don't delete persistent tuples "as we go",
-        // so just return a normal iterator.
-        return TableIterator(this, m_data.begin());
+        throwFatalException("TableIterator is not applicable in PersistentTable");
     }
-
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
@@ -431,9 +424,9 @@ public:
      */
     size_t hashCode();
 
-    size_t getBlocksNotPendingSnapshotCount() {
-        return m_blocksNotPendingSnapshot.size();
-    }
+//    size_t getBlocksNotPendingSnapshotCount() {
+//        return m_blocksNotPendingSnapshot.size();
+//    }
 
     void printBucketInfo();
 
@@ -445,7 +438,7 @@ public:
         m_nonInlinedMemorySize -= bytes;
     }
 
-    size_t allocatedBlockCount() const { return m_data.size(); }
+    size_t allocatedBlockCount() const { return 0; }
 
     int visibleTupleCount() const {
         vassert(m_dataStorage != nullptr);
@@ -628,36 +621,11 @@ private:
                                     std::vector<std::string>& predicateStrings,
                                     bool skipInternalActivation);
 
-    size_t getSnapshotPendingBlockCount() const {
-        return m_blocksPendingSnapshot.size();
-    }
-
-    size_t getSnapshotPendingLoadBlockCount() const {
-        size_t blockCnt = 0;
-        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
-            blockCnt += m_blocksPendingSnapshotLoad[ii]->size();
-        }
-        return blockCnt;
-    }
-
     bool blockCountConsistent() const {
-        // if the table is empty, the empty cache block will not be present in m_blocksNotPendingSnapshot
-        return isPersistentTableEmpty() || m_blocksNotPendingSnapshot.size() == m_data.size();
+        return true;
     }
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-        if (nextBlock != NULL) {
-            vassert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
-            m_blocksPendingSnapshot.erase(nextBlock);
-            nextBlock->swapToBucket(TBBucketPtr());
-        }
-        if (finishedBlock != NULL && !finishedBlock->isEmpty()) {
-            m_blocksNotPendingSnapshot.insert(finishedBlock);
-            int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != NO_NEW_BUCKET_INDEX) {
-                finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
-            }
-        }
     }
 
     void nextFreeTuple(TableTuple* tuple);
@@ -678,7 +646,7 @@ private:
     // Add truncate operation to dr log stream if dr is enabled and running
     void drLogTruncate(ExecutorContext* ec, bool fallible);
 
-    void notifyBlockWasCompactedAway(TBPtr block);
+    //void notifyBlockWasCompactedAway(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
@@ -734,10 +702,6 @@ private:
 
     TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
-    TBPtr allocateFirstBlock();
-
-    TBPtr allocateNextBlock();
-
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
         if (isReplicatedTable()) {
             return ec->drReplicatedStream();
@@ -779,12 +743,6 @@ private:
                           std::vector<TableIndex*> const& theIndexes,
                           std::vector<TableIndex*> const& otherIndexes);
 
-    // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    TBMap m_data;
-
-    // default iterator
-    TableIterator m_iter;
-
     // CONSTRAINTS
     //Is this a materialized view?
     bool m_isMaterialized;
@@ -812,21 +770,6 @@ private:
 
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
-
-    // Map from load to the blocks with level of load
-    TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
-
-    TBBucketPtrVector m_blocksPendingSnapshotLoad;
-
-    // Map containing blocks that aren't pending snapshot
-    boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
-
-    // Map containing blocks that are pending snapshot
-    boost::unordered_set<TBPtr> m_blocksPendingSnapshot;
-
-    // Set of blocks with non-empty free lists or available tuples
-    // that have never been allocated
-    stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -897,7 +840,7 @@ inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
 { }
 
 inline TBMap& PersistentTableSurgeon::getData() const {
-    return m_table.m_data;
+    throwFatalException("getData is not applicable for PersistentTable");
 }
 
 inline PersistentTable& PersistentTableSurgeon::getTable() {
@@ -930,15 +873,6 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {
     m_table.deleteTupleStorage(tuple);
 }
-
-inline size_t PersistentTableSurgeon::getSnapshotPendingBlockCount() const {
-    return m_table.getSnapshotPendingBlockCount();
-}
-
-inline size_t PersistentTableSurgeon::getSnapshotPendingLoadBlockCount() const {
-    return m_table.getSnapshotPendingLoadBlockCount();
-}
-
 inline bool PersistentTableSurgeon::blockCountConsistent() const {
     return m_table.blockCountConsistent();
 }
@@ -1101,38 +1035,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
  }
 
 inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSize) {
-    if (!blocks.empty()) {
-        TBMapI i = blocks.lower_bound(tuple);
-
-        // Not the first tuple of any known block, move back a block, see if it
-        // belongs to the previous block
-        if (i == blocks.end() || i.key() != tuple) {
-            i--;
-        }
-
-        // If the tuple is within the block boundaries, we found the block
-        if (i.key() <= tuple && tuple < i.key() + blockSize) {
-            if (i.data().get() == NULL) {
-                throwFatalException("A block has gone missing in the tuple block map.");
-            }
-            return i.data();
-        }
-    }
-
     return TBPtr(NULL);
-}
-
-inline TBPtr PersistentTable::allocateFirstBlock() {
-    TBPtr block(new TupleBlock(this, TBBucketPtr()));
-    m_data.insert(block->address(), block);
-    return block;
-}
-
-inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert(block->address(), block);
-    m_blocksNotPendingSnapshot.insert(block);
-    return block;
 }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {

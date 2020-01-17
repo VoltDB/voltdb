@@ -362,38 +362,6 @@ TEST_F(PersistentTableLogTest, InsertDupsThenUndoWorksTest) {
     ASSERT_EQ(0, m_table->activeTupleCount());
 }
 
-TEST_F(PersistentTableLogTest, FindBlockTest) {
-    initTable();
-    const int blockSize = m_table->getTableAllocationSize();
-    TBBucketPtr bucket(new TBBucket());
-
-    // these will be used as artificial tuple block addresses
-    TBPtr block1(new TupleBlock(m_table, bucket));
-    TBPtr block2(new TupleBlock(m_table, bucket));
-    TBPtr block3(new TupleBlock(m_table, bucket));
-
-    TBMap blocks;
-    char *base = block1->address();
-
-    // block2 is adjacent to block1, block3 is 1 block away from block2
-    blocks.insert(base,                 block1);
-    blocks.insert(base + blockSize,     block2);
-    blocks.insert(base + blockSize * 3, block3);
-
-    // in the middle but land on a missing boundary
-    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 2, blocks, blockSize).get(), NULL);
-    // past the end but on a boundary
-    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4, blocks, blockSize).get(), NULL);
-
-    // the following tuples should be found in the map
-    ASSERT_EQ(PersistentTable::findBlock(base,                     blocks, blockSize)->address(),
-              block1->address());
-    ASSERT_EQ(PersistentTable::findBlock(base + blockSize - 1,     blocks, blockSize)->address(),
-              block1->address());
-    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4 - 1, blocks, blockSize)->address(),
-              block3->address());
-}
-
 TEST_F(PersistentTableLogTest, LookupTupleForUndoNoPKTest) {
     initTable(false);
     tableutil::addDuplicateRandomTuples(m_table, 2);
