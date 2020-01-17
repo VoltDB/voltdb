@@ -395,7 +395,7 @@ public class TestTaskManager {
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        Thread.sleep(50);
+        Thread.sleep(100);
         assertEquals(1, s_firstActionSchedulerCallCount.get());
         assertEquals(1, s_postRunActionSchedulerCallCount.get());
     }
