@@ -26,8 +26,8 @@ namespace voltdb {
  */
 class TableCountPlanNode : public AbstractScanPlanNode {
 public:
-    TableCountPlanNode() { }
-    ~TableCountPlanNode();
+    TableCountPlanNode() {}
+    ~TableCountPlanNode() {}
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 };

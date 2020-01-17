@@ -18,6 +18,7 @@
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
 #include <array>
+#include <numeric>
 
 using namespace voltdb;
 using namespace voltdb::storage;
@@ -466,6 +467,14 @@ CompactingStorageTrait<dir>::operator()() const noexcept {
 template<shrink_direction dir>
 inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept : m_tupleSize(tupleSize) {
     trait::associate(this);
+}
+
+template<shrink_direction dir> inline
+size_t CompactingChunks<dir>::size() const noexcept {
+    return accumulate(begin(), end(), 0lu, [this](size_t acc, CompactingChunk const& c) {
+                return acc +
+                    (reinterpret_cast<char const*>(c.next()) - reinterpret_cast<char const*>(c.begin())) / this->tupleSize();
+            });
 }
 
 template<shrink_direction dir> inline void* CompactingChunks<dir>::allocate() {

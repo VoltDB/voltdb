@@ -373,6 +373,7 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
+            size_t size() const noexcept;              // used for table count executor
             using trait::freeze; using trait::thaw;
             using list_type::empty;
         };

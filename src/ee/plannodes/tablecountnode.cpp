@@ -21,12 +21,11 @@
 
 namespace voltdb {
 
-TableCountPlanNode::~TableCountPlanNode() { }
+PlanNodeType TableCountPlanNode::getPlanNodeType() const {
+    return PlanNodeType::TableCount;
+}
 
-PlanNodeType TableCountPlanNode::getPlanNodeType() const { return PlanNodeType::TableCount; }
-
-std::string TableCountPlanNode::debugInfo(const std::string &spacer) const
-{
+std::string TableCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     vassert(m_predicate == NULL);

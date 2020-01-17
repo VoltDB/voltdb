@@ -16,26 +16,21 @@
  */
 
 
-#ifndef HSTORETABLECOUNTEXECUTOR_H
-#define HSTORETABLECOUNTEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
-namespace voltdb
-{
+namespace voltdb {
     class TableCountExecutor : public AbstractExecutor {
     public:
         TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-        ~TableCountExecutor();
+            : AbstractExecutor(engine, abstract_node) {}
+        ~TableCountExecutor() {}
     protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    const ExecutorVector& executorVector);
+        bool p_init(AbstractPlanNode* abstract_node, const ExecutorVector& executorVector);
         bool p_execute(const NValueArray& params);
     };
 }
 
-#endif

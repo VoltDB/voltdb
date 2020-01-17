@@ -240,7 +240,8 @@ public:
     }
 
     int64_t occupiedTupleMemory() const {
-        return m_tupleCount * m_tempTuple.tupleLength();
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->size() * m_tempTuple.tupleLength();
     }
 
     void signature(char const* signature) {
@@ -446,8 +447,10 @@ public:
 
     size_t allocatedBlockCount() const { return m_data.size(); }
 
-    // This is a testability feature not intended for use in product logic.
-    int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
+    int visibleTupleCount() const {
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->size() - m_invisibleTuplesPendingDeleteCount;
+    }
 
     int tupleLimit() const { return m_tupleLimit; }
 
@@ -485,7 +488,8 @@ public:
         // m_invisibleTuplesPendingDeleteCount even when it would change the answer --
         // if ALL tuples had been deleted earlier in the current transaction.
         // This should never be the case while updating the catalog.
-        return m_tupleCount == 0;
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->empty();
     }
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
@@ -1087,7 +1091,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
     tuple.setActiveFalse();
 
     // add to the free list
-    m_tupleCount--;
     if (tuple.isPendingDelete()) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;

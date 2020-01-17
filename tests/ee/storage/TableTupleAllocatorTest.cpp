@@ -287,6 +287,7 @@ void testCompactingChunks() {
     fold<const_iterator>(alloc_cref,
             [&i, &addresses](void const* p) { assert(p == addresses[i++]); });
     assert(i == NumTuples);
+    assert(alloc_cref.size() == NumTuples);
     // testing compacting behavior
     // 1. free() call sequence that does not trigger compaction
     bool const shrinkFromHead = Chunks::Compact::value == Compactibility::head;

@@ -24,8 +24,7 @@
 using namespace voltdb;
 
 bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
-                                const ExecutorVector& executorVector)
-{
+                                const ExecutorVector& executorVector) {
     VOLT_TRACE("init Table Count Executor");
 
     vassert(dynamic_cast<TableCountPlanNode*>(abstract_node));
@@ -64,7 +63,6 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
                    (int)target_table->activeTupleCount(),
                    (int)target_table->visibleTupleCount(),
                    (int)target_table->allocatedTupleCount());
-
         rowCounts = target_table->visibleTupleCount();
     }
 
@@ -78,5 +76,3 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-TableCountExecutor::~TableCountExecutor() {
-}
