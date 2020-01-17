@@ -30,7 +30,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -128,7 +127,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (limit != null) {
             if (limit instanceof RexDynamicParam) {
                 lpn.setLimit(-1);
-                lpn.setLimitParameterIndex(RexConverter.PARAM_COUNTER.getAndIncrement());
+                lpn.setLimitParameterIndex(((RexDynamicParam) limit).getIndex());
             } else {
                 lpn.setLimit(RexLiteral.intValue(limit));
             }
@@ -136,7 +135,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (offset != null) {
             if (offset instanceof RexDynamicParam) {
                 lpn.setOffset(0);
-                lpn.setOffsetParameterIndex(RexConverter.PARAM_COUNTER.getAndIncrement());
+                lpn.setOffsetParameterIndex(((RexDynamicParam) limit).getIndex());
             } else {
                 lpn.setOffset(RexLiteral.intValue(offset));
             }

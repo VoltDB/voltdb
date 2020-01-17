@@ -113,8 +113,6 @@ public class VoltRelUtil {
 
     public static CompiledPlan calciteToVoltDBPlan(VoltPhysicalRel rel, CompiledPlan compiledPlan) {
 
-        RexConverter.PARAM_COUNTER.reset();
-
         AbstractPlanNode root = rel.toPlanNode();
         // if the root has a distribution other than SINGLETON
         // and the partitioning value is not set
