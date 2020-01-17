@@ -271,6 +271,7 @@ public class SynchronizedStatesManager {
         private final String m_stateMachineName;
         private Set<String> m_knownMembers;
         private volatile boolean m_membershipChangePending = false;
+        private volatile boolean m_participantsChangePending = false;
         private final String m_statePath;
         private final String m_lockPath;
         private final String m_barrierResultsPath;
@@ -372,6 +373,7 @@ public class SynchronizedStatesManager {
             public void process(final WatchedEvent event) {
                 try {
                     if (!m_done.get()) {
+                        m_participantsChangePending = true;
                         submitCallable(HandlerForBarrierParticipantsEvent);
                     }
                 } catch (RejectedExecutionException e) {
@@ -794,6 +796,7 @@ public class SynchronizedStatesManager {
         private void checkForBarrierParticipantsChange() throws KeeperException {
             assert(debugIsLocalStateLocked());
             try {
+                m_participantsChangePending = false;
                 int newParticipantCnt = m_zk.getChildren(m_barrierParticipantsPath, m_barrierParticipantsWatcher).size();
                 Stat nodeStat = new Stat();
                 // inspect the m_barrierResultsPath and get the new and old states and version
@@ -822,13 +825,12 @@ public class SynchronizedStatesManager {
                                 byte result[] = new byte[1];
                                 if (existingAndProposedStates.m_proposal.equals(m_synchronizedState)) {
                                     result[0] = (byte)1;
-                                    addResultEntry(result);
                                 }
                                 else {
                                     assert(existingAndProposedStates.m_previousState.equals(m_synchronizedState));
                                     result[0] = (byte)0;
-                                    addResultEntry(result);
                                 }
+                                addResultEntry(result);
                                 unlockLocalState();
                             }
                             else {
@@ -906,7 +908,7 @@ public class SynchronizedStatesManager {
                 }
                 else {
                     m_currentParticipants = newParticipantCnt;
-                    if (m_ourDistributedLockName != null && m_ourDistributedLockName == m_lockWaitingOn && newParticipantCnt == 0) {
+                    if (canObtainDistributedLock()) {
                         // We can finally notify the lock waiter because everyone is finished evaluating the previous state proposal
                         notifyDistributedLockWaiter();
                     }
@@ -924,6 +926,16 @@ public class SynchronizedStatesManager {
                 unlockLocalState();
             }
             assert(!debugIsLocalStateLocked());
+        }
+
+        /**
+         * Utility method to validate that all of the conditions are met to be able to obtain the distributed lock
+         *
+         * @return {@code true} if this host is able to obtain the distributed lock
+         */
+        private boolean canObtainDistributedLock() {
+            return m_ourDistributedLockName != null && !m_participantsChangePending
+                    && m_ourDistributedLockName.equals(m_lockWaitingOn) && m_currentParticipants == 0;
         }
 
         private void monitorParticipantChanges() throws KeeperException {
@@ -1481,7 +1493,7 @@ public class SynchronizedStatesManager {
                         }
                         m_lockWaitingOn = "We died so we can't ever get the distributed lock";
                     }
-                    if (m_lockWaitingOn.equals(m_ourDistributedLockName) && m_currentParticipants == 0) {
+                    if (canObtainDistributedLock()) {
                         // There are no more members still processing the last result
                         notifyDistributedLockWaiter();
                     }
@@ -1620,7 +1632,8 @@ public class SynchronizedStatesManager {
                 m_ourDistributedLockName = m_zk.create(ZKUtil.joinZKPath(m_lockPath, "lock_"), null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 m_lockWaitingOn = getNextLockNodeFromList();
-                if (m_lockWaitingOn.equals(m_ourDistributedLockName) && m_currentParticipants == 0) {
+
+                if (canObtainDistributedLock()) {
                     // Prevents a second notification.
                     if (m_log.isDebugEnabled()) {
                         m_log.debug(m_stateMachineId + ": requestLock successful for " + m_ourDistributedLockName);
@@ -1751,6 +1764,7 @@ public class SynchronizedStatesManager {
          * Propose a new state. Only call after successful acquisition of the distributed lock.
          */
         protected void proposeStateChange(ByteBuffer proposedState) {
+            assert m_holdingDistributedLock;
             assert(proposedState != null);
             assert(proposedState.remaining() < Short.MAX_VALUE);
             lockLocalState();
