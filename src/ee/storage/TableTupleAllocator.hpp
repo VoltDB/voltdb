@@ -103,7 +103,6 @@ namespace voltdb {
             void*const m_end = nullptr;                // indication of chunk capacity
         protected:
             void* m_next = nullptr;                    // tail of allocation
-
             ChunkHolder(ChunkHolder const&) = delete;  // non-copyable, non-assignable, non-moveable
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
@@ -193,7 +192,7 @@ namespace voltdb {
             void clear() noexcept;
             void splice(const_iterator, ChunkList&, iterator) noexcept;
             using super::begin; using super::end; using super::cbegin; using super::cend;
-            using super::empty;
+            using super::empty; using super::size;
             using super::front; using super::back;
         };
 
@@ -224,7 +223,7 @@ namespace voltdb {
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             size_t const m_tupleSize;
-
+            size_t m_allocs = 0;
             NonCompactingChunks(EagerNonCompactingChunk const&) = delete;
             NonCompactingChunks(NonCompactingChunks&&) = delete;
             NonCompactingChunks& operator=(NonCompactingChunks const&) = delete;
@@ -233,6 +232,7 @@ namespace voltdb {
             NonCompactingChunks(size_t) noexcept;
             ~NonCompactingChunks() = default;
             size_t tupleSize() const noexcept;
+            size_t size() const noexcept;
             void* allocate();
             void free(void*);
             bool tryFree(void*);                       // not an error if addr not found
@@ -346,7 +346,11 @@ namespace voltdb {
             using list_type = ChunkList<CompactingChunk>;
             using trait = CompactingStorageTrait<dir>;
             size_t const m_tupleSize;
-
+            size_t m_allocs = 0;
+            // used to keep track of end of 1st chunk when frozen:
+            // needed for special case when there is a single
+            // non-full chunk when snapshot started.
+            void const* m_endOfFirstChunk = nullptr;
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
@@ -372,8 +376,10 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
-            using trait::freeze; using trait::thaw;
-            using list_type::empty;
+            size_t size() const noexcept;              // used for table count executor
+            void freeze() noexcept; void thaw() noexcept;
+            void const* endOfFirstChunk() const noexcept;
+            using trait::thaw; using list_type::empty;
         };
 
         struct BaseHistoryRetainTrait {
@@ -539,13 +545,12 @@ namespace voltdb {
                          typename Chunks::list_type::iterator>::type m_iter;
             protected:
                 using value_type = typename super::value_type;
-                value_type m_cursor;
-                bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 // ctor arg type
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
                     Chunks const, Chunks>::type>::type;
-
+                value_type m_cursor;
+                bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 void advance();
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
