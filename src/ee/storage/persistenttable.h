@@ -74,6 +74,7 @@
 #include <map>
 #include <set>
 
+
 class CopyOnWriteTest;
 
 namespace catalog {
@@ -112,7 +113,7 @@ public:
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
-    void deleteTupleRelease(char* tuple);
+    void deleteTupleRelease(std::deque<char*> tuples);
     void deleteTupleStorage(TableTuple& tuple);
 
     size_t getSnapshotPendingBlockCount() const;
@@ -673,8 +674,7 @@ private:
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
-    void deleteTupleRelease(char* tuple);
-
+    void deleteTupleRelease(std::deque<char*> tuples);
     void deleteTupleFinalize(TableTuple& tuple);
 
     /**
@@ -866,8 +866,8 @@ inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool ski
     m_table.deleteTupleForUndo(tupleData, skipLookup);
 }
 
-inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
-    m_table.deleteTupleRelease(tuple);
+inline void PersistentTableSurgeon::deleteTupleRelease(std::deque<char*> tuples) {
+    m_table.deleteTupleRelease(tuples);
 }
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {

@@ -22,11 +22,13 @@
 #include <common/debuglog.h>
 #include <string.h>
 #include <list>
+#include <set>
 
 #include "common/Pool.hpp"
 #include "common/VoltContainer.hpp"
 #include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
+#include "common/types.h"
 #include "boost/unordered_set.hpp"
 
 class StreamedTableTest;
@@ -113,10 +115,31 @@ public:
      * table before all the inserts and deletes are released.
      */
     static Pool* release(UndoQuantum&& quantum) {
+        /*
+         * Release is done in batch for DELETE action. If releases are also done in batch for other actions
+         * specific undo actions must be tracked. However no other releases are done in batch, so there will be only
+         * one release in batch
+         *
+         */
+        UndoReleaseAction* aggregateRelease = nullptr;
         for (auto i = quantum.m_undoActions.begin();
              i != quantum.m_undoActions.end(); ++i) {
-            (*i)->release();
-            delete *i;
+             if ((*i)->isReleaseAggregated()) {
+                if (aggregateRelease == nullptr) {
+                    aggregateRelease = (*i);
+                    aggregateRelease->aggreate(*i);
+                    continue;
+                } else {
+                    aggregateRelease->aggreate(*i);
+                }
+             } else {
+                (*i)->release();
+             }
+             delete *i;
+        }
+        if (aggregateRelease != nullptr) {
+             aggregateRelease->releaseBatch();
+             delete aggregateRelease;
         }
         for(auto cur = quantum.m_interests.begin(); cur != quantum.m_interests.end(); ++cur) {
            (*cur)->notifyQuantumRelease();

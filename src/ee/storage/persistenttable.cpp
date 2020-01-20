@@ -1230,13 +1230,22 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 /**
  * This entry point is triggered by the successful release of an UndoDeleteAction.
  */
-void PersistentTable::deleteTupleRelease(char* tupleData) {
-    TableTuple target(m_schema);
-    target.move(tupleData);
-    target.setPendingDeleteOnUndoReleaseFalse();
-    --m_tuplesPinnedByUndo;
-    --m_invisibleTuplesPendingDeleteCount;
-    deleteTupleFinalize(target);
+void PersistentTable::deleteTupleRelease(std::deque<char*> tupleData) {
+
+//      std::deque<char*>::iterator it = tupleData.begin();
+//      while (it != tupleData.end()) {
+//          TableTuple target(m_schema);
+//          target.move(*it++);
+//         // TableTuple* tuple = reinterpret_cast<TableTuple*>(*it++);
+//          VOLT_DEBUG("**************%s", target.debug(m_name).c_str());
+//      }
+
+//    TableTuple target(m_schema);
+//    target.move(tupleData);
+//    target.setPendingDeleteOnUndoReleaseFalse();
+//    --m_tuplesPinnedByUndo;
+//    --m_invisibleTuplesPendingDeleteCount;
+//    deleteTupleFinalize(target);
 }
 
 /**

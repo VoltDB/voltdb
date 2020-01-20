@@ -451,29 +451,8 @@ public:
     // PersistentTable privates from here. Tests should call these methods
     // instead of adding them as friends.
 
-    TBMap &getTableData() {
-        return m_table->m_data;
-    }
-
     PersistentTableSurgeon& getSurgeon() {
         return m_table->m_surgeon;
-    }
-
-
-    boost::unordered_set<TBPtr> &getBlocksPendingSnapshot() {
-        return m_table->m_blocksPendingSnapshot;
-    }
-
-    boost::unordered_set<TBPtr> &getBlocksNotPendingSnapshot() {
-        return m_table->m_blocksNotPendingSnapshot;
-    }
-
-    TBBucketPtrVector &getBlocksPendingSnapshotLoad() {
-        return m_table->m_blocksPendingSnapshotLoad;
-    }
-
-    TBBucketPtrVector &getBlocksNotPendingSnapshotLoad() {
-        return m_table->m_blocksNotPendingSnapshotLoad;
     }
 
     bool doActivateStream(TableStreamType streamType,
@@ -1151,36 +1130,6 @@ public:
     T_ValueSet m_shuffles;
 };
 
-TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
-    initTable(1, 0);
-
-    int tupleCount = TUPLE_COUNT;
-    addRandomUniqueTuples( m_table, tupleCount);
-
-    voltdb::TableIterator iterator = m_table->iterator();
-    TBMap blocks(getTableData());
-    getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
-    getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon());
-    TableTuple tuple(m_table->schema());
-    TableTuple COWTuple(m_table->schema());
-
-    int iteration = 0;
-    while (true) {
-        iteration++;
-        if (!iterator.next(tuple)) {
-            break;
-        }
-        ASSERT_TRUE(COWIterator.next(COWTuple));
-
-        if (tuple.address() != COWTuple.address()) {
-            printf("Failed in iteration %d with %p and %p\n", iteration, tuple.address(), COWTuple.address());
-        }
-        ASSERT_EQ(tuple.address(), COWTuple.address());
-    }
-    ASSERT_FALSE(COWIterator.next(COWTuple));
-}
-
 TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     initTable(1, 0);
     char storage[9];
@@ -1561,43 +1510,6 @@ TEST_F(CopyOnWriteTest, MultiStream) {
 
         checkMultiCOW(expected, actual, doDelete, tupleCount, totalSkipped);
     }
-}
-
-/*
- * Test for the ENG-4524 edge condition where serializeMore() yields on
- * precisely the last tuple which had caused the loop to skip the last call to
- * the iterator next() method. Need to rig this test with the appropriate
- * buffer size and tuple count to force the edge condition.
- *
- * The buffer has to be a smidge larger than what is needed to hold the tuples
- * so that TupleOutputStreamProcessor::writeRow() discovers it can't fit
- * another tuple immediately after writing the last one. It doesn't know how
- * many there are so it yields even if no more tuples will be delivered.
- */
-TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
-    const size_t tupleCount = 3;
-    const size_t bufferSize = (sizeof(int32_t) * 3) + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
-    initTable(1, 0);
-    TableTuple tuple(m_table->schema());
-    addRandomUniqueTuples(m_table, tupleCount);
-    size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
-    // This should succeed in one call to serializeMore().
-    char serializationBuffer[bufferSize];
-    char config[4];
-    ::memset(config, 0, 4);
-    ReferenceSerializeInputBE input(config, 4);
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
-    TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
-    std::vector<int> retPositions;
-    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
-    if (remaining >= 0) {
-        ASSERT_EQ(outputStreams.size(), retPositions.size());
-    }
-    ASSERT_EQ(0, remaining);
-    // Expect the same pending count, because it should get reset when
-    // serialization finishes cleanly.
-    size_t curPendingCount = m_table->getBlocksNotPendingSnapshotCount();
-    ASSERT_EQ(origPendingCount, curPendingCount);
 }
 
 /**
