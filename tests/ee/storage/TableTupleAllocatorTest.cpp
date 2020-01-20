@@ -1094,7 +1094,7 @@ void testSingleChunkSnapshot() {
     using Alloc = HookedCompactingChunks<CompactingChunks<dir>,
           TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
-    static constexpr auto Number = NumTuples - 3;
+    static constexpr auto Number = AllocsPerChunk - 3;
     using addresses_type = array<void const*, Number>;
     Gen gen;
     Alloc alloc(TupleSize);

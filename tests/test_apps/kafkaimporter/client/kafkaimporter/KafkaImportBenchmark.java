@@ -494,6 +494,8 @@ public class KafkaImportBenchmark {
                 throw new Exception("Timeout waiting for export to drain");
             }
             log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
+        } else {
+            log.info("depending on external tool to populate kafka");
         }
 
         // final check time since the import and export tables have quiesced.

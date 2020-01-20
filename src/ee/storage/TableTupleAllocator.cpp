@@ -475,6 +475,30 @@ inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept : m_tu
     trait::associate(this);
 }
 
+// returns non-null value only if in snapshot,
+// and the marked position is still in the first chunk.
+template<shrink_direction dir> inline void const* CompactingChunks<dir>::endOfFirstChunk() const noexcept {
+    if (m_endOfFirstChunk == nullptr || list_type::empty()) {
+        return nullptr;
+    } else {
+        auto const& first = list_type::front();
+        return first.begin() < m_endOfFirstChunk && first.end() >= m_endOfFirstChunk ?
+            m_endOfFirstChunk : nullptr;
+    }
+}
+
+template<shrink_direction dir> inline void CompactingChunks<dir>::freeze() noexcept {
+    if (! list_type::empty()) {
+        m_endOfFirstChunk = list_type::begin()->next();
+    }
+    trait::freeze();
+}
+
+template<shrink_direction dir> inline void CompactingChunks<dir>::thaw() noexcept {
+    m_endOfFirstChunk = nullptr;
+    trait::thaw();
+}
+
 template<shrink_direction dir> inline size_t CompactingChunks<dir>::size() const noexcept {
     return m_allocs;
 }
@@ -579,9 +603,8 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src,
-        bool const& f):
-    m_offset(src.tupleSize()), m_storage(src),
-    m_iter(m_storage.begin()),
+        bool const& f) :
+    m_offset(src.tupleSize()), m_storage(src), m_iter(m_storage.begin()),
     m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())),
     m_deletedSnapshot(f) {
     // paranoid check
@@ -625,17 +648,30 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
  * head-compacting, when there are tuple deletions occurring
  * during snapshot.
  */
-template<typename Chunks, typename Iter, iterator_view_type view, typename Comp>
+template<typename ChunkList, typename Iter, iterator_view_type view, typename Comp>
 struct ChunkBoundary {
-    inline void const* operator()(Chunks&, Iter const& iter, bool) const noexcept {
+    inline void const* operator()(ChunkList const&, Iter const& iter, bool) const noexcept {
         return iter->next();
     }
 };
 
-template<typename Chunks, typename Iter>
-struct ChunkBoundary<Chunks, Iter, iterator_view_type::snapshot, integral_constant<Compactibility, Compactibility::head>> {
-    inline void const* operator()(Chunks& l, Iter const& iter, bool flag) const noexcept {
-        return flag && iter == l.begin() ? iter->end() : iter->next();
+template<typename ChunkList, typename Iter>
+struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot,
+    integral_constant<Compactibility, Compactibility::head>> {
+    inline void const* operator()(ChunkList const& l, Iter const& iter, bool flag) const noexcept {
+        if (flag && iter == l.begin()) {
+            void const* end = reinterpret_cast<CompactingChunks<shrink_direction::head> const&>(l).endOfFirstChunk();
+            if (end != nullptr) {              // The first chunk in txn is the first chunk when snapshot started
+                return end;
+            } else if (l.size() > 1) {         // The first chunk when snapshot started had been "reclaimed" in txn view,
+                return iter->end();            // and the first chunk in current txn view is not the last chunk: frozen view needs
+                // (and is safe) to cover the whole first chunk
+            } else {                           // There is now a single chunk in txn view, which is not the first chunk
+                return iter->next();           // when we froze.
+            }
+        } else {
+            return iter->next();
+        }
     }
 };
 
@@ -1302,4 +1338,3 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen2
 #undef HookedIteratorCodegen3
 // # # # # # # # # # # # # # # # # # Codegen: end # # # # # # # # # # # # # # # # # # # # # # #
-
