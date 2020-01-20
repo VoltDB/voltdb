@@ -154,7 +154,7 @@ public class ExportRabbitMQVerifier {
                 }
                 ValidationErr err = null;
                 try {
-                    err = ExportOnServerVerifier.verifyRow(row);
+                    err = RowVerifier.verifyRow(row);
                 } catch (ValidationErr validationErr) {
                     validationErr.printStackTrace();
                 }
