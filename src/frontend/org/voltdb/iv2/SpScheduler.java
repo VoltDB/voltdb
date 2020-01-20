@@ -907,12 +907,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
                 CreateMode.PERSISTENT, tmLog, "Transfer to Reduced Safety Mode");
-
-        if (VoltDB.instance().isClusterComplete()) {
-            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
-            Set<Integer> liveHids = hostMessenger.getLiveHostIds();
-            for (Integer integer : liveHids) {
-                m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        boolean isClusterComplete = VoltDB.instance().isClusterComplete();
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
+        for (Integer hostId : liveHids) {
+            final long ciHsid = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
+            if (isClusterComplete) {
+                m_mailbox.send(ciHsid, message);
+            }
+            // Send message to other client interfaces for self check-up.
+            if (hostMessenger.getHostId() != hostId) {
+                m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
             }
         }
     }

@@ -2441,6 +2441,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     "As a result, the rejoin operation has been canceled.");
             return;
         }
+
+        // No partition leaders on this host
+        if (message.isCheckHostMessage() && db.getLeaderSites().isEmpty()) {
+            VoltDB.crashLocalVoltDB("The cluster will transfer to master-only state after hash mismatch is found." +
+                    " There is no partition leaders on this host. As a result, the host is shutdown.");
+            return;
+        }
+
         // Only work on MPI host
         if (db.m_leaderAppointer == null || !db.m_leaderAppointer.isLeader()) {
             return;
