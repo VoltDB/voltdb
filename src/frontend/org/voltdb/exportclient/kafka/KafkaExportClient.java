@@ -76,7 +76,7 @@ public class KafkaExportClient extends ExportClientBase {
     private final static String OLD_PARTITIONER = "partitioner.class";
     private final static String ACKS_TIMEOUT = "acks.retry.timeout";
     private final static String LEGACY_ACKS = "request.required.acks";
-    private final static String ENCODE_FORMAT = "type";
+    public final static String ENCODE_FORMAT = "type";
 
     private final static Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();

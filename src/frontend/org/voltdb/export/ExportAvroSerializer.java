@@ -27,7 +27,6 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.common.errors.SerializationException;
-import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 
@@ -47,12 +46,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ExportAvroSerializer {
     private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>(); // (topic -> decoder) mapping
 
-    private static String s_schemaRegistryUrl;
-    private static SchemaRegistryClient s_schemaRegistryClient;
-    private static final EncoderFactory s_encoderFactory = EncoderFactory.get();
+    private String m_schemaRegistryUrl;
+    private SchemaRegistryClient m_schemaRegistryClient;
+    private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
-    public ExportAvroSerializer() {
-        updateConfig();
+    public ExportAvroSerializer(String schemaRegistryUrl) {
+        updateConfig(schemaRegistryUrl);
     }
 
     /**
@@ -75,16 +74,16 @@ public class ExportAvroSerializer {
         if (avroRecord == null) {
             return null;
         }
-        topic = "kipling" + topic + "-value";
+        String schemaName = "kipling-" + topic + "-value";
         Schema schema = avroRecord.getSchema();
         try {
             // register the schema if not registered, return the schema id.
-            int schemaId = s_schemaRegistryClient.register(topic, schema);
+            int schemaId = m_schemaRegistryClient.register(schemaName, schema);
             // serialize to bytes
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             out.write(0);
             out.write(ByteBuffer.allocate(4).putInt(schemaId).array());
-            BinaryEncoder encoder = s_encoderFactory.directBinaryEncoder(out, null);
+            BinaryEncoder encoder = m_encoderFactory.directBinaryEncoder(out, null);
             DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
 
             writer.write(avroRecord, encoder);
@@ -107,14 +106,13 @@ public class ExportAvroSerializer {
     /**
      * Handling the change of the {@code SchemaRegistryUrl} in the deployment file.
      */
-    public synchronized void updateConfig() {
-        String url = VoltDB.instance().getCatalogContext().getDeployment().getSchemaregistryurl().trim();
+    public synchronized void updateConfig(String schemaRegistryUrl) {
         // update the serializer config if the schema_register_url in the deployment file changes
-        if (!Objects.equals(s_schemaRegistryUrl, url)) {
-            s_schemaRegistryUrl = url;
-            List<String> baseUrls = Arrays.asList(url.split(","));
-            // create a new s_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            s_schemaRegistryClient = new CachedSchemaRegistryClient(baseUrls, 10000);
+        if (!Objects.equals(m_schemaRegistryUrl, schemaRegistryUrl)) {
+            m_schemaRegistryUrl = schemaRegistryUrl;
+            List<String> baseUrls = Arrays.asList(schemaRegistryUrl.split(","));
+            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
+            m_schemaRegistryClient = new CachedSchemaRegistryClient(baseUrls, 10000);
         }
     }
 }

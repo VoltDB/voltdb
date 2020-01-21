@@ -50,6 +50,7 @@ import org.voltdb.exportclient.ExportRowSchema;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.exportclient.kafka.KafkaExportClient;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -89,6 +90,11 @@ public class GuestProcessor implements ExportDataProcessor {
 
             String exportClientClass = properties.getProperty(EXPORT_TO_TYPE);
             Preconditions.checkNotNull(exportClientClass, "export to type is undefined or custom export plugin class missing.");
+            if(exportClientClass.equals("KafkaExportClient")) {
+                // ignore the encode format for KafkaExportClient if we are using E2.
+                // In E2 we only support CSV and in E3 we support AVRO and CSV.
+                properties.remove(KafkaExportClient.ENCODE_FORMAT);
+            }
 
             try {
                 final Class<?> clientClass = Class.forName(exportClientClass);
