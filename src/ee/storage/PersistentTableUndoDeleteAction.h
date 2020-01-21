@@ -20,14 +20,14 @@
 #include "common/UndoReleaseAction.h"
 #include "common/types.h"
 #include "storage/persistenttable.h"
-
+#include <set>
 namespace voltdb {
 
 
 class PersistentTableUndoDeleteAction: public UndoReleaseAction {
     char *m_tuple;
     PersistentTableSurgeon *m_table;
-    std::deque<char*> m_tuples;
+    std::set<char*> m_tuples;
     virtual ~PersistentTableUndoDeleteAction() { }
 
     /*
@@ -39,7 +39,7 @@ class PersistentTableUndoDeleteAction: public UndoReleaseAction {
 
     virtual bool isReleaseAggregated() { return true;}
     virtual void aggreate(UndoReleaseAction * action) {
-        m_tuples.push_back(action->getTuple());
+        m_tuples.insert(action->getTuple());
     }
     virtual void releaseBatch() { m_table->deleteTupleRelease(m_tuples);}
     virtual char* getTuple() { return m_tuple;}

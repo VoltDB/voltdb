@@ -22,7 +22,6 @@
 #include <common/debuglog.h>
 #include <string.h>
 #include <list>
-#include <set>
 
 #include "common/Pool.hpp"
 #include "common/VoltContainer.hpp"

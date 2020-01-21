@@ -113,7 +113,7 @@ public:
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
-    void deleteTupleRelease(std::deque<char*> tuples);
+    void deleteTupleRelease(std::set<char*> tuples);
     void deleteTupleStorage(TableTuple& tuple);
 
     size_t getSnapshotPendingBlockCount() const;
@@ -674,7 +674,7 @@ private:
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
-    void deleteTupleRelease(std::deque<char*> tuples);
+    void deleteTupleRelease(std::set<char*> tuples);
     void deleteTupleFinalize(TableTuple& tuple);
 
     /**
@@ -866,7 +866,7 @@ inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool ski
     m_table.deleteTupleForUndo(tupleData, skipLookup);
 }
 
-inline void PersistentTableSurgeon::deleteTupleRelease(std::deque<char*> tuples) {
+inline void PersistentTableSurgeon::deleteTupleRelease(std::set<char*> tuples) {
     m_table.deleteTupleRelease(tuples);
 }
 
@@ -1029,9 +1029,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
     }
-
-    // TO DO: Need update indexes here for the migrated tuple.
-    m_dataStorage->remove(&tuple);
  }
 
 inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSize) {

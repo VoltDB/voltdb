@@ -1230,15 +1230,24 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 /**
  * This entry point is triggered by the successful release of an UndoDeleteAction.
  */
-void PersistentTable::deleteTupleRelease(std::deque<char*> tupleData) {
+void PersistentTable::deleteTupleRelease(std::set<char*> tuples) {
 
-//      std::deque<char*>::iterator it = tupleData.begin();
-//      while (it != tupleData.end()) {
-//          TableTuple target(m_schema);
-//          target.move(*it++);
-//         // TableTuple* tuple = reinterpret_cast<TableTuple*>(*it++);
-//          VOLT_DEBUG("**************%s", target.debug(m_name).c_str());
-//      }
+      std::set<char*>::iterator it = tuples.begin();
+      while (it != tuples.end()) {
+          TableTuple target(m_schema);
+          target.move(*it++);
+          if (m_tableStreamer != NULL) {
+             m_tableStreamer->notifyTupleDelete(target);
+          }
+          target.setPendingDeleteOnUndoReleaseFalse();
+          VOLT_TRACE("Deleted tuple: %s", target.debug(m_name).c_str());
+      }
+
+      // Delete in batch
+      m_dataStorage->remove(&tuples);
+
+      //TO DO: update indexes for those moved tuples
+
 
 //    TableTuple target(m_schema);
 //    target.move(tupleData);
