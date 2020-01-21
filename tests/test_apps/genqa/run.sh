@@ -295,13 +295,6 @@ function jdbc-benchmark() {
         --wait=0
 }
 
-function export-on-server-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportOnServerVerifier \
-        $EXPORTDATAREMOTE \
-        4 \
-        $CLIENTLOG
-}
-
 # vertica host_port is volt15d:5433
 # posgres should be installed locally and is on post 5432
 function export-jdbc-postgres-verify() {
