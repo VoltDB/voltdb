@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <vector>
 
 // older GCC compilers incurs some efficiency loss
 #if defined(__GNUC__) && __GNUC__ <= 4
