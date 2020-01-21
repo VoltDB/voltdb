@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 APPNAME="genqa"
-APPNAME2="genqa2"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -52,7 +51,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar sp.jar voltdbroot voltdbroot genqa.jar genqq2.jar eggenqa.jar eggenqa2.jar genqa_nocat.jar exportdata clientlog log build
+    rm -rf obj debugoutput sp.jar voltdbroot exportdata clientlog log build
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
@@ -61,21 +60,12 @@ function srccompile() {
     # this will create a sp.jar file
     ant -f build.xml
 
-    # these are deprecated and necessary for legacy test coverage in older apps.
-    cp sp.jar genqa.jar
-    cp sp.jar genqa2.jar
-    cp sp.jar eggenqa.jar
-    cp sp.jar eggenqa2.jar
-    cp sp.jar genqa_nocat.jar
-
     # this is needed for the customexporter
     mkdir -p obj
 
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
-    javac -classpath $CLASSPATH -d obj \
-        src/$APPNAME2/procedures/*.java
     javac -classpath $CLASSPATH -d obj \
         src/customexport/*.java
 
