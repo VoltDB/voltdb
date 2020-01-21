@@ -269,8 +269,9 @@ TEST_F(TableTupleAllocatorTest, TestIteratorOfNonCompactingChunks) {
     testIteratorOfNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>();
 }
 
-template<typename Chunks>
+template<shrink_direction dir>
 void testCompactingChunks() {
+    using Chunks = CompactingChunks<dir>;
     using Gen = StringGen<TupleSize>;
     using const_iterator = typename IterableTableTupleChunks<Chunks, truth>::const_iterator;
     using iterator = typename IterableTableTupleChunks<Chunks, truth>::iterator;
@@ -373,6 +374,35 @@ void testCompactingChunks() {
         }
         assert(j == NumTuples);
     }
+}
+
+template<shrink_direction dir>
+void testCompactingChunksBatchRemoval() {
+    using Chunks = CompactingChunks<dir>;
+    using Gen = StringGen<AllocsPerChunk>;
+    Gen gen;
+    Chunks alloc(TupleSize);
+    array<void*, AllocsPerChunk> addresses;
+    size_t i;
+    puts("Original:");
+    for(i = 0; i < AllocsPerChunk; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+        assert(Gen::same(addresses[i], i));
+        printf("%lu: %p\n", i, addresses[i]);
+    }
+    // Remove last 10 addr allocated
+    auto result = alloc.free({{prev(addresses.end(), 10), addresses.end()}});
+    auto const dump = [](decltype(result) const& r) {
+        puts("P1: ");
+        for(auto const& p : get<0>(r)) {
+            printf("%p => %p\n", p.first, p.second);
+        }
+        puts("P2: ");
+        for(auto const* p : get<1>(r)) {
+            printf("%p\n", p);
+        }
+    };
+    dump(result);
 }
 
 template<typename Alloc, typename Compactible = typename Alloc::Compact> struct TrackedDeleter {
@@ -485,8 +515,9 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
 }
 
 TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
-    testCompactingChunks<CompactingChunks<shrink_direction::head>>();
-    testCompactingChunks<CompactingChunks<shrink_direction::tail>>();
+    testCompactingChunksBatchRemoval<shrink_direction::head>();
+    testCompactingChunks<shrink_direction::head>();
+    testCompactingChunks<shrink_direction::tail>();
     for (auto skipped = 8lu; skipped < 64; skipped += 8) {
         testCustomizedIterator<CompactingChunks<shrink_direction::head>, 3>(skipped);
         testCustomizedIterator<CompactingChunks<shrink_direction::tail>, 3>(skipped);
