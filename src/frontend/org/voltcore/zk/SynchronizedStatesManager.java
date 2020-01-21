@@ -719,6 +719,7 @@ public class SynchronizedStatesManager {
             m_stateChangeInitiator = false;
             m_ourDistributedLockName = null;
             m_lockWaitingOn = null;
+            m_knownMembers = null;
             m_holdingDistributedLock = false;
             m_pendingProposal = null;
             m_currentRequestType = REQUEST_TYPE.INITIALIZING;
