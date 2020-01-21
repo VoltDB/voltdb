@@ -639,7 +639,7 @@ CompactingChunks<dir>::free(set<void*> const& args) {
             } else {
                 snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(): invalid addr %p",
                         dir == shrink_direction::head ? "head" : "tail", p);
-                buf[sizeof buf] = 0;
+                buf[sizeof buf - 1] = 0;
                 throw range_error(buf);
             }
         });
