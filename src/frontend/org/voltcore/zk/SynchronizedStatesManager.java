@@ -590,8 +590,8 @@ public class SynchronizedStatesManager {
 
             if (m_membershipChangePending) {
                 getLatestMembership();
-            }
-            else {
+            } else if (m_knownMembers == null) {
+                // Members could be set by the callback which was handled between the async initialization calls
                 m_knownMembers = knownMembers;
             }
             // We need to always monitor participants so that if we are initialized we can add ourselves and insert
@@ -756,7 +756,15 @@ public class SynchronizedStatesManager {
             return proposalVersion;
         }
 
-        private ByteBuffer buildProposal(REQUEST_TYPE requestType,  ByteBuffer existingState, ByteBuffer proposedState) {
+        private ByteBuffer buildProposal(REQUEST_TYPE requestType, ByteBuffer existingState, ByteBuffer proposedState) {
+            if (m_log.isTraceEnabled()) {
+                m_log.trace(String.format("%s: Building proposal %s: previous %s action %s", m_stateMachineId,
+                        requestType, stateToString(existingState.slice()),
+                        (requestType == REQUEST_TYPE.CORRELATED_COORDINATED_TASK
+                                || requestType == REQUEST_TYPE.UNCORRELATED_COORDINATED_TASK)
+                                        ? taskToString(proposedState.slice())
+                                        : stateToString(proposedState.slice())));
+            }
             ByteBuffer states = ByteBuffer.allocate(proposedState.remaining() + existingState.remaining() + 4);
             states.putShort((short)requestType.ordinal());
             states.putShort((short)existingState.remaining());
@@ -769,7 +777,7 @@ public class SynchronizedStatesManager {
         private StateChangeRequest getExistingAndProposedBuffersFromResultsNode(byte oldAndNewState[]) {
             // Either the barrier or the state node should have the current state
             assert(oldAndNewState != null);
-            ByteBuffer states = ByteBuffer.wrap(oldAndNewState);
+            ByteBuffer states = ByteBuffer.wrap(oldAndNewState).asReadOnlyBuffer();
             // Maximum state size is 64K
             REQUEST_TYPE requestType = REQUEST_TYPE.values()[states.getShort()];
             int oldStateSize = states.getShort();
@@ -778,7 +786,7 @@ public class SynchronizedStatesManager {
             states.flip();      // just the old state
             states.position(4);
             states.limit(oldStateSize+4);
-            return new StateChangeRequest(requestType, states, proposedState);
+            return new StateChangeRequest(requestType, states.slice(), proposedState);
         }
 
         private void checkForBarrierParticipantsChange() {
@@ -830,7 +838,10 @@ public class SynchronizedStatesManager {
 
                                 m_pendingProposal = existingAndProposedStates.m_proposal;
                                 ByteBuffer proposedState = m_pendingProposal.asReadOnlyBuffer();
-                                assert(existingAndProposedStates.m_previousState.equals(m_synchronizedState));
+                                assert (existingAndProposedStates.m_previousState.equals(m_synchronizedState)) : String
+                                        .format("%s: %s proposed previous: %s, actual previous: %s", m_stateMachineId,
+                                                type, stateToString(existingAndProposedStates.m_previousState),
+                                                stateToString(m_synchronizedState));
                                 if (m_log.isDebugEnabled()) {
                                     if (type == REQUEST_TYPE.STATE_CHANGE_REQUEST) {
                                         m_log.debug(m_stateMachineId + ": Received new State proposal " +
@@ -943,16 +954,23 @@ public class SynchronizedStatesManager {
                 byte result[];
                 try {
                     result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(String.format("%s: Checking result from member %s: %s", m_stateMachineId, memberId,
+                                Arrays.toString(result)));
+                    }
                     if (result != null) {
                         if (result[0] == 0) {
                             return RESULT_CONCENSUS.DISAGREE;
                         }
                         agree = true;
                     }
-                }
-                catch (NoNodeException ke) {
+                } catch (NoNodeException ke) {
                     // This can happen when a new member joins and other members detect the new member before
                     // it's initialization code is called and a Null result is supplied to treat this as a null result.
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(String.format("%s: Could not find a result from member %s", m_stateMachineId,
+                                memberId));
+                    }
                 }
             }
             if (agree) {
@@ -1643,6 +1661,10 @@ public class SynchronizedStatesManager {
         private void getLatestMembership() {
             try {
                 m_knownMembers = ImmutableSet.copyOf(m_zk.getChildren(m_stateMachineMemberPath, null));
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug(String.format("%s: getLatestMembership Updating known members to: ", m_stateMachineId,
+                            m_knownMembers));
+                }
             } catch (KeeperException.SessionExpiredException e) {
                 if (m_log.isDebugEnabled()) {
                     m_log.debug(m_stateMachineId + ": Received SessionExpiredException in getLatestMembership");
