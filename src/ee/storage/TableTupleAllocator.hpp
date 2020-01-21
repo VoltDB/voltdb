@@ -195,6 +195,8 @@ namespace voltdb {
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::empty; using super::size;
             using super::front; using super::back;
+            size_t distance(iterator);           // std::distance(begin(), arg)
+            size_t distance(const_iterator) const;
         };
 
         /**
@@ -334,7 +336,26 @@ namespace voltdb {
             ExtendedIterator operator()() noexcept;
             ExtendedIterator operator()() const noexcept;
         };
+    }
+}
 
+/**
+ * For CompactingChunks::element_type
+ */
+namespace std {
+    // NOTE: this alone does not guarantee strong order across hosts, since
+    // the comparison is on the chunk allocation address only.
+    using namespace voltdb::storage;
+    template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
+        using value_type = typename ChunkList<CompactingChunk>::iterator;
+        inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
+            return lhs->begin() < rhs->begin();
+        }
+    };
+}
+
+namespace voltdb {
+    namespace storage {
         /**
          * A linked list of self-compacting chunks:
          * All allocation operations are appended to the last chunk
@@ -364,10 +385,22 @@ namespace voltdb {
             typename list_type::iterator compactFrom() noexcept;
             typename list_type::const_iterator compactFrom() const noexcept;
             // Helper for batch free
-            template<typename bucket_type> void
-            reduce_chunk(bucket_type&,
-                    pair<typename bucket_type::const_iterator, typename bucket_type::const_iterator> const&&,
-                    map<void*, void*>&);
+            class element_type : private map<list_type::iterator, tuple<size_t, vector<void*>>> {
+                using bucket_type = map<list_type::iterator, tuple<size_t, vector<void*>>>;
+                CompactingChunks<dir>& m_self;
+            public:
+                struct ptr_cb {
+                    vector<void*> m_addr;
+                    ptr_cb(vector<void*> const&) noexcept;
+                    void* operator()();
+                };
+                element_type(CompactingChunks<dir>& o) noexcept;
+                void insert(list_type::iterator, void*);
+                unique_ptr<ptr_cb> min_pop();
+                unique_ptr<ptr_cb> find_pop(list_type::iterator);
+                using bucket_type::empty;
+            };
+            void reduce(typename element_type::ptr_cb&&, map<void*, void*>&);
         protected:
             size_t tupleSize() const noexcept;
         public:

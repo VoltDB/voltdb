@@ -223,7 +223,7 @@ inline void ChunkList<Chunk, E>::splice(const_iterator pos, ChunkList& other, it
     other.m_map.erase(it->begin());
     super::splice(
 #ifdef CENTOS7
-            next(begin(), distance(cbegin(), pos)),
+            next(begin(), distance(pos)),
 #else
             pos,
 #endif
@@ -249,6 +249,16 @@ template<typename Chunk, typename E>
 inline void ChunkList<Chunk, E>::clear() noexcept {
     m_map.clear();
     super::clear();
+}
+
+template<typename Chunk, typename E> inline
+size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter) {
+    return std::distance(begin(), iter);
+}
+
+template<typename Chunk, typename E> inline
+size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
+    return std::distance(begin(), iter);
 }
 
 // queue: insert to tail; get from head; stack: insert to head,
@@ -564,6 +574,8 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
         auto& dst_iter = *pos;
         if (dst_iter != from_iter) {         // cross-chunk movement needed
             dst_iter->free(dst, src);        // memcpy()
+        } else if (src != dst) {
+            memcpy(dst, src, tupleSize());
         }
         trait::released(from_iter);
         --m_allocs;
@@ -580,8 +592,10 @@ template<typename T> static tuple<map<T, T>, vector<T>>& reduceTransitiveClosure
         tuple<map<T, T>, vector<T>>& cont) {
     auto& m = get<0>(cont);
     auto& v = get<1>(cont);
-    auto const iter1 = find_if(m.cbegin(), m.cend(),
-            [&m](pair<T, T> const& p) { return m.count(p.second) > 0; });
+    // non-id arcs: v1 => v2 AND v2 => v3 AND v1 != v2
+    auto const iter1 = find_if(m.cbegin(), m.cend(), [&m](pair<T, T> const& p) {
+                return p.first != p.second && m.count(p.second) > 0;
+            });
     if (iter1 != m.cend()) {
         auto iter2 = m.find(iter1->second);
         vassert(iter2 != m.cend());
@@ -601,62 +615,177 @@ template<typename T> static tuple<map<T, T>, vector<T>>& reduceTransitiveClosure
     }
 }
 
-template<shrink_direction dir>
-template<typename bucket_type> inline void
-CompactingChunks<dir>::reduce_chunk(bucket_type& buckets,
-        pair<typename bucket_type::const_iterator, typename bucket_type::const_iterator> const&& iters,
-        map<void*, void*>& acc) {
-    vassert(iters.first != buckets.cend());
-    // Within-chunk removal in desc order so it doesn't stomp on itself
-    for(void* p : set<void*, greater<void*>>{iters.first->second, iters.second->second}) {
-        // invariant guaranteed by the order that we
-        // always check all chunks to be compacted from
-        // before freeing any non-compacted chunk.
-        vassert(acc.find(p) == acc.cend());
-        acc.emplace(p, free(p));               // freed addr => moved addr
+template<shrink_direction dir> inline void
+CompactingChunks<dir>::reduce(typename CompactingChunks<dir>::element_type::ptr_cb&& cb, map<void*, void*>& acc) {
+    void* p;
+    while((p = cb()) != nullptr) {
+        acc.emplace(p, free(p));
     }
-    buckets.erase(iters.first, iters.second);
 }
 
-namespace std {
-    template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
-        using value_type = typename ChunkList<CompactingChunk>::iterator;
-        inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
-            return lhs->begin() < rhs->begin();
-        }
-    };
+template<shrink_direction dir> inline
+CompactingChunks<dir>::element_type::element_type(CompactingChunks<dir>& o) noexcept : m_self(o) {}
+
+template<shrink_direction dir> inline void
+CompactingChunks<dir>::element_type::insert(typename CompactingChunks<dir>::list_type::iterator key, void* p) {
+    auto iter = find(key);
+    if (iter == end()) {
+        emplace(key, make_tuple(m_self.distance(key), vector<void*>{p}));
+    } else {
+        get<1>(iter->second).emplace_back(p);
+    }
 }
+
+template<shrink_direction dir> inline unique_ptr<typename CompactingChunks<dir>::element_type::ptr_cb>
+CompactingChunks<dir>::element_type::min_pop() {
+    auto const iter = min_element(begin(), end(),
+            [](typename bucket_type::value_type const& lhs,
+                typename bucket_type::value_type const& rhs) {
+            return get<0>(lhs.second) < get<0>(rhs.second);
+            });
+    if (iter == end()) {
+        return {};
+    } else {
+        unique_ptr<ptr_cb> ptr(new ptr_cb{get<1>(iter->second)});
+        erase(iter);
+        return ptr;
+    }
+}
+
+template<shrink_direction dir> inline unique_ptr<typename CompactingChunks<dir>::element_type::ptr_cb>
+CompactingChunks<dir>::element_type::find_pop(typename CompactingChunks<dir>::list_type::iterator key) {
+    auto const iter = find(key);
+    if (iter == end()) {
+        return {};
+    } else {
+        unique_ptr<ptr_cb> ptr(new ptr_cb{get<1>(iter->second)});
+        erase(iter);
+        return ptr;
+    }
+}
+
+template<shrink_direction dir> inline
+CompactingChunks<dir>::element_type::ptr_cb::ptr_cb(vector<void*> const& v) noexcept : m_addr(v) {
+    std::sort(m_addr.begin(), m_addr.end());
+}
+
+template<shrink_direction dir> inline void*
+CompactingChunks<dir>::element_type::ptr_cb::operator()() {
+    if (! m_addr.empty()) {
+        void* p = m_addr.back();
+        m_addr.pop_back();
+        return p;
+    } else {
+        return nullptr;
+    }
+}
+
+// Weak check for batch free
+static bool validate_batch_free(set<void*> const& args,
+        tuple<map<void*, void*>, vector<void*>> const& ret) {
+    auto const& p1 = get<0>(ret);
+    auto const& p2 = get<1>(ret);
+    auto acc = accumulate(p1.cbegin(), p1.cend(), set<void*>(),
+            [](set<void*>& acc, typename map<void*, void*>::value_type const& entry) {
+                acc.emplace(entry.first);
+                return acc;
+            });
+    return args == accumulate(p2.cbegin(), p2.cend(), acc,
+            [](set<void*>& acc, void* p) {
+                acc.emplace(p);
+                return acc;
+            });
+}
+
+// Verifier for batch-free, checking that the reported outcome is
+// indeed what happened.
+struct BatchFreeVerification {
+#ifdef NDEBUG
+    constexpr BatchFreeVerification(ChunkList<CompactingChunk> const&, size_t) noexcept = default;
+    constexpr bool operator()(map<void*, void*>const& trans) const noexcept {
+        return false;
+    }
+#else
+    using value_type = forward_list<tuple<void const*, void const*, char*>>;
+    size_t const m_tupleSize;
+    value_type const m_tracker;
+    BatchFreeVerification(ChunkList<CompactingChunk> const& chunks, size_t tupleSize) :
+        m_tupleSize(tupleSize),
+        m_tracker(accumulate(chunks.cbegin(), chunks.cend(), value_type{},
+                    [](value_type& acc, CompactingChunk const& c) {
+                        auto const size = reinterpret_cast<char*>(c.end()) -
+                            reinterpret_cast<char*>(c.begin());
+                        char* dst = new char[size];
+                        memcpy(dst, c.begin(), size);
+                        acc.emplace_front(c.begin(), c.end(), dst);
+                        return acc;
+                    })) {}
+    ~BatchFreeVerification() {
+        for (auto& entry : m_tracker) {
+            delete[] get<2>(entry);
+        }
+    }
+    void const* of(void const* src) const {
+        auto const iter = find_if(m_tracker.cbegin(), m_tracker.cend(),
+                [src](typename value_type::value_type const& entry) {
+                    void const* beg; void const* end;
+                    tie(beg, end, ignore) = entry;
+                    return src >= beg && src < end;
+                });
+        if (iter == m_tracker.end()) {
+            snprintf(buf, sizeof buf, "BatchFreeVerification: invalid address %p", src);
+            buf[sizeof buf - 1] = 0;
+            throw logic_error(buf);
+        } else {
+            return get<2>(*iter) + reinterpret_cast<ptrdiff_t>(
+                (reinterpret_cast<char const*>(src)) - reinterpret_cast<char const*>(get<0>(*iter)));
+        }
+    }
+    bool operator()(map<void*, void*>const& trans) const {
+        return all_of(trans.cbegin(), trans.cend(),
+                [this](typename map<void*, void*>::value_type const& entry) {
+                   bool const equals = ! memcmp(entry.first, of(entry.second), m_tupleSize);
+                   return equals;
+                });
+    }
+#endif
+};
 
 template<shrink_direction dir> typename CompactingChunks<dir>::batch_type
 CompactingChunks<dir>::free(set<void*> const& args) {
-    using bucket_type = multimap<typename list_type::iterator, void*>;
-    bucket_type buckets = accumulate(args.cbegin(), args.cend(), bucket_type{},
-        [this](bucket_type& acc, void* p) {    // validation & transformation
-            auto* iter = this->find(p);
-            if (iter != nullptr) {
-                acc.emplace(*iter, p);
-                return acc;
-            } else {
-                snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(): invalid addr %p",
-                        dir == shrink_direction::head ? "head" : "tail", p);
-                buf[sizeof buf - 1] = 0;
-                throw range_error(buf);
-            }
-        });
+    BatchFreeVerification const verifier{*this, tupleSize()};
+    element_type state{*this};
+    for_each(args.cbegin(), args.cend(), [this, &state](void* p) {    // validation & transformation
+                auto const* iter = this->find(p);
+                if (iter != nullptr) {
+                    state.insert(*iter, p);
+                } else {
+                    snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(): invalid addr %p",
+                            dir == shrink_direction::head ? "head" : "tail", p);
+                    buf[sizeof buf - 1] = 0;
+                    throw range_error(buf);
+                }
+            });
     batch_type acc;
-    while (! buckets.empty()) {
-        for(auto p = buckets.equal_range(compactFrom());       // check on the chunk to be compacted,
-                p.first != buckets.cend();
-                reduce_chunk(buckets, move(p), get<0>(acc))) {}
-        if (! buckets.empty()) { // then reduce one single chunk that is NOT to be compacted.
-            reduce_chunk(buckets,
-                    buckets.equal_range(buckets.cbegin()->first),
-                    get<0>(acc));
+    while (! state.empty()) {
+        do {                                   // check on the chunk to be compacted
+            auto const& p = state.find_pop(compactFrom());
+            if (! p) {
+                break;
+            } else {
+                reduce(move(*p), get<0>(acc));
+            }
+        } while (! state.empty());
+        if (! state.empty()) {               // then reduce one single chunk that is NOT to be compacted, as the lowest chunk
+            auto const& p = state.min_pop();
+            vassert(p);
+            reduce(move(*p), get<0>(acc));
         }
     }
-    vassert(m_allocs >= args.size());
-    m_allocs -= args.size();
-    return reduceTransitiveClosure(acc);
+    reduceTransitiveClosure(acc);
+    vassert(validate_batch_free(args, acc));
+    vassert(verifier(get<0>(acc)));
+    return acc;
 }
 
 namespace voltdb { namespace storage {          // older GCC would warn in absence of this

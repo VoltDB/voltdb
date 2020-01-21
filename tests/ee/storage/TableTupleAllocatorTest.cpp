@@ -24,6 +24,7 @@
 #include "harness.h"
 #include "common/debuglog.h"
 #include "storage/TableTupleAllocator.hpp"
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -377,32 +378,56 @@ void testCompactingChunks() {
 }
 
 template<shrink_direction dir>
-void testCompactingChunksBatchRemoval() {
+void testCompactingChunksBatchRemoval_single() {                     // single chunk test
     using Chunks = CompactingChunks<dir>;
-    using Gen = StringGen<AllocsPerChunk>;
+    using Gen = StringGen<TupleSize>;
     Gen gen;
     Chunks alloc(TupleSize);
     array<void*, AllocsPerChunk> addresses;
     size_t i;
-    puts("Original:");
     for(i = 0; i < AllocsPerChunk; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
         assert(Gen::same(addresses[i], i));
-        printf("%lu: %p\n", i, addresses[i]);
     }
-    // Remove last 10 addr allocated
-    auto result = alloc.free({{prev(addresses.end(), 10), addresses.end()}});
-    auto const dump = [](decltype(result) const& r) {
-        puts("P1: ");
-        for(auto const& p : get<0>(r)) {
-            printf("%p => %p\n", p.first, p.second);
-        }
-        puts("P2: ");
-        for(auto const* p : get<1>(r)) {
-            printf("%p\n", p);
-        }
-    };
-    dump(result);
+    // 1. Remove last 10 addr allocated: no movement needed
+    auto result = alloc.free(set<void*>(prev(addresses.cend(), 10), addresses.cend()));
+    assert(get<0>(result).empty());
+    assert(get<1>(result).size() == 10);
+    // correctness check
+    assert(get<1>(result).cend() ==
+            mismatch(prev(addresses.cend(), 10), addresses.cend(),
+                get<1>(result).cbegin()).second);
+    // restore (but with different content; but we don't care
+    // about content in this test)
+    for (i = AllocsPerChunk - 10; i < AllocsPerChunk; ++i) {
+        assert(addresses[i] == gen.fill(alloc.allocate()));
+    }
+    assert(alloc.size() == AllocsPerChunk);
+    // 2. Remove first 10 addr allocated
+    result = alloc.free(set<void*>(addresses.begin(), next(addresses.begin(), 10)));
+    auto const& m = get<0>(result);
+    assert(m.size() == 10);
+    assert(get<1>(result).empty());
+    i = 0;         // correctness check: 9 => 31, 8 => 30, 7 => 29, ...
+    for (auto iter1 = addresses.cbegin(), iter2 = prev(addresses.cend(), 10);
+            i < 10;
+            ++i, ++iter1, ++iter2) {
+        assert(m.count(*iter1) > 0 && m.find(*iter1)->second == *iter2);
+    }
+}
+
+template<shrink_direction dir>
+void testCompactingChunksBatchRemoval_multi() {                     // single chunk test
+    using Chunks = CompactingChunks<dir>;
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    Chunks alloc(TupleSize);
+    array<void*, AllocsPerChunk * 3> addresses;
+    size_t i;
+    for(i = 0; i < AllocsPerChunk * 3; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+        assert(Gen::same(addresses[i], i));
+    }
 }
 
 template<typename Alloc, typename Compactible = typename Alloc::Compact> struct TrackedDeleter {
@@ -515,7 +540,6 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
 }
 
 TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
-    testCompactingChunksBatchRemoval<shrink_direction::head>();
     testCompactingChunks<shrink_direction::head>();
     testCompactingChunks<shrink_direction::tail>();
     for (auto skipped = 8lu; skipped < 64; skipped += 8) {
@@ -525,6 +549,9 @@ TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
         testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
         testCustomizedIterator<CompactingChunks<shrink_direction::head>, 6>(skipped);       // a different mask
     }
+    testCompactingChunksBatchRemoval_single<shrink_direction::head>();
+    testCompactingChunksBatchRemoval_single<shrink_direction::tail>();
+    testCompactingChunksBatchRemoval_multi<shrink_direction::head>();
 }
 
 template<typename Chunks, size_t NthBit>
