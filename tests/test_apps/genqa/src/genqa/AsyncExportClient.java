@@ -78,8 +78,6 @@ import org.voltdb.iv2.TxnEgo;
 public class AsyncExportClient
 {
     static VoltLogger log = new VoltLogger("ExportClient");
-// Transactions between catalog swaps.
-    public static long CATALOG_SWAP_INTERVAL = 500000;
     // Number of txn ids per client log file.
     public static long CLIENT_TXNID_FILE_SIZE = 250000;
 
@@ -290,7 +288,6 @@ public class AsyncExportClient
     private static int UPDATE_NEW = 4;
     private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
 
-    private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
 
     // Connection reference
@@ -335,7 +332,6 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
@@ -347,7 +343,6 @@ public class AsyncExportClient
             config = new ConnectionConfig(apph);
 
             // Retrieve parameters
-            final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
@@ -411,9 +406,7 @@ public class AsyncExportClient
 
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
-            int swap_count = 0;
             Random r = new Random();
-            boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
                 long currentRowId = rowId.incrementAndGet();
@@ -450,14 +443,6 @@ public class AsyncExportClient
                         e.printStackTrace();
                         System.exit(-1);
                     }
-                }
-
-                swap_count++;
-                if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
-                {
-                    log.info("Changing catalogs...");
-                    clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
-                    first_cat = !first_cat;
                 }
             }
 
