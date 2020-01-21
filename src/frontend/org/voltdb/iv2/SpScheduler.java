@@ -905,6 +905,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
 
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        VoltZK.addHashMismatchedSite(hostMessenger.getZK(), m_mailbox.getHSId());
+
         VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
                 CreateMode.PERSISTENT, tmLog, "Transfer to Reduced Safety Mode");
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
@@ -915,7 +917,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (isClusterComplete) {
                 m_mailbox.send(ciHsid, message);
             }
-            // Send message to other client interfaces for self check-up.
+            // Send message to the client interfaces of other hosts. If a host does not host any partition leaders,
+            // the host will be shutdown.
             if (hostMessenger.getHostId() != hostId) {
                 m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
             }
