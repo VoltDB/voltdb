@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -327,7 +328,8 @@ public class KafkaExportClient extends ExportClientBase {
         boolean m_primed = false;
         Properties m_decoderProducerConfig;
         KafkaProducer<String, Object> m_producer;
-        final RowDecoder<?, RuntimeException> m_decoder;
+        Map<String, AvroDecoder> m_tableAvroDecoderMap;
+        CSVStringDecoder m_csvDecoder;
         final List<Future<RecordMetadata>> m_futures = new ArrayList<>();
         private final AtomicBoolean m_failure = new AtomicBoolean(false);
         final ListeningExecutorService m_es;
@@ -336,7 +338,7 @@ public class KafkaExportClient extends ExportClientBase {
             super(source);
 
             if (m_encodeFormat == EncodeFormat.AVRO) {
-                m_decoder = new AvroDecoder.Builder().build();
+                m_tableAvroDecoderMap = new ConcurrentHashMap<>();
             } else {
                 CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
                 builder
@@ -345,7 +347,7 @@ public class KafkaExportClient extends ExportClientBase {
                         .binaryEncoding(m_binaryEncoding)
                         .skipInternalFields(m_skipInternals)
                 ;
-                m_decoder = builder.build();
+                m_csvDecoder = builder.build();
             }
 
             if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
@@ -436,10 +438,11 @@ public class KafkaExportClient extends ExportClientBase {
             String pval = (rd.partitionValue == null) ? String.valueOf(rd.partitionId) : rd.partitionValue.toString();
             ProducerRecord<String, Object> krec;
             if (m_encodeFormat == EncodeFormat.AVRO) {
-                GenericRecord avroRecord = (GenericRecord) m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
+                AvroDecoder decoder = m_tableAvroDecoderMap.computeIfAbsent(rd.tableName, k -> new AvroDecoder.Builder().build());
+                GenericRecord avroRecord = decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
                 krec = new ProducerRecord<>(m_topic, pval, avroRecord);
             } else {
-                String decoded = (String) m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
+                String decoded = m_csvDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
                 krec = new ProducerRecord<>(m_topic, pval, decoded);
             }
 
