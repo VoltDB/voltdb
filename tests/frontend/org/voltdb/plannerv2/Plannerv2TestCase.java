@@ -36,7 +36,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
-import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.CompiledPlan;
@@ -55,6 +54,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -175,13 +176,18 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 throw new AssertionError("Unexpected exception thrown: " + m_sap.sql, ex);
             } else if (ex instanceof SqlParseException){
                 String errMessage = ex.getMessage();
-                if (errMessage == null || ! ex.getMessage().matches(m_expectedException)) {
+                if (errMessage == null || ! checkExMatch(m_expectedException)) {
                     throw new AssertionError("Exception thrown not matching the pattern: "
                             + m_expectedException, ex);
                 }
             } else {
                 SqlTests.checkEx(ex, m_expectedException, m_sap, SqlTests.Stage.VALIDATE);
             }
+        }
+        private boolean checkExMatch(String errMessage) {
+            Pattern p = Pattern.compile(m_expectedException);
+            Matcher m = p.matcher(errMessage);
+            return m.find();
         }
     }
 
