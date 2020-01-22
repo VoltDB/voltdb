@@ -48,7 +48,7 @@ import org.voltdb.utils.CatalogUtil;
 public class DuplicateCounter
 {
     public static final String HASHMISMATCH_MSG = "Hash mismatch occurred.";
-    public static final String MISMATCH_RESPONSE_MSG = "INTERNAL ERROR. The procedure generated different results on different copies of the partition. Please report the following information to support@voltdb.com.";
+    public static final String MISMATCH_RESPONSE_MSG = "The procedure generated different results on different copies of the partition. Please report the following information to support@voltdb.com.";
     public static final String MISMATCH_HASH_MSG = "The stored procedure generated different SQL queries on different copies of the partition because the procedure is non-deterministic. \n" +
             "The following information can be used to debug the procedure: ";
 
