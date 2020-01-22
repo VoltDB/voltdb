@@ -119,8 +119,8 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             List<String> logSearchPatterns = new ArrayList<>(1);
             logSearchPatterns.add(expectedLogMessage);
             logSearchPatterns.add(expectHashDetectionMessage);
-            logSearchPatterns.add(DuplicateCounter.FAIL_MSG);
-            logSearchPatterns.add(DuplicateCounter.MISMATCH_MSG);
+            logSearchPatterns.add(DuplicateCounter.MISMATCH_RESPONSE_MSG);
+            logSearchPatterns.add(DuplicateCounter.MISMATCH_HASH_MSG);
             logSearchPatterns.add(CatalogUtil.MISMATCHED_STATEMENTS);
             logSearchPatterns.add(CatalogUtil.MISMATCHED_PARAMETERS);
             logSearchPatterns.add(expectedHashNotIncludeMessage);
@@ -349,7 +349,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     1234,
                     999,
                     NonDeterministicSPProc.TXN_ABORT);
-            assertTrue(server.anyHostHasLogMessage(DuplicateCounter.FAIL_MSG));
+            assertTrue(server.anyHostHasLogMessage(DuplicateCounter.MISMATCH_RESPONSE_MSG));
             if (MiscUtils.isPro()) {
                 assertTrue(server.anyHostHasLogMessage(expectHashDetectionMessage));
                 verifyTopologyAfterHashMismatch();
