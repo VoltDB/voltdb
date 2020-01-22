@@ -380,9 +380,6 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         void closeFiles() {
-            File[] notifySet = new VoltFile[m_writers.size()];
-
-            int i = 0;
             // Sort the open files by TXN ID so that we can close and rename
             // them in the order in which they were created.  This allows
             // apps interested in the files to know that whenever a new file
@@ -409,9 +406,6 @@ public class ExportToFileClient extends ExportClientBase {
                     m_logger.error("Failed to rename export file from " + oldPath
                             + " to any revisions of " + handle.getPath(""));
                 }
-
-                notifySet[i] = newFile;
-                i++;
             }
         }
 
