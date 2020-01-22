@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <vector>
 
 // older GCC compilers incurs some efficiency loss
 #if defined(__GNUC__) && __GNUC__ <= 4
@@ -345,6 +346,7 @@ namespace voltdb {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             using trait = CompactingStorageTrait<dir>;
+            using batch_type = tuple<map<void*, void*>, vector<void*>>;
             size_t const m_tupleSize;
             size_t m_allocs = 0;
             // used to keep track of end of 1st chunk when frozen:
@@ -361,6 +363,11 @@ namespace voltdb {
              */
             typename list_type::iterator compactFrom() noexcept;
             typename list_type::const_iterator compactFrom() const noexcept;
+            // Helper for batch free
+            template<typename bucket_type> void
+            reduce_chunk(bucket_type&,
+                    pair<typename bucket_type::const_iterator, typename bucket_type::const_iterator> const&&,
+                    map<void*, void*>&);
         protected:
             size_t tupleSize() const noexcept;
         public:
@@ -369,13 +376,21 @@ namespace voltdb {
                       integral_constant<Compactibility, Compactibility::tail>>::type;
             CompactingChunks(size_t tupleSize) noexcept;
             void* allocate();
-            // frees tuple and returns the tuple that gets copied
+            // frees a single tuple, and returns the tuple that gets copied
             // over the given address, which is at the tail of
             // first/last chunk; or nullptr when the address is
             // *reasonably* invalid. See documents of
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
+            // Efficiently frees a batch of allocations.
+            // \return a map of freed-tuple-addr => moved tuple
+            // addr, where the freed-tuple-addr is possibly a
+            // subset of arguments, excluding those that do not
+            // effectively need any memory movement; and a set
+            // of addresses that to the client does not involve
+            // any movement.
+            batch_type free(set<void*> const&);
             size_t size() const noexcept;              // used for table count executor
             void freeze() noexcept; void thaw() noexcept;
             void const* endOfFirstChunk() const noexcept;
@@ -497,6 +512,16 @@ namespace voltdb {
             void freeze() noexcept; void thaw();       // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
+            /**
+             * Batch removal.
+             * \return
+             * 1. a map of removed allocs addr => allocs addr
+             * that got moved over to fill in the removed hole
+             * (possibly invalid at return time);
+             * 2. A list of (unique) removed allocs that does not
+             * involve any memory movement.
+             */
+            tuple<map<void*, void*>, vector<void*>> remove(set<void*> const&);      // batch removal
             void update(void* dst, void const* src);   // src as temp tuple gets written to persistent location dst
         };
 
