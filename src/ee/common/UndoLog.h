@@ -24,7 +24,10 @@
 
 #include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
-
+#include "common/UndoQuantumReleaseInterest.h"
+#include <boost/foreach.hpp>
+#include <set>
+#include <list>
 namespace voltdb
 {
     static const size_t MAX_CACHED_POOLS = 192;
@@ -130,11 +133,16 @@ namespace voltdb
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             vassert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
-            while (! m_undoQuantums.empty()) {
+            std::set<UndoQuantumReleaseInterest*> releaseInterests{};
+            while (!m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
+                std::list<UndoQuantumReleaseInterest*> interests = undoQuantum->getUndoQuantumReleaseInterest();
+                BOOST_FOREACH (auto interest, interests) {
+                   releaseInterests.insert(interest);
+                }
                 if (undoQuantumToken > undoToken) {
-                    return;
+                    break;
                 }
 
                 m_undoQuantums.pop_front();
@@ -147,8 +155,11 @@ namespace voltdb
                     delete pool;
                 }
                 if(undoQuantumToken == undoToken) {
-                    return;
+                    break;
                 }
+            }
+            BOOST_FOREACH (auto interest, releaseInterests) {
+                interest->releaseBatch();
             }
         }
 

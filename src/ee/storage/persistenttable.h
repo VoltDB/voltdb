@@ -73,6 +73,7 @@
 #include "common/SynchronizedThreadLock.h"
 #include <map>
 #include <set>
+#include <functional>
 
 
 class CopyOnWriteTest;
@@ -113,7 +114,7 @@ public:
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
-    void deleteTupleRelease(std::set<char*> tuples);
+    void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple& tuple);
 
     size_t getSnapshotPendingBlockCount() const;
@@ -237,6 +238,8 @@ public:
         return *m_dataStorage;
     }
 
+    using DeleteCallBack = std::function<void(map<void*, void*>&&)>;
+
     int64_t occupiedTupleMemory() const {
         vassert(m_dataStorage != nullptr);
         return m_dataStorage->size() * m_tempTuple.tupleLength();
@@ -341,7 +344,7 @@ public:
     }
 
     TableTuple* createTuple(TableTuple const &source);
-
+    void releaseBatch();
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
@@ -424,12 +427,6 @@ public:
      * the tuple data.
      */
     size_t hashCode();
-
-//    size_t getBlocksNotPendingSnapshotCount() {
-//        return m_blocksNotPendingSnapshot.size();
-//    }
-
-    void printBucketInfo();
 
     void increaseStringMemCount(size_t bytes) {
         m_nonInlinedMemorySize += bytes;
@@ -601,6 +598,8 @@ public:
      */
     bool deleteMigratedRows(int64_t deletableTxnId);
 
+    void deleteTuplesCallBack(map<void*, void*> &&);
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
@@ -674,7 +673,7 @@ private:
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
-    void deleteTupleRelease(std::set<char*> tuples);
+    void deleteTupleRelease(char* tuple);
     void deleteTupleFinalize(TableTuple& tuple);
 
     /**
@@ -770,6 +769,7 @@ private:
 
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
+    DeleteCallBack m_callBack;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -832,6 +832,7 @@ private:
     typedef std::set<void*> MigratingBatch;
     typedef std::map<int64_t, MigratingBatch> MigratingRows;
     MigratingRows m_migratingRows;
+    MigratingBatch m_releaseBatch;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
@@ -866,8 +867,8 @@ inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool ski
     m_table.deleteTupleForUndo(tupleData, skipLookup);
 }
 
-inline void PersistentTableSurgeon::deleteTupleRelease(std::set<char*> tuples) {
-    m_table.deleteTupleRelease(tuples);
+inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
+    m_table.deleteTupleRelease(tuple);
 }
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {

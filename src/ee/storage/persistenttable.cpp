@@ -67,7 +67,7 @@
 #include "common/ValuePeeker.hpp"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
-
+#include <map>
 namespace voltdb {
 
 #define TABLE_BLOCKSIZE 2097152
@@ -127,6 +127,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_releaseReplicated(this)
     , m_tableType(tableType)
     , m_shadowStream(nullptr)
+    , m_releaseBatch()
 {
     ::memcpy(&m_signature, signature, 20);
 }
@@ -147,6 +148,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
         m_allowNulls[i] = columnInfo->allowNull;
     }
+    m_callBack = std::bind(&PersistentTable::deleteTuplesCallBack, this, std::placeholders::_1);
 }
 
 PersistentTable::~PersistentTable() {
@@ -675,6 +677,39 @@ TableTuple* PersistentTable::createTuple(TableTuple const &source){
     target->copyForPersistentInsert(source);
     return target;
 }
+
+void PersistentTable::releaseBatch() {
+    if (m_tableStreamer != NULL) {
+        TableTuple target(m_schema);
+        BOOST_FOREACH (auto toDelete, m_releaseBatch) {
+            target.move(toDelete);
+            m_tableStreamer->notifyTupleDelete(target);
+        }
+    }
+    m_dataStorage->remove(m_releaseBatch, m_callBack);
+    m_releaseBatch.clear();
+}
+
+void PersistentTable::deleteTuplesCallBack(map<void*, void*> && tuples) {
+    TableTuple target(m_schema);
+    TableTuple origin(m_schema);
+    for(auto const& p : tuples) {
+        target.move(p.first);
+        origin.move(p.second);
+        BOOST_FOREACH (auto index, m_indexes) {
+            index->replaceEntryNoKeyChange(target, origin);
+        }
+        if (isTableWithMigrate(m_tableType)) {
+            uint16_t migrateColumnIndex = getMigrateColumnIndex();
+            NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
+            if (!txnId.isNull()) {
+                migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
+                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+            }
+        }
+    }
+}
+
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
@@ -1230,25 +1265,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 /**
  * This entry point is triggered by the successful release of an UndoDeleteAction.
  */
-void PersistentTable::deleteTupleRelease(std::set<char*> tuples) {
-
-      std::set<char*>::iterator it = tuples.begin();
-      while (it != tuples.end()) {
-          TableTuple target(m_schema);
-          target.move(*it++);
-          if (m_tableStreamer != NULL) {
-             m_tableStreamer->notifyTupleDelete(target);
-          }
-          target.setPendingDeleteOnUndoReleaseFalse();
-          VOLT_TRACE("Deleted tuple: %s", target.debug(m_name).c_str());
-      }
-
-      // Delete in batch
-      m_dataStorage->remove(&tuples);
-
-      //TO DO: update indexes for those moved tuples
-
-
+void PersistentTable::deleteTupleRelease(char* tuple) {
+    m_releaseBatch.insert(tuple);
+    VOLT_DEBUG("*******: %s: %ld", m_name.c_str(), m_releaseBatch.size());
 //    TableTuple target(m_schema);
 //    target.move(tupleData);
 //    target.setPendingDeleteOnUndoReleaseFalse();

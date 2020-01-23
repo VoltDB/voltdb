@@ -20,7 +20,7 @@
 #define UNDORELEASEACTION_H_
 
 #include <cstdlib>
-#include "common/types.h"
+
 namespace voltdb {
 class UndoQuantum;
 
@@ -46,14 +46,6 @@ public:
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
     virtual void release() = 0;
-
-    /*
-     * for aggregated release, DELETE action
-     */
-    virtual bool isReleaseAggregated() { return false;}
-    virtual void aggreate(UndoReleaseAction * action) {}
-    virtual void releaseBatch() {}
-    virtual char* getTuple() { return nullptr;}
 
     /*
      * Generate a synchronized Version of UndoAction

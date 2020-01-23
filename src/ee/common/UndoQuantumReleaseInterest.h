@@ -35,6 +35,7 @@ public:
         }
     }
     inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
+    virtual void releaseBatch() {}
 private:
     int64_t m_lastSeenUndoToken;
 };
