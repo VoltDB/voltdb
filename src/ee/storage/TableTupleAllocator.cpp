@@ -223,7 +223,7 @@ inline void ChunkList<Chunk, E>::splice(const_iterator pos, ChunkList& other, it
     other.m_map.erase(it->begin());
     super::splice(
 #ifdef CENTOS7
-            next(begin(), distance(cbegin(), pos)),
+            next(begin(), distance(pos)),
 #else
             pos,
 #endif
@@ -249,6 +249,16 @@ template<typename Chunk, typename E>
 inline void ChunkList<Chunk, E>::clear() noexcept {
     m_map.clear();
     super::clear();
+}
+
+template<typename Chunk, typename E> inline
+size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter) {
+    return std::distance(begin(), iter);
+}
+
+template<typename Chunk, typename E> inline
+size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
+    return std::distance(begin(), iter);
 }
 
 // queue: insert to tail; get from head; stack: insert to head,
@@ -564,6 +574,8 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
         auto& dst_iter = *pos;
         if (dst_iter != from_iter) {         // cross-chunk movement needed
             dst_iter->free(dst, src);        // memcpy()
+        } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
+            memcpy(dst, src, tupleSize());
         }
         trait::released(from_iter);
         --m_allocs;
@@ -571,92 +583,50 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
     }
 }
 
-/**
- * Helper to reduce a map with value type castible to key
- * type, so that it contains no arcs of v1 => v2 AND v2 => v3,
- * nor id. maps of v => v.
- */
-template<typename T> static tuple<map<T, T>, vector<T>>& reduceTransitiveClosure(
-        tuple<map<T, T>, vector<T>>& cont) {
-    auto& m = get<0>(cont);
-    auto& v = get<1>(cont);
-    auto const iter1 = find_if(m.cbegin(), m.cend(),
-            [&m](pair<T, T> const& p) { return m.count(p.second) > 0; });
-    if (iter1 != m.cend()) {
-        auto iter2 = m.find(iter1->second);
-        vassert(iter2 != m.cend());
-        m.emplace_hint(iter1, iter1->first, iter2->second);
-        m.erase(iter2);
-        v.emplace_back(iter1->second);
-        return reduceTransitiveClosure<>(cont);
-    } else {                                   // now reduce all v => v entries (id mapping)
-        auto const size = v.size();            // and move them to the vector.
-        for(auto const& p : m) {
-            if (p.first == p.second) {
-                v.emplace_back(p.first);
-            }
-        }
-        for_each(next(v.begin(), size), v.end(), [&m](void* p) { m.erase(p); });
-        return cont;
+template<shrink_direction dir> inline
+CompactingChunks<dir>::element_type::element_type(CompactingChunks<dir>& o) noexcept : m_self(o) {}
+
+template<shrink_direction dir> inline void
+CompactingChunks<dir>::element_type::insert(typename CompactingChunks<dir>::list_type::iterator key, void* p) {
+    auto iter = find(key);
+    if (iter == end()) {
+        linear_access_type cont;
+        cont.emplace(p);
+        emplace(key, make_tuple(m_self.distance(key), cont));
+    } else {
+        get<1>(iter->second).emplace(p);
     }
 }
 
-template<shrink_direction dir>
-template<typename bucket_type> inline void
-CompactingChunks<dir>::reduce_chunk(bucket_type& buckets,
-        pair<typename bucket_type::const_iterator, typename bucket_type::const_iterator> const&& iters,
-        map<void*, void*>& acc) {
-    vassert(iters.first != buckets.cend());
-    // Within-chunk removal in desc order so it doesn't stomp on itself
-    for(void* p : set<void*, greater<void*>>{iters.first->second, iters.second->second}) {
-        // invariant guaranteed by the order that we
-        // always check all chunks to be compacted from
-        // before freeing any non-compacted chunk.
-        vassert(acc.find(p) == acc.cend());
-        acc.emplace(p, free(p));               // freed addr => moved addr
+template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
+CompactingChunks<dir>::element_type::min_pop() {
+    auto const iter = min_element(begin(), end(),
+            [](typename super::value_type const& lhs, typename super::value_type const& rhs)
+            { return get<0>(lhs.second) < get<0>(rhs.second); });
+    if (iter == end()) {
+        return {};
+    } else {
+        auto const r = get<1>(iter->second);
+        erase(iter);
+        return r;
     }
-    buckets.erase(iters.first, iters.second);
 }
 
-namespace std {
-    template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
-        using value_type = typename ChunkList<CompactingChunk>::iterator;
-        inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
-            return lhs->begin() < rhs->begin();
-        }
-    };
+template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
+CompactingChunks<dir>::element_type::find_pop(typename CompactingChunks<dir>::list_type::iterator key) {
+    auto const iter = find(key);
+    if (iter == end()) {
+        return {};
+    } else {
+        auto const r = get<1>(iter->second);
+        erase(iter);
+        return r;
+    }
 }
 
-template<shrink_direction dir> typename CompactingChunks<dir>::batch_type
-CompactingChunks<dir>::free(set<void*> const& args) {
-    using bucket_type = multimap<typename list_type::iterator, void*>;
-    bucket_type buckets = accumulate(args.cbegin(), args.cend(), bucket_type{},
-        [this](bucket_type& acc, void* p) {    // validation & transformation
-            auto* iter = this->find(p);
-            if (iter != nullptr) {
-                acc.emplace(*iter, p);
-                return acc;
-            } else {
-                snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(): invalid addr %p",
-                        dir == shrink_direction::head ? "head" : "tail", p);
-                buf[sizeof buf - 1] = 0;
-                throw range_error(buf);
-            }
-        });
-    batch_type acc;
-    while (! buckets.empty()) {
-        for(auto p = buckets.equal_range(compactFrom());       // check on the chunk to be compacted,
-                p.first != buckets.cend();
-                reduce_chunk(buckets, move(p), get<0>(acc))) {}
-        if (! buckets.empty()) { // then reduce one single chunk that is NOT to be compacted.
-            reduce_chunk(buckets,
-                    buckets.equal_range(buckets.cbegin()->first),
-                    get<0>(acc));
-        }
-    }
-    vassert(m_allocs >= args.size());
-    m_allocs -= args.size();
-    return reduceTransitiveClosure(acc);
+template<shrink_direction dir> inline typename CompactingChunks<dir>::batch_type
+CompactingChunks<dir>::free(set<void*> const& args, function<void(map<void*, void*>&&)> const& cb) {
+    throw logic_error("Not yet implemented");
 }
 
 namespace voltdb { namespace storage {          // older GCC would warn in absence of this
@@ -1251,16 +1221,16 @@ HookedCompactingChunks<Chunks, Hook, E>::remove(void* dst) {
     return src;
 }
 
-template<typename Chunks, typename Hook, typename E> inline tuple<map<void*, void*>, vector<void*>>
-HookedCompactingChunks<Chunks, Hook, E>::remove(set<void*> const& src) {
-    auto const removed = Chunks::free(src);                            // batched removal
+template<typename Chunks, typename Hook, typename E> inline void
+HookedCompactingChunks<Chunks, Hook, E>::remove(
+        set<void*> const& src, function<void(map<void*, void*>&&)> const& cb) {
+    auto const removed = Chunks::free(src, cb);                        // batched removal
     for (auto const& p : get<0>(removed)) {                            // register all removal actions
         Hook::add(Hook::ChangeType::Deletion, p.first, p.second);
     }
     for (auto const& s : get<1>(removed)) {
         Hook::add(Hook::ChangeType::Deletion, s, s);
     }
-    return removed;
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #
