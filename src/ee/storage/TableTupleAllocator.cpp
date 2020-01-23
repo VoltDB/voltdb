@@ -574,52 +574,12 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
         auto& dst_iter = *pos;
         if (dst_iter != from_iter) {         // cross-chunk movement needed
             dst_iter->free(dst, src);        // memcpy()
-        } else if (src != dst) {
+        } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
             memcpy(dst, src, tupleSize());
         }
         trait::released(from_iter);
         --m_allocs;
         return src;
-    }
-}
-
-/**
- * Helper to reduce a map with value type castible to key
- * type, so that it contains no arcs of v1 => v2 AND v2 => v3,
- * nor id. maps of v => v.
- */
-template<typename T> static tuple<map<T, T>, vector<T>>& reduceTransitiveClosure(
-        tuple<map<T, T>, vector<T>>& cont) {
-    auto& m = get<0>(cont);
-    auto& v = get<1>(cont);
-    // non-id arcs: v1 => v2 AND v2 => v3 AND v1 != v2
-    auto const iter1 = find_if(m.cbegin(), m.cend(), [&m](pair<T, T> const& p) {
-                return p.first != p.second && m.count(p.second) > 0;
-            });
-    if (iter1 != m.cend()) {
-        auto iter2 = m.find(iter1->second);
-        vassert(iter2 != m.cend());
-        m.emplace_hint(iter1, iter1->first, iter2->second);
-        m.erase(iter2);
-        v.emplace_back(iter1->second);
-        return reduceTransitiveClosure<>(cont);
-    } else {                                   // now reduce all v => v entries (id mapping)
-        auto const size = v.size();            // and move them to the vector.
-        for(auto const& p : m) {
-            if (p.first == p.second) {
-                v.emplace_back(p.first);
-            }
-        }
-        for_each(next(v.begin(), size), v.end(), [&m](void* p) { m.erase(p); });
-        return cont;
-    }
-}
-
-template<shrink_direction dir> inline void
-CompactingChunks<dir>::reduce(typename CompactingChunks<dir>::element_type::ptr_cb&& cb, map<void*, void*>& acc) {
-    void* p;
-    while((p = cb()) != nullptr) {
-        acc.emplace(p, free(p));
     }
 }
 
@@ -630,162 +590,43 @@ template<shrink_direction dir> inline void
 CompactingChunks<dir>::element_type::insert(typename CompactingChunks<dir>::list_type::iterator key, void* p) {
     auto iter = find(key);
     if (iter == end()) {
-        emplace(key, make_tuple(m_self.distance(key), vector<void*>{p}));
+        linear_access_type cont;
+        cont.emplace(p);
+        emplace(key, make_tuple(m_self.distance(key), cont));
     } else {
-        get<1>(iter->second).emplace_back(p);
+        get<1>(iter->second).emplace(p);
     }
 }
 
-template<shrink_direction dir> inline unique_ptr<typename CompactingChunks<dir>::element_type::ptr_cb>
+template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
 CompactingChunks<dir>::element_type::min_pop() {
     auto const iter = min_element(begin(), end(),
-            [](typename bucket_type::value_type const& lhs,
-                typename bucket_type::value_type const& rhs) {
-            return get<0>(lhs.second) < get<0>(rhs.second);
-            });
+            [](typename super::value_type const& lhs, typename super::value_type const& rhs)
+            { return get<0>(lhs.second) < get<0>(rhs.second); });
     if (iter == end()) {
         return {};
     } else {
-        unique_ptr<ptr_cb> ptr(new ptr_cb{get<1>(iter->second)});
+        auto const r = get<1>(iter->second);
         erase(iter);
-        return ptr;
+        return r;
     }
 }
 
-template<shrink_direction dir> inline unique_ptr<typename CompactingChunks<dir>::element_type::ptr_cb>
+template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
 CompactingChunks<dir>::element_type::find_pop(typename CompactingChunks<dir>::list_type::iterator key) {
     auto const iter = find(key);
     if (iter == end()) {
         return {};
     } else {
-        unique_ptr<ptr_cb> ptr(new ptr_cb{get<1>(iter->second)});
+        auto const r = get<1>(iter->second);
         erase(iter);
-        return ptr;
+        return r;
     }
 }
 
-template<shrink_direction dir> inline
-CompactingChunks<dir>::element_type::ptr_cb::ptr_cb(vector<void*> const& v) noexcept : m_addr(v) {
-    std::sort(m_addr.begin(), m_addr.end());
-}
-
-template<shrink_direction dir> inline void*
-CompactingChunks<dir>::element_type::ptr_cb::operator()() {
-    if (! m_addr.empty()) {
-        void* p = m_addr.back();
-        m_addr.pop_back();
-        return p;
-    } else {
-        return nullptr;
-    }
-}
-
-// Weak check for batch free
-static bool validate_batch_free(set<void*> const& args,
-        tuple<map<void*, void*>, vector<void*>> const& ret) {
-    auto const& p1 = get<0>(ret);
-    auto const& p2 = get<1>(ret);
-    auto acc = accumulate(p1.cbegin(), p1.cend(), set<void*>(),
-            [](set<void*>& acc, typename map<void*, void*>::value_type const& entry) {
-                acc.emplace(entry.first);
-                return acc;
-            });
-    return args == accumulate(p2.cbegin(), p2.cend(), acc,
-            [](set<void*>& acc, void* p) {
-                acc.emplace(p);
-                return acc;
-            });
-}
-
-// Verifier for batch-free, checking that the reported outcome is
-// indeed what happened.
-struct BatchFreeVerification {
-#ifdef NDEBUG
-    constexpr BatchFreeVerification(ChunkList<CompactingChunk> const&, size_t) noexcept = default;
-    constexpr bool operator()(map<void*, void*>const& trans) const noexcept {
-        return false;
-    }
-#else
-    using value_type = forward_list<tuple<void const*, void const*, char*>>;
-    size_t const m_tupleSize;
-    value_type const m_tracker;
-    BatchFreeVerification(ChunkList<CompactingChunk> const& chunks, size_t tupleSize) :
-        m_tupleSize(tupleSize),
-        m_tracker(accumulate(chunks.cbegin(), chunks.cend(), value_type{},
-                    [](value_type& acc, CompactingChunk const& c) {
-                        auto const size = reinterpret_cast<char*>(c.end()) -
-                            reinterpret_cast<char*>(c.begin());
-                        char* dst = new char[size];
-                        memcpy(dst, c.begin(), size);
-                        acc.emplace_front(c.begin(), c.end(), dst);
-                        return acc;
-                    })) {}
-    ~BatchFreeVerification() {
-        for (auto& entry : m_tracker) {
-            delete[] get<2>(entry);
-        }
-    }
-    void const* of(void const* src) const {
-        auto const iter = find_if(m_tracker.cbegin(), m_tracker.cend(),
-                [src](typename value_type::value_type const& entry) {
-                    void const* beg; void const* end;
-                    tie(beg, end, ignore) = entry;
-                    return src >= beg && src < end;
-                });
-        if (iter == m_tracker.end()) {
-            snprintf(buf, sizeof buf, "BatchFreeVerification: invalid address %p", src);
-            buf[sizeof buf - 1] = 0;
-            throw logic_error(buf);
-        } else {
-            return get<2>(*iter) + reinterpret_cast<ptrdiff_t>(
-                (reinterpret_cast<char const*>(src)) - reinterpret_cast<char const*>(get<0>(*iter)));
-        }
-    }
-    bool operator()(map<void*, void*>const& trans) const {
-        return all_of(trans.cbegin(), trans.cend(),
-                [this](typename map<void*, void*>::value_type const& entry) {
-                   bool const equals = ! memcmp(entry.first, of(entry.second), m_tupleSize);
-                   return equals;
-                });
-    }
-#endif
-};
-
-template<shrink_direction dir> typename CompactingChunks<dir>::batch_type
-CompactingChunks<dir>::free(set<void*> const& args) {
-    BatchFreeVerification const verifier{*this, tupleSize()};
-    element_type state{*this};
-    for_each(args.cbegin(), args.cend(), [this, &state](void* p) {    // validation & transformation
-                auto const* iter = this->find(p);
-                if (iter != nullptr) {
-                    state.insert(*iter, p);
-                } else {
-                    snprintf(buf, sizeof buf, "CompactingChunks<%s>::free(): invalid addr %p",
-                            dir == shrink_direction::head ? "head" : "tail", p);
-                    buf[sizeof buf - 1] = 0;
-                    throw range_error(buf);
-                }
-            });
-    batch_type acc;
-    while (! state.empty()) {
-        do {                                   // check on the chunk to be compacted
-            auto const& p = state.find_pop(compactFrom());
-            if (! p) {
-                break;
-            } else {
-                reduce(move(*p), get<0>(acc));
-            }
-        } while (! state.empty());
-        if (! state.empty()) {               // then reduce one single chunk that is NOT to be compacted, as the lowest chunk
-            auto const& p = state.min_pop();
-            vassert(p);
-            reduce(move(*p), get<0>(acc));
-        }
-    }
-    reduceTransitiveClosure(acc);
-    vassert(validate_batch_free(args, acc));
-    vassert(verifier(get<0>(acc)));
-    return acc;
+template<shrink_direction dir> inline typename CompactingChunks<dir>::batch_type
+CompactingChunks<dir>::free(set<void*> const& args, function<void(map<void*, void*>&&)> const& cb) {
+    throw logic_error("Not yet implemented");
 }
 
 namespace voltdb { namespace storage {          // older GCC would warn in absence of this
@@ -1380,16 +1221,16 @@ HookedCompactingChunks<Chunks, Hook, E>::remove(void* dst) {
     return src;
 }
 
-template<typename Chunks, typename Hook, typename E> inline tuple<map<void*, void*>, vector<void*>>
-HookedCompactingChunks<Chunks, Hook, E>::remove(set<void*> const& src) {
-    auto const removed = Chunks::free(src);                            // batched removal
+template<typename Chunks, typename Hook, typename E> inline void
+HookedCompactingChunks<Chunks, Hook, E>::remove(
+        set<void*> const& src, function<void(map<void*, void*>&&)> const& cb) {
+    auto const removed = Chunks::free(src, cb);                        // batched removal
     for (auto const& p : get<0>(removed)) {                            // register all removal actions
         Hook::add(Hook::ChangeType::Deletion, p.first, p.second);
     }
     for (auto const& s : get<1>(removed)) {
         Hook::add(Hook::ChangeType::Deletion, s, s);
     }
-    return removed;
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

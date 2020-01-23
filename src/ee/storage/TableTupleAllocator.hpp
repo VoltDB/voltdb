@@ -23,6 +23,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <queue>
 #include <set>
 #include <vector>
 
@@ -385,22 +386,19 @@ namespace voltdb {
             typename list_type::iterator compactFrom() noexcept;
             typename list_type::const_iterator compactFrom() const noexcept;
             // Helper for batch free
-            class element_type : private map<list_type::iterator, tuple<size_t, vector<void*>>> {
-                using bucket_type = map<list_type::iterator, tuple<size_t, vector<void*>>>;
+            class element_type : private map<list_type::iterator,
+                    tuple<size_t, priority_queue<void*, vector<void*>, greater<void*>>>> {
                 CompactingChunks<dir>& m_self;
             public:
-                struct ptr_cb {
-                    vector<void*> m_addr;
-                    ptr_cb(vector<void*> const&) noexcept;
-                    void* operator()();
-                };
+                using linear_access_type = priority_queue<void*, vector<void*>, greater<void*>>;
+                using super = map<list_type::iterator, tuple<size_t, linear_access_type>>;
                 element_type(CompactingChunks<dir>& o) noexcept;
                 void insert(list_type::iterator, void*);
-                unique_ptr<ptr_cb> min_pop();
-                unique_ptr<ptr_cb> find_pop(list_type::iterator);
-                using bucket_type::empty;
+                linear_access_type min_pop();
+                linear_access_type find_pop(list_type::iterator);
+                using super::empty;
             };
-            void reduce(typename element_type::ptr_cb&&, map<void*, void*>&);
+            void reduce(typename element_type::linear_access_type&, map<void*, void*>&);
         protected:
             size_t tupleSize() const noexcept;
         public:
@@ -416,14 +414,16 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
-            // Efficiently frees a batch of allocations.
-            // \return a map of freed-tuple-addr => moved tuple
-            // addr, where the freed-tuple-addr is possibly a
-            // subset of arguments, excluding those that do not
-            // effectively need any memory movement; and a set
-            // of addresses that to the client does not involve
-            // any movement.
-            batch_type free(set<void*> const&);
+            /**
+             * Efficiently frees a batch of allocations.
+             * \arg #1: a set of allocation addresses to be
+             * removed
+             * \arg #2: a call back that client specifies what
+             * should happen when a move (from compaction)
+             * occurs. Map for removed addr => addr that fills in
+             * the removed address.
+             */
+            batch_type free(set<void*> const&, function<void(map<void*, void*>&&)> const&);
             size_t size() const noexcept;              // used for table count executor
             void freeze() noexcept; void thaw() noexcept;
             void const* endOfFirstChunk() const noexcept;
@@ -547,14 +547,14 @@ namespace voltdb {
             void const* remove(void*);
             /**
              * Batch removal.
-             * \return
-             * 1. a map of removed allocs addr => allocs addr
-             * that got moved over to fill in the removed hole
-             * (possibly invalid at return time);
-             * 2. A list of (unique) removed allocs that does not
-             * involve any memory movement.
+             * \arg #1: a set of allocation addresses to be
+             * removed
+             * \arg #2: a call back that client specifies what
+             * should happen when a move (from compaction)
+             * occurs. Map for removed addr => addr that fills in
+             * the removed address
              */
-            tuple<map<void*, void*>, vector<void*>> remove(set<void*> const&);      // batch removal
+            void remove(set<void*> const&, function<void(map<void*, void*>&&)> const&);
             void update(void* dst, void const* src);   // src as temp tuple gets written to persistent location dst
         };
 
