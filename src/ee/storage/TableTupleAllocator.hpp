@@ -181,6 +181,8 @@ namespace voltdb {
         public:
             using iterator = typename super::iterator;
             using const_iterator = typename super::const_iterator;
+            using reverse_iterator = typename super::reverse_iterator;
+            using const_reverse_iterator = typename super::const_reverse_iterator;
             using reference = typename super::reference;
             using const_reference = typename super::const_reference;
             // "override" writing behavior
@@ -194,6 +196,7 @@ namespace voltdb {
             void clear() noexcept;
             void splice(const_iterator, ChunkList&, iterator) noexcept;
             using super::begin; using super::end; using super::cbegin; using super::cend;
+            using super::crbegin; using super::crend;
             using super::empty; using super::size;
             using super::front; using super::back;
             size_t distance(iterator);           // std::distance(begin(), arg)
@@ -386,6 +389,28 @@ namespace voltdb {
             typename list_type::iterator compactFrom() noexcept;
             typename list_type::const_iterator compactFrom() const noexcept;
             // Helper for batch free
+            class ConstCompactingIterator {
+                using iterator_type = typename conditional<
+                    dir == shrink_direction::head, list_type::const_iterator, list_type::const_reverse_iterator>::type;
+                list_type const& m_cont;
+                iterator_type m_iter;
+                void const* m_cursor;
+                iterator_type _end() const noexcept;
+                void advance();
+                friend ConstCompactingIterator CompactingChunks<dir>::end() noexcept;
+            public:
+                using value_type = pair<iterator_type, void const*>;
+                ConstCompactingIterator(list_type const&) noexcept;
+                value_type operator*() const noexcept;
+                bool drained() const noexcept;
+                ConstCompactingIterator& operator++();             // prefix
+                ConstCompactingIterator operator++(int);           // postfix
+                bool operator==(ConstCompactingIterator const&) const noexcept;
+                bool operator!=(ConstCompactingIterator const&) const noexcept;
+            };
+            ConstCompactingIterator begin() noexcept;
+            ConstCompactingIterator end() noexcept;
+            template<typename Fun> inline void until_(Fun&&) const;// fold on ConstCompactingIterator
             class element_type : private map<list_type::iterator,
                     tuple<size_t, priority_queue<void*, vector<void*>, greater<void*>>>> {
                 CompactingChunks<dir>& m_self;
@@ -399,13 +424,12 @@ namespace voltdb {
                 using super::empty;
             };
             void reduce(typename element_type::linear_access_type&, map<void*, void*>&);
-        protected:
-            size_t tupleSize() const noexcept;
         public:
             using Compact = typename conditional<dir == shrink_direction::head,
                       integral_constant<Compactibility, Compactibility::head>,
                       integral_constant<Compactibility, Compactibility::tail>>::type;
             CompactingChunks(size_t tupleSize) noexcept;
+            size_t tupleSize() const noexcept;
             void* allocate();
             // frees a single tuple, and returns the tuple that gets copied
             // over the given address, which is at the tail of

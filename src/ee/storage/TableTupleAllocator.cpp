@@ -624,36 +624,140 @@ CompactingChunks<dir>::element_type::find_pop(typename CompactingChunks<dir>::li
     }
 }
 
+// iterator used for batch removal
+namespace voltdb { namespace storage {
+}}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::ConstCompactingIterator::value_type
+CompactingChunks<dir>::ConstCompactingIterator::operator*() const noexcept {
+    return {m_iter, m_cursor};
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::ConstCompactingIterator&
+CompactingChunks<dir>::ConstCompactingIterator::operator++() {     // prefix
+    advance();
+    return *this;
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::ConstCompactingIterator
+CompactingChunks<dir>::ConstCompactingIterator::operator++(int) {      // postfix
+    CompactingChunks<dir>::ConstCompactingIterator copy(*this);
+    copy.advance();
+    return copy;
+}
+
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::ConstCompactingIterator::drained() const noexcept {
+    return m_cursor == nullptr;
+}
+
+template<shrink_direction dir>
+template<typename Fun> inline void CompactingChunks<dir>::until_(Fun&& f) const {
+    for (auto iter = ConstCompactingIterator(*this); ! iter.drained();) {
+        auto const* addr = *iter;
+        ++iter;
+        if (f(addr)) {
+            break;
+        }
+    }
+}
+
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::ConstCompactingIterator::operator==(
+        CompactingChunks<dir>::ConstCompactingIterator const& o) const noexcept{
+    return m_cursor == o.m_cursor;
+}
+
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::ConstCompactingIterator::operator!=(
+        CompactingChunks<dir>::ConstCompactingIterator const& o) const noexcept{
+    return ! operator==(o);
+}
+
+template<shrink_direction dir> inline
+typename CompactingChunks<dir>::ConstCompactingIterator CompactingChunks<dir>::begin() noexcept {
+    return {*this};
+}
+
+template<shrink_direction dir> inline
+typename CompactingChunks<dir>::ConstCompactingIterator CompactingChunks<dir>::end() noexcept {
+    CompactingChunks<dir>::ConstCompactingIterator iter{*this};
+    iter.m_cursor = nullptr;
+    return iter;
+}
+
+template<shrink_direction dir> inline void CompactingChunks<dir>::ConstCompactingIterator::advance() {
+    if (m_cursor == nullptr) {
+        snprintf(buf, sizeof buf, "CompactingIterator <%s> drained.",
+                dir == shrink_direction::head ? "head" : "tail");
+        buf[sizeof buf - 1] = 0;
+        throw runtime_error(buf);
+    } else if (m_cursor >= m_iter->begin()) {
+        reinterpret_cast<char const*&>(m_cursor) -=
+            reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
+    } else if (++m_iter == _end()) {           // drained now
+        m_cursor = nullptr;
+    } else {
+        m_cursor = reinterpret_cast<char const*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
+        vassert(m_cursor >= m_iter->begin());
+    }
+}
+
 template<shrink_direction dir> inline typename CompactingChunks<dir>::batch_type
 CompactingChunks<dir>::free(set<void*> const& args, function<void(map<void*, void*>&&)> const& cb) {
     throw logic_error("Not yet implemented");
 }
 
 namespace voltdb { namespace storage {          // older GCC would warn in absence of this
-    template<shrink_direction dir> inline size_t CompactingChunks<dir>::tupleSize() const noexcept {
-        return m_tupleSize;
+    template<> inline
+    CompactingChunks<shrink_direction::head>::ConstCompactingIterator::ConstCompactingIterator(
+            typename CompactingChunks<shrink_direction::head>::list_type const& c) noexcept :
+    m_cont(c), m_iter(c.cbegin()),
+    m_cursor(reinterpret_cast<char const*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<shrink_direction::head> const&>(c).tupleSize()) {}
+
+    template<> inline
+    CompactingChunks<shrink_direction::tail>::ConstCompactingIterator::ConstCompactingIterator(
+            typename CompactingChunks<shrink_direction::tail>::list_type const& c) noexcept :
+    m_cont(c), m_iter(c.crbegin()),
+    m_cursor(reinterpret_cast<char const*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<shrink_direction::head> const&>(c).tupleSize()) {}
+
+    template<> inline typename CompactingChunks<shrink_direction::head>::ConstCompactingIterator::iterator_type
+    CompactingChunks<shrink_direction::head>::ConstCompactingIterator::_end() const noexcept {
+        return m_cont.cend();
+    }
+
+    template<> inline typename CompactingChunks<shrink_direction::tail>::ConstCompactingIterator::iterator_type
+    CompactingChunks<shrink_direction::tail>::ConstCompactingIterator::_end() const noexcept {
+        return m_cont.crend();
     }
 
     template<> inline typename CompactingChunks<shrink_direction::head>::list_type::iterator
-        CompactingChunks<shrink_direction::head>::compactFrom() noexcept {
-            return begin();
-        }
+    CompactingChunks<shrink_direction::head>::compactFrom() noexcept {
+        return list_type::begin();
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::tail>::list_type::iterator
-        CompactingChunks<shrink_direction::tail>::compactFrom() noexcept {
-            return empty() ? end() : prev(end());
-        }
+    CompactingChunks<shrink_direction::tail>::compactFrom() noexcept {
+        return empty() ? list_type::end() : prev(list_type::end());
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::head>::list_type::const_iterator
-        CompactingChunks<shrink_direction::head>::compactFrom() const noexcept {
-            return cbegin();
-        }
+    CompactingChunks<shrink_direction::head>::compactFrom() const noexcept {
+        return list_type::cbegin();
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::tail>::list_type::const_iterator
-        CompactingChunks<shrink_direction::tail>::compactFrom() const noexcept {
-            return empty() ? cend() : prev(cend());
-        }
+    CompactingChunks<shrink_direction::tail>::compactFrom() const noexcept {
+        return empty() ? list_type::cend() : prev(list_type::cend());
+    }
 }}
+
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::tupleSize() const noexcept {
+    return m_tupleSize;
+}
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
