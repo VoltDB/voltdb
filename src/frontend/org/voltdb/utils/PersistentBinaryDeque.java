@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Executor;
 import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
@@ -295,40 +296,53 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             // If this segment is already marked for deletion, check if it is the first one
             // and delete it if fully acked. All the subsequent marked ones can be checked and deleted as well.
             if (segment.m_deleteOnAck == true && segment.segmentIndex() == m_segments.firstKey()) {
-                Iterator<PBDSegment<M>> itr = m_segments.values().iterator();
-                while (itr.hasNext()) {
-                    PBDSegment<M> toDelete = itr.next();
-                    try {
-                        if (toDelete.m_deleteOnAck == true && canDeleteSegment(toDelete)) {
-                            itr.remove();
-                            closeAndDeleteSegment(toDelete);
-                        } else {
-                            break;
-                        }
-                    } catch(IOException e) {
-                        m_usageSpecificLog.error("Unexpected error deleting segment after all have been read and acked", e);
-                    }
-                }
-
+                m_deferredDeleter.execute(this::deleteMarkedSegments);
                 return;
             }
 
-            deleteSegmentsBefore(segment, entryNumber);
-        }
-
-        private void deleteSegmentsBefore(PBDSegment<M> segment, int entryNumber) {
             // If this is the first entry of a segment, see if previous segments can be deleted or marked ready to delete
             if (m_cursorClosed || m_segments.size() == 1
                     || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
                     || !canDeleteSegmentsBefore(segment)) {
                 return;
             }
+            // We can try to delete previous segments, if above if clause didn't succeed
+            m_deferredDeleter.execute(() -> deleteSegmentsBefore(segment));
+        }
 
-             if (m_rewoundFromId == segment.m_id) {
+        private void deleteMarkedSegments() {
+            // With deferred deleters, this may be executed later, so check closed status again
+            if (m_cursorClosed) {
+                return;
+            }
+
+            Iterator<PBDSegment<M>> itr = m_segments.values().iterator();
+            while (itr.hasNext()) {
+                PBDSegment<M> toDelete = itr.next();
+                try {
+                    if (toDelete.m_deleteOnAck == true && canDeleteSegment(toDelete)) {
+                        itr.remove();
+                        closeAndDeleteSegment(toDelete);
+                    } else {
+                        break;
+                    }
+                } catch(IOException e) {
+                    m_usageSpecificLog.error("Unexpected error deleting segment after all have been read and acked", e);
+                }
+            }
+        }
+
+        private void deleteSegmentsBefore(PBDSegment<M> segment) {
+            // With deferred deleters, this may be executed later, so check closed status again
+            if (m_cursorClosed) {
+                return;
+            }
+
+            if (m_rewoundFromId == segment.m_id) {
                 m_rewoundFromId = -1;
             }
 
-             try {
+            try {
                 Iterator<PBDSegment<M>> iter = m_segments.headMap(segment.segmentIndex(), false).values()
                         .iterator();
                 boolean markForDel = false;
@@ -419,8 +433,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     // Monotonic segment counter: note that this counter always *increases* even when
     // used for a *previous* segment (or inserting a segment *before* the others.
     private long m_segmentCounter = 0L;
-
     private M m_extraHeader;
+    private Executor m_deferredDeleter = Runnable::run;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path. This is a
@@ -1408,6 +1422,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
         return segmentDeleted;
+    }
+
+    @Override
+    public void registerDeferredDeleter(Executor deferredDeleter) {
+        m_deferredDeleter = (deferredDeleter == null) ? Runnable::run : deferredDeleter;
     }
 
     /**
