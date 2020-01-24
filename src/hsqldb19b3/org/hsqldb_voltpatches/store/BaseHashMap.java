@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches.store;
 
 import java.util.NoSuchElementException;
 
+import org.hsqldb_voltpatches.Expression;
 import org.hsqldb_voltpatches.lib.ArrayCounter;
 import org.hsqldb_voltpatches.lib.Iterator;
 
@@ -204,6 +205,26 @@ public class BaseHashMap {
             tempKey = objectKeyTable[lookup];
 
             if (key.equals(tempKey)) {
+                return lookup;
+            }
+        }
+
+        return lookup;
+    }
+
+    protected int getLookupSameIndex(Object key, int hash) {
+        if (!(key instanceof Expression)) {
+            return getLookup(key, hash);
+        }
+        Expression expression = (Expression) key;
+
+        int    lookup = hashIndex.getLookup(hash);
+        Expression tempKey;
+
+        for (; lookup >= 0; lookup = hashIndex.getNextLookup(lookup)) {
+            tempKey = (Expression) objectKeyTable[lookup];
+
+            if (expression.equals(tempKey) && expression.queryTableColumnIndexEquals(tempKey)) {
                 return lookup;
             }
         }
