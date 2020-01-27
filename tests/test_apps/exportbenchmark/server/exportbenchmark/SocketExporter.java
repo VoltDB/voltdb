@@ -157,13 +157,13 @@ public class SocketExporter extends ExportClientBase {
             // Transaction count
             transactions++;
             m_logger.info(String.format("%s %s %s %s %s %s\n",
-            		r.values[0],
-            		r.values[1],
-            		r.values[2],
-            		r.values[3],
-            		r.values[4],
-            		r.values[5])
-            		);
+                    r.values[0],
+                    r.values[1],
+                    r.values[2],
+                    r.values[3],
+                    r.values[4],
+                    r.values[5])
+                    );
 
             return true;
         }
