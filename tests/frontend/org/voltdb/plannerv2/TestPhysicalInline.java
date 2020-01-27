@@ -23,6 +23,7 @@
 
 package org.voltdb.plannerv2;
 
+import org.junit.Test;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
 public class TestPhysicalInline extends Plannerv2TestCase {
@@ -274,7 +275,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                     "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
                     "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], I=[$t0])\n" +
                     "  VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], I=[$t0])\n")
-        .json("{\"PLAN_NODES\":[{\"ID\":8,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[5,6],\"UNION_TYPE\":\"EXCEPT\"},{\"ID\":5,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"CHILDREN_IDS\":[4],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":7,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[2,6,4,5,1,8],\"IS_LARGE_QUERY\":false}")
+        .json("{\"PLAN_NODES\":[{\"ID\":9,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[5,6],\"UNION_TYPE\":\"EXCEPT\"},{\"ID\":5,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"CHILDREN_IDS\":[4],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":8,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[2,6,4,5,1,9],\"IS_LARGE_QUERY\":false}")
         .pass();
     }
 
@@ -284,7 +285,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
                     "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
                     "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], I=[$t0])\n" +
                     "  VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], I=[$t0])\n")
-        .json("{\"PLAN_NODES\":[{\"ID\":8,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[5,6],\"UNION_TYPE\":\"INTERSECT\"},{\"ID\":5,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"CHILDREN_IDS\":[4],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":7,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[2,6,4,5,1,8],\"IS_LARGE_QUERY\":false}")
+        .json("{\"PLAN_NODES\":[{\"ID\":9,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[5,6],\"UNION_TYPE\":\"INTERSECT\"},{\"ID\":5,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"CHILDREN_IDS\":[4],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":8,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[2,6,4,5,1,9],\"IS_LARGE_QUERY\":false}")
         .pass();
     }
 
@@ -293,7 +294,7 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         .transform("VoltPhysicalUnion(all=[true])\n" +
                    "  VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
                    "  VoltPhysicalTableSequentialScan(table=[[public, P2]], expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n")
-        .json("{\"PLAN_NODES\":[{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[2,4],\"UNION_TYPE\":\"UNION_ALL\"},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":9}},\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":9}},\"TARGET_TABLE_NAME\":\"P2\",\"TARGET_TABLE_ALIAS\":\"P2\"}],\"EXECUTE_LIST\":[2,4,1,6],\"IS_LARGE_QUERY\":false}")
+        .json("{\"PLAN_NODES\":[{\"ID\":8,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[2,5],\"UNION_TYPE\":\"UNION_ALL\"},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":9}},\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":5,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":7,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"PREDICATE\":{\"TYPE\":10,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":9}},\"TARGET_TABLE_NAME\":\"P2\",\"TARGET_TABLE_ALIAS\":\"P2\"}],\"EXECUTE_LIST\":[2,5,1,8],\"IS_LARGE_QUERY\":false}")
         .pass();
     }
 
@@ -324,5 +325,31 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         .json("{\"PLAN_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\",\"OFFSET\":0,\"LIMIT\":-1,\"OFFSET_PARAM_IDX\":1,\"LIMIT_PARAM_IDX\":0,\"LIMIT_EXPRESSION\":null}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[1,4],\"IS_LARGE_QUERY\":false}")
         .pass();
     }
+
+    @Test
+    public void testMutlipleSetOps() {
+        m_tester.sql("SELECT I FROM P1 UNION SELECT I FROM R1 EXCEPT SELECT I FROM R2")
+        .transform("VoltPhysicalMinus(all=[false])\n" +
+                    "  VoltPhysicalUnion(all=[false])\n" +
+                    "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "  VoltPhysicalTableSequentialScan(table=[[public, R2]], expr#0..5=[{inputs}], I=[$t0])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":13,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[2,10],\"UNION_TYPE\":\"EXCEPT\"},{\"ID\":2,\"PLAN_NODE_TYPE\":\"UNION\",\"CHILDREN_IDS\":[6,7],\"UNION_TYPE\":\"UNION\"},{\"ID\":6,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"CHILDREN_IDS\":[5],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]},{\"ID\":5,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[3]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"P1\",\"TARGET_TABLE_ALIAS\":\"P1\"},{\"ID\":7,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":9,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"},{\"ID\":10,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":12,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R2\",\"TARGET_TABLE_ALIAS\":\"R2\"}],\"EXECUTE_LIST\":[3,7,10,5,6,2,1,13],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
+
+
+//    public void testFullJoinWithUsing() {
+//        m_tester.sql("SELECT * FROM R1 FULL JOIN R2 USING (I, SI)")
+//        .json("")
+//        .pass();
+//    }
+//
+//    public void test() {
+//        m_tester.sql("select r.i from p1 r full join p1 l on r.i = l.i order by 1")
+//        .json("")
+//        .pass();
+//    }
 
 }

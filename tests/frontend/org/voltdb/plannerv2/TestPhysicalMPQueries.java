@@ -23,6 +23,7 @@
 
 package org.voltdb.plannerv2;
 
+import org.junit.Test;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
 public class TestPhysicalMPQueries extends Plannerv2TestCase {
@@ -124,7 +125,7 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
         m_tester.sql("select i from PI1 order by ii limit 10 offset 4")
                 .transform("VoltPhysicalLimit(limit=[10], offset=[4], pusheddown=[true])\n" +
                             "  VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[true])\n" +
-                            "    VoltPhysicalMergeExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalMergeExchange(distribution=[hash[0]], collation=[[1]])\n" +
                             "      VoltPhysicalLimit(limit=[14], pusheddown=[false])\n" +
                             "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], II=[$t2])\n" +
                             "          VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
@@ -135,47 +136,47 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
         m_tester.sql("select i from PI1 order by ii offset 10")
                 .transform("VoltPhysicalLimit(offset=[10], pusheddown=[false])\n" +
                             "  VoltPhysicalSort(sort0=[$1], dir0=[ASC], pusheddown=[true])\n" +
-                            "    VoltPhysicalMergeExchange(distribution=[hash[0]])\n" +
+                            "    VoltPhysicalMergeExchange(distribution=[hash[0]], collation=[[1]])\n" +
                             "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], II=[$t2])\n" +
                             "        VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[PI1_IND1_ASCEQ0_0])\n")
                 .pass();
     }
 
-    public void testPartitionedWithAggregate() {
-        m_tester.sql("select max(R1.I) from R1")
-        .transform("\n")
-        .pass();
-    }
-
-    public void testPartitionedWithAggregate4() {
-        m_tester.sql("select count(*) from P1")
-        .transform("\n")
-        .pass();
-    }
-
-    public void testPartitionedWithAggregate5() {
-        m_tester.sql("select count(P1.I) from P1")
-        .transform("\n")
-        .pass();
-    }
-
-    public void testPartitionedWithAggregate6() {
-        m_tester.sql("select avg(P1.I) from P1")
-        .transform("\n")
-        .pass();
-    }
-
-    public void testPartitionedWithAggregate7() {
-        m_tester.sql("select distinct(P1.I) from P1") // no coord aggr because P1.I is part column
-        .transform("\n")
-        .pass();
-    }
-
-    public void testPartitionedWithAggregate8() {
-        m_tester.sql("select distinct(P1.SI) from P1") // coord aggr because P1.SI is not a part column
-        .transform("\n")
-        .pass();
-    }
+//    public void testPartitionedWithAggregate() {
+//        m_tester.sql("select max(R1.I) from R1")
+//        .transform("\n")
+//        .pass();
+//    }
+//
+//    public void testPartitionedWithAggregate4() {
+//        m_tester.sql("select count(*) from P1")
+//        .transform("\n")
+//        .pass();
+//    }
+//
+//    public void testPartitionedWithAggregate5() {
+//        m_tester.sql("select count(P1.I) from P1")
+//        .transform("\n")
+//        .pass();
+//    }
+//
+//    public void testPartitionedWithAggregate6() {
+//        m_tester.sql("select avg(P1.I) from P1")
+//        .transform("\n")
+//        .pass();
+//    }
+//
+//    public void testPartitionedWithAggregate7() {
+//        m_tester.sql("select distinct(P1.I) from P1") // no coord aggr because P1.I is part column
+//        .transform("\n")
+//        .pass();
+//    }
+//
+//    public void testPartitionedWithAggregate8() {
+//        m_tester.sql("select distinct(P1.SI) from P1") // coord aggr because P1.SI is not a part column
+//        .transform("\n")
+//        .pass();
+//    }
 
     public void testPartitionedWithAggregate9() {
         m_tester.sql("select max(P1.I) from P1 where I = 8")
@@ -227,6 +228,19 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                     "        VoltPhysicalTableSequentialScan(table=[[public, P2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                     "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltPhysicalTableSequentialScan(table=[[public, R2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
+    public void testPartitionedJoinWithSort() {
+        m_tester.sql("select r.i from p1 r full join p1 l on r.i = l.i order by 1")
+        .transform("VoltPhysicalSort(sort0=[$0], dir0=[ASC], pusheddown=[false])\n" +
+                    "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltPhysicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "      VoltPhysicalNestLoopJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
         .pass();
     }
 }

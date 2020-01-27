@@ -49,15 +49,19 @@ public final class PlanNodeUtil {
             // ENG-6291: Voltdb wants to make inline varchar / varbynary to be outlined
             // for VAR types in its output schema
             if (child.getOutputSchema() != null) {
-                NodeSchema newSchema = verifyOutputSchema(upn.getChild(0).getOutputSchema());
+                NodeSchema newSchema = verifyOutputSchema(child.getOutputSchema());
+                // @TODO This is a hack to reset a schema. VoltDB prohibit it
+                // if the node already has one.
+                child.setHaveSignificantOutputSchema(false);
                 child.setOutputSchema(newSchema);
+                child.setHaveSignificantOutputSchema(true);
             } else {
-                // there must be a projection with a schema if the node itself doesn't have one
                 AbstractPlanNode projection = child.getInlinePlanNode(PlanNodeType.PROJECTION);
-                assert(projection != null);
-                NodeSchema newSchema = verifyOutputSchema(projection.getOutputSchema());
-                AbstractPlanNode newProjection = new ProjectionPlanNode(newSchema);
-                child.addInlinePlanNode(newProjection);
+                if (projection != null) {
+                    NodeSchema newSchema = verifyOutputSchema(projection.getOutputSchema());
+                    AbstractPlanNode newProjection = new ProjectionPlanNode(newSchema);
+                    child.addInlinePlanNode(newProjection);
+                }
             }
             upn.addAndLinkChild(child);
 
