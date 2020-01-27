@@ -42,7 +42,7 @@ public class VoltPSortConvertRule extends ConverterRule {
     @Override
     public RelNode convert(RelNode rel) {
         final Sort sort = (Sort) rel;
-        final RelTraitSet traits = sort.getInput().getTraitSet().replace(VoltPhysicalRel.CONVENTION);
+        final RelTraitSet traits = sort.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
         final RelNode input = sort.getInput();
         final RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
