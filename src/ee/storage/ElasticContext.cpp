@@ -229,8 +229,7 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple) {
 /**
  * Tuple compaction handler lets us reindex when a tuple's address changes.
  */
-void ElasticContext::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-        TableTuple &sourceTuple, TableTuple &targetTuple) {
+void ElasticContext::notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
     if (m_indexActive) {
         if (m_surgeon.indexHas(sourceTuple)) {
             m_surgeon.indexRemove(sourceTuple);

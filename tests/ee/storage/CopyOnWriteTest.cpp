@@ -1543,10 +1543,7 @@ public:
 
     virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
 
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {}
-
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
+    virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
         m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));
     }
 
@@ -1717,14 +1714,9 @@ public:
         return m_context->notifyTupleDelete(tuple);
     }
 
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        m_context->notifyBlockWasCompactedAway(block);
-    }
-
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
-        DummyTableStreamer::notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
-        m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+    virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
+        DummyTableStreamer::notifyTupleMovement(sourceTuple, targetTuple);
+        m_context->notifyTupleMovement(sourceTuple, targetTuple);
         T_Value value = *reinterpret_cast<T_Value*>(sourceTuple.address() + 1);
         m_test.m_moved.insert(value);
     }

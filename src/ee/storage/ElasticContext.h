@@ -85,8 +85,7 @@ public:
     /**
      * Optional tuple compaction handler.
      */
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple);
+    virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple);
 
     /**
      * Validate the predicate update is compatible with the existing predicates

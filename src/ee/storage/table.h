@@ -312,7 +312,7 @@ protected:
                                     bool ignoreTupleLimit = true) { }
 
     // virtual block management functions
-    virtual void nextFreeTuple(TableTuple* tuple) = 0;
+    virtual void nextFreeTuple(TableTuple* tuple){};
 
     Table(int tableAllocationTargetSize);
     void resetTable();

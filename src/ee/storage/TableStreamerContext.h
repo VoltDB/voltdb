@@ -105,15 +105,9 @@ public:
     virtual bool notifyTupleDelete(TableTuple &tuple) {return true;}
 
     /**
-     * Optional block compaction handler.
-     */
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {}
-
-    /**
      * Optional tuple compaction handler.
      */
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) {}
+    virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {}
 
     /**
      * Table accessor.

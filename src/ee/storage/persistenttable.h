@@ -120,7 +120,7 @@ public:
     size_t getSnapshotPendingBlockCount() const;
     size_t getSnapshotPendingLoadBlockCount() const;
     bool blockCountConsistent() const;
-    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
+ //   void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
     // Elastic index methods. Used by ElasticContext.
@@ -202,8 +202,7 @@ private:
  * policy because we expect reverting rarely occurs.
  */
 
-class PersistentTable : public Table, public UndoQuantumReleaseInterest,
-                        public TupleMovementListener {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
     friend class ::CopyOnWriteTest;
@@ -375,11 +374,6 @@ public:
         return debug("");
     }
     virtual std::string debug(const std::string &spacer) const;
-
-    /*
-     * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.
-     */
-    static TBPtr findBlock(char* tuple, TBMap& blocks, int blockSize);
 
     int partitionColumn() const { return m_partitionColumn; }
 
@@ -625,10 +619,8 @@ private:
         return true;
     }
 
-    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-    }
-
-    void nextFreeTuple(TableTuple* tuple);
+//    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+//    }
 
     void insertIntoAllIndexes(TableTuple* tuple);
 
@@ -645,12 +637,6 @@ private:
 
     // Add truncate operation to dr log stream if dr is enabled and running
     void drLogTruncate(ExecutorContext* ec, bool fallible);
-
-    //void notifyBlockWasCompactedAway(TBPtr block);
-
-    // Call-back from TupleBlock::merge() for each tuple moved.
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple& sourceTuple, TableTuple& targetTuple);
 
     void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple);
 
@@ -878,9 +864,9 @@ inline bool PersistentTableSurgeon::blockCountConsistent() const {
     return m_table.blockCountConsistent();
 }
 
-inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-    m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
-}
+//inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+//    m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
+//}
 
 inline bool PersistentTableSurgeon::hasIndex() const {
     return (m_index != NULL);
@@ -1031,10 +1017,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         --m_invisibleTuplesPendingDeleteCount;
     }
  }
-
-inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSize) {
-    return TBPtr(NULL);
-}
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
     return lookupTuple(tuple, LOOKUP_BY_VALUES);

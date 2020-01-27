@@ -114,23 +114,12 @@ public:
     }
 
     /**
-     * Block compaction hook.
-     */
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            vassert(streamPtr != NULL);
-            streamPtr->m_context->notifyBlockWasCompactedAway(block);
-        }
-    }
-
-    /**
      * Called for each tuple moved.
      */
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
+    virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             vassert(streamPtr != NULL);
-            streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+            streamPtr->m_context->notifyTupleMovement(sourceTuple, targetTuple);
         }
     }
 

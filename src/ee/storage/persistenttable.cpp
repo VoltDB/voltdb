@@ -194,7 +194,7 @@ PersistentTable::~PersistentTable() {
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void PersistentTable::nextFreeTuple(TableTuple* tuple) { }
+//void PersistentTable::nextFreeTuple(TableTuple* tuple) { }
 
 void PersistentTable::drLogTruncate(ExecutorContext* ec, bool fallible) {
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
@@ -707,6 +707,9 @@ void PersistentTable::deleteTuplesCallBack(map<void*, void*> && tuples) {
                 migratingAdd(ValuePeeker::peekBigInt(txnId), target);
             }
         }
+        if (m_tableStreamer != NULL) {
+            m_tableStreamer->notifyTupleMovement(origin, target);
+        }
     }
 }
 
@@ -1055,7 +1058,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
-
+    m_dataStorage->update(&targetTupleToUpdate, &sourceTupleWithNewValues);
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
@@ -1268,12 +1271,6 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 void PersistentTable::deleteTupleRelease(char* tuple) {
     m_releaseBatch.insert(tuple);
     VOLT_DEBUG("*******: %s: %ld", m_name.c_str(), m_releaseBatch.size());
-//    TableTuple target(m_schema);
-//    target.move(tupleData);
-//    target.setPendingDeleteOnUndoReleaseFalse();
-//    --m_tuplesPinnedByUndo;
-//    --m_invisibleTuplesPendingDeleteCount;
-//    deleteTupleFinalize(target);
 }
 
 /**
@@ -1809,14 +1806,6 @@ size_t PersistentTable::hashCode() {
     return hashCode;
 }
 
-// Call-back from TupleBlock::merge() for each tuple moved.
-void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-      TableTuple& sourceTuple, TableTuple& targetTuple) {
-//    if (m_tableStreamer != NULL) {
-//        m_tableStreamer->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
-//    }
-}
-
 void PersistentTable::swapTuples(TableTuple& originalTuple,
                                  TableTuple& destinationTuple) {
     ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
@@ -1902,25 +1891,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 }
 
 void PersistentTableSurgeon::activateSnapshot() {
-//    TBMapI blockIterator = m_table.m_data.begin();
-//
-//    // Persistent table should have minimum of one block in it's block map.
-//    vassert(m_table.m_data.begin() != m_table.m_data.end());
-//
-//    if ((m_table.m_data.size() == 1) && blockIterator.data()->isEmpty()) {
-//        vassert(m_table.activeTupleCount() == 0);
-//        // The single empty block in an empty table does not need to be considered as pending block
-//        // for snapshot(load). CopyOnWriteIterator may not and need not expect empty blocks.
-//        return;
-//    }
-//
-//    // All blocks are now pending snapshot
-//    m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
-//    m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
-//    vassert(m_table.m_blocksNotPendingSnapshot.empty());
-//    for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
-//        vassert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
-//    }
+
 }
 
 std::pair<TableIndex const*, uint32_t> PersistentTable::getUniqueIndexForDR() {
@@ -2004,13 +1975,6 @@ TableIndex* PersistentTable::index(std::string const& name) const {
 
 void PersistentTable::addIndex(TableIndex* index) {
     vassert(!isExistingTableIndex(m_indexes, index));
-
-    // fill the index with tuples... potentially the slow bit
-//    TableTuple tuple(m_schema);
-//    TableIterator iter = iterator();
-//    while (iter.next(tuple)) {
-//        index->addEntry(&tuple, NULL);
-//    }
 
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
                          [this, &index](void* p) {

@@ -170,7 +170,7 @@ public:
 
     /** Merge this block with the given block. Returns the new bucket
         index for this and the other block. */
-    std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
+ //   std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
 
     /**
      * Find next free tuple storage address and its tupleblock's bucket index,

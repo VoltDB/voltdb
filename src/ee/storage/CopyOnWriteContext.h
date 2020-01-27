@@ -70,11 +70,6 @@ public:
                                      std::vector<int> &retPositions);
 
     /**
-     * Optional block compaction handler.
-     */
-    virtual void notifyBlockWasCompactedAway(TBPtr block);
-
-    /**
      * Optional tuple insert handler.
      */
     virtual bool notifyTupleInsert(TableTuple &tuple);
