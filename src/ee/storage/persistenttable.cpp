@@ -1058,6 +1058,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
+    //TO DO: update() should update the values and generate diff instead of calling copyForPersistentUpdate
     m_dataStorage->update(&targetTupleToUpdate, &sourceTupleWithNewValues);
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
@@ -1372,49 +1373,42 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
     if (m_pkeyIndex) {
         return m_pkeyIndex->uniqueMatchingTuple(tuple);
     }
-//    /*
-//     * Do a table scan.
-//     */
-//    TableTuple tableTuple(m_schema);
-//    TableIterator ti(this, m_data.begin());
-//
-//    if (lookupType == LOOKUP_FOR_DR && m_schema->hiddenColumnCount()) {
-//        // Force column compare for DR so we can easily use the filter
-//        HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
-//        while (ti.next(tableTuple)) {
-//            if (tableTuple.equalsNoSchemaCheck(tuple, &filter)) {
-//                return tableTuple;
-//            }
-//        }
-//    } else if (lookupType != LOOKUP_FOR_UNDO && m_schema->getUninlinedObjectColumnCount() != 0) {
-//        while (ti.next(tableTuple)) {
-//            if (tableTuple.equalsNoSchemaCheck(tuple)) {
-//                return tableTuple;
-//            }
-//        }
-//    } else {
-//        size_t tuple_length;
-//        if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
-//            // Looking up a tuple by values should not include any internal
-//            // hidden column values, which are appended to the end of the
-//            // tuple.
-//            tuple_length = m_schema->offsetOfHiddenColumns();
-//        } else {
-//            tuple_length = m_schema->tupleLength();
-//        }
-//        // Do an inline tuple byte comparison
-//        // to avoid matching duplicate tuples with different pointers to Object storage
-//        // -- which would cause erroneous releases of the wrong Object storage copy.
-//        while (ti.next(tableTuple)) {
-//            char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
-//            char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
-//            if (::memcmp(tableTupleData, tupleData, tuple_length) == 0) {
-//                return tableTuple;
-//            }
-//        }
-//    }
-    TableTuple nullTuple(m_schema);
-    return nullTuple;
+    size_t tuple_length;
+    if (lookupType == LOOKUP_BY_VALUES && this->schema()->hiddenColumnCount() > 0) {
+        // Looking up a tuple by values should not include any internal
+        // hidden column values, which are appended to the end of the
+        // tuple.
+        tuple_length = this->schema()->offsetOfHiddenColumns();
+     } else {
+        tuple_length = this->schema()->tupleLength();
+     }
+
+    TableTuple matchedTuple(m_schema);
+    storage::until<PersistentTable::txn_iterator>(allocator(), [&tuple, &lookupType, this, tuple_length, &matchedTuple](void* p) {
+        auto* tableTuple = reinterpret_cast<TableTuple*>(p);
+        bool matched = false;
+        if (lookupType == LOOKUP_FOR_DR && this->schema()->hiddenColumnCount()) {
+            // Force column compare for DR so we can easily use the filter
+            HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, this->schema());
+            matched = (tableTuple->equalsNoSchemaCheck(tuple, &filter));
+        } else if (lookupType != LOOKUP_FOR_UNDO && this->schema()->getUninlinedObjectColumnCount() != 0) {
+            matched =  (tableTuple->equalsNoSchemaCheck(tuple));
+        } else {
+             // Do an inline tuple byte comparison
+             // to avoid matching duplicate tuples with different pointers to Object storage
+             // -- which would cause erroneous releases of the wrong Object storage copy.
+             char* tableTupleData = tableTuple->address() + TUPLE_HEADER_SIZE;
+             char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
+             matched = (::memcmp(tableTupleData, tupleData, tuple_length) == 0);
+        }
+        if (matched) {
+            matchedTuple.copy(*tableTuple);
+            return true;
+        } else {
+            return false;
+        }
+     });
+     return matchedTuple;
 }
 
 void PersistentTable::insertIntoAllIndexes(TableTuple* tuple) {
