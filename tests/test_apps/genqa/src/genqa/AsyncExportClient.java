@@ -78,99 +78,16 @@ import org.voltdb.iv2.TxnEgo;
 public class AsyncExportClient
 {
     static VoltLogger log = new VoltLogger("ExportClient");
-// Transactions between catalog swaps.
+    // Transactions between catalog swaps.
     public static long CATALOG_SWAP_INTERVAL = 500000;
-    // Number of txn ids per client log file.
-    public static long CLIENT_TXNID_FILE_SIZE = 250000;
-
-    static class TxnIdWriter
-    {
-        String m_nonce;
-        String m_txnLogPath;
-        AtomicLong m_count = new AtomicLong(0);
-
-        private Map<Integer,File> m_curFiles = new TreeMap<>();
-        private Map<Integer,File> m_baseDirs = new TreeMap<>();
-        private Map<Integer,OutputStreamWriter> m_osws = new TreeMap<>();
-
-        public TxnIdWriter(String nonce, String txnLogPath)
-        {
-            m_nonce = nonce;
-            m_txnLogPath = txnLogPath;
-
-            File logPath = new File(m_txnLogPath);
-            if (!logPath.exists()) {
-                if (!logPath.mkdir()) {
-                    log.warn("Problem creating log directory " + logPath);
-                }
-            }
-        }
-
-        public void createNewFile(int partId) throws IOException {
-            File dh = m_baseDirs.get(partId);
-            if (dh == null) {
-                dh = new File(m_txnLogPath, Integer.toString(partId));
-                if (!dh.mkdir()) {
-                    log.warn("Problem creating log directory " + dh);
-                }
-                m_baseDirs.put(partId, dh);
-            }
-            long count = m_count.get();
-            count = count - count % CLIENT_TXNID_FILE_SIZE;
-            File logFH = new File(dh, "active-" + count + "-" + m_nonce + "-txns");
-            OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(logFH));
-
-            m_curFiles.put(partId,logFH);
-            m_osws.put(partId,osw);
-        }
-
-        public void write(int partId, String rec) throws IOException {
-
-            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0) {
-                close(false);
-            }
-            OutputStreamWriter osw = m_osws.get(partId);
-            if (osw == null) {
-                createNewFile(partId);
-                osw = m_osws.get(partId);
-            }
-            osw.write(rec);
-            m_count.incrementAndGet();
-        }
-
-        public void close(boolean isLast) throws IOException
-        {
-            for (Map.Entry<Integer,OutputStreamWriter> e: m_osws.entrySet()) {
-
-                int partId = e.getKey();
-                OutputStreamWriter osw = e.getValue();
-
-                if (osw != null) {
-                    osw.close();
-                    File logFH = m_curFiles.get(partId);
-                    File renamed = new File(
-                            m_baseDirs.get(partId),
-                            logFH.getName().substring("active-".length()) + (isLast ? "-last" : "")
-                            );
-                    logFH.renameTo(renamed);
-
-                    e.setValue(null);
-                }
-                m_curFiles.put(partId, null);
-            }
-
-        }
-    }
 
     static class AsyncCallback implements ProcedureCallback
     {
-        private final TxnIdWriter m_writer;
         private final long m_rowid;
-        public AsyncCallback(TxnIdWriter writer, long rowid)
+        public AsyncCallback(long rowid)
         {
             super();
             m_rowid = rowid;
-            m_writer = writer;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) {
@@ -180,45 +97,21 @@ public class AsyncExportClient
             {
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(INSERT);
-                long txid = clientResponse.getResults()[0].asScalarLong();
-                final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
-                // log.info("Success " + trace);
-                try
-                {
-                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
             }
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
-                // log.info("Fail " + trace);
-                try
-                {
-                    m_writer.write(-1,trace);
-                }
-                catch (IOException e)
-                {
-                    log.error("Exception: " + e);
-                    e.printStackTrace();
-                }
             }
         }
     }
 
     static class TableExportCallback implements ProcedureCallback
     {
-        private final TxnIdWriter m_writer;
         private final long m_type;
-        public TableExportCallback(TxnIdWriter writer, long type)
+        public TableExportCallback(long type)
         {
             super();
             m_type = type;
-            m_writer = writer;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) {
@@ -350,8 +243,6 @@ public class AsyncExportClient
             final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
-            TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
-
             // Validate parameters
             apph.validate("duration", (config.duration > 0))
                 .validate("poolsize", (config.poolSize > 0))
@@ -424,7 +315,7 @@ public class AsyncExportClient
                     for (int i = 0; i < 2; i++) {
                         try {
                             clientRef.get().callProcedure(
-                                    new TableExportCallback(writer, r.nextInt(3)+1),
+                                    new TableExportCallback(r.nextInt(3)+1),
                                     "TableExport",
                                     currentRowId,
                                     0);
@@ -440,7 +331,7 @@ public class AsyncExportClient
                 // Post the request, asynchronously
                     try {
                         clientRef.get().callProcedure(
-                                                      new AsyncCallback(writer, currentRowId),
+                                                      new AsyncCallback(currentRowId),
                                                       config.procedure,
                                                       currentRowId,
                                                       0);
@@ -492,14 +383,10 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
-            // Might need lots of waiting but we'll do that in the runapp driver.
-            waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
 
             //Write to export table to get count to be expected on other side.
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             clientRef.get().callProcedure("InsertExportDoneDetails", TrackingResults.get(0));
-
-            writer.close(true);
 
             // Now print application results:
 
@@ -727,85 +614,4 @@ public class AsyncExportClient
                 stats.kPercentileLatencyAsDouble(0.95));
         log.info(stats_out);
     }
-
-    /**
-     * Wait for export processor to catch up and have nothing to be exported.
-     *
-     * @param client
-     * @throws Exception
-     */
-    public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
-        waitForStreamedAllocatedMemoryZero(client,300);
-    }
-
-    public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
-        boolean passed = false;
-        Instant maxTime = Instant.now().plusSeconds(timeout);
-        Instant maxStatsTime = Instant.now().plusSeconds(60);
-        long lastPending = 0;
-        VoltTable stats = null;
-
-        // this is a problem -- Quiesce forces queuing but does NOT mean export is done
-        try {
-            log.info(client.callProcedure("@Quiesce").getResults()[0]);
-        }
-        catch (Exception ex) {
-        }
-        while (true) {
-
-            if ( Instant.now().isAfter(maxStatsTime) ) {
-                throw new Exception("Test Timeout waiting for non-null @Statistics call");
-            }
-            try {
-                stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
-                maxStatsTime = Instant.now().plusSeconds(60);
-            }
-            catch (Exception ex) {
-                // Export Statistics are updated asynchronously and may not be up to date immediately on all hosts
-                // retry a few times if we don't get an answer
-                log.error("Problem getting @Statistics export: "+ex.getMessage());
-            }
-            if (stats == null) {
-                Thread.sleep(5000);
-                continue;
-            }
-            boolean passedThisTime = true;
-            while (stats.advanceRow()) {
-                if ( Instant.now().isAfter(maxTime) ) {
-                    throw new Exception("Test Timeout waiting for export to drain, expecting non-zero TUPLE_PENDING Statistic, "
-                    + "increase --timeout arg for slower clients" );
-                }
-                Long pending = stats.getLong("TUPLE_PENDING");
-                String stream = stats.getString("SOURCE");
-                String target = stats.getString("TARGET");
-                String active = stats.getString("ACTIVE");
-                Long partition = stats.getLong("PARTITION_ID");
-
-                // don't wait for inactive partitions.
-                // there are cases where ACTIVE==FALSE is a bug that won't get caught here anyway
-                if (active.equalsIgnoreCase("FALSE"))
-                    continue;
-                if ( pending != lastPending) {
-                    // reset the timer if we are making progress
-                    maxTime = Instant.now().plusSeconds(timeout);
-                    lastPending = pending;
-                }
-                // switch this message to debug out?
-                log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
-                if (pending != 0) {
-                    passedThisTime = false;
-                    log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
-                    break;
-                }
-            }
-            if (passedThisTime) {
-                passed = true;
-                break;
-            }
-            Thread.sleep(5000);
-        }
-        log.info("Passed is: " + passed);
-        log.info(stats);
-    }
-
 }

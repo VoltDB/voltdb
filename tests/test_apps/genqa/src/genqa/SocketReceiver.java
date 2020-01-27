@@ -128,74 +128,6 @@ public class SocketReceiver {
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
-    /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
-     */
-    static class SocketReceiverConfig extends CLIConfig {
-        @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 5;
-
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 25;
-
-        @Option(desc = "Warmup duration in seconds.")
-        int warmup = 10;
-
-        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
-        String servers = "localhost";
-
-        @Option (desc = "Port on which to listen for statistics info from export clients")
-        int statsPort = 5001;
-
-        @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
-
-        @Option(desc = "Filename to write periodic stat infomation in CSV format")
-        String csvfile = "";
-
-        @Option(desc = "Export to socket or export to Kafka cluster or discarding (socket|kafka|discarding|other)")
-        String target = "socket";
-
-        @Option(desc = "if a socket target, act as a client only 'client', socket 'receiver', or default 'both' ")
-        String socketmode = "both";
-
-        @Option(desc = "How many tuples to push includes priming count.")
-        int count = 0; // 10000000+40000
-
-        @Option(desc="How many tuples to insert for each procedure call (default = 1)")
-        int multiply = 1;
-
-        @Option(desc="How many targets to divide the multiplier into (default = 1)")
-        int targets = 1;
-
-        @Override
-        public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (count < 0) exitWithMessageAndUsage("count must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other") && !target.equals("discarding")) {
-                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\" or \"discarding\"");
-            }
-            if (target.equals("socket")) {
-                if ( !socketmode.equals("client") && !socketmode.equals("receiver") && !socketmode.equals("both")) {
-                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"receiver\" or \"both\"");
-                }
-            }
-            if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
-            if (target.equals("other") && count == 0 ) {
-               count = 10000000+40000;
-               log.info("Using count mode with count: " + count);
-            }
-            //If count is specified turn warmup off.
-            if (count > 0) {
-                warmup = 0;
-                duration = 0;
-            }
-        }
-    }
 
     /**
      * Clean way of exiting from an exception
@@ -211,7 +143,7 @@ public class SocketReceiver {
     /**
      * Creates socket receiver thread
      */
-    public SocketReceiver(SocketReceiverConfig config) {
+    public SocketReceiver() {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
