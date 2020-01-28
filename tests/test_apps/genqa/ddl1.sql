@@ -473,7 +473,32 @@ CREATE TABLE export_replicated_table_loopback EXPORT TO TARGET loopback_target O
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
+CREATE STREAM export_skinny_partitioned_table_kafka  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_rabbit PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_file PARTITION ON COLUMN rowid export to target file_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_jdbc PARTITION ON COLUMN rowid export to target jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;

@@ -905,22 +905,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         tmLog.warn("Hash mismatch is detected on replicas:" + CoreUtils.hsIdCollectionToString(counter.getMisMatchedReplicas()));
 
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
-        VoltZK.addHashMismatchedSite(hostMessenger.getZK(), m_mailbox.getHSId());
-
         VoltZK.createActionBlocker(hostMessenger.getZK(), VoltZK.reducedClusterSafety,
                 CreateMode.PERSISTENT, tmLog, "Transfer to Reduced Safety Mode");
-        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
-        boolean isClusterComplete = VoltDB.instance().isClusterComplete();
-        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
-        for (Integer hostId : liveHids) {
-            final long ciHsid = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
-            if (isClusterComplete) {
-                m_mailbox.send(ciHsid, message);
-            }
-            // Send message to the client interfaces of other hosts. If a host does not host any partition leaders,
-            // the host will be shutdown.
-            if (hostMessenger.getHostId() != hostId) {
-                m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
+
+        if (VoltDB.instance().isClusterComplete()) {
+            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_mailbox.getHSId(), Integer.MIN_VALUE);
+            Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+            for (Integer integer : liveHids) {
+                m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
             }
         }
     }

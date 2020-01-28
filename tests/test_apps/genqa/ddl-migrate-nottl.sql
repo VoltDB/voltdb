@@ -394,7 +394,32 @@ CREATE TABLE export_replicated_table_jdbc MIGRATE TO TARGET jdbc_target
 CREATE INDEX export_replicated_table_jdbc_idx ON  export_replicated_table_jdbc(type_not_null_timestamp)  where not migrating;
 
 
+CREATE STREAM export_skinny_partitioned_table_kafka  PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_rabbit PARTITION ON COLUMN rowid EXPORT TO TARGET rabbit_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_file PARTITION ON COLUMN rowid export to target file_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_skinny_partitioned_table_jdbc PARTITION ON COLUMN rowid export to target jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.MigratePartitionedExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateReplicatedExport;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;

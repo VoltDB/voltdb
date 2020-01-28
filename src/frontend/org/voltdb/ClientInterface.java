@@ -2436,18 +2436,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     void processReplicaRemovalTask(HashMismatchMessage message) {
         final RealVoltDB db = (RealVoltDB) VoltDB.instance();
-        if (db.m_leaderAppointer == null || !db.m_leaderAppointer.isLeader()) {
-            if (db.rejoining() || db.isJoining()) {
-                VoltDB.crashLocalVoltDB("Hash mismatch found before this node could finish " + (db.rejoining() ? "rejoin" : "join") +
-                        "As a result, the rejoin operation has been canceled.");
-                return;
-            }
-            if (message.isCheckHostMessage() && db.getLeaderSites().isEmpty()) {
-                VoltDB.crashLocalVoltDB("The cluster will transfer to master-only state after hash mismatch is found." +
-                        " There is no partition leaders on this host. As a result, the host is shutdown.");
-            }
+        if (db.rejoining() || db.isJoining()) {
+            VoltDB.crashLocalVoltDB("Hash mismatch found before this node could finish " + (db.rejoining() ? "rejoin" : "join") +
+                    "As a result, the rejoin operation has been canceled.");
             return;
-        } else if (message.isCheckHostMessage()) {
+        }
+        // Only work on MPI host
+        if (db.m_leaderAppointer == null || !db.m_leaderAppointer.isLeader()) {
             return;
         }
 

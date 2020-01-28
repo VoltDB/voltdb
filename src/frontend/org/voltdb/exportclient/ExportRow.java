@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.voltdb.VoltType;
@@ -83,36 +82,6 @@ public class ExportRow {
 
     public ROW_OPERATION getOperation() {
         return ROW_OPERATION.values()[(byte)values[INTERNAL_OPERATION_COLUMN]];
-    }
-
-    public String toSchemaString() {
-        Iterator<String> itNames = this.names.iterator();
-        Iterator<VoltType> itTypes = this.types.iterator();
-        Iterator<Integer> itSizes = this.lengths.iterator();
-
-        StringBuilder sb = new StringBuilder("[");
-        while(itNames.hasNext()) {
-            sb.append(itNames.next())
-              .append(":")
-              .append(itTypes.next())
-              .append(":")
-              .append(itSizes.next())
-              .append((itNames.hasNext()) ? ", " : "]");
-        }
-        return sb.toString();
-    }
-
-    // Temporary: only print schema, values omitted
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder(this.tableName)
-                .append(":")
-                .append(this.partitionId)
-                .append(":")
-                .append(this.generation)
-                .append(" - ")
-                .append(toSchemaString());
-        return sb.toString();
     }
 
     // Note: used to decode schemas in encoded rows produced by {@code ExportEncoder.encodeRow}

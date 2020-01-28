@@ -130,6 +130,9 @@ def verifyGetHostName(f, content):
         else:
             return 0
 
+    if f.endswith('/ExportOnServerVerifier.java'):
+        return 0
+
 
     if num > 0:
         print("ERROR: \"%s\" contains %d calls to InetAddress.getHostName(). You should use ReverseDNSCache to avoid performance issues with broken DNS configs" % (f, num))

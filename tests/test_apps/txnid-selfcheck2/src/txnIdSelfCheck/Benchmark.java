@@ -539,6 +539,7 @@ public class Benchmark {
             printJStack();
             hardStop(((ClientResponseImpl) cr).toJSONString());
         }
+        // try {
         long failures = 0;
         VoltTable t = cr.getResults()[0];
         log.info(String.format("%15s%15s%15s%15s",
@@ -550,11 +551,9 @@ public class Benchmark {
             if (f > 0)
                 failures += f;
         }
-        // don't fail the test on PROCEDURE_FAILCOUNT -- see ENG-19932
-        log.info(failures + " unexpected TASK failures");
-        // if (failures > 0) {
-        //     hardStop(failures + " unexpected TASK failures");
-        // }
+        if (failures > 0) {
+            hardStop(failures + " unexpected TASK failures");
+        }
     }
 
     private byte reportDeadThread(Thread th) {

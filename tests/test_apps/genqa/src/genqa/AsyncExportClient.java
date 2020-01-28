@@ -492,6 +492,8 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            // Might need lots of waiting but we'll do that in the runapp driver.
+            waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
 
             //Write to export table to get count to be expected on other side.
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
@@ -725,4 +727,85 @@ public class AsyncExportClient
                 stats.kPercentileLatencyAsDouble(0.95));
         log.info(stats_out);
     }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+        waitForStreamedAllocatedMemoryZero(client,300);
+    }
+
+    public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
+        boolean passed = false;
+        Instant maxTime = Instant.now().plusSeconds(timeout);
+        Instant maxStatsTime = Instant.now().plusSeconds(60);
+        long lastPending = 0;
+        VoltTable stats = null;
+
+        // this is a problem -- Quiesce forces queuing but does NOT mean export is done
+        try {
+            log.info(client.callProcedure("@Quiesce").getResults()[0]);
+        }
+        catch (Exception ex) {
+        }
+        while (true) {
+
+            if ( Instant.now().isAfter(maxStatsTime) ) {
+                throw new Exception("Test Timeout waiting for non-null @Statistics call");
+            }
+            try {
+                stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+                maxStatsTime = Instant.now().plusSeconds(60);
+            }
+            catch (Exception ex) {
+                // Export Statistics are updated asynchronously and may not be up to date immediately on all hosts
+                // retry a few times if we don't get an answer
+                log.error("Problem getting @Statistics export: "+ex.getMessage());
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
+            boolean passedThisTime = true;
+            while (stats.advanceRow()) {
+                if ( Instant.now().isAfter(maxTime) ) {
+                    throw new Exception("Test Timeout waiting for export to drain, expecting non-zero TUPLE_PENDING Statistic, "
+                    + "increase --timeout arg for slower clients" );
+                }
+                Long pending = stats.getLong("TUPLE_PENDING");
+                String stream = stats.getString("SOURCE");
+                String target = stats.getString("TARGET");
+                String active = stats.getString("ACTIVE");
+                Long partition = stats.getLong("PARTITION_ID");
+
+                // don't wait for inactive partitions.
+                // there are cases where ACTIVE==FALSE is a bug that won't get caught here anyway
+                if (active.equalsIgnoreCase("FALSE"))
+                    continue;
+                if ( pending != lastPending) {
+                    // reset the timer if we are making progress
+                    maxTime = Instant.now().plusSeconds(timeout);
+                    lastPending = pending;
+                }
+                // switch this message to debug out?
+                log.info("DEBUG: Partition "+partition+" for stream "+stream+", target "+target+" TUPLE_PENDING is "+pending);
+                if (pending != 0) {
+                    passedThisTime = false;
+                    log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
+                    break;
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        log.info("Passed is: " + passed);
+        log.info(stats);
+    }
+
 }

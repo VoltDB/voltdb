@@ -25,17 +25,13 @@ package org.voltcore.zk;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CyclicBarrier;
 import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -43,9 +39,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
 import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -53,18 +47,13 @@ import org.voltdb.StartAction;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class TestStateMachine extends ZKTestBase {
-    private static final int NUM_AGREEMENT_SITES = 4;
+    private final int NUM_AGREEMENT_SITES = 4;
     enum stateMachines {
         SMI1,
         SMI2
-    }
-
-    @Rule
-    public final TestName m_name = new TestName();
-
+    };
     private final String stateMachineManagerRoot = "/test/db/States";
 
     VoltLogger log = new VoltLogger("HOST");
@@ -144,7 +133,6 @@ public class TestStateMachine extends ZKTestBase {
 
     @Before
     public void setUp() throws Exception {
-        log.info("Starting " + m_name.getMethodName());
         setUpZK(NUM_AGREEMENT_SITES);
         coordinators = IntStream.range(0, NUM_AGREEMENT_SITES)
                 .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
@@ -281,12 +269,11 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
             assertFalse("State machine local lock held after bool state change resolution", debugIsLocalStateLocked());
-            assertEquals("Test state inconsistent with state machine", (proposed != null), ourProposal);
+            assertTrue("Test state inconsistent with state machine", ourProposal == makeProposal);
             if (success) {
                 state = toBoolean(proposedState);
             }
             if (ourProposal) {
-                proposed = null;
                 makeProposal = false;
                 ourProposalOrTaskFinished = true;
             }
@@ -325,7 +312,6 @@ public class TestStateMachine extends ZKTestBase {
             taskResultString = defaultTaskResult;
             correlatedResults = results;
             if (ourTask) {
-                proposed = null;
                 startTask = false;
                 ourTask = false;
                 ourProposalOrTaskFinished = true;
@@ -344,7 +330,6 @@ public class TestStateMachine extends ZKTestBase {
             taskResultString = defaultTaskResult;
             uncorrelatedResults = results;
             if (ourTask) {
-                proposed = null;
                 ourProposalOrTaskFinished = true;
                 startTask = false;
                 ourTask = false;
@@ -836,6 +821,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSingleNodeStateChange() {
+        log.info("Starting testSuccessfulStateChange");
         try {
             m_booleanStateMachinesForGroup1[1] = null;
             m_booleanStateMachinesForGroup1[2] = null;
@@ -869,6 +855,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSuccessfulStateChange() {
+        log.info("Starting testSuccessfulStateChange");
         try {
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
                 registerGroup1BoolFor(ii);
@@ -900,6 +887,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSingleRejectedProposal() {
+        log.info("Starting testSingleRejectedProposal");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -934,6 +922,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testAllRejectedProposal() {
+        log.info("Starting testAllRejectedProposal");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -970,6 +959,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testVerifyProposerCantReject() {
+        log.info("Starting testVerifyProposerCantReject");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
 
@@ -1001,6 +991,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testLateJoiner() {
+        log.info("Starting testLateJoiner");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1046,6 +1037,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testAllLateJoiners() {
+        log.info("Starting testAllLateJoiners");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1099,6 +1091,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testRecoverFromDeadHostHoldingLock() {
+        log.info("Starting testRecoverFromDeadHostHoldingLock");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1140,6 +1133,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testRecoverFromContendingDeadHostRequestingLock() {
+        log.info("Starting testRecoverFromContendingDeadHostRequestingLock");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1182,6 +1176,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testRoundRobinStates() {
+        log.info("Starting testRoundRobinStates");
         try {
             ByteStateMachine i0 = m_byteStateMachinesForGroup2[0];
             ByteStateMachine i1 = m_byteStateMachinesForGroup2[1];
@@ -1229,6 +1224,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testMultipleStateMachines() {
+        log.info("Starting testMultipleStateMachines");
         try {
             BooleanStateMachine g1i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine g2i0 = m_booleanStateMachinesForGroup2[0];
@@ -1300,6 +1296,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testCallbackExceptionCorrectlyResetOtherStateMachines() {
+        log.info("Starting testCallbackExceptionCorrectlyResetOtherStateMachines");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1372,6 +1369,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testHandleMultipleCallbackExceptionHandlerFromDifferentSMI() {
+        log.info("Starting testHandleMultipleCallbackExceptionHandlerFromDifferentSMI");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1442,6 +1440,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testFailureDuringProposalStateChange() {
+        log.info("Starting testFailureDuringProposalStateChange");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1493,6 +1492,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testFailureDuringProposedTask() {
+        log.info("Starting testFailureDuringProposedTask");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1542,6 +1542,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSuccessfulUncorrelatedWithStateChangeTask() {
+        log.info("Starting testSuccessfulUncorrelatedWithStateChangeTask");
         try {
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
                 registerGroup1BoolFor(ii);
@@ -1581,6 +1582,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSuccessfulCorrelatedTask() {
+        log.info("Starting testSuccessfulCorrelatedTask");
         try {
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
                 registerGroup1BoolFor(ii);
@@ -1615,6 +1617,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testSingleTaskWithOneUniqueResult() {
+        log.info("Starting testSingleTaskWithOneUniqueResult");
         try {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
@@ -1647,6 +1650,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInSetInitialState() {
+        log.info("Starting testResetIfExceptionInSetInitialState");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1687,6 +1691,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInTaskRequested() {
+        log.info("Starting testResetIfExceptionInTaskRequested");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1740,6 +1745,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInCorrelatedTaskCompleted() {
+        log.info("Starting testResetIfExceptionInCorrelatedTaskCompleted");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1790,6 +1796,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInUncorrelatedTaskCompleted() {
+        log.info("Starting testResetIfExceptionInUncorrelatedTaskCompleted");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1841,6 +1848,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInLockRequestCompleted() {
+        log.info("Starting testResetIfExceptionInLockRequestCompleted");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1893,6 +1901,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInMembershipChanged() {
+        log.info("Starting testResetIfExceptionInMembershipChanged");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1932,6 +1941,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInStateChangeProposed() {
+        log.info("Starting testResetIfExceptionInStateChangeProposed");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -1984,8 +1994,8 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInStaleTaskRequestNotification() {
+        log.info("Starting testResetIfExceptionInStaleTaskRequestNotification");
 
-        // Remove the pre-staged machines because they did not have broken state machines
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
         }
@@ -2033,6 +2043,7 @@ public class TestStateMachine extends ZKTestBase {
 
     @Test
     public void testResetIfExceptionInProposedStateResolved() {
+        log.info("Starting testResetIfExceptionInProposedStateResolved");
 
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             removeStateMachinesFor(ii);
@@ -2081,138 +2092,5 @@ public class TestStateMachine extends ZKTestBase {
         catch (InterruptedException e) {
             fail("Exception occurred during test.");
         }
-    }
-
-    /*
-     * Test that if a host dies immediately after making a proposal another host grabbing the distributed lock will wait
-     * until that proposal has been resolved
-     */
-    @Test(timeout = 10_000)
-    public void testHostFailureAfterProposalGrabLock() throws Exception {
-        m_booleanStateMachinesForGroup1[0].registerStateMachineWithManager(ByteBuffer.allocate(1));
-        m_booleanStateMachinesForGroup1[1].registerStateMachineWithManager(ByteBuffer.allocate(1));
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        ListeningExecutorService ssmEs = getField(SynchronizedStatesManager.class, "s_sharedEs");
-
-        assertTrue(m_booleanStateMachinesForGroup1[0].requestLock());
-
-        // Submit a runnable which will block execution of callbacks in the ssm
-        ssmEs.submit(() -> {
-            barrier.await();
-            return null;
-        });
-
-        m_booleanStateMachinesForGroup1[0].makeProposal = true;
-        m_booleanStateMachinesForGroup1[0].proposeStateChange(
-                m_booleanStateMachinesForGroup1[0].toByteBuffer(!m_booleanStateMachinesForGroup1[0].state));
-
-        m_messengers.get(0).getZK().close();
-
-        // Give the system time to react to close
-        Thread.sleep(200);
-
-        m_booleanStateMachinesForGroup1[1].makeProposal = true;
-        assertFalse(m_booleanStateMachinesForGroup1[1].requestLock());
-
-        // Should not have made proposal yet
-        assertNull(m_booleanStateMachinesForGroup1[1].proposed);
-
-        // Let the state machines process callbacks
-        barrier.await();
-
-        // Loop until proposal is made or timeout
-        do {
-            // Submit a runnable to wake this thread up once the queue is drained
-            ssmEs.submit(() -> {
-                barrier.await();
-                return null;
-            });
-
-            // Wait for all queued callbacks to be processed
-            barrier.await();
-        } while (m_booleanStateMachinesForGroup1[1].makeProposal);
-    }
-
-    /*
-     * Test that if a host dies immediately after making a proposal another host waiting on the distributed lock will
-     * wait until that proposal has been resolved
-     */
-    @Test(timeout = 10_000)
-    public void testHostFailureAfterProposalWaitingOnLock() throws Exception {
-        m_booleanStateMachinesForGroup1[0].registerStateMachineWithManager(ByteBuffer.allocate(1));
-        m_booleanStateMachinesForGroup1[1].registerStateMachineWithManager(ByteBuffer.allocate(1));
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        ListeningExecutorService ssmEs = getField(SynchronizedStatesManager.class, "s_sharedEs");
-
-        assertTrue(m_booleanStateMachinesForGroup1[0].requestLock());
-
-        m_booleanStateMachinesForGroup1[1].makeProposal = true;
-        assertFalse(m_booleanStateMachinesForGroup1[1].requestLock());
-
-        // Submit a runnable which will block execution of callbacks in the ssm
-        ssmEs.submit(() -> {
-            barrier.await();
-            return null;
-        });
-
-        m_booleanStateMachinesForGroup1[0].makeProposal = true;
-        m_booleanStateMachinesForGroup1[0].proposeStateChange(
-                m_booleanStateMachinesForGroup1[0].toByteBuffer(!m_booleanStateMachinesForGroup1[0].state));
-
-        m_messengers.get(0).getZK().close();
-
-        // Give the system time to react to close
-        Thread.sleep(200);
-
-        // Force the lock callback to run first
-        ((Callable<?>) getField(m_booleanStateMachinesForGroup1[1], "HandlerForDistributedLockEvent")).call();
-
-        // Should not have made proposal yet
-        assertNull(m_booleanStateMachinesForGroup1[1].proposed);
-
-        // Let the state machines process callbacks
-        barrier.await();
-
-        // Loop until proposal is made or timeout
-        do {
-            // Submit a runnable to wake this thread up once the queue is drained
-            ssmEs.submit(() -> {
-                barrier.await();
-                return null;
-            });
-
-            // Wait for all queued callbacks to be processed
-            barrier.await();
-        } while (m_booleanStateMachinesForGroup1[1].makeProposal);
-    }
-
-    // Utility methods for extracting a field from a class or instance
-    static <F> F getField(Class<?> clazz, String fieldName)
-            throws NoSuchFieldException, SecurityException, IllegalAccessException {
-        return getField(clazz, null, fieldName);
-    }
-
-    static <F> F getField(Object instance, String fieldName)
-            throws NoSuchFieldException, SecurityException, IllegalAccessException {
-        Class<?> clazz = instance.getClass();
-        NoSuchFieldException exception = null;
-        do {
-            try {
-                return getField(clazz, instance, fieldName);
-            } catch (NoSuchFieldException e) {
-                if (exception == null) {
-                    exception = e;
-                }
-            }
-        } while ((clazz = clazz.getSuperclass()) != null);
-        throw exception;
-    }
-
-    @SuppressWarnings("unchecked")
-    static <F> F getField(Class<?> clazz, Object instance, String fieldName)
-            throws NoSuchFieldException, SecurityException, IllegalAccessException {
-        Field field = clazz.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        return (F) field.get(instance);
     }
 }

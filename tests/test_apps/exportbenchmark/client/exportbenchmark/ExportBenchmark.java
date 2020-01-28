@@ -50,14 +50,6 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -257,22 +249,6 @@ public class ExportBenchmark {
                                     config.displayinterval * 1000);
     }
 
-    public VoltTable getExportStats() throws IOException,InterruptedException{
-        long retryStats = 5;
-        VoltTable stats = null;
-        while (retryStats-- > 0) {
-            try {
-                stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
-                break;
-            } catch (ProcCallException e) {
-                log.warn("Error while calling procedures: ");
-                e.printStackTrace();
-            }
-            Thread.sleep(5000);
-        }
-        return stats;
-    }
-
     /**
      * Checks the export table to make sure that everything has been successfully
      * processed.
@@ -289,15 +265,16 @@ public class ExportBenchmark {
         //Wait 10 mins only
         long end = st + (10 * 60 * 1000);
         while (true) {
-            stats = getExportStats();
-
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
                 log.info("Waited too long...");
+                log.info(stats);
                 break;
             }
             if (ctime - st > (3 * 60 * 1000)) {
+                log.info(stats);
                 st = System.currentTimeMillis();
             }
             long ts = 0;
@@ -307,8 +284,9 @@ public class ExportBenchmark {
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (stats.getLong("TUPLE_PENDING") != 0) {
+                if (0 != stats.getLong("TUPLE_PENDING")) {
                     passedThisTime = false;
+                    log.info("Table " + stats.getString("SOURCE") + "/" + stats.getString("TARGET") + ": Partition Not Zero... Pending: " + stats.getLong("TUPLE_PENDING"));
                     break;
                 }
             }
@@ -327,47 +305,8 @@ public class ExportBenchmark {
             Thread.sleep(5000);
         }
         log.info("Passed is: " + passed);
+        log.info(stats);
         return passed;
-    }
-
-    public boolean waitTilTupleCountSettles(long insertCount) throws IOException, InterruptedException {
-        /*
-         * There might be a delay between the completion of the last insert transaction and when
-         * stats register all tuples, that is TUPLE_COUNT = insert count
-         *
-         * Since at this point, all the stream/partitions are disabled, we have to be careful
-         * to count each partition for each table once.
-         */
-        long st = System.currentTimeMillis();
-        //Wait 10 mins only
-        long end = st + (10 * 60 * 1000);
-        while (true) {
-            Map<String, Long> partitionMap = new HashMap<String, Long>();
-            VoltTable stats = getExportStats();
-            long totalTupleCount = 0;
-            while (stats.advanceRow()) {
-                long partitionid = stats.getLong("PARTITION_ID");
-                String source = stats.getString("SOURCE");
-                Long tupleCount = stats.getLong("TUPLE_COUNT");
-                String tablePart = source + "_" + partitionid;
-                if (! partitionMap.containsKey(tablePart)) {
-                    // only put this table+partition count in the map once
-                    partitionMap.put(tablePart, tupleCount);
-                    totalTupleCount += tupleCount;
-                }
-            }
-            if (totalTupleCount == insertCount) {
-                long settleTimeMillis = System.currentTimeMillis() - st;
-                log.info("TUPLE_COUNT settled in " + settleTimeMillis/1000.0 + " seconds");
-                return true;
-            }
-            long ctime = System.currentTimeMillis();
-            if (ctime > end) {
-                log.info("Waited too long...");
-                return false;
-            }
-            Thread.sleep(1000);
-        }
     }
 
     /**
@@ -404,6 +343,7 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
+    // public void doInserts(Client client, int target) {
     public void doInserts(Client client) {
 
         // Don't track warmup inserts
@@ -422,6 +362,8 @@ public class ExportBenchmark {
                             rowId.getAndIncrement(),
                             config.multiply,
                             1);
+                    // log.info("calling "+"InsertExport"+target);
+
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -483,15 +425,6 @@ public class ExportBenchmark {
         // Use this to correlate the total rows exported
         log.info("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
                 + (totalInserts * config.multiply) + " (includes warmup)");
-        try {
-            if (waitTilTupleCountSettles(totalInserts * config.multiply)) {
-                log.info("TUPLE_COUNT matches tuples inserted!");
-            } else {
-                log.info("TUPLE_COUNT did not settle in 10 minutes");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     /**
@@ -667,14 +600,18 @@ public class ExportBenchmark {
             }
 
             // Do the inserts in a separate thread
-            log.info("Creating thread ");
-            writes = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                log.info("Creating thread target " + target);
-                doInserts(client);
-                }
-            });
+            // for (target = 0; target < config.targets; target++) {
+                log.info("Creating thread ");
+                writes = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        log.info("Creating thread target " + target);
+                        // doInserts(client, target);
+                        doInserts(client);
+
+                    }
+                });
+            // }
             writes.start();
             Thread.sleep(config.warmup * 1000);
         }
@@ -760,6 +697,7 @@ public class ExportBenchmark {
         // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
         // log merger correlate correctly
         // System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
+        log.info(String.format(" Throughput %d/s, ", stats.getTxnThroughput()));
         log.info(String.format(" Throughput %d/s, ", stats.getTxnThroughput()));
         log.info(String.format("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors()));
