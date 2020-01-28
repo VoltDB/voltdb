@@ -25,6 +25,7 @@ import org.voltcore.messaging.VoltMessage;
 public class HashMismatchMessage extends VoltMessage {
 
     private boolean m_reschedule = false;
+    private boolean m_checkHostMessage = false;
 
     public HashMismatchMessage() {
         super();
@@ -35,27 +36,39 @@ public class HashMismatchMessage extends VoltMessage {
         m_reschedule = reschedule;
     }
 
+    public HashMismatchMessage(boolean reschedule, boolean hostLeaderCheck) {
+        this(reschedule);
+        m_reschedule = hostLeaderCheck;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         msgsize += 1; // m_reschedule
+        msgsize += 1; // m_checkHostMessage
         return msgsize;
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_reschedule = buf.get() == 1;
+        m_checkHostMessage = buf.get() == 1;
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.HASH_MISMATCH_MESSAGE_ID);
         buf.put(m_reschedule ? (byte) 1 : (byte) 0);
+        buf.put(m_checkHostMessage ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
 
     public boolean isReschedule() {
         return m_reschedule;
+    }
+
+    public boolean isCheckHostMessage() {
+        return m_checkHostMessage;
     }
 }

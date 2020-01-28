@@ -264,19 +264,8 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
                 .append(this.initialGenerationId)
                 .append(":")
                 .append(this.generation)
-                .append(" - [");
-
-        Iterator<String> itNames = this.names.iterator();
-        Iterator<VoltType> itTypes = this.types.iterator();
-        Iterator<Integer> itSizes = this.lengths.iterator();
-        while(itNames.hasNext()) {
-            sb.append(itNames.next())
-              .append(":")
-              .append(itTypes.next())
-              .append(":")
-              .append(itSizes.next())
-              .append((itNames.hasNext()) ? ", " : "]");
-        }
+                .append(" - ")
+                .append(toSchemaString());
         return sb.toString();
     }
 }
