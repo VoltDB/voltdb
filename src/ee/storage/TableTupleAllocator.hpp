@@ -339,8 +339,8 @@ namespace voltdb {
              * Called after in-chunk operation completes, since this
              * operates on the level of list iterator, not void*.
              */
-            void releasible(iterator);
-            void releasible(reverse_iterator);
+            void releasable(iterator);
+            void releasable(reverse_iterator);
             ExtendedIterator operator()() noexcept;
             ExtendedIterator operator()() const noexcept;
         };
@@ -348,7 +348,7 @@ namespace voltdb {
 }
 
 /**
- * For CompactingChunks::element_type
+ * Needed for maps keyed on iterator
  */
 namespace std {
     // NOTE: this alone does not guarantee strong order across hosts, since

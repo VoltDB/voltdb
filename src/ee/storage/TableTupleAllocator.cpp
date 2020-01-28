@@ -17,7 +17,6 @@
 
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
-#include <cmath>
 #include <array>
 #include <numeric>
 
@@ -467,7 +466,7 @@ template<shrink_direction dir> inline void CompactingStorageTrait<dir>::thaw() {
 /**
  * Immediately free to OS when the tail is unused
  */
-template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasible(
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasable(
         typename CompactingStorageTrait<dir>::iterator iter) {
     vassert(m_storage != nullptr);
     if (iter->empty()) {
@@ -479,10 +478,10 @@ template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasib
     }
 }
 
-template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasible(
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasable(
         typename CompactingStorageTrait<dir>::reverse_iterator riter) {
     vassert(m_storage != nullptr);
-    releasible(m_storage->rev2fwd(riter));
+    releasable(m_storage->rev2fwd(riter));
 }
 
 template<shrink_direction dir> inline ExtendedIterator
@@ -591,7 +590,7 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
         } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
             memcpy(dst, src, tupleSize());
         }
-        trait::releasible(from_iter);
+        trait::releasable(from_iter);
         --m_allocs;
         return src;
     }
@@ -779,7 +778,7 @@ CompactingChunks<dir>::free(set<void*> const& args,
          offset = reinterpret_cast<char const*>(compactFrom()->next()) - reinterpret_cast<char const*>(compactFrom()->begin());
     // dangerous: direct manipulation on each offended chunks
     for (auto wholeChunks = args.size() / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
-        trait::releasible(compactFrom());      // whole chunk releases
+        trait::releasable(compactFrom());      // whole chunk releases
     }
     if (args.size() >= allocsPerTuple) {       // any chunk released at all?
         reinterpret_cast<char*&>(compactFrom()->m_next) = reinterpret_cast<char*>(compactFrom()->begin()) + offset;
@@ -788,7 +787,7 @@ CompactingChunks<dir>::free(set<void*> const& args,
     if (n > 0) {          // need manual cursor adjustment on the remaining chunks
         auto const rem = reinterpret_cast<char*>(compactFrom()->next()) - reinterpret_cast<char*>(compactFrom()->begin());
         if (n > rem) {
-            trait::releasible(compactFrom());
+            trait::releasable(compactFrom());
             reinterpret_cast<char*&>(compactFrom()->m_next) -= n - rem;
         } else {
             reinterpret_cast<char*&>(compactFrom()->m_next) -= rem - n;
