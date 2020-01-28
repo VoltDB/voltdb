@@ -32,8 +32,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -88,8 +88,9 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * can be initialized (registered) before any individual instance needs to access the shared state.
  */
 public class SynchronizedStatesManager {
-    private final AtomicBoolean m_done = new AtomicBoolean(false);
-    private final static String m_memberNode = "MEMBERS";
+    private final static String s_memberNode = "MEMBERS";
+
+    private final AtomicReference<State> m_state = new AtomicReference<>(State.RUNNING);
     private Set<String> m_groupMembers = new HashSet<String>();
     private final StateMachineInstance m_registeredStateMachines[];
     private int m_registeredStateMachineInstances = 0;
@@ -123,6 +124,10 @@ public class SynchronizedStatesManager {
         AGREE,
         DISAGREE,
         NO_QUORUM
+    }
+
+    private enum State {
+        RUNNING, ERROR, SHUTDOWN
     }
 
     // Utility methods for handling uncaught exceptions from runnables and callables
@@ -170,7 +175,7 @@ public class SynchronizedStatesManager {
                 if (m_resultCode == KeeperException.Code.OK) {
                     m_resultString = name;
                 }
-                if (!m_done.get()) {
+                if (isRunning()) {
                     // Will execute the specialized implementation of Run()
                     submitRunnable(this);
                 }
@@ -178,6 +183,15 @@ public class SynchronizedStatesManager {
                 ssmLog.warn("Async initialization of ZK directory for SSM was rejected by the SSM Thread: " + path);
             }
         }
+
+        @Override
+        public final void run() {
+            if (isRunning()) {
+                runImpl();
+            }
+        }
+
+        abstract void runImpl();
     }
 
     protected abstract class ZKAsyncChildrenHandler implements AsyncCallback.ChildrenCallback, Runnable {
@@ -200,7 +214,7 @@ public class SynchronizedStatesManager {
                             m_resultCode == KeeperException.Code.CONNECTIONLOSS ||
                             m_resultCode == KeeperException.Code.SESSIONEXPIRED);
                 }
-                if (!m_done.get()) {
+                if (isRunning()) {
                     // Will execute the specialized implementation of Run()
                     submitRunnable(this);
                 }
@@ -208,6 +222,15 @@ public class SynchronizedStatesManager {
                 ssmLog.warn("Async getChildren for SSM was rejected by the SSM Thread: " + path);
             }
         }
+
+        @Override
+        public final void run() {
+            if (isRunning()) {
+                runImpl();
+            }
+        }
+
+        abstract void runImpl();
     }
 
     /*
@@ -313,7 +336,7 @@ public class SynchronizedStatesManager {
             @Override
             public void process(final WatchedEvent event) {
                 try {
-                    if (!m_done.get()) {
+                    if (isRunning()) {
                         submitCallable(HandlerForDistributedLockEvent);
                     }
                 } catch (RejectedExecutionException e) {
@@ -328,7 +351,7 @@ public class SynchronizedStatesManager {
             @Override
             public void process(final WatchedEvent event) {
                 try {
-                    if (!m_done.get()) {
+                    if (isRunning()) {
                         m_participantsChangePending = true;
                         submitCallable(HandlerForBarrierParticipantsEvent);
                     }
@@ -357,7 +380,7 @@ public class SynchronizedStatesManager {
             @Override
             public void process(final WatchedEvent event) {
                 try {
-                    if (!m_done.get()) {
+                    if (isRunning()) {
                         submitCallable(HandlerForBarrierResultsEvent);
                     }
                 } catch (RejectedExecutionException e) {
@@ -383,10 +406,10 @@ public class SynchronizedStatesManager {
         }
 
         public StateMachineInstance(String instanceName, VoltLogger logger) throws RuntimeException {
-            if (instanceName.equals(m_memberNode)) {
-                throw new RuntimeException("State machine name may not be named " + m_memberNode);
+            if (instanceName.equals(s_memberNode)) {
+                throw new RuntimeException("State machine name may not be named " + s_memberNode);
             }
-            assert(!instanceName.equals(m_memberNode));
+            assert(!instanceName.equals(s_memberNode));
             m_stateMachineName = instanceName;
             m_statePath = ZKUtil.joinZKPath(m_stateMachineRoot, instanceName);
             m_lockPath = ZKUtil.joinZKPath(m_statePath, "LOCK_CONTENDERS");
@@ -464,7 +487,7 @@ public class SynchronizedStatesManager {
             final Set<String> m_startingMemberSet;
 
             private void initializationFailed() {
-                m_done.set(true);
+                m_state.set(State.ERROR);
                 m_initComplete.set(false);
             }
 
@@ -494,7 +517,7 @@ public class SynchronizedStatesManager {
             public void startInitialization() {
                 new ZKAsyncCreateHandler(m_statePath, null, CreateMode.PERSISTENT) {
                     @Override
-                    public void run() {
+                    public void runImpl() {
                         if (noCommonKeeperExceptions(m_resultCode)) {
                             addLockPath();
                         }
@@ -505,7 +528,7 @@ public class SynchronizedStatesManager {
             private void addLockPath() {
                 new ZKAsyncCreateHandler(m_lockPath, null, CreateMode.PERSISTENT) {
                     @Override
-                    public void run() {
+                    public void runImpl() {
                         if (noCommonKeeperExceptions(m_resultCode)) {
                             addBarrierParticipantPath();
                         }
@@ -516,7 +539,7 @@ public class SynchronizedStatesManager {
             private void addBarrierParticipantPath() {
                 new ZKAsyncCreateHandler(m_barrierParticipantsPath, null, CreateMode.PERSISTENT) {
                     @Override
-                    public void run() {
+                    public void runImpl() {
                         if (noCommonKeeperExceptions(m_resultCode)) {
                             try {
                                 initializeStateMachine(m_startingMemberSet);
@@ -587,9 +610,7 @@ public class SynchronizedStatesManager {
                     m_lastProposalVersion = getProposalVersion();
                     ByteBuffer readOnlyResult = m_synchronizedState.asReadOnlyBuffer();
                     // Add an acceptable result so the next initializing member recognizes an immediate quorum.
-                    byte result[] = new byte[1];
-                    result[0] = (byte) (1);
-                    addResultEntry(result);
+                    addResultEntry(new byte[] { 1 });
                     m_lockWaitingOn = "bogus"; // Avoids call to notifyDistributedLockWaiter
                     if (m_log.isDebugEnabled()) {
                         m_log.debug(m_stateMachineId + ": Initialized (first member) with State "
@@ -652,6 +673,9 @@ public class SynchronizedStatesManager {
          */
         private void disableMembership() {
             try (Mutex.Releaser r = m_mutex.acquire()) {
+                if (m_log.isTraceEnabled()) {
+                    m_log.trace(m_stateMachineId + ": Disabling member");
+                }
                 // put in two separate try-catch blocks so that both actions are attempted
                 try {
                     m_zk.delete(m_myParticipantPath, -1);
@@ -1402,6 +1426,9 @@ public class SynchronizedStatesManager {
             public Void call() throws KeeperException {
                 SmiCallable outOfLockWork;
                 try (Mutex.Releaser r = m_mutex.acquire()) {
+                    if (!isRunning()) {
+                        return null;
+                    }
                     outOfLockWork = checkForBarrierParticipantsChange();
                 }
                 if (outOfLockWork != null) {
@@ -1416,6 +1443,9 @@ public class SynchronizedStatesManager {
             public Void call() throws KeeperException {
                 SmiCallable outOfLockWork;
                 try (Mutex.Releaser r = m_mutex.acquire()) {
+                    if (!isRunning()) {
+                        return null;
+                    }
                     outOfLockWork = checkForBarrierResultsChanges();
                 }
 
@@ -1465,6 +1495,9 @@ public class SynchronizedStatesManager {
             public Void call() throws KeeperException {
                 SmiCallable outOfLockWork = null;
                 try (Mutex.Releaser r = m_mutex.acquire()) {
+                    if (!isRunning()) {
+                        return null;
+                    }
                     if (m_ourDistributedLockName != null) {
                         try {
                             m_lockWaitingOn = getNextLockNodeFromList();
@@ -1558,7 +1591,7 @@ public class SynchronizedStatesManager {
             try {
                 m_knownMembers = ImmutableSet.copyOf(m_zk.getChildren(m_stateMachineMemberPath, null));
                 if (m_log.isDebugEnabled()) {
-                    m_log.debug(String.format("%s: getLatestMembership Updating known members to: ", m_stateMachineId,
+                    m_log.debug(String.format("%s: getLatestMembership Updating known members to: %s", m_stateMachineId,
                             m_knownMembers));
                 }
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
@@ -1639,6 +1672,12 @@ public class SynchronizedStatesManager {
         }
 
         private void addResultEntry(byte result[]) throws KeeperException {
+            if (m_log.isDebugEnabled()) {
+                m_log.debug(String.format("%s: Responding to request %d:%s with result: %s", m_stateMachineId,
+                        m_lastProposalVersion, m_currentRequestType,
+                        (result == null || result.length < 10 || m_log.isTraceEnabled()) ? Arrays.toString(result)
+                                : "suppressed"));
+            }
             try {
                 m_zk.create(m_myResultPath, result, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
@@ -1651,8 +1690,16 @@ public class SynchronizedStatesManager {
                 // is not hung. However, if a new proposal is submitted by another instance between that assignment
                 // and the call to checkForBarrierParticipantsChange, a second null result is assigned.
                 if (m_requestedInitialState == null || result != null) {
+                    byte[] previousResult = null;
+                    try {
+                        previousResult = m_zk.getData(m_myResultPath, null, null);
+                    } catch (Exception e1) {
+                        m_log.error("Failed to retrieve existing result", e1);
+                    }
                     org.voltdb.VoltDB.crashLocalVoltDB(
-                            "Unexpected failure in StateMachine; Two results created for one proposal.", true, e);
+                            "Unexpected failure in StateMachine; Two results created for one proposal.: "
+                                    + Arrays.toString(previousResult),
+                            true, e);
                 }
             }
         }
@@ -1661,8 +1708,7 @@ public class SynchronizedStatesManager {
             assert(debugIsLocalStateLocked());
             assert(m_pendingProposal != null);
             assert(m_currentRequestType == REQUEST_TYPE.STATE_CHANGE_REQUEST);
-            byte result[] = new byte[1];
-            result[0] = (byte)(acceptable?1:0);
+            byte result[] = { (byte) (acceptable ? 1 : 0) };
             addResultEntry(result);
             if (acceptable) {
                 // Since we are only interested in the results when we agree with the proposal
@@ -2018,7 +2064,7 @@ public class SynchronizedStatesManager {
         ByteBuffer numberOfInstances = ByteBuffer.allocate(4);
         numberOfInstances.putInt(registeredInstances);
         addIfMissing(m_stateMachineRoot, CreateMode.PERSISTENT, numberOfInstances.array());
-        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, m_memberNode);
+        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, s_memberNode);
         m_canonical_memberId = memberId;
         m_resetCounter = 0;
         m_resetAllowance = resetAllowance;
@@ -2026,23 +2072,30 @@ public class SynchronizedStatesManager {
         m_memberId = m_canonical_memberId + "_v" + m_resetCounter;
     }
 
-    public void ShutdownSynchronizedStatesManager() throws InterruptedException {
+    public void shutdownSynchronizedStatesManager() throws InterruptedException {
         ListenableFuture<?> disableComplete = s_sharedEs.submit(disableInstances);
         try {
             disableComplete.get();
         }
         catch (ExecutionException e) {
-            Throwables.throwIfUnchecked(e);
+            Throwables.throwIfUnchecked(e.getCause());
             throw new RuntimeException(e.getCause());
         }
 
     }
 
+    boolean isRunning() {
+        return m_state.get() == State.RUNNING;
+    }
+
     private final Callable<Void> disableInstances = new Callable<Void>() {
         @Override
         public Void call() throws KeeperException {
+            if (ssmLog.isDebugEnabled()) {
+                ssmLog.debug(m_stateMachineRoot + ": Shutting down");
+            }
             try {
-                m_done.set(true);
+                m_state.set(State.SHUTDOWN);
                 for (StateMachineInstance stateMachine : m_registeredStateMachines) {
                     stateMachine.disableMembership();
                 }
@@ -2062,13 +2115,15 @@ public class SynchronizedStatesManager {
     private final Callable<Void> membershipEventHandler = new Callable<Void>() {
         @Override
         public Void call() throws KeeperException {
-            try {
-                checkForMembershipChanges();
-            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
-                    | InterruptedException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdown without the elector being
-                // shutdown; ignore.
+            if (isRunning()) {
+                try {
+                    checkForMembershipChanges();
+                } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
+                        | InterruptedException e) {
+                    // lost the full connection. some test cases do this...
+                    // means shutdown without the elector being
+                    // shutdown; ignore.
+                }
             }
             return null;
         }
@@ -2079,7 +2134,7 @@ public class SynchronizedStatesManager {
         @Override
         public void process(WatchedEvent event) {
             try {
-                if (!m_done.get()) {
+                if (isRunning()) {
                     for (StateMachineInstance stateMachine : m_registeredStateMachines) {
                         stateMachine.checkMembership();
                     }
@@ -2102,7 +2157,7 @@ public class SynchronizedStatesManager {
         }
 
         private void initializationFailed() {
-            m_done.set(true);
+            m_state.set(State.ERROR);
             m_initComplete.set(false);
         }
 
@@ -2130,7 +2185,7 @@ public class SynchronizedStatesManager {
                 // First become a member of the community
                 new ZKAsyncCreateHandler(m_stateMachineMemberPath, null, CreateMode.PERSISTENT) {
                     @Override
-                    public void run() {
+                    public void runImpl() {
                         if (noCommonKeeperExceptions(m_resultCode)) {
                             addMemberIdIfMissing();
                         }
@@ -2147,7 +2202,7 @@ public class SynchronizedStatesManager {
             new ZKAsyncCreateHandler(ZKUtil.joinZKPath(m_stateMachineMemberPath, m_memberId),
                     null, CreateMode.EPHEMERAL) {
                 @Override
-                public void run() {
+                public void runImpl() {
                     if (noCommonKeeperExceptions(m_resultCode)) {
                         setInitialGroupMembers();
                     }
@@ -2158,7 +2213,7 @@ public class SynchronizedStatesManager {
         private void setInitialGroupMembers() {
             new ZKAsyncChildrenHandler(m_stateMachineMemberPath, m_membershipWatcher) {
                 @Override
-                public void run() {
+                public void runImpl() {
                     if (noCommonKeeperExceptions(m_resultCode)) {
                         m_groupMembers = ImmutableSet.copyOf(m_resultChildren);
 
@@ -2197,7 +2252,7 @@ public class SynchronizedStatesManager {
             // lost the full connection. some test cases do this...
             // means zk shutdown without the elector being shutdown.
             // ignore.
-            m_done.set(true);
+            m_state.set(State.SHUTDOWN);
         }
     }
 
@@ -2267,7 +2322,7 @@ public class SynchronizedStatesManager {
                 } catch (Exception e) {
                     return null; // if something wrong happened in reset(), give up as if the reset limit is hit
                 }
-                m_done.set(false);
+                m_state.set(State.RUNNING);
 
                 syncSSMInitialize();
             }

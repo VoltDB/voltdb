@@ -34,8 +34,11 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -51,6 +54,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.StartAction;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.test.utils.RandomTestRule;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -215,6 +219,9 @@ public class TestStateMachine extends ZKTestBase {
         boolean isDirectVictim;
         volatile boolean staleTaskRequestProcessed = false;
 
+        final CompletableFuture<?> initializedFuture = new CompletableFuture<>();
+        volatile CompletableFuture<?> workFuture;
+
         public boolean toBoolean(ByteBuffer buff) {
             byte[] b = new byte[buff.remaining()];
             buff.get(b, 0, b.length);
@@ -241,6 +248,7 @@ public class TestStateMachine extends ZKTestBase {
         protected void setInitialState(ByteBuffer currentAgreedState) {
             state = toBoolean(currentAgreedState);
             initialized = true;
+            initializedFuture.complete(null);
             assertFalse("State machine local lock held after bool initial state notification", debugIsLocalStateLocked());
         }
 
@@ -289,12 +297,17 @@ public class TestStateMachine extends ZKTestBase {
                 proposed = null;
                 makeProposal = false;
                 ourProposalOrTaskFinished = true;
+                CompletableFuture<?> f = workFuture;
+                workFuture = null;
+                f.complete(null);
             }
             acceptProposalOrTask = true;
             proposalsOrTasksCompleted++;
         }
 
-        void switchState() {
+        Future<?> switchState() {
+            assertNull(workFuture);
+            workFuture = new CompletableFuture<>();
             ourProposalOrTaskFinished = false;
             makeProposal = true;
             if (requestLock()) {
@@ -302,6 +315,8 @@ public class TestStateMachine extends ZKTestBase {
                 proposeStateChange(proposed);
                 assertFalse("State machine local lock held after bool state change request", debugIsLocalStateLocked());
             }
+
+            return workFuture;
         }
 
         @Override
@@ -319,8 +334,7 @@ public class TestStateMachine extends ZKTestBase {
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
             assertFalse("State machine local lock held after bool correlated task completion", debugIsLocalStateLocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
-            assertTrue(ourTask == startTask);
-            startTask = false;
+            assertEquals("Getting unexepected completions ourTask state", proposed != null, ourTask);
             acceptProposalOrTask = true;
             taskResultString = defaultTaskResult;
             correlatedResults = results;
@@ -329,6 +343,9 @@ public class TestStateMachine extends ZKTestBase {
                 startTask = false;
                 ourTask = false;
                 ourProposalOrTaskFinished = true;
+                CompletableFuture<?> f = workFuture;
+                workFuture = null;
+                f.complete(null);
             }
             proposalsOrTasksCompleted++;
         }
@@ -339,7 +356,6 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             assertTrue(ourTask == startTask);
             correlatedTask = true;
-            startTask = false;
             acceptProposalOrTask = true;
             taskResultString = defaultTaskResult;
             uncorrelatedResults = results;
@@ -348,11 +364,16 @@ public class TestStateMachine extends ZKTestBase {
                 ourProposalOrTaskFinished = true;
                 startTask = false;
                 ourTask = false;
+                CompletableFuture<?> f = workFuture;
+                workFuture = null;
+                f.complete(null);
             }
             proposalsOrTasksCompleted++;
         }
 
-        void startTask() {
+        Future<?> startTask() {
+            assertNull(workFuture);
+            workFuture = new CompletableFuture<>();
             ourProposalOrTaskFinished = false;
             correlatedResults = null;
             uncorrelatedResults = null;
@@ -362,6 +383,7 @@ public class TestStateMachine extends ZKTestBase {
                 initiateCoordinatedTask(correlatedTask, proposed);
                 assertFalse("State machine local lock held after bool task request", debugIsLocalStateLocked());
             }
+            return workFuture;
         }
 
         @Override
@@ -2184,6 +2206,92 @@ public class TestStateMachine extends ZKTestBase {
             // Wait for all queued callbacks to be processed
             barrier.await();
         } while (m_booleanStateMachinesForGroup1[1].makeProposal);
+    }
+
+    /*
+     * Test starting a statemachine and shutting it down in a loop with other state machines
+     */
+    @Test(timeout = 60_000)
+    public void thrashRestartingStateMachines() throws Exception {
+        final int loopCount = 10;
+        // Use a cyclic barrier so all state machines shutdown at the same point
+        CyclicBarrier barrier = new CyclicBarrier(4);
+        CompletableFuture<?> future = new CompletableFuture<>();
+
+        // Thread to wrap each state machine manager and instance
+        class SSMThrasher extends Thread {
+            final ZooKeeper m_zooKeeper;
+            final int m_instanceId;
+            SynchronizedStatesManager m_ssm;
+            BooleanStateMachine m_bsm;
+            RandomTestRule m_random = new RandomTestRule();
+
+            public SSMThrasher(ZooKeeper zooKeeper, int instanceId) {
+                super(m_name.getMethodName() + '_' + instanceId);
+                setDaemon(true);
+                m_zooKeeper = zooKeeper;
+                m_instanceId = instanceId;
+                m_random.apply(null, org.junit.runner.Description.createTestDescription(
+                        TestStateMachine.class.getName(), m_name.getMethodName() + '_' + m_instanceId));
+            }
+
+            @Override
+            public void run() {
+                try {
+                    for (int i = 0; i < loopCount; ++i) {
+                        if (m_instanceId == 0) {
+                            System.out.println("LOOP " + i);
+                        }
+                        m_ssm = new SynchronizedStatesManager(m_zooKeeper, stateMachineManagerRoot,
+                                m_name.getMethodName(), Integer.toString(m_instanceId));
+                        m_bsm = new BooleanStateMachine(m_ssm, "test");
+
+                        Thread.sleep(m_random.nextInt(5));
+                        m_bsm.registerStateMachineWithManagerAsync(m_bsm.toByteBuffer(true));
+                        m_bsm.initializedFuture.get();
+
+                        Thread.sleep(m_random.nextInt(5));
+                        m_bsm.startTask().get();
+
+                        Thread.sleep(m_random.nextInt(5));
+                        if (i % barrier.getParties() == m_instanceId) {
+                            m_bsm.switchState().get();
+                        }
+
+                        Thread.sleep(m_random.nextInt(5));
+                        barrier.await();
+
+                        // Sometimes start a task or proposal but don't wait for it to finish before shutdown
+                        if ((i % barrier.getParties() == m_instanceId && i % 3 == 0)
+                                || ((i + 1 % barrier.getParties() == m_instanceId && i % 2 == 0))) {
+                            Thread.sleep(m_random.nextInt(5));
+                            m_bsm.startTask();
+                        } else if (i + 1 % barrier.getParties() == m_instanceId) {
+                            Thread.sleep(m_random.nextInt(5));
+                            m_bsm.switchState();
+                        }
+
+                        Thread.sleep(m_random.nextInt(5));
+                        m_ssm.shutdownSynchronizedStatesManager();
+                    }
+                    future.complete(null);
+                } catch (BrokenBarrierException e) {
+                    System.out.println("Encountered broke barrier: " + m_instanceId);
+                } catch (Throwable t) {
+                    barrier.reset();
+                    future.completeExceptionally(t);
+                }
+            }
+        }
+
+        SSMThrasher[] thrashers = new SSMThrasher[barrier.getParties()];
+
+        for (int i = 0; i < thrashers.length; ++i) {
+            thrashers[i] = new SSMThrasher(m_messengers.get(i).getZK(), i);
+            thrashers[i].start();
+        }
+
+        future.get();
     }
 
     // Utility methods for extracting a field from a class or instance
