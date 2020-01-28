@@ -613,25 +613,21 @@ CompactingChunks<dir>::BatchRemoveAccumulator::insert(
     }
 }
 
-template<shrink_direction dir> inline
-pair<vector<typename CompactingChunks<dir>::list_type::iterator>, vector<void*>>
+template<shrink_direction dir> inline vector<void*>
 CompactingChunks<dir>::BatchRemoveAccumulator::sorted() {
-    using map_type = map<size_t, pair<typename list_type::iterator, vector<void*>>, Comp>;
-    using result_type = pair<vector<typename list_type::iterator>, vector<void*>>;
+    using map_type = map<size_t, vector<void*>, Comp>;
     auto const s = accumulate(begin(), end(), map_type{},
             [](map_type& acc, super::value_type& entry) {                  // entry : map<list_type::iterator, tuple<size_t, vector<void*>>>
-                auto& iter = entry.first;
                 auto const index = get<0>(entry.second);
                 auto& v = get<1>(entry.second);
                 std::sort(v.begin(), v.end(), greater<void*>());           // destructuring (i.e. in-place) sort
-                acc.emplace(index, make_pair(iter, v));
+                acc.emplace(index, v);
                 return acc;
             });
-    return accumulate(s.cbegin(), s.cend(), result_type{},
-            [](result_type& acc, typename map_type::value_type const& entry) {
+    return accumulate(s.cbegin(), s.cend(), vector<void*>{},
+            [](vector<void*>& acc, typename map_type::value_type const& entry) {
                 auto const& val = entry.second;
-                acc.first.emplace_back(val.first);
-                copy(val.second.cbegin(), val.second.cend(), back_inserter(acc.second));
+                copy(val.cbegin(), val.cend(), back_inserter(acc));
                 return acc;
             });
 }
@@ -771,29 +767,33 @@ CompactingChunks<dir>::free(set<void*> const& args,
                     return acc;
                 }
             }).sorted();
-    auto const trans = build_map(subtract(sorted.second, unmoved),         // addr requested to be removed, and
-            subtract(addrToRemove, unmoved));                              // addr that got compacted: increase together
+    auto const trans = build_map(subtract(sorted, unmoved),         // addr requested to be removed, and
+            subtract(addrToRemove, unmoved));                       // addr that got compacted: increase together
     cb(move(unmoved), trans);
     // storage remapping and clean up
-    for (auto const& entry : trans) {
-        memcpy(entry.first, entry.second, tupleSize());
-    }
+    for_each(trans.cbegin(), trans.cend(), [this](typename decltype(trans)::value_type const& entry) {
+                memcpy(entry.first, entry.second, tupleSize());
+            });
     auto const allocsPerTuple =
         (reinterpret_cast<char const*>(compactFrom()->end()) - reinterpret_cast<char const*>(compactFrom()->begin())) / tupleSize(),
          offset = reinterpret_cast<char const*>(compactFrom()->next()) - reinterpret_cast<char const*>(compactFrom()->begin());
     // dangerous: direct manipulation on each offended chunks
     for (auto wholeChunks = args.size() / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
-        trait::releasible(compactFrom());
+        trait::releasible(compactFrom());      // whole chunk releases
     }
-    if (args.size() >= allocsPerTuple) {
+    if (args.size() >= allocsPerTuple) {       // any chunk released at all?
         reinterpret_cast<char*&>(compactFrom()->m_next) = reinterpret_cast<char*>(compactFrom()->begin()) + offset;
     }
-    n = args.size() % allocsPerTuple;
-    if (n > 0) {          // need for manual cursor adjustment on each chunk
-        until_([this, &n] (pair<iterator_type, void*> const& p) {
-                    free(p.second);
-                    return --n == 0;
-                });
+    n = (args.size() % allocsPerTuple) * tupleSize();
+    if (n > 0) {          // need manual cursor adjustment on the remaining chunks
+        auto const rem = reinterpret_cast<char*>(compactFrom()->next()) - reinterpret_cast<char*>(compactFrom()->begin());
+        if (n > rem) {
+            trait::releasible(compactFrom());
+            reinterpret_cast<char*&>(compactFrom()->m_next) -= n - rem;
+        } else {
+            reinterpret_cast<char*&>(compactFrom()->m_next) -= rem - n;
+        }
+        vassert(compactFrom()->next() >= compactFrom()->begin());
     }
 }
 

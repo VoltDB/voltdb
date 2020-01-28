@@ -901,11 +901,6 @@ void testHookedCompactingChunks() {
         using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
         size_t i = 0;
         fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
-            if (p != nullptr && ! Gen::same(p, i)) {
-                printf("Diff %lu: expecting %s, got %s\n", i,
-                        Gen::hex(i).c_str(), Gen::hex(p).c_str());
-                fflush(stdout);
-            }
             assert(p == nullptr || Gen::same(p, i++));
         });
         assert(i == NumTuples);
@@ -949,10 +944,7 @@ void testHookedCompactingChunks() {
         assert(iter != addresses.cend());
         return distance(addresses.cbegin(), iter);
     };
-    alloc.remove(ss, [&index_of](map<void*, void*> const& m) {
-            for(auto const& entry : m) {
-                printf("%lu => %lu\n", index_of(entry.first), index_of(entry.second));
-            }});
+    alloc.remove(ss, [&index_of](map<void*, void*> const& m) {});
     verify_snapshot_const();
 
     // Step 4: insertion
@@ -1109,7 +1101,7 @@ void testHookedCompactingChunksBatchRemove_single2() {
 }
 
 template<typename Chunk, gc_policy pol>
-void testHookedCompactingChunksBatchRemove_multi() {
+void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
     using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
@@ -1155,6 +1147,55 @@ void testHookedCompactingChunksBatchRemove_multi() {
     alloc.thaw();
 }
 
+template<typename Chunk, gc_policy pol>
+void testHookedCompactingChunksBatchRemove_multi2() {
+    using HookAlloc = NonCompactingChunks<Chunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, NumTuples>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    addresses_type addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.insert(gen.get());
+    }
+    // verifies both const snapshot iterator, and destructuring iterator
+    auto const verify_snapshot_const = [&alloc]() {
+        auto const& alloc_cref = alloc;
+        using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
+        using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
+        size_t i = 0;
+        fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
+                assert(p == nullptr || Gen::same(p, i++));
+            });
+        assert(i == NumTuples);
+        i = 0;
+        for_each<snapshot_iterator>(alloc, [&i](void const* p) {
+                assert(p == nullptr || Gen::same(p, i++));
+                });
+        assert(i == NumTuples);
+    };
+    alloc.freeze();
+
+    set<void*> batch;
+    for(auto iter = addresses.cbegin();                             // remove every other
+            iter != addresses.cend();) {
+        batch.emplace(const_cast<void*>(*iter));
+        if (++iter == addresses.cend()) {
+            break;
+        } else {
+            ++iter;
+        }
+    }
+    assert(batch.size() == NumTuples / 2);
+    alloc.remove(batch, [](map<void*, void*> const&){});
+    verify_snapshot_const();
+    alloc.thaw();
+}
+
 template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
     inline void operator()() const {
         testHookedCompactingChunks<Chunk, pol, shrink_direction::head>();
@@ -1162,7 +1203,8 @@ template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
         // batch removal tests assume head-compacting direction
         testHookedCompactingChunksBatchRemove_single1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single2<Chunk, pol>();
-        testHookedCompactingChunksBatchRemove_multi<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_multi1<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_multi2<Chunk, pol>();
     }
 };
 template<typename Chunk> struct TestHookedCompactingChunks1 {

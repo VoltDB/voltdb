@@ -423,7 +423,7 @@ namespace voltdb {
                 using super = map<list_type::iterator, tuple<size_t, vector<void*>>>;
                 BatchRemoveAccumulator(CompactingChunks<dir>*);
                 void insert(list_type::iterator, void*);
-                pair<vector<list_type::iterator>, vector<void*>> sorted();                         // in compacting order
+                vector<void*> sorted();                         // in compacting order
             };
         public:
             using Compact = typename conditional<dir == shrink_direction::head,
