@@ -90,11 +90,11 @@ public class HashSet extends BaseHashMap implements Set {
         return oldSize != size();
     }
 
-    public boolean addCheckIndex(Object key) {
+    public boolean addAlwaysIfAggregate(Object key) {
 
         int oldSize = size();
 
-        super.addOrRemoveCheckIndex(0, 0, key, null, false);
+        super.addOrRemoveAlwaysIfAggregate(0, 0, key, null, false);
 
         return oldSize != size();
     }

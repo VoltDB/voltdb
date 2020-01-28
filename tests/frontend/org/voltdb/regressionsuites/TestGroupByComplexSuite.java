@@ -114,6 +114,9 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
     @Test
     public void testComplexAggs() throws IOException, ProcCallException {
+        if (isHSQL()) {
+            return;
+        }
         loadData(false);
         Client client = getClient();
         ClientResponse cr;

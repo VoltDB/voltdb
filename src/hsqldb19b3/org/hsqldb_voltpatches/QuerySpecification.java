@@ -802,8 +802,6 @@ public class QuerySpecification extends QueryExpression {
                 exprColumns[i].dataType = e.dataType;
                 exprColumns[i].queryTableColumnIndex = e.queryTableColumnIndex;
             }
-
-            tempSet.clear();
         }
     }
 
@@ -1051,8 +1049,7 @@ public class QuerySpecification extends QueryExpression {
         for (int i = indexStartAggregates; i < indexLimitExpressions; i++) {
             Expression e = exprColumns[i];
             Expression c = new ExpressionColumn(e, i, resultRangePosition);
-
-            expressions.addCheckIndex(e);
+            expressions.addAlwaysIfAggregate(e);
             columnExpressions.add(c);
         }
 

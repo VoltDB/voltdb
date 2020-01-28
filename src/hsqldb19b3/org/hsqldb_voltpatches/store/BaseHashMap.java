@@ -431,9 +431,9 @@ public class BaseHashMap {
         return returnValue;
     }
 
-    protected Object addOrRemoveCheckIndex(long longKey, long longValue,
-                                 Object objectKey, Object objectValue,
-                                 boolean remove) {
+    protected Object addOrRemoveAlwaysIfAggregate(long longKey, long longValue,
+                                                  Object objectKey, Object objectValue,
+                                                  boolean remove) {
 
         int hash = (int) longKey;
 
@@ -456,13 +456,9 @@ public class BaseHashMap {
             if (isObjectKey) {
                 // A VoltDB extension to prevent an intermittent NPE on catalogUpdate?
                 if (objectKey.equals(objectKeyTable[lookup])) {
-                    if ((objectKey instanceof ExpressionAggregate) &&
-                            ((Expression) objectKey).queryTableColumnIndexEquals((Expression) objectKeyTable[lookup])) {
+                    if (!(objectKey instanceof ExpressionAggregate)) {
                         break;
                     }
-                /* disabled 1 line ...
-                if (objectKeyTable[lookup].equals(objectKey)) {
-                ... disabled 1 line */
                     // End of VoltDB extension
                 }
             } else if (isIntKey) {
