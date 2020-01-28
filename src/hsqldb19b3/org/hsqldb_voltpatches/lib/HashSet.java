@@ -90,6 +90,15 @@ public class HashSet extends BaseHashMap implements Set {
         return oldSize != size();
     }
 
+    public boolean addCheckIndex(Object key) {
+
+        int oldSize = size();
+
+        super.addOrRemoveCheckIndex(0, 0, key, null, false);
+
+        return oldSize != size();
+    }
+
     public boolean addAll(Collection c) {
 
         int      oldSize = size();

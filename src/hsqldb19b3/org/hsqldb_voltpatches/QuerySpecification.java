@@ -789,19 +789,18 @@ public class QuerySpecification extends QueryExpression {
         if (isAggregated) {
             aggregateCheck = new boolean[indexStartAggregates];
 
-            tempSet.addAll(aggregateSet);
-
             indexLimitData = indexLimitExpressions = exprColumns.length
-                    + tempSet.size();
+                    + aggregateSet.size();
             exprColumns = (Expression[]) ArrayUtil.resizeArray(exprColumns,
                     indexLimitExpressions);
 
             for (int i = indexStartAggregates, j = 0;
                     i < indexLimitExpressions; i++, j++) {
-                ExpressionAggregate e = (ExpressionAggregate) tempSet.get(j);
+                ExpressionAggregate e = (ExpressionAggregate) aggregateSet.get(j);
 
                 exprColumns[i]          = new ExpressionAggregate(e);
                 exprColumns[i].dataType = e.dataType;
+                exprColumns[i].queryTableColumnIndex = e.queryTableColumnIndex;
             }
 
             tempSet.clear();
@@ -1053,7 +1052,7 @@ public class QuerySpecification extends QueryExpression {
             Expression e = exprColumns[i];
             Expression c = new ExpressionColumn(e, i, resultRangePosition);
 
-            expressions.add(e);
+            expressions.addCheckIndex(e);
             columnExpressions.add(c);
         }
 
