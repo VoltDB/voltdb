@@ -929,7 +929,7 @@ public class ExportCoordinator {
                         exportLog.debug("Export coordinator shutting down...");
                     }
                     m_stateMachine.shutdownCoordinationTask();
-                    m_ssm.ShutdownSynchronizedStatesManager();
+                    m_ssm.shutdownSynchronizedStatesManager();
 
                 } catch (Exception e) {
                     exportLog.error("Failed to initiate a coordinator shutdown: " + e);
