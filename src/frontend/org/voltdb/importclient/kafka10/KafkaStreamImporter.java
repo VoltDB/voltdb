@@ -108,6 +108,9 @@ public class KafkaStreamImporter extends AbstractImporter {
             props.put("security.protocol", m_config.getSecurityProtocol());
         }
 
+        // We manually commit offsets after we know data has been processed
+        props.put("enable.auto.commit", false);
+
         // Query the topics and partitions outside the lock in order to properly
         // respond to a shutdown query in case we're querying a non-existent broker
         int kafkaPartitions = 0;
