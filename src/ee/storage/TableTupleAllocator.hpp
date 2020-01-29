@@ -30,7 +30,6 @@
 // older GCC compilers incurs some efficiency loss
 #if defined(__GNUC__) && (__GNUC__ <= 4)
 #define CENTOS7
-#error __GNUC__
 #endif
 
 namespace voltdb {
@@ -201,6 +200,7 @@ namespace voltdb {
             using super::empty; using super::size;
             using super::front; using super::back;
             size_t distance(iterator);           // std::distance(begin(), arg)
+            size_t distance(const_iterator) const;
             typename super::iterator rev2fwd(typename super::reverse_iterator);
         };
 
@@ -421,14 +421,16 @@ namespace voltdb {
                 using map_type = map<size_t, vector<void*>, Comp>;
             protected:
                 CompactingChunks<dir>& chunks() noexcept;
+                list_type::iterator pop();             // force removing the chunk to be compacted from
                 vector<void*> collect() const;
                 using map<list_type::iterator, tuple<size_t, vector<void*>>>::clear;
             public:
                 using super = map<list_type::iterator, tuple<size_t, vector<void*>>>;
-                BatchRemoveAccumulator(CompactingChunks<dir>*);
+                explicit BatchRemoveAccumulator(CompactingChunks<dir>*);
                 void insert(list_type::iterator, void*);
                 vector<void*> sorted();                         // in compacting order
             };
+        protected:
             class DelayedRemover : protected BatchRemoveAccumulator {
                 using super = BatchRemoveAccumulator;
                 size_t m_size = 0;
@@ -437,15 +439,14 @@ namespace voltdb {
                 map<void*, void*> m_move{};
             public:
                 explicit DelayedRemover(CompactingChunks<dir>&);
-                DelayedRemover(DelayedRemover const&) = delete;
-                DelayedRemover(DelayedRemover&&) = delete;
                 // Register a single allocation to be removed later
                 size_t add(void*);
                 // Memory movements (src to be removed => dst to be copied over) due to batch remove
-                void prepare(bool);
-                map<void*, void*> movements() const;
+                DelayedRemover& prepare(bool);
+                map<void*, void*> const& movements() const;
+                set<void*> const& removed() const;
                 // Actuate batch remove
-                void force(bool);
+                size_t force();
             } m_batched;
         public:
             using Compact = typename conditional<dir == shrink_direction::head,
@@ -461,33 +462,10 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
-            /**
-             * Efficiently frees a batch of allocations.
-             * \arg #1: a set of allocation addresses to be
-             * removed
-             * \arg #2: a call back that client specifies what
-             * should happen when a move (from compaction)
-             * occurs. Map for removed addr => addr that fills in
-             * the removed address.
-             */
-            void free(set<void*> const&, function<void(set<void*>const&&, map<void*, void*>const&)> const&);
             size_t size() const noexcept;              // used for table count executor
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
             using list_type::empty;
-            /**
-             * Separate calls for batch-free:
-             * 1. delayed_free_add registers one allocation to be
-             * freed later in a batch. Returns batch size pending
-             * to be freed
-             * 2. delayed_free_get is called prior to actual
-             * forcing batch free, to retrieve translations.
-             * 3. delayed_free_force is called to actuate the
-             * batch free.
-             */
-            size_t delayed_free_add(void*);
-            map<void*, void*> delayed_free_get();
-            void delayed_free_force();
         };
 
         struct BaseHistoryRetainTrait {
@@ -606,7 +584,7 @@ namespace voltdb {
             void const* insert(void const*);
             void const* remove(void*);
             /**
-             * Batch removal.
+             * Batch removal using a single call
              * \arg #1: a set of allocation addresses to be
              * removed
              * \arg #2: a call back that client specifies what
@@ -615,6 +593,12 @@ namespace voltdb {
              * the removed address
              */
             void remove(set<void*> const&, function<void(map<void*, void*>const&)> const&);
+            /**
+             * Batch removal using separate calls
+             */
+            size_t remove_add(void*);
+            map<void*, void*>const& remove_moves();
+            size_t remove_force();
             void update(void* dst, void const* src);   // src as temp tuple gets written to persistent location dst
         };
 
@@ -778,10 +762,10 @@ namespace voltdb {
             template<iterator_permission_type perm>
             class hooked_iterator_type : public time_traveling_iterator_type<typename Chunks::hook_type, perm> {
                 using super = time_traveling_iterator_type<typename Chunks::hook_type, perm>;
-                hooked_iterator_type(typename super::container_type);
             public:
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
+                hooked_iterator_type(typename super::container_type);
                 static hooked_iterator_type begin(container_type);
                 static hooked_iterator_type end(container_type);
             };

@@ -263,6 +263,11 @@ size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter
     return std::distance(begin(), iter);
 }
 
+template<typename Chunk, typename E> inline
+size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
+    return std::distance(cbegin(), iter);
+}
+
 // queue: insert to tail; get from head; stack: insert to head,
 // get from head. We could use if-constexpr to replace this
 // implementation hassel.
@@ -614,8 +619,8 @@ namespace batch_remove_aid {
      */
     template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
         for (auto const& entry : inter) {
-            auto const iter = find(src.cbegin(), src.cend(), entry);
-            vassert(iter != src.cend());
+            auto const iter = find(src.begin(), src.end(), entry);
+            vassert(iter != src.end());
             src.erase(iter);
         }
         return src;
@@ -639,6 +644,14 @@ CompactingChunks<dir>::BatchRemoveAccumulator::BatchRemoveAccumulator(Compacting
 template<shrink_direction dir> inline CompactingChunks<dir>&
 CompactingChunks<dir>::BatchRemoveAccumulator::chunks() noexcept {
     return *m_self;
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::list_type::iterator
+CompactingChunks<dir>::BatchRemoveAccumulator::pop() {
+    auto iter = m_self->compactFrom();
+    reinterpret_cast<char*&>(iter->m_next) = reinterpret_cast<char*>(iter->begin());
+    m_self->releasable(iter);
+    return m_self->compactFrom();
 }
 
 template<shrink_direction dir> inline vector<void*>
@@ -698,12 +711,18 @@ template<shrink_direction dir> inline size_t CompactingChunks<dir>::DelayedRemov
     }
 }
 
-template<shrink_direction dir> inline map<void*, void*>
+template<shrink_direction dir> inline map<void*, void*> const&
 CompactingChunks<dir>::DelayedRemover::movements() const{
     return m_move;
 }
 
-template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::prepare(bool dupCheck) {
+template<shrink_direction dir> inline set<void*> const&
+CompactingChunks<dir>::DelayedRemover::removed() const{
+    return m_remove;
+}
+
+template<shrink_direction dir> typename CompactingChunks<dir>::DelayedRemover&
+CompactingChunks<dir>::DelayedRemover::prepare(bool dupCheck) {
     using namespace batch_remove_aid;
     if (! m_prepared) {
         // extra validation: any duplicates with add() calls?
@@ -726,38 +745,36 @@ template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::prepa
             m_prepared = true;
         }
     }
+    return *this;
 }
 
-template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::force(bool dupCheck) {
-    prepare(dupCheck);
+template<shrink_direction dir> size_t CompactingChunks<dir>::DelayedRemover::force() {
     auto hd = super::chunks().compactFrom();
     auto const tupleSize = super::chunks().tupleSize(),
         allocsPerTuple = (reinterpret_cast<char const*>(hd->end()) -
-                reinterpret_cast<char const*>(hd->begin())) / tupleSize,
-         offset = reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
+                reinterpret_cast<char const*>(hd->begin())) / tupleSize;
+    auto const offset =
+        reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
     auto const total = m_move.size() + m_remove.size();
     // storage remapping and clean up
     for_each(m_move.cbegin(), m_move.cend(),
-            [tupleSize, this](typename map<void*, void*>::value_type const& entry) {
+            [tupleSize](typename map<void*, void*>::value_type const& entry) {
                 memcpy(entry.first, entry.second, tupleSize);
             });
     m_move.clear();
     m_remove.clear();
     // dangerous: direct manipulation on each offended chunks
     for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
-        super::chunks().releasable(super::chunks().compactFrom());      // whole chunk releases
+        hd = super::pop();
     }
-    hd = super::chunks().compactFrom();
     if (total >= allocsPerTuple) {       // any chunk released at all?
-        reinterpret_cast<char*&>(hd->m_next) =
-            reinterpret_cast<char*>(hd->begin()) + offset;
+        reinterpret_cast<char*&>(hd->m_next) = reinterpret_cast<char*>(hd->begin()) + offset;
     }
     auto const remBytes = (total % allocsPerTuple) * tupleSize;
     if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
         auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
         if (remBytes > rem) {
-            super::chunks().releasable(hd);
-            hd = super::chunks().compactFrom();
+            hd = super::pop();
             reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
         } else {
             reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
@@ -765,20 +782,9 @@ template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::force
         vassert(hd->next() >= hd->begin());
     }
     super::clear();
-}
-
-// Separate API calls for batch free
-template<shrink_direction dir> inline size_t CompactingChunks<dir>::delayed_free_add(void* p) {
-    return m_batched.add(p);
-}
-
-template<shrink_direction dir> inline map<void*, void*> CompactingChunks<dir>::delayed_free_get() {
-    m_batched.prepare(true);
-    return m_batched.movements();
-}
-
-template<shrink_direction dir> inline void CompactingChunks<dir>::delayed_free_force() {
-    m_batched.force(true);
+    auto r = m_size;
+    m_size = 0;
+    return r;
 }
 
 template<shrink_direction dir> inline typename CompactingChunks<dir>::CompactingIterator::value_type
@@ -854,62 +860,6 @@ template<shrink_direction dir> inline void CompactingChunks<dir>::CompactingIter
         m_cursor = reinterpret_cast<char*>(m_iter->next()) -
             reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
         vassert(m_cursor >= m_iter->begin());
-    }
-}
-
-template<shrink_direction dir> inline void
-CompactingChunks<dir>::free(set<void*> const& args,
-        function<void(set<void*>const&&, map<void*, void*>const&)> const& cb) {
-    using namespace batch_remove_aid;
-    using iterator_type = typename CompactingChunks<dir>::CompactingIterator::iterator_type;
-    vector<void*> addrToRemove{};
-    size_t n = args.size();
-    addrToRemove.reserve(n);
-    until_([&addrToRemove, &n] (pair<iterator_type, void*> const& entry) {
-            addrToRemove.emplace_back(entry.second);
-            return --n == 0;
-        });
-    auto const unmoved = intersection(args, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
-    auto const sorted = accumulate(args.cbegin(), args.cend(), BatchRemoveAccumulator(this),
-            [this](BatchRemoveAccumulator& acc, void* p) {
-                auto const* iter = find(p);
-                if (iter == nullptr) {         // validate,
-                    snprintf(buf, sizeof buf, "CompactingChunk<%s>::free(set<void*>, ...): invalid addr %p",
-                            dir == shrink_direction::head ? "head" : "tail", p);
-                    buf[sizeof buf - 1] = 0;
-                    throw range_error(buf);
-                } else {                       // and accumulate
-                    acc.insert(*iter, p);
-                    return acc;
-                }
-            }).sorted();
-    auto const trans = build_map(subtract(sorted, unmoved),         // addr requested to be removed, and
-            subtract(addrToRemove, unmoved));                       // addr that got compacted: increase together
-    cb(move(unmoved), trans);
-    // storage remapping and clean up
-    for_each(trans.cbegin(), trans.cend(), [this](typename decltype(trans)::value_type const& entry) {
-                memcpy(entry.first, entry.second, tupleSize());
-            });
-    auto const allocsPerTuple =
-        (reinterpret_cast<char const*>(compactFrom()->end()) - reinterpret_cast<char const*>(compactFrom()->begin())) / tupleSize(),
-         offset = reinterpret_cast<char const*>(compactFrom()->next()) - reinterpret_cast<char const*>(compactFrom()->begin());
-    // dangerous: direct manipulation on each offended chunks
-    for (auto wholeChunks = args.size() / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
-        trait::releasable(compactFrom());      // whole chunk releases
-    }
-    if (args.size() >= allocsPerTuple) {       // any chunk released at all?
-        reinterpret_cast<char*&>(compactFrom()->m_next) = reinterpret_cast<char*>(compactFrom()->begin()) + offset;
-    }
-    n = (args.size() % allocsPerTuple) * tupleSize();
-    if (n > 0) {          // need manual cursor adjustment on the remaining chunks
-        auto const rem = reinterpret_cast<char*>(compactFrom()->next()) - reinterpret_cast<char*>(compactFrom()->begin());
-        if (n > rem) {
-            trait::releasable(compactFrom());
-            reinterpret_cast<char*&>(compactFrom()->m_next) -= n - rem;
-        } else {
-            reinterpret_cast<char*&>(compactFrom()->m_next) -= rem - n;
-        }
-        vassert(compactFrom()->next() >= compactFrom()->begin());
     }
 }
 
@@ -1536,18 +1486,51 @@ HookedCompactingChunks<Chunks, Hook, E>::remove(void* dst) {
 template<typename Chunks, typename Hook, typename E> inline void
 HookedCompactingChunks<Chunks, Hook, E>::remove(
         set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
-    Chunks::free(src, [this, &cb] (set<void*> const&& v, map<void*, void*> const& m) {       // HOF
-                cb(m);     // client call back
-                // hook registration
-                for_each(v.cbegin(), v.cend(), [this](void* s) {
-                        Hook::copy(s);
-                        Hook::add(Hook::ChangeType::Deletion, s, nullptr);
-                    });
-                for_each(m.cbegin(), m.cend(), [this](pair<void*, void*> const& entry) {
-                        Hook::copy(entry.first);
-                        Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
-                    });
+    using Remover = typename Chunks::DelayedRemover;
+    auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
+            [](Remover& batch, void* p) {
+                batch.add(p);
+                return batch;
+            }).prepare(false);
+    cb(batch.movements());
+    // hook registration
+    for_each(batch.removed().cbegin(), batch.removed().cend(),
+            [this](void* s) {
+                Hook::copy(s);
+                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
             });
+    for_each(batch.movements().cbegin(), batch.movements().cend(),
+            [this](pair<void*, void*> const& entry) {
+                Hook::copy(entry.first);
+                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+            });
+    batch.force();
+}
+
+template<typename Chunks, typename Hook, typename E> inline size_t
+HookedCompactingChunks<Chunks, Hook, E>::remove_add(void* p) {
+    return Chunks::m_batched.add(p);
+}
+
+template<typename Chunks, typename Hook, typename E> inline map<void*, void*> const&
+HookedCompactingChunks<Chunks, Hook, E>::remove_moves() {
+    return Chunks::m_batched.prepare(true).movements();
+}
+
+template<typename Chunks, typename Hook, typename E> inline size_t
+HookedCompactingChunks<Chunks, Hook, E>::remove_force() {
+    // hook registration
+    for_each(Chunks::m_batched.removed().cbegin(), Chunks::m_batched.removed().cend(),
+            [this](void* s) {
+                Hook::copy(s);
+                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
+            });
+    for_each(remove_moves().cbegin(), remove_moves().cend(),
+            [this](pair<void*, void*> const& entry) {
+                Hook::copy(entry.first);
+                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+            });
+    return Chunks::m_batched.prepare(true).force();
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

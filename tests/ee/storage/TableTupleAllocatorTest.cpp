@@ -377,87 +377,6 @@ void testCompactingChunks() {
     }
 }
 
-template<shrink_direction dir>
-void testCompactingChunksBatchRemoval_single1() {                     // single chunk test
-    using Chunks = CompactingChunks<dir>;
-    StringGen<TupleSize> gen;
-    Chunks alloc(TupleSize);
-    array<void*, AllocsPerChunk> addresses;
-    size_t i;
-    for(i = 0; i < AllocsPerChunk; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-    // 1. Remove last 10 addr allocated: no movement needed
-    vector<void*> removed; map<void*, void*> moved;
-    alloc.free(set<void*>(prev(addresses.cend(), 10), addresses.cend()),
-            [&removed, &moved](set<void*> const&& s, map<void*, void*> const& m) {
-                copy(s.cbegin(), s.cend(), back_inserter(removed));
-                copy(m.cbegin(), m.cend(), inserter(moved, moved.end()));
-            });
-    assert(moved.empty());
-    assert(removed.size() == 10);
-    // correctness check
-    assert(removed.cend() ==
-            mismatch(prev(addresses.cend(), 10), addresses.cend(),
-                removed.cbegin()).second);
-}
-
-template<shrink_direction dir>
-void testCompactingChunksBatchRemoval_single2() {                     // single chunk test
-    using Chunks = CompactingChunks<dir>;
-    StringGen<TupleSize> gen;
-    Chunks alloc(TupleSize);
-    array<void*, AllocsPerChunk> addresses;
-    size_t i;
-    for(i = 0; i < AllocsPerChunk; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-    // 2. Remove first 10 addr allocated
-    vector<void*> removed; map<void*, void*> moved;
-    alloc.free(set<void*>(addresses.begin(), next(addresses.begin(), 10)),
-            [&moved, &removed](set<void*> const&& s, map<void*, void*> const& m) {
-                copy(s.cbegin(), s.cend(), back_inserter(removed));
-                copy(m.cbegin(), m.cend(), inserter(moved, moved.end()));
-            });
-    assert(moved.size() == 10);
-    assert(removed.empty());
-    i = 0;         // correctness check: 9 => 31, 8 => 30, 7 => 29, ...
-    for (auto iter1 = addresses.cbegin(), iter2 = prev(addresses.cend(), 10);
-            i < 10;
-            ++i, ++iter1, ++iter2) {
-        assert(moved.count(*iter1) > 0 && moved.find(*iter1)->second == *iter2);
-        assert(StringGen<TupleSize>::same(*iter1, i + 22));
-    }
-}
-
-template<shrink_direction dir>
-void testCompactingChunksBatchRemoval_multi() {                     // multiple chunk test
-    using Gen = StringGen<TupleSize>;
-    Gen gen;
-    CompactingChunks<dir> alloc(TupleSize);
-    array<void*, AllocsPerChunk * 3> addresses;
-    size_t i;
-    for (i = 0; i < AllocsPerChunk * 3; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-    set<void*> batch;
-    // first and last 10 allocs in each of 3 chunks
-    auto iter = addresses.begin();
-    for (i = 0; i < 3; ++i) {
-        copy(iter, next(iter, 10), inserter(batch, batch.end()));
-        advance(iter, AllocsPerChunk - 10);
-        copy(iter, next(iter, 10), inserter(batch, batch.end()));
-        advance(iter, 10);
-    }
-    assert(batch.size() == 60);
-    vector<void*> removed; map<void*, void*> moved;
-    alloc.free(batch, [&moved, &removed](set<void*> const&& s, map<void*, void*> const& m){
-                copy(s.cbegin(), s.cend(), back_inserter(removed));
-                copy(m.cbegin(), m.cend(), inserter(moved, moved.end()));
-            });
-    assert(removed.size() == 36 && moved.size() == 24);
-}
-
 template<typename Alloc, typename Compactible = typename Alloc::Compact> struct TrackedDeleter {
     Alloc& m_alloc;
     bool& m_freed;
@@ -577,12 +496,6 @@ TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
         testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
         testCustomizedIterator<CompactingChunks<shrink_direction::head>, 6>(skipped);       // a different mask
     }
-    testCompactingChunksBatchRemoval_single1<shrink_direction::head>();
-    testCompactingChunksBatchRemoval_single1<shrink_direction::tail>();
-    testCompactingChunksBatchRemoval_single2<shrink_direction::head>();
-    testCompactingChunksBatchRemoval_single2<shrink_direction::tail>();
-    testCompactingChunksBatchRemoval_multi<shrink_direction::head>();
-    testCompactingChunksBatchRemoval_multi<shrink_direction::tail>();
 }
 
 template<typename Chunks, size_t NthBit>
@@ -934,7 +847,7 @@ void testHookedCompactingChunks() {
     }
     verify_snapshot_const();
 
-    // Step 3: batch deletion
+    // Step 3: batch deletion, using single API
     set<void*> ss;
     for (i = 909; i < 999; ++i) {
         ss.emplace(const_cast<void*>(addresses[i]));
@@ -954,8 +867,8 @@ void testHookedCompactingChunks() {
     verify_snapshot_const();
 
     // Step 5: update
-    for (i = 0; i < 200; ++i) {
-        alloc.update(const_cast<void*>(addresses[i + 2000]), addresses[i]);
+    for (i = 2000; i < 2200; ++i) {
+        alloc.update(const_cast<void*>(addresses[i]), gen.get());
     }
     verify_snapshot_const();
 
@@ -970,42 +883,49 @@ void testHookedCompactingChunks() {
     latest.reserve(NumTuples);
     fold<const_iterator>(alloc_cref, [&latest](void const* p) { latest.emplace_back(p); });
     random_device rd; mt19937 rgen(rd());
-    uniform_int_distribution<size_t> range(0, latest.size() - 1), changeTypes(0, 2);
+    uniform_int_distribution<size_t> range(0, latest.size() - 1), changeTypes(0, 3), whole(0, NumTuples - 1);
     void const* p1 = nullptr;
-    size_t ins = 0, del = 0, update = 0;
     for (i = 0; i < 8000;) {
-        size_t i1, i2;
+        size_t ii;
         switch(changeTypes(rgen)) {
             case 0:                                            // insertion
                 p1 = alloc.insert(gen.get());
-                ++ins;
                 break;
             case 1:                                            // deletion
-                i1 = range(rgen);
-                if (latest[i1] == nullptr) {
+                ii = range(rgen);
+                if (latest[ii] == nullptr) {
                     continue;
                 } else {
                     try {
-                        alloc.remove(const_cast<void*>(latest[i1]));
-                        latest[i1] = p1;
+                        alloc.remove(const_cast<void*>(latest[ii]));
+                        latest[ii] = p1;
                         p1 = nullptr;
-                        ++del;
                     } catch (range_error const&) {             // if we tried to delete a non-existent address, pick another option
                         continue;
                     }
                     break;
                 }
             case 2:                                            // update
-            default:;
-                i1 = range(rgen); i2 = range(rgen);
-                if (i1 == i2 || latest[i1] == nullptr || latest[i2] == nullptr) {
+                ii = range(rgen);
+                if (latest[ii] == nullptr) {
                     continue;
                 } else {
-                    alloc.update(const_cast<void*>(latest[i2]), latest[i1]);
-                    latest[i2] = p1;
+                    alloc.update(const_cast<void*>(latest[ii]), gen.get());
+                    latest[ii] = p1;
                     p1 = nullptr;
-                    ++update;
                 }
+                break;
+            case 3:                                            // batch remove, using separate APIs
+                ii = 0;
+                for_each<typename IterableTableTupleChunks<Alloc, truth>::iterator>(
+                        alloc, [&alloc, &ii, &rgen, &whole](void* p) {
+                            if (static_cast<double>(whole(rgen)) / NumTuples < 0.01) {     // 1% chance getting picked for batch deletion
+                                ++ii;
+                                alloc.remove_add(p);
+                            }
+                        });
+                assert(alloc.remove_force() == ii);
+            default:;
         }
         ++i;
     }
