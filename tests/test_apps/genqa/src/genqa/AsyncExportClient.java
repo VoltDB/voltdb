@@ -438,13 +438,17 @@ public class AsyncExportClient
                 // do some sanity checks on the counts...
                 long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
                 if (table_with_metadata_count != meta_data_expected) {
-                    System.err.println("ERROR: Metadata expected " + meta_data_expected +
+                    log.info("Metadata expected " + meta_data_expected +
                         " count does not match with table count: " + table_with_metadata_count + "\n");
+                    // System.err.println("ERROR: Metadata expected " + meta_data_expected +
+                    //     " count does not match with table count: " + table_with_metadata_count + "\n");
                 }
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
-                    System.err.println("Insert and delete count " + export_table_expected +
+                    log.info("Insert and delete count " + export_table_expected +
                         " does not match export table count: " + export_table_count + "\n");
+                    // System.err.println("Insert and delete count " + export_table_expected +
+                    //     " does not match export table count: " + export_table_count + "\n");
                 }
 
             }
@@ -557,7 +561,7 @@ public class AsyncExportClient
         // connect to the first server in list; with TopologyChangeAware set, no need for more
             try {
                 client.createConnection(server, config.port);
-                break;
+                // break; ** Temp change -- connect to all servers
             }catch (Exception e) {
                 log.error("Connection to " + server + " failed.\n");
             }
