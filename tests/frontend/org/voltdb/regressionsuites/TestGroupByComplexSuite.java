@@ -116,14 +116,10 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void testComplexAggsSuite() throws IOException, ProcCallException {
-        System.out.println("Test complex aggs...");
-        complexAggs();
-        complexAggsOrderbySuite();
-        complexAggsDistinctLimit();
-    }
-
-    private void complexAggs() throws IOException, ProcCallException {
+    public void testComplexAggs() throws IOException, ProcCallException {
+        if (isHSQL()) {
+            return;
+        }
         loadData(false);
 
         Client client = getClient();
