@@ -471,7 +471,7 @@ public class ExportCoordinator {
                                     exportLog.debug("Truncating coordination tracker: " + tracker
                                             + ", to seqNo: " + lastReleasedSeqNo);
                                 }
-                                tracker.truncate(lastReleasedSeqNo);
+                                tracker.truncateBefore(lastReleasedSeqNo);
                             }
                             int bufSize = tracker.getSerializedSize() + 4;
                             response = ByteBuffer.allocate(bufSize);

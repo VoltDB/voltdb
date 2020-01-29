@@ -53,14 +53,14 @@ public class TestExportSequenceNumberTracker {
         assertEquals(1L, tracker.getLastSeqNo());
         assertEquals(1L, tracker.getSafePoint());
 
-        int truncated = tracker.truncate(1L);
+        int truncated = tracker.truncateBefore(1L);
         assertEquals(1L, tracker.getFirstSeqNo());
         assertEquals(1L, tracker.getLastSeqNo());
         assertEquals(1L, tracker.getSafePoint());
         assertEquals(2L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(ExportSequenceNumberTracker.INFINITE_SEQNO,
                 tracker.getFirstGap().getSecond().longValue());
-        assertEquals(1, truncated);
+        assertEquals(0, truncated);
 
         // Append adjacent single to range
         tracker.append(2L, 9L);
@@ -151,7 +151,7 @@ public class TestExportSequenceNumberTracker {
 
         assertEquals(4, tracker.size());
 
-        truncated = tracker.truncate(7L);
+        truncated = tracker.truncateBefore(7L);
         // state of tracker now = [7, 9] [15, 20] [25, 30] [35, 40]
         assertEquals(7L, tracker.getFirstSeqNo());
         assertEquals(40L, tracker.getLastSeqNo());
@@ -162,7 +162,9 @@ public class TestExportSequenceNumberTracker {
         assertEquals(14L, tracker.getFirstGap(7L).getSecond().longValue());
         assertEquals(4, tracker.size());
         assertEquals(6, truncated);
-        assertEquals(20, tracker.sizeInSequence());
+        assertEquals(21, tracker.sizeInSequence());
+        System.out.println("Expected: [7, 9] [15, 20] [25, 30] [35, 40]");
+        System.out.println("Actual: " + tracker);
 
         tracker.truncateAfter(22L);
         // state of tracker now = [7, 9] [15, 20]
@@ -174,24 +176,28 @@ public class TestExportSequenceNumberTracker {
         assertEquals(10L, tracker.getFirstGap(7L).getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap(7L).getSecond().longValue());
         assertEquals(2, tracker.size());
-        assertEquals(8, tracker.sizeInSequence());
+        assertEquals(9, tracker.sizeInSequence());
+        System.out.println("Expected: [7, 9] [15, 20]");
+        System.out.println("Actual: " + tracker);
 
         // Truncate inside a gap
-        truncated = tracker.truncate(11L);
-        // state of tracker now = [11, 11] [15, 20]
-        assertEquals(11L, tracker.getFirstSeqNo());
+        truncated = tracker.truncateBefore(11L);
+        // state of tracker now = [15, 20]
+        assertEquals(15L, tracker.getFirstSeqNo());
         assertEquals(20L, tracker.getLastSeqNo());
-        assertEquals(11L, tracker.getSafePoint());
+        assertEquals(20L, tracker.getSafePoint());
         assertEquals(1L, tracker.getFirstGap().getFirst().longValue());
-        assertEquals(10L, tracker.getFirstGap().getSecond().longValue());
+        assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(1L, tracker.getFirstGap(10L).getFirst().longValue());
-        assertEquals(10L, tracker.getFirstGap(10L).getSecond().longValue());
-        assertEquals(12L, tracker.getFirstGap(11L).getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap(10L).getSecond().longValue());
+        assertEquals(1L, tracker.getFirstGap(11L).getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap(11L).getSecond().longValue());
-        assertEquals(12L, tracker.getFirstGap(12L).getFirst().longValue());
+        assertEquals(1L, tracker.getFirstGap(12L).getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap(12L).getSecond().longValue());
-        assertEquals(2, tracker.size());
-        assertEquals(2, truncated);
+        System.out.println("Expected: [15, 20]");
+        System.out.println("Actual: " + tracker);
+        assertEquals(1, tracker.size());
+        assertEquals(3, truncated);
         assertEquals(6, tracker.sizeInSequence());
     }
 
