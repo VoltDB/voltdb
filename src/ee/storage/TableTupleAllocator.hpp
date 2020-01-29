@@ -419,12 +419,34 @@ namespace voltdb {
                 CompactingChunks<dir>* m_self;
                 using Comp = typename conditional<dir == shrink_direction::head, less<size_t>, greater<size_t>>::type;
                 using map_type = map<size_t, vector<void*>, Comp>;
+            protected:
+                CompactingChunks<dir>& chunks() noexcept;
+                vector<void*> collect() const;
+                using map<list_type::iterator, tuple<size_t, vector<void*>>>::clear;
             public:
                 using super = map<list_type::iterator, tuple<size_t, vector<void*>>>;
                 BatchRemoveAccumulator(CompactingChunks<dir>*);
                 void insert(list_type::iterator, void*);
                 vector<void*> sorted();                         // in compacting order
             };
+            class DelayedRemover : protected BatchRemoveAccumulator {
+                using super = BatchRemoveAccumulator;
+                size_t m_size = 0;
+                bool m_prepared = false;
+                set<void*> m_remove{};
+                map<void*, void*> m_move{};
+            public:
+                explicit DelayedRemover(CompactingChunks<dir>&);
+                DelayedRemover(DelayedRemover const&) = delete;
+                DelayedRemover(DelayedRemover&&) = delete;
+                // Register a single allocation to be removed later
+                size_t add(void*);
+                // Memory movements (src to be removed => dst to be copied over) due to batch remove
+                void prepare(bool);
+                map<void*, void*> movements() const;
+                // Actuate batch remove
+                void force(bool);
+            } m_batched;
         public:
             using Compact = typename conditional<dir == shrink_direction::head,
                       integral_constant<Compactibility, Compactibility::head>,
@@ -453,6 +475,19 @@ namespace voltdb {
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
             using list_type::empty;
+            /**
+             * Separate calls for batch-free:
+             * 1. delayed_free_add registers one allocation to be
+             * freed later in a batch. Returns batch size pending
+             * to be freed
+             * 2. delayed_free_get is called prior to actual
+             * forcing batch free, to retrieve translations.
+             * 3. delayed_free_force is called to actuate the
+             * batch free.
+             */
+            size_t delayed_free_add(void*);
+            map<void*, void*> delayed_free_get();
+            void delayed_free_force();
         };
 
         struct BaseHistoryRetainTrait {

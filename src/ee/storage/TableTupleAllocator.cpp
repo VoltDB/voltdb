@@ -495,8 +495,9 @@ CompactingStorageTrait<dir>::operator()() const noexcept {
 }
 
 template<shrink_direction dir>
-inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept : m_tupleSize(tupleSize) {
-    trait::associate(this);
+inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept :
+    m_tupleSize(tupleSize), m_batched(*this) {      // cyclic dependency from m_batched is fine,
+    trait::associate(this);                        // since we are only setting up ptr there
 }
 
 // returns non-null value only if in snapshot,
@@ -596,9 +597,58 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
     }
 }
 
+namespace batch_remove_aid {
+    template<typename T, typename Cont1> inline static set<T>
+    intersection(Cont1 const& t1, set<T> const&& t2) {
+        return accumulate(t1.cbegin(), t1.cend(), set<T>{}, [&t2](set<T>& acc, T const& e) {
+                if (t2.count(e)) {
+                    acc.emplace(e);
+                }
+                return acc;
+            });
+    }
+
+    /**
+     * Assuming that inter \subset src, removes all elements from
+     * src, keeping the rest in order.
+     */
+    template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
+        for (auto const& entry : inter) {
+            auto const iter = find(src.cbegin(), src.cend(), entry);
+            vassert(iter != src.cend());
+            src.erase(iter);
+        }
+        return src;
+    }
+
+    template<typename T1, typename T2> inline
+    static map<T1, T2> build_map(vector<T1> const&& v1, vector<T2> const&& v2) {
+        vassert(v1.size() == v2.size());
+        return inner_product(v1.cbegin(), v1.cend(), v2.cbegin(), map<void*, void*>{},
+                [](map<void*, void*>& acc, pair<void*, void*> const& entry)
+                { acc.emplace(entry); return acc; },
+                [](void* p1, void* p2) { return make_pair(p1, p2); });
+    }
+}
+
 template<shrink_direction dir> inline
 CompactingChunks<dir>::BatchRemoveAccumulator::BatchRemoveAccumulator(CompactingChunks<dir>* o) : m_self(o) {
     vassert(o != nullptr);
+}
+
+template<shrink_direction dir> inline CompactingChunks<dir>&
+CompactingChunks<dir>::BatchRemoveAccumulator::chunks() noexcept {
+    return *m_self;
+}
+
+template<shrink_direction dir> inline vector<void*>
+CompactingChunks<dir>::BatchRemoveAccumulator::collect() const {
+    return accumulate(cbegin(), cend(), vector<void*>{},
+            [](vector<void*>& acc, typename super::value_type const& entry) {
+                auto const& v = get<1>(entry.second);
+                copy(v.cbegin(), v.cend(), back_inserter(acc));
+                return acc;
+            });
 }
 
 template<shrink_direction dir> inline void
@@ -629,6 +679,106 @@ CompactingChunks<dir>::BatchRemoveAccumulator::sorted() {
                 copy(val.cbegin(), val.cend(), back_inserter(acc));
                 return acc;
             });
+}
+
+template<shrink_direction dir> inline
+CompactingChunks<dir>::DelayedRemover::DelayedRemover(CompactingChunks<dir>& s) : super(&s) {}
+
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::DelayedRemover::add(void* p) {
+    auto const* iter = super::chunks().find(p);
+    if (iter == nullptr) {         // validate,
+        snprintf(buf, sizeof buf, "CompactingChunk<%s>::DelayedRemover::add(%p): invalid address",
+                dir == shrink_direction::head ? "head" : "tail", p);
+        buf[sizeof buf - 1] = 0;
+        throw range_error(buf);
+    } else {
+        m_prepared = false;
+        super::insert(*iter, p);
+        return ++m_size;
+    }
+}
+
+template<shrink_direction dir> inline map<void*, void*>
+CompactingChunks<dir>::DelayedRemover::movements() const{
+    return m_move;
+}
+
+template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::prepare(bool dupCheck) {
+    using namespace batch_remove_aid;
+    if (! m_prepared) {
+        // extra validation: any duplicates with add() calls?
+        // This check is spared in the single-call batch-free API
+        auto const ptrs = super::collect();
+        size_t size = ptrs.size();
+        if (dupCheck && size != set<void*>(ptrs.cbegin(), ptrs.cend()).size()) {
+            throw runtime_error("Duplicate addresses detected");
+        } else {
+            vector<void*> addrToRemove{};
+            addrToRemove.reserve(size);
+            super::chunks().until_([&addrToRemove, &size] (
+                    pair<typename CompactingChunks<dir>::CompactingIterator::iterator_type, void*> const& entry) {
+                        addrToRemove.emplace_back(entry.second);
+                        return --size == 0;
+                    });
+            m_remove = intersection(ptrs, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
+            m_move = build_map(subtract(super::sorted(), m_remove),
+                    subtract(addrToRemove, m_remove));
+            m_prepared = true;
+        }
+    }
+}
+
+template<shrink_direction dir> void CompactingChunks<dir>::DelayedRemover::force(bool dupCheck) {
+    prepare(dupCheck);
+    auto hd = super::chunks().compactFrom();
+    auto const tupleSize = super::chunks().tupleSize(),
+        allocsPerTuple = (reinterpret_cast<char const*>(hd->end()) -
+                reinterpret_cast<char const*>(hd->begin())) / tupleSize,
+         offset = reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
+    auto const total = m_move.size() + m_remove.size();
+    // storage remapping and clean up
+    for_each(m_move.cbegin(), m_move.cend(),
+            [tupleSize, this](typename map<void*, void*>::value_type const& entry) {
+                memcpy(entry.first, entry.second, tupleSize);
+            });
+    m_move.clear();
+    m_remove.clear();
+    // dangerous: direct manipulation on each offended chunks
+    for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
+        super::chunks().releasable(super::chunks().compactFrom());      // whole chunk releases
+    }
+    hd = super::chunks().compactFrom();
+    if (total >= allocsPerTuple) {       // any chunk released at all?
+        reinterpret_cast<char*&>(hd->m_next) =
+            reinterpret_cast<char*>(hd->begin()) + offset;
+    }
+    auto const remBytes = (total % allocsPerTuple) * tupleSize;
+    if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
+        auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
+        if (remBytes > rem) {
+            super::chunks().releasable(hd);
+            hd = super::chunks().compactFrom();
+            reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
+        } else {
+            reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
+        }
+        vassert(hd->next() >= hd->begin());
+    }
+    super::clear();
+}
+
+// Separate API calls for batch free
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::delayed_free_add(void* p) {
+    return m_batched.add(p);
+}
+
+template<shrink_direction dir> inline map<void*, void*> CompactingChunks<dir>::delayed_free_get() {
+    m_batched.prepare(true);
+    return m_batched.movements();
+}
+
+template<shrink_direction dir> inline void CompactingChunks<dir>::delayed_free_force() {
+    m_batched.force(true);
 }
 
 template<shrink_direction dir> inline typename CompactingChunks<dir>::CompactingIterator::value_type
@@ -704,39 +854,6 @@ template<shrink_direction dir> inline void CompactingChunks<dir>::CompactingIter
         m_cursor = reinterpret_cast<char*>(m_iter->next()) -
             reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
         vassert(m_cursor >= m_iter->begin());
-    }
-}
-
-namespace batch_remove_aid {
-    template<typename T> inline static set<T> intersection(set<T> const& t1, set<T> const&& t2) {
-        return accumulate(t1.cbegin(), t1.cend(), set<T>{}, [&t2](set<T>& acc, T const& e) {
-                if (t2.count(e)) {
-                    acc.emplace(e);
-                }
-                return acc;
-            });
-    }
-
-    /**
-     * Assuming that inter \subset src, removes all elements from
-     * src, keeping the rest in order.
-     */
-    template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
-        for (auto const& entry : inter) {
-            auto const iter = find(src.cbegin(), src.cend(), entry);
-            vassert(iter != src.cend());
-            src.erase(iter);
-        }
-        return src;
-    }
-
-    template<typename T1, typename T2> inline
-    static map<T1, T2> build_map(vector<T1> const&& v1, vector<T2> const&& v2) {
-        vassert(v1.size() == v2.size());
-        return inner_product(v1.cbegin(), v1.cend(), v2.cbegin(), map<void*, void*>{},
-                [](map<void*, void*>& acc, pair<void*, void*> const& entry)
-                { acc.emplace(entry); return acc; },
-                [](void* p1, void* p2) { return make_pair(p1, p2); });
     }
 }
 
