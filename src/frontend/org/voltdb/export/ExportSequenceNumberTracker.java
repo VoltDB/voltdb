@@ -136,14 +136,14 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
     }
 
     /**
-     * Truncate the tracker to the given safe point. After truncation, the new
+     * Truncate the tracker to before the given safe point. After truncation, the new
      * safe point will be the first sequence number of the tracker. If the new safe point
      * is before the first sequence number of the tracker, it's a no-op. If the
      * map is empty, truncation point will be the new safe point of tracker.
      * @param newTruncationPoint    New safe point
      * @return number of sequence be truncated
      */
-    public int truncate(long newTruncationPoint) {
+    public int truncateBefore(long newTruncationPoint) {
         int truncated = 0;
         if (m_map.isEmpty()) {
             return truncated;
@@ -158,7 +158,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
                 truncated += end(next) - start(next) + 1;
                 iter.remove();
             } else if (next.contains(newTruncationPoint)) {
-                truncated += newTruncationPoint - start(next) + 1;
+                truncated += newTruncationPoint - start(next);
                 iter.remove();
                 m_map.add(range(newTruncationPoint, end(next)));
                 return truncated;
@@ -410,9 +410,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             count += 4;
             count += 2 * 8 * size();
         }
-
-        // Sentinel (byte)
-        return count + 1;
+        return count;
     }
 
     public ExportSequenceNumberTracker duplicate() {
