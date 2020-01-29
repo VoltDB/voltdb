@@ -213,6 +213,8 @@ public class BaseHashMap {
         return lookup;
     }
 
+    // extended version for getLookup(Object key, int hash), except same Expression with different
+    // queryTableColumnIndex are considered as different keys
     protected int getLookupSameIndex(Object key, int hash) {
         if (!(key instanceof Expression)) {
             return getLookup(key, hash);
@@ -431,6 +433,8 @@ public class BaseHashMap {
         return returnValue;
     }
 
+    // if the object added is an Aggregate expression, always add it to the set even it's already in the set
+    // see ENG-18917
     protected Object addOrRemoveAlwaysIfAggregate(long longKey, long longValue,
                                                   Object objectKey, Object objectValue,
                                                   boolean remove) {
