@@ -140,7 +140,7 @@ public final class Mutex {
      */
     private static final class Sync extends AbstractQueuedLongSynchronizer {
         private static final long serialVersionUID = 1L;
-        private static final long UNHELD = -1;
+        private static final long UNHELD = -1L;
 
         public Sync() {
             setState(UNHELD);
@@ -224,11 +224,11 @@ public final class Mutex {
         }
 
         public StringBuilder toString(StringBuilder sb) {
-            long s = getState();
-            if (s == UNHELD) {
+            Thread lockHolder = getExclusiveOwnerThread();
+            if (lockHolder == null) {
                 sb.append("unheld");
             } else {
-                sb.append("held by thread ").append(s).append(" queue is ");
+                sb.append("held by thread ").append(lockHolder).append(" queue is ");
                 if (!hasQueuedThreads()) {
                     sb.append("not ");
                 }
@@ -239,9 +239,9 @@ public final class Mutex {
 
         @Override
         protected boolean tryAcquire(long threadId) {
-            if (!compareAndSetState(-1, threadId)) {
+            if (!compareAndSetState(UNHELD, threadId)) {
                 if (getState() == threadId) {
-                    throw new IllegalMonitorStateException("Thread already holds this lock");
+                    throw new IllegalMonitorStateException("Thread already holds this mutex");
                 }
                 return false;
             }
@@ -250,10 +250,12 @@ public final class Mutex {
 
         @Override
         protected boolean tryRelease(long threadId) {
-            if (!compareAndSetState(threadId, UNHELD)) {
-                throw new IllegalMonitorStateException("Lock not held by this thread");
+            if (getState() != threadId) {
+                throw new IllegalMonitorStateException("Mutex not held by this thread");
             }
+            // Clear owner before actually releasing the mutex
             setExclusiveOwnerThread(null);
+            setState(UNHELD);
             return true;
         }
     }
