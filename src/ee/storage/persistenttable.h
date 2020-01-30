@@ -75,7 +75,6 @@
 #include <set>
 #include <functional>
 
-
 class CopyOnWriteTest;
 
 namespace catalog {
@@ -227,6 +226,8 @@ public:
                 storage::HistoryRetainTrait<storage::gc_policy::batched>>>;
     using txn_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::iterator;
     using txn_const_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::const_iterator;
+    using SnapshotIterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::hooked_iterator;
+
     virtual ~PersistentTable();
     Alloc& allocator() noexcept {
         vassert(m_dataStorage);
@@ -415,6 +416,13 @@ public:
     int64_t streamMore(TupleOutputStreamProcessor& outputStreams,
                        TableStreamType streamType,
                        std::vector<int>& retPositions);
+
+    void activateSnapshot();
+
+    /**
+     * return true if no more tuples to be snasphsotted
+     */
+    bool nextSnapshotTuple(TableTuple& tuple);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
@@ -756,6 +764,7 @@ private:
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
     DeleteCallBack m_callBack;
+    std::unique_ptr<SnapshotIterator> m_snapIt;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -838,6 +847,10 @@ inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
     m_table.insertTupleForUndo(tuple);
 }
 
+inline void PersistentTableSurgeon::activateSnapshot() {
+    m_table.activateSnapshot();
+}
+
 inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
                                                        char* sourceTupleWithNewValues,
                                                        bool revertIndexes,
@@ -863,10 +876,6 @@ inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {
 inline bool PersistentTableSurgeon::blockCountConsistent() const {
     return m_table.blockCountConsistent();
 }
-
-//inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-//    m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
-//}
 
 inline bool PersistentTableSurgeon::hasIndex() const {
     return (m_index != NULL);
@@ -1016,6 +1025,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
     }
+
+    allocator().remove(&tuple);
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {

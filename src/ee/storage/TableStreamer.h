@@ -174,7 +174,7 @@ private:
 
     /**
      * Snapshot streams.
-     * All streams are notified of inserts, updates, deletes, and compactions.
+     * All streams are notified of inserts, updates, deletes and tuple movements
      */
     typedef boost::shared_ptr<Stream> StreamPtr;
     typedef std::vector<StreamPtr> StreamList;

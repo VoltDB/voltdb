@@ -718,12 +718,12 @@ namespace voltdb {
             template<iterator_permission_type perm>
             class hooked_iterator_type : public time_traveling_iterator_type<typename Chunks::hook_type, perm> {
                 using super = time_traveling_iterator_type<typename Chunks::hook_type, perm>;
-                hooked_iterator_type(typename super::container_type);
             public:
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 static hooked_iterator_type begin(container_type);
                 static hooked_iterator_type end(container_type);
+                hooked_iterator_type(typename super::container_type);
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;

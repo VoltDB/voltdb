@@ -142,7 +142,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
     m_dataStorage.reset(new Alloc{sizeof(TableTuple) + schema->tupleLength() + TUPLE_HEADER_SIZE});
-
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
@@ -194,8 +193,6 @@ PersistentTable::~PersistentTable() {
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-//void PersistentTable::nextFreeTuple(TableTuple* tuple) { }
-
 void PersistentTable::drLogTruncate(ExecutorContext* ec, bool fallible) {
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
@@ -347,41 +344,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         deleteAllTuples(true, fallible);
         return;
     }
-
-    // If the table has only one tuple-storage block, it may be better to truncate
-    // table by iteratively deleting table rows. Evaluate if this is the case
-    // based on the block and tuple block load factor
-//    if (m_data.size() == 1) {
-//        // Determine a threshold cutoff in terms of block load factor beyond
-//        // which wholesale truncate is estimated to be preferable to
-//        // tuple-by-tuple retail delete. Cut-off values are based on worst
-//        // case scenarios with intent to improve performance and to avoid
-//        // performance regressions. Cut-off numbers were obtained from
-//        // benchmark tests of a few scenarios:
-//        // - varying table schema - effect of tables having more columns
-//        // - varying number of views on table
-//        // - tables with more varchar columns with size below and above 16
-//        // - tables with indexes
-//
-//        // cut-off for table with no views
-//        double tableWithNoViewLFCutoffForTrunc = 0.105666;
-//        // cut-off for table with views
-//        double tableWithViewsLFCutoffForTrunc = 0.015416;
-//
-//        bool noView = m_views.empty() && m_viewHandlers.empty();
-//        double cutoff = noView ? tableWithNoViewLFCutoffForTrunc
-//                               : tableWithViewsLFCutoffForTrunc;
-//        double blockLoadFactor = m_data.begin().data()->loadFactor();
-//        if (blockLoadFactor <= cutoff) {
-//            /* // enable to debug
-//            std::cout << "DEBUG: truncating (retail) "
-//                      << activeTupleCount()
-//                      << " tuples in " << name() << std::endl;
-//            // */
-//            deleteAllTuples(true, fallible);
-//            return;
-//        }
-//    }
 
     TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
     vassert(tcd);
@@ -672,9 +634,13 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
 }
 
 TableTuple* PersistentTable::createTuple(TableTuple const &source){
-    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(m_dataStorage->insert(&source)));
+    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(allocator().insert(&source)));
     target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));
     target->copyForPersistentInsert(source);
+    target->setActiveTrue();
+    target->setPendingDeleteFalse();
+    target->setPendingDeleteOnUndoReleaseFalse();
+    target->setDirtyFalse();
     return target;
 }
 
@@ -686,7 +652,7 @@ void PersistentTable::releaseBatch() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
-    m_dataStorage->remove(m_releaseBatch, m_callBack);
+    allocator().remove(m_releaseBatch, m_callBack);
     m_releaseBatch.clear();
 }
 
@@ -1059,7 +1025,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
     //TO DO: update() should update the values and generate diff instead of calling copyForPersistentUpdate
-    m_dataStorage->update(&targetTupleToUpdate, &sourceTupleWithNewValues);
+    allocator().update(&targetTupleToUpdate, &sourceTupleWithNewValues);
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
@@ -1271,7 +1237,6 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
  */
 void PersistentTable::deleteTupleRelease(char* tuple) {
     m_releaseBatch.insert(tuple);
-    VOLT_DEBUG("*******: %s: %ld", m_name.c_str(), m_releaseBatch.size());
 }
 
 /**
@@ -1617,7 +1582,6 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
     int tupleCount = serialInput.readInt();
     vassert(tupleCount >= 0);
 
-    TableTuple target(m_schema);
     //Reserve space for a length prefix for rows that violate unique constraints
     //If there is no output supplied it will just throw
     size_t lengthPosition = 0;
@@ -1628,23 +1592,18 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
     }
 
     for (int i = 0; i < tupleCount; ++i) {
-        nextFreeTuple(&target);
-        target.setActiveTrue();
-        target.setDirtyFalse();
-        target.setPendingDeleteFalse();
-        target.setPendingDeleteOnUndoReleaseFalse();
-
         try {
-            target.deserializeFrom(serialInput, stringPool, caller);
+           m_tempTuple.deserializeFrom(serialInput, stringPool, caller);
         } catch (SQLException &e) {
-            deleteTupleStorage(target);
             throw;
         }
+
+        TableTuple* target = createTuple(m_tempTuple);
         // TODO: we do not catch other types of exceptions, such as
         // SQLException, etc. The assumption we held that no other
         // exceptions should be thrown in the try-block is pretty
         // daring and likely not correct.
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
+        processLoadedTuple(*target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            caller.shouldDrStream(), caller.ignoreTupleLimit());
     }
 
@@ -1884,8 +1843,25 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
     return mispartitionedRows;
 }
 
-void PersistentTableSurgeon::activateSnapshot() {
+void PersistentTable::activateSnapshot() {
+    allocator().freeze();
+    m_snapIt.reset(new SnapshotIterator(allocator()));
+}
 
+bool PersistentTable::nextSnapshotTuple(TableTuple& tuple) {
+    vassert(!m_snapIt->drained());
+    auto *p = **m_snapIt;
+    if (p != nullptr) {
+        auto* inputTuple = const_cast<TableTuple*>(reinterpret_cast<const TableTuple*>(p));
+        tuple.move(inputTuple->address());
+        ++*m_snapIt;
+        if (m_snapIt->drained()) {
+           allocator().thaw();
+           return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 std::pair<TableIndex const*, uint32_t> PersistentTable::getUniqueIndexForDR() {

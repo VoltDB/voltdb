@@ -30,8 +30,6 @@
 #include <boost/ptr_container/ptr_vector.hpp>
 
 namespace voltdb {
-class TupleIterator;
-class TempTable;
 class ParsedPredicate;
 class TupleOutputStreamProcessor;
 class PersistentTableSurgeon;
@@ -42,15 +40,6 @@ class CopyOnWriteContext : public TableStreamerContext {
             const  HiddenColumnFilter&, const std::vector<std::string>&);
 
 public:
-
-    /**
-     * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
-     * that this is a new tuple being introduced into the table (nextFreeTuple was called).
-     * In that situation the tuple doesn't need to be copied, but and may need to be marked dirty
-     * (if it will be scanned later by COWIterator), and it must be marked clean if it is not going to
-     * be scanned by the COWIterator
-     */
-    void markTupleDirty(TableTuple tuple, bool newTuple);
 
     virtual ~CopyOnWriteContext();
 
@@ -98,40 +87,17 @@ private:
                        const std::vector<std::string> &predicateStrings,
                        int64_t totalTuples);
 
-    /**
-     * Temp table for copies of tuples that were dirtied.
-     */
-    boost::scoped_ptr<TempTable> m_backedUpTuples;
 
     /**
      * Memory pool for string allocations
      */
     Pool m_pool;
 
-    /**
-     * Iterator over the table via a CopyOnWriteIterator or an iterator over
-     *  temp table used to stored backed up tuples
-     */
-    std::unique_ptr<TupleIterator> m_iterator;
-
-    TableTuple m_tuple;
-
-    bool m_finishedTableScan;
-
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
-    int64_t m_blocksCompacted;
     int64_t m_serializationBatches;
-    int64_t m_inserts;
-    int64_t m_deletes;
-    int64_t m_updates;
-    int32_t m_skippedDirtyRows;
-    int32_t m_skippedInactiveRows;
     const bool m_replicated;
     const HiddenColumnFilter m_hiddenColumnFilter;
-
-    void checkRemainingTuples(const std::string &label);
-
 };
 
 }
