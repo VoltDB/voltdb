@@ -37,8 +37,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
     public static final long MIN_SEQNO = 1L;
 
     protected RangeSet<Long> m_map;
-    // Is the first sequence a sentinel? Sentinel doesn't count into the total sequence size of tracker.
-    protected boolean m_hasSentinel = false;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -99,7 +97,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             long end = buf.getLong();
             append(start, end);
         }
-        m_hasSentinel = buf.get() == 1;
     }
 
     public int size() {
@@ -139,26 +136,20 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
     }
 
     /**
-     * Truncate the tracker to the given safe point. After truncation, the new
+     * Truncate the tracker to before the given safe point. After truncation, the new
      * safe point will be the first sequence number of the tracker. If the new safe point
      * is before the first sequence number of the tracker, it's a no-op. If the
      * map is empty, truncation point will be the new safe point of tracker.
      * @param newTruncationPoint    New safe point
      * @return number of sequence be truncated
      */
-    public int truncate(long newTruncationPoint) {
+    public int truncateBefore(long newTruncationPoint) {
         int truncated = 0;
         if (m_map.isEmpty()) {
-            m_map.add(range(newTruncationPoint, newTruncationPoint));
-            m_hasSentinel = true;
             return truncated;
         }
         if (newTruncationPoint < getFirstSeqNo()) {
             return truncated;
-        }
-        // Sentinel doesn't count as valid sequence
-        if (m_hasSentinel) {
-            truncated -= 1;
         }
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         while (iter.hasNext()) {
@@ -167,18 +158,13 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
                 truncated += end(next) - start(next) + 1;
                 iter.remove();
             } else if (next.contains(newTruncationPoint)) {
-                truncated += newTruncationPoint - start(next) + 1;
+                truncated += newTruncationPoint - start(next);
                 iter.remove();
                 m_map.add(range(newTruncationPoint, end(next)));
-                m_hasSentinel = true;
                 return truncated;
             } else {
                 break;
             }
-        }
-        if (!m_map.contains(newTruncationPoint)) {
-            m_map.add(range(newTruncationPoint, newTruncationPoint));
-            m_hasSentinel = true;
         }
         return truncated;
     }
@@ -196,8 +182,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      */
     public void truncateAfter(long newTruncationPoint) {
         if (size() == 0) {
-            m_map.add(range(newTruncationPoint, newTruncationPoint));
-            m_hasSentinel = true;
             return;
         }
         if (newTruncationPoint > getLastSeqNo()) {
@@ -215,10 +199,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             } else {
                 break;
             }
-        }
-        if (m_map.isEmpty()) {
-            m_map.add(range(newTruncationPoint, newTruncationPoint));
-            m_hasSentinel = true;
         }
     }
 
@@ -358,9 +338,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             Range<Long> range = iter.next();
             sequence += end(range) - start(range) + 1;
         }
-        if (m_hasSentinel) {
-            sequence -= 1;
-        }
         return sequence;
     }
 
@@ -415,9 +392,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
                 buf.putLong(end(entry));
             }
         }
-
-        // Sentinel (byte)
-        buf.put(m_hasSentinel ? (byte) 1 : (byte) 0);
     }
 
     @Override
@@ -436,9 +410,7 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             count += 4;
             count += 2 * 8 * size();
         }
-
-        // Sentinel (byte)
-        return count + 1;
+        return count;
     }
 
     public ExportSequenceNumberTracker duplicate() {
@@ -448,7 +420,6 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
         for (Range<Long> entry : m_map.asRanges()) {
             tracker.append(start(entry), end(entry));
         }
-        tracker.m_hasSentinel = m_hasSentinel;
         return tracker;
     }
 }

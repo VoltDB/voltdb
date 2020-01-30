@@ -624,7 +624,7 @@ public class StateMachineSnipits extends ZKTestBase {
             assertTrue(monitorForManager1.m_members.size() == 3);
 
             // Remove MembershipMonitor1 from ZooKeeper0 while keeping MembershipMonitor3 alive
-            ssm1.ShutdownSynchronizedStatesManager();
+            ssm1.shutdownSynchronizedStatesManager();
 
             while (monitorForManager3.m_members.size() != 2 &&
                     !monitorForManager2.hasIdenticalMembership(monitorForManager3)) {

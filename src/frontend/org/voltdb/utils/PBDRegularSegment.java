@@ -340,13 +340,6 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         validateHeader();
         final int initialEntryCount = getNumEntries();
         int entriesTruncated = 0;
-        // Zero entry count means the segment is empty or corrupted, in both cases
-        // the segment can be deleted.
-        if (initialEntryCount == 0) {
-            reader.close(false);
-            close();
-            return Integer.MAX_VALUE;
-        }
         int sizeInBytes = 0;
 
         DBBPool.BBContainer cont;
