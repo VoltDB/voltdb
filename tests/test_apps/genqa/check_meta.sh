@@ -1,8 +1,8 @@
-# echo $1
-rows=`cat $1/* | wc -l`
+echo 'dollar star is: ' $*
+rows=`cat $*/* | wc -l`
 tmpfile=`mktemp`
-# echo "sort -u $1/* to $tmpfile"
-sort -u $1/* > $tmpfile
+echo "sort -u $*/* to $tmpfile"
+sort -u $*/* > $tmpfile
 dedupedrows=`cat $tmpfile | wc -l`
 duperows=$(($rows - $dedupedrows))
 echo Dupes: $duperows
