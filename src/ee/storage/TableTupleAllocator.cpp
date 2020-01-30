@@ -753,36 +753,37 @@ template<shrink_direction dir> size_t CompactingChunks<dir>::DelayedRemover::for
     auto const tupleSize = super::chunks().tupleSize(),
         allocsPerTuple = (reinterpret_cast<char const*>(hd->end()) -
                 reinterpret_cast<char const*>(hd->begin())) / tupleSize;
-    auto const offset =
-        reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
     auto const total = m_move.size() + m_remove.size();
-    // storage remapping and clean up
-    for_each(m_move.cbegin(), m_move.cend(),
-            [tupleSize](typename map<void*, void*>::value_type const& entry) {
-                memcpy(entry.first, entry.second, tupleSize);
-            });
-    m_move.clear();
-    m_remove.clear();
-    // dangerous: direct manipulation on each offended chunks
-    for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
-        hd = super::pop();
-    }
-    if (total >= allocsPerTuple) {       // any chunk released at all?
-        reinterpret_cast<char*&>(hd->m_next) = reinterpret_cast<char*>(hd->begin()) + offset;
-    }
-    auto const remBytes = (total % allocsPerTuple) * tupleSize;
-    if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
-        auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
-        if (remBytes > rem) {
+    if (total > 0) {
+        // storage remapping and clean up
+        for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
+                    memcpy(entry.first, entry.second, tupleSize);
+                });
+        m_move.clear();
+        m_remove.clear();
+        auto const offset =
+            reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
+        // dangerous: direct manipulation on each offended chunks
+        for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
             hd = super::pop();
-            reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
-        } else {
-            reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
         }
-        vassert(hd->next() >= hd->begin());
+        if (total >= allocsPerTuple) {       // any chunk released at all?
+            reinterpret_cast<char*&>(hd->m_next) = reinterpret_cast<char*>(hd->begin()) + offset;
+        }
+        auto const remBytes = (total % allocsPerTuple) * tupleSize;
+        if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
+            auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
+            if (remBytes > rem) {
+                hd = super::pop();
+                reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
+            } else {
+                reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
+            }
+            vassert(hd->next() >= hd->begin());
+        }
+        super::clear();
     }
-    super::clear();
-    auto r = m_size;
+    auto const r = m_size;
     m_size = 0;
     return r;
 }
