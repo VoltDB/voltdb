@@ -6,4 +6,5 @@ sort -u $1/* > $tmpfile
 dedupedrows=`cat $tmpfile | wc -l`
 duperows=$(($rows - $dedupedrows))
 echo Dupes: $duperows
-python ~/python/123-nodupcheck.py $tmpfile
+python 123-nodupcheck.py $tmpfile
+rm -f $tmpfile

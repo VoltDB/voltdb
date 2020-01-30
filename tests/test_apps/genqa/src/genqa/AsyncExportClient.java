@@ -417,9 +417,9 @@ public class AsyncExportClient
                       + " Table/Export Results\n"
                       + "-------------------------------------------------------------------------------------\n\n"
                       + "A total of %d calls were received...\n"
-                      + " - %,9d INSERT\n"
-                      + " - %,9d DELETE\n"
-                      + " - %,9d UPDATE (OLD)"
+                      + " - %,9d Inserts\n"
+                      + " - %,9d Deletes\n"
+                      + " - %,9d Updates/Before"
                       + "\n\n"
                       + "-------------------------------------------------------------------------------------\n"
                       , TrackingResults.get(0)+TrackingResults.get(1)
