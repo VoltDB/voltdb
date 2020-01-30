@@ -38,6 +38,7 @@ using TableTupleAllocatorTest = Test;
 using namespace voltdb::storage;
 using namespace std;
 
+static random_device rd;
 /**
  * For usage, see commented test in HelloWorld
  */
@@ -882,7 +883,11 @@ void testHookedCompactingChunks() {
     vector<void const*> latest;
     latest.reserve(NumTuples);
     fold<const_iterator>(alloc_cref, [&latest](void const* p) { latest.emplace_back(p); });
-    random_device rd; mt19937 rgen(rd());
+    // FIXME: a known bug when you replace rd() next line to seed 63558933, change upper bound on i to 4935,
+    // and set a break point on case 2 when i == 4934. The
+    // verifier errornouly reads out extra artificial data beyond
+    // 8192 values.
+    mt19937 rgen(rd());
     uniform_int_distribution<size_t> range(0, latest.size() - 1), changeTypes(0, 3), whole(0, NumTuples - 1);
     void const* p1 = nullptr;
     for (i = 0; i < 8000;) {
@@ -1209,7 +1214,7 @@ void testInterleavedCompactingChunks() {
         return true;
     };
 
-    random_device rd; mt19937 rgen(rd());
+    mt19937 rgen(rd());
     uniform_int_distribution<size_t> range(0, NumTuples - 1), changeTypes(0, 2),
         advanceTimes(0, 4);
     void const* p1 = nullptr;
