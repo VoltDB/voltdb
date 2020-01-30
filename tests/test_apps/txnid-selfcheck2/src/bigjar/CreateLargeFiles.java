@@ -70,20 +70,21 @@ public class CreateLargeFiles {
 
         @Option(shortOpt = "o", opt = "outputfile", desc = "The name of the (large, random) "
                 + "text output file; ignored for 'java'; default 'large-random-text.jar'")
-        String outputTextFileName = "large-random-text.jar";
+        String textOutputFileName = "large-random-text.jar";
 
         @Option(shortOpt = "l", opt = "numtextlines", desc = "The number of lines "
-                + "in the (text) output file; ignored for 'java'; default 800000")
-        int numTextLines = 850000;  // results in a .jar file a little under 50Mb
+                + "in the (text) output file; ignored for 'java'; default 800000, "
+                + "which results in a .jar file a little under 50Mb")
+        int textNumLines = 850000;
 
         @Option(shortOpt = "c", opt = "numchars", desc = "The number of characters per "
                 + "line, in the (text) output file; ignored for 'java'; default 80")
-        int numCharsPerLine = 80;
+        int textNumCharsPerLine = 80;
 
         @Option(shortOpt = "d", opt = "templatedir", desc = "The directory in "
                 + "which to find the Java template file to be copied and modified; "
                 + "ignored for 'text'; default './src/bigjar/procedures'")
-        String javaTemplateDirectory = "./procedures";
+        String javaTemplateDirectory = "./src/bigjar/procedures";
 
         @Option(shortOpt = "t", opt = "templatefile", desc = "The name of the "
                 + "Java template file to be copied and modified; ignored for "
@@ -105,16 +106,21 @@ public class CreateLargeFiles {
                 + "ignored for 'text'; default 10 (TODO)")
         int javaFileMaxValue = 10;  // TODO: make this bigger! (how big?)
 
+        @Option(shortOpt = "D", opt = "debug", desc = "The debug value, "
+                + "specifying the amount of debug output: 0 for none, higher "
+                + "values for more; default 0")
+        int debug = 0;
+
         @Override
         public void validate() {
             if (!Arrays.asList("text", "java").contains(generateFileType.toLowerCase())) {
                 exitWithMessageAndUsage("filetype ("+generateFileType
                         + ") must be 'text' or 'java'");
             }
-            if (numTextLines <= 0) exitWithMessageAndUsage("numtextlines ("
-                        + numTextLines+") must be > 0");
-            if (numCharsPerLine <= 0) exitWithMessageAndUsage("numchars ("
-                        + numCharsPerLine+") must be > 0");
+            if (textNumLines <= 0) exitWithMessageAndUsage("numtextlines ("
+                        + textNumLines+") must be > 0");
+            if (textNumCharsPerLine <= 0) exitWithMessageAndUsage("numchars ("
+                        + textNumCharsPerLine+") must be > 0");
             if (!javaTemplateFilename.contains(javaReplaceSubstring)) {
                 exitWithMessageAndUsage("templatefile ("+javaTemplateFilename
                         + ") must contain replace substring ("+javaReplaceSubstring+")");
@@ -126,20 +132,46 @@ public class CreateLargeFiles {
         }
     }
 
+    public void debugPrint() {
+        if (config.debug > 0) {
+            System.out.println("\nDebug print: (config.)...");
+            System.out.println("  debug                : "+config.debug);
+            System.out.println("  generateFileType     : "+config.generateFileType);
+            System.out.println("  textOutputFileName   : "+config.textOutputFileName);
+            System.out.println("  textNumLines         : "+config.textNumLines);
+            System.out.println("  textNumCharsPerLine  : "+config.textNumCharsPerLine);
+            System.out.println("  javaTemplateDirectory: "+config.javaTemplateDirectory);
+            System.out.println("  javaTemplateFilename : "+config.javaTemplateFilename);
+            System.out.println("  javaReplaceSubstring : "+config.javaReplaceSubstring);
+            System.out.println("  javaFileMinValue     : "+config.javaFileMinValue);
+            System.out.println("  javaFileMaxValue     : "+config.javaFileMaxValue);
+        }
+    }
+
     public void createLargeTextFile() throws IOException {
-        Path outputFile = Paths.get(config.outputTextFileName);
+        Path outputFile = Paths.get(config.textOutputFileName);
         Files.write(outputFile, Arrays.asList("Randomly generated text:"),
-                StandardCharsets.UTF_8, StandardOpenOption.CREATE);
+                StandardCharsets.UTF_8);
+
+        if (config.debug > 0) {
+            System.out.println("  outputFile (text)    : "+outputFile);
+        }
 
         Random random = new Random();
         List<String> lines = new ArrayList<String>();
-        for (long i=0; i < config.numTextLines; i++) {
-            StringBuffer line = new StringBuffer(config.numCharsPerLine);
-            for (int j=0; j < config.numCharsPerLine; j++) {
+        for (long i=0; i < config.textNumLines; i++) {
+            StringBuffer line = new StringBuffer(config.textNumCharsPerLine);
+            for (int j=0; j < config.textNumCharsPerLine; j++) {
                 int index = random.nextInt(POSSIBLE_CHARACTERS.length());
                 line.append(POSSIBLE_CHARACTERS.charAt(index));
             }
             lines.add(line.toString());
+
+            if (config.debug > 0) {
+                if (config.debug >= i || i == config.textNumLines - 1) {
+                    System.out.println("i; line: "+i+"\n"+line);
+                }
+            }
         }
         Files.write(outputFile, lines, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
     }
@@ -149,38 +181,40 @@ public class CreateLargeFiles {
         Path templateFile = Paths.get(config.javaTemplateDirectory+"/"+config.javaTemplateFilename);
         List<String> templateFileLines = Files.readAllLines(templateFile);
 
-        // TODO: Debug print!
-//        System.out.println("createJavaClassFiles: (config.)...");
-//        System.out.println("  generateFileType     :"+config.generateFileType);
-//        System.out.println("  javaTemplateDirectory:"+config.javaTemplateDirectory);
-//        System.out.println("  javaTemplateFilename :"+config.javaTemplateFilename);
-//        System.out.println("  javaReplaceSubstring :"+config.javaReplaceSubstring);
-//        System.out.println("  javaFileMinValue     :"+config.javaFileMinValue);
-//        System.out.println("  javaFileMaxValue     :"+config.javaFileMaxValue);
-//        System.out.println("  templateFile         :"+templateFile);
-//        System.out.println("  templateFileLines    :\n"+templateFileLines);
+        if (config.debug > 0) {
+            System.out.println("  templateFile (& path): "+templateFile);
+            System.out.println("  # templateFileLines  : "+templateFileLines.size());
+            if (config.debug >= 5) {
+                System.out.println("  templateFileLines    :\n"+templateFileLines);
+            }
+        }
 
         // Make copies of the template file, slightly modified
-        String replace = config.javaReplaceSubstring;
-        // TODO: Debug print!
-//        System.out.println("  replace              :"+replace);
+        String replsub = config.javaReplaceSubstring;
         for (int i=config.javaFileMinValue; i <= config.javaFileMaxValue; i++) {
             String replacement = String.valueOf(i);
             List<String> outputJavaFileLines = new ArrayList<String>(templateFileLines.size());
             for (int j=0; j < templateFileLines.size(); j++) {
                 outputJavaFileLines.add(templateFileLines.get(j)
-                                        .replace(replace, replacement));
+                                        .replace(replsub, replacement));
             }
-            // TODO: Debug print!
-//            System.out.println("\nreplacement            :"+replacement);
-//            System.out.println("  outputJavaFileLines  :"+outputJavaFileLines.size());
-            String outputJavaFileName = config.javaTemplateFilename.replace(replace, replacement);
+            String outputJavaFileName = config.javaTemplateFilename.replace(replsub, replacement);
             Path outputJavaFile = Paths.get(config.javaTemplateDirectory+"/"+outputJavaFileName);
             Files.write(outputJavaFile, outputJavaFileLines,
                         StandardCharsets.UTF_8, StandardOpenOption.CREATE);
-            // TODO: Debug print!
-//            System.out.println("  outputJavaFileName   :"+outputJavaFileName);
-//            System.out.println("  outputJavaFile       :"+outputJavaFile);
+
+            if (config.debug > 0) {
+                if (config.debug >= i || i == config.javaFileMaxValue) {
+                    System.out.println("i, replacement         : "+i+", "+replacement);
+                    System.out.println("  outputJavaFileName   : "+outputJavaFileName);
+                    System.out.println("  outputJavaFile       : "+outputJavaFile);
+                    System.out.println("  # outputJavaFileLines: "+outputJavaFileLines.size());
+                }
+                if (config.debug >= 10 || (config.debug >= 5 &&
+                        (i == config.javaFileMinValue || i == config.javaFileMaxValue) )) {
+                    System.out.println("  outputJavaFileLines  :\n"+outputJavaFileLines);
+                }
+            }
         }
     }
 
@@ -189,6 +223,7 @@ public class CreateLargeFiles {
         config.parse(CreateLargeFiles.class.getName(), args);
 
         CreateLargeFiles clf = new CreateLargeFiles(config);
+        clf.debugPrint();
         if ("java".equalsIgnoreCase(config.generateFileType)) {
             clf.createJavaClassFiles();
         } else {
