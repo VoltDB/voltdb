@@ -147,7 +147,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
         m_allowNulls[i] = columnInfo->allowNull;
     }
-    m_callBack = std::bind(&PersistentTable::deleteTuplesCallBack, this, std::placeholders::_1);
 }
 
 PersistentTable::~PersistentTable() {
@@ -652,31 +651,29 @@ void PersistentTable::releaseBatch() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
-    allocator().remove(m_releaseBatch, m_callBack);
-    m_releaseBatch.clear();
-}
-
-void PersistentTable::deleteTuplesCallBack(map<void*, void*> && tuples) {
-    TableTuple target(m_schema);
-    TableTuple origin(m_schema);
-    for(auto const& p : tuples) {
-        target.move(p.first);
-        origin.move(p.second);
-        BOOST_FOREACH (auto index, m_indexes) {
-            index->replaceEntryNoKeyChange(target, origin);
-        }
-        if (isTableWithMigrate(m_tableType)) {
-            uint16_t migrateColumnIndex = getMigrateColumnIndex();
-            NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
-            if (!txnId.isNull()) {
-                migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
-                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+    allocator().remove(m_releaseBatch, [this](map<void*, void*> const& tuples) {
+        TableTuple target(m_schema);
+        TableTuple origin(m_schema);
+        for(auto const& p : tuples) {
+            target.move((reinterpret_cast<TableTuple*>(p.first))->address());
+            origin.move((reinterpret_cast<TableTuple*>(p.second))->address());
+            BOOST_FOREACH (auto index, m_indexes) {
+                index->replaceEntryNoKeyChange(target, origin);
             }
-        }
-        if (m_tableStreamer != NULL) {
-            m_tableStreamer->notifyTupleMovement(origin, target);
-        }
-    }
+            if (isTableWithMigrate(m_tableType)) {
+               uint16_t migrateColumnIndex = getMigrateColumnIndex();
+                NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
+                if (!txnId.isNull()) {
+                    migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
+                    migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+                }
+            }
+            if (m_tableStreamer != NULL) {
+                m_tableStreamer->notifyTupleMovement(origin, target);
+            }
+       }
+    });
+    m_releaseBatch.clear();
 }
 
 /*

@@ -238,8 +238,6 @@ public:
         return *m_dataStorage;
     }
 
-    using DeleteCallBack = std::function<void(map<void*, void*>&&)>;
-
     int64_t occupiedTupleMemory() const {
         vassert(m_dataStorage != nullptr);
         return m_dataStorage->size() * m_tempTuple.tupleLength();
@@ -600,8 +598,6 @@ public:
      */
     bool deleteMigratedRows(int64_t deletableTxnId);
 
-    void deleteTuplesCallBack(map<void*, void*> &&);
-
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
@@ -626,9 +622,6 @@ private:
     bool blockCountConsistent() const {
         return true;
     }
-
-//    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
-//    }
 
     void insertIntoAllIndexes(TableTuple* tuple);
 
@@ -763,7 +756,6 @@ private:
 
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
-    DeleteCallBack m_callBack;
     std::unique_ptr<SnapshotIterator> m_snapIt;
 
     // Provides access to all table streaming apparati, including COW and recovery.

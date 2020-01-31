@@ -768,7 +768,6 @@ namespace voltdb {
                 hooked_iterator_type(typename super::container_type);
                 static hooked_iterator_type begin(container_type);
                 static hooked_iterator_type end(container_type);
-                hooked_iterator_type(typename super::container_type);
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;
