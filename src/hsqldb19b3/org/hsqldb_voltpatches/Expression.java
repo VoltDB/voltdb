@@ -448,8 +448,12 @@ public class Expression {
 
             default :
                 return equals(nodes, other.nodes)
-                       && equals(subQuery, other.subQuery);
+                        && equals(subQuery, other.subQuery);
         }
+    }
+
+    public boolean queryTableColumnIndexEquals(Expression other) {
+        return queryTableColumnIndex == other.queryTableColumnIndex;
     }
 
     @Override
@@ -706,7 +710,7 @@ public class Expression {
             return;
         }
 
-        int index = expressions.getIndex(this);
+        int index = expressions.getIndexByQueryTableColumnIndex(this);
 
         if (index != -1) {
             Expression e = (Expression) replacements.get(index);
@@ -1697,7 +1701,6 @@ public class Expression {
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
         exp.attributes.put("id", getUniqueId(context.m_session));
-
         if (opType == OpTypes.USER_DEFINED_AGGREGATE) {
             if (this instanceof ExpressionAggregate) {
                 ExpressionAggregate tempExpr = (ExpressionAggregate) this;

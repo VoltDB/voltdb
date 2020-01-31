@@ -541,7 +541,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_lastReleasedSeqNo = releaseSeqNo;
-        m_gapTracker.truncate(releaseSeqNo);
+        m_gapTracker.truncateBefore(releaseSeqNo);
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
         // Next poll starts from this number, if it sit in between buffers and stream is active, next poll will
@@ -1244,7 +1244,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 // Discard the blocks
                 for (StreamBlock sb : blocksToDelete) {
-                    m_gapTracker.truncate(sb.lastSequenceNumber());
+                    m_gapTracker.truncateBefore(sb.lastSequenceNumber());
                     sb.discard();
                 }
             }

@@ -245,6 +245,13 @@ inline typename ChunkList<Chunk, E>::iterator ChunkList<Chunk, E>::erase(
     return super::erase(first, last);
 }
 
+template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator
+ChunkList<Chunk, E>::rev2fwd(typename ChunkList<Chunk, E>::reverse_iterator iter) {
+    auto const dist = std::distance(iter, rend());
+    vassert(dist > 0);                     // partial func
+    return next(begin(), dist - 1);
+}
+
 template<typename Chunk, typename E>
 inline void ChunkList<Chunk, E>::clear() noexcept {
     m_map.clear();
@@ -258,7 +265,7 @@ size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter
 
 template<typename Chunk, typename E> inline
 size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
-    return std::distance(begin(), iter);
+    return std::distance(cbegin(), iter);
 }
 
 // queue: insert to tail; get from head; stack: insert to head,
@@ -362,7 +369,7 @@ CompactingStorageTrait<dir>::LinearizedChunks::iterator() noexcept {
 template<shrink_direction dir> inline typename CompactingStorageTrait<dir>::LinearizedChunks::iterator_type
 CompactingStorageTrait<dir>::LinearizedChunks::iterator() const noexcept {
     m_iterHelper.reset();
-    return [this]() { return this->m_iterHelper(); };
+    return [this]() { return m_iterHelper(); };
 }
 
 template<typename C, typename E>
@@ -443,23 +450,28 @@ inline void CompactingStorageTrait<dir>::associate(list_type* s) noexcept {
     m_storage = s;
 }
 
-template<shrink_direction dir> inline void CompactingStorageTrait<dir>::freeze() noexcept {
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::freeze() {
     vassert(m_storage != nullptr);
+    if (m_frozen) {
+        throw logic_error("Double freeze detected");
+    }
     m_frozen = true;
 }
 
-template<shrink_direction dir> inline void CompactingStorageTrait<dir>::thaw() noexcept {
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::thaw() {
     vassert(m_storage != nullptr);
     if (m_frozen) {
         m_unreleased.clear();
         m_frozen = false;
+    } else {
+        throw logic_error("Double thaw detected");
     }
 }
 
 /**
  * Immediately free to OS when the tail is unused
  */
-template<shrink_direction dir> inline void CompactingStorageTrait<dir>::released(
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasable(
         typename CompactingStorageTrait<dir>::iterator iter) {
     vassert(m_storage != nullptr);
     if (iter->empty()) {
@@ -469,6 +481,12 @@ template<shrink_direction dir> inline void CompactingStorageTrait<dir>::released
             m_storage->erase(iter);
         }
     }
+}
+
+template<shrink_direction dir> inline void CompactingStorageTrait<dir>::releasable(
+        typename CompactingStorageTrait<dir>::reverse_iterator riter) {
+    vassert(m_storage != nullptr);
+    releasable(m_storage->rev2fwd(riter));
 }
 
 template<shrink_direction dir> inline ExtendedIterator
@@ -482,8 +500,9 @@ CompactingStorageTrait<dir>::operator()() const noexcept {
 }
 
 template<shrink_direction dir>
-inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept : m_tupleSize(tupleSize) {
-    trait::associate(this);
+inline CompactingChunks<dir>::CompactingChunks(size_t tupleSize) noexcept :
+    m_tupleSize(tupleSize), m_batched(*this) {      // cyclic dependency from m_batched is fine,
+    trait::associate(this);                        // since we are only setting up ptr there
 }
 
 // returns non-null value only if in snapshot,
@@ -498,14 +517,14 @@ template<shrink_direction dir> inline void const* CompactingChunks<dir>::endOfFi
     }
 }
 
-template<shrink_direction dir> inline void CompactingChunks<dir>::freeze() noexcept {
+template<shrink_direction dir> inline void CompactingChunks<dir>::freeze() {
     if (! list_type::empty()) {
         m_endOfFirstChunk = list_type::begin()->next();
     }
     trait::freeze();
 }
 
-template<shrink_direction dir> inline void CompactingChunks<dir>::thaw() noexcept {
+template<shrink_direction dir> inline void CompactingChunks<dir>::thaw() {
     m_endOfFirstChunk = nullptr;
     trait::thaw();
 }
@@ -577,83 +596,323 @@ template<shrink_direction dir> void* CompactingChunks<dir>::free(void* dst) {
         } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
             memcpy(dst, src, tupleSize());
         }
-        trait::released(from_iter);
+        trait::releasable(from_iter);
         --m_allocs;
         return src;
     }
 }
 
+namespace batch_remove_aid {
+    template<typename T, typename Cont1> inline static set<T>
+    intersection(Cont1 const& t1, set<T> const&& t2) {
+        return accumulate(t1.cbegin(), t1.cend(), set<T>{}, [&t2](set<T>& acc, T const& e) {
+                if (t2.count(e)) {
+                    acc.emplace(e);
+                }
+                return acc;
+            });
+    }
+
+    /**
+     * Assuming that inter \subset src, removes all elements from
+     * src, keeping the rest in order.
+     */
+    template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
+        for (auto const& entry : inter) {
+            auto const iter = find(src.begin(), src.end(), entry);
+            vassert(iter != src.end());
+            src.erase(iter);
+        }
+        return src;
+    }
+
+    template<typename T1, typename T2> inline
+    static map<T1, T2> build_map(vector<T1> const&& v1, vector<T2> const&& v2) {
+        vassert(v1.size() == v2.size());
+        return inner_product(v1.cbegin(), v1.cend(), v2.cbegin(), map<void*, void*>{},
+                [](map<void*, void*>& acc, pair<void*, void*> const& entry)
+                { acc.emplace(entry); return acc; },
+                [](void* p1, void* p2) { return make_pair(p1, p2); });
+    }
+}
+
 template<shrink_direction dir> inline
-CompactingChunks<dir>::element_type::element_type(CompactingChunks<dir>& o) noexcept : m_self(o) {}
+CompactingChunks<dir>::BatchRemoveAccumulator::BatchRemoveAccumulator(CompactingChunks<dir>* o) : m_self(o) {
+    vassert(o != nullptr);
+}
+
+template<shrink_direction dir> inline CompactingChunks<dir>&
+CompactingChunks<dir>::BatchRemoveAccumulator::chunks() noexcept {
+    return *m_self;
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::list_type::iterator
+CompactingChunks<dir>::BatchRemoveAccumulator::pop() {
+    auto iter = m_self->compactFrom();
+    reinterpret_cast<char*&>(iter->m_next) = reinterpret_cast<char*>(iter->begin());
+    m_self->releasable(iter);
+    return m_self->compactFrom();
+}
+
+template<shrink_direction dir> inline vector<void*>
+CompactingChunks<dir>::BatchRemoveAccumulator::collect() const {
+    return accumulate(cbegin(), cend(), vector<void*>{},
+            [](vector<void*>& acc, typename super::value_type const& entry) {
+                auto const& v = get<1>(entry.second);
+                copy(v.cbegin(), v.cend(), back_inserter(acc));
+                return acc;
+            });
+}
 
 template<shrink_direction dir> inline void
-CompactingChunks<dir>::element_type::insert(typename CompactingChunks<dir>::list_type::iterator key, void* p) {
+CompactingChunks<dir>::BatchRemoveAccumulator::insert(
+        typename CompactingChunks<dir>::list_type::iterator key, void* p) {
     auto iter = find(key);
     if (iter == end()) {
-        linear_access_type cont;
-        cont.emplace(p);
-        emplace(key, make_tuple(m_self.distance(key), cont));
+        emplace(key, make_tuple(m_self->distance(key), vector<void*>{p}));
     } else {
-        get<1>(iter->second).emplace(p);
+        get<1>(iter->second).emplace_back(p);
     }
 }
 
-template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
-CompactingChunks<dir>::element_type::min_pop() {
-    auto const iter = min_element(begin(), end(),
-            [](typename super::value_type const& lhs, typename super::value_type const& rhs)
-            { return get<0>(lhs.second) < get<0>(rhs.second); });
-    if (iter == end()) {
-        return {};
+template<shrink_direction dir> inline vector<void*>
+CompactingChunks<dir>::BatchRemoveAccumulator::sorted() {
+    using map_type = map<size_t, vector<void*>, Comp>;
+    auto const s = accumulate(begin(), end(), map_type{},
+            [](map_type& acc, super::value_type& entry) {                  // entry : map<list_type::iterator, tuple<size_t, vector<void*>>>
+                auto const index = get<0>(entry.second);
+                auto& v = get<1>(entry.second);
+                std::sort(v.begin(), v.end(), greater<void*>());           // destructuring (i.e. in-place) sort
+                acc.emplace(index, v);
+                return acc;
+            });
+    return accumulate(s.cbegin(), s.cend(), vector<void*>{},
+            [](vector<void*>& acc, typename map_type::value_type const& entry) {
+                auto const& val = entry.second;
+                copy(val.cbegin(), val.cend(), back_inserter(acc));
+                return acc;
+            });
+}
+
+template<shrink_direction dir> inline
+CompactingChunks<dir>::DelayedRemover::DelayedRemover(CompactingChunks<dir>& s) : super(&s) {}
+
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::DelayedRemover::add(void* p) {
+    auto const* iter = super::chunks().find(p);
+    if (iter == nullptr) {         // validate,
+        snprintf(buf, sizeof buf, "CompactingChunk<%s>::DelayedRemover::add(%p): invalid address",
+                dir == shrink_direction::head ? "head" : "tail", p);
+        buf[sizeof buf - 1] = 0;
+        throw range_error(buf);
     } else {
-        auto const r = get<1>(iter->second);
-        erase(iter);
-        return r;
+        m_prepared = false;
+        super::insert(*iter, p);
+        return ++m_size;
     }
 }
 
-template<shrink_direction dir> inline typename CompactingChunks<dir>::element_type::linear_access_type
-CompactingChunks<dir>::element_type::find_pop(typename CompactingChunks<dir>::list_type::iterator key) {
-    auto const iter = find(key);
-    if (iter == end()) {
-        return {};
-    } else {
-        auto const r = get<1>(iter->second);
-        erase(iter);
-        return r;
+template<shrink_direction dir> inline map<void*, void*> const&
+CompactingChunks<dir>::DelayedRemover::movements() const{
+    return m_move;
+}
+
+template<shrink_direction dir> inline set<void*> const&
+CompactingChunks<dir>::DelayedRemover::removed() const{
+    return m_remove;
+}
+
+template<shrink_direction dir> typename CompactingChunks<dir>::DelayedRemover&
+CompactingChunks<dir>::DelayedRemover::prepare(bool dupCheck) {
+    using namespace batch_remove_aid;
+    if (! m_prepared) {
+        // extra validation: any duplicates with add() calls?
+        // This check is spared in the single-call batch-free API
+        auto const ptrs = super::collect();
+        size_t size = ptrs.size();
+        if (dupCheck && size != set<void*>(ptrs.cbegin(), ptrs.cend()).size()) {
+            throw runtime_error("Duplicate addresses detected");
+        } else {
+            vector<void*> addrToRemove{};
+            addrToRemove.reserve(size);
+            super::chunks().until_([&addrToRemove, &size] (
+                    pair<typename CompactingChunks<dir>::CompactingIterator::iterator_type, void*> const& entry) {
+                        addrToRemove.emplace_back(entry.second);
+                        return --size == 0;
+                    });
+            m_remove = intersection(ptrs, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
+            m_move = build_map(subtract(super::sorted(), m_remove),
+                    subtract(addrToRemove, m_remove));
+            m_prepared = true;
+        }
+    }
+    return *this;
+}
+
+template<shrink_direction dir> size_t CompactingChunks<dir>::DelayedRemover::force() {
+    auto hd = super::chunks().compactFrom();
+    auto const tupleSize = super::chunks().tupleSize(),
+        allocsPerTuple = (reinterpret_cast<char const*>(hd->end()) -
+                reinterpret_cast<char const*>(hd->begin())) / tupleSize;
+    auto const total = m_move.size() + m_remove.size();
+    if (total > 0) {
+        // storage remapping and clean up
+        for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
+                    memcpy(entry.first, entry.second, tupleSize);
+                });
+        m_move.clear();
+        m_remove.clear();
+        auto const offset =
+            reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
+        // dangerous: direct manipulation on each offended chunks
+        for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
+            hd = super::pop();
+        }
+        if (total >= allocsPerTuple) {       // any chunk released at all?
+            reinterpret_cast<char*&>(hd->m_next) = reinterpret_cast<char*>(hd->begin()) + offset;
+        }
+        auto const remBytes = (total % allocsPerTuple) * tupleSize;
+        if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
+            auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
+            if (remBytes > rem) {
+                hd = super::pop();
+                reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
+            } else {
+                reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
+            }
+            vassert(hd->next() >= hd->begin());
+        }
+        super::clear();
+    }
+    auto const r = m_size;
+    m_size = 0;
+    return r;
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::CompactingIterator::value_type
+CompactingChunks<dir>::CompactingIterator::operator*() const noexcept {
+    return {m_iter, m_cursor};
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::CompactingIterator&
+CompactingChunks<dir>::CompactingIterator::operator++() {     // prefix
+    advance();
+    return *this;
+}
+
+template<shrink_direction dir> inline typename CompactingChunks<dir>::CompactingIterator
+CompactingChunks<dir>::CompactingIterator::operator++(int) {      // postfix
+    CompactingChunks<dir>::CompactingIterator copy(*this);
+    copy.advance();
+    return copy;
+}
+
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::CompactingIterator::drained() const noexcept {
+    return m_cursor == nullptr;
+}
+
+template<shrink_direction dir>
+template<typename Fun> inline void CompactingChunks<dir>::until_(Fun&& f) {
+    for (auto iter = CompactingIterator(*this); ! iter.drained();) {
+        auto const addr = *iter;
+        ++iter;
+        if (f(addr)) {
+            break;
+        }
     }
 }
 
-template<shrink_direction dir> inline typename CompactingChunks<dir>::batch_type
-CompactingChunks<dir>::free(set<void*> const& args, function<void(map<void*, void*>&&)> const& cb) {
-    throw logic_error("Not yet implemented");
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::CompactingIterator::operator==(
+        CompactingChunks<dir>::CompactingIterator const& o) const noexcept{
+    return m_cursor == o.m_cursor;
+}
+
+template<shrink_direction dir> inline bool
+CompactingChunks<dir>::CompactingIterator::operator!=(
+        CompactingChunks<dir>::CompactingIterator const& o) const noexcept{
+    return ! operator==(o);
+}
+
+template<shrink_direction dir> inline
+typename CompactingChunks<dir>::CompactingIterator CompactingChunks<dir>::begin() noexcept {
+    return {*this};
+}
+
+template<shrink_direction dir> inline
+typename CompactingChunks<dir>::CompactingIterator CompactingChunks<dir>::end() noexcept {
+    CompactingChunks<dir>::CompactingIterator iter{*this};
+    iter.m_cursor = nullptr;
+    return iter;
+}
+
+template<shrink_direction dir> inline void CompactingChunks<dir>::CompactingIterator::advance() {
+    if (m_cursor == nullptr) {
+        snprintf(buf, sizeof buf, "CompactingIterator <%s> drained.",
+                dir == shrink_direction::head ? "head" : "tail");
+        buf[sizeof buf - 1] = 0;
+        throw runtime_error(buf);
+    } else if (m_cursor > m_iter->begin()) {
+        reinterpret_cast<char*&>(m_cursor) -=
+            reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
+    } else if (++m_iter == _end()) {           // drained now
+        m_cursor = nullptr;
+    } else {
+        m_cursor = reinterpret_cast<char*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<dir> const&>(m_cont).tupleSize();
+        vassert(m_cursor >= m_iter->begin());
+    }
 }
 
 namespace voltdb { namespace storage {          // older GCC would warn in absence of this
-    template<shrink_direction dir> inline size_t CompactingChunks<dir>::tupleSize() const noexcept {
-        return m_tupleSize;
+    template<> inline
+    CompactingChunks<shrink_direction::head>::CompactingIterator::CompactingIterator(
+            typename CompactingChunks<shrink_direction::head>::list_type& c) noexcept :
+    m_cont(c), m_iter(c.begin()),
+    m_cursor(reinterpret_cast<char*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<shrink_direction::head> const&>(c).tupleSize()) {}
+
+    template<> inline
+    CompactingChunks<shrink_direction::tail>::CompactingIterator::CompactingIterator(
+            typename CompactingChunks<shrink_direction::tail>::list_type& c) noexcept :
+    m_cont(c), m_iter(c.rbegin()),
+    m_cursor(reinterpret_cast<char*>(m_iter->next()) -
+            reinterpret_cast<CompactingChunks<shrink_direction::head> const&>(c).tupleSize()) {}
+
+    template<> inline typename CompactingChunks<shrink_direction::head>::CompactingIterator::iterator_type
+    CompactingChunks<shrink_direction::head>::CompactingIterator::_end() const noexcept {
+        return m_cont.end();
+    }
+
+    template<> inline typename CompactingChunks<shrink_direction::tail>::CompactingIterator::iterator_type
+    CompactingChunks<shrink_direction::tail>::CompactingIterator::_end() const noexcept {
+        return m_cont.rend();
     }
 
     template<> inline typename CompactingChunks<shrink_direction::head>::list_type::iterator
-        CompactingChunks<shrink_direction::head>::compactFrom() noexcept {
-            return begin();
-        }
+    CompactingChunks<shrink_direction::head>::compactFrom() noexcept {
+        return list_type::begin();
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::tail>::list_type::iterator
-        CompactingChunks<shrink_direction::tail>::compactFrom() noexcept {
-            return empty() ? end() : prev(end());
-        }
+    CompactingChunks<shrink_direction::tail>::compactFrom() noexcept {
+        return empty() ? list_type::end() : prev(list_type::end());
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::head>::list_type::const_iterator
-        CompactingChunks<shrink_direction::head>::compactFrom() const noexcept {
-            return cbegin();
-        }
+    CompactingChunks<shrink_direction::head>::compactFrom() const noexcept {
+        return list_type::cbegin();
+    }
 
     template<> inline typename CompactingChunks<shrink_direction::tail>::list_type::const_iterator
-        CompactingChunks<shrink_direction::tail>::compactFrom() const noexcept {
-            return empty() ? cend() : prev(cend());
-        }
+    CompactingChunks<shrink_direction::tail>::compactFrom() const noexcept {
+        return empty() ? list_type::cend() : prev(list_type::cend());
+    }
 }}
+
+template<shrink_direction dir> inline size_t CompactingChunks<dir>::tupleSize() const noexcept {
+    return m_tupleSize;
+}
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
@@ -1081,9 +1340,9 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 template<typename Alloc, typename Trait, typename C, typename E>
 inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
     Trait([this](void const* key) {
-                this->m_changes.erase(key);                        // no-op for non-existent key
-                this->m_copied.erase(key);
-                this->m_storage.tryFree(const_cast<void*>(key));
+                m_changes.erase(key);                        // no-op for non-existent key
+                m_copied.erase(key);
+                m_storage.tryFree(const_cast<void*>(key));
             }),
     m_storage(tupleSize) { }
 
@@ -1114,23 +1373,27 @@ inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait
                 break;
             case ChangeType::Deletion:
             default:
-                remove(src, dst);
+                remove(src);
         }
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::freeze() noexcept {
-    m_recording = true;
+template<typename Alloc, typename Trait, typename C, typename E> inline void TxnPreHook<Alloc, Trait, C, E>::freeze() {
+    if (m_recording) {
+        throw logic_error("Double freeze detected");
+    } else {
+        m_recording = true;
+    }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::thaw() {
+template<typename Alloc, typename Trait, typename C, typename E> inline void TxnPreHook<Alloc, Trait, C, E>::thaw() {
     if (m_recording) {
         m_changes.clear();
         m_copied.clear();
         m_storage.clear();
         m_hasDeletes = m_recording = false;
+    } else {
+        throw logic_error("Double thaw detected");
     }
 }
 
@@ -1163,7 +1426,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* src, void const* 
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src, void const* dst) {
+inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
@@ -1189,7 +1452,7 @@ template<typename Chunks, typename Hook, typename E> inline
 HookedCompactingChunks<Chunks, Hook, E>::HookedCompactingChunks(size_t s) noexcept : Chunks(s), Hook(s) {}
 
 template<typename Chunks, typename Hook, typename E> inline void
-HookedCompactingChunks<Chunks, Hook, E>::freeze() noexcept {
+HookedCompactingChunks<Chunks, Hook, E>::freeze() {
     Hook::freeze();
     Chunks::freeze();
 }
@@ -1217,20 +1480,58 @@ template<typename Chunks, typename Hook, typename E> inline void const*
 HookedCompactingChunks<Chunks, Hook, E>::remove(void* dst) {
     Hook::copy(dst);
     void const* src = Chunks::free(dst);
-    Hook::add(Hook::ChangeType::Deletion, dst, src);
+    Hook::add(Hook::ChangeType::Deletion, dst, nullptr);
     return src;
 }
 
 template<typename Chunks, typename Hook, typename E> inline void
 HookedCompactingChunks<Chunks, Hook, E>::remove(
-        set<void*> const& src, function<void(map<void*, void*>&&)> const& cb) {
-    auto const removed = Chunks::free(src, cb);                        // batched removal
-    for (auto const& p : get<0>(removed)) {                            // register all removal actions
-        Hook::add(Hook::ChangeType::Deletion, p.first, p.second);
-    }
-    for (auto const& s : get<1>(removed)) {
-        Hook::add(Hook::ChangeType::Deletion, s, s);
-    }
+        set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
+    using Remover = typename Chunks::DelayedRemover;
+    auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
+            [](Remover& batch, void* p) {
+                batch.add(p);
+                return batch;
+            }).prepare(false);
+    cb(batch.movements());
+    // hook registration
+    for_each(batch.removed().cbegin(), batch.removed().cend(),
+            [this](void* s) {
+                Hook::copy(s);
+                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
+            });
+    for_each(batch.movements().cbegin(), batch.movements().cend(),
+            [this](pair<void*, void*> const& entry) {
+                Hook::copy(entry.first);
+                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+            });
+    batch.force();
+}
+
+template<typename Chunks, typename Hook, typename E> inline size_t
+HookedCompactingChunks<Chunks, Hook, E>::remove_add(void* p) {
+    return Chunks::m_batched.add(p);
+}
+
+template<typename Chunks, typename Hook, typename E> inline map<void*, void*> const&
+HookedCompactingChunks<Chunks, Hook, E>::remove_moves() {
+    return Chunks::m_batched.prepare(true).movements();
+}
+
+template<typename Chunks, typename Hook, typename E> inline size_t
+HookedCompactingChunks<Chunks, Hook, E>::remove_force() {
+    // hook registration
+    for_each(Chunks::m_batched.removed().cbegin(), Chunks::m_batched.removed().cend(),
+            [this](void* s) {
+                Hook::copy(s);
+                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
+            });
+    for_each(remove_moves().cbegin(), remove_moves().cend(),
+            [this](pair<void*, void*> const& entry) {
+                Hook::copy(entry.first);
+                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+            });
+    return Chunks::m_batched.prepare(true).force();
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

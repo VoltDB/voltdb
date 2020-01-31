@@ -40,6 +40,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
 
 import org.junit.After;
 import org.junit.Before;
@@ -983,6 +987,107 @@ public class TestPersistentBinaryDeque {
             return;
         }
         fail();
+    }
+
+    @Test
+    public void testDeferredDiscards() throws Exception {
+        // Set up deferred discarder
+        Timer timer = new Timer();
+        DeferredDiscarder discarder = new DeferredDiscarder();
+        long timerPeriod = 500;
+        timer.schedule(discarder, timerPeriod, timerPeriod);
+        m_pbd.registerDeferredDeleter(discarder);
+
+        // Insert and read buffers. Verify that the discards happen by verifying the segment count
+        int numSegments = 5;
+        int numBuffers = 25;
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<numBuffers; j++) {
+                m_pbd.offer(DBBPool.wrapBB(ByteBuffer.allocate(100)));
+            }
+        }
+
+        assertEquals(numSegments, getSortedDirectoryListing().size());
+
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        for (int i=0; i<numSegments; i++) {
+            for (int j=0; j<numBuffers; j++) {
+                reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+                if (i>0 && j==0) { // deletes happen on the first discard on the next segment.
+                    Thread.sleep(timerPeriod*2); // sleep double the time to make sure the timer task is executed.
+                    assertEquals(numSegments-i, getSortedDirectoryListing().size());
+                }
+            }
+        }
+
+        assertEquals(1, getSortedDirectoryListing().size());
+        assertNull(discarder.m_error);
+        discarder.cancel();
+    }
+
+    @Test
+    public void testDeferredDiscardsAfterClose() throws Exception {
+        // Set up deferred discarder
+        Timer timer = new Timer();
+        DeferredDiscarder discarder = new DeferredDiscarder();
+        long timerPeriod = 1000;
+        timer.schedule(discarder, timerPeriod, timerPeriod);
+        m_pbd.registerDeferredDeleter(discarder);
+
+        // Insert and read buffers. Verify that the discards happen by verifying the segment count
+        int numSegments = 5;
+        int numBuffers = 25;
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<numBuffers; j++) {
+                m_pbd.offer(DBBPool.wrapBB(ByteBuffer.allocate(100)));
+            }
+        }
+
+        assertEquals(numSegments, getSortedDirectoryListing().size());
+
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        for (int i=0; i<numSegments*numBuffers; i++) {
+            reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        }
+
+        m_pbd.closeCursor("testreader");
+        Thread.sleep(timerPeriod + 500); // wait for timer to execute
+        assertNull(discarder.m_error);
+        discarder.cancel();
+    }
+
+    class DeferredDiscarder extends TimerTask implements Executor {
+
+        ConcurrentLinkedQueue<Runnable> m_actions = new ConcurrentLinkedQueue<>();
+        Throwable m_error;
+
+        @Override
+        public void execute(Runnable runnable) {
+            m_actions.add(runnable);
+        }
+
+        @Override
+        public void run() {
+            List<Runnable> copy = new ArrayList<>();
+            int size = m_actions.size();
+            for (int i=0; i<size; i++) {
+                copy.add(m_actions.poll());
+            }
+
+            for (Runnable runnable : copy) {
+                try {
+                    runnable.run();
+                } catch(Throwable t) {
+                    m_error = t;
+                }
+            }
+        }
     }
 
     @Test

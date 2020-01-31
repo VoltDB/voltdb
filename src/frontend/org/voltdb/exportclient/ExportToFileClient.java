@@ -195,7 +195,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             // Use a specific revision to generate a file path
-            String getPathUtility(String extension, String hostId, String prefix, int revision) {
+            private String getPathUtility(String extension, String hostId, String prefix, int revision) {
                 String res = "";
                 String rev = revision == 0 ? "" : ("-" + revision);
                 if(m_batched) {
@@ -226,6 +226,9 @@ public class ExportToFileClient extends ExportClientBase {
                 return res;
             }
 
+            String getActivePath() {
+                return getPath(ACTIVE_PREFIX);
+            }
             // Use no revision to generate a file path
             String getPath(String prefix) {
                 return getPath(prefix, 0);
@@ -304,6 +307,10 @@ public class ExportToFileClient extends ExportClientBase {
             }
         }
 
+        FileHandle getFileHandle(String tableName, long generation) {
+           return new FileHandle(tableName, generation);
+        }
+
         String getPathOfBatchDir(String prefix) {
             assert(m_batched);
             return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
@@ -332,10 +339,12 @@ public class ExportToFileClient extends ExportClientBase {
                     writer.flush();
                     writer.close();
                 } catch (IOException e) {
-                    m_logger.error("Failed to flush or close file, export file may be unavailable/unwritable, or not enough space.", e);
+                    m_logger.error("Failed to flush or close file '" + entry.getKey().getActivePath() +
+                                   "'. Export file may be unavailable/unwritable, or not enough space.", e);
                 } finally {
                     if (writer.checkError()) {
-                        m_logger.error("Failed to flush or close file, export file may be unavailable/unwritable, or not enough space.");
+                        m_logger.error("Failed to flush or close file '" + entry.getKey().getActivePath() +
+                                "'. Export file may be unavailable/unwritable, or not enough space.");
                     }
                 }
             }
@@ -380,9 +389,6 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         void closeFiles() {
-            File[] notifySet = new VoltFile[m_writers.size()];
-
-            int i = 0;
             // Sort the open files by TXN ID so that we can close and rename
             // them in the order in which they were created.  This allows
             // apps interested in the files to know that whenever a new file
@@ -398,7 +404,7 @@ public class ExportToFileClient extends ExportClientBase {
 
             for (FileHandle handle : keys)
             {
-                String oldPath = handle.getPath(ACTIVE_PREFIX);
+                String oldPath = handle.getActivePath();
                 File oldFile = new VoltFile(oldPath);
                 assert(oldFile.exists());
                 assert(oldFile.isFile());
@@ -409,9 +415,6 @@ public class ExportToFileClient extends ExportClientBase {
                     m_logger.error("Failed to rename export file from " + oldPath
                             + " to any revisions of " + handle.getPath(""));
                 }
-
-                notifySet[i] = newFile;
-                i++;
             }
         }
 
@@ -439,7 +442,7 @@ public class ExportToFileClient extends ExportClientBase {
             if (writer != null)
                 return writer;
 
-            String path = handle.getPath(ACTIVE_PREFIX);
+            String path = handle.getActivePath();
             File newFile = new VoltFile(path);
             if (newFile.exists()) {
                 m_logger.error("Error: Output file for next period already exists at path: " + newFile.getPath()
@@ -685,7 +688,8 @@ public class ExportToFileClient extends ExportClientBase {
                 // if writeSchema or getWriter method fails, it will throw IOException
                 // try reset writer and restart the block
                 if (e.getCause() instanceof IOException) {
-                    m_logger.error("Failed to get writer, export file may be unavailable/unwritable, or not enough space.", e);
+                    m_logger.error("Failed to get writer for file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
+                            "'. Export file may be unavailable/unwritable, or not enough space.", e);
 
                     resetWriter();
                     //This means we will not reach onBlockCompletion and thus not release and roll will block
@@ -730,7 +734,8 @@ public class ExportToFileClient extends ExportClientBase {
             finally {
                 m_batchLock.readLock().unlock();
                 if (m_writer.checkError()) {
-                    rateLimitedLogError(m_logger, "Failed to flush, export file may be unavailable/unwritable, or not enough space.");
+                    rateLimitedLogError(m_logger, "Failed to flush file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
+                            "'. Export file may be unavailable/unwritable, or not enough space.");
                     m_writer.resetWriter();
                     throw new RestartBlockException("Failed to complete the block.", true);
                 }
