@@ -22,12 +22,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -36,6 +40,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
@@ -48,12 +53,14 @@ import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.ExportRow;
+import org.voltdb.exportclient.decode.AvroDecoder;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltdb.exportclient.decode.RowDecoder;
 
 public class KafkaExportClient extends ExportClientBase {
 
@@ -70,6 +77,7 @@ public class KafkaExportClient extends ExportClientBase {
     private final static String OLD_PARTITIONER = "partitioner.class";
     private final static String ACKS_TIMEOUT = "acks.retry.timeout";
     private final static String LEGACY_ACKS = "request.required.acks";
+    public final static String ENCODE_FORMAT = "type";
 
     private final static Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
@@ -78,6 +86,10 @@ public class KafkaExportClient extends ExportClientBase {
     public final static String DEFAULT_EXPORT_PREFIX = "voltdbexport";
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
+
+    enum EncodeFormat {CSV, AVRO}
+
+    private EncodeFormat m_encodeFormat = EncodeFormat.CSV;
 
     Properties m_producerConfig;
     String m_topicPrefix = DEFAULT_EXPORT_PREFIX;
@@ -93,6 +105,13 @@ public class KafkaExportClient extends ExportClientBase {
 
     @Override
     public void configure(Properties config) throws Exception {
+        String decodeType = config.getProperty(ENCODE_FORMAT, "").trim();
+        if (decodeType.toLowerCase().equals("avro")) {
+            m_encodeFormat = EncodeFormat.AVRO;
+        } else {
+            m_encodeFormat = EncodeFormat.CSV;
+        }
+
         m_producerConfig = new Properties();
         m_producerConfig.putAll(config);
 
@@ -100,6 +119,7 @@ public class KafkaExportClient extends ExportClientBase {
         m_producerConfig.remove(BATCH_MODE_PN);
         m_producerConfig.remove(OLD_SERIALIZER);
         m_producerConfig.remove(OLD_PARTITIONER);
+        m_producerConfig.remove(ENCODE_FORMAT);
 
         m_timeZone = VoltDB.GMT_TIMEZONE;
         String timeZoneID = config.getProperty(TIMEZONE_PN, "").trim();
@@ -257,13 +277,25 @@ public class KafkaExportClient extends ExportClientBase {
             throw new IllegalArgumentException("Unable to load serializer class " + kSerializer , e);
         }
 
-        String vSerializer = config.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "").trim();
-        if (vSerializer.isEmpty()) {
-            m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        } else try {
-            Class.forName(vSerializer);
-        } catch (UnknownError|ExceptionInInitializerError|ClassNotFoundException e) {
-            throw new IllegalArgumentException("Unable to load serializer class " + vSerializer , e);
+        if (m_encodeFormat == EncodeFormat.AVRO) {
+            m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class.getName());
+
+            String schemaRegistryUrl = config.getProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, "").trim();
+            if (StringUtil.isEmpty(schemaRegistryUrl)) {
+                throw new IllegalArgumentException("Property \"schema.registry.url\" cannot be empty.");
+            }
+
+            m_producerConfig.setProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG,
+                    schemaRegistryUrl);
+        } else {
+            String vSerializer = config.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "").trim();
+            if (vSerializer.isEmpty()) {
+                m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            } else try {
+                Class.forName(vSerializer);
+            } catch (UnknownError|ExceptionInInitializerError|ClassNotFoundException e) {
+                throw new IllegalArgumentException("Unable to load serializer class " + vSerializer , e);
+            }
         }
 
         String bootstrapVal = config.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "").trim();
@@ -295,8 +327,9 @@ public class KafkaExportClient extends ExportClientBase {
         String m_topic = null;
         boolean m_primed = false;
         Properties m_decoderProducerConfig;
-        KafkaProducer<String, String> m_producer;
-        final CSVStringDecoder m_decoder;
+        KafkaProducer<String, Object> m_producer;
+        Map<String, AvroDecoder> m_tableAvroDecoderMap;
+        CSVStringDecoder m_csvDecoder;
         final List<Future<RecordMetadata>> m_futures = new ArrayList<>();
         private final AtomicBoolean m_failure = new AtomicBoolean(false);
         final ListeningExecutorService m_es;
@@ -304,13 +337,19 @@ public class KafkaExportClient extends ExportClientBase {
         public KafkaExportDecoder(AdvertisedDataSource source) {
             super(source);
 
-            CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
-            builder
-                .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
-                .timeZone(m_timeZone)
-                .binaryEncoding(m_binaryEncoding)
-                .skipInternalFields(m_skipInternals)
-            ;
+            if (m_encodeFormat == EncodeFormat.AVRO) {
+                m_tableAvroDecoderMap = new ConcurrentHashMap<>();
+            } else {
+                CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
+                builder
+                        .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
+                        .timeZone(m_timeZone)
+                        .binaryEncoding(m_binaryEncoding)
+                        .skipInternalFields(m_skipInternals)
+                ;
+                m_csvDecoder = builder.build();
+            }
+
             if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
                 m_es = CoreUtils.getListeningSingleThreadExecutor(
                         "Kafka Export decoder for partition " +
@@ -319,7 +358,6 @@ public class KafkaExportClient extends ExportClientBase {
                 m_es = null;
             }
 
-            m_decoder = builder.build();
             // Ensure each decoder uses its own properties (ENG-17657)
             m_decoderProducerConfig = new Properties();
             m_decoderProducerConfig.putAll(m_producerConfig);
@@ -395,12 +433,19 @@ public class KafkaExportClient extends ExportClientBase {
         @Override
         public boolean processRow(ExportRow rd) throws RestartBlockException {
             if (!m_primed) checkOnFirstRow();
-
-            String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
             //Use partition value by default if its null use partition id.
             //partition value will be null only if partition column is overridden table.column and is nullable
             String pval = (rd.partitionValue == null) ? String.valueOf(rd.partitionId) : rd.partitionValue.toString();
-            ProducerRecord<String, String> krec = new ProducerRecord<String, String>(m_topic, pval, decoded);
+            ProducerRecord<String, Object> krec;
+            if (m_encodeFormat == EncodeFormat.AVRO) {
+                AvroDecoder decoder = m_tableAvroDecoderMap.computeIfAbsent(rd.tableName, k -> new AvroDecoder.Builder().build());
+                GenericRecord avroRecord = decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
+                krec = new ProducerRecord<>(m_topic, pval, avroRecord);
+            } else {
+                String decoded = m_csvDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
+                krec = new ProducerRecord<>(m_topic, pval, decoded);
+            }
+
             try {
                 m_futures.add(m_producer.send(krec, new Callback() {
                     @Override

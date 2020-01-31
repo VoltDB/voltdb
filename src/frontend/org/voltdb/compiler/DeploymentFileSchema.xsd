@@ -54,6 +54,7 @@
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
       <xs:element name="kipling" minOccurs="0" maxOccurs="1" type="kiplingType" />
+      <xs:element name="schemaregistryurl" minOccurs="0" maxOccurs="1" type="xs:string" />
       <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType"/>
     </xs:all>
   </xs:complexType>

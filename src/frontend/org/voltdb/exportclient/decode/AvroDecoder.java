@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -55,7 +56,7 @@ import com.google_voltpatches.common.collect.FluentIterable;
 public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
     protected final String m_packageName;
-    protected Map<Long, Schema> m_schemas = new HashMap<>();
+    protected Map<Long, Schema> m_schemas = new ConcurrentHashMap<>();
     protected Map<Long, FieldNameDecoder []> m_fieldDecoders = new HashMap<>();
     protected final SimpleDateFormat m_dtfmt =
             new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
@@ -104,7 +105,9 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             decoders.add(e.getValue().accept(decodingVisitor, fieldPos++, null));
         }
         schema = schemaFields.endRecord();
-        m_schemas.put(generation, schema);
+        // clear up the schema cache before we insert a new one. The old generations are out-dated and we will never revisit them
+        m_schemas.clear();
+        m_schemas.putIfAbsent(generation, schema);
         FieldNameDecoder [] fieldDecoders = decoders.toArray(new FieldNameDecoder[0]);
         m_fieldDecoders.put(generation, fieldDecoders);
 

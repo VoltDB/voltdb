@@ -50,6 +50,7 @@ import org.voltdb.exportclient.ExportRowSchema;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.exportclient.kafka.KafkaExportClient;
 
 public class GuestProcessor implements ExportDataProcessor {
 
