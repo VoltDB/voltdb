@@ -257,22 +257,6 @@ namespace voltdb {
         };
 
         /**
-         * The snapshot iterator, i.e.
-         * time_traveling_iterator_type, need to access
-         * deceased chunks in txn view in the txn order at
-         * the time those chunks were alive. These functions
-         * extend normal iterator to "splice" deceased chunks
-         * (and allocations) for TxnPreHook to extrapolate.
-         */
-        class ExtendedIterator final {
-            using iterator_type = function<void const*()>;
-            iterator_type const m_iter;
-        public:
-            ExtendedIterator(iterator_type const&&) noexcept;
-            void const* operator()() const noexcept;
-        };
-
-        /**
          * Shrink-directional-dependent book-keeping
          */
         class CompactingStorageTrait {
@@ -323,8 +307,8 @@ namespace voltdb {
              * operates on the level of list iterator, not void*.
              */
             void releasable(iterator);
-            ExtendedIterator operator()() noexcept;
-            ExtendedIterator operator()() const noexcept;
+            function<void const*()> operator()() noexcept;
+            function<void const*()> operator()() const noexcept;
         };
     }
 }
@@ -663,7 +647,7 @@ namespace voltdb {
                 using super = iterator_cb_type<perm>;
                 using history_type = typename add_lvalue_reference<typename conditional<
                     perm == iterator_permission_type::ro, Hook const, Hook>::type>::type;
-                ExtendedIterator const m_extendingCb;
+                function<void const*()> const m_extendingCb;
                 void const* m_extendingPtr;
                 void advance();
             public:

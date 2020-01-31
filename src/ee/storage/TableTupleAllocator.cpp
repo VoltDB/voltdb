@@ -261,12 +261,6 @@ size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterato
     return std::distance(cbegin(), iter);
 }
 
-inline ExtendedIterator::ExtendedIterator(typename ExtendedIterator::iterator_type const&& iter) noexcept : m_iter(iter) {}
-
-inline void const* ExtendedIterator::operator()() const noexcept {
-    return m_iter();
-}
-
 inline void CompactingStorageTrait::LinearizedChunks::emplace(
         typename CompactingStorageTrait::list_type& o,
         typename CompactingStorageTrait::list_type::iterator const& it) noexcept {
@@ -445,12 +439,12 @@ inline void CompactingStorageTrait::releasable(typename CompactingStorageTrait::
     }
 }
 
-inline ExtendedIterator CompactingStorageTrait::operator()() noexcept {
-    return {m_unreleased.iterator()};
+inline function<void const*()> CompactingStorageTrait::operator()() noexcept {
+    return m_unreleased.iterator();
 }
 
-inline ExtendedIterator CompactingStorageTrait::operator()() const noexcept {
-    return {m_unreleased.iterator()};
+inline function<void const*()> CompactingStorageTrait::operator()() const noexcept {
+    return m_unreleased.iterator();
 }
 
 inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
@@ -557,7 +551,8 @@ namespace batch_remove_aid {
     }
 }
 
-inline CompactingChunks::BatchRemoveAccumulator::BatchRemoveAccumulator(CompactingChunks* o) : m_self(o) {
+inline CompactingChunks::BatchRemoveAccumulator::BatchRemoveAccumulator(
+        CompactingChunks* o) : m_self(o) {
     vassert(o != nullptr);
 }
 
@@ -1383,7 +1378,7 @@ using t4 = mt<LazyNonCompactingChunk, gc_policy::never>;
 using t5 = mt<LazyNonCompactingChunk, gc_policy::always>;
 using t6 = mt<LazyNonCompactingChunk, gc_policy::batched>;
 }
-#define range8(ranger)                                                           \
+#define range8(ranger)                                                     \
     ranger(0); ranger(1); ranger(2); ranger(3); ranger(4); ranger(5); ranger(6); ranger(7)
 // BitChecker: 8 instantiations
 #define NthBitCheckerCodegen(n) template struct voltdb::storage::NthBitChecker<n>
@@ -1394,7 +1389,7 @@ range8(NthBitCheckerCodegen);
 range8(ByteOfCodegen);
 // composition of BytOf |> NthBitCheckerCodegen, for first 4 bytes: 8 x 4 = 32 instantiations
 #define ComposeByteAndBit0(m, n) template struct voltdb::Compose<ByteOf<n>, NthBitChecker<m>>
-#define ComposeByteAndBitCodegen(m)                                              \
+#define ComposeByteAndBitCodegen(m)                                        \
     ComposeByteAndBit0(m, 0); ComposeByteAndBit0(m, 1); ComposeByteAndBit0(m, 2); ComposeByteAndBit0(m, 3)
 range8(ComposeByteAndBitCodegen);
 #undef ComposeByteAndBitCodegen
@@ -1406,7 +1401,7 @@ template class voltdb::storage::NonCompactingChunks<EagerNonCompactingChunk>;
 template class voltdb::storage::NonCompactingChunks<LazyNonCompactingChunk>;
 // HookedCompactingChunks : 2 x 2 x 3 = 12 instantiations
 #define HookedChunksCodegen2(alloc, gc)                                     \
-    template class voltdb::storage::HookedCompactingChunks<                      \
+    template class voltdb::storage::HookedCompactingChunks<                 \
         CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>
 #define HookedChunksCodegen1(alloc)                                         \
     HookedChunksCodegen2(alloc, gc_policy::never);                          \
@@ -1431,7 +1426,7 @@ template class voltdb::storage::IterableTableTupleChunks<chunks, tag>           
 #define IteratorTagCodegen(tag)                                                  \
     IteratorTagCodegen1(NonCompactingChunks<EagerNonCompactingChunk>, tag);      \
     IteratorTagCodegen1(NonCompactingChunks<LazyNonCompactingChunk>, tag);       \
-    IteratorTagCodegen1(CompactingChunks, tag);          \
+    IteratorTagCodegen1(CompactingChunks, tag);                                  \
     IteratorTagCodegen1(__codegen__::t1, tag);                                   \
     IteratorTagCodegen1(__codegen__::t2, tag);                                   \
     IteratorTagCodegen1(__codegen__::t3, tag);                                   \
@@ -1489,19 +1484,19 @@ TTIteratorCodegen(__codegen__::t6);
 #undef TTIteratorCodegen2
 #undef TTIteratorCodegen3
 #undef TTIteratorCodegen4
-// hooked_iterator_type : 8 x 2 x 2 x 3 = 96 instantiations
+// hooked_iterator_type : 8 x 2 x 3 = 48 instantiations
 #define HookedIteratorCodegen3(tag, alloc, gc)                                           \
-template class voltdb::storage::IterableTableTupleChunks<                                     \
+template class voltdb::storage::IterableTableTupleChunks<                                \
     HookedCompactingChunks<CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
-    tag>::template hooked_iterator_type<iterator_permission_type::rw>;                                 \
-template class voltdb::storage::IterableTableTupleChunks<                                     \
+    tag>::template hooked_iterator_type<iterator_permission_type::rw>;                   \
+template class voltdb::storage::IterableTableTupleChunks<                                \
     HookedCompactingChunks<CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
     tag>::template hooked_iterator_type<iterator_permission_type::ro>
 #define HookedIteratorCodegen2(tag, alloc)                                               \
     HookedIteratorCodegen3(tag, alloc, gc_policy::never);                                \
     HookedIteratorCodegen3(tag, alloc, gc_policy::always);                               \
     HookedIteratorCodegen3(tag, alloc, gc_policy::batched)
-#define HookedIteratorCodegen(tag)                                                      \
+#define HookedIteratorCodegen(tag)                                                       \
     HookedIteratorCodegen2(tag, NonCompactingChunks<EagerNonCompactingChunk>);           \
     HookedIteratorCodegen2(tag, NonCompactingChunks<LazyNonCompactingChunk>)
 HookedIteratorCodegen(truth);
