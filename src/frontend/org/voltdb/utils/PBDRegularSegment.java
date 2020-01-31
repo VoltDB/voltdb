@@ -54,6 +54,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
     private static final int VERSION = 3;
+    private static final int COMPATIBLE_VERSION = 3;
     private static final Random RANDOM = new Random();
 
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
@@ -243,9 +244,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 PBDUtils.readBufferFully(m_fc, b, 0);
                 int crc = b.getInt();
                 int version = b.getInt();
-                if (version != VERSION) {
-                    String message = "File version incorrect. Detected version " + version + " requires version "
-                            + VERSION + " in file " + m_file.getName();
+                if (version < COMPATIBLE_VERSION) {
+                    String message = "File version is incorrect. Detected version " + version + " in header. Requires version "
+                            + COMPATIBLE_VERSION + " or higher in file " + m_file.getName();
                     m_usageSpecificLog.warn(message);
                     throw new IOException(message);
                 }
