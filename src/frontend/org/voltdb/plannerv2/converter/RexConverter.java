@@ -289,6 +289,7 @@ public class RexConverter {
                 RexConverter.setType(ae, call.getType());
                 break;
             case CASE:
+            case COALESCE:
                 ae = buildCaseWhenExpression(aeOperands, 0, call.getType());
                 break;
 //            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
