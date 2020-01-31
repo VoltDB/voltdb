@@ -271,14 +271,12 @@ TEST_F(TableTupleAllocatorTest, TestIteratorOfNonCompactingChunks) {
     testIteratorOfNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>();
 }
 
-template<shrink_direction dir>
 void testCompactingChunks() {
-    using Chunks = CompactingChunks<dir>;
     using Gen = StringGen<TupleSize>;
-    using const_iterator = typename IterableTableTupleChunks<Chunks, truth>::const_iterator;
-    using iterator = typename IterableTableTupleChunks<Chunks, truth>::iterator;
+    using const_iterator = typename IterableTableTupleChunks<CompactingChunks, truth>::const_iterator;
+    using iterator = typename IterableTableTupleChunks<CompactingChunks, truth>::iterator;
     Gen gen;
-    Chunks alloc(TupleSize);
+    CompactingChunks alloc(TupleSize);
     array<void*, NumTuples> addresses;
     size_t i;
     for(i = 0; i < NumTuples; ++i) {
@@ -291,28 +289,21 @@ void testCompactingChunks() {
     fold<const_iterator>(alloc_cref,
             [&i, &addresses](void const* p) { assert(p == addresses[i++]); });
     assert(i == NumTuples);
-    assert(alloc_cref.size() == NumTuples);
+//    assert(alloc_cref.size() == NumTuples);
     // testing compacting behavior
     // 1. free() call sequence that does not trigger compaction
-    bool const shrinkFromHead = Chunks::Compact::value == Compactibility::head;
+    assert(CompactingChunks::Compact::value);
     // free() from either end: freed values should not be
     // overwritten.
-    if (shrinkFromHead) {   // shrink from head is a little twisted:
-        for(int j = 0; j < NumTuples / AllocsPerChunk; ++j) {      // on each chunk, free from its tail
-            for(int i = AllocsPerChunk - 1; i >= 0; --i) {
-                auto index = j * AllocsPerChunk + i;
-                if (addresses[index] != alloc.free(addresses[index])) {
-                    assert(false);
-                }
-                // skip content check on i == 0, since OS has already claimed the chunk upon free() call
-                assert(i == 0 || Gen::same(addresses[index], index));
+    // shrink from head is a little twisted:
+    for(int j = 0; j < NumTuples / AllocsPerChunk; ++j) {      // on each chunk, free from its tail
+        for(int i = AllocsPerChunk - 1; i >= 0; --i) {
+            auto index = j * AllocsPerChunk + i;
+            if (addresses[index] != alloc.free(addresses[index])) {
+                assert(false);
             }
-        }
-    } else {       // shrink from tail: free in LIFO order of allocation
-        for(int i = NumTuples - 1; i >= 0; --i) {
-            // return ptr points to memory that was copied from,
-            assert(addresses[i] == alloc.free(addresses[i]));      // should not point to a different addr
-            assert(! (i % AllocsPerChunk) || Gen::same(addresses[i], i));    // ptr content is not altered
+            // skip content check on i == 0, since OS has already claimed the chunk upon free() call
+            assert(i == 0 || Gen::same(addresses[index], index));
         }
     }
     assert(alloc.empty());
@@ -323,59 +314,33 @@ void testCompactingChunks() {
         assert(Gen::same(addresses[i], i));
     }
     size_t j = 0;
-    if (shrinkFromHead) {                  // shrink from head: free in LIFO order triggers compaction in "roughly" opposite direction
-        // 1st half: chop from tail, replaced by "head" (the tail of the first chunk, to be exact)
-        for(i = 0; i < NumTuples / 2; ++i, ++j) {
-            auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
-                 indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-            if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples - 1 - i])) {
-                assert(false);
-            }
+    // shrink from head: free in LIFO order triggers compaction in "roughly" opposite direction
+    // 1st half: chop from tail, replaced by "head" (the tail of the first chunk, to be exact)
+    for(i = 0; i < NumTuples / 2; ++i, ++j) {
+        auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
+             indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
+        if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples - 1 - i])) {
+            assert(false);
         }
-        // 2nd half
-        i = 0;
-        fold<const_iterator>(alloc_cref, [&i, &addresses](void const* p)
-                { addresses[i++] = const_cast<void*>(p); });
-        for(i = 0; i < NumTuples / 4; ++i, ++j) {
-            auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
-                 indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-            if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples / 2 - 1 - i])) {
-                assert(false);
-            }
-        }
-        // free them all! See note on IterableTableTupleChunks on
-        // why we need a loop of calls to iterate through.
-        while(! alloc.empty()) {
-            for_each<iterator>(alloc, [&alloc, &j](void* p) {      // no-ops on boundary of each compacted chunk
-                    if (alloc.free(p) != nullptr) {++j;} });
-        }
-        assert(j == NumTuples);            // number of free() calls
-    } else {       // shrink from tail: free in FIFO order triggers compaction in opposite direction
-        // 1st haf: chop from head, replaced by tail
-        for (i = 0; i < NumTuples / 2; ++i, ++j) {               // 1st half: compacts from tail backwards
-            assert(addresses[NumTuples - 1 - i] == alloc.free(addresses[i]));
-            assert(Gen::same(addresses[i], NumTuples - 1 - i));
-        }
-        // 2nd half: similar story. Resets addresses ptr along
-        // the way
-        i = 0;
-        fold<const_iterator>(alloc_cref, [&i, &addresses](void const* p)
-                { addresses[i++] = const_cast<void*>(p); });
-        for(i = 0; i < NumTuples / 4; ++i, ++j) {
-            assert(addresses[NumTuples/2 - 1 - i] == alloc.free(addresses[i]));
-        }
-        // we can continue, each time free()-ing half of
-        // what is left. But that is not needed since we already
-        // checked twice. See documents on CompactingChunksIgnoreableFree
-        // for why it need to be exception-tolerant.
-
-        while (! alloc.empty()) {
-            try {
-                for_each<iterator>(alloc, [&alloc, &j](void* p) { alloc.free(p); ++j; });
-            } catch (range_error const&) { }
-        }
-        assert(j == NumTuples);
     }
+    // 2nd half
+    i = 0;
+    fold<const_iterator>(alloc_cref, [&i, &addresses](void const* p)
+            { addresses[i++] = const_cast<void*>(p); });
+    for(i = 0; i < NumTuples / 4; ++i, ++j) {
+        auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
+             indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
+        if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples / 2 - 1 - i])) {
+            assert(false);
+        }
+    }
+    // free them all! See note on IterableTableTupleChunks on
+    // why we need a loop of calls to iterate through.
+    while(! alloc.empty()) {
+        for_each<iterator>(alloc, [&alloc, &j](void* p) {      // no-ops on boundary of each compacted chunk
+                if (alloc.free(p) != nullptr) {++j;} });
+    }
+    assert(j == NumTuples);            // number of free() calls
 }
 
 template<typename Alloc, typename Compactible = typename Alloc::Compact> struct TrackedDeleter {
@@ -388,7 +353,7 @@ template<typename Alloc, typename Compactible = typename Alloc::Compact> struct 
 };
 // non-compacting chunks' free() is void. Not getting tested, see
 // comments at caller.
-template<typename Alloc> struct TrackedDeleter<Alloc, integral_constant<Compactibility, Compactibility::none>> {
+template<typename Alloc> struct TrackedDeleter<Alloc, integral_constant<bool, false>> {
     Alloc& m_alloc;
     bool& m_freed;
     TrackedDeleter(Alloc& alloc, bool& freed) : m_alloc(alloc), m_freed(freed) {}
@@ -441,7 +406,7 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
                 if (i % skipped == 0) {
                     ++i;
                 }
-                if (Chunks::Compact::value != Compactibility::none) {
+                if (Chunks::Compact::value) {
                     assert(p == addresses[i]);
                 }
                 ++i;
@@ -454,7 +419,7 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
     // Note: see document on NonCompactingChunks to understand
     // why we cannot use iterator to free memories.
     Tag const tag;
-    if (Chunks::Compact::value != Compactibility::none) {
+    if (Chunks::Compact::value) {
         bool freed;
         TrackedDeleter<Chunks> deleter(alloc, freed);
         do {
@@ -488,14 +453,12 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
 }
 
 TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
-    testCompactingChunks<shrink_direction::head>();
-    testCompactingChunks<shrink_direction::tail>();
+    testCompactingChunks();
     for (auto skipped = 8lu; skipped < 64; skipped += 8) {
-        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 3>(skipped);
-        testCustomizedIterator<CompactingChunks<shrink_direction::tail>, 3>(skipped);
+        testCustomizedIterator<CompactingChunks, 3>(skipped);
         testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
         testCustomizedIterator<NonCompactingChunks<LazyNonCompactingChunk>, 3>(skipped);
-        testCustomizedIterator<CompactingChunks<shrink_direction::head>, 6>(skipped);       // a different mask
+        testCustomizedIterator<CompactingChunks, 6>(skipped);       // a different mask
     }
 }
 
@@ -558,8 +521,8 @@ void testCustomizedIteratorCB() {
 TEST_F(TableTupleAllocatorTest, TestIteratorCB) {
     testCustomizedIteratorCB<NonCompactingChunks<EagerNonCompactingChunk>, 0>();
     testCustomizedIteratorCB<NonCompactingChunks<LazyNonCompactingChunk>, 1>();
-    testCustomizedIteratorCB<CompactingChunks<shrink_direction::head>, 2>();
-    testCustomizedIteratorCB<CompactingChunks<shrink_direction::tail>, 3>();
+    testCustomizedIteratorCB<CompactingChunks, 2>();
+    testCustomizedIteratorCB<CompactingChunks, 3>();
 }
 
 // expression template used to apply variadic NthBitChecker
@@ -756,23 +719,13 @@ void testTxnHook() {
     alloc.thaw();
 }
 
-template<typename Alloc1, typename Alloc2> struct TestTxnHook2 {
-    void operator()() const {
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::never>>();
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::always>>();
-        testTxnHook<Alloc1, Alloc2, HistoryRetainTrait<gc_policy::batched>>();
-    }
-};
 template<typename Alloc1> struct TestTxnHook1 {
-    static TestTxnHook2<Alloc1, CompactingChunks<shrink_direction::tail>> const sChain1;
-    static TestTxnHook2<Alloc1, CompactingChunks<shrink_direction::head>> const sChain2;
     void operator()() const {
-        sChain1();
-        sChain2();
+        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::never>>();
+        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::always>>();
+        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::batched>>();
     }
 };
-template<typename Alloc1>TestTxnHook2<Alloc1, CompactingChunks<shrink_direction::tail>> const TestTxnHook1<Alloc1>::sChain1{};
-template<typename Alloc1>TestTxnHook2<Alloc1, CompactingChunks<shrink_direction::head>> const TestTxnHook1<Alloc1>::sChain2{};
 struct TestTxnHook {
     static TestTxnHook1<NonCompactingChunks<EagerNonCompactingChunk>> const sChain1;
     static TestTxnHook1<NonCompactingChunks<LazyNonCompactingChunk>> const sChain2;
@@ -793,10 +746,10 @@ TEST_F(TableTupleAllocatorTest, TestTxnHook) {
  * Test of HookedCompactingChunks using its RW iterator that
  * effects (GC) as snapshot process continues.
  */
-template<typename Chunk, gc_policy pol, shrink_direction dir>
+template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunks() {
     using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks<dir>, Hook>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -951,7 +904,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -985,7 +938,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -1029,7 +982,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk * 3>;
     Gen gen;
@@ -1076,7 +1029,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks<shrink_direction::head>, Hook>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1123,8 +1076,7 @@ void testHookedCompactingChunksBatchRemove_multi2() {
 
 template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
     inline void operator()() const {
-        testHookedCompactingChunks<Chunk, pol, shrink_direction::head>();
-//        testHookedCompactingChunks<Chunk, pol, shrink_direction::tail>(); TODO
+        testHookedCompactingChunks<Chunk, pol>();
         // batch removal tests assume head-compacting direction
         testHookedCompactingChunksBatchRemove_single1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single2<Chunk, pol>();
@@ -1169,10 +1121,9 @@ TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
  * Simulates how MP execution works: interleaved snapshot
  * advancement with txn in progress.
  */
-template<typename Chunk, gc_policy pol, shrink_direction dir>
+template<typename Chunk, gc_policy pol>
 void testInterleavedCompactingChunks() {
-    using Alloc = HookedCompactingChunks<CompactingChunks<dir>,
-          TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Alloc = HookedCompactingChunks<CompactingChunks, TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1260,8 +1211,7 @@ void testInterleavedCompactingChunks() {
 template<typename Chunk, gc_policy pol> struct TestInterleavedCompactingChunks2 {
     inline void operator()() const {
         for (size_t i = 0; i < 16; ++i) {                      // repeat randomized test
-            testInterleavedCompactingChunks<Chunk, pol, shrink_direction::head>();
-//            testInterleavedCompactingChunks<Chunk, pol, shrink_direction::tail>(); TODO
+            testInterleavedCompactingChunks<Chunk, pol>();
         }
     }
 };
@@ -1298,9 +1248,9 @@ TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
     t();
 }
 
-template<typename Chunk, gc_policy pol, shrink_direction dir>
+template<typename Chunk, gc_policy pol>
 void testSingleChunkSnapshot() {
-    using Alloc = HookedCompactingChunks<CompactingChunks<dir>,
+    using Alloc = HookedCompactingChunks<CompactingChunks,
           TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     static constexpr auto Number = AllocsPerChunk - 3;
@@ -1332,8 +1282,7 @@ void testSingleChunkSnapshot() {
 
 template<typename Chunk, gc_policy pol> struct TestSingleChunkSnapshot2 {
     inline void operator()() const {
-        testSingleChunkSnapshot<Chunk, pol, shrink_direction::head>();
-//        testSingleChunkSnapshot<Chunk, pol, shrink_direction::tail>(); TODO
+        testSingleChunkSnapshot<Chunk, pol>();
     }
 };
 template<typename Chunk> struct TestSingleChunkSnapshot1 {
