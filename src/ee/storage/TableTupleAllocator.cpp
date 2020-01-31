@@ -87,13 +87,17 @@ inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
 
 // We remove member initialization from init list to save from
 // storing chunk size into object
-inline ChunkHolder::ChunkHolder(size_t tupleSize): m_tupleSize(tupleSize) {
+inline ChunkHolder::ChunkHolder(size_t id, size_t tupleSize): m_id(id), m_tupleSize(tupleSize) {
     vassert(tupleSize <= 4 * 0x100000);    // individual tuple cannot exceeding 4MB
     auto const size = chunkSize(m_tupleSize);
     m_resource.reset(new char[size]);
     m_next = m_resource.get();
     vassert(m_next != nullptr);
     const_cast<void*&>(m_end) = reinterpret_cast<char*>(m_next) + size;
+}
+
+inline size_t ChunkHolder::id() const noexcept {
+    return m_id;
 }
 
 inline void* ChunkHolder::allocate() noexcept {
@@ -137,7 +141,7 @@ inline size_t ChunkHolder::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s): ChunkHolder(s) {}
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t id, size_t s): ChunkHolder(id, s) {}
 
 inline void* EagerNonCompactingChunk::allocate() noexcept {
     if (m_freed.empty()) {
@@ -171,7 +175,7 @@ inline bool EagerNonCompactingChunk::full() const noexcept {
     return ChunkHolder::full() && m_freed.empty();
 }
 
-inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t tupleSize) : ChunkHolder(tupleSize) {}
+inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t id, size_t tupleSize) : ChunkHolder(id, tupleSize) {}
 
 inline void LazyNonCompactingChunk::free(void* src) {
     vassert(src >= begin() && src < next());
@@ -246,12 +250,20 @@ inline void ChunkList<Chunk, E>::clear() noexcept {
 
 template<typename Chunk, typename E> inline
 size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter) {
-    return std::distance(begin(), iter);
+    if (iter == end()) {
+        return empty() ? 0 : back().id() - front().id();
+    } else {
+        return iter->id() - front().id();
+    }
 }
 
 template<typename Chunk, typename E> inline
 size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
-    return std::distance(cbegin(), iter);
+    if (iter == cend()) {
+        return empty() ? 0 : back().id() - front().id();
+    } else {
+        return iter->id() - front().id();
+    }
 }
 
 inline void CompactingStorageTrait::LinearizedChunks::emplace(
@@ -338,7 +350,9 @@ inline void* NonCompactingChunks<C, E>::allocate() {
             [](C const& c) { return ! c.full(); });
     void* r;
     if (iter == list_type::cend()) {        // all chunks are full
-        list_type::emplace_back(m_tupleSize);
+        list_type::emplace_back(
+                list_type::empty() ? 0 : list_type::back().id() + 1,
+                m_tupleSize);
         r = list_type::back().allocate();
     } else {
         r = iter->allocate();
@@ -373,7 +387,7 @@ template<typename C, typename E> inline bool NonCompactingChunks<C, E>::tryFree(
     return p != nullptr;
 }
 
-inline CompactingChunk::CompactingChunk(size_t s) : ChunkHolder(s) {}
+inline CompactingChunk::CompactingChunk(size_t id, size_t s) : ChunkHolder(id, s) {}
 
 inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chunk free(): update only on dst chunk
     vassert(contains(dst));
@@ -474,7 +488,7 @@ inline size_t CompactingChunks::size() const noexcept {
 
 inline void* CompactingChunks::allocate() {
     if (empty() || back().full()) {                  // always allocates from tail
-        emplace_back(m_tupleSize);
+        emplace_back(empty() ? 0 : back().id() + 1, m_tupleSize);
     }
     ++m_allocs;
     return back().allocate();

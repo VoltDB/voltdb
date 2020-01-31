@@ -89,6 +89,7 @@ namespace voltdb {
          */
         class ChunkHolder {
             static size_t chunkSize(size_t) noexcept;
+            size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
             unique_ptr<char[]> m_resource{};
             void*const m_end = nullptr;                // indication of chunk capacity
@@ -99,7 +100,7 @@ namespace voltdb {
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;      // for batch free
         public:
-            ChunkHolder(size_t tupleSize);
+            ChunkHolder(size_t id, size_t tupleSize);
             ~ChunkHolder() = default;
             void* allocate() noexcept;                 // returns NULL if this chunk is full.
             bool contains(void const*) const;          // query if a table tuple is stored in current chunk
@@ -109,6 +110,7 @@ namespace voltdb {
             void*const end() const noexcept;
             void*const next() const noexcept;
             size_t tupleSize() const noexcept;
+            size_t id() const noexcept;
         };
 
         /**
@@ -124,7 +126,7 @@ namespace voltdb {
             EagerNonCompactingChunk& operator=(EagerNonCompactingChunk const&) = delete;
             EagerNonCompactingChunk(EagerNonCompactingChunk&&) = delete;
         public:
-            EagerNonCompactingChunk(size_t);
+            EagerNonCompactingChunk(size_t, size_t);
             ~EagerNonCompactingChunk() = default;
             void* allocate() noexcept;
             void free(void*);
@@ -147,7 +149,7 @@ namespace voltdb {
             LazyNonCompactingChunk& operator=(LazyNonCompactingChunk const&) = delete;
             LazyNonCompactingChunk(LazyNonCompactingChunk&&) = delete;
         public:
-            LazyNonCompactingChunk(size_t);
+            LazyNonCompactingChunk(size_t, size_t);
             ~LazyNonCompactingChunk() = default;
             // void* allocate() noexcept; same as ChunkHolder
             // when contains(void const*) returns true, the addr may
@@ -238,7 +240,7 @@ namespace voltdb {
          * self-compacting chunk (with help from CompactingChunks to compact across a list)
          */
         struct CompactingChunk final : public ChunkHolder {
-            CompactingChunk(size_t tupleSize);
+            CompactingChunk(size_t id, size_t tupleSize);
             CompactingChunk(CompactingChunk&&) = delete;
             CompactingChunk(CompactingChunk const&) = delete;
             CompactingChunk& operator=(CompactingChunk const&) = delete;
@@ -316,13 +318,13 @@ namespace voltdb {
  * Needed for maps keyed on iterator
  */
 namespace std {
-    // NOTE: this alone does not guarantee strong order across hosts, since
-    // the comparison is on the chunk allocation address only.
     using namespace voltdb::storage;
     template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
         using value_type = typename ChunkList<CompactingChunk>::iterator;
         inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
-            return lhs->begin() < rhs->begin();
+            // Rolling integer comparison
+            using signed_type = typename make_signed<decltype(lhs->id())>::type;
+            return static_cast<signed_type>(lhs->id()) - static_cast<signed_type>(rhs->id()) < 0;
         }
     };
 }
