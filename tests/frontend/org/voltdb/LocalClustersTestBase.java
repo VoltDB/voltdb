@@ -217,7 +217,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                int partitionedTableCount,
                                                int replicatedTableCount) throws Exception {
         configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount,
-                ArrayUtils.EMPTY_STRING_ARRAY);
+                0, ArrayUtils.EMPTY_STRING_ARRAY);
     }
 
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
@@ -225,23 +225,23 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                int replicatedTableCount,
                                                String[] streamTargets) throws Exception {
         configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount,
-                streamTargets, ArrayUtils.EMPTY_STRING_ARRAY, "", "");
+                0, streamTargets, "", "");
     }
 
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
             int partitionedTableCount,
             int replicatedTableCount,
-            String[] streamTargets,
-            String[] topics) throws Exception {
+            int topicsCount,
+            String[] streamTargets) throws Exception {
         configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount,
-                streamTargets, topics, "", "");
+                topicsCount, streamTargets, "", "");
     }
 
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
                                                int partitionedTableCount,
                                                int replicatedTableCount,
+                                               int topicsCount,
                                                String[] streamTargets,
-                                               String[] topics,
                                                String username,
                                                String password) throws Exception {
         if (configs.size() > getMaxClusters()) {
@@ -249,10 +249,10 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         }
 
         if (Objects.equals(CLUSTER_CONFIGURATIONS, configs)) {
-            addSchema(partitionedTableCount, replicatedTableCount, streamTargets, topics);
+            addSchema(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
         } else {
             createClustersAndClientsWithCredentials(configs, partitionedTableCount, replicatedTableCount,
-                    streamTargets, topics, username, password);
+                    topicsCount, streamTargets, username, password);
         }
     }
 
@@ -329,13 +329,13 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     protected void addSchema(int partitionedTableCount, int replicatedTableCount, String[] streamTargets)
             throws Exception {
-        addSchema(partitionedTableCount, replicatedTableCount, streamTargets, ArrayUtils.EMPTY_STRING_ARRAY);
+        addSchema(partitionedTableCount, replicatedTableCount, 0, streamTargets);
     }
 
     protected void addSchema(int partitionedTableCount, int replicatedTableCount,
-            String[] streamTargets, String[] topics)
+            int topicsCount, String[] streamTargets)
             throws Exception {
-        String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, streamTargets, topics);
+        String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
 
         for (Pair<LocalCluster, Client> clusterAndClient : CLUSTERS_AND_CLIENTS) {
             Client client = clusterAndClient.getSecond();
@@ -356,8 +356,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     private void createClustersAndClientsWithCredentials(List<ClusterConfiguration> configs,
                                                          int partitionedTableCount,
                                                          int replicatedTableCount,
+                                                         int topicsCount,
                                                          String[] streamTargets,
-                                                         String[] topics,
                                                          String username,
                                                          String password) throws Exception {
         System.out.println("Creating clusters and clients. method: " + m_methodName + " configurations: " + configs
@@ -376,7 +376,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             DrRoleType drRoleType = config.getDrRole(configs.size());
             try {
                 System.out.println("Creating cluster " + clusterNumber);
-                String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, streamTargets, topics);
+                String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
                         m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
@@ -401,12 +401,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         CLUSTER_CONFIGURATIONS.addAll(configs);
     }
 
-    private String createSchemaDDL(int partitionedTableCount, int replicatedTableCount, String[] streamTargets) {
-        return createSchemaDDL(partitionedTableCount, replicatedTableCount, streamTargets, ArrayUtils.EMPTY_STRING_ARRAY);
-    }
-
     private String createSchemaDDL(int partitionedTableCount, int replicatedTableCount,
-            String[] streamTargets, String[] topics) {
+            int topicsCount, String[] streamTargets) {
         StringBuffer sb = new StringBuffer();
         for (int i = 0; i < partitionedTableCount; ++i) {
             generateTableDDL(i, TableType.PARTITIONED, sb);
@@ -417,7 +413,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         for (int i = 0; i < streamTargets.length; ++i) {
             generateStreamDDL(streamTargets[i], i, sb);
         }
-        for (int i = 0; i < topics.length; ++i) {
+        for (int i = 0; i < topicsCount; ++i) {
             generateTopicDDL(i, sb);
         }
 
