@@ -776,7 +776,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
                 switch (segmentName.m_result) {
                 case INVALID_NAME:
-                case INVALID_VERSION:
                     invalidPbds.add(file.getName());
                     //$FALL-THROUGH$
                 case NOT_PBD:

@@ -21,31 +21,28 @@ import java.io.File;
 import java.text.MessageFormat;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.RealVoltDB;
 
 /**
  * Utility class for generating and parsing the names of segment files
  * <p>
- * File name structure = "nonce_currentCounter_previousCounter[_quarantine]_version.pbd"<br>
+ * File name structure = "nonce_currentCounter_previousCounter[_quarantine].pbd"<br>
  * Where:
  * <ul>
  * <li>currentCounter = Value of monotonic counter at PBD segment creation
  * <li>previousCounter = Value of monotonic counter at previous PBD segment creation
  * <li>quarantine = A flag at the end of the file which indicates if this segment was quarantined
- * <li>version = A version string indicating version of filename
  * </ul>
  */
 public final class PbdSegmentName {
-    private static final int MINIMUM_LENGTH = 28;
+    // 1(nonce) + 1(_) + 10(currCounter) + 1(_) + 10(prevCounter) + 4(.pbd)
+    private static final int MINIMUM_LENGTH = 27;
     static final String PBD_SUFFIX = ".pbd";
     private static final String PBD_QUARANTINED = "_q";
     private static final MessageFormat FORMAT = new MessageFormat(
-            "{0}_{1,number,0000000000}_{2,number,0000000000}{3}_{4}" + PBD_SUFFIX);
-    static final String VERSION_STR = getVersionString();
+            "{0}_{1,number,0000000000}_{2,number,0000000000}{3}" + PBD_SUFFIX);
 
     private static final PbdSegmentName NOT_PBD = new PbdSegmentName(Result.NOT_PBD);
     private static final PbdSegmentName INVALID_NAME = new PbdSegmentName(Result.INVALID_NAME);
-    private static final PbdSegmentName INVALID_VERSION = new PbdSegmentName(Result.INVALID_VERSION);
 
     /** The result of parsing a file name. The other fields are only valid if the result is {@link Result#OK} */
     public final Result m_result;
@@ -61,7 +58,7 @@ public final class PbdSegmentName {
     public final boolean m_quarantined;
 
     public static String createName(String nonce, long id, long prevId, boolean quarantine) {
-        return FORMAT.format(new Object[] { nonce, id, prevId, quarantine ? PBD_QUARANTINED : "", VERSION_STR });
+        return FORMAT.format(new Object[] { nonce, id, prevId, quarantine ? PBD_QUARANTINED : "" });
     }
 
     public static PbdSegmentName asQuarantinedSegment(VoltLogger logger, File file) {
@@ -95,23 +92,7 @@ public final class PbdSegmentName {
             return INVALID_NAME;
         }
 
-        int endOfName = fileName.length() - PBD_SUFFIX.length();
-        int startOfVersion = fileName.lastIndexOf('_', endOfName - 1);
-        if (startOfVersion <= 0) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("File " + fileName + " does not have a _ in it for version");
-            }
-            return INVALID_NAME;
-        }
-
-        if (!fileName.regionMatches(startOfVersion + 1, VERSION_STR, 0, VERSION_STR.length())) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("File " + fileName + " is not required version: " + VERSION_STR);
-            }
-            return INVALID_VERSION;
-        }
-
-        int endOfPrevId = startOfVersion;
+        int endOfPrevId = fileName.length() - PBD_SUFFIX.length();
         boolean quarantined = false;
         if (fileName.regionMatches(endOfPrevId - PBD_QUARANTINED.length(), PBD_QUARANTINED, 0,
                 PBD_QUARANTINED.length())) {
@@ -146,15 +127,6 @@ public final class PbdSegmentName {
         return new PbdSegmentName(file, fileName.substring(0, startOfId), id, prevId, quarantined);
     }
 
-    private static String getVersionString() {
-        String versionNumber = RealVoltDB.extractBuildInfo(null)[0];
-        StringBuilder sb = new StringBuilder();
-        for (String number : versionNumber.split("\\.")) {
-            sb.append(String.format("%02d", Integer.parseInt(number)));
-        }
-        return sb.toString();
-    }
-
     private PbdSegmentName(Result result) {
         m_result = result;
         m_file = null;
@@ -174,6 +146,6 @@ public final class PbdSegmentName {
     }
 
     public enum Result {
-        OK, NOT_PBD, INVALID_NAME, INVALID_VERSION;
+        OK, NOT_PBD, INVALID_NAME;
     }
 }
