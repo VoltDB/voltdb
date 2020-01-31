@@ -339,6 +339,11 @@ public class Plannerv2TestCase extends PlannerTestCase {
                     CompiledPlan compiledPlan = new CompiledPlan(false);
                     calciteToVoltDBPlan((VoltPhysicalRel) m_transformedNode, compiledPlan);
                     AbstractPlanNode voltPlan = compiledPlan.rootPlanGraph;
+                    try {
+                        voltPlan.validate();
+                    } catch (Exception ex) {
+                        assertTrue(false);
+                    }
                     PlanNodeList planNodeList = new PlanNodeList(voltPlan, false);
                     anyMatch(m_expectedVoltPlanJsons, planNodeList.toJSONString());
                 }

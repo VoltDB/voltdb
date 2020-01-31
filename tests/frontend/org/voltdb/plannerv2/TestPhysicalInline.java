@@ -339,15 +339,15 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         .pass();
     }
 
-
+    public void testSelectWithCoalesce() {
+        m_tester.sql("SELECT * FROM R1 ORDER BY COALESCE(R1.SI, 10)")
+        .transform("VoltPhysicalSort(sort0=[$6], dir0=[ASC], pusheddown=[false])\n" +
+                    "  VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], expr#6=[IS NOT NULL($t1)], expr#7=[CAST($t1):INTEGER], expr#8=[10], expr#9=[CASE($t6, $t7, $t8)], proj#0..5=[{exprs}], EXPR$6=[$t9])\n")
+        .json("{\"PLAN_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[3]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"CHILDREN_IDS\":[1],\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":6},\"SORT_DIRECTION\":\"ASC\"}]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":2}},{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"F\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":8,\"COLUMN_IDX\":4}},{\"COLUMN_NAME\":\"V\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"COLUMN_IDX\":5}},{\"COLUMN_NAME\":\"EXPR$6\",\"EXPRESSION\":{\"TYPE\":300,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":8,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":9,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}},\"RIGHT\":{\"TYPE\":301,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":7,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":10}}}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}],\"EXECUTE_LIST\":[1,3,4],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
 //    public void testFullJoinWithUsing() {
 //        m_tester.sql("SELECT * FROM R1 FULL JOIN R2 USING (I, SI)")
-//        .json("")
-//        .pass();
-//    }
-//
-//    public void test() {
-//        m_tester.sql("select r.i from p1 r full join p1 l on r.i = l.i order by 1")
 //        .json("")
 //        .pass();
 //    }

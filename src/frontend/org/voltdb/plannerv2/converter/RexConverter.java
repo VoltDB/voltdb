@@ -274,6 +274,7 @@ public class RexConverter {
                         ExpressionType.OPERATOR_IS_NULL,
                         aeOperands.get(0),
                         null);
+                RexConverter.setType(isnullexpr, VoltType.BOOLEAN, PRECISION_NOT_SPECIFIED);
                 ae = new OperatorExpression(
                         ExpressionType.OPERATOR_NOT,
                         isnullexpr,
