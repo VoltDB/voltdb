@@ -205,13 +205,6 @@ inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(v
 
 template<typename Chunk, typename E>
 template<typename... Args>
-inline void ChunkList<Chunk, E>::emplace_front(Args&&... args) {
-    super::emplace_front(forward<Args>(args)...);
-    add(super::begin());
-}
-
-template<typename Chunk, typename E>
-template<typename... Args>
 inline void ChunkList<Chunk, E>::emplace_back(Args&&... args) {
     super::emplace_back(forward<Args>(args)...);
     add(prev(super::end()));
@@ -345,8 +338,8 @@ inline void* NonCompactingChunks<C, E>::allocate() {
             [](C const& c) { return ! c.full(); });
     void* r;
     if (iter == list_type::cend()) {        // all chunks are full
-        list_type::emplace_front(m_tupleSize);
-        r = list_type::front().allocate();
+        list_type::emplace_back(m_tupleSize);
+        r = list_type::back().allocate();
     } else {
         r = iter->allocate();
     }

@@ -174,7 +174,6 @@ namespace voltdb {
             using reference = typename super::reference;
             using const_reference = typename super::const_reference;
             // "override" writing behavior
-            template<typename... Args> void emplace_front(Args&&...);     // NOTE: C++17 changed return type
             template<typename... Args> void emplace_back(Args&&...);
             iterator erase(iterator);
             iterator erase(iterator, iterator);
