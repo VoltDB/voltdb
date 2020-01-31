@@ -337,7 +337,7 @@ namespace voltdb {
          * the non-empty allocation from the head to freed space.
          */
         class CompactingChunks : private ChunkList<CompactingChunk>, private CompactingStorageTrait {
-            template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
+            template<typename Chunks, typename Tag, typename E> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             using trait = CompactingStorageTrait;
             size_t const m_tupleSize;

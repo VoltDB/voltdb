@@ -970,6 +970,9 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Ho
     super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }, h.hasDeletes()),
     m_extendingCb(c()),
     m_extendingPtr(m_extendingCb()) {
+    if (m_extendingPtr != nullptr) {           // perform translation layer right away
+        m_extendingPtr = super::m_cb(const_cast<value_type>(m_extendingPtr));
+    }
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -984,6 +987,9 @@ inline void IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_ty
     if (! drained()) {
         if (m_extendingPtr != nullptr) {
             m_extendingPtr = m_extendingCb();
+            if (m_extendingPtr != nullptr) {           // perform translation layer right away
+                m_extendingPtr = super::m_cb(const_cast<value_type>(m_extendingPtr));
+            }
         } else {
             super::advance();
         }
@@ -1011,7 +1017,7 @@ template<typename Chunks, typename Tag, typename E>
 template<typename Hook, iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator*() noexcept {
-    return m_extendingPtr == nullptr ? super::operator*() : super::m_cb(const_cast<value_type>(m_extendingPtr));
+    return m_extendingPtr == nullptr ? super::operator*() : const_cast<void*>(m_extendingPtr);
 }
 
 template<typename Chunks, typename Tag, typename E>
