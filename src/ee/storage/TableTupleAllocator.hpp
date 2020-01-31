@@ -266,11 +266,9 @@ namespace voltdb {
          */
         class ExtendedIterator final {
             using iterator_type = function<void const*()>;
-            bool const m_shrinkFromHead;
             iterator_type const m_iter;
         public:
-            ExtendedIterator(bool, iterator_type const&&) noexcept;
-            bool shrinkFromHead() const noexcept;
+            ExtendedIterator(iterator_type const&&) noexcept;
             void const* operator()() const noexcept;
         };
 
@@ -348,7 +346,6 @@ namespace std {
 
 namespace voltdb {
     namespace storage {
-        struct CompactingIterator;
         /**
          * A linked list of self-compacting chunks:
          * All allocation operations are appended to the last chunk
@@ -368,7 +365,6 @@ namespace voltdb {
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
-            template<typename Fun> inline void until_(Fun&&);   // fold on CompactingIterator
             class BatchRemoveAccumulator : private map<list_type::iterator, tuple<size_t, vector<void*>>> {
                 CompactingChunks* m_self;
                 using map_type = map<size_t, vector<void*>>;
@@ -417,26 +413,6 @@ namespace voltdb {
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
             using list_type::empty;
-        };
-
-        // Helper for batch free
-        struct CompactingIterator {
-            using list_type = ChunkList<CompactingChunk>;
-            using iterator_type = list_type::iterator;
-            using value_type = pair<iterator_type, void*>;
-
-            CompactingIterator(list_type&) noexcept;
-            value_type operator*() const noexcept;
-            bool drained() const noexcept;
-            CompactingIterator& operator++();             // prefix
-            CompactingIterator operator++(int);           // postfix
-            bool operator==(CompactingIterator const&) const noexcept;
-            bool operator!=(CompactingIterator const&) const noexcept;
-        private:
-            list_type& m_cont;
-            iterator_type m_iter;
-            void* m_cursor;
-            void advance();
         };
 
         struct BaseHistoryRetainTrait {

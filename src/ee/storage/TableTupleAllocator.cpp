@@ -261,13 +261,7 @@ size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterato
     return std::distance(cbegin(), iter);
 }
 
-inline ExtendedIterator::ExtendedIterator(bool fromHead,
-        typename ExtendedIterator::iterator_type const&& iter) noexcept :
-m_shrinkFromHead(fromHead), m_iter(iter) {}
-
-inline bool ExtendedIterator::shrinkFromHead() const noexcept {
-    return m_shrinkFromHead;
-}
+inline ExtendedIterator::ExtendedIterator(typename ExtendedIterator::iterator_type const&& iter) noexcept : m_iter(iter) {}
 
 inline void const* ExtendedIterator::operator()() const noexcept {
     return m_iter();
@@ -452,11 +446,11 @@ inline void CompactingStorageTrait::releasable(typename CompactingStorageTrait::
 }
 
 inline ExtendedIterator CompactingStorageTrait::operator()() noexcept {
-    return {true, m_unreleased.iterator()};
+    return {m_unreleased.iterator()};
 }
 
 inline ExtendedIterator CompactingStorageTrait::operator()() const noexcept {
-    return {true, m_unreleased.iterator()};
+    return {m_unreleased.iterator()};
 }
 
 inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
@@ -637,6 +631,56 @@ inline map<void*, void*> const& CompactingChunks::DelayedRemover::movements() co
 inline set<void*> const& CompactingChunks::DelayedRemover::removed() const{
     return m_remove;
 }
+//
+// Helper for batch-free of CompactingChunks
+struct CompactingIterator {
+    using list_type = ChunkList<CompactingChunk>;
+    using iterator_type = list_type::iterator;
+    using value_type = pair<iterator_type, void*>;
+
+    CompactingIterator(list_type& c) noexcept : m_cont(c), m_iter(c.begin()),
+        m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
+    value_type operator*() const noexcept {
+        return {m_iter, m_cursor};
+    }
+    bool drained() const noexcept {
+        return m_cursor == nullptr;
+    }
+    CompactingIterator& operator++() {
+        advance();
+        return *this;
+    }
+    CompactingIterator operator++(int) {
+        CompactingIterator copy(*this);
+        copy.advance();
+        return copy;
+    }
+    bool operator==(CompactingIterator const& o) const noexcept {
+        return m_cursor == o.m_cursor;
+    }
+    bool operator!=(CompactingIterator const& o) const noexcept {
+        return ! operator==(o);
+    }
+private:
+    list_type& m_cont;
+    iterator_type m_iter;
+    void* m_cursor;
+    void advance() {
+        if (m_cursor == nullptr) {
+            throw runtime_error("CompactingIterator drained");
+        } else if (m_cursor > m_iter->begin()) {
+            reinterpret_cast<char*&>(m_cursor) -=
+                reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
+        } else if (++m_iter == m_cont.end()) {           // drained now
+            m_cursor = nullptr;
+        } else {
+            m_cursor = reinterpret_cast<char*>(m_iter->next()) -
+                reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
+            assert(m_cursor >= m_iter->begin());
+        }
+    }
+};
+
 
 typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::prepare(bool dupCheck) {
     using namespace batch_remove_aid;
@@ -650,11 +694,14 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
         } else {
             vector<void*> addrToRemove{};
             addrToRemove.reserve(size);
-            super::chunks().until_([&addrToRemove, &size] (
-                    pair<typename CompactingIterator::iterator_type, void*> const& entry) {
-                        addrToRemove.emplace_back(entry.second);
-                        return --size == 0;
-                    });
+            for (auto iter = CompactingIterator(super::chunks()); ! iter.drained();) {
+                auto const addr = *iter;
+                ++iter;
+                addrToRemove.emplace_back(addr.second);
+                if (--size == 0) {
+                    break;
+                }
+            }
             m_remove = intersection(ptrs, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
             m_move = build_map(subtract(super::sorted(), m_remove),
                     subtract(addrToRemove, m_remove));
@@ -703,62 +750,6 @@ size_t CompactingChunks::DelayedRemover::force() {
     m_size = 0;
     return r;
 }
-
-inline typename CompactingIterator::value_type CompactingIterator::operator*() const noexcept {
-    return {m_iter, m_cursor};
-}
-
-inline CompactingIterator& CompactingIterator::operator++() {     // prefix
-    advance();
-    return *this;
-}
-
-inline CompactingIterator CompactingIterator::operator++(int) {      // postfix
-    CompactingIterator copy(*this);
-    copy.advance();
-    return copy;
-}
-
-inline bool CompactingIterator::drained() const noexcept {
-    return m_cursor == nullptr;
-}
-
-template<typename Fun> inline void CompactingChunks::until_(Fun&& f) {
-    for (auto iter = CompactingIterator(*this); ! iter.drained();) {
-        auto const addr = *iter;
-        ++iter;
-        if (f(addr)) {
-            break;
-        }
-    }
-}
-
-inline bool CompactingIterator::operator==(CompactingIterator const& o) const noexcept{
-    return m_cursor == o.m_cursor;
-}
-
-inline bool CompactingIterator::operator!=(CompactingIterator const& o) const noexcept{
-    return ! operator==(o);
-}
-
-inline void CompactingIterator::advance() {
-    if (m_cursor == nullptr) {
-        throw runtime_error("CompactingIterator drained");
-    } else if (m_cursor > m_iter->begin()) {
-        reinterpret_cast<char*&>(m_cursor) -=
-            reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
-    } else if (++m_iter == m_cont.end()) {           // drained now
-        m_cursor = nullptr;
-    } else {
-        m_cursor = reinterpret_cast<char*>(m_iter->next()) -
-            reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
-        vassert(m_cursor >= m_iter->begin());
-    }
-}
-
-inline CompactingIterator::CompactingIterator(typename CompactingIterator::list_type& c) noexcept :
-m_cont(c), m_iter(c.begin()),
-    m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
 
 inline size_t CompactingChunks::tupleSize() const noexcept {
     return m_tupleSize;
@@ -983,7 +974,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Ho
         typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::history_type h) :
     super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }, h.hasDeletes()),
     m_extendingCb(c()),
-    m_extendingPtr(m_extendingCb.shrinkFromHead() ? m_extendingCb() : nullptr) {
+    m_extendingPtr(m_extendingCb()) {
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -1000,10 +991,6 @@ inline void IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_ty
             m_extendingPtr = m_extendingCb();
         } else {
             super::advance();
-            if (super::m_cursor == nullptr && ! m_extendingCb.shrinkFromHead()) {
-                // tail compacting: point to deceased chunks
-                m_extendingPtr = m_extendingCb();
-            }
         }
     }
 }
