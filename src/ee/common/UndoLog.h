@@ -159,7 +159,7 @@ namespace voltdb
                 }
             }
             BOOST_FOREACH (auto interest, releaseInterests) {
-                interest->releaseBatch();
+                interest->finalizeDelete();
             }
         }
 

@@ -636,14 +636,10 @@ TableTuple* PersistentTable::createTuple(TableTuple const &source){
     TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(allocator().insert(&source)));
     target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));
     target->copyForPersistentInsert(source);
-    target->setActiveTrue();
-    target->setPendingDeleteFalse();
-    target->setPendingDeleteOnUndoReleaseFalse();
-    target->setDirtyFalse();
     return target;
 }
 
-void PersistentTable::releaseBatch() {
+void PersistentTable::finalizeDelete() {
     if (m_tableStreamer != NULL) {
         TableTuple target(m_schema);
         BOOST_FOREACH (auto toDelete, m_releaseBatch) {
