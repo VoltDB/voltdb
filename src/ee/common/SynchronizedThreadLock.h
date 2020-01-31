@@ -38,7 +38,7 @@ public:
         m_realInterest(realInterest) {}
     virtual ~SynchronizedUndoQuantumReleaseInterest() {}
     void notifyQuantumRelease();
-    void finalizeDelete() { if (m_realInterest != nullptr) m_realInterest->finalizeDelete();}
+    void finalizeDelete();
 private:
     UndoQuantumReleaseInterest *m_realInterest;
 };

@@ -69,7 +69,13 @@ void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
         m_realInterest->notifyQuantumRelease();
      }
      SynchronizedThreadLock::signalLowestSiteFinished();
-};
+}
+
+void SynchronizedUndoQuantumReleaseInterest::finalizeDelete() {
+   if (m_realInterest != nullptr) {
+      m_realInterest->finalizeDelete();
+   }
+}
 
 void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
