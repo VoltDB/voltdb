@@ -418,7 +418,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             generateStreamDDL(streamTargets[i], i, sb);
         }
         for (int i = 0; i < topics.length; ++i) {
-            generateTopicDDL(topics[i], i, sb);
+            generateTopicDDL(i, sb);
         }
 
         return sb.toString();
@@ -432,7 +432,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         TableType.STREAM.generateTableDDL(sb, m_methodName, streamNum, target);
     }
 
-    protected void generateTopicDDL(String target, int topicNum, StringBuffer sb) {
+    protected void generateTopicDDL(int topicNum, StringBuffer sb) {
         TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum);
     }
 

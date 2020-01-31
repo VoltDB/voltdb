@@ -1403,7 +1403,7 @@ public class VoltProjectBuilder {
 
         deployment.setFeatures(m_featureOptions);
         setKiplingConfiguration(deployment);
-        setTopicConfiguration(deployment, factory);
+        setTopicConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1422,13 +1422,12 @@ public class VoltProjectBuilder {
         }
     }
 
-    private void setTopicConfiguration(DeploymentType deployment,
-            org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
+    private void setTopicConfiguration(DeploymentType deployment) {
         // FIXME: may be extended to handle a list of topic profiles
         if (m_topicDefaults == null) {
             return;
         }
-        TopicsType topics = factory.createTopicsType();
+        TopicsType topics = new TopicsType();
         topics.setDefaults(m_topicDefaults);
         deployment.setTopics(topics);
     }
