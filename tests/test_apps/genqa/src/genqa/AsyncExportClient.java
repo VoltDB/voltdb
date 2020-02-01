@@ -117,10 +117,9 @@ public class AsyncExportClient
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
             long now = System.currentTimeMillis();
-            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
+            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
-
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(transType);
             }
@@ -129,6 +128,7 @@ public class AsyncExportClient
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
                 log.info("TableExport failed: " + trace);
+		log.info("Failed transaction type (from getAppStatus: " + transType);
             }
         }
     }
@@ -181,6 +181,7 @@ public class AsyncExportClient
     private static int DELETE = 2;
     private static int UPDATE_OLD = 3;
     private static int UPDATE_NEW = 4;
+    // TBD: add MIGRATE (5), though not relevant in this test (yet)
     private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
@@ -406,7 +407,7 @@ public class AsyncExportClient
             , TrackingResults.get(1))
             );
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
-                log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+                log.info("WARNING Tracking results total doesn't match final rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
 
             // 2. Print TABLE EXPORT stats if that's configured
