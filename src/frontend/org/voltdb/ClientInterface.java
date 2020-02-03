@@ -2509,6 +2509,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Invoke @StopReplicas");
             }
+            tmLog.warn("Invoke @StopReplicas--->decommissionReplicas");
             synchronized (m_executeTaskAdpater) {
                 if (createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
