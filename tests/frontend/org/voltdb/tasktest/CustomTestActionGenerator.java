@@ -33,6 +33,6 @@ import org.voltdb.task.TestTasksEnd2End;
 public class CustomTestActionGenerator implements ActionGenerator {
     @Override
     public Action getFirstAction() {
-        return Action.createCallback(r -> getFirstAction());
+        return Action.callback(r -> getFirstAction());
     }
 }

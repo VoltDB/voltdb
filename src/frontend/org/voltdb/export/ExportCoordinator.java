@@ -471,7 +471,7 @@ public class ExportCoordinator {
                                     exportLog.debug("Truncating coordination tracker: " + tracker
                                             + ", to seqNo: " + lastReleasedSeqNo);
                                 }
-                                tracker.truncate(lastReleasedSeqNo);
+                                tracker.truncateBefore(lastReleasedSeqNo);
                             }
                             int bufSize = tracker.getSerializedSize() + 4;
                             response = ByteBuffer.allocate(bufSize);
@@ -929,7 +929,7 @@ public class ExportCoordinator {
                         exportLog.debug("Export coordinator shutting down...");
                     }
                     m_stateMachine.shutdownCoordinationTask();
-                    m_ssm.ShutdownSynchronizedStatesManager();
+                    m_ssm.shutdownSynchronizedStatesManager();
 
                 } catch (Exception e) {
                     exportLog.error("Failed to initiate a coordinator shutdown: " + e);

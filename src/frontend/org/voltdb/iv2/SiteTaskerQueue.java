@@ -103,4 +103,8 @@ public class SiteTaskerQueue
     public int size() {
         return m_tasks.size();
     }
+
+    public void clear() {
+        m_tasks.clear();
+    }
 }

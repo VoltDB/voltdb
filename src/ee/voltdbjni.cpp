@@ -257,6 +257,47 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 
+/**
+ * decommision the execution engine.
+ * @param engine_ptr the VoltDBEngine pointer
+ * @return error code
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDecommission(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jboolean remove, jboolean promote, jint newSitePerHost) {
+    VOLT_DEBUG("nativeDecommission() start");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    if (engine == NULL) {
+        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+
+    //copy to std::string. utf_chars may or may not by a copy of the string
+    VOLT_DEBUG("calling decommission...");
+
+    try {
+        bool success = engine->decommission(remove, promote, newSitePerHost);
+
+        if (success) {
+            VOLT_DEBUG("decommission succeeded");
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+        }
+    } catch (const SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
+    } catch (const FatalException &fe) {
+        if (topend != NULL) {
+            topend->crashVoltDB(fe);
+        }
+    }
+
+    VOLT_ERROR("decommission failed");
+    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // Initialization
 ////////////////////////////////////////////////////////////////////////////

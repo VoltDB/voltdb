@@ -155,6 +155,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public void decommission(boolean remove, boolean promote, int newSitePerHost) throws EEException {
+    }
+
+    @Override
     public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
         return false;
     }

@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.voltdb.VoltType;
@@ -85,8 +86,38 @@ public class ExportRow {
         return ROW_OPERATION.values()[(byte)values[INTERNAL_OPERATION_COLUMN]];
     }
 
+    public String toSchemaString() {
+        Iterator<String> itNames = this.names.iterator();
+        Iterator<VoltType> itTypes = this.types.iterator();
+        Iterator<Integer> itSizes = this.lengths.iterator();
+
+        StringBuilder sb = new StringBuilder("[");
+        while(itNames.hasNext()) {
+            sb.append(itNames.next())
+              .append(":")
+              .append(itTypes.next())
+              .append(":")
+              .append(itSizes.next())
+              .append((itNames.hasNext()) ? ", " : "]");
+        }
+        return sb.toString();
+    }
+
     public Long getTimestamp() {
         return (Long)values[EXPORT_TIMESTAMP_COLUMN];
+    }
+
+    // Temporary: only print schema, values omitted
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(this.tableName)
+                .append(":")
+                .append(this.partitionId)
+                .append(":")
+                .append(this.generation)
+                .append(" - ")
+                .append(toSchemaString());
+        return sb.toString();
     }
 
     // Note: used to decode schemas in encoded rows produced by {@code ExportEncoder.encodeRow}
@@ -116,15 +147,22 @@ public class ExportRow {
      * @throws IOException
      */
     public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, ByteBuffer bb) throws IOException {
-        final int partitionColIndex = bb.getInt();
-        final int columnCount = bb.getInt();
-        assert(columnCount <= DDLCompiler.MAX_COLUMNS);
-        boolean[] is_null = extractNullFlags(bb, columnCount);
-
-        assert(previous != null);
+        assert (previous != null);
         if (previous == null) {
             throw new IOException("Export block with no schema found without prior block with schema.");
         }
+
+        final int partitionColIndex = bb.getInt();
+        final int columnCount = bb.getInt();
+        assert(columnCount <= DDLCompiler.MAX_COLUMNS);
+        if (columnCount != previous.names.size()) {
+            throw new IOException(
+                    String.format("Read %d columns from row but expected %d columns: %s", columnCount,
+                            previous.names.size(), previous));
+        }
+
+        boolean[] is_null = extractNullFlags(bb, columnCount);
+
         final long generation = previous.generation;
         final String tableName = previous.tableName;
         final List<String> colNames = previous.names;

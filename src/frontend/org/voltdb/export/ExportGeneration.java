@@ -54,6 +54,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB;
@@ -818,8 +819,11 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
-            exportLog.error("PUSH Could not find export data sources for partition "
-                    + partitionId + ". The export data is being discarded.");
+            RealVoltDB db = (RealVoltDB)VoltDB.instance();
+            if (!db.isPartitionDecommissioned(partitionId)) {
+                exportLog.error("PUSH Could not find export data sources for partition "
+                        + partitionId + ". The export data is being discarded.");
+            }
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -1052,6 +1056,24 @@ public class ExportGeneration implements Generation {
                         results.addRow(source.getTableName(), source.getTarget(), partition, "SUCCESS", "");
                     }
                 }
+            }
+        }
+    }
+
+    public void closeDataSources(List<Integer> removedPartitions) {
+        synchronized (m_dataSourcesByPartition) {
+            for (Map.Entry<Integer, Map<String, ExportDataSource>> dataSources : m_dataSourcesByPartition.entrySet()) {
+                Integer partition = dataSources.getKey();
+                if (removedPartitions.contains(partition)) {
+                    for (ExportDataSource source : dataSources.getValue().values()) {
+                        source.closeAndDelete();
+                    }
+                }
+            }
+            m_dataSourcesByPartition.keySet().removeAll(removedPartitions);
+            removedPartitions.stream().forEach(p -> removeMailbox(p));
+            if (exportLog.isDebugEnabled()) {
+                exportLog.info("Remaining datasources:" + m_dataSourcesByPartition);
             }
         }
     }

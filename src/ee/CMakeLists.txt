@@ -271,6 +271,7 @@ SET (VOLTDB_SRC
   storage/TableStats.cpp
   storage/TableStreamer.cpp
   storage/TableStreamerContext.cpp
+  storage/TableTupleAllocator.cpp
   storage/TempTableLimits.cpp
   storage/TupleBlock.cpp
   storage/constraintutil.cpp

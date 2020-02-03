@@ -153,6 +153,8 @@ VoltEEExceptionType VoltDBEngine::s_loadTableException =
     VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_NONE;
 int VoltDBEngine::s_drHiddenColumnSize = 0;
 
+AbstractDRTupleStream* VoltDBEngine::s_drReplicatedStream = nullptr;
+
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(logProxy), m_topend(topend) {
     loadBuiltInJavaFunctions();
 }
@@ -168,11 +170,11 @@ VoltDBEngine::initialize(
         int32_t drClusterId,
         int32_t defaultDrBufferSize,
         int64_t tempTableMemoryLimit,
-        bool isLowestSiteId,
+        bool isLowestSite,
         int32_t compactionThreshold) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
-    m_isLowestSite = isLowestSiteId;
+    m_isLowestSite = isLowestSite;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
@@ -250,7 +252,7 @@ VoltDBEngine::~VoltDBEngine() {
             }
 
             if (deleteWithMpPool) {
-                if (m_isLowestSite) {
+                if (isLowestSite()) {
                     ScopedReplicatedResourceLock scopedLock;
                     ExecuteWithMpMemory usingMpMemory;
                     delete eraseThis->second;
@@ -262,7 +264,7 @@ VoltDBEngine::~VoltDBEngine() {
             m_catalogDelegates.erase(eraseThis->first);
         }
 
-        if (m_isLowestSite) {
+        if (isLowestSite()) {
             SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
         }
         for (auto tid : m_snapshottingTables) {
@@ -275,12 +277,64 @@ VoltDBEngine::~VoltDBEngine() {
 
         delete m_executorContext;
 
-        delete m_drReplicatedStream;
+        if (isLowestSite()) {
+            delete s_drReplicatedStream;
+            s_drReplicatedStream = nullptr;
+        }
         delete m_drStream;
     } else {
         delete m_executorContext;
     }
     VOLT_DEBUG("finished deallocate for partition %d", m_partitionId);
+}
+
+bool VoltDBEngine::decommission(bool remove, bool promote, int newSitePerHost) {
+    VOLT_DEBUG("start decommission for partition %d, site % " PRId64, m_partitionId, m_siteId);
+    {
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+                (true, isLowestSite(), []() {});
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            VOLT_DEBUG("on lowest site");
+            // update site per host count for next countdown latch
+            SynchronizedThreadLock::updateSitePerHost(newSitePerHost);
+            // give up lowest site role
+            if (remove) {
+                m_isLowestSite = false;
+                if (m_drReplicatedStream) {
+                    m_drReplicatedStream = nullptr;
+                    m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
+                }
+            }
+        } else {
+            VOLT_DEBUG("on non lowest site");
+            if (promote) {
+                m_isLowestSite = true;
+                if (s_drReplicatedStream) {
+                    m_drReplicatedStream = s_drReplicatedStream;
+                    m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
+                }
+                SynchronizedThreadLock::swapContextforMPEngine();
+
+            }
+        }
+    }
+    if (remove) {
+        cleanup();
+        VOLT_DEBUG("Deactive EngineLocals %d", m_partitionId);
+        SynchronizedThreadLock::deactiveEngineLocals(m_partitionId);
+    }
+    return true;
+}
+
+void VoltDBEngine::cleanup() {
+    // clean up execution plans
+    m_plans.reset();
+
+    // Clear the undo log before deleting the persistent tables so
+    // that the persistent table schema are still around so we can
+    // actually find the memory that has been allocated to non-inlined
+    // strings and deallocated it.
+    m_undoLog.clear();
 }
 
 // ------------------------------------------------------------------
@@ -946,7 +1000,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     rebuildTableCollections();
 
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite())) {
         VOLT_TRACE("loading replicated parts of catalog from partition %d", m_partitionId);
 
         // load up all the tables, adding all tables
@@ -976,7 +1030,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     // Because Join views of partitioned tables could update the handler list of replicated tables we need to make
     // sure all partitions finish these updates before allowing other transactions to touch the replicated tables
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite())) {
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
     VOLT_TRACE("Loaded catalog from partition %d ...", m_partitionId);
@@ -1663,7 +1717,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     std::map<std::string, ExportTupleStream*> purgedStreams;
     processCatalogDeletes(timestamp, false, purgedStreams);
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite())) {
         processReplicatedCatalogDeletes(timestamp, purgedStreams);
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
@@ -1676,7 +1730,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     rebuildTableCollections();
 
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite())) {
         vassert(SynchronizedThreadLock::isLowestSiteContext());
         VOLT_TRACE("updating catalog from partition %d", m_partitionId);
 
@@ -1698,7 +1752,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     // Because Join views of partitioned tables could update the handler list of replicated tables we need to make
     // sure all partitions finish these updates before allowing other transactions to touch the replicated tables
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite())) {
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
@@ -2874,8 +2928,9 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
         uint8_t drProtocolVersion = static_cast<uint8_t >(taskInfo.readInt());
         // create or delete dr replicated stream as needed
-        if (m_drReplicatedStream == NULL && m_isLowestSite) {
-            m_drReplicatedStream = new DRTupleStream(16383, m_drStream->getDefaultCapacity(), drProtocolVersion);
+        if (s_drReplicatedStream == nullptr && isLowestSite()) {
+            s_drReplicatedStream = new DRTupleStream(16383, m_drStream->getDefaultCapacity(), drProtocolVersion);
+            m_drReplicatedStream = s_drReplicatedStream;
         }
         m_drStream->setDrProtocolVersion(drProtocolVersion);
         m_executorContext->setDrStream(m_drStream);
@@ -2977,7 +3032,7 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                updateReplicated, m_isLowestSite, [](){});
+                updateReplicated, isLowestSite(), [](){});
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {

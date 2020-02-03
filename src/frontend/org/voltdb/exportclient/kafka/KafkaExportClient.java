@@ -17,6 +17,7 @@
 
 package org.voltdb.exportclient.kafka;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,8 @@ public class KafkaExportClient extends ExportClientBase {
     private final static String ACKS_TIMEOUT = "acks.retry.timeout";
     private final static String LEGACY_ACKS = "request.required.acks";
     public final static String ENCODE_FORMAT = "type";
+
+    private final static String MAX_BLOCK_MS_DEFAULT = "60000";
 
     private final static Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
@@ -253,21 +256,6 @@ public class KafkaExportClient extends ExportClientBase {
         }
         m_producerConfig.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
 
-        String acksTimeout = "5000";
-        try {
-            acksTimeout = config.getProperty(ACKS_TIMEOUT, acksTimeout);
-            if ((m_acksTimeout=Integer.parseInt(acksTimeout)) <= 0) {
-                throw new IllegalArgumentException(
-                        "\"" + ACKS_TIMEOUT + "\" must be >= 0"
-                        );
-            }
-        }  catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    "\"" + ACKS_TIMEOUT + "\" must be an integer", e
-                    );
-        }
-        m_producerConfig.remove(ACKS_TIMEOUT);
-
         String kSerializer = config.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "").trim();
         if (kSerializer.isEmpty()) {
             m_producerConfig.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -312,7 +300,7 @@ public class KafkaExportClient extends ExportClientBase {
             m_producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapVal);
         }
 
-        m_producerConfig.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
+        m_producerConfig.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, MAX_BLOCK_MS_DEFAULT);
 
         LOG.info("Configuring Kafka export client: %s", m_producerConfig);
     }
@@ -405,9 +393,10 @@ public class KafkaExportClient extends ExportClientBase {
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 if (m_pollFutures || m_failure.get()) {
+                    m_producer.flush();
                     ImmutableList<Future<RecordMetadata>> pollFutures = ImmutableList.copyOf(m_futures);
                     for (Future<RecordMetadata> fut: pollFutures) {
-                        fut.get(m_acksTimeout, TimeUnit.MILLISECONDS);
+                        fut.get(1, TimeUnit.MILLISECONDS); // flush call above ensures that the send calls completed.
                     }
                 }
             } catch (TimeoutException e) {
@@ -460,18 +449,19 @@ public class KafkaExportClient extends ExportClientBase {
             } catch (KafkaException e) {
                 LOG.warn("Unable to send %s", e, krec);
                 throw new RestartBlockException("Unable to send message", e, true);
-            } catch (IllegalStateException e) {
-                LOG.warn("Unable to send %s", e, krec);
-                if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
-                m_primed = false;
-                throw new RestartBlockException("Unable to send message", e, true);
             }
             return true;
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
+            if (m_producer != null) {
+                try {
+                    m_producer.close(Duration.ofMillis(0));
+                } catch (Exception ignoreIt) {
+                    LOG.debug("Unexpected error trying to close KafkaProducer", ignoreIt);
+                }
+            }
             if (m_es != null) {
                 m_es.shutdown();
                 try {

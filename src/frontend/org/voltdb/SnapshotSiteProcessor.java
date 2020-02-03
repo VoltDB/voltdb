@@ -108,11 +108,14 @@ public class SnapshotSiteProcessor {
 
     public static void readySnapshotSetupBarriers(int numSites) {
         synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
-            if (requireNewBarrierInTest) {
+            if (requireNewBarrierInTest || SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.getParties() != numSites) {
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numSites);
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
                         new CyclicBarrier(numSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
                 requireNewBarrierInTest = false;
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Local active site count for snapshot barriers:" + numSites);
+                }
             } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();

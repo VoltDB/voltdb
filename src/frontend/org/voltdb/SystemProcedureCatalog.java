@@ -667,6 +667,12 @@ public class SystemProcedureCatalog {
         builder.put("@CollectDrSiteTrackers",
                 Builder.createMp("org.voltdb.sysprocs.CollectDrSiteTrackers").commercial().notDurable()
                         .allowedInReplica().build());
+        builder.put("@StopReplicas",
+                new Config("org.voltdb.sysprocs.StopReplicas",
+                        false, false, false,  0, VoltType.INVALID,
+                        true, false, true, Durability.NOT_DURABLE,
+                        false, true, Restartability.RESTARTABLE));
+
         listing = builder.build();
     }
 

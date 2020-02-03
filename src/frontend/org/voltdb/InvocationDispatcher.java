@@ -470,9 +470,15 @@ public final class InvocationDispatcher {
                 if (retval != null) {
                     return retval;
                 }
+
                 if (m_isInitialRestore.compareAndSet(true, false) && shouldLoadSchemaFromSnapshot()) {
                     m_NTProcedureService.isRestoring = true;
-                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
+                    retval = useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
+                    if (retval != null && retval.getStatus() != ClientResponse.SUCCESS) {
+                        // restore failed reset state
+                        resetStateAfterSchemaFailure();
+                    }
+                    return retval;
                 }
             }
             else if ("@Shutdown".equals(procName)) {
@@ -1208,8 +1214,7 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user, OverrideCheck bypass
-            )
+            final AuthUser user, OverrideCheck bypass)
     {
         CatalogContext catalogContext = m_catalogContext.get();
         if (!catalogContext.cluster.getUseddlschema()) {
@@ -1218,107 +1223,108 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
         log.info("No schema found. Restoring schema and procedures from snapshot.");
+        final File catalogFH;
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-            final File catalogFH = getSnapshotCatalogFile(jsObj);
-
-            final byte[] catalog;
-            try {
-                catalog = MiscUtils.fileToBytes(catalogFH);
-            } catch (IOException e) {
-                HostMessenger hm = VoltDB.instance().getHostMessenger();
-                log.warn("Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
-                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
-                        " may has redundant copies elsewhere.");
-                log.info("Stacktrace: ", e);
-                return unexpectedFailureResponse(
-                        "Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
-                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
-                        " may has redundant copies elsewhere.", task.clientHandle);
-            }
-            final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
-
-            final StoredProcedureInvocation catalogUpdateTask = new StoredProcedureInvocation();
-
-            catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
-            catalogUpdateTask.setParams(catalog,dep);
-
-            //A connection with positive id will be thrown into live client statistics. The connection does not support stats.
-            //Thus make the connection id as a negative constant to skip the stats collection.
-            final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                    ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update"
-                    );
-            final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
-                @Override
-                public boolean isAdmin() {
-                    return handler.isAdmin();
-                }
-                @Override
-                public long connectionId() {
-                    return ClientInterface.RESTORE_SCHEMAS_CID;
-                }
-            };
-
-            final long sourceHandle = task.clientHandle;
-            SimpleClientResponseAdapter.SyncCallback restoreCallback =
-                    new SimpleClientResponseAdapter.SyncCallback()
-                    ;
-            final ListenableFuture<ClientResponse> onRestoreComplete =
-                    restoreCallback.getResponseFuture()
-                    ;
-            onRestoreComplete.addListener(new Runnable() {
-                @Override
-                public void run() {
-                    ClientResponse r;
-                    try {
-                        r = onRestoreComplete.get();
-                    } catch (ExecutionException|InterruptedException e) {
-                        VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                        return;
-                    }
-                    transmitResponseMessage(r, ccxn, sourceHandle);
-                }
-            },
-            CoreUtils.SAMETHREADEXECUTOR);
-            task.setClientHandle(alternateAdapter.registerCallback(restoreCallback));
-
-            SimpleClientResponseAdapter.SyncCallback catalogUpdateCallback =
-                    new SimpleClientResponseAdapter.SyncCallback()
-                    ;
-            final ListenableFuture<ClientResponse> onCatalogUpdateComplete =
-                    catalogUpdateCallback.getResponseFuture()
-                    ;
-            onCatalogUpdateComplete.addListener(new Runnable() {
-                @Override
-                public void run() {
-                    ClientResponse r;
-                    try {
-                        r = onCatalogUpdateComplete.get();
-                    } catch (ExecutionException|InterruptedException e) {
-                        VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                        return;
-                    }
-                    if (r.getStatus() != ClientResponse.SUCCESS) {
-                        transmitResponseMessage(r, ccxn, sourceHandle);
-                        log.error("Received error response for updating catalog " + r.getStatusString());
-                        return;
-                    }
-                    m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                    dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
-                }
-            },
-            CoreUtils.SAMETHREADEXECUTOR);
-            catalogUpdateTask.setClientHandle(alternateAdapter.registerCallback(catalogUpdateCallback));
-
-            VoltDB.instance().getClientInterface().bindAdapter(alternateAdapter, null);
-
-            // dispatch the catalog update
-            dispatchNTProcedure(alternateHandler, catalogUpdateTask, user, alternateAdapter, System.nanoTime(), false);
-        }
-        catch (JSONException e) {
+             catalogFH = getSnapshotCatalogFile(jsObj);
+        } catch (JSONException e) {
             return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
         }
+
+        final byte[] catalog;
+        try {
+            catalog = MiscUtils.fileToBytes(catalogFH);
+        } catch (IOException e) {
+            HostMessenger hm = VoltDB.instance().getHostMessenger();
+            log.warn("Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname()
+                    + ", if you believe the path is correct, please retry the command on other hosts, this file"
+                    + " may has redundant copies elsewhere.");
+            log.info("Stacktrace: ", e);
+            return unexpectedFailureResponse(
+                    "Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname()
+                            + ", if you believe the path is correct, please retry the command on other hosts, this file"
+                            + " may has redundant copies elsewhere.",
+                    task.clientHandle);
+        }
+        final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
+
+        final StoredProcedureInvocation catalogUpdateTask = new StoredProcedureInvocation();
+
+        catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
+        catalogUpdateTask.setParams(catalog, dep);
+
+        // A connection with positive id will be thrown into live client statistics. The connection does not support
+        // stats.
+        // Thus make the connection id as a negative constant to skip the stats collection.
+        final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
+                ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update");
+        final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
+            @Override
+            public boolean isAdmin() {
+                return handler.isAdmin();
+            }
+
+            @Override
+            public long connectionId() {
+                return ClientInterface.RESTORE_SCHEMAS_CID;
+            }
+        };
+
+        final long sourceHandle = task.clientHandle;
+        SimpleClientResponseAdapter.SyncCallback restoreCallback = new SimpleClientResponseAdapter.SyncCallback();
+        final ListenableFuture<ClientResponse> onRestoreComplete = restoreCallback.getResponseFuture();
+        onRestoreComplete.addListener(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    transmitResponseMessage(onRestoreComplete.get(), ccxn, sourceHandle);
+                } catch (ExecutionException | InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Unexpected error", true, e);
+                    return;
+                }
+            }
+        }, CoreUtils.SAMETHREADEXECUTOR);
+        task.setClientHandle(alternateAdapter.registerCallback(restoreCallback));
+
+        SimpleClientResponseAdapter.SyncCallback catalogUpdateCallback = new SimpleClientResponseAdapter.SyncCallback();
+        final ListenableFuture<ClientResponse> onCatalogUpdateComplete = catalogUpdateCallback.getResponseFuture();
+        onCatalogUpdateComplete.addListener(new Runnable() {
+            @Override
+            public void run() {
+                ClientResponse r;
+                try {
+                    r = onCatalogUpdateComplete.get();
+                } catch (ExecutionException | InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Unexpected error", true, e);
+                    return;
+                }
+                if (r.getStatus() != ClientResponse.SUCCESS) {
+                    resetStateAfterSchemaFailure();
+                    transmitResponseMessage(r, ccxn, sourceHandle);
+                    log.error("Update catalog failed: " + r.getStatusString());
+                    return;
+                }
+                m_catalogContext.set(VoltDB.instance().getCatalogContext());
+                dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
+            }
+        }, CoreUtils.SAMETHREADEXECUTOR);
+        catalogUpdateTask.setClientHandle(alternateAdapter.registerCallback(catalogUpdateCallback));
+
+        VoltDB.instance().getClientInterface().bindAdapter(alternateAdapter, null);
+
+        // dispatch the catalog update
+        dispatchNTProcedure(alternateHandler, catalogUpdateTask, user, alternateAdapter, System.nanoTime(), false);
+
         return null;
+    }
+
+    /**
+     * Reset the state when the schema was failed to be applied from a snapshot. This is done so that the schema can be
+     * applied from another snapshot
+     */
+    private void resetStateAfterSchemaFailure() {
+        m_NTProcedureService.isRestoring = false;
+        m_isInitialRestore.set(true);
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future

@@ -86,6 +86,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
     protected LoadedProcedureSet m_procSet;
+    protected boolean m_isLowestSiteId;
 
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
@@ -112,6 +113,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // Lock shared by all schedulers to de-conflict the first dump message to log a stacktrace of all site threads
     private static final Object s_threadDumpLock = new Object();
     private static long s_txnIdForSiteThreadDump = 0;
+
+    protected boolean m_isEnterpriseLicense = false;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
@@ -185,6 +188,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_procSet = procSet;
     }
 
+    public void setIsLowestSiteId(Boolean isLowestSiteId) {
+        m_isLowestSiteId = isLowestSiteId;
+    }
+
     /**
      * Update last seen uniqueIds in the replay sequencer. This is used on MPI repair.
      * @param message
@@ -227,6 +234,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     //flush out read only transactions upon host failure
     public void cleanupTransactionBacklogOnRepair() {}
+
+    //flush out transactions for the site to be removed
+    public void cleanupTransactionBacklogs() {}
 
     protected static void generateSiteThreadDump(StringBuilder threadDumps) {
         ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();

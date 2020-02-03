@@ -20,22 +20,15 @@
 package org.voltdb.exportclient;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
@@ -48,23 +41,32 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
-import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class SocketExporter extends ExportClientBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+
+    public static final String SYNC_BLOCK_PROP = "syncblocks";
+    public static final String SYNC_BLOCK_MSG = "__SYNC_BLOCK__";
+    private static final byte[] SYNC_BLOCK_BYTES;
+    static {
+        byte[] bytes = null;
+        try {
+            bytes = (SYNC_BLOCK_MSG+"\n").getBytes("UTF-8");
+        } catch(UnsupportedEncodingException e) { /* Will not happen */ }
+        SYNC_BLOCK_BYTES = bytes;
+    }
+
     String host;
     boolean m_skipInternals = false;
     TimeZone m_timeZone = VoltDB.REAL_DEFAULT_TIMEZONE;
     ExportDecoderBase.BinaryEncoding m_binaryEncoding = ExportDecoderBase.BinaryEncoding.HEX;
     private String[] serverArray;
-    private Set<Callable<Pair<HostAndPort, OutputStream>>> callables;
-    ExecutorService m_executorService;
+    private boolean m_syncBlocks;
 
     @Override
     public void configure(Properties config) throws Exception {
@@ -76,6 +78,7 @@ public class SocketExporter extends ExportClientBase {
         if (!timeZoneID.isEmpty()) {
             m_timeZone = TimeZone.getTimeZone(timeZoneID);
         }
+        m_syncBlocks = Boolean.parseBoolean(config.getProperty(SYNC_BLOCK_PROP));
 
         //Dont do actual config in check mode.
         boolean configcheck = Boolean.parseBoolean(config.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
@@ -84,80 +87,6 @@ public class SocketExporter extends ExportClientBase {
         }
 
         serverArray = host.split(",");
-        m_executorService = Executors.newFixedThreadPool(serverArray.length);
-        setupConnection();
-    }
-
-    private void setupConnection() {
-        callables = new HashSet<Callable<Pair<HostAndPort, OutputStream>>>();
-
-        // use a new thread to connect to each server
-        for (final String server : serverArray) {
-            callables.add(new Callable<Pair<HostAndPort, OutputStream>>() {
-                @Override
-                public Pair<HostAndPort, OutputStream> call() throws IOException {
-                    int port = 5001;
-                    HostAndPort hap = HostAndPort.fromString(server);
-                    if (hap.hasPort()) {
-                        port = hap.getPort();
-                    }
-                    return new Pair<HostAndPort, OutputStream>(hap, connectToOneServer(hap.getHostText(), port));
-                }
-            });
-        }
-    }
-
-    /**
-     * Connect to a set of servers in parallel, and return map of connections. Each will retry until
-     * connection. This call will block until all have connected.
-     *
-     * @param haplist map of hosts to writers filled by this method
-     * @throws InterruptedException if anything bad happens with the threads.
-     * @throws RestartBlockException
-     */
-    void connect(final Map<HostAndPort, OutputStream> haplist) throws InterruptedException, RestartBlockException {
-        m_logger.info("Connecting to Socket export endpoint...");
-
-        // gather the result or retry
-        List<Future<Pair<HostAndPort, OutputStream>>> futures = m_executorService.invokeAll(callables);
-        boolean complete = false;
-        try {
-            for (Future<Pair<HostAndPort, OutputStream>> future : futures) {
-                Pair<HostAndPort, OutputStream> result = future.get();
-                HostAndPort hap = result.getFirst();
-                OutputStream writer = result.getSecond();
-                if (writer != null) {
-                    haplist.put(hap, writer);
-                } else {
-                    throw new RestartBlockException(true);
-                }
-            }
-            complete = true;
-        } catch (ExecutionException ex) {
-            ex.getCause().printStackTrace();
-            throw new RestartBlockException(true);
-        } finally {
-            if (!complete) {
-                for (OutputStream writer : haplist.values()) {
-                    try {
-                        writer.close();
-                    } catch (Exception e) {
-                        // Best effort... oh well...
-                    }
-                }
-                haplist.clear();
-            }
-        }
-    }
-
-    @Override
-    public void shutdown() {
-        m_executorService.shutdown();
-        try {
-            m_executorService.awaitTermination(365, TimeUnit.DAYS);
-        } catch( InterruptedException iex) {
-            Throwables.propagate(iex);
-        }
     }
 
     /**
@@ -168,19 +97,10 @@ public class SocketExporter extends ExportClientBase {
      * @param server hostname:port or just hostname (hostname can be ip).
      * @throws IOException
      */
-    static OutputStream connectToOneServer(String server, int port) throws IOException {
-        try {
-            Socket pushSocket = new Socket(server, port);
-            OutputStream out = pushSocket.getOutputStream();
-            m_logger.info("Connected to export endpoint node at: " + server + ":" + port);
-            return out;
-        } catch (UnknownHostException e) {
-            m_logger.rateLimitedLog(120, Level.ERROR, e, "Don't know about host: " + server);
-            throw e;
-        } catch (IOException e) {
-            m_logger.rateLimitedLog(120, Level.ERROR, e, "Couldn't get I/O for the connection to: " + server);
-            throw e;
-        }
+    static Pair<OutputStream, InputStream> connectToOneServer(String server, int port) throws IOException {
+        @SuppressWarnings("resource") // We close the outputstream, which closes the socket
+        Socket pushSocket = new Socket(server, port);
+        return new Pair<>(pushSocket.getOutputStream(), pushSocket.getInputStream());
     }
 
     /**
@@ -195,7 +115,7 @@ public class SocketExporter extends ExportClientBase {
         long totalDecodeTime = 0;
         long timerStart = 0;
         final CSVStringDecoder m_decoder;
-        final Map<HostAndPort, OutputStream> haplist = new HashMap<HostAndPort, OutputStream>();
+        final Map<HostAndPort, Pair<OutputStream, InputStream>> haplist = new HashMap<HostAndPort, Pair<OutputStream, InputStream>>();
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -221,19 +141,41 @@ public class SocketExporter extends ExportClientBase {
             }
         }
 
+        /**
+         * Connect to a set of servers and track the connections.
+         *
+         * @param haplist map of hosts to writers filled by this method
+         * @throws InterruptedException if anything bad happens with the threads.
+         * @throws IOException on any IO error trying to connect to the sockets
+         */
+        void connect() throws IOException {
+            m_logger.info("Connecting to Socket export endpoint...");
+
+            for (final String server : serverArray) {
+                int port = 5001;
+                HostAndPort hap = HostAndPort.fromString(server);
+                if (hap.hasPort()) {
+                    port = hap.getPort();
+                }
+                haplist.put(hap, connectToOneServer(hap.getHost(), port));
+            }
+        }
+
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             try {
-                for (OutputStream writer : haplist.values()) {
+                for (Pair<OutputStream, InputStream> streams : haplist.values()) {
                     if (m_logger.isDebugEnabled()) {
-                        m_logger.debug("Flushing " + writer + " for source " + source);
+                        m_logger.debug("Flushing " + streams.getFirst() + " for source " + source);
                     }
-                    writer.flush();
-                    writer.close();
+                    try (OutputStream out = streams.getFirst(); InputStream in = streams.getSecond()) {
+                        streams.getFirst().flush();
+                    } catch(IOException e) {
+                        m_logger.error("Failed to close streams for " + source, e);
+                    }
                 }
+            } finally {
                 haplist.clear();
-            } catch (IOException e) {
-                m_logger.error("Failed to close writers for " + source, e);
             }
             if (m_es != null) {
                 m_es.shutdown();
@@ -249,23 +191,26 @@ public class SocketExporter extends ExportClientBase {
         public boolean processRow(ExportRow rd) throws ExportDecoderBase.RestartBlockException {
             try {
                 if (haplist.isEmpty()) {
-                    connect(haplist);
+                    connect();
                 }
                 if (haplist.isEmpty()) {
                     m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
                     throw new RestartBlockException(true);
+                }
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug(m_source.tableName + ":P" + m_source.partitionId + " sending seqNum: " + rd.values[2]);
                 }
                 String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);
                 buf.flip();
-                for (OutputStream hap : haplist.values()) {
-                    hap.write(buf.array());
-                    hap.flush();
+                for (Pair<OutputStream, InputStream> streams : haplist.values()) {
+                    streams.getFirst().write(buf.array());
+                    streams.getFirst().flush();
                 }
             } catch (Exception e) {
-                m_logger.error(e.getLocalizedMessage());
+                m_logger.warn("Unexpected error processing row: " + e.getLocalizedMessage() + ". Row will be retried.");
                 haplist.clear();
                 throw new RestartBlockException(true);
             }
@@ -274,10 +219,18 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRow row) {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
-                for (OutputStream hap : haplist.values()) {
-                    hap.flush();
+                for (Pair<OutputStream, InputStream> streams : haplist.values()) {
+                    if (m_syncBlocks) {
+                        streams.getFirst().write(SYNC_BLOCK_BYTES);
+                    }
+                    streams.getFirst().flush();
+                    if (m_syncBlocks) { // wait for the other side to tell us it got the block
+                        if (streams.getSecond().read() == -1) {
+                            throw new RestartBlockException("Target may not have received the block", true);
+                        }
+                    }
                 }
             } catch (IOException ex) {
                 m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to flush to export socket endpoint %s, some servers may be down.", host);

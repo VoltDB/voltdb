@@ -442,7 +442,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     TableTuple tuple;
     if (activeNumOfSearchKeys > 0) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
+                   static_cast<int>(localLookupType), activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         switch(localLookupType) {
             case IndexLookupType::Equal:
                 tableIndex->moveToKey(&searchKey, indexCursor);

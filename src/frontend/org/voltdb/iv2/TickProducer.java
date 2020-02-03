@@ -48,7 +48,7 @@ public class TickProducer extends SiteTasker implements Runnable
             + "-- over %d seconds -- and blocking the queue for site %d (%s) "
             + "No other jobs will be executed until that process completes.";
 
-    public TickProducer(SiteTaskerQueue taskQueue, long siteId)
+    TickProducer(SiteTaskerQueue taskQueue, long siteId)
     {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
@@ -75,7 +75,11 @@ public class TickProducer extends SiteTasker implements Runnable
                 TimeUnit.MILLISECONDS);
     }
 
-    public void changeTickInterval(long newInterval) {
+    void cancel() {
+        m_scheduledTick.cancel(true);
+    }
+
+    void changeTickInterval(long newInterval) {
         if (newInterval != m_scheduledTickInterval) {
             m_scheduledTick.cancel(false);
             m_scheduledTick = VoltDB.instance().schedulePriorityWork(
@@ -109,7 +113,6 @@ public class TickProducer extends SiteTasker implements Runnable
             if (m_logger.isDebugEnabled()) {
                 String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, "Site:" + CoreUtils.hsIdToString(m_siteId) + " " + m_taskQueue.toString());
             } else {
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
             }

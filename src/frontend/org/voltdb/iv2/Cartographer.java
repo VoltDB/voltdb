@@ -425,7 +425,11 @@ public class Cartographer extends StatsSource
         Set<Integer> hostIds = Sets.newHashSet();
 
         Multimap<Integer, Integer> hostToPartitions = getHostToPartitionMap();
-        assert hostToPartitions.containsKey(hostId);
+        if (!hostToPartitions.containsKey(hostId)) {
+            // during the reduced k safety mode
+            // host with no partition leader contains no effective partitions
+            return hostIds;
+        }
         Multimap<Integer, Integer> partitionByIds = ArrayListMultimap.create();
         Multimaps.invertFrom(hostToPartitions, partitionByIds);
         for (int partition : hostToPartitions.asMap().get(hostId)) {

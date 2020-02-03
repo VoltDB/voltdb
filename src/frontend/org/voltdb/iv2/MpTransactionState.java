@@ -768,5 +768,9 @@ public class MpTransactionState extends TransactionState
     public boolean haveSentFragment() {
         return m_haveSentfragment;
     }
+
+    public boolean isRestart() {
+        return m_isRestart;
+    }
 }
 

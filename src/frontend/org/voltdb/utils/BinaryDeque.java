@@ -18,6 +18,7 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
@@ -161,6 +162,16 @@ public interface BinaryDeque<M> {
     public void scanEntries(BinaryDequeScanner scanner) throws IOException;
 
     public boolean deletePBDSegment(BinaryDequeValidator<M> checker) throws IOException;
+
+    /**
+     * If pbd files should only be deleted based on some external events,
+     * register a deferred action handler using this. All deletes will be sent
+     * to the {@code deleter} as a Runnable, which may be executed later.
+     *
+     * @param deleter {@link java.util.concurrent.Executor} that will do the actual deletes
+     *
+     */
+    public void registerDeferredDeleter(Executor deleter);
 
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
