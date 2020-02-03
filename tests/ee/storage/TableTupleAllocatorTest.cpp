@@ -806,12 +806,7 @@ void testHookedCompactingChunks() {
     for (i = 909; i < 999; ++i) {
         ss.emplace(const_cast<void*>(addresses[i]));
     }
-    auto index_of = [&addresses](void const* p) {
-        auto iter = find(addresses.cbegin(), addresses.cend(), p);
-        assert(iter != addresses.cend());
-        return distance(addresses.cbegin(), iter);
-    };
-    alloc.remove(ss, [&index_of](map<void*, void*> const& m) {});
+    alloc.remove(ss, [](map<void*, void*> const& m) {});
     verify_snapshot_const();
 
     // Step 4: insertion

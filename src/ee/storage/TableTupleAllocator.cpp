@@ -207,6 +207,22 @@ inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(v
     }
 }
 
+template<typename Chunk, typename E> inline char
+ChunkList<Chunk, E>::compare(pair<iterator, void*> const& l, pair<iterator, void*> const& r) const {
+    if (l.first == end()) {
+        return r.first == end() ? 0 : 1;
+    } else if (r.first == end()) {
+        return -1;
+    } else if (l.first->id() == r.first->id()) {
+        vassert(l.first->contains(l.second) && r.first->contains(r.second));
+        return l.second < r.second ? -1 : (l.second == r.second ? 0 : 1);
+    } else {
+        static less<Chunk> const L;
+        vassert(l.first->contains(l.second) && r.first->contains(r.second));
+        return L(l.first->id(), r.first->id()) ? -1 : 1;
+    }
+}
+
 template<typename Chunk, typename E>
 template<typename... Args>
 inline void ChunkList<Chunk, E>::emplace_back(Args&&... args) {
@@ -1264,6 +1280,10 @@ HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : Com
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::freeze() {
+    if (! CompactingChunks::empty()) {
+        auto iter = prev(CompactingChunks::end());
+        m_frozenSentry = make_pair(iter->id(), iter->next());
+    }
     Hook::freeze();
     CompactingChunks::freeze();
 }
@@ -1272,6 +1292,7 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
+    m_frozenSentry = {numeric_limits<size_t>::max(), nullptr};
 }
 
 template<typename Hook, typename E> inline void const*

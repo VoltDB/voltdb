@@ -20,6 +20,7 @@
 #include <forward_list>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <list>
 #include <map>
 #include <memory>
@@ -184,6 +185,8 @@ namespace voltdb {
             // careful forwarding to maintain invariant
             void clear() noexcept;
             void splice(iterator, ChunkList&, iterator) noexcept;
+            // compare two allocation addr in O(1): returns either of -1, 0, 1
+            char compare(pair<iterator, void*> const& , pair<iterator, void*> const&) const;
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::rbegin; using super::rend;
             using super::empty; using super::size;
@@ -313,16 +316,26 @@ namespace voltdb {
 }
 
 /**
- * Needed for maps keyed on iterator
+ * Needed for maps keyed on iterator, or chunk.
+ * Of course, compared items must belong to the same list.
  */
 namespace std {
     using namespace voltdb::storage;
     template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
         using value_type = typename ChunkList<CompactingChunk>::iterator;
         inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
-            // Rolling integer comparison
-            using signed_type = typename make_signed<decltype(lhs->id())>::type;
-            return static_cast<signed_type>(lhs->id()) - static_cast<signed_type>(rhs->id()) < 0;
+            // Rolling integer comparison, assuming that neither
+            // is end().
+            using id_type = decltype(lhs->id());
+            static_assert(! is_signed<id_type>::value, "Chunk::id() must be unsigned");
+            return static_cast<typename make_signed<id_type>::type>(lhs->id() - rhs->id()) < 0;
+        }
+    };
+    template<> struct less<ChunkHolder> {
+        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
+            using id_type = decltype(lhs.id());
+            static_assert(! is_signed<id_type>::value, "Chunk::id() must be unsigned");
+            return static_cast<typename make_signed<id_type>::type>(lhs.id() - rhs.id()) < 0;
         }
     };
 }
@@ -394,7 +407,7 @@ namespace voltdb {
             size_t size() const noexcept;              // used for table count executor
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
-            using list_type::empty;
+            using list_type::empty; using list_type::end;
         };
 
         struct BaseHistoryRetainTrait {
@@ -504,6 +517,7 @@ namespace voltdb {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using Hook::add; using Hook::copy;
             // the end of allocations when snapshot started: (block id, end ptr)
+            pair<size_t, void const*> m_frozenSentry{numeric_limits<size_t>::max(), nullptr};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
