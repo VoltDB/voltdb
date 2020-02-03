@@ -183,7 +183,7 @@ namespace voltdb {
             iterator const* find(void const*) const;
             // careful forwarding to maintain invariant
             void clear() noexcept;
-            void splice(const_iterator, ChunkList&, iterator) noexcept;
+            void splice(iterator, ChunkList&, iterator) noexcept;
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::rbegin; using super::rend;
             using super::empty; using super::size;

@@ -215,16 +215,10 @@ inline void ChunkList<Chunk, E>::emplace_back(Args&&... args) {
 }
 
 template<typename Chunk, typename E>
-inline void ChunkList<Chunk, E>::splice(const_iterator pos, ChunkList& other, iterator it) noexcept {
+inline void ChunkList<Chunk, E>::splice(iterator pos, ChunkList& other, iterator it) noexcept {
     m_map.emplace(it->begin(), it);
     other.m_map.erase(it->begin());
-    super::splice(
-#ifdef CENTOS7
-            next(begin(), distance(cbegin(), pos)),
-#else
-            pos,
-#endif
-            other, it);
+    super::splice(pos, other, it);
 }
 
 template<typename Chunk, typename E>
@@ -651,7 +645,7 @@ private:
         } else {
             m_cursor = reinterpret_cast<char*>(m_iter->next()) -
                 reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
-            assert(m_cursor >= m_iter->begin());
+            vassert(m_cursor >= m_iter->begin());
         }
     }
 };
