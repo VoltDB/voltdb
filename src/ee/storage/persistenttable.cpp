@@ -141,7 +141,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // NOTE: we embed m_data pointer immediately after the
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
-    m_dataStorage.reset(new Alloc{sizeof(TableTuple) + schema->tupleLength() + TUPLE_HEADER_SIZE});
+    m_dataStorage.reset(new Alloc{schema->tupleLength() + TUPLE_HEADER_SIZE});
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
@@ -153,10 +153,12 @@ PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
 
     // delete all tuples to free strings
-    storage::for_each<PersistentTable::txn_iterator>(allocator(),[](void* p) {
-        auto* tuple = reinterpret_cast<TableTuple*>(p);
-        tuple->freeObjectColumns();
-        tuple->setActiveFalse();
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),[this](void* p) {
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        TableTuple tuple(this->schema());
+        tuple.move(tupleAddress);
+        tuple.freeObjectColumns();
+        tuple.setActiveFalse();
     });
 
     // note this class has ownership of the views, even if they
@@ -219,8 +221,10 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
                   [this,fallible](void* p) {
-        auto* inputTuple = reinterpret_cast<TableTuple*>(p);
-        this->deleteTuple(*inputTuple, fallible);
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        TableTuple inputTuple(this->schema());
+        inputTuple.move(tupleAddress);
+        this->deleteTuple(inputTuple, fallible);
     });
 }
 
@@ -610,19 +614,21 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
     if (!m_deltaTable->isPersistentTableEmpty()) {
        storage::for_each<PersistentTable::txn_iterator>(dynamic_cast<PersistentTable*>(m_deltaTable)->allocator(),
                       [this, fallible](void* p) {
-             auto* inputTuple = reinterpret_cast<TableTuple*>(p);
-             m_deltaTable->deleteTuple(*inputTuple, fallible);
+             void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+             TableTuple inputTuple(this->schema());
+             inputTuple.move(tupleAddress);
+             m_deltaTable->deleteTuple(inputTuple, fallible);
         });
     }
 
-    TableTuple* targetForDelta = m_deltaTable->createTuple(source);
+    TableTuple targetForDelta = m_deltaTable->createTuple(source);
     try {
-        m_deltaTable->insertTupleCommon(source, *targetForDelta, fallible);
+        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
     } catch (ConstraintFailureException const& e) {
-        m_deltaTable->deleteTupleStorage(*targetForDelta);
+        m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     } catch (TupleStreamException const& e) {
-        m_deltaTable->deleteTupleStorage(*targetForDelta);
+        m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
 
     }
@@ -632,10 +638,11 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
     // daring and likely not correct.
 }
 
-TableTuple* PersistentTable::createTuple(TableTuple const &source){
-    TableTuple* target = const_cast<TableTuple*>(reinterpret_cast<TableTuple const*>(allocator().insert(&source)));
-    target->move(reinterpret_cast<char*>(target) + sizeof(TableTuple));
-    target->copyForPersistentInsert(source);
+TableTuple PersistentTable::createTuple(TableTuple const &source){
+    TableTuple target(m_schema);
+    void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().insert(source.m_data)));
+    target.move(address);
+    target.copyForPersistentInsert(source);
     return target;
 }
 
@@ -651,8 +658,8 @@ void PersistentTable::finalizeDelete() {
         TableTuple target(m_schema);
         TableTuple origin(m_schema);
         for(auto const& p : tuples) {
-            target.move((reinterpret_cast<TableTuple*>(p.first))->address());
-            origin.move((reinterpret_cast<TableTuple*>(p.second))->address());
+            target.move(p.first);
+            origin.move(p.second);
             BOOST_FOREACH (auto index, m_indexes) {
                 index->replaceEntryNoKeyChange(target, origin);
             }
@@ -688,18 +695,14 @@ void PersistentTable::insertPersistentTuple(TableTuple const& source, bool falli
         throw ConstraintFailureException(this, source, str.str());
     }
 
-    // NOTE: we are actually copying from memory beyond source,
-    // bc. how the TableTuple inlined data content (that m_data points
-    // to) is constructed in the Alloc. This is one hacky way to
-    // do it!!
-    TableTuple* target = createTuple(source);
+    TableTuple target = createTuple(source);
     try {
-        insertTupleCommon(source, *target, fallible);
+        insertTupleCommon(source, target, fallible);
     } catch (TupleStreamException const& e) {
-        deleteTupleStorage(*target); // also frees object columns
+        deleteTupleStorage(target); // also frees object columns
         throw;
     } catch (ConstraintFailureException const& e) {
-        deleteTupleStorage(*target); // also frees object columns
+        deleteTupleStorage(target); // also frees object columns
         throw;
     }
 }
@@ -1343,24 +1346,26 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
 
     TableTuple matchedTuple(m_schema);
     storage::until<PersistentTable::txn_iterator>(allocator(), [&tuple, &lookupType, this, tuple_length, &matchedTuple](void* p) {
-        auto* tableTuple = reinterpret_cast<TableTuple*>(p);
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        TableTuple tableTuple(this->schema());
+        tableTuple.move(tupleAddress);
         bool matched = false;
         if (lookupType == LOOKUP_FOR_DR && this->schema()->hiddenColumnCount()) {
             // Force column compare for DR so we can easily use the filter
             HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, this->schema());
-            matched = (tableTuple->equalsNoSchemaCheck(tuple, &filter));
+            matched = (tableTuple.equalsNoSchemaCheck(tuple, &filter));
         } else if (lookupType != LOOKUP_FOR_UNDO && this->schema()->getUninlinedObjectColumnCount() != 0) {
-            matched =  (tableTuple->equalsNoSchemaCheck(tuple));
+            matched =  (tableTuple.equalsNoSchemaCheck(tuple));
         } else {
              // Do an inline tuple byte comparison
              // to avoid matching duplicate tuples with different pointers to Object storage
              // -- which would cause erroneous releases of the wrong Object storage copy.
-             char* tableTupleData = tableTuple->address() + TUPLE_HEADER_SIZE;
+             char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
              char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
              matched = (::memcmp(tableTupleData, tupleData, tuple_length) == 0);
         }
         if (matched) {
-            matchedTuple.copy(*tableTuple);
+            matchedTuple.copy(tableTuple);
             return true;
         } else {
             return false;
@@ -1591,12 +1596,12 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
             throw;
         }
 
-        TableTuple* target = createTuple(m_tempTuple);
+        TableTuple target = createTuple(m_tempTuple);
         // TODO: we do not catch other types of exceptions, such as
         // SQLException, etc. The assumption we held that no other
         // exceptions should be thrown in the try-block is pretty
         // daring and likely not correct.
-        processLoadedTuple(*target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            caller.shouldDrStream(), caller.ignoreTupleLimit());
     }
 
@@ -1734,8 +1739,10 @@ size_t PersistentTable::hashCode() {
 
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
                         [this, &pkeyIndex](void* p) {
-         auto* inputTuple = reinterpret_cast<TableTuple*>(p);
-         pkeyIndex->addEntry(inputTuple, NULL);
+         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+         TableTuple inputTuple(this->schema());
+         inputTuple.move(tupleAddress);
+         pkeyIndex->addEntry(&inputTuple, NULL);
     });
 
     IndexCursor indexCursor(pkeyIndex->getTupleSchema());
@@ -1807,15 +1814,17 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
     int64_t mispartitionedRows = 0;
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
                            [this, &hashinator, &mispartitionedRows, partitionId](void* p) {
-       auto* tuple = reinterpret_cast<TableTuple*>(p);
-       int32_t newPartitionId = hashinator->hashinate(tuple->getNValue(m_partitionColumn));
+       void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+       TableTuple tuple(this->schema());
+       tuple.move(tupleAddress);
+       int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
        if (newPartitionId != partitionId) {
             std::ostringstream buffer;
             buffer << "@ValidPartitioning found a mispartitioned row (hash: "
-                   << m_surgeon.generateTupleHash(*tuple)
+                   << m_surgeon.generateTupleHash(tuple)
                    << " should in "<< partitionId
                    << ", but in " << newPartitionId << "):\n"
-                   << tuple->debug(name())
+                   << tuple.debug(name())
                    << std::endl;
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buffer.str().c_str());
             mispartitionedRows++;
@@ -1845,8 +1854,8 @@ bool PersistentTable::nextSnapshotTuple(TableTuple& tuple) {
     vassert(!m_snapIt->drained());
     auto *p = **m_snapIt;
     if (p != nullptr) {
-        auto* inputTuple = const_cast<TableTuple*>(reinterpret_cast<const TableTuple*>(p));
-        tuple.move(inputTuple->address());
+        auto* inputTuple = const_cast<void*>(reinterpret_cast<const void*>(p));
+        tuple.move(inputTuple);
         ++*m_snapIt;
         if (m_snapIt->drained()) {
            allocator().thaw();
@@ -1941,8 +1950,10 @@ void PersistentTable::addIndex(TableIndex* index) {
 
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
                          [this, &index](void* p) {
-          auto* inputTuple = reinterpret_cast<TableTuple*>(p);
-          index->addEntry(inputTuple, NULL);
+          void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+          TableTuple inputTuple(this->schema());
+          inputTuple.move(tupleAddress);
+          index->addEntry(&inputTuple, NULL);
      });
 
     // add the index to the table

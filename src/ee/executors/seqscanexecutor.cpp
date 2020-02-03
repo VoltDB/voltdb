@@ -246,16 +246,18 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 [this, &input_table, &temp_tuple, &tuple_ctr, &pmp, &postfilter, &projectionNode, num_of_columns]
                 (void const* p) {
                     if (postfilter.isUnderLimit()) {
-                        auto const* tuple = reinterpret_cast<TableTuple const*>(p);
-                        VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", tuple,
-                                   tuple->debug(input_table->name()).c_str(),
+                        void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(p));
+                        TableTuple tuple(input_table->schema());
+                        tuple.move(tupleData);
+                        VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", &tuple,
+                                   tuple.debug(input_table->name()).c_str(),
                                    ++tuple_ctr, input_table->activeTupleCount());
                         pmp.countdownProgress();
 
                         //
                         // For each tuple we need to evaluate it against our predicate and limit/offset
                         //
-                        if (postfilter.eval(tuple, nullptr)) {
+                        if (postfilter.eval(&tuple, nullptr)) {
                             //
                             // Nested Projection
                             // Project (or replace) values from input tuple
@@ -266,12 +268,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                                 // the columns of the select list in the
                                 // select statement.
                                 for (int ctr = 0; ctr < num_of_columns; ctr++) {
-                                    NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(tuple, nullptr);
+                                    NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&tuple, nullptr);
                                     temp_tuple.setNValue(ctr, value);
                                 }
                                 this->outputTuple(temp_tuple);
                             } else {
-                                this->outputTuple(*tuple);
+                                this->outputTuple(tuple);
                             }
                             pmp.countdownProgress();
                         }

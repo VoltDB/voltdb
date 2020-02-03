@@ -341,7 +341,7 @@ public:
         return true;
     }
 
-    TableTuple* createTuple(TableTuple const &source);
+    TableTuple createTuple(TableTuple const &source);
     void finalizeDelete();
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.

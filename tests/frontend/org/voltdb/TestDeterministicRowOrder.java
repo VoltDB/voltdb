@@ -100,14 +100,58 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
         try {
-            for (int i = 0; i < 20; i++) {
-                client.callProcedure("@AdHoc", "insert into kv values(" + i + "," + i + ")");
+            for (int i = 0; i <= 100; i++) {
+                client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
+                client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
             }
-            System.out.println("deleting from KV...");
-            ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV where key < 10");
+            System.out.print("deleting from partitioned table KV...");
+            ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV where key < 50");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
-            VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
-            assert(10 == vt.asScalarLong());
+            VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            int count = 0;
+            while(vt.advanceRow()) {
+                assert(vt.getLong(0) >= 50);
+                count++;
+            }
+            assert(count == 50);
+            System.out.print("deleting from replicated table FOO...");
+            resp = client.callProcedure("@AdHoc", "delete from FOO where key < 50");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            vt = client.callProcedure("@AdHoc", "select * from FOO order by key").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            count = 0;
+            while(vt.advanceRow()) {
+                assert(vt.getLong(0) >= 50);
+                count++;
+            }
+            assert(count == 50);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
+        }
+    }
+
+    @Test
+    public void testTruncateDelete() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            for (int i = 0; i <= 100; i++) {
+                client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
+                client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
+            }
+            System.out.print("deleting from partitioned table KV...");
+            ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV;");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from KV order by key").getResults()[0];
+            assert(vt.asScalarLong() == 0);
+            System.out.print("deleting from replicated table FOO...");
+            resp = client.callProcedure("@AdHoc", "delete from FOO");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            vt = client.callProcedure("@AdHoc", "select count(*) from FOO order by key").getResults()[0];
+            assert(vt.asScalarLong() == 0);
         } catch (Exception e) {
             fail(e.getMessage());
         } finally {
