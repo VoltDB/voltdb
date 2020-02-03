@@ -95,7 +95,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-   // @Test
+    @Test
     public void testBatchDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -159,7 +159,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
+    @Test
     public void testSnapshotSaveAndRestore() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
