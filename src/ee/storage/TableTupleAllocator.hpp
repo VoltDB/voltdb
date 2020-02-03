@@ -461,6 +461,19 @@ namespace voltdb {
             is_same<typename remove_const<T>::type, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
             is_base_of<CompactingChunks, typename remove_const<T>::type>::value>;
 
+        /**
+         * Communication channel between TxnPreHook and
+         * HookedCompactingChunks
+         */
+        class AllocBoundary {
+            size_t const m_lastChunkId;
+            void const* m_lastAlloc;
+        public:
+            AllocBoundary(ChunkHolder const&) noexcept;
+            size_t lastChunkId() const noexcept;
+            void const* lastAlloc() const noexcept;
+        };
+
         template<typename Alloc, typename Trait,
             typename Collections = stdCollections<void const*, void const*>,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
@@ -523,12 +536,12 @@ namespace voltdb {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using Hook::add; using Hook::copy;
             // the end of allocations when snapshot started: (block id, end ptr)
-            pair<size_t, void const*> m_frozenSentry{numeric_limits<size_t>::max(), nullptr};
+            shared_ptr<AllocBoundary> m_frozenSentry;
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            void freeze(); void thaw();                 // switch of snapshot process
+            void freeze(); void thaw();                // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
             /**

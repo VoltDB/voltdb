@@ -446,6 +446,16 @@ inline function<void const*()> CompactingStorageTrait::operator()() const noexce
     return m_unreleased.iterator();
 }
 
+size_t CompactingChunks::s_id = 0;
+
+size_t CompactingChunks::gen_id() {
+    return s_id++;
+}
+
+inline size_t CompactingChunks::id() const noexcept {
+    return m_id;
+}
+
 inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     trait(this), m_id(gen_id()), m_tupleSize(tupleSize), m_batched(*this) {}
 
@@ -459,16 +469,6 @@ inline void const* CompactingChunks::endOfFirstChunk() const noexcept {
         return first.begin() < m_endOfFirstChunk && first.end() >= m_endOfFirstChunk ?
             m_endOfFirstChunk : nullptr;
     }
-}
-
-size_t CompactingChunks::s_id = 0;
-
-size_t CompactingChunks::gen_id() {
-    return s_id++;
-}
-
-inline size_t CompactingChunks::id() const noexcept {
-    return m_id;
 }
 
 inline void CompactingChunks::freeze() {
@@ -1173,6 +1173,14 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
     }
 }
 
+inline AllocBoundary::AllocBoundary(ChunkHolder const& c) noexcept : m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
+inline size_t AllocBoundary::lastChunkId() const noexcept {
+    return m_lastChunkId;
+}
+inline void const* AllocBoundary::lastAlloc() const noexcept {
+    return m_lastAlloc;
+}
+
 template<typename Alloc, typename Trait, typename C, typename E>
 inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
     Trait([this](void const* key) {
@@ -1291,7 +1299,7 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::freeze() {
     if (! CompactingChunks::empty()) {
         auto iter = prev(CompactingChunks::end());
-        m_frozenSentry = make_pair(iter->id(), iter->next());
+        m_frozenSentry = make_shared<AllocBoundary>(*iter);
     }
     Hook::freeze();
     CompactingChunks::freeze();
@@ -1301,7 +1309,7 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
-    m_frozenSentry = {numeric_limits<size_t>::max(), nullptr};
+    m_frozenSentry.reset(static_cast<AllocBoundary*>(nullptr));
 }
 
 template<typename Hook, typename E> inline void const*
