@@ -188,8 +188,6 @@ namespace voltdb {
             using super::rbegin; using super::rend;
             using super::empty; using super::size;
             using super::front; using super::back;
-            size_t distance(iterator);           // std::distance(begin(), arg)
-            size_t distance(const_iterator) const;
         };
 
         /**
@@ -350,16 +348,15 @@ namespace voltdb {
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
-            class BatchRemoveAccumulator : private map<list_type::iterator, tuple<size_t, vector<void*>>> {
+            class BatchRemoveAccumulator : private map<list_type::iterator, vector<void*>> {
                 CompactingChunks* m_self;
-                using map_type = map<size_t, vector<void*>>;
+                using map_type = map<list_type::iterator, vector<void*>>;
             protected:
                 CompactingChunks& chunks() noexcept;
                 list_type::iterator pop();             // force removing the chunk to be compacted from
                 vector<void*> collect() const;
-                using map<list_type::iterator, tuple<size_t, vector<void*>>>::clear;
+                using map_type::clear;
             public:
-                using super = map<list_type::iterator, tuple<size_t, vector<void*>>>;
                 explicit BatchRemoveAccumulator(CompactingChunks*);
                 void insert(list_type::iterator, void*);
                 vector<void*> sorted();                         // in compacting order

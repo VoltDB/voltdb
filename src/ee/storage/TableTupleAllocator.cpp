@@ -220,7 +220,7 @@ inline void ChunkList<Chunk, E>::splice(const_iterator pos, ChunkList& other, it
     other.m_map.erase(it->begin());
     super::splice(
 #ifdef CENTOS7
-            next(begin(), distance(pos)),
+            next(begin(), distance(cbegin(), pos)),
 #else
             pos,
 #endif
@@ -246,24 +246,6 @@ template<typename Chunk, typename E>
 inline void ChunkList<Chunk, E>::clear() noexcept {
     m_map.clear();
     super::clear();
-}
-
-template<typename Chunk, typename E> inline
-size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::iterator iter) {
-    if (iter == end()) {
-        return empty() ? 0 : back().id() - front().id();
-    } else {
-        return iter->id() - front().id();
-    }
-}
-
-template<typename Chunk, typename E> inline
-size_t ChunkList<Chunk, E>::distance(typename ChunkList<Chunk, E>::const_iterator iter) const {
-    if (iter == cend()) {
-        return empty() ? 0 : back().id() - front().id();
-    } else {
-        return iter->id() - front().id();
-    }
 }
 
 inline void CompactingStorageTrait::LinearizedChunks::emplace(
@@ -576,9 +558,8 @@ inline typename CompactingChunks::list_type::iterator CompactingChunks::BatchRem
 
 inline vector<void*> CompactingChunks::BatchRemoveAccumulator::collect() const {
     return accumulate(cbegin(), cend(), vector<void*>{},
-            [](vector<void*>& acc, typename super::value_type const& entry) {
-                auto const& v = get<1>(entry.second);
-                copy(v.cbegin(), v.cend(), back_inserter(acc));
+            [](vector<void*>& acc, typename map_type::value_type const& entry) {
+                copy(entry.second.cbegin(), entry.second.cend(), back_inserter(acc));
                 return acc;
             });
 }
@@ -587,25 +568,17 @@ inline void CompactingChunks::BatchRemoveAccumulator::insert(
         typename CompactingChunks::list_type::iterator key, void* p) {
     auto iter = find(key);
     if (iter == end()) {
-        emplace(key, make_tuple(m_self->distance(key), vector<void*>{p}));
+        emplace(key, vector<void*>{p});
     } else {
-        get<1>(iter->second).emplace_back(p);
+        iter->second.emplace_back(p);
     }
 }
 
 inline vector<void*> CompactingChunks::BatchRemoveAccumulator::sorted() {
-    using map_type = map<size_t, vector<void*>>;
-    auto const s = accumulate(begin(), end(), map_type{},
-            [](map_type& acc, super::value_type& entry) {                  // entry : map<list_type::iterator, tuple<size_t, vector<void*>>>
-                auto const index = get<0>(entry.second);
-                auto& v = get<1>(entry.second);
-                std::sort(v.begin(), v.end(), greater<void*>());           // destructuring (i.e. in-place) sort
-                acc.emplace(index, v);
-                return acc;
-            });
-    return accumulate(s.cbegin(), s.cend(), vector<void*>{},
-            [](vector<void*>& acc, typename map_type::value_type const& entry) {
-                auto const& val = entry.second;
+    return accumulate(begin(), end(), vector<void*>{},
+            [](vector<void*>& acc, typename map_type::value_type& entry) {
+                auto& val = entry.second;
+                std::sort(val.begin(), val.end(), greater<void*>());
                 copy(val.cbegin(), val.cend(), back_inserter(acc));
                 return acc;
             });
@@ -615,7 +588,7 @@ inline CompactingChunks::DelayedRemover::DelayedRemover(CompactingChunks& s) : s
 
 inline size_t CompactingChunks::DelayedRemover::add(void* p) {
     auto const* iter = super::chunks().find(p);
-    if (iter == nullptr) {         // validate,
+    if (iter == nullptr) {
         snprintf(buf, sizeof buf, "CompactingChunk::DelayedRemover::add(%p): invalid address", p);
         buf[sizeof buf - 1] = 0;
         throw range_error(buf);
