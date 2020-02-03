@@ -23,7 +23,7 @@
 using namespace voltdb;
 using namespace voltdb::storage;
 
-static char buf[64];
+static char buf[128];
 
 template<typename T>
 template<typename... Args>
@@ -447,8 +447,7 @@ inline function<void const*()> CompactingStorageTrait::operator()() const noexce
 }
 
 inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    trait(this), m_tupleSize(tupleSize),
-    m_batched(*this) {}      // cyclic dependency from m_batched is fine, since we are only setting up ptr there
+    trait(this), m_id(gen_id()), m_tupleSize(tupleSize), m_batched(*this) {}
 
 // returns non-null value only if in snapshot,
 // and the marked position is still in the first chunk.
@@ -460,6 +459,16 @@ inline void const* CompactingChunks::endOfFirstChunk() const noexcept {
         return first.begin() < m_endOfFirstChunk && first.end() >= m_endOfFirstChunk ?
             m_endOfFirstChunk : nullptr;
     }
+}
+
+size_t CompactingChunks::s_id = 0;
+
+size_t CompactingChunks::gen_id() {
+    return s_id++;
+}
+
+inline size_t CompactingChunks::id() const noexcept {
+    return m_id;
 }
 
 inline void CompactingChunks::freeze() {
@@ -743,6 +752,88 @@ inline size_t CompactingChunks::tupleSize() const noexcept {
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
 
+/**
+ * Is it permissible to create a new iterator for the given Chunk
+ * list type? We need to ensure that at most one RW iterator can
+ * be created at the same time for a compacting chunk list.
+ */
+template<iterator_view_type, iterator_permission_type,
+    typename container_type, typename = typename container_type::Compact>
+struct IteratorPermissible {
+    void operator()(set<size_t> const&, container_type) const noexcept {
+        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
+    }
+};
+
+/**
+ * Specialization for rw snapshot iterator: check & update map
+ */
+template<typename container_type>
+struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_type::rw,
+    container_type, integral_constant<bool, true>> {
+    void operator()(set<size_t>& exists, container_type cont) const {
+        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
+        auto iter = exists.find(cont.id());
+        if (iter == exists.end()) {            // add entry
+            exists.emplace_hint(iter, cont.id());
+        } else {
+            snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", cont.id());
+            buf[sizeof buf - 1] = 0;
+            throw logic_error(buf);
+        }
+    }
+};
+
+/**
+ * Correctly de-registers a rw snapshot iterator, allowing one to
+ * be created later.
+ */
+template<iterator_view_type, iterator_permission_type,
+    typename container_type, typename = typename container_type::Compact>
+struct IteratorDeregistration {
+    void operator()(set<size_t> const&, container_type) const noexcept {       // No-op for irrelavent types
+        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
+    }
+};
+
+template<typename container_type>
+struct IteratorDeregistration<iterator_view_type::snapshot, iterator_permission_type::rw,
+    container_type, integral_constant<bool, true>> {
+    void operator()(set<size_t>& m, container_type cont) const {
+        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
+        auto iter = m.find(cont.id());
+        if (iter != m.end()) {
+            // TODO: we need to also guard against "double deletion" case;
+            // but eecheck is currently failing mysteriously
+            m.erase(iter);
+        }
+    }
+};
+
+/**
+ * The implementation just forward IteratorPermissible
+ */
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::validate(
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
+    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator;
+    validator(m_inUse, src);
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::remove(
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
+    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg;
+    dereg(m_inUse, src);
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view>
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::Constructible
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::s_constructible;
+
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
@@ -751,14 +842,21 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iter
     m_offset(src.tupleSize()), m_storage(src), m_iter(m_storage.begin()),
     m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())),
     m_deletedSnapshot(f) {
-    // paranoid check
-    static_assert(is_reference<container_type>::value,
+    // paranoid type check
+    static_assert(is_lvalue_reference<container_type>::value,
             "IterableTableTupleChunks::iterator_type::container_type is not a reference");
     static_assert(is_pointer<value_type>::value,
             "IterableTableTupleChunks::value_type is not a pointer");
+    s_constructible.validate(src);
     while (m_cursor != nullptr && ! s_tagger(m_cursor)) {
         advance();         // calibrate to first non-skipped position
     }
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::~iterator_type() {
+    s_constructible.remove(static_cast<container_type>(m_storage));
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -942,17 +1040,6 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::begin(
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::cb_type cb) {
-    typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm> cur(c, cb);
-    const_cast<void*&>(cur.m_cursor) = nullptr;
-    return cur;
-}
-
-template<typename Chunks, typename Tag, typename E>
 template<typename Hook, iterator_permission_type perm>
 inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::container_type c,
@@ -1020,17 +1107,6 @@ IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, per
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>
-IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::history_type h) {
-    IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm> cur(c, h);
-    const_cast<void*&>(cur.m_cursor) = nullptr;
-    return cur;
-}
-
-template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::hooked_iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) :
@@ -1041,73 +1117,6 @@ template<iterator_permission_type perm> inline typename IterableTableTupleChunks
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) {
     return {c};
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm> inline typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>
-IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) {
-    IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm> cur{c};
-    const_cast<void*&>(cur.m_cursor) = nullptr;
-    return cur;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::begin(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>::history_type h) {
-    return {c, h};
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb<Hook>::history_type h) {
-    iterator_cb<Hook> iter(c, h);
-    iter.m_cursor = nullptr;
-    return iter;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::cbegin(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::history_type h) {
-    return {c, h};
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::cend(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::history_type h) {
-    const_iterator_cb<Hook> iter(c, h);
-    iter.m_cursor = nullptr;
-    return iter;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::begin(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::history_type h) {
-    return cbegin(c, h);
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>
-IterableTableTupleChunks<Chunks, Tag, E>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template const_iterator_cb<Hook>::history_type h) {
-    return cend(c, h);
 }
 
 template<unsigned char NthBit, typename E>

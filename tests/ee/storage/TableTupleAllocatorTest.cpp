@@ -715,6 +715,40 @@ void testTxnHook() {
             [&hook](void const* p) {
                 hook.release(p);
             }, hook);
+    // Verify that we cannot create two snapshot iterators at the
+    // same time
+    if (DataAlloc::Compact::value) {
+        using snapshot_rw_iterator =
+            typename IterableTableTupleChunks<DataAlloc, truth>::
+            template iterator_type<iterator_permission_type::rw, iterator_view_type::snapshot>;
+        {                                                      // verifiy on base iterator type
+            snapshot_rw_iterator iter1(alloc);
+            try {
+                snapshot_rw_iterator iter2(alloc);             // expected to throw
+                assert(false);
+            } catch (logic_error const& e) {
+                assert(string(e.what()).substr(0, 52) ==
+                        "Cannot create RW snapshot iterator on chunk list id ");
+            }
+        }
+        {                                                      // verifiy on iterator_cb_type
+            auto iter1 = snapshot_iterator::begin(alloc, hook);
+            try {
+                auto iter2 = snapshot_iterator::begin(alloc, hook);
+                assert(false);
+            } catch (logic_error const& e) {
+                assert(string(e.what()).substr(0, 52) ==
+                        "Cannot create RW snapshot iterator on chunk list id ");
+            }
+        }
+        // But it's okay to create multiple snapshot RO iterators
+        auto iter1 = const_snapshot_iterator::begin(alloc, hook),
+             iter2 = const_snapshot_iterator::begin(alloc, hook);
+        // or RW iterators on different allocators
+        DataAlloc alloc2(TupleSize);
+        auto iter10 = snapshot_iterator::begin(alloc, hook),
+             iter20 = snapshot_iterator::begin(alloc2, hook);
+    }
     hook.thaw();
     alloc.thaw();
 }

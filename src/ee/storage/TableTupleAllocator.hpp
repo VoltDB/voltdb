@@ -16,6 +16,7 @@
  */
 
 #pragma once
+#include <atomic>
 #include <cassert>
 #include <forward_list>
 #include <functional>
@@ -54,7 +55,7 @@ namespace voltdb {
          * batched: it deletes in a batch style when fixed
          *       number of entries had been reverted. Kind-of lazy.
          */
-        enum class gc_policy: char { never, always, batched };
+        enum class gc_policy: char {never, always, batched};
 
         /**
          * More efficient stack than STL (which was backed by
@@ -352,6 +353,10 @@ namespace voltdb {
             template<typename Chunks, typename Tag, typename E> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             using trait = CompactingStorageTrait;
+            static size_t s_id;
+            static size_t gen_id();
+
+            size_t const m_id;                    // ensure injection relation to rw iterator
             size_t const m_tupleSize;
             size_t m_allocs = 0;
             // used to keep track of end of 1st chunk when frozen:
@@ -405,6 +410,7 @@ namespace voltdb {
             // details.
             void* free(void*);
             size_t size() const noexcept;              // used for table count executor
+            size_t id() const noexcept;
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
             using list_type::empty; using list_type::end;
@@ -522,7 +528,7 @@ namespace voltdb {
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            void freeze(); void thaw();         // switch of snapshot process
+            void freeze(); void thaw();                 // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
             /**
@@ -578,7 +584,6 @@ namespace voltdb {
                 typename conditional<perm == iterator_permission_type::ro, void const*, iterator_value_type>::type> {
                 using super = iterator<forward_iterator_tag,
                     typename conditional<perm == iterator_permission_type::ro, void const*, iterator_value_type>::type>;
-
                 ptrdiff_t const m_offset;
                 using list_type = typename conditional<perm == iterator_permission_type::ro,
                       typename add_const<typename Chunks::list_type>::type,
@@ -593,6 +598,12 @@ namespace voltdb {
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
                     Chunks const, Chunks>::type>::type;
+                class Constructible {
+                    set<size_t> m_inUse{};
+                public:
+                    void validate(container_type);
+                    void remove(container_type);
+                } static s_constructible;
                 value_type m_cursor;
                 bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 void advance();
@@ -601,6 +612,7 @@ namespace voltdb {
                 iterator_type(container_type, bool const& = FALSE_VALUE);
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
+                ~iterator_type();
                 static iterator_type begin(container_type);
                 static iterator_type end(container_type);
                 bool operator==(iterator_type const&) const noexcept;
@@ -636,6 +648,11 @@ namespace voltdb {
              * correct any behavior in the iterator. For example,
              * if call back may return NULL, the client must know
              * about it and skip/throw accordingly.
+             *
+             * NOTE also: we deliberately do not encourage using
+             * end(), since multiple RW iterators on snapshot
+             * view would conflict with each other and does not
+             * make sense.
              */
             template<iterator_permission_type perm>
             class iterator_cb_type : public iterator_type<perm, iterator_view_type::snapshot> {
@@ -651,7 +668,6 @@ namespace voltdb {
                 value_type operator*() noexcept;
                 iterator_cb_type(container_type, cb_type, bool const& = FALSE_VALUE);
                 static iterator_cb_type begin(container_type, cb_type);
-                static iterator_cb_type end(container_type, cb_type);
             };
 
             template<typename Hook, iterator_permission_type perm>
@@ -666,7 +682,6 @@ namespace voltdb {
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 static time_traveling_iterator_type begin(container_type, history_type);
-                static time_traveling_iterator_type end(container_type, history_type);
                 value_type operator*() noexcept;
                 bool drained() const noexcept;
                 time_traveling_iterator_type& operator++();           // Need to redefine/shadow, since the polymorphism is meant to be used statically
@@ -678,19 +693,6 @@ namespace voltdb {
             using iterator_cb = time_traveling_iterator_type<Hook, iterator_permission_type::rw>;
             template<typename Hook>
             using const_iterator_cb = time_traveling_iterator_type<Hook, iterator_permission_type::ro>;
-
-            template<typename Hook> iterator_cb<Hook> static
-                begin(typename iterator_cb<Hook>::container_type, typename iterator_cb<Hook>::history_type);
-            template<typename Hook> iterator_cb<Hook> static
-                end(typename iterator_cb<Hook>::container_type, typename iterator_cb<Hook>::history_type);
-            template<typename Hook> const_iterator_cb<Hook> static
-                cbegin(typename const_iterator_cb<Hook>::container_type, typename const_iterator_cb<Hook>::history_type);
-            template<typename Hook> const_iterator_cb<Hook> static
-                cend(typename const_iterator_cb<Hook>::container_type, typename const_iterator_cb<Hook>::history_type);
-            template<typename Hook> const_iterator_cb<Hook> static
-                begin(typename const_iterator_cb<Hook>::container_type, typename const_iterator_cb<Hook>::history_type);
-            template<typename Hook> const_iterator_cb<Hook> static
-                end(typename const_iterator_cb<Hook>::container_type, typename const_iterator_cb<Hook>::history_type);
 
             /**
              * This is the snapshot iterator for the client. The
@@ -709,7 +711,6 @@ namespace voltdb {
                 using value_type = typename super::value_type;
                 hooked_iterator_type(typename super::container_type);
                 static hooked_iterator_type begin(container_type);
-                static hooked_iterator_type end(container_type);
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;
