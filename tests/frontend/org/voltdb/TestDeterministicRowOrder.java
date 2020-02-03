@@ -95,7 +95,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   // @Test
     public void testBatchDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -143,12 +143,12 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                 client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
             }
             System.out.print("deleting from partitioned table KV...");
-            ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV;");
+            ClientResponse resp = client.callProcedure("@AdHoc", "truncate table KV;");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from KV order by key").getResults()[0];
             assert(vt.asScalarLong() == 0);
             System.out.print("deleting from replicated table FOO...");
-            resp = client.callProcedure("@AdHoc", "delete from FOO");
+            resp = client.callProcedure("@AdHoc", "truncate table FOO");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             vt = client.callProcedure("@AdHoc", "select count(*) from FOO order by key").getResults()[0];
             assert(vt.asScalarLong() == 0);
@@ -159,7 +159,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+    //@Test
     public void testSnapshotSaveAndRestore() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
