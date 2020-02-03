@@ -280,9 +280,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         @Override
         public void skipPast(long id) throws IOException {
-            moveToValidSegment();
-            while (id >= m_segment.getEndId() && skipToNextSegment(false)) {
-
+            synchronized(PersistentBinaryDeque.this) {
+                moveToValidSegment();
+                while (id >= m_segment.getEndId() && skipToNextSegment(false));
             }
         }
 
@@ -296,25 +296,21 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             if (segmentReader == null) {
                 segmentReader = m_segment.openForRead(m_cursorId);
             }
+
             m_numRead += m_segment.getNumEntries() - segmentReader.readIndex();
             segmentReader.markAllReadAndDiscarded();
 
             Map.Entry<Long, PBDSegment<M>> entry = m_segments.higherEntry(m_segment.segmentIndex());
             if (entry == null) { // on the last segment
                 // We are marking this one as read. So OK to delete segments before this
-                if (canDeleteSegmentsBefore(m_segment, 1)) {
-                    deleteSegmentsBefore(m_segment);
-                }
+                callDeleteSegmentsBefore(m_segment, 1);
                 return false;
             }
 
             PBDSegment<M> oldSegment = m_segment;
             m_segment = entry.getValue();
             PBDSegment<M> segmentToDeleteBefore = deleteCurrent ? m_segment : oldSegment;
-            if (canDeleteSegmentsBefore(segmentToDeleteBefore, 1)) {
-                deleteSegmentsBefore(segmentToDeleteBefore);
-            }
-
+            callDeleteSegmentsBefore(segmentToDeleteBefore, 1);
             return true;
         }
 
@@ -497,9 +493,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 return;
             }
 
-            if (canDeleteSegmentsBefore(segment, entryNumber)) {
-                deleteSegmentsBefore(segment);
-            }
+            callDeleteSegmentsBefore(segment, entryNumber);
         }
 
         private void deleteMarkedSegments() {
@@ -526,14 +520,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private boolean canDeleteSegmentsBefore(PBDSegment<M> segment, int entryNumber) {
+        private void callDeleteSegmentsBefore(PBDSegment<M> segment, int entryNumber) {
             // If this is the first entry of a segment, see if previous segments can be deleted or marked ready to
             // delete
             if (m_cursorClosed || m_segments.size() == 1 || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
                     || !PersistentBinaryDeque.this.canDeleteSegmentsBefore(segment)) {
-                return false;
+                return;
             }
-            return true;
+            m_deferredDeleter.execute(() -> deleteSegmentsBefore(segment));
         }
 
         private void deleteSegmentsBefore(PBDSegment<M> segment) {

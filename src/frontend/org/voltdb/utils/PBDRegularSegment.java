@@ -913,11 +913,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void markAllReadAndDiscarded() {
-            // This doesn't set the readOffset and bytesRead nor does it move the file pointer,
-            // but just updates the read and discarded count
+        public void markAllReadAndDiscarded() throws IOException {
+            //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
             m_objectReadIndex = m_numOfEntries;
             m_discardCount = m_numOfEntries;
+            m_readOffset = m_fc.size();
         }
 
         @Override
