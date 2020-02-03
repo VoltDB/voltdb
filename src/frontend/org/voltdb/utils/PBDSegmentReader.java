@@ -109,5 +109,5 @@ interface PBDSegmentReader<M> {
      */
     public boolean isClosed();
 
-    public void markAllReadAndDiscarded();
+    public void markAllReadAndDiscarded() throws IOException;
 }
