@@ -453,7 +453,7 @@ namespace voltdb {
             bool m_recording = false;       // in snapshot process?
             bool m_hasDeletes = false;      // observer for iterator::advance()
             Alloc m_storage;
-            void* m_last = nullptr;   // last allocation by copy(void const*);
+            void* m_last = nullptr;         // last allocation by copy(void const*);
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -499,16 +499,16 @@ namespace voltdb {
         /**
          * Client API that manipulates in high level.
          */
-        template<typename Chunks, typename Hook,       // product type
-            typename = typename enable_if<is_chunks<Chunks>::value && Hook::is_hook::value>::type>
-        class HookedCompactingChunks : public Chunks, public Hook {
-            using Chunks::allocate; using Chunks::free;            // hide details
+        template<typename Hook, typename = typename enable_if<Hook::is_hook::value>::type>
+        class HookedCompactingChunks : public CompactingChunks, public Hook {
+            using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using Hook::add; using Hook::copy;
+            // the end of allocations when snapshot started: (block id, end ptr)
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            void freeze(); void thaw();       // switch of snapshot process
+            void freeze(); void thaw();         // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
             /**

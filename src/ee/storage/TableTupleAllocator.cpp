@@ -1259,46 +1259,45 @@ inline void TxnPreHook<Alloc, Trait, C, E>::release(void const* src) {
     Trait::remove(src);
 }
 
-template<typename Chunks, typename Hook, typename E> inline
-HookedCompactingChunks<Chunks, Hook, E>::HookedCompactingChunks(size_t s) noexcept : Chunks(s), Hook(s) {}
+template<typename Hook, typename E> inline
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
 
-template<typename Chunks, typename Hook, typename E> inline void
-HookedCompactingChunks<Chunks, Hook, E>::freeze() {
+template<typename Hook, typename E> inline void
+HookedCompactingChunks<Hook, E>::freeze() {
     Hook::freeze();
-    Chunks::freeze();
+    CompactingChunks::freeze();
 }
 
-template<typename Chunks, typename Hook, typename E> inline void
-HookedCompactingChunks<Chunks, Hook, E>::thaw() {
+template<typename Hook, typename E> inline void
+HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
-    Chunks::thaw();
+    CompactingChunks::thaw();
 }
 
-template<typename Chunks, typename Hook, typename E> inline void const*
-HookedCompactingChunks<Chunks, Hook, E>::insert(void const* src) {
-    void const* r = memcpy(Chunks::allocate(), src, Chunks::tupleSize());
+template<typename Hook, typename E> inline void const*
+HookedCompactingChunks<Hook, E>::insert(void const* src) {
+    void const* r = memcpy(CompactingChunks::allocate(), src, CompactingChunks::tupleSize());
     Hook::add(Hook::ChangeType::Insertion, nullptr, r);
     return r;
 }
 
-template<typename Chunks, typename Hook, typename E> inline void
-HookedCompactingChunks<Chunks, Hook, E>::update(void* dst, void const* src) {
+template<typename Hook, typename E> inline void
+HookedCompactingChunks<Hook, E>::update(void* dst, void const* src) {
     Hook::add(Hook::ChangeType::Update, src, dst);
-    memcpy(dst, src, Chunks::tupleSize());
+    memcpy(dst, src, CompactingChunks::tupleSize());
 }
 
-template<typename Chunks, typename Hook, typename E> inline void const*
-HookedCompactingChunks<Chunks, Hook, E>::remove(void* dst) {
+template<typename Hook, typename E> inline void const*
+HookedCompactingChunks<Hook, E>::remove(void* dst) {
     Hook::copy(dst);
-    void const* src = Chunks::free(dst);
+    void const* src = CompactingChunks::free(dst);
     Hook::add(Hook::ChangeType::Deletion, dst, nullptr);
     return src;
 }
 
-template<typename Chunks, typename Hook, typename E> inline void
-HookedCompactingChunks<Chunks, Hook, E>::remove(
+template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove(
         set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
-    using Remover = typename Chunks::DelayedRemover;
+    using Remover = typename CompactingChunks::DelayedRemover;
     auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
             [](Remover& batch, void* p) {
                 batch.add(p);
@@ -1319,20 +1318,17 @@ HookedCompactingChunks<Chunks, Hook, E>::remove(
     batch.force();
 }
 
-template<typename Chunks, typename Hook, typename E> inline size_t
-HookedCompactingChunks<Chunks, Hook, E>::remove_add(void* p) {
-    return Chunks::m_batched.add(p);
+template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_add(void* p) {
+    return CompactingChunks::m_batched.add(p);
 }
 
-template<typename Chunks, typename Hook, typename E> inline map<void*, void*> const&
-HookedCompactingChunks<Chunks, Hook, E>::remove_moves() {
-    return Chunks::m_batched.prepare(true).movements();
+template<typename Hook, typename E> inline map<void*, void*> const& HookedCompactingChunks<Hook, E>::remove_moves() {
+    return CompactingChunks::m_batched.prepare(true).movements();
 }
 
-template<typename Chunks, typename Hook, typename E> inline size_t
-HookedCompactingChunks<Chunks, Hook, E>::remove_force() {
+template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force() {
     // hook registration
-    for_each(Chunks::m_batched.removed().cbegin(), Chunks::m_batched.removed().cend(),
+    for_each(CompactingChunks::m_batched.removed().cbegin(), CompactingChunks::m_batched.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
                 Hook::add(Hook::ChangeType::Deletion, s, nullptr);
@@ -1342,13 +1338,13 @@ HookedCompactingChunks<Chunks, Hook, E>::remove_force() {
                 Hook::copy(entry.first);
                 Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
             });
-    return Chunks::m_batched.prepare(true).force();
+    return CompactingChunks::m_batched.prepare(true).force();
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #
 namespace __codegen__ {    // clumsy hack around macro arg arity check
 template<typename Alloc, gc_policy gc>
-using mt = HookedCompactingChunks<CompactingChunks, TxnPreHook<NonCompactingChunks<Alloc>, HistoryRetainTrait<gc>>>;
+using mt = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Alloc>, HistoryRetainTrait<gc>>>;
 
 using t1 = mt<EagerNonCompactingChunk, gc_policy::never>;
 using t2 = mt<EagerNonCompactingChunk, gc_policy::always>;
@@ -1381,8 +1377,7 @@ template class voltdb::storage::NonCompactingChunks<EagerNonCompactingChunk>;
 template class voltdb::storage::NonCompactingChunks<LazyNonCompactingChunk>;
 // HookedCompactingChunks : 2 x 2 x 3 = 12 instantiations
 #define HookedChunksCodegen2(alloc, gc)                                     \
-    template class voltdb::storage::HookedCompactingChunks<                 \
-        CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>
+    template class voltdb::storage::HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>>
 #define HookedChunksCodegen1(alloc)                                         \
     HookedChunksCodegen2(alloc, gc_policy::never);                          \
     HookedChunksCodegen2(alloc, gc_policy::always);                         \
@@ -1467,10 +1462,10 @@ TTIteratorCodegen(__codegen__::t6);
 // hooked_iterator_type : 8 x 2 x 3 = 48 instantiations
 #define HookedIteratorCodegen3(tag, alloc, gc)                                           \
 template class voltdb::storage::IterableTableTupleChunks<                                \
-    HookedCompactingChunks<CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
+    HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
     tag>::template hooked_iterator_type<iterator_permission_type::rw>;                   \
 template class voltdb::storage::IterableTableTupleChunks<                                \
-    HookedCompactingChunks<CompactingChunks, TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
+    HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
     tag>::template hooked_iterator_type<iterator_permission_type::ro>
 #define HookedIteratorCodegen2(tag, alloc)                                               \
     HookedIteratorCodegen3(tag, alloc, gc_policy::never);                                \

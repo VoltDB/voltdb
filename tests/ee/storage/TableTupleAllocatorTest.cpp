@@ -749,7 +749,7 @@ TEST_F(TableTupleAllocatorTest, TestTxnHook) {
 template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunks() {
     using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -904,7 +904,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -938,7 +938,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -982,7 +982,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk * 3>;
     Gen gen;
@@ -1029,7 +1029,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1123,7 +1123,7 @@ TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
  */
 template<typename Chunk, gc_policy pol>
 void testInterleavedCompactingChunks() {
-    using Alloc = HookedCompactingChunks<CompactingChunks, TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1250,8 +1250,7 @@ TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
 
 template<typename Chunk, gc_policy pol>
 void testSingleChunkSnapshot() {
-    using Alloc = HookedCompactingChunks<CompactingChunks,
-          TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     static constexpr auto Number = AllocsPerChunk - 3;
     using addresses_type = array<void const*, Number>;
