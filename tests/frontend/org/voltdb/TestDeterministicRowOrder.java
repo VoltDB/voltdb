@@ -100,7 +100,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
         try {
-            for (int i = 0; i <= 100; i++) {
+            for (int i = 0; i < 100; i++) {
                 client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
                 client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
             }
