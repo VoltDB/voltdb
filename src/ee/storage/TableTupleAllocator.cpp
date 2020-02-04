@@ -483,7 +483,7 @@ inline void CompactingChunks::thaw() {
     trait::thaw();
 }
 
-inline size_t CompactingChunks::size() const noexcept {
+size_t CompactingChunks::size() const noexcept {
     return m_allocs;
 }
 
