@@ -24,11 +24,11 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
     static final String SCHEMA =
             "CREATE TABLE kv (" +
                     "key bigint not null, " +
-                    "nondetval bigint not null " +  // non-deterministic value (host ID)
+                    "val bigint not null " +  // non-deterministic value (host ID)
                     "); " +
                     "PARTITION TABLE kv ON COLUMN key;" +
-                    "CREATE INDEX idx_kv ON kv(nondetval);" +
-                    "CREATE TABLE foo(key bigint not null, nondetval bigint not null);";
+                    "CREATE INDEX idx_kv ON kv(val);" +
+                    "CREATE TABLE foo(key bigint not null, val bigint not null);";
 
     Client client;
     final int sitesPerHost = 2;
@@ -108,7 +108,6 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV where key < 50");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
-            System.out.println(vt.toFormattedString());
             int count = 0;
             while(vt.advanceRow()) {
                 assert(vt.getLong(0) >= 50);
@@ -119,13 +118,75 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             resp = client.callProcedure("@AdHoc", "delete from FOO where key < 50");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             vt = client.callProcedure("@AdHoc", "select * from FOO order by key").getResults()[0];
-            System.out.println(vt.toFormattedString());
             count = 0;
             while(vt.advanceRow()) {
                 assert(vt.getLong(0) >= 50);
                 count++;
             }
             assert(count == 50);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
+        }
+    }
+
+    @Test
+    public void testUpdate() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            for (int i = 0; i <= 100; i++) {
+                client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
+                client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
+            }
+            System.out.println("updating table KV...1");
+            ClientResponse resp = client.callProcedure("@AdHoc", "update KV set val = 100 where key < 50;");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
+            while(vt.advanceRow()) {
+                if (vt.getLong(0) < 50) {
+                    assert(vt.getLong(1) == 100);
+                } else {
+                    assert(vt.getLong(1) >= 50);
+                }
+            }
+
+            System.out.println("updating table KV...2");
+            resp = client.callProcedure("@AdHoc", "update KV set val = 200 where key < 60;");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
+            while(vt.advanceRow()) {
+                if (vt.getLong(0) < 60) {
+                    assert(vt.getLong(1) == 200);
+                } else {
+                    assert(vt.getLong(1) >= 60);
+                }
+            }
+
+            System.out.println("update table FOO...1");
+            resp = client.callProcedure("@AdHoc", "update FOO set val = 100 where key < 50;");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            vt = client.callProcedure("@AdHoc", "select * from FOO order by key").getResults()[0];
+            while(vt.advanceRow()) {
+                if (vt.getLong(0) < 50) {
+                    assert(vt.getLong(1) == 100);
+                } else {
+                    assert(vt.getLong(1) >= 50);
+                }
+            }
+
+            System.out.println("updating table FOO...2");
+            resp = client.callProcedure("@AdHoc", "update FOO set val = 200 where key < 60;");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            vt = client.callProcedure("@AdHoc", "select * from FOO order by key").getResults()[0];
+            while(vt.advanceRow()) {
+                if (vt.getLong(0) < 60) {
+                    assert(vt.getLong(1) == 200);
+                } else {
+                    assert(vt.getLong(1) >= 60);
+                }
+            }
         } catch (Exception e) {
             fail(e.getMessage());
         } finally {

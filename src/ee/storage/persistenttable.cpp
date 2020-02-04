@@ -1038,9 +1038,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     std::vector<char*> newObjects;
 
     // this is the actual write of the new values
+    allocator().update(targetTupleToUpdate.address(), sourceTupleWithNewValues.address());
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
-    //TO DO: update() should update the values and generate diff instead of calling copyForPersistentUpdate
-    allocator().update(&targetTupleToUpdate, &sourceTupleWithNewValues);
+
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
