@@ -2492,9 +2492,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (VoltZK.zkNodeExists(m_zk, VoltZK.rejoinInProgress)) {
                     RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
                     Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
+                    liveHids.remove(voltDB.getHostMessenger().getHostId());
                     m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(Collections.max(liveHids), HostMessenger.CLIENT_INTERFACE_SITE_ID), new HashMismatchMessage());
                 }
-                return false;
             }
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@StopReplicas";
@@ -2506,10 +2506,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
             }
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Invoke @StopReplicas");
-            }
-            tmLog.warn("Invoke @StopReplicas--->decommissionReplicas");
+            tmLog.info("Cluster starts to transfer to master only state.");
             synchronized (m_executeTaskAdpater) {
                 if (createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
