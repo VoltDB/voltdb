@@ -311,61 +311,65 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         private void deleteMarkedSegments() {
-            // With deferred deleters, this may be executed later, so check closed status again
-            if (m_cursorClosed) {
-                return;
-            }
+            synchronized(PersistentBinaryDeque.this) {
+                // With deferred deleters, this may be executed later, so check closed status again
+                if (m_cursorClosed) {
+                    return;
+                }
 
-            Iterator<PBDSegment<M>> itr = m_segments.values().iterator();
-            while (itr.hasNext()) {
-                PBDSegment<M> toDelete = itr.next();
-                try {
-                    if (toDelete.m_deleteOnAck == true && canDeleteSegment(toDelete)) {
-                        itr.remove();
-                        closeAndDeleteSegment(toDelete);
-                    } else {
-                        break;
+                Iterator<PBDSegment<M>> itr = m_segments.values().iterator();
+                while (itr.hasNext()) {
+                    PBDSegment<M> toDelete = itr.next();
+                    try {
+                        if (toDelete.m_deleteOnAck == true && canDeleteSegment(toDelete)) {
+                            itr.remove();
+                            closeAndDeleteSegment(toDelete);
+                        } else {
+                            break;
+                        }
+                    } catch(IOException e) {
+                        m_usageSpecificLog.error("Unexpected error deleting segment after all have been read and acked", e);
                     }
-                } catch(IOException e) {
-                    m_usageSpecificLog.error("Unexpected error deleting segment after all have been read and acked", e);
                 }
             }
         }
 
         private void deleteSegmentsBefore(PBDSegment<M> segment) {
-            // With deferred deleters, this may be executed later, so check closed status again
-            if (m_cursorClosed) {
-                return;
-            }
-
-            if (m_rewoundFromId == segment.m_id) {
-                m_rewoundFromId = -1;
-            }
-
-            try {
-                Iterator<PBDSegment<M>> iter = m_segments.headMap(segment.segmentIndex(), false).values()
-                        .iterator();
-                boolean markForDel = false;
-                while (iter.hasNext()) {
-                    // Only delete a segment if all buffers have been acked.
-                    // If not, mark this and all following segments for deletion.
-                    PBDSegment<M> earlierSegment = iter.next();
-                    if (markForDel) {
-                        earlierSegment.m_deleteOnAck = true;
-                    } else if (canDeleteSegment(earlierSegment)) {
-                        iter.remove();
-                        if (m_usageSpecificLog.isDebugEnabled()) {
-                            m_usageSpecificLog.debug("Segment " + earlierSegment.file()
-                            + " has been closed and deleted after discarding last buffer");
-                        }
-                        closeAndDeleteSegment(earlierSegment);
-                    } else {
-                        earlierSegment.m_deleteOnAck = true;
-                        markForDel = true;
-                    }
+            synchronized(PersistentBinaryDeque.this) {
+                // With deferred deleters, this may be executed later, so check closed status again
+                if (m_cursorClosed) {
+                    return;
                 }
-            } catch (IOException e) {
-                m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
+
+                if (m_rewoundFromId == segment.m_id) {
+                    m_rewoundFromId = -1;
+                }
+
+                try {
+                    Iterator<PBDSegment<M>> iter = m_segments.headMap(segment.segmentIndex(), false).values()
+                            .iterator();
+                    boolean markForDel = false;
+                    while (iter.hasNext()) {
+                        // Only delete a segment if all buffers have been acked.
+                        // If not, mark this and all following segments for deletion.
+                        PBDSegment<M> earlierSegment = iter.next();
+                        if (markForDel) {
+                            earlierSegment.m_deleteOnAck = true;
+                        } else if (canDeleteSegment(earlierSegment)) {
+                            iter.remove();
+                            if (m_usageSpecificLog.isDebugEnabled()) {
+                                m_usageSpecificLog.debug("Segment " + earlierSegment.file()
+                                + " has been closed and deleted after discarding last buffer");
+                            }
+                            closeAndDeleteSegment(earlierSegment);
+                        } else {
+                            earlierSegment.m_deleteOnAck = true;
+                            markForDel = true;
+                        }
+                    }
+                } catch (IOException e) {
+                    m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
+                }
             }
         }
 
