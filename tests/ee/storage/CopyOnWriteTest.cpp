@@ -34,7 +34,6 @@
 #include "expressions/expressions.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-#include "storage/CopyOnWriteIterator.h"
 #include "storage/DRTupleStream.h"
 #include "storage/ElasticContext.h"
 #include "storage/ElasticScanner.h"

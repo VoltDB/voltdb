@@ -56,7 +56,6 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
-#include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
 #include "storage/table.h"
 #include "storage/ExportTupleStream.h"

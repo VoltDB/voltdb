@@ -252,7 +252,6 @@ SET (VOLTDB_SRC
   storage/BinaryLogSinkWrapper.cpp
   storage/ConstraintFailureException.cpp
   storage/CopyOnWriteContext.cpp
-  storage/CopyOnWriteIterator.cpp
   storage/DRTableNotFoundException.cpp
   storage/DRTupleStream.cpp
   storage/ElasticContext.cpp
