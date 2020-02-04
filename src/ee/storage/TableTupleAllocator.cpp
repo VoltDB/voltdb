@@ -860,6 +860,21 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::~iterator_t
 }
 
 template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::storage() const noexcept {
+    static_assert(is_lvalue_reference<container_type>::value, "container_type must be reference type");
+    return reinterpret_cast<container_type>(m_storage);
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::list_iterator_type const&
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::list_iterator() const noexcept {
+    return m_iter;
+}
+
+template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::begin(
@@ -1119,6 +1134,17 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
     return {c};
 }
 
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
+    auto const& boundary = reinterpret_cast<container_type const&>(super::storage()).boundary();
+    return super::drained() || (
+            super::m_extendingPtr == nullptr &&    // not in spliced chunks;
+            ! boundary.empty() &&                  // snapshot in progress,
+            (super::m_cursor == boundary.lastAlloc() ||                                // pointer match; or
+             less_rolling(boundary.lastChunkId(), super::list_iterator()->id())));     // chunk id > last seen
+}
+
 template<unsigned char NthBit, typename E>
 inline bool NthBitChecker<NthBit, E>::operator()(void* p) const noexcept {
     return *reinterpret_cast<unsigned char*>(p) & MASK;
@@ -1174,6 +1200,7 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 }
 
 inline AllocBoundary::AllocBoundary(ChunkHolder const& c) noexcept : m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
+
 inline size_t AllocBoundary::lastChunkId() const noexcept {
     return m_lastChunkId;
 }

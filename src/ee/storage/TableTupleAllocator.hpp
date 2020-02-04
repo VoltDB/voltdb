@@ -313,6 +313,15 @@ namespace voltdb {
             function<void const*()> operator()() noexcept;
             function<void const*()> operator()() const noexcept;
         };
+
+        /**
+         * Comparison (less<Number>) of rolling unsigned numbers.
+         */
+        template<typename T,
+            typename = typename enable_if<is_integral<T>::value && ! is_signed<T>::value>::type>
+        inline constexpr bool less_rolling(T const& l, T const& r) noexcept {
+            return static_cast<typename make_signed<T>::type>(l - r) < 0;
+        }
     }
 }
 
@@ -325,18 +334,13 @@ namespace std {
     template<> struct less<typename ChunkList<CompactingChunk>::iterator> {
         using value_type = typename ChunkList<CompactingChunk>::iterator;
         inline bool operator()(value_type const& lhs, value_type const& rhs) const noexcept {
-            // Rolling integer comparison, assuming that neither
-            // is end().
-            using id_type = decltype(lhs->id());
-            static_assert(! is_signed<id_type>::value, "Chunk::id() must be unsigned");
-            return static_cast<typename make_signed<id_type>::type>(lhs->id() - rhs->id()) < 0;
+            // Rolling number comparison, assuming that neither is end().
+            return less_rolling(lhs->id(), rhs->id());
         }
     };
     template<> struct less<ChunkHolder> {
         inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
-            using id_type = decltype(lhs.id());
-            static_assert(! is_signed<id_type>::value, "Chunk::id() must be unsigned");
-            return static_cast<typename make_signed<id_type>::type>(lhs.id() - rhs.id()) < 0;
+            return less_rolling(lhs.id(), rhs.id());
         }
     };
 }
@@ -608,9 +612,9 @@ namespace voltdb {
                       typename add_const<typename Chunks::list_type>::type,
                       typename Chunks::list_type>::type;
                 list_type& m_storage;
-                typename conditional<perm == iterator_permission_type::ro,
-                         typename Chunks::list_type::const_iterator,
-                         typename Chunks::list_type::iterator>::type m_iter;
+                using list_iterator_type = typename conditional<perm == iterator_permission_type::ro,
+                      typename Chunks::list_type::const_iterator, typename Chunks::list_type::iterator>::type;
+                list_iterator_type m_iter;
             protected:
                 using value_type = typename super::value_type;
                 // ctor arg type
@@ -626,6 +630,8 @@ namespace voltdb {
                 value_type m_cursor;
                 bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 void advance();
+                container_type storage() const noexcept;
+                list_iterator_type const& list_iterator() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
                 iterator_type(container_type, bool const& = FALSE_VALUE);
@@ -667,11 +673,6 @@ namespace voltdb {
              * correct any behavior in the iterator. For example,
              * if call back may return NULL, the client must know
              * about it and skip/throw accordingly.
-             *
-             * NOTE also: we deliberately do not encourage using
-             * end(), since multiple RW iterators on snapshot
-             * view would conflict with each other and does not
-             * make sense.
              */
             template<iterator_permission_type perm>
             class iterator_cb_type : public iterator_type<perm, iterator_view_type::snapshot> {
@@ -695,7 +696,6 @@ namespace voltdb {
                 using history_type = typename add_lvalue_reference<typename conditional<
                     perm == iterator_permission_type::ro, Hook const, Hook>::type>::type;
                 function<void const*()> const m_extendingCb;
-                void const* m_extendingPtr;
                 void advance();
             public:
                 using container_type = typename super::container_type;
@@ -706,6 +706,7 @@ namespace voltdb {
                 time_traveling_iterator_type& operator++();           // Need to redefine/shadow, since the polymorphism is meant to be used statically
                 time_traveling_iterator_type operator++(int);
             protected:
+                void const* m_extendingPtr;
                 time_traveling_iterator_type(container_type, history_type);
             };
             template<typename Hook>
@@ -721,6 +722,13 @@ namespace voltdb {
              * different combinations in the same gist of
              * HookedCompactingChunks, and instantiate it to
              * hooked_iterator_type.
+             *
+             * An optimization on the snapshot boundary obtained
+             * from HookedCompactingChunks ensures that
+             * dereferencing this iterator type **will never**
+             * get NULL, unlike above iterators on snapshots. See
+             * TableTupleAllocationTest::testHookedCompactingChunks()
+             * for where this is checked.
              */
             template<iterator_permission_type perm>
             class hooked_iterator_type : public time_traveling_iterator_type<typename Chunks::hook_type, perm> {
@@ -730,6 +738,7 @@ namespace voltdb {
                 using value_type = typename super::value_type;
                 hooked_iterator_type(typename super::container_type);
                 static hooked_iterator_type begin(container_type);
+                bool drained() const noexcept;
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;

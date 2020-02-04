@@ -117,6 +117,21 @@ public:
     }
 };
 
+TEST_F(TableTupleAllocatorTest, RollingNumberComparison) {
+#define RollingNumberComparisons(type)                                            \
+    ASSERT_TRUE(less_rolling(numeric_limits<type>::max(),                         \
+                static_cast<type>(numeric_limits<type>::max() + 1)));             \
+    ASSERT_FALSE(less_rolling(static_cast<type>(numeric_limits<type>::max() + 1), \
+                numeric_limits<type>::max()))
+    RollingNumberComparisons(unsigned char);
+    RollingNumberComparisons(unsigned short);
+    RollingNumberComparisons(unsigned);
+    RollingNumberComparisons(unsigned long);
+    RollingNumberComparisons(unsigned long long);
+    RollingNumberComparisons(size_t);
+#undef RollingNumberComparisons
+}
+
 TEST_F(TableTupleAllocatorTest, HelloWorld) {
     // Test on StringGen test util
     /*
@@ -802,7 +817,7 @@ void testHookedCompactingChunks() {
         using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
         size_t i = 0;
         fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
-            assert(p == nullptr || Gen::same(p, i++));
+            assert(Gen::same(p, i++));
         });
         assert(i == NumTuples);
     };
@@ -920,10 +935,8 @@ void testHookedCompactingChunks() {
     // simulates actual snapshot process: memory clean up as we go
     i = 0;
     for_each<snapshot_iterator>(alloc, [&alloc, &i](void const* p) {
-                if (p != nullptr) {
-                    assert(Gen::same(p, i++));
-                    alloc.release(p);                          // snapshot of the tuple finished
-                }
+                assert(Gen::same(p, i++));
+                alloc.release(p);                          // snapshot of the tuple finished
             });
     assert(i == NumTuples);
     alloc.thaw();
