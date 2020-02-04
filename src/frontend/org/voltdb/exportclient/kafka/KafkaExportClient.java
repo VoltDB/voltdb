@@ -30,8 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -56,12 +54,15 @@ import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
+import org.voltdb.serdes.EncodeFormat;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltdb.exportclient.decode.RowDecoder;
+
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
 
 public class KafkaExportClient extends ExportClientBase {
 
@@ -89,8 +90,6 @@ public class KafkaExportClient extends ExportClientBase {
     public final static String DEFAULT_EXPORT_PREFIX = "voltdbexport";
 
     private static final ExportClientLogger LOG = new ExportClientLogger();
-
-    enum EncodeFormat {CSV, AVRO}
 
     private EncodeFormat m_encodeFormat = EncodeFormat.CSV;
 
