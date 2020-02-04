@@ -460,6 +460,17 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testNLNotDistinct() {
+      m_tester.sql("SELECT P1.I FROM P1 INNER JOIN P2 ON P1.I IS NOT DISTINCT FROM P2.I")
+      .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                  "  VoltLogicalJoin(condition=[CASE(IS NULL($0), IS NULL($1), IS NULL($1), IS NULL($0), =($0, $1))], joinType=[inner])\n" +
+                  "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                  "      VoltLogicalTableScan(table=[[public, P1]])\n" +
+                  "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                  "      VoltLogicalTableScan(table=[[public, P2]])\n")
+      .pass();
+  }
+
     public void testMultiWayJoinWithFilter() {
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +

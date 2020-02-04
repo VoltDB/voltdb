@@ -243,4 +243,16 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                     "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
         .pass();
     }
+
+    public void testPartitionedJoinWithNotDistinct() {
+        m_tester.sql("SELECT P1.I FROM P1 INNER JOIN P2 ON P1.I IS NOT DISTINCT FROM P2.I")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "  VoltPhysicalNestLoopJoin(condition=[CASE(IS NULL($0), IS NULL($1), IS NULL($1), IS NULL($0), =($0, $1))], joinType=[inner])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                    "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltPhysicalTableSequentialScan(table=[[public, P2]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+        .pass();
+    }
+
 }

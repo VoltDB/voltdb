@@ -173,7 +173,43 @@ final class RelDistributionUtils {
     }
 
     /**
-     * For the condition of form "T1.c1 = T2.c2", the c1/c2 indexes are based on the joined table with columns coming
+     * Given a pair of RexInputRef returns a pair corresponding column indexes (inner, outer)
+     * @param leftConj
+     * @param rightConj
+     * @return
+     */
+    private static Optional<Pair<Integer, Integer>> pairInputRefToIndePair(RexNode leftConj, RexNode rightConj) {
+        if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
+            return Optional.empty();
+        } else {
+            final int col1 = ((RexInputRef) leftConj).getIndex(),
+                    col2 = ((RexInputRef) rightConj).getIndex();
+            if (col1 < col2) {
+                return Optional.of(Pair.of(col1, col2));
+            } else {
+                return Optional.of(Pair.of(col2, col1));
+            }
+        }
+    }
+
+    /**
+     * Given a pair of IS NULL expressions returns a pair corresponding column indexes (inner, outer)
+     * @param leftConj
+     * @param rightConj
+     * @return
+     */
+    private static Optional<Pair<Integer, Integer>> pairIsNullToIndePair(RexNode leftConj, RexNode rightConj) {
+        if (!(leftConj.isA(SqlKind.IS_NULL)) || !(rightConj.isA(SqlKind.IS_NULL))) {
+            return Optional.empty();
+        } else {
+            return pairInputRefToIndePair(((RexCall) leftConj).getOperands().get(0),
+                    ((RexCall) rightConj).getOperands().get(0));
+        }
+    }
+
+    /**
+     * For the condition of form "T1.c1 = T2.c2" or "T1.c1 IS NOTDISTINCT FROM T2.c2",
+     * the c1/c2 indexes are based on the joined table with columns coming
      * from both tables. Return [c1, c2] such that c1 < c2 (i.e. if they come from different table, then c1 comes from
      * outer table and c2 from inner table).
      * For other forms of join condition, return null.
@@ -181,22 +217,30 @@ final class RelDistributionUtils {
      * @return ordered indexes of column references.
      */
     private static Optional<Pair<Integer, Integer>> getJoiningColumns(RexCall joinCondition) {
-        if (! joinCondition.isA(SqlKind.EQUALS)) {
-            return Optional.empty();
-        } else {
+        if (joinCondition.isA(SqlKind.EQUALS)) {
             final RexNode leftConj = uncast(joinCondition.getOperands().get(0)),
                     rightConj = uncast(joinCondition.getOperands().get(1));
-            if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
-                return Optional.empty();
-            } else {
-                final int col1 = ((RexInputRef) leftConj).getIndex(),
-                        col2 = ((RexInputRef) rightConj).getIndex();
-                if (col1 < col2) {
-                    return Optional.of(Pair.of(col1, col2));
-                } else {
-                    return Optional.of(Pair.of(col2, col1));
+            return pairInputRefToIndePair(leftConj, rightConj);
+        } else if (joinCondition.isA(SqlKind.CASE)) {
+            // A T1.c1 IS NOTDISTINCT FROM T2.c2 condition get converted to a CASE expression
+            // CASE
+            //      WHEN T1.c1 IS NULL THEN t2.c2 IS NULL
+            //      WHEN T2.c2 IS NULL THEN t1.c1 IS NULL
+            //      ELSE NOT NULL CAST(T1.C1) = NOT NULL CAST(T2.C2)
+            // END
+            int operandsCount = joinCondition.getOperands().size();
+            RexNode last = joinCondition.getOperands().get(operandsCount - 1);
+            if (operandsCount == 5 && last instanceof RexCall) {
+                Optional<Pair<Integer, Integer>> p1 = pairIsNullToIndePair(joinCondition.getOperands().get(0), joinCondition.getOperands().get(1));
+                Optional<Pair<Integer, Integer>> p2 = pairIsNullToIndePair(joinCondition.getOperands().get(2), joinCondition.getOperands().get(3));
+                Optional<Pair<Integer, Integer>> p3 = getJoiningColumns((RexCall)last);
+                if (p1.equals(p2) && p1.equals(p3)) {
+                    return p3;
                 }
             }
+            return Optional.empty();
+        } else {
+            return Optional.empty();
         }
     }
 
