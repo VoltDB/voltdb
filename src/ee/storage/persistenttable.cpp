@@ -654,29 +654,48 @@ void PersistentTable::finalizeDelete() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
-    allocator().remove(m_releaseBatch, [this](map<void*, void*> const& tuples) {
-        TableTuple target(m_schema);
+    std::vector<void*> moved{};
+    allocator().remove(m_releaseBatch, [this, &moved](map<void*, void*> const& tuples) {
         TableTuple origin(m_schema);
         for(auto const& p : tuples) {
-            target.move(p.first);
+            moved.emplace_back(p.first);
             origin.move(p.second);
             BOOST_FOREACH (auto index, m_indexes) {
-                index->replaceEntryNoKeyChange(target, origin);
+                index->deleteEntry(&origin);
             }
             if (isTableWithMigrate(m_tableType)) {
                uint16_t migrateColumnIndex = getMigrateColumnIndex();
                 NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
                 if (!txnId.isNull()) {
                     migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
-                    migratingAdd(ValuePeeker::peekBigInt(txnId), target);
                 }
             }
             if (m_tableStreamer != NULL) {
-                m_tableStreamer->notifyTupleMovement(origin, target);
+                m_tableStreamer->notifyTupleDelete(origin);
             }
        }
     });
+
     m_releaseBatch.clear();
+
+    // add back to indexes after moved
+    TableTuple target(m_schema);
+    BOOST_FOREACH (auto* tuple, moved) {
+       target.move(tuple);
+       BOOST_FOREACH (auto index, m_indexes) {
+          index->addEntry(&target, NULL);
+       }
+       if (isTableWithMigrate(m_tableType)) {
+          uint16_t migrateColumnIndex = getMigrateColumnIndex();
+          NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+          if (!txnId.isNull()) {
+              migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+          }
+       }
+       if (m_tableStreamer != NULL) {
+           m_tableStreamer->notifyTupleInsert(target);
+       }
+    }
 }
 
 /*
