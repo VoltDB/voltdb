@@ -221,7 +221,6 @@ private:
 
 public:
     using Alloc = storage::HookedCompactingChunks<
-        storage::CompactingChunks<storage::shrink_direction::head>,
             storage::TxnPreHook<storage::NonCompactingChunks<storage::LazyNonCompactingChunk>,
                 storage::HistoryRetainTrait<storage::gc_policy::batched>>>;
     using txn_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::iterator;
