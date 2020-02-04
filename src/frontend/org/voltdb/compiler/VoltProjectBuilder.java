@@ -80,6 +80,8 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
@@ -338,6 +340,7 @@ public class VoltProjectBuilder {
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
     private KiplingType m_kiplingConfiguration;
+    private TopicDefaultsType m_topicDefaults;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -414,6 +417,14 @@ public class VoltProjectBuilder {
             m_kiplingConfiguration = new KiplingType();
         }
         return m_kiplingConfiguration;
+    }
+
+    public TopicDefaultsType getTopicDefaults() {
+        if (m_topicDefaults == null) {
+            // Note: defaults with no explicit retention policies are ok
+            m_topicDefaults = new TopicDefaultsType();
+        }
+        return m_topicDefaults;
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -1392,6 +1403,7 @@ public class VoltProjectBuilder {
 
         deployment.setFeatures(m_featureOptions);
         setKiplingConfiguration(deployment);
+        setTopicConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1408,6 +1420,16 @@ public class VoltProjectBuilder {
         if (m_kiplingConfiguration != null) {
             deployment.setKipling(m_kiplingConfiguration);
         }
+    }
+
+    private void setTopicConfiguration(DeploymentType deployment) {
+        // FIXME: may be extended to handle a list of topic profiles
+        if (m_topicDefaults == null) {
+            return;
+        }
+        TopicsType topics = new TopicsType();
+        topics.setDefaults(m_topicDefaults);
+        deployment.setTopics(topics);
     }
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)

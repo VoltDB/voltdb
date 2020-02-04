@@ -661,12 +661,24 @@ public abstract class CatalogUtil {
         for (Connector connector : connectors) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 Table t = tinfo.getTable();
-                if (t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get()) {
-                    // Skip view-only streams
+                if (!TableType.needsExportDataSource(t.getTabletype())) {
                     continue;
                 }
                 exportTables.add(t);
             }
+        }
+        return exportTables.build();
+    }
+
+    // Return all the tables that are persistent streams, i.e. all tables creating PBDs,
+    // regardless of whether a connector exists
+    public static NavigableSet<Table> getAllStreamsExcludingViews(Database db) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Table t : db.getTables()) {
+            if (!TableType.needsExportDataSource(t.getTabletype())) {
+                continue;
+            }
+            exportTables.add(t);
         }
         return exportTables.build();
     }
