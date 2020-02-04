@@ -466,12 +466,17 @@ namespace voltdb {
          * HookedCompactingChunks
          */
         class AllocBoundary {
-            size_t const m_lastChunkId;
-            void const* m_lastAlloc;
+            size_t const m_lastChunkId = 0;
+            void const* m_lastAlloc = nullptr;
         public:
+            AllocBoundary() noexcept = default;        // empty initiator
             AllocBoundary(ChunkHolder const&) noexcept;
+            AllocBoundary(AllocBoundary const&) noexcept = default;
+            AllocBoundary(AllocBoundary&&) noexcept = default;
+            AllocBoundary& operator=(AllocBoundary const&) noexcept;
             size_t lastChunkId() const noexcept;
             void const* lastAlloc() const noexcept;
+            bool empty() const noexcept;               // makes it behave like std::optional<AllocBoundary>
         };
 
         template<typename Alloc, typename Trait,
@@ -503,13 +508,13 @@ namespace voltdb {
              *   the tuple that gets moved to the hole by deletion, and
              *   its content.
              */
-            void update(void const* dst);                          // src tuple from temp table written to dst in persistent storage. src doesn't matter
-            void insert(void const* src, void const* dst);         // same
-            void remove(void const* src);                          // src tuple is deleted, tmp tuple should have alloc/copied using the copy() by client
+            void update(void const*);
+            void insert(void const*);
+            void remove(void const*);
         public:
             enum class ChangeType : char {Update, Insertion, Deletion};
             using is_hook = integral_constant<bool, true>;
-            explicit TxnPreHook(size_t);
+            TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
@@ -517,7 +522,7 @@ namespace voltdb {
             void freeze(); void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
-            void add(ChangeType, void const* src, void const* dst);
+            void add(ChangeType, void const*);
             void const* reverted(void const*) const;               // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
@@ -536,12 +541,13 @@ namespace voltdb {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using Hook::add; using Hook::copy;
             // the end of allocations when snapshot started: (block id, end ptr)
-            shared_ptr<AllocBoundary> m_frozenSentry;
+            AllocBoundary m_frozenSentry{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
             void freeze(); void thaw();                 // switch of snapshot process
+            AllocBoundary const& boundary() const noexcept;        // notify the snapshot iterator state of affairs
             void const* insert(void const*);
             void const* remove(void*);
             /**

@@ -1180,6 +1180,15 @@ inline size_t AllocBoundary::lastChunkId() const noexcept {
 inline void const* AllocBoundary::lastAlloc() const noexcept {
     return m_lastAlloc;
 }
+inline bool AllocBoundary::empty() const noexcept {
+    return m_lastAlloc == nullptr;
+}
+
+inline AllocBoundary& AllocBoundary::operator=(AllocBoundary const& o) noexcept {
+    const_cast<size_t&>(m_lastChunkId) = o.lastChunkId();
+    m_lastAlloc = o.lastAlloc();
+    return *this;
+}
 
 template<typename Alloc, typename Trait, typename C, typename E>
 inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
@@ -1188,7 +1197,7 @@ inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
                 m_copied.erase(key);
                 m_storage.tryFree(const_cast<void*>(key));
             }),
-    m_storage(tupleSize) { }
+    m_storage(tupleSize) {}
 
 template<typename Alloc, typename Trait, typename C, typename E> inline bool const&
 TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
@@ -1205,19 +1214,18 @@ inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API ess
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait, C, E>::ChangeType type,
-        void const* src, void const* dst) {
+inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait, C, E>::ChangeType type, void const* dst) {
     if (m_recording) {
         switch (type) {
             case ChangeType::Update:
                 update(dst);
                 break;
             case ChangeType::Insertion:
-                insert(src, dst);
+                insert(dst);
                 break;
             case ChangeType::Deletion:
             default:
-                remove(src);
+                remove(dst);
         }
     }
 }
@@ -1259,8 +1267,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* dst) {
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* src, void const* dst) {
-    vassert(src == nullptr);
+inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* dst) {
     if (m_recording && ! m_changes.count(dst)) {
         // for insertions, since previous memory is unused, there
         // is nothing to keep track of. Just mark the position as
@@ -1293,13 +1300,19 @@ inline void TxnPreHook<Alloc, Trait, C, E>::release(void const* src) {
 }
 
 template<typename Hook, typename E> inline
-HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept :
+    CompactingChunks(s), Hook(s) {}
+
+template<typename Hook, typename E> inline AllocBoundary const&
+HookedCompactingChunks<Hook, E>::boundary() const noexcept {
+    return m_frozenSentry;
+}
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::freeze() {
     if (! CompactingChunks::empty()) {
         auto iter = prev(CompactingChunks::end());
-        m_frozenSentry = make_shared<AllocBoundary>(*iter);
+        m_frozenSentry = AllocBoundary(*iter);
     }
     Hook::freeze();
     CompactingChunks::freeze();
@@ -1309,19 +1322,19 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
-    m_frozenSentry.reset(static_cast<AllocBoundary*>(nullptr));
+    m_frozenSentry = AllocBoundary();
 }
 
 template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::insert(void const* src) {
     void const* r = memcpy(CompactingChunks::allocate(), src, CompactingChunks::tupleSize());
-    Hook::add(Hook::ChangeType::Insertion, nullptr, r);
+    Hook::add(Hook::ChangeType::Insertion, r);
     return r;
 }
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::update(void* dst, void const* src) {
-    Hook::add(Hook::ChangeType::Update, src, dst);
+    Hook::add(Hook::ChangeType::Update, dst);
     memcpy(dst, src, CompactingChunks::tupleSize());
 }
 
@@ -1329,7 +1342,7 @@ template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::remove(void* dst) {
     Hook::copy(dst);
     void const* src = CompactingChunks::free(dst);
-    Hook::add(Hook::ChangeType::Deletion, dst, nullptr);
+    Hook::add(Hook::ChangeType::Deletion, dst);
     return src;
 }
 
@@ -1346,12 +1359,12 @@ template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>:
     for_each(batch.removed().cbegin(), batch.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
+                Hook::add(Hook::ChangeType::Deletion, s);
             });
     for_each(batch.movements().cbegin(), batch.movements().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
-                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+                Hook::add(Hook::ChangeType::Deletion, entry.first);
             });
     batch.force();
 }
@@ -1369,12 +1382,12 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     for_each(CompactingChunks::m_batched.removed().cbegin(), CompactingChunks::m_batched.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s, nullptr);
+                Hook::add(Hook::ChangeType::Deletion, s);
             });
     for_each(remove_moves().cbegin(), remove_moves().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
-                Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
+                Hook::add(Hook::ChangeType::Deletion, entry.first);
             });
     return CompactingChunks::m_batched.prepare(true).force();
 }
