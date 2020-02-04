@@ -1088,9 +1088,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
 
                 Boolean requiresId = segment.getNumEntries() == 0 ? null : (segment.getStartId() >= 0);
-                assert (m_requiresId == null
-                        || Objects.equals(m_requiresId.booleanValue(), requiresId)) : "m_requiresId:" + m_requiresId
-                                + ", requiresId: " + requiresId;
+                assert (requiresId == null || m_requiresId == null || m_requiresId.equals(requiresId))
+                    : "m_requiresId:" + m_requiresId + ", requiresId: " + requiresId;
                 assert(segment.getEndId() >= segment.getStartId());
                 if (requiresId != null) {
                     assert !requiresId || peekLastSegment() == null
