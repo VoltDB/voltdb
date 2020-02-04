@@ -715,6 +715,40 @@ void testTxnHook() {
             [&hook](void const* p) {
                 hook.release(p);
             }, hook);
+    // Verify that we cannot create two snapshot iterators at the
+    // same time
+    if (DataAlloc::Compact::value) {
+        using snapshot_rw_iterator =
+            typename IterableTableTupleChunks<DataAlloc, truth>::
+            template iterator_type<iterator_permission_type::rw, iterator_view_type::snapshot>;
+        {                                                      // verifiy on base iterator type
+            snapshot_rw_iterator iter1(alloc);
+            try {
+                snapshot_rw_iterator iter2(alloc);             // expected to throw
+                assert(false);
+            } catch (logic_error const& e) {
+                assert(string(e.what()).substr(0, 52) ==
+                        "Cannot create RW snapshot iterator on chunk list id ");
+            }
+        }
+        {                                                      // verifiy on iterator_cb_type
+            auto iter1 = snapshot_iterator::begin(alloc, hook);
+            try {
+                auto iter2 = snapshot_iterator::begin(alloc, hook);
+                assert(false);
+            } catch (logic_error const& e) {
+                assert(string(e.what()).substr(0, 52) ==
+                        "Cannot create RW snapshot iterator on chunk list id ");
+            }
+        }
+        // But it's okay to create multiple snapshot RO iterators
+        auto iter1 = const_snapshot_iterator::begin(alloc, hook),
+             iter2 = const_snapshot_iterator::begin(alloc, hook);
+        // or RW iterators on different allocators
+        DataAlloc alloc2(TupleSize);
+        auto iter10 = snapshot_iterator::begin(alloc, hook),
+             iter20 = snapshot_iterator::begin(alloc2, hook);
+    }
     hook.thaw();
     alloc.thaw();
 }
@@ -749,7 +783,7 @@ TEST_F(TableTupleAllocatorTest, TestTxnHook) {
 template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunks() {
     using Hook = TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -806,12 +840,7 @@ void testHookedCompactingChunks() {
     for (i = 909; i < 999; ++i) {
         ss.emplace(const_cast<void*>(addresses[i]));
     }
-    auto index_of = [&addresses](void const* p) {
-        auto iter = find(addresses.cbegin(), addresses.cend(), p);
-        assert(iter != addresses.cend());
-        return distance(addresses.cbegin(), iter);
-    };
-    alloc.remove(ss, [&index_of](map<void*, void*> const& m) {});
+    alloc.remove(ss, [](map<void*, void*> const& m) {});
     verify_snapshot_const();
 
     // Step 4: insertion
@@ -904,7 +933,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -938,7 +967,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_single2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk>;
     Gen gen;
@@ -982,7 +1011,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, AllocsPerChunk * 3>;
     Gen gen;
@@ -1029,7 +1058,7 @@ template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi2() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
-    using Alloc = HookedCompactingChunks<CompactingChunks, Hook>;
+    using Alloc = HookedCompactingChunks<Hook>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1123,7 +1152,7 @@ TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
  */
 template<typename Chunk, gc_policy pol>
 void testInterleavedCompactingChunks() {
-    using Alloc = HookedCompactingChunks<CompactingChunks, TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     using addresses_type = array<void const*, NumTuples>;
     Gen gen;
@@ -1250,8 +1279,7 @@ TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
 
 template<typename Chunk, gc_policy pol>
 void testSingleChunkSnapshot() {
-    using Alloc = HookedCompactingChunks<CompactingChunks,
-          TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
     static constexpr auto Number = AllocsPerChunk - 3;
     using addresses_type = array<void const*, Number>;
