@@ -483,7 +483,7 @@ inline void CompactingChunks::thaw() {
     trait::thaw();
 }
 
-inline size_t CompactingChunks::size() const noexcept {
+size_t CompactingChunks::size() const noexcept {
     return m_allocs;
 }
 
@@ -730,11 +730,11 @@ size_t CompactingChunks::DelayedRemover::force() {
         auto const remBytes = (total % allocsPerTuple) * tupleSize;
         if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
             auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
-            if (remBytes > rem) {
+            if (remBytes >= rem) {
                 hd = super::pop();
                 reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
             } else {
-                reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
+                reinterpret_cast<char*&>(hd->m_next) -= remBytes;
             }
             vassert(hd->next() >= hd->begin());
         }
@@ -817,7 +817,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline void
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::validate(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator;
+    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator{};
     validator(m_inUse, src);
 }
 
@@ -825,7 +825,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline void
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::remove(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg;
+    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg{};
     dereg(m_inUse, src);
 }
 

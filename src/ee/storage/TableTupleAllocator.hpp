@@ -541,7 +541,7 @@ namespace voltdb {
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            void freeze(); void thaw();                // switch of snapshot process
+            void freeze(); void thaw();                 // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
             /**
