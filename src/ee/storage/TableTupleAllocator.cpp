@@ -817,7 +817,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline void
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::validate(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator;
+    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator{};
     validator(m_inUse, src);
 }
 
@@ -825,7 +825,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline void
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::remove(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg;
+    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg{};
     dereg(m_inUse, src);
 }
 
