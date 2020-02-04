@@ -730,11 +730,11 @@ size_t CompactingChunks::DelayedRemover::force() {
         auto const remBytes = (total % allocsPerTuple) * tupleSize;
         if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
             auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
-            if (remBytes > rem) {
+            if (remBytes >= rem) {
                 hd = super::pop();
                 reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
             } else {
-                reinterpret_cast<char*&>(hd->m_next) -= rem - remBytes;
+                reinterpret_cast<char*&>(hd->m_next) -= remBytes;
             }
             vassert(hd->next() >= hd->begin());
         }

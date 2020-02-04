@@ -1008,6 +1008,36 @@ void testHookedCompactingChunksBatchRemove_single2() {
 }
 
 template<typename Chunk, gc_policy pol>
+void testHookedCompactingChunksBatchRemove_single3() {         // correctness on txn view: single elem remove
+    using HookAlloc = NonCompactingChunks<Chunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, 10>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    auto const& alloc_cref = alloc;
+    addresses_type addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < 10; ++i) {
+        addresses[i] = alloc.insert(gen.get());
+    }
+    alloc.freeze();
+    alloc.remove(set<void*>{const_cast<void*>(addresses[4])},      // 9 => 4
+            [](map<void*, void*> const&){});
+    i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            alloc_cref,
+            [&i](void const* p) {
+                assert(Gen::same(p, i == 4 ? 9 : i));
+                ++i;
+            });
+    assert(i == 9);
+    alloc.thaw();
+}
+
+template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
@@ -1109,6 +1139,7 @@ template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
         // batch removal tests assume head-compacting direction
         testHookedCompactingChunksBatchRemove_single1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single2<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_single3<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi2<Chunk, pol>();
     }
