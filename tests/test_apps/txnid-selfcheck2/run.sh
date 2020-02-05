@@ -48,7 +48,7 @@ function cleanall() {
 function jars() {
     ant
     alt-jars
-    big-jars
+    bigjars
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -93,8 +93,8 @@ function alt-jars() {
 
 # create alternate jars that are functionally equivalent but
 # each includes some very large files (> 40Mb, but < 50Mb)
-function big-jars() {
-    echo -e `date`": Running function big-jars"
+function bigjars() {
+    echo -e `date`": Running function bigjars"
 
     # call jars-ifneeded, to make sure that txnid.jar has already been
     # generated; but make sure not to run this function twice as a result
@@ -109,8 +109,6 @@ function big-jars() {
     cp -fv txnid.jar txnid-big-text2.jar
     cp -fv txnid.jar txnid-big-text3.jar
     cp -fv txnid.jar txnid-big-text4.jar
-    cp -fv txnid.jar txnid-big-java1.jar
-    cp -fv txnid.jar txnid-big-java2.jar
 
     # find the voltdb-X.X.jar file
     JAR_NAME=`ls $VOLTDB_VOLTDB | grep .jar | grep -v client`
@@ -150,8 +148,22 @@ function big-jars() {
     if [ $? != 0 ]; then echo "Failed to update txnid-big-text3.jar"; exit 17; fi
     jar uf txnid-big-text4.jar obj/large-random-text4.txt
     if [ $? != 0 ]; then echo "Failed to update txnid-big-text4.jar"; exit 18; fi
-    echo -e `date`": Completed generation of jar files containing large text files"
+    echo -e `date`": Completed generation of jar files containing large text files."
 
+
+    if [[ -e txnid-big-java1.jar && -e txnid-big-java2.jar ]]; then
+        set -e
+        echo -e `date`": No need to generate jar files containing lots of Java files:"
+        echo -e `date`"      txnid-big-java1.jar, txnid-big-java2.jar already exist."
+        return
+    else
+        echo -e `date`": Beginning generation of jar files containing lots of Java files"
+    fi
+
+
+    # make copies of the standard txnid.jar, to be added to below
+    cp -fv txnid.jar txnid-big-java1.jar
+    cp -fv txnid.jar txnid-big-java2.jar
 
     # create many small, almost identical, Java source (.java) files
     java -cp obj:$VOLTDB_JAR bigjar.CreateLargeFiles -f java -M 26000
@@ -176,22 +188,30 @@ function big-jars() {
     jar uf txnid-big-java1.jar obj/bigjar/procedures/Insert* src/bigjar/procedures/Insert*
     if [ $? != 0 ]; then echo "Failed to add Insert* to txnid-big-java1.jar"; exit 23; fi
     # the list of SelectLE* classes is too long for jar, so break it up
-    for i in {1..9}; do
-        for j in {0..8}; do
-            (( k = j + 1 ))
-            jar uf txnid-big-java1.jar obj/bigjar/procedures/SelectLE${i}${j}*.class
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${j}*.class to txnid-big-java1.jar"; exit 25; fi
-            jar uf txnid-big-java1.jar src/bigjar/procedures/SelectLE${i}${j}*.java
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${j}*.java  to txnid-big-java1.jar"; exit 26; fi
-            jar uf txnid-big-java2.jar obj/bigjar/procedures/SelectLE${i}${k}*.class
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${k}*.class to txnid-big-java2.jar"; exit 27; fi
-            jar uf txnid-big-java2.jar src/bigjar/procedures/SelectLE${i}${k}*.java
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${k}*.java  to txnid-big-java2.jar"; exit 28; fi
+    for i1 in {1..8}; do
+        (( i2 = i1 + 1 ))
+        for j in {0..9}; do
+            jar uf txnid-big-java1.jar obj/bigjar/procedures/SelectLE${i1}${j}*.class
+            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i1}${j}*.class to txnid-big-java1.jar"; exit 25; fi
+            jar uf txnid-big-java1.jar src/bigjar/procedures/SelectLE${i1}${j}*.java
+            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i1}${j}*.java  to txnid-big-java1.jar"; exit 26; fi
+            jar uf txnid-big-java2.jar obj/bigjar/procedures/SelectLE${i2}${j}*.class
+            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i2}${j}*.class to txnid-big-java2.jar"; exit 27; fi
+            jar uf txnid-big-java2.jar src/bigjar/procedures/SelectLE${i2}${j}*.java
+            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i2}${j}*.java  to txnid-big-java2.jar"; exit 28; fi
+            rm -f obj/bigjar/procedures/SelectLE${i1}${j}*.class
+            rm -f src/bigjar/procedures/SelectLE${i1}${j}*.java
         done
-        echo -e `date`": Completed addition of SelectLE${i}*.class, SelectLE${i}*.java to txnid-big-javaX.jar"
+        echo -e `date`": Completed addition of SelectLE${i1}*.class, SelectLE${i1}*.java to txnid-big-javaX.jar"
     done
+    for j in {0..9}; do
+        rm -f obj/bigjar/procedures/SelectLE9${j}*.class
+        rm -f src/bigjar/procedures/SelectLE9${j}*.java
+    done
+    echo -e `date`": Completed additions to txnid-big-javaX.jar (including SelectLE9*.class, SelectLE9*.java)"
+
     set -e
-    echo -e `date`": Completed generation of ALL big-jar files"
+    echo -e `date`": Completed generation of ALL big-jar files."
 }
 
 # run the voltdb server locally
