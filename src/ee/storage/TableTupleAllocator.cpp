@@ -1207,6 +1207,19 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 inline AllocPosition::AllocPosition(ChunkHolder const& c) noexcept :
 m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
 
+inline AllocPosition::AllocPosition(CompactingChunks const& c, void const* p) : m_lastAlloc(p) {
+    auto const* iterp = c.find(p);
+    if (iterp == nullptr || ! ((*iterp)->contains(p) || (*iterp)->end() > p)) {
+        // NOTE: it is possible that the txn view does not
+        // contain the ptr, as the chunk has been removed. In
+        // that case, we simply "empty" it, and note the
+        // semantics of less<AllocPosition>.
+        const_cast<void*&>(m_lastAlloc) = nullptr;
+    } else {
+        const_cast<size_t&>(m_lastChunkId) = (*iterp)->id();
+    }
+}
+
 template<typename iterator>
 inline AllocPosition::AllocPosition(void const* p, iterator const& iter) noexcept :
 m_lastChunkId(iter->id()), m_lastAlloc(p) {}
@@ -1230,19 +1243,18 @@ inline AllocPosition& AllocPosition::operator=(AllocPosition const& o) noexcept 
 namespace std {
     using namespace voltdb::storage;
     template<> struct less<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const {
-            bool const empty1 = lhs.empty(), empty2 = rhs.empty();
-            if (empty1 && empty2) {
-                return false;
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
+            bool const e1 = lhs.empty(), e2 = rhs.empty();
+            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
+                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
             } else {
-                vassert(! empty1 && ! empty2);
                 auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
-                return less_rolling(id1, id2) || (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc());
+                return (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc()) || less_rolling(id1, id2);
             }
         }
     };
     template<> struct less_equal<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const {
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
             return lhs.lastAlloc() == rhs.lastAlloc() || less<AllocPosition>()(lhs, rhs);
         }
     };
@@ -1278,8 +1290,9 @@ inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API ess
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::add(typename TxnPreHook<Alloc, Trait, C, E>::ChangeType type, void const* dst) {
-    if (m_recording) {
+inline void TxnPreHook<Alloc, Trait, C, E>::add(CompactingChunks const& t,
+        typename TxnPreHook<Alloc, Trait, C, E>::ChangeType type, void const* dst) {
+    if (m_recording) {     // ignore changes beyond boundary
         switch (type) {
             case ChangeType::Update:
                 update(dst);
@@ -1382,13 +1395,13 @@ HookedCompactingChunks<Hook, E>::thaw() {
 template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::insert(void const* src) {
     void const* r = memcpy(CompactingChunks::allocate(), src, CompactingChunks::tupleSize());
-    Hook::add(Hook::ChangeType::Insertion, r);
+    Hook::add(*this, Hook::ChangeType::Insertion, r);
     return r;
 }
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::update(void* dst, void const* src) {
-    Hook::add(Hook::ChangeType::Update, dst);
+    Hook::add(*this, Hook::ChangeType::Update, dst);
     memcpy(dst, src, CompactingChunks::tupleSize());
 }
 
@@ -1396,7 +1409,7 @@ template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::remove(void* dst) {
     Hook::copy(dst);
     void const* src = CompactingChunks::free(dst);
-    Hook::add(Hook::ChangeType::Deletion, dst);
+    Hook::add(*this, Hook::ChangeType::Deletion, dst);
     return src;
 }
 
@@ -1413,12 +1426,12 @@ template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>:
     for_each(batch.removed().cbegin(), batch.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s);
+                Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
     for_each(batch.movements().cbegin(), batch.movements().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
-                Hook::add(Hook::ChangeType::Deletion, entry.first);
+                Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
     batch.force();
 }
@@ -1436,12 +1449,12 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     for_each(CompactingChunks::m_batched.removed().cbegin(), CompactingChunks::m_batched.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s);
+                Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
     for_each(remove_moves().cbegin(), remove_moves().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
-                Hook::add(Hook::ChangeType::Deletion, entry.first);
+                Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
     return CompactingChunks::m_batched.prepare(true).force();
 }

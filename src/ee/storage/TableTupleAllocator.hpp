@@ -347,11 +347,13 @@ namespace voltdb {
          * Communication channel between TxnPreHook and
          * HookedCompactingChunks
          */
+        class CompactingChunks;
         class AllocPosition {
             size_t const m_lastChunkId = 0;
             void const* m_lastAlloc = nullptr;
         public:
             AllocPosition() noexcept = default;        // empty initiator
+            AllocPosition(CompactingChunks const&, void const*);
             template<typename iterator> AllocPosition(void const*, iterator const&) noexcept;
             AllocPosition(ChunkHolder const&) noexcept;
             AllocPosition(AllocPosition const&) noexcept = default;
@@ -435,7 +437,7 @@ namespace voltdb {
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
             AllocPosition const& boundary() const noexcept;        // notify the snapshot iterator state of affairs
-            using list_type::empty; using list_type::end;
+            using list_type::empty; using list_type::end; using list_type::find;
         };
 
         struct BaseHistoryRetainTrait {
@@ -527,7 +529,7 @@ namespace voltdb {
             void freeze(); void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
-            void add(ChangeType, void const*);
+            void add(CompactingChunks const&, ChangeType, void const*);
             void const* reverted(void const*) const;               // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,

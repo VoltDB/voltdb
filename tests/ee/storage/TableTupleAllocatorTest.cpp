@@ -634,7 +634,7 @@ void testTxnHook() {
     // started
     for (i = NumTuples; i < NumTuples + InsertTuples; ++i) {
         auto* p = alloc.allocate();
-        hook.add(Hook::ChangeType::Insertion, p);
+        hook.add(alloc, Hook::ChangeType::Insertion, p);
         addresses[i] = gen.fill(p);
         InsertionTag::set(p);                                  // mark as "insertion pending"
     }
@@ -680,7 +680,7 @@ void testTxnHook() {
         hook.copy(src);                 // NOTE: client need to remember to call this, before making any deletes
         auto* dst = alloc.free(src);
         assert(dst);
-        hook.add(Hook::ChangeType::Deletion, src);
+        hook.add(alloc, Hook::ChangeType::Deletion, src);
         DeletionUpdateTag::reset(dst);   // NOTE: sequencing this before the hook would cause std::stack<void*> default ctor to crash in GLIBC++7 (~L94 of TableTupleAllocator.h), in /usr/include/c++/7/ext/new_allocator.h
     }
     i = 0;
@@ -706,7 +706,7 @@ void testTxnHook() {
         // for update changes, hook does not need to copy
         // tuple getting updated (i.e. dst), since the hook is
         // called pre-update.
-        hook.add(Hook::ChangeType::Update, addresses[i]);    // 1280 == first eval
+        hook.add(alloc, Hook::ChangeType::Update, addresses[i]);    // 1280 == first eval
         memcpy(addresses[i], addresses[i + 1], TupleSize);
         DeletionUpdateTag::reset(addresses[i]);
     }
