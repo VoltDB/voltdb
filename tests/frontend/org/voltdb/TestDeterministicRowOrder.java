@@ -251,8 +251,8 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    //@Test
-    private void testInsertWithDelete() throws Exception {
+    @Test
+    public void testInsertWithDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         createCluster();
         Thread insert = new Thread(() -> {
