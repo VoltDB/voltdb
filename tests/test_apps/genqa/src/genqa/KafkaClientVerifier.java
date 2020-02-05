@@ -97,10 +97,10 @@ public class KafkaClientVerifier {
         // as a means to distinquish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
-        
+
         @Option(desc = "use table export (CDC)")
         Boolean usetableexport = false;
-        
+
         @Option(desc = "topic .  NOTE topicprofix+topic == the topic used when quering kafka ")
         String topic = "";
 
