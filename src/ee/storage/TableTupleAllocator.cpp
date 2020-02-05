@@ -217,9 +217,8 @@ ChunkList<Chunk, E>::compare(pair<iterator, void*> const& l, pair<iterator, void
         vassert(l.first->contains(l.second) && r.first->contains(r.second));
         return l.second < r.second ? -1 : (l.second == r.second ? 0 : 1);
     } else {
-        static less<Chunk> const L;
         vassert(l.first->contains(l.second) && r.first->contains(r.second));
-        return L(l.first->id(), r.first->id()) ? -1 : 1;
+        return less<Chunk>()(l.first->id(), r.first->id()) ? -1 : 1;
     }
 }
 
@@ -474,13 +473,20 @@ inline void const* CompactingChunks::endOfFirstChunk() const noexcept {
 inline void CompactingChunks::freeze() {
     if (! list_type::empty()) {
         m_endOfFirstChunk = list_type::begin()->next();
+        auto iter = prev(CompactingChunks::end());
+        m_frozenSentry = AllocPosition(*iter);
     }
     trait::freeze();
 }
 
 inline void CompactingChunks::thaw() {
+    m_frozenSentry = AllocPosition();
     m_endOfFirstChunk = nullptr;
     trait::thaw();
+}
+
+inline AllocPosition const& CompactingChunks::boundary() const noexcept {
+    return m_frozenSentry;
 }
 
 size_t CompactingChunks::size() const noexcept {
@@ -1141,8 +1147,7 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() 
     return super::drained() || (
             super::m_extendingPtr == nullptr &&    // not in spliced chunks;
             ! boundary.empty() &&                  // snapshot in progress,
-            (super::m_cursor == boundary.lastAlloc() ||                                // pointer match; or
-             less_rolling(boundary.lastChunkId(), super::list_iterator()->id())));     // chunk id > last seen
+            less_equal<AllocPosition>()(boundary, {super::m_cursor, super::list_iterator()}));
 }
 
 template<unsigned char NthBit, typename E>
@@ -1199,32 +1204,64 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
     }
 }
 
-inline AllocBoundary::AllocBoundary(ChunkHolder const& c) noexcept : m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
+inline AllocPosition::AllocPosition(ChunkHolder const& c) noexcept :
+m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
 
-inline size_t AllocBoundary::lastChunkId() const noexcept {
+template<typename iterator>
+inline AllocPosition::AllocPosition(void const* p, iterator const& iter) noexcept :
+m_lastChunkId(iter->id()), m_lastAlloc(p) {}
+
+inline size_t AllocPosition::lastChunkId() const noexcept {
     return m_lastChunkId;
 }
-inline void const* AllocBoundary::lastAlloc() const noexcept {
+inline void const* AllocPosition::lastAlloc() const noexcept {
     return m_lastAlloc;
 }
-inline bool AllocBoundary::empty() const noexcept {
+inline bool AllocPosition::empty() const noexcept {
     return m_lastAlloc == nullptr;
 }
 
-inline AllocBoundary& AllocBoundary::operator=(AllocBoundary const& o) noexcept {
+inline AllocPosition& AllocPosition::operator=(AllocPosition const& o) noexcept {
     const_cast<size_t&>(m_lastChunkId) = o.lastChunkId();
     m_lastAlloc = o.lastAlloc();
     return *this;
 }
 
+namespace std {
+    using namespace voltdb::storage;
+    template<> struct less<AllocPosition> {
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const {
+            bool const empty1 = lhs.empty(), empty2 = rhs.empty();
+            if (empty1 && empty2) {
+                return false;
+            } else {
+                vassert(! empty1 && ! empty2);
+                auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
+                return less_rolling(id1, id2) || (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc());
+            }
+        }
+    };
+    template<> struct less_equal<AllocPosition> {
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const {
+            return lhs.lastAlloc() == rhs.lastAlloc() || less<AllocPosition>()(lhs, rhs);
+        }
+    };
+    template<> struct less<ChunkHolder> {
+        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
+            return less_rolling(lhs.id(), rhs.id());
+        }
+    };
+}
+
 template<typename Alloc, typename Trait, typename C, typename E>
-inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize):
+inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(
+        size_t tupleSize, AllocPosition const& boundary):
     Trait([this](void const* key) {
                 m_changes.erase(key);                        // no-op for non-existent key
                 m_copied.erase(key);
                 m_storage.tryFree(const_cast<void*>(key));
             }),
-    m_storage(tupleSize) {}
+    m_storage(tupleSize), m_boundary(boundary) {}
 
 template<typename Alloc, typename Trait, typename C, typename E> inline bool const&
 TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
@@ -1328,19 +1365,10 @@ inline void TxnPreHook<Alloc, Trait, C, E>::release(void const* src) {
 
 template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept :
-    CompactingChunks(s), Hook(s) {}
-
-template<typename Hook, typename E> inline AllocBoundary const&
-HookedCompactingChunks<Hook, E>::boundary() const noexcept {
-    return m_frozenSentry;
-}
+    CompactingChunks(s), Hook(s, CompactingChunks::boundary()) {}
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::freeze() {
-    if (! CompactingChunks::empty()) {
-        auto iter = prev(CompactingChunks::end());
-        m_frozenSentry = AllocBoundary(*iter);
-    }
     Hook::freeze();
     CompactingChunks::freeze();
 }
@@ -1349,7 +1377,6 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
-    m_frozenSentry = AllocBoundary();
 }
 
 template<typename Hook, typename E> inline void const*

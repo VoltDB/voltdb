@@ -338,15 +338,30 @@ namespace std {
             return less_rolling(lhs->id(), rhs->id());
         }
     };
-    template<> struct less<ChunkHolder> {
-        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
-            return less_rolling(lhs.id(), rhs.id());
-        }
-    };
 }
 
 namespace voltdb {
     namespace storage {
+
+        /**
+         * Communication channel between TxnPreHook and
+         * HookedCompactingChunks
+         */
+        class AllocPosition {
+            size_t const m_lastChunkId = 0;
+            void const* m_lastAlloc = nullptr;
+        public:
+            AllocPosition() noexcept = default;        // empty initiator
+            template<typename iterator> AllocPosition(void const*, iterator const&) noexcept;
+            AllocPosition(ChunkHolder const&) noexcept;
+            AllocPosition(AllocPosition const&) noexcept = default;
+            AllocPosition(AllocPosition&&) noexcept = default;
+            AllocPosition& operator=(AllocPosition const&) noexcept;
+            size_t lastChunkId() const noexcept;
+            void const* lastAlloc() const noexcept;
+            bool empty() const noexcept;               // makes it behave like std::optional<AllocPosition>
+        };
+
         /**
          * A linked list of self-compacting chunks:
          * All allocation operations are appended to the last chunk
@@ -367,6 +382,8 @@ namespace voltdb {
             // needed for special case when there is a single
             // non-full chunk when snapshot started.
             void const* m_endOfFirstChunk = nullptr;
+            // the end of allocations when snapshot started: (block id, end ptr)
+            AllocPosition m_frozenSentry{};
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
@@ -417,6 +434,7 @@ namespace voltdb {
             size_t id() const noexcept;
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
+            AllocPosition const& boundary() const noexcept;        // notify the snapshot iterator state of affairs
             using list_type::empty; using list_type::end;
         };
 
@@ -465,24 +483,6 @@ namespace voltdb {
             is_same<typename remove_const<T>::type, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
             is_base_of<CompactingChunks, typename remove_const<T>::type>::value>;
 
-        /**
-         * Communication channel between TxnPreHook and
-         * HookedCompactingChunks
-         */
-        class AllocBoundary {
-            size_t const m_lastChunkId = 0;
-            void const* m_lastAlloc = nullptr;
-        public:
-            AllocBoundary() noexcept = default;        // empty initiator
-            AllocBoundary(ChunkHolder const&) noexcept;
-            AllocBoundary(AllocBoundary const&) noexcept = default;
-            AllocBoundary(AllocBoundary&&) noexcept = default;
-            AllocBoundary& operator=(AllocBoundary const&) noexcept;
-            size_t lastChunkId() const noexcept;
-            void const* lastAlloc() const noexcept;
-            bool empty() const noexcept;               // makes it behave like std::optional<AllocBoundary>
-        };
-
         template<typename Alloc, typename Trait,
             typename Collections = stdCollections<void const*, void const*>,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
@@ -495,6 +495,7 @@ namespace voltdb {
             bool m_hasDeletes = false;      // observer for iterator::advance()
             Alloc m_storage;
             void* m_last = nullptr;         // last allocation by copy(void const*);
+            AllocPosition const& m_boundary;
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -518,7 +519,7 @@ namespace voltdb {
         public:
             enum class ChangeType : char {Update, Insertion, Deletion};
             using is_hook = integral_constant<bool, true>;
-            TxnPreHook(size_t);
+            TxnPreHook(size_t, AllocPosition const&);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
@@ -544,14 +545,11 @@ namespace voltdb {
         class HookedCompactingChunks : public CompactingChunks, public Hook {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using Hook::add; using Hook::copy;
-            // the end of allocations when snapshot started: (block id, end ptr)
-            AllocBoundary m_frozenSentry{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
             void freeze(); void thaw();                 // switch of snapshot process
-            AllocBoundary const& boundary() const noexcept;        // notify the snapshot iterator state of affairs
             void const* insert(void const*);
             void const* remove(void*);
             /**

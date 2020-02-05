@@ -607,7 +607,7 @@ void testTxnHook() {
     using Hook = TxnPreHook<HookAlloc, RetainTrait>;
     DataAlloc alloc(TupleSize);
     auto const& alloc_cref = alloc;
-    Hook hook(TupleSize);
+    Hook hook(TupleSize, alloc.boundary());
     /**
      * We reserve 2 bits in the leading char to signify that this
      * tuple is newly inserted, thus invisible in snapshot view (bit#7),
