@@ -36,6 +36,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltFile;
 
 public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
@@ -50,7 +51,14 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                     "); " +
                     "PARTITION TABLE kv ON COLUMN key;" +
                     "CREATE INDEX idx_kv ON kv(val);" +
-                    "CREATE TABLE foo(key bigint not null, val bigint not null);";
+            "CREATE TABLE foo(key bigint not null, val bigint not null);" +
+            "CREATE TABLE bigfoo (" +
+                    "id BIGINT not null," +
+                    "ts TIMESTAMP,"+
+                    "description VARCHAR(200)," +
+                   "PRIMARY KEY (id));" +
+                   "PARTITION TABLE bigfoo ON COLUMN id;" +
+                   "CREATE INDEX bigindex ON bigfoo (ts);";
 
     Client client;
     final int sitesPerHost = 2;
@@ -126,17 +134,18 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                 client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
                 client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
             }
-            System.out.print("deleting from partitioned table KV...");
+            System.out.println("deleting from partitioned table KV...");
             ClientResponse resp = client.callProcedure("@AdHoc", "delete from KV where key < 50");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
             int count = 0;
+            System.out.println(vt.toFormattedString());
             while(vt.advanceRow()) {
                 assert(vt.getLong(0) >= 50);
                 count++;
             }
             assert(count == 50);
-            System.out.print("deleting from replicated table FOO...");
+            System.out.println("deleting from replicated table FOO...");
             resp = client.callProcedure("@AdHoc", "delete from FOO where key < 50");
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             vt = client.callProcedure("@AdHoc", "select * from FOO order by key").getResults()[0];
@@ -239,6 +248,58 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             fail(e.getMessage());
         } finally {
             shutDown(server);
+        }
+    }
+
+    //@Test
+    private void testInsertWithDelete() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        createCluster();
+        Thread insert = new Thread(() -> {
+            long numberOfItems = 10000;
+            int duration = 60 * 1000;
+            long start = System.currentTimeMillis();
+            long now = start;
+            long end = start + duration;
+            int i = 0;
+            while (now < end && i < numberOfItems) {
+                try {
+                    client.callProcedure("bigfoo.insert", i++, new TimestampType(i), "test");
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                    break;
+                }
+                now = System.currentTimeMillis();
+            }
+        });
+
+        Thread delete = new Thread(()-> {
+            long start = System.currentTimeMillis();
+            int duration = 100 * 1000;
+            long now = start;
+            long end = start + duration;
+            while (now < end) {
+                try {
+                   client.callProcedure("@LowImpactDeleteNT", "bigfoo", "ts", "1000000000", "<", 10000, 1000 * 1000, 4, 1);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    break;
+                }
+                now = System.currentTimeMillis();
+            }
+        });
+        insert.start();
+        Thread.sleep(3000);
+        delete.start();
+
+        insert.join();
+        delete.join();
+        Thread.sleep(5000);
+        try {
+            long rowCount = client.callProcedure("@AdHoc", "select count(*) from bigfoo").getResults()[0].asScalarLong();
+            assert(0 == rowCount);
+        } catch (Exception e) {
+            fail("Failed to get row count from Table part");
         }
     }
 
