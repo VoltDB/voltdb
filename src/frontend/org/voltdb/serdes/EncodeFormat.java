@@ -37,7 +37,7 @@ public enum EncodeFormat {
      */
     public static EncodeFormat checkedValueOf(String name) {
         try {
-            return Enum.valueOf(EncodeFormat.class, name);
+            return valueOf(EncodeFormat.class, name);
         }
         catch (Exception ex) {
             VoltDB.crashLocalVoltDB("Illegal encoding format " + name, true, ex);

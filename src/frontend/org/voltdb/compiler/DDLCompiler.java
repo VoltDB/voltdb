@@ -1641,8 +1641,8 @@ public class DDLCompiler {
         if (topicFormatName != null) {
             try {
                 // Parse the format in an unchecked fashion and handle exceptions
-                EncodeFormat format = Enum.valueOf(EncodeFormat.class, topicFormatName);
-                table.setTopicformat(format.toString());
+                EncodeFormat format = EncodeFormat.valueOf(EncodeFormat.class, topicFormatName);
+                table.setTopicformat(format.name());
             }
             catch (Exception ex) {
                 throw compiler.new VoltCompilerException(
