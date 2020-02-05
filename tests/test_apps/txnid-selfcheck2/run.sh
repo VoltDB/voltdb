@@ -92,9 +92,9 @@ function alt-jars() {
 }
 
 # create alternate jars that are functionally equivalent but
-# each includes some very large files (> 40Mb, but < 50Mb)
+# each includes some very large files (40Mb < size < 50Mb)
 function bigjars() {
-    echo -e `date`": Running function bigjars"
+    echo -e `date`": Running function bigjars..."
 
     # call jars-ifneeded, to make sure that txnid.jar has already been
     # generated; but make sure not to run this function twice as a result
@@ -154,10 +154,11 @@ function bigjars() {
     if [[ -e txnid-big-java1.jar && -e txnid-big-java2.jar ]]; then
         set -e
         echo -e `date`": No need to generate jar files containing lots of Java files:"
-        echo -e `date`"      txnid-big-java1.jar, txnid-big-java2.jar already exist."
+        echo -e `date`"      txnid-big-java1.jar, txnid-big-java2.jar already exist"
+        echo -e `date`": Completed generation of ALL big-jar files."
         return
     else
-        echo -e `date`": Beginning generation of jar files containing lots of Java files"
+        echo -e `date`": Beginning generation of jar files containing lots of Java classes..."
     fi
 
 
@@ -166,49 +167,52 @@ function bigjars() {
     cp -fv txnid.jar txnid-big-java2.jar
 
     # create many small, almost identical, Java source (.java) files
-    java -cp obj:$VOLTDB_JAR bigjar.CreateLargeFiles -f java -M 26000
-    if [ $? != 0 ]; then echo "Failed to create lots of Java files"; exit 20; fi
+    java -cp obj:$VOLTDB_JAR bigjar.CreateLargeFiles -f java -m 100000 -M 123000
+    if [ $? != 0 ]; then echo "Failed to create lots of Java files (1)"; exit 21; fi
+    java -cp obj:$VOLTDB_JAR bigjar.CreateLargeFiles -f java -m 200000 -M 223000
+    if [ $? != 0 ]; then echo "Failed to create lots of Java files (2)"; exit 22; fi
     echo -e `date`": Completed generation of lots of Java files"
 
     # compile the various Java source (.java files)
     javac -cp $VOLTDB_JAR -d obj `pwd`/src/bigjar/procedures/Insert*
-    if [ $? != 0 ]; then echo "Failed to compile the Java Insert class"; exit 21; fi
+    if [ $? != 0 ]; then echo "Failed to compile the Java Insert class"; exit 23; fi
     # the list of SelectLE* classes is too long for javac, so break it up
-    for i in {1..9}; do
-        for j in {0..9}; do
-            javac -cp $VOLTDB_JAR -d obj `pwd`/src/bigjar/procedures/SelectLE${i}${j}*
-            if [ $? != 0 ]; then echo "Failed to compile the Java SelectLE1${i}${j}* classes"; exit 22; fi
+    for i in {1..2}; do
+        for j in {0..2}; do
+            for k in {0..9}; do
+                if [[ -e `pwd`/src/bigjar/procedures/SelectLE${i}${j}${k}000.java ]]; then
+                    javac -cp $VOLTDB_JAR -d obj `pwd`/src/bigjar/procedures/SelectLE${i}${j}${k}*
+                    if [ $? != 0 ]; then echo "Failed to compile the Java SelectLE${i}${j}${k}* classes"; exit 24; fi
+                fi
+            done
+            echo -e `date`": Completed compilation of SelectLE${i}${j}*.java"
         done
-        echo -e `date`": Completed compilation of SelectLE${i}*.java"
     done
     echo -e `date`": Completed compilation of ALL Java files"
 
     # add various Java source (.java) and compiled (.class) files to copies
     # of the standard txnid.jar;
     jar uf txnid-big-java1.jar obj/bigjar/procedures/Insert* src/bigjar/procedures/Insert*
-    if [ $? != 0 ]; then echo "Failed to add Insert* to txnid-big-java1.jar"; exit 23; fi
+    if [ $? != 0 ]; then echo "Failed to add the Java Insert class to txnid-big-java1.jar"; exit 25; fi
+    jar uf txnid-big-java2.jar obj/bigjar/procedures/Insert* src/bigjar/procedures/Insert*
+    if [ $? != 0 ]; then echo "Failed to add the Java Insert class to txnid-big-java2.jar"; exit 26; fi
     # the list of SelectLE* classes is too long for jar, so break it up
-    for i1 in {1..8}; do
-        (( i2 = i1 + 1 ))
-        for j in {0..9}; do
-            jar uf txnid-big-java1.jar obj/bigjar/procedures/SelectLE${i1}${j}*.class
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i1}${j}*.class to txnid-big-java1.jar"; exit 25; fi
-            jar uf txnid-big-java1.jar src/bigjar/procedures/SelectLE${i1}${j}*.java
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i1}${j}*.java  to txnid-big-java1.jar"; exit 26; fi
-            jar uf txnid-big-java2.jar obj/bigjar/procedures/SelectLE${i2}${j}*.class
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i2}${j}*.class to txnid-big-java2.jar"; exit 27; fi
-            jar uf txnid-big-java2.jar src/bigjar/procedures/SelectLE${i2}${j}*.java
-            if [ $? != 0 ]; then echo "Failed to add SelectLE1${i2}${j}*.java  to txnid-big-java2.jar"; exit 28; fi
-            rm -f obj/bigjar/procedures/SelectLE${i1}${j}*.class
-            rm -f src/bigjar/procedures/SelectLE${i1}${j}*.java
+    for i in {1..2}; do
+        for j in {0..2}; do
+            for k in {0..9}; do
+                if [[ -e `pwd`/obj/bigjar/procedures/SelectLE${i}${j}${k}000.class ]]; then
+                    jar uf txnid-big-java${i}.jar obj/bigjar/procedures/SelectLE${i}${j}${k}*.class
+                    if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${j}*.class to txnid-big-java${i}.jar"; exit 27; fi
+                    jar uf txnid-big-java${i}.jar src/bigjar/procedures/SelectLE${i}${j}${k}*.java
+                    if [ $? != 0 ]; then echo "Failed to add SelectLE1${i}${j}*.java  to txnid-big-java${i}.jar"; exit 28; fi
+                    rm -f obj/bigjar/procedures/SelectLE${i}${j}${k}*.class
+                    rm -f src/bigjar/procedures/SelectLE${i}${j}${k}*.java
+                fi
+            done
+            echo -e `date`": Completed addition of SelectLE${i}${j}*.class, SelectLE${i}${j}*.java to txnid-big-java${i}.jar"
         done
-        echo -e `date`": Completed addition of SelectLE${i1}*.class, SelectLE${i1}*.java to txnid-big-javaX.jar"
+        echo -e `date`": Completed additions to txnid-big-java${i}.jar"
     done
-    for j in {0..9}; do
-        rm -f obj/bigjar/procedures/SelectLE9${j}*.class
-        rm -f src/bigjar/procedures/SelectLE9${j}*.java
-    done
-    echo -e `date`": Completed additions to txnid-big-javaX.jar (including SelectLE9*.class, SelectLE9*.java)"
 
     set -e
     echo -e `date`": Completed generation of ALL big-jar files."
