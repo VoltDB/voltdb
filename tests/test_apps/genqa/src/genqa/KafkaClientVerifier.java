@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -36,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.time.LocalTime;
+import java.util.HashMap;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -46,10 +49,10 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltcore.logging.VoltLogger;
 
 /**
- * This verifier connects to kafka and consumes messsages from a topic, it then
+ * This verifier connects to kafka and consumes messages from a topic, it then
  * looks for inconsistencies in the data.
  *
- * It requires a field with a seqeuence number and another field with an
+ * It requires a field with a sequence number and another field with an
  * unique index. It will compute gaps in the sequence and check for
  * duplicates based on the index.  It expects that the max sequence number should
  * match the expected number of unique records.
@@ -71,6 +74,7 @@ public class KafkaClientVerifier {
     private final AtomicLong expectedRows = new AtomicLong(0);
     private final AtomicLong consumedRows = new AtomicLong(0);
     private final AtomicLong verifiedRows = new AtomicLong(0);
+    private final AtomicLong duplifiedRows = new AtomicLong(0);
     private final AtomicBoolean testGood = new AtomicBoolean(true);
     private final AtomicInteger maxRecordSize = new AtomicInteger(0); // use
                                                                       // this to
@@ -79,6 +83,7 @@ public class KafkaClientVerifier {
                                                                       // allowable
                                                                       // duplicates
     private final ConcurrentLinkedQueue<Long> foundRowIds = new ConcurrentLinkedQueue<Long>();
+    private final Map<Long, RowData> rowData = new ConcurrentHashMap<>();
 
     static class VerifierCliConfig extends CLIConfig {
 
@@ -92,7 +97,10 @@ public class KafkaClientVerifier {
         // as a means to distinquish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
-
+        
+        @Option(desc = "use table export (CDC)")
+        Boolean usetableexport = false;
+        
         @Option(desc = "topic .  NOTE topicprofix+topic == the topic used when quering kafka ")
         String topic = "";
 
@@ -109,7 +117,8 @@ public class KafkaClientVerifier {
         Integer consumers = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
-        Integer timeout = 300;
+        Integer timeout = 60;
+        // Integer timeout = 300;
 
         @Override
         public void validate() {
@@ -129,6 +138,28 @@ public class KafkaClientVerifier {
                 exitWithMessageAndUsage("partitionfield must not be empty, partition id field is usually 3");
             }
 
+        }
+    }
+
+    /**
+     *
+     * @author pshaw
+     * Simple data only class, one instance per consumed row
+     *
+     * Assumes row data includes metadata (skipinternals=False), or things won't go well
+     *
+     */
+    public class RowData {
+        Long m_partitionId;
+        Long m_sequenceNum;
+        Long m_rowId;
+        byte m_exportOp;
+
+        public RowData(Long partitionId, Long sequenceNum, Long rowId, byte exportOp) {
+            m_partitionId = partitionId;
+            m_sequenceNum = sequenceNum;
+            m_rowId = rowId;
+            m_exportOp = exportOp;
         }
     }
 
@@ -188,8 +219,24 @@ public class KafkaClientVerifier {
 
                     // the number of expected rows should match the max of the
                     // field that contains the sequence field
-                    long maxRow = Math.max(expectedRows.get(), sequenceNum);
+                    long maxRow = Math.max(expectedRows.get(), sequenceNum); // this doesn't really work since we now know seq numbers are 0 based per partition
                     expectedRows.set(maxRow);
+
+                    Long partitionId = Long.parseLong(row[3]);
+                    // long sequencNum = Long.parseLong(row[2]);
+                    RowData rowObj = new RowData(
+                        Long.parseLong(row[3]), // partition id
+                        sequenceNum, // sequence number
+                        rowTxnId, // row id
+                        Byte.parseByte(row[5])  // export operation
+                    );
+                    long mapID = (partitionId<<32) | sequenceNum; // assumes sequence number doesn't exceed 4 billion unsigned
+                    if (!rowData.containsKey(mapID)) {
+                        rowData.put(mapID, rowObj);
+                    } else {
+                        duplifiedRows.incrementAndGet();
+                        log.info("Duplicate row found: " + smsg);
+                    }
                     foundRowIds.add(sequenceNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
                         log.info("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
@@ -250,13 +297,27 @@ public class KafkaClientVerifier {
 
     /**
      * Verify that the topic contains an expected number of rows, no records are
-     * skipped based on the sequence field and no records are duplicated based
-     * on the unique field
+     * skipped based on the sequence field and no records are duplicated based on
+     * the unique field
+     *
+     * Command line options typically passed in Python via runapp*.py
+     *
+     * "genqa.KafkaClientVerifier":
+     * [
+     *         ('--brokers', self.kafkacluster.get_kfka_conn_str()),
+     *         ('--topicprefix', tableprefix),
+     *         ('--topic',"EXPORT_PARTITIONED_TABLE_KAFKA"),
+     *         ('--sequencefield',7),
+     *         ('--uniquenessfield',0),
+     *         ('--partitionfield',3),
+     *         ('--consumers',3),
+     * ]
+     *
      *
      * @throws Exception
      */
     public void verifyTopic(String topic, Integer uniqueIndexFieldNum, Integer sequenceFieldNum,
-            Integer partitionFieldNum) throws Exception {
+            Integer partitionFieldNum, Boolean usetableexport) throws Exception {
 
         List<String> topics = new ArrayList<String>();
         topics.add(topic);
@@ -297,6 +358,7 @@ public class KafkaClientVerifier {
             }
         }
 
+        log.info("+++ consumersLatch.getCount(): " +  consumersLatch.getCount());
         consumersLatch.await();
         log.info("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
         if (consumedRows.get() == 0) {
@@ -351,7 +413,7 @@ public class KafkaClientVerifier {
         log.info(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
 
         // duplicates may be expected in some situations where only part of a buffer was transferred before
-        // a failure and we and  volt re-submits the entire buffer
+        // a failure and volt re-submits the entire buffer
         if (duplicateCnt > 0) {
             // if we have more then 60 MB worth of duplicates, this is an error
             long duplicate_size = duplicateCnt * maxRecordSize.get();
@@ -364,6 +426,25 @@ public class KafkaClientVerifier {
             } else {
                 log.warn("there were " + duplicateCnt + " duplicate ids");
             }
+        }
+
+        // process metadata
+        if (usetableexport) {
+            long metaOps[] = {0, 0, 0, 0, 0};
+            final int INSERTS = 1;
+            final int DELETES = 2;
+            final int UPDATES_BEFORE = 3;
+            final int UPDATES_AFTER = 4;
+            // long inserts = 1, updates_before = 0, updates_after = 0, deletes = 0;
+            for (Long rowObj : rowData.keySet()) {
+                metaOps[rowData.get(rowObj).m_exportOp]++;
+            }
+            log.info("Duplicates " + duplifiedRows.get());
+            log.info("Inserts " + metaOps[INSERTS]);
+            log.info("Deletes " + metaOps[DELETES]);
+            log.info("Updates/Before " + metaOps[UPDATES_BEFORE]);
+            log.info("Updates/After " + metaOps[UPDATES_AFTER]);
+            log.info("Total-rows " + ids.size());
         }
     }
 
@@ -385,7 +466,7 @@ public class KafkaClientVerifier {
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
         try {
-            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield);
+            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield, config.usetableexport);
         } catch (IOException e) {
             log.error(e.toString());
             e.printStackTrace(System.err);

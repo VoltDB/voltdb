@@ -128,7 +128,6 @@ public class AsyncExportClient
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
                 log.info("TableExport failed: " + trace);
-		log.info("Failed transaction type (from getAppStatus: " + transType);
             }
         }
     }
