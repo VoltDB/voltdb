@@ -100,6 +100,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
+import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
@@ -111,8 +112,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
-
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Compiles schema (SQL DDL) text files and stores the results in a given catalog.
@@ -1626,9 +1625,6 @@ public class DDLCompiler {
         }
     }
 
-    // Note: duplication of allowed topic format values in enterprise code.
-    private static final ImmutableSet<String> s_topicFormats = ImmutableSet.of("AVRO", "JSON", "CSV");
-
     private static void addTopicToCatalogTable (Table table,
                             VoltXMLElement node,
                             Map<String, Column> columnMap,
@@ -1643,12 +1639,16 @@ public class DDLCompiler {
         }
         String topicFormatName = node.attributes.get(SQLParser.CAPTURE_TOPIC_FORMAT);
         if (topicFormatName != null) {
-            if (!s_topicFormats.contains(topicFormatName)) {
-                throw compiler.new VoltCompilerException(
-                        String.format("% is not a valid topic format in STREAM %s. Acceptable values are: %s",
-                                topicFormatName, table.getTypeName(), s_topicFormats));
+            try {
+                // Parse the format in an unchecked fashion and handle exceptions
+                EncodeFormat format = EncodeFormat.valueOf(EncodeFormat.class, topicFormatName);
+                table.setTopicformat(format.name());
             }
-            table.setTopicformat(topicFormatName);
+            catch (Exception ex) {
+                throw compiler.new VoltCompilerException(
+                        String.format("%s is not a valid topic format in STREAM %s. Acceptable values are: %s",
+                                topicFormatName, table.getTypeName(), EncodeFormat.valueSet()));
+            }
         }
         String topicKeyColumnNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
         if (topicKeyColumnNames != null) {
