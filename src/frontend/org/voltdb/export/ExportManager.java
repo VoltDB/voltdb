@@ -35,10 +35,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
+import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
@@ -51,6 +53,7 @@ import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
@@ -121,7 +124,8 @@ public class ExportManager implements ExportManagerInterface
     private int m_exportTablesCount = 0;
     private int m_connCount = 0;
     private boolean m_startPolling = false;
-    private SimpleClientResponseAdapter m_adapter;
+    private SimpleClientResponseAdapter m_migratePartitionAdapter;
+    private SimpleClientResponseAdapter m_migrateRowAdapter;
     private ClientInterface m_ci;
 
     // Track the data sources being closed, and a lock allowing {@code canUpdateCatalog()}
@@ -133,21 +137,6 @@ public class ExportManager implements ExportManagerInterface
     @Override
     public ExportManagerInterface.ExportMode getExportMode() {
         return ExportManagerInterface.ExportMode.BASIC;
-    }
-
-    /**
-     * Indicate to associated {@link ExportGeneration}s to become
-     * leaders for the given partition id
-     * @param partitionId
-     */
-    @Override
-    synchronized public void becomeLeader(int partitionId) {
-        m_masterOfPartitions.add(partitionId);
-        ExportGeneration generation = m_generation.get();
-        if (generation == null) {
-            return;
-        }
-        generation.becomeLeader(partitionId);
     }
 
     protected ExportManager() {
@@ -183,6 +172,64 @@ public class ExportManager implements ExportManagerInterface
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
+    }
+
+    @Override
+    public void startListeners(ClientInterface cif) {
+        m_ci = cif;
+
+        // Initialize adapter for migrating rows
+        m_migrateRowAdapter = new SimpleClientResponseAdapter(
+                ClientInterface.MIGRATE_ROWS_DELETE_CID, "MigrateRowsAdapter");
+        m_ci.bindAdapter(m_migrateRowAdapter, null);
+
+        // Initialize adapter fpr partition leadership and start a listener
+        m_migratePartitionAdapter = new SimpleClientResponseAdapter(
+                ClientInterface.EXPORT_MANAGER_CID, getClass().getSimpleName());
+
+        cif.bindAdapter(m_migratePartitionAdapter, new ClientInterfaceRepairCallback() {
+
+            @Override
+            public void repairCompleted(int partitionId, long initiatorHSId) {
+                handlePartitionLeader(partitionId, initiatorHSId);
+            }
+
+            @Override
+            public void leaderMigrated(int partitionId, long initiatorHSId) {
+                handlePartitionLeader(partitionId, initiatorHSId);
+            }
+
+            private void handlePartitionLeader(int partitionId, long initiatorHSId) {
+                if (partitionId == MpInitiator.MP_INIT_PID) {
+                    return;
+                }
+                onPartitionLeaderMigrated(isLocalHost(initiatorHSId), partitionId);
+            }
+
+            private boolean isLocalHost(long hsId) {
+                return CoreUtils.getHostIdFromHSId(hsId) == m_hostId;
+            }
+        });
+    }
+
+    synchronized void onPartitionLeaderMigrated(boolean isLeader, int partitionId) {
+        if (isLeader) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Acquire leadership of partition " + partitionId);
+            }
+            m_masterOfPartitions.add(partitionId);
+            ExportGeneration generation = m_generation.get();
+            if (generation == null) {
+                return;
+            }
+            generation.becomeLeader(partitionId);
+        }
+        else {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Lost leadership of partition " + partitionId);
+            }
+            m_masterOfPartitions.remove(partitionId);
+        }
     }
 
     public HostMessenger getHostMessenger() {
@@ -606,14 +653,6 @@ public class ExportManager implements ExportManagerInterface
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
         }
-    }
-
-    @Override
-    public void clientInterfaceStarted(ClientInterface clientInterface) {
-        m_ci = clientInterface;
-        m_adapter = new SimpleClientResponseAdapter(ClientInterface.MIGRATE_ROWS_DELETE_CID,
-                                                    "MigrateRowsAdapter");
-        m_ci.bindAdapter(m_adapter, null);
     }
 
     @Override
