@@ -119,6 +119,10 @@ class RetentionPolicyMgr {
         m_futures.remove(nonce);
     }
 
+    synchronized boolean isTaskRunning(String nonce) {
+        return m_futures.containsKey(nonce);
+    }
+
     /**
      * Abstract PBDRetentionPolicy class that uses this mgr class for scheduling executions.
      */
@@ -151,6 +155,11 @@ class RetentionPolicyMgr {
         public void stopPolicyEnforcement() {
             m_pbd.closeCursor(getCursorId());
             removeTaskFuture(m_pbd.getNonce());
+        }
+
+        @Override
+        public boolean isPolicyEnforced() {
+            return isTaskRunning(m_pbd.getNonce());
         }
     }
 

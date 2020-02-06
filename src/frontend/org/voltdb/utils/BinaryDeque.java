@@ -188,7 +188,11 @@ public interface BinaryDeque<M> {
 
     /**
      * Sets the retention policy to use on the PBD data.
-     * As of the current implementation, only one retention policy may be set on a PBD.
+     * In the current implementation, only one retention policy may be set on a PBD.
+     * <p>
+     * This method can also be used to replace an existing retention policy on the PBD
+     * data, provided that {@code stopRetentionPolicyEnforcement} has been called beforehand
+     * to stop the enforcement.
      *
      * @param policyType the retention policy type
      * @param params parameters specific to the retention policy type. For example, for time based
@@ -198,10 +202,18 @@ public interface BinaryDeque<M> {
 
     /**
      * Indicates that the BinaryDeque can now start retention policy enforcement.
+     * <p>
      * This will be typically called after the BinaryDeque is setup and required initializations
-     * are completed.
+     * are completed, or to start enforcing a new policy after a catalog update.
      */
     public void startRetentionPolicyEnforcement();
+
+    /**
+     * Indicates that the BinaryDeque must stop retention policy enforcement.
+     * <p>
+     * This will be typically on catalog update when a new policy must replace the current one.
+     */
+    public void stopRetentionPolicyEnforcement();
 
     public static class TruncatorResponse {
         public enum Status {

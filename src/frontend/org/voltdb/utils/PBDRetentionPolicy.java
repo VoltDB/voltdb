@@ -37,6 +37,11 @@ interface PBDRetentionPolicy {
     public void stopPolicyEnforcement();
 
     /**
+     * @return true if the policy is being enforced
+     */
+    public boolean isPolicyEnforced();
+
+    /**
      * This will be used by the {@link BinaryDeque} to notify the retention policy implementation that a new segment of data
      * has been added to it.
      */

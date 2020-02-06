@@ -1845,7 +1845,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public void setRetentionPolicy(RetentionPolicyType policyType, Object... params) {
-        assert(m_retentionPolicy == null);
+        if (m_retentionPolicy != null) {
+            assert !m_retentionPolicy.isPolicyEnforced()
+                : "Retention policy on PBD " + m_nonce + " must be stopped before replacing it";
+        }
         m_retentionPolicy = RetentionPolicyMgr.getInstance().addRetentionPolicy(policyType, this, params);
     }
 
@@ -1858,6 +1861,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         } catch(IOException e) {
             // Unexpected error. Hence runtime error
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void stopRetentionPolicyEnforcement() {
+        if (m_retentionPolicy != null) {
+            m_retentionPolicy.stopPolicyEnforcement();
         }
     }
 
