@@ -1159,6 +1159,28 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     alloc.thaw();
 }
 
+TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2chunks) {
+    using HookAlloc = NonCompactingChunks<LazyNonCompactingChunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<gc_policy::never>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, AllocsPerChunk * 2 - 2>;     // 2 chunks, 2nd 2 allocs from full
+    Gen gen;
+    Alloc alloc(TupleSize);
+    addresses_type addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < addresses.size(); ++i) {
+        addresses[i] = alloc.insert(gen.get());
+    }
+    set<void*> batch;
+    for(i = 0; i < AllocsPerChunk + 2; ++i) {                  // batch remove 1st chunk plus 2
+        batch.emplace(const_cast<void*>(addresses[i]));
+    }
+    alloc.remove(batch, [](map<void*, void*> const&){});
+    ASSERT_EQ(AllocsPerChunk - 4, alloc.size());
+}
+
 template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
     inline void operator()() const {
         testHookedCompactingChunks<Chunk, pol>();

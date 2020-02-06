@@ -731,7 +731,10 @@ size_t CompactingChunks::DelayedRemover::force() {
             hd = super::pop();
         }
         if (total >= allocsPerTuple) {       // any chunk released at all?
-            reinterpret_cast<char*&>(hd->m_next) = reinterpret_cast<char*>(hd->begin()) + offset;
+            reinterpret_cast<char*&>(hd->m_next) +=
+                reinterpret_cast<char const*>(hd->begin()) - reinterpret_cast<char const*>(hd->end()) + offset;
+            // cannot possibly remove more entries than table already contains
+            vassert(hd->next() >= hd->begin());
         }
         auto const remBytes = (total % allocsPerTuple) * tupleSize;
         if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
@@ -1418,7 +1421,7 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
     return src;
 }
 
-template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove(
+template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove(
         set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
     using Remover = typename CompactingChunks::DelayedRemover;
     auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
@@ -1438,7 +1441,9 @@ template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>:
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
-    batch.force();
+    auto const removed = batch.force();
+    CompactingChunks::m_allocs -= removed;                     // adjust tuple count
+    return removed;
 }
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -1461,7 +1466,9 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
-    return CompactingChunks::m_batched.prepare(true).force();
+    auto const removed = CompactingChunks::m_batched.prepare(true).force();
+    CompactingChunks::m_allocs -= removed;
+    return removed;
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #
@@ -1622,4 +1629,3 @@ HookedFreeze(truth);
 #undef HookedFreeze1
 #undef HookedFreeze2
 // # # # # # # # # # # # # # # # # # Codegen: end # # # # # # # # # # # # # # # # # # # # # # #
-
