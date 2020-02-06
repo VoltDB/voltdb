@@ -193,6 +193,19 @@ void testNonCompactingChunks(size_t outOfOrder) {
     assert(alloc.empty());                 // everything gone
 }
 
+TEST_F(TableTupleAllocatorTest, TestChunkListFind) {
+    CompactingChunks alloc(TupleSize);
+    array<void*, 3 * AllocsPerChunk> addresses;
+    for(auto i = 0; i < addresses.size(); ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    for(auto i = 0; i < addresses.size(); ++i) {
+        auto const* iter = alloc.find(addresses[i]);
+        ASSERT_NE(iter, nullptr);
+        ASSERT_TRUE((*iter)->contains(addresses[i]));
+    }
+}
+
 template<typename Chunks>
 void testIteratorOfNonCompactingChunks() {
     using const_iterator = typename IterableTableTupleChunks<Chunks, truth>::const_iterator;

@@ -200,7 +200,7 @@ inline void ChunkList<Chunk, E>::add(iterator const&& h) {
 template<typename Chunk, typename E>
 inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(void const* k) const {
     if (! m_map.empty()) {
-        auto const& iter = prev(m_map.upper_bound(k));                    // find last entry whose begin() <= k
+        auto const& iter = prev(m_map.upper_bound(k));                    // find first entry whose begin() > k
         return iter != m_map.cend() && iter->second->contains(k) ? &iter->second : nullptr;
     } else {
         return nullptr;
