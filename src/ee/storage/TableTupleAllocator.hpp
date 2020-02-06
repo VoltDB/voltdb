@@ -540,7 +540,7 @@ namespace voltdb {
              * occurs. Map for removed addr => addr that fills in
              * the removed address
              */
-            void remove(set<void*> const&, function<void(map<void*, void*>const&)> const&);
+            size_t remove(set<void*> const&, function<void(map<void*, void*>const&)> const&);
             /**
              * Batch removal using separate calls
              */
