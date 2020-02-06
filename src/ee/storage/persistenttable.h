@@ -1016,7 +1016,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         --m_invisibleTuplesPendingDeleteCount;
     }
 
-    allocator().remove(&tuple);
+    allocator().remove(tuple.address());
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {

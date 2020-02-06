@@ -654,48 +654,30 @@ void PersistentTable::finalizeDelete() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
-    std::vector<void*> moved{};
-    allocator().remove(m_releaseBatch, [this, &moved](map<void*, void*> const& tuples) {
-        TableTuple origin(m_schema);
-        for(auto const& p : tuples) {
-            moved.emplace_back(p.first);
-            origin.move(p.second);
-            BOOST_FOREACH (auto index, m_indexes) {
-                index->deleteEntry(&origin);
-            }
-            if (isTableWithMigrate(m_tableType)) {
-               uint16_t migrateColumnIndex = getMigrateColumnIndex();
-                NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
-                if (!txnId.isNull()) {
-                    migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
-                }
-            }
-            if (m_tableStreamer != NULL) {
-                m_tableStreamer->notifyTupleDelete(origin);
-            }
-       }
-    });
-
-    m_releaseBatch.clear();
-
-    // add back to indexes after moved
-    TableTuple target(m_schema);
-    BOOST_FOREACH (auto* tuple, moved) {
-       target.move(tuple);
-       BOOST_FOREACH (auto index, m_indexes) {
-          index->addEntry(&target, NULL);
-       }
-       if (isTableWithMigrate(m_tableType)) {
-          uint16_t migrateColumnIndex = getMigrateColumnIndex();
-          NValue txnId = target.getHiddenNValue(migrateColumnIndex);
-          if (!txnId.isNull()) {
-              migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+    allocator().remove(m_releaseBatch, [this](map<void*, void*> const& tuples) {
+           TableTuple target(m_schema);
+           TableTuple origin(m_schema);
+           for(auto const& p : tuples) {
+               target.move(p.first);
+               origin.move(p.second);
+               target.copy(origin);
+               BOOST_FOREACH (auto index, m_indexes) {
+                   index->replaceEntryNoKeyChange(target, origin);
+               }
+               if (isTableWithMigrate(m_tableType)) {
+                  uint16_t migrateColumnIndex = getMigrateColumnIndex();
+                   NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
+                   if (!txnId.isNull()) {
+                       migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
+                       migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+                   }
+               }
+               if (m_tableStreamer != NULL) {
+                   m_tableStreamer->notifyTupleMovement(origin, target);
+               }
           }
-       }
-       if (m_tableStreamer != NULL) {
-           m_tableStreamer->notifyTupleInsert(target);
-       }
-    }
+       });
+    m_releaseBatch.clear();
 }
 
 /*
@@ -804,12 +786,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
          */
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
-           char* tupleData = partialCopyToPool(uq->getPool(), target.address(), target.tupleLength());
-           //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
-           //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-           //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(
-                  *uq->getPool(), tupleData, &m_surgeon);
+                  *uq->getPool(), target.address(), &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 vassert(m_shadowStream != nullptr);
@@ -891,7 +869,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(
       std::vector<TableIndex*> const& indexesToUpdate, bool fallible, bool updateDRTimestamp, bool fromMigrate) {
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
-    int tupleLength = targetTupleToUpdate.tupleLength();
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
 
     /**
@@ -1055,9 +1032,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(
          * Create and register an undo action with copies of the "before" and "after" tuple storage
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
-        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
-              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
+              *uq->getPool(), oldTupleData, targetTupleToUpdate.address(), oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -1110,16 +1086,8 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
                                          char* sourceTupleDataWithNewValues,
                                          bool revertIndexes,
                                          bool fromMigrate) {
-    TableTuple matchable(m_schema);
-    // Get the address of the tuple in the table from one of the copies on hand.
-    // Any TableScan OR a primary key lookup on an already updated index will find the tuple
-    // by its unwanted updated values.
-    if (revertIndexes || primaryKeyIndex() == NULL) {
-        matchable.move(tupleWithUnwantedValues);
-    } else { // A primary key lookup on a not-yet-updated index will find the tuple by its original/new values.
-        matchable.move(sourceTupleDataWithNewValues);
-    }
-    TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
+
+    TableTuple targetTupleToUpdate(tupleWithUnwantedValues, m_schema);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
     //If the indexes were never updated there is no need to revert them.
@@ -1317,24 +1285,11 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple& target) {
  *     can be used directly.
  */
 void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
-    TableTuple matchable(tupleData, m_schema);
     TableTuple target(tupleData, m_schema);
-    //* enable for debug */ std::cout << "DEBUG: undoing "
-    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-    if (!skipLookup) {
-        // The UndoInsertAction got a pooled copy of the tupleData.
-        // Relocate the original tuple actually in the table.
-        target = lookupTupleForUndo(matchable);
-    }
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
-              matchable.debugNoHeader().c_str());
+           target.debugNoHeader().c_str());
     }
-    //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
-    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-
     // Make sure that they are not trying to delete the same tuple twice
     vassert(target.isActive());
     deleteFromAllIndexes(&target);
