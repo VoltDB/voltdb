@@ -654,30 +654,31 @@ void PersistentTable::finalizeDelete() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
-    allocator().remove(m_releaseBatch, [this](map<void*, void*> const& tuples) {
-           TableTuple target(m_schema);
-           TableTuple origin(m_schema);
-           for(auto const& p : tuples) {
-               target.move(p.first);
-               origin.move(p.second);
-               target.copy(origin);
-               BOOST_FOREACH (auto index, m_indexes) {
-                   index->replaceEntryNoKeyChange(target, origin);
-               }
-               if (isTableWithMigrate(m_tableType)) {
-                  uint16_t migrateColumnIndex = getMigrateColumnIndex();
-                   NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
-                   if (!txnId.isNull()) {
-                       migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
-                       migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-                   }
-               }
-               if (m_tableStreamer != NULL) {
-                   m_tableStreamer->notifyTupleMovement(origin, target);
-               }
-          }
-       });
+    map<void*, void*> movedTuples{};
+    allocator().remove(m_releaseBatch, [this, &movedTuples](map<void*, void*> const& tuples) {
+        movedTuples = tuples;
+    });
     m_releaseBatch.clear();
+    TableTuple target(m_schema);
+    TableTuple origin(m_schema);
+    for(auto const& p : movedTuples) {
+        target.move(p.first);
+        origin.move(p.second);
+        BOOST_FOREACH (auto index, m_indexes) {
+            index->replaceEntryNoKeyChange(target, origin);
+        }
+        if (isTableWithMigrate(m_tableType)) {
+            uint16_t migrateColumnIndex = getMigrateColumnIndex();
+            NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
+            if (!txnId.isNull()) {
+                migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
+                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+            }
+        }
+        if (m_tableStreamer != NULL) {
+            m_tableStreamer->notifyTupleMovement(origin, target);
+        }
+    }
 }
 
 /*
