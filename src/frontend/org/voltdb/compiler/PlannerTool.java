@@ -25,7 +25,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -230,7 +229,6 @@ public class PlannerTool {
         JoinCounter scanCounter = new JoinCounter();
         rel.accept(scanCounter);
         boolean canCommuteJoins = scanCounter.canCommuteJoins();
-        boolean hasJoins = scanCounter.hasJoins();
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
@@ -261,12 +259,6 @@ public class PlannerTool {
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
-
-        final RelDistribution distribution = transformed.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-        // Allow MP single table queries only
-        if (! distribution.getIsSP() && hasJoins) { // defer SP/MP detection outside MP_FALLBACK phase
-            throw new PlannerFallbackException("MP query with join(s) is not supported in Calcite planner.");
-        }
 
         // Transform RIGHT Outer joins to LEFT ones
         transformed = VoltPlanner.transformHep(Phase.LOGICAL_JOIN, transformed);
