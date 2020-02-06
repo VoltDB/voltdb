@@ -81,6 +81,9 @@ public class AsyncExportClient
     // Transactions between catalog swaps.
     public static long CATALOG_SWAP_INTERVAL = 500000;
 
+    // used by table export (change data capture) mode
+    // String requestedOp[] = {"INSERT", "DELETE", "UPDATE" };
+
     static class AsyncCallback implements ProcedureCallback
     {
         private final long m_rowid;
@@ -107,27 +110,32 @@ public class AsyncExportClient
 
     static class TableExportCallback implements ProcedureCallback
     {
-        private final long m_type;
-        public TableExportCallback(long type)
+
+        private final long m_row_id;
+        private final long m_op;
+        public TableExportCallback(long row_id, long op)
         {
             super();
-            m_type = type;
+            m_op = op;
+            m_row_id = row_id;
         }
+
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
-            long now = System.currentTimeMillis();
-            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
+                int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(transType);
             }
             else
             {
+                long now = System.currentTimeMillis();
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
-                log.info("TableExport failed: " + trace);
+                // log.info("TableExport failed: " + trace);
+                // log.info("Failed row_id: " + m_row_id + ", Operation: " + m_op); // it's static so whose rowid anyway?
             }
         }
     }
@@ -176,12 +184,14 @@ public class AsyncExportClient
 
     // If testing Table/Export, count inserts, deletes, update fore & aft
 
+    private static int NONE = 0;
     private static int INSERT = 1;
-    private static int DELETE = 2;
-    private static int UPDATE_OLD = 3;
+    private static int DELETE = 3;
+    private static int UPDATE_OLD = 2;
     private static int UPDATE_NEW = 4;
     // TBD: add MIGRATE (5), though not relevant in this test (yet)
     private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
+    private static final AtomicLongArray RequestedTransactionCounts = new AtomicLongArray(4);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
@@ -311,14 +321,14 @@ public class AsyncExportClient
 
                 // Table with Export
                 if (config.usetableexport) {
-                    // call TableExport twice, once will insert, the second will randomly update or delete
-                    for (int i = 0; i < 2; i++) {
+                    for (long op = 1; op < 4; op++) {
+                        RequestedTransactionCounts.incrementAndGet((int) op);
                         try {
                             clientRef.get().callProcedure(
-                                    new TableExportCallback(r.nextInt(3)+1),
+                                    new TableExportCallback(rowId.get(), op),
                                     "TableExport",
                                     currentRowId,
-                                    0);
+                                    op);
                         }
                         catch (Exception e) {
                             log.fatal("Exception: " + e);
@@ -417,9 +427,9 @@ public class AsyncExportClient
                       + " Table/Export Results\n"
                       + "-------------------------------------------------------------------------------------\n\n"
                       + "A total of %d calls were received...\n"
-                      + " - %,9d Inserts\n"
-                      + " - %,9d Deletes\n"
-                      + " - %,9d Updates/Before"
+                      + " - %,9d Committed-Inserts\n"
+                      + " - %,9d Committed-Deletes\n"
+                      + " - %,9d Committed-Updates/Before"
                       + "\n\n"
                       + "-------------------------------------------------------------------------------------\n"
                       , TrackingResults.get(0)+TrackingResults.get(1)
@@ -429,9 +439,29 @@ public class AsyncExportClient
                       // old & new on each update so either = total updates, not the sum of the 2
                       // +TransactionCounts.get(UPDATE_NEW)
                       );
+                log.info(
+                        String.format(
+                            "-------------------------------------------------------------------------------------\n"
+                          + " Table/Export Requested Operation Results\n"
+                          + "-------------------------------------------------------------------------------------\n\n"
+                          + "A total of %d calls were requested...\n"
+                          + " - %,9d Requested-Inserts\n"
+                          + " - %,9d Requested-Deletes\n"
+                          + " - %,9d Requested-Updates/Before"
+                          + "\n\n"
+                          + "-------------------------------------------------------------------------------------\n"
+                          , TrackingResults.get(0)+TrackingResults.get(1)
+                          , RequestedTransactionCounts.get(INSERT)
+                          , RequestedTransactionCounts.get(DELETE)
+                          , RequestedTransactionCounts.get(UPDATE_OLD))
+                          // old & new on each update so either = total updates, not the sum of the 2
+                          // +TransactionCounts.get(UPDATE_NEW)
+                          );
 
                 long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
                 log.info("\nEXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
+                
+                /*********** Removed in newer versions -- no loopback exporter back into the database
                 long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
                 log.info("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
 
@@ -443,6 +473,7 @@ public class AsyncExportClient
                     // System.err.println("ERROR: Metadata expected " + meta_data_expected +
                     //     " count does not match with table count: " + table_with_metadata_count + "\n");
                 }
+                 ************/
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
                     log.info("Insert and delete count " + export_table_expected +
