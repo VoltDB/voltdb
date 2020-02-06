@@ -455,7 +455,7 @@ inline size_t CompactingChunks::id() const noexcept {
     return m_id;
 }
 
-inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
+CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     trait(this), m_id(gen_id()), m_tupleSize(tupleSize), m_batched(*this) {}
 
 // returns non-null value only if in snapshot,
@@ -1133,6 +1133,77 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::hooked_ite
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) :
 super(c, c) {}
 
+inline AllocPosition::AllocPosition(ChunkHolder const& c) noexcept :
+m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
+
+inline AllocPosition::AllocPosition(CompactingChunks const& c, void const* p) : m_lastAlloc(p) {
+    auto const* iterp = c.find(p);
+    if (iterp == nullptr || ! ((*iterp)->contains(p) || (*iterp)->end() > p)) {
+        // NOTE: it is possible that the txn view does not
+        // contain the ptr, as the chunk has been removed. In
+        // that case, we simply "empty" it, and note the
+        // semantics of less<AllocPosition>.
+        const_cast<void*&>(m_lastAlloc) = nullptr;
+    } else {
+        const_cast<size_t&>(m_lastChunkId) = (*iterp)->id();
+    }
+}
+
+template<typename iterator>
+inline AllocPosition::AllocPosition(void const* p, iterator const& iter) noexcept :
+m_lastChunkId(iter->id()), m_lastAlloc(p) {}
+
+inline size_t AllocPosition::lastChunkId() const noexcept {
+    return m_lastChunkId;
+}
+inline void const* AllocPosition::lastAlloc() const noexcept {
+    return m_lastAlloc;
+}
+inline bool AllocPosition::empty() const noexcept {
+    return m_lastAlloc == nullptr;
+}
+
+inline AllocPosition& AllocPosition::operator=(AllocPosition const& o) noexcept {
+    const_cast<size_t&>(m_lastChunkId) = o.lastChunkId();
+    m_lastAlloc = o.lastAlloc();
+    return *this;
+}
+
+template<typename Alloc, typename Trait, typename C, typename E>
+inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(
+        size_t tupleSize, AllocPosition const& boundary):
+    Trait([this](void const* key) {
+                m_changes.erase(key);                        // no-op for non-existent key
+                m_copied.erase(key);
+                m_storage.tryFree(const_cast<void*>(key));
+            }),
+    m_storage(tupleSize), m_boundary(boundary) {}
+
+
+namespace std {
+    using namespace voltdb::storage;
+    template<> struct less<AllocPosition> {
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
+            bool const e1 = lhs.empty(), e2 = rhs.empty();
+            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
+                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
+            } else {
+                auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
+                return (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc()) || less_rolling(id1, id2);
+            }
+        }
+    };
+    template<> struct less_equal<AllocPosition> {
+        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
+            return lhs.lastAlloc() == rhs.lastAlloc() || less<AllocPosition>()(lhs, rhs);
+        }
+    };
+    template<> struct less<ChunkHolder> {
+        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
+            return less_rolling(lhs.id(), rhs.id());
+        }
+    };
+}
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
@@ -1203,77 +1274,6 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
         m_batched.emplace_front(addr);
     }
 }
-
-inline AllocPosition::AllocPosition(ChunkHolder const& c) noexcept :
-m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
-
-inline AllocPosition::AllocPosition(CompactingChunks const& c, void const* p) : m_lastAlloc(p) {
-    auto const* iterp = c.find(p);
-    if (iterp == nullptr || ! ((*iterp)->contains(p) || (*iterp)->end() > p)) {
-        // NOTE: it is possible that the txn view does not
-        // contain the ptr, as the chunk has been removed. In
-        // that case, we simply "empty" it, and note the
-        // semantics of less<AllocPosition>.
-        const_cast<void*&>(m_lastAlloc) = nullptr;
-    } else {
-        const_cast<size_t&>(m_lastChunkId) = (*iterp)->id();
-    }
-}
-
-template<typename iterator>
-inline AllocPosition::AllocPosition(void const* p, iterator const& iter) noexcept :
-m_lastChunkId(iter->id()), m_lastAlloc(p) {}
-
-inline size_t AllocPosition::lastChunkId() const noexcept {
-    return m_lastChunkId;
-}
-inline void const* AllocPosition::lastAlloc() const noexcept {
-    return m_lastAlloc;
-}
-inline bool AllocPosition::empty() const noexcept {
-    return m_lastAlloc == nullptr;
-}
-
-inline AllocPosition& AllocPosition::operator=(AllocPosition const& o) noexcept {
-    const_cast<size_t&>(m_lastChunkId) = o.lastChunkId();
-    m_lastAlloc = o.lastAlloc();
-    return *this;
-}
-
-namespace std {
-    using namespace voltdb::storage;
-    template<> struct less<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
-            bool const e1 = lhs.empty(), e2 = rhs.empty();
-            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
-                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
-            } else {
-                auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
-                return (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc()) || less_rolling(id1, id2);
-            }
-        }
-    };
-    template<> struct less_equal<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
-            return lhs.lastAlloc() == rhs.lastAlloc() || less<AllocPosition>()(lhs, rhs);
-        }
-    };
-    template<> struct less<ChunkHolder> {
-        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
-            return less_rolling(lhs.id(), rhs.id());
-        }
-    };
-}
-
-template<typename Alloc, typename Trait, typename C, typename E>
-inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(
-        size_t tupleSize, AllocPosition const& boundary):
-    Trait([this](void const* key) {
-                m_changes.erase(key);                        // no-op for non-existent key
-                m_copied.erase(key);
-                m_storage.tryFree(const_cast<void*>(key));
-            }),
-    m_storage(tupleSize), m_boundary(boundary) {}
 
 template<typename Alloc, typename Trait, typename C, typename E> inline bool const&
 TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
@@ -1380,10 +1380,15 @@ template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept :
     CompactingChunks(s), Hook(s, CompactingChunks::boundary()) {}
 
-template<typename Hook, typename E> inline void
+template<typename Hook, typename E>
+template<typename Tag> inline shared_ptr<typename
+    IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
 HookedCompactingChunks<Hook, E>::freeze() {
+    using iterator_type = typename
+    IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator;
     Hook::freeze();
     CompactingChunks::freeze();
+    return make_shared<iterator_type>(*this);
 }
 
 template<typename Hook, typename E> inline void
@@ -1600,5 +1605,21 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen
 #undef HookedIteratorCodegen2
 #undef HookedIteratorCodegen3
+// template member function
+#define HookedFreeze2(tag, alloc, gc)                                                    \
+template shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<alloc,  \
+         HistoryRetainTrait<gc>>, void>, tag, void>::hooked_iterator>                    \
+HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>()
+#define HookedFreeze1(tag, alloc)                                                        \
+    HookedFreeze2(tag, alloc, gc_policy::never);                                         \
+    HookedFreeze2(tag, alloc, gc_policy::always);                                        \
+    HookedFreeze2(tag, alloc, gc_policy::batched)
+#define HookedFreeze(tag)                                                                \
+    HookedFreeze1(tag, NonCompactingChunks<EagerNonCompactingChunk>);                    \
+    HookedFreeze1(tag, NonCompactingChunks<LazyNonCompactingChunk>)
+HookedFreeze(truth);
+#undef HookedFreeze
+#undef HookedFreeze1
+#undef HookedFreeze2
 // # # # # # # # # # # # # # # # # # Codegen: end # # # # # # # # # # # # # # # # # # # # # # #
 

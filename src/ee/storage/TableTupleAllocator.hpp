@@ -540,18 +540,24 @@ namespace voltdb {
             bool const& hasDeletes() const noexcept;
         };
 
+        template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
+
         /**
          * Client API that manipulates in high level.
          */
-        template<typename Hook, typename = typename enable_if<Hook::is_hook::value>::type>
+        template<typename Hook, typename E = typename enable_if<Hook::is_hook::value>::type>
         class HookedCompactingChunks : public CompactingChunks, public Hook {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
+            using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            void freeze(); void thaw();                 // switch of snapshot process
+            template<typename Tag>
+            shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
+            freeze();
+            void thaw();                 // switch of snapshot process
             void const* insert(void const*);
             void const* remove(void*);
             /**

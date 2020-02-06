@@ -823,7 +823,7 @@ void testHookedCompactingChunks() {
     for(i = 0; i < NumTuples; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();
+    alloc.template freeze<truth>();
     using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
     using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
     auto const verify_snapshot_const = [&alloc_cref]() {
@@ -971,7 +971,7 @@ void testHookedCompactingChunksBatchRemove_single1() {
     for(i = 0; i < AllocsPerChunk; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();
+    alloc.template freeze<truth>();
     auto const verify_snapshot_const = [&alloc_cref]() {
         using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
         size_t i = 0;
@@ -1005,7 +1005,7 @@ void testHookedCompactingChunksBatchRemove_single2() {
     for(i = 0; i < AllocsPerChunk; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();
+    alloc.template freeze<truth>();
     // verifies both const snapshot iterator, and destructuring iterator
     auto const verify_snapshot_const = [&alloc, &alloc_cref]() {
         using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
@@ -1049,7 +1049,7 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
     for(i = 0; i < 10; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();
+    alloc.template freeze<truth>();
     alloc.remove(set<void*>{const_cast<void*>(addresses[4])},      // 9 => 4
             [](map<void*, void*> const&){});
     i = 0;
@@ -1094,7 +1094,7 @@ void testHookedCompactingChunksBatchRemove_multi1() {
                 });
         assert(i == AllocsPerChunk * 3);
     };
-    alloc.freeze();
+    alloc.template freeze<truth>();
 
     set<void*> batch;
     auto iter = addresses.begin();
@@ -1141,7 +1141,7 @@ void testHookedCompactingChunksBatchRemove_multi2() {
                 });
         assert(i == NumTuples);
     };
-    alloc.freeze();
+    alloc.template freeze<truth>();
 
     set<void*> batch;
     for(auto iter = addresses.cbegin();                             // remove every other
@@ -1220,7 +1220,7 @@ void testInterleavedCompactingChunks() {
     for(i = 0; i < NumTuples; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();
+    alloc.template freeze<truth>();
     using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
     using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
     using explicit_iterator_type = pair<size_t, snapshot_iterator>;
@@ -1348,7 +1348,7 @@ void testSingleChunkSnapshot() {
     for(i = 0; i < Number; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.freeze();                                            // single chunk, not full before freeze,
+    alloc.template freeze<truth>();                                     // single chunk, not full before freeze,
     alloc.remove(const_cast<void*>(addresses[0]));             // then a few deletions
     alloc.remove(const_cast<void*>(addresses[5]));
     alloc.remove(const_cast<void*>(addresses[10]));
