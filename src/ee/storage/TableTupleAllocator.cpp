@@ -1348,7 +1348,9 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
             });
-    return batch.force();
+    auto const removed = batch.force();
+    CompactingChunks::m_allocs -= removed;                     // adjust tuple count
+    return removed;
 }
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -1371,7 +1373,9 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(Hook::ChangeType::Deletion, entry.first, nullptr);
             });
-    return CompactingChunks::m_batched.prepare(true).force();
+    auto const removed = CompactingChunks::m_batched.prepare(true).force();
+    CompactingChunks::m_allocs -= removed;
+    return removed;
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

@@ -358,7 +358,6 @@ namespace voltdb {
 
             size_t const m_id;                    // ensure injection relation to rw iterator
             size_t const m_tupleSize;
-            size_t m_allocs = 0;
             // used to keep track of end of 1st chunk when frozen:
             // needed for special case when there is a single
             // non-full chunk when snapshot started.
@@ -380,6 +379,7 @@ namespace voltdb {
                 vector<void*> sorted();                         // in compacting order
             };
         protected:
+            size_t m_allocs = 0;
             class DelayedRemover : protected BatchRemoveAccumulator {
                 using super = BatchRemoveAccumulator;
                 size_t m_size = 0;
