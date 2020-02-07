@@ -219,7 +219,7 @@ public class KafkaClientVerifier {
 
                     // the number of expected rows should match the max of the
                     // field that contains the sequence field
-                    long maxRow = Math.max(expectedRows.get(), sequenceNum); // this doesn't really work since we now know seq numbers are 0 based per partition
+                    long maxRow = Math.max(expectedRows.get(), sequenceNum); // TODO: rework based on partitionid + sequence number
                     expectedRows.set(maxRow);
 
                     Long partitionId = Long.parseLong(row[3]);
@@ -358,7 +358,6 @@ public class KafkaClientVerifier {
             }
         }
 
-        log.info("+++ consumersLatch.getCount(): " +  consumersLatch.getCount());
         consumersLatch.await();
         log.info("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
         if (consumedRows.get() == 0) {
@@ -407,7 +406,7 @@ public class KafkaClientVerifier {
         log.info("");
         log.info("Total messages in Kafka = " + ids.size());
         log.info("Total missing client row IDs in Kafka = " + missingCnt);
-        log.info("Total duplicates discovered in Kafka = " + duplicateCnt);
+        // log.info("Total duplicates discovered in Kafka = " + duplicateCnt); TODO: rework dupe counting using partition id & sequence number
         log.info("Total attempted rows submitted from client (max client row ID) = " + lastId);
         log.info("max row ID number should = received count - duplicates + missing row ids");
         log.info(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
@@ -435,10 +434,12 @@ public class KafkaClientVerifier {
             final int DELETES = 2;
             final int UPDATES_BEFORE = 3;
             final int UPDATES_AFTER = 4;
-            // long inserts = 1, updates_before = 0, updates_after = 0, deletes = 0;
+
+            // total up metadata for all the rows, by metadata operation type
             for (Long rowObj : rowData.keySet()) {
                 metaOps[rowData.get(rowObj).m_exportOp]++;
             }
+            log.info("\nTable Export (change data capture) Statistics\n");
             log.info("Duplicates " + duplifiedRows.get());
             log.info("Inserts " + metaOps[INSERTS]);
             log.info("Deletes " + metaOps[DELETES]);
