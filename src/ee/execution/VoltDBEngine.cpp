@@ -86,6 +86,8 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/DRTupleStream.h"
 
+#include "kipling/GroupStore.h"
+
 #if !defined(NDEBUG) && defined(MACOSX)
 // Mute EXC_BAD_ACCESS in the debug mode for running LLDB.
 #include <mach/task.h>
@@ -213,6 +215,7 @@ VoltDBEngine::initialize(
     EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
     SynchronizedThreadLock::init(sitesPerHost, newLocals);
     SynchronizedThreadLock::unlockReplicatedResourceForInit();
+    m_groupStore.reset(new kipling::GroupStore());
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -1263,6 +1266,8 @@ void VoltDBEngine::createSystemTables() {
         table->incrementRefcount();
         m_systemTables[id] = table;
     }
+
+    m_groupStore->initialize(this);
 }
 
 /*
@@ -3130,6 +3135,62 @@ void VoltDBEngine::disableExternalStreams() {
 
 bool VoltDBEngine::externalStreamsEnabled() {
     return m_executorContext->externalStreamsEnabled();
+}
+
+int32_t VoltDBEngine::storeKiplingGroup(int64_t undoToken, SerializeInputBE& in){
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->storeGroup(in);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::deleteKiplingGroup(int64_t undoToken, const NValue& groupId){
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->deleteGroup(groupId);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::fetchKiplingGroups(int32_t maxResultSize, const NValue& startGroupId) {
+    resetReusedResultOutputBuffer();
+    try {
+        return m_groupStore->fetchGroups(maxResultSize, startGroupId, m_resultOutput) ? 1 : 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return -1;
+}
+
+int32_t VoltDBEngine::commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
+        const NValue& groupId, SerializeInputBE& in) {
+    setUndoToken(undoToken);
+    resetReusedResultOutputBuffer();
+    try {
+        m_groupStore->commitOffsets(spUniqueId, requestVersion, groupId, in, m_resultOutput);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in) {
+    resetReusedResultOutputBuffer();
+    try {
+        m_groupStore->fetchOffsets(requestVersion, groupId, in, m_resultOutput);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
 }
 
 void VoltDBEngine::loadBuiltInJavaFunctions() {

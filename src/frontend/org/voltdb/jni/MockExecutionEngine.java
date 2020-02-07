@@ -280,4 +280,31 @@ public class MockExecutionEngine extends ExecutionEngine {
     public boolean externalStreamsEnabled() {
         return true;
     }
+
+    @Override
+    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deleteKiplingGroup(long undoToken, String groupId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+            byte[] offsets) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        throw new UnsupportedOperationException();
+    }
+
 }

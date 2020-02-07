@@ -233,6 +233,12 @@ public:
         return m_end - m_current;
     }
 
+    // Reduce the size of this input down to limit. Limit must be less then current end
+    void limit(size_t limit) {
+        vassert(m_current + limit <= m_end);
+        m_end = m_current + limit;
+    }
+
 private:
     template <typename T>
     T readPrimitive() {
