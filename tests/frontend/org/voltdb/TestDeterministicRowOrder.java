@@ -256,8 +256,8 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         createCluster();
         Thread insert = new Thread(() -> {
-            long numberOfItems = 10000;
-            int duration = 60 * 1000;
+            long numberOfItems = 5000;
+            int duration = 30 * 1000;
             long start = System.currentTimeMillis();
             long now = start;
             long end = start + duration;
@@ -275,7 +275,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
 
         Thread delete = new Thread(()-> {
             long start = System.currentTimeMillis();
-            int duration = 100 * 1000;
+            int duration = 50 * 1000;
             long now = start;
             long end = start + duration;
             while (now < end) {
@@ -294,7 +294,6 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
 
         insert.join();
         delete.join();
-        Thread.sleep(5000);
         try {
             long rowCount = client.callProcedure("@AdHoc", "select count(*) from bigfoo").getResults()[0].asScalarLong();
             assert(0 == rowCount);
