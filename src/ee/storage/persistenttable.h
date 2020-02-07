@@ -754,7 +754,7 @@ private:
 
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
-    std::unique_ptr<SnapshotIterator> m_snapIt;
+    std::shared_ptr<SnapshotIterator> m_snapIt;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;

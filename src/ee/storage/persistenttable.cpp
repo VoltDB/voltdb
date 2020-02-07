@@ -640,7 +640,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
 
 TableTuple PersistentTable::createTuple(TableTuple const &source){
     TableTuple target(m_schema);
-    void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().insert(source.m_data)));
+    void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
     target.move(address);
     target.copyForPersistentInsert(source);
     return target;
@@ -1017,7 +1017,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     std::vector<char*> newObjects;
 
     // this is the actual write of the new values
-    allocator().update(targetTupleToUpdate.address(), sourceTupleWithNewValues.address());
+    allocator().update(targetTupleToUpdate.address());
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (fromMigrate) {
@@ -1139,6 +1139,8 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
         }
     }
+    //TO DO: undo update
+    allocator().update(targetTupleToUpdate.address());
 }
 
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool removeMigratingIndex) {
@@ -1822,8 +1824,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 }
 
 void PersistentTable::activateSnapshot() {
-    allocator().freeze();
-    m_snapIt.reset(new SnapshotIterator(allocator()));
+   m_snapIt = allocator().template freeze<storage::truth>();
 }
 
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple) {
@@ -1838,6 +1839,9 @@ bool PersistentTable::nextSnapshotTuple(TableTuple& tuple) {
            return false;
         }
         return true;
+    }
+    if (m_snapIt->drained()) {
+        allocator().thaw();
     }
     return false;
 }

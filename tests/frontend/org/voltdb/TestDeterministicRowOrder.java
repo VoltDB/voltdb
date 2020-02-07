@@ -358,6 +358,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             long rows = vt.asScalarLong();
             vt = client.callProcedure("@AdHoc", "select count(*) from foo").getResults()[0];
             long mprows = vt.asScalarLong();
+            vt = client.callProcedure("@AdHoc", "delete from KV").getResults()[0];
             client.drain();
             System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
             vt = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
@@ -371,10 +372,11 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             vt = client.callProcedure("@AdHoc", "select * from KV").getResults()[0];
             vt = client.callProcedure("@AdHoc", "select * from FOO").getResults()[0];
             vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
-            assert((rows *2) == vt.asScalarLong());
+            assert(rows == vt.asScalarLong());
             vt = client.callProcedure("@AdHoc", "select count(*) from FOO").getResults()[0];
             assert((mprows *2) == vt.asScalarLong());
         } catch (Exception e) {
+            e.printStackTrace();
             fail(e.getMessage());
         } finally {
             shutDown(server);

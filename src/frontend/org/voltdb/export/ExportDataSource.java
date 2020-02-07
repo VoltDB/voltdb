@@ -1721,30 +1721,34 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void updateCatalog(Table table, long genId) {
-        // Skip unneeded catalog update
-        if (m_currentGenerationId >= genId || m_closed) {
+        if (m_closed) {
             return;
         }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (m_currentGenerationId < genId) {
-                    try {
-                        ExportRowSchema schema =
-                                ExportRowSchema.create(table, m_partitionId, m_committedBuffers.getGenerationIdCreated(), genId);
-                        m_committedBuffers.updateSchema(schema);
-                    } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
-                    }
-                    m_currentGenerationId = genId;
+                try {
+                    ExportRowSchema schema =
+                            ExportRowSchema.create(table, m_partitionId, m_committedBuffers.getGenerationIdCreated(), genId);
+                    m_committedBuffers.updateSchema(schema);
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
                 }
+                m_currentGenerationId = genId;
             }
         });
     }
 
     // This is called when schema update doesn't affect export
     public void updateGenerationId(long genId) {
-        m_currentGenerationId = genId;
+        // This needs to be serialized through the executor service, so the when updateCatalog() writes
+        // genId to the PBD header, the correct generation id for that schema is used.
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                m_currentGenerationId = genId;
+            }
+        });
     }
 
     // Called from {@code ExportCoordinator}, returns duplicate of tracker

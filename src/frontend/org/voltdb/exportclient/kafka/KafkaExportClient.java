@@ -281,13 +281,14 @@ public class KafkaExportClient extends ExportClientBase {
     class KafkaExportDecoder extends ExportDecoderBase {
 
         String m_topic = null;
-        boolean m_primed = false;
         Properties m_decoderProducerConfig;
         KafkaProducer<String, String> m_producer;
         final CSVStringDecoder m_decoder;
         final List<Future<RecordMetadata>> m_futures = new ArrayList<>();
         private final AtomicBoolean m_failure = new AtomicBoolean(false);
         final ListeningExecutorService m_es;
+        private volatile boolean m_primed = false;
+        private volatile boolean m_paused = false;;
 
         public KafkaExportDecoder(AdvertisedDataSource source) {
             super(source);
@@ -313,7 +314,24 @@ public class KafkaExportClient extends ExportClientBase {
             m_decoderProducerConfig.putAll(m_producerConfig);
         }
 
-        final void checkOnFirstRow() throws RestartBlockException {
+        @Override
+        public synchronized void pause() {
+            m_paused = true;
+            if (m_producer != null) {
+                m_producer.close(Duration.ofMillis(0));
+            }
+            m_primed = false;
+        }
+
+        @Override
+        public synchronized void resume() {
+            m_paused = false;
+        }
+
+        final synchronized void checkOnFirstRow() throws RestartBlockException {
+            if (m_paused) {
+                throw new RestartBlockException("Exporter has been paused", false);
+            }
             if (!m_primed) try {
                 setClientId();
                 m_producer = new KafkaProducer<>(m_decoderProducerConfig);
@@ -377,13 +395,13 @@ public class KafkaExportClient extends ExportClientBase {
 
         @Override
         public void onBlockStart(ExportRow row) throws RestartBlockException {
-            if (!m_primed) checkOnFirstRow();
+            checkOnFirstRow();
             if (m_topic == null) populateTopic(row.tableName);
         }
 
         @Override
         public boolean processRow(ExportRow rd) throws RestartBlockException {
-            if (!m_primed) checkOnFirstRow();
+            checkOnFirstRow();
 
             String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
             //Use partition value by default if its null use partition id.
@@ -404,6 +422,8 @@ public class KafkaExportClient extends ExportClientBase {
             } catch (KafkaException e) {
                 LOG.warn("Unable to send %s", e, krec);
                 throw new RestartBlockException("Unable to send message", e, true);
+            } catch(IllegalStateException e) { // thrown if a catalog update closes the producer through pause()
+                throw new RestartBlockException("IllegalStateException, possibly because kafka producer was closed", e, false);
             }
             return true;
         }
