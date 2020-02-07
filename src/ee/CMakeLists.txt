@@ -210,6 +210,7 @@ SET (VOLTDB_SRC
   indexes/IndexStats.cpp
   indexes/tableindex.cpp
   indexes/tableindexfactory.cpp
+  kipling/GroupStore.cpp
   kipling/messages/OffsetCommit.cpp
   kipling/messages/OffsetFetch.cpp
   kipling/orm/Group.cpp
