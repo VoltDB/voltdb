@@ -1400,17 +1400,15 @@ HookedCompactingChunks<Hook, E>::thaw() {
     CompactingChunks::thaw();
 }
 
-template<typename Hook, typename E> inline void const*
-HookedCompactingChunks<Hook, E>::insert(void const* src) {
-    void const* r = memcpy(CompactingChunks::allocate(), src, CompactingChunks::tupleSize());
+template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
+    void* r = CompactingChunks::allocate();
     Hook::add(*this, Hook::ChangeType::Insertion, r);
     return r;
 }
 
 template<typename Hook, typename E> inline void
-HookedCompactingChunks<Hook, E>::update(void* dst, void const* src) {
+HookedCompactingChunks<Hook, E>::update(void* dst) {
     Hook::add(*this, Hook::ChangeType::Update, dst);
-    memcpy(dst, src, CompactingChunks::tupleSize());
 }
 
 template<typename Hook, typename E> inline void const*

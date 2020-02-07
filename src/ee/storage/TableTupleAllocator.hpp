@@ -557,8 +557,9 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            void thaw();                 // switch of snapshot process
-            void const* insert(void const*);
+            void thaw();                               // switch of snapshot process
+            void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
+            void update(void*);                        // NOTE: this must be called prior to any memcpy operations happen
             void const* remove(void*);
             /**
              * Batch removal using a single call
@@ -576,7 +577,6 @@ namespace voltdb {
             size_t remove_add(void*);
             map<void*, void*>const& remove_moves();
             size_t remove_force();
-            void update(void* dst, void const* src);   // src as temp tuple gets written to persistent location dst
         };
 
         /**

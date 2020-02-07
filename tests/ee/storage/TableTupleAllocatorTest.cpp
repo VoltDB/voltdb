@@ -821,7 +821,8 @@ void testHookedCompactingChunks() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     auto iterp = alloc.template freeze<truth>();
     using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
@@ -849,7 +850,8 @@ void testHookedCompactingChunks() {
 
     // Step 1: update
     for (i = 200; i < 1200; ++i) {
-        alloc.update(const_cast<void*>(addresses[i]), addresses[i + 2000]);
+        alloc.update(const_cast<void*>(addresses[i]));
+        memcpy(const_cast<void*>(addresses[i]), addresses[i + 2000], TupleSize);
     }
     verify_snapshot_const();
 
@@ -869,13 +871,14 @@ void testHookedCompactingChunks() {
 
     // Step 4: insertion
     for (i = 0; i < 500; ++i) {
-        alloc.insert(gen.get());
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
     verify_snapshot_const();
 
     // Step 5: update
     for (i = 2000; i < 2200; ++i) {
-        alloc.update(const_cast<void*>(addresses[i]), gen.get());
+        alloc.update(const_cast<void*>(addresses[i]));
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     verify_snapshot_const();
 
@@ -900,7 +903,7 @@ void testHookedCompactingChunks() {
         size_t ii;
         switch(changeTypes(rgen)) {
             case 0:                                            // insertion
-                p1 = alloc.insert(gen.get());
+                p1 = memcpy(alloc.allocate(), gen.get(), TupleSize);
                 break;
             case 1:                                            // deletion
                 ii = range(rgen);
@@ -921,7 +924,8 @@ void testHookedCompactingChunks() {
                 if (latest[ii] == nullptr) {
                     continue;
                 } else {
-                    alloc.update(const_cast<void*>(latest[ii]), gen.get());
+                    alloc.update(const_cast<void*>(latest[ii]));
+                    memcpy(const_cast<void*>(latest[ii]), gen.get(), TupleSize);
                     latest[ii] = p1;
                     p1 = nullptr;
                 }
@@ -972,7 +976,8 @@ void testHookedCompactingChunksBatchRemove_single1() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < AllocsPerChunk; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
     auto const verify_snapshot_const = [&alloc_cref]() {
@@ -1006,7 +1011,8 @@ void testHookedCompactingChunksBatchRemove_single2() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < AllocsPerChunk; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
     // verifies both const snapshot iterator, and destructuring iterator
@@ -1029,7 +1035,7 @@ void testHookedCompactingChunksBatchRemove_single2() {
         s.emplace(const_cast<void*>(addresses[i]));
     }
     for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
-        alloc.insert(gen.get());
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
     alloc.remove(s, [](map<void*, void*> const&) {});
     verify_snapshot_const();
@@ -1050,7 +1056,8 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < 10; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
     alloc.remove(set<void*>{const_cast<void*>(addresses[4])},      // 9 => 4
@@ -1079,7 +1086,8 @@ void testHookedCompactingChunksBatchRemove_multi1() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < AllocsPerChunk * 3; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     // verifies both const snapshot iterator, and destructuring iterator
     auto const verify_snapshot_const = [&alloc]() {
@@ -1126,7 +1134,8 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     // verifies both const snapshot iterator, and destructuring iterator
     auto const verify_snapshot_const = [&alloc]() {
@@ -1174,7 +1183,8 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2c
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < addresses.size(); ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     set<void*> batch;
     for(i = 0; i < AllocsPerChunk + 2; ++i) {                  // batch remove 1st chunk plus 2
@@ -1243,7 +1253,8 @@ void testInterleavedCompactingChunks() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
     using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
@@ -1284,7 +1295,7 @@ void testInterleavedCompactingChunks() {
         size_t i1, i2;
         switch(changeTypes(rgen)) {
             case 0:                                            // insertion
-                p1 = alloc.insert(gen.get());
+                memcpy(const_cast<void*&>(p1) = alloc.allocate(), gen.get(), TupleSize);
                 break;
             case 1:                                            // deletion
                 i1 = range(rgen);
@@ -1306,7 +1317,8 @@ void testInterleavedCompactingChunks() {
                     if (i1 == i2 || addresses[i1] == nullptr || addresses[i2] == nullptr) {
                         continue;
                     } else {
-                        alloc.update(const_cast<void*>(addresses[i2]), addresses[i1]);
+                        alloc.update(const_cast<void*>(addresses[i2]));
+                        memcpy(const_cast<void*>(addresses[i2]), addresses[i1], TupleSize);
                         addresses[i2] = p1;
                         p1 = nullptr;
                     }
@@ -1371,7 +1383,8 @@ void testSingleChunkSnapshot() {
     assert(alloc.empty());
     size_t i;
     for(i = 0; i < Number; ++i) {
-        addresses[i] = alloc.insert(gen.get());
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();                                     // single chunk, not full before freeze,
     alloc.remove(const_cast<void*>(addresses[0]));             // then a few deletions
