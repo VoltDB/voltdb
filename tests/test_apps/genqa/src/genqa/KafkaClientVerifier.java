@@ -170,15 +170,17 @@ public class KafkaClientVerifier {
         private final Integer m_uniqueFieldNum;
         private final Integer m_sequenceFieldNum;
         private final Integer m_partitionFieldNum;
+        private final Boolean m_usetableexport;
         private final Integer timeoutSec;
 
         public TopicReader(KafkaConsumer<String, String> consumer, CountDownLatch cdl, Integer uniqueFieldNum,
-                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout, AtomicBoolean testGood ) {
+                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout, AtomicBoolean testGood, Boolean usetableexport) {
             this.consumer = consumer;
             m_cdl = cdl;
             m_uniqueFieldNum = uniqueFieldNum;
             m_sequenceFieldNum = sequenceFieldNum;
             m_partitionFieldNum = partitionFieldNum;
+            m_usetableexport = usetableexport;
             timeoutSec = timeout;
 
         }
@@ -222,20 +224,23 @@ public class KafkaClientVerifier {
                     long maxRow = Math.max(expectedRows.get(), sequenceNum); // TODO: rework based on partitionid + sequence number
                     expectedRows.set(maxRow);
 
-                    Long partitionId = Long.parseLong(row[3]);
-                    // long sequencNum = Long.parseLong(row[2]);
-                    RowData rowObj = new RowData(
-                        Long.parseLong(row[3]), // partition id
-                        sequenceNum, // sequence number
-                        rowTxnId, // row id
-                        Byte.parseByte(row[5])  // export operation
-                    );
-                    long mapID = (partitionId<<32) | sequenceNum; // assumes sequence number doesn't exceed 4 billion unsigned
-                    if (!rowData.containsKey(mapID)) {
-                        rowData.put(mapID, rowObj);
-                    } else {
-                        duplifiedRows.incrementAndGet();
-                        log.info("Duplicate row found: " + smsg);
+                    // new code to check for dupes using the combination of partition id and sequence number
+                    // since sequence number by itself is zero-based per partition
+                    if (m_usetableexport) {
+                        Long partitionId = Long.parseLong(row[3]);
+                        RowData rowObj = new RowData(
+                            Long.parseLong(row[3]), // partition id
+                            sequenceNum, // sequence number
+                            rowTxnId, // row id
+                            Byte.parseByte(row[5])  // export operation
+                        );
+                        long mapID = (partitionId<<32) | sequenceNum; // assumes sequence number doesn't exceed 4 billion unsigned
+                        if (!rowData.containsKey(mapID)) {
+                            rowData.put(mapID, rowObj);
+                        } else {
+                            duplifiedRows.incrementAndGet();
+                            log.info("Duplicate row found: " + smsg);
+                        }
                     }
                     foundRowIds.add(sequenceNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
@@ -330,7 +335,7 @@ public class KafkaClientVerifier {
             consumer.subscribe(Arrays.asList(topic));
             log.info("Creating consumer for " + topic);
             TopicReader reader = new TopicReader(consumer, consumersLatch, uniqueIndexFieldNum, sequenceFieldNum,
-                    partitionFieldNum, consumerTimeoutSecs, testGood);
+                    partitionFieldNum, consumerTimeoutSecs, testGood, usetableexport);
             executor.execute(reader);
         }
 

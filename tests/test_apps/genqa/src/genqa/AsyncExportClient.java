@@ -452,7 +452,7 @@ public class AsyncExportClient
                           + " - %,9d Queued-Updates/Before"
                           + "\n\n"
                           + "-------------------------------------------------------------------------------------\n"
-                          , QueuedTransactionCounts.get(INSERT) + QueuedTransactionCounts.get(DELETE) + QueuedTransactionCounts.get(UPDATE_OLD))
+                          , QueuedTransactionCounts.get(INSERT) + QueuedTransactionCounts.get(DELETE) + QueuedTransactionCounts.get(UPDATE_OLD)
                           , QueuedTransactionCounts.get(INSERT)
                           , QueuedTransactionCounts.get(DELETE)
                           , QueuedTransactionCounts.get(UPDATE_OLD))
