@@ -654,6 +654,7 @@ void PersistentTable::finalizeDelete() {
             m_tableStreamer->notifyTupleDelete(target);
         }
     }
+    m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
     map<void*, void*> movedTuples{};
     allocator().remove(m_releaseBatch, [this, &movedTuples](map<void*, void*> const& tuples) {
         movedTuples = tuples;
