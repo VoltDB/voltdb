@@ -1871,6 +1871,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
+    @Override
+    public boolean isRetentionPolicyEnforced() {
+        return m_retentionPolicy != null && m_retentionPolicy.isPolicyEnforced();
+    }
+
     /**
      * Create a new builder for constructing instances of {@link PersistentBinaryDeque}
      *

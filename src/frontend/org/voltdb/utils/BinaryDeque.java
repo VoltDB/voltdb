@@ -215,6 +215,11 @@ public interface BinaryDeque<M> {
      */
     public void stopRetentionPolicyEnforcement();
 
+    /**
+     * @return if a retention policy is currently enforced
+     */
+    public boolean isRetentionPolicyEnforced();
+
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
