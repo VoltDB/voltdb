@@ -1341,7 +1341,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
              matched = (::memcmp(tableTupleData, tupleData, tuple_length) == 0);
         }
         if (matched) {
-            matchedTuple.copy(tableTuple);
+            matchedTuple.move(tableTuple.address());
             return true;
         } else {
             return false;
