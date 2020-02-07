@@ -1309,7 +1309,7 @@ HookedCompactingChunks<Hook, E>::thaw() {
 
 template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::insert(void const* src) {
-    void const* r = memcpy(CompactingChunks::allocate(), src, CompactingChunks::tupleSize());
+    void const* r = CompactingChunks::allocate();
     Hook::add(Hook::ChangeType::Insertion, nullptr, r);
     return r;
 }
