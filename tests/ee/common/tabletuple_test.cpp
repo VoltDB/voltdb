@@ -276,11 +276,11 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
                                              std::make_pair(ValueType::tVARCHAR, 256));
     std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     char signature[20];
-    std::unique_ptr<Table> table{TableFactory::getPersistentTable(0,
+    PersistentTable* table = dynamic_cast<PersistentTable *> (TableFactory::getPersistentTable(0,
                                                                   "perstbl",
                                                                   schema,
                                                                   columnNames,
-                                                                  signature)};
+                                                                  signature));
     TableTuple tuple = table->tempTuple();
     Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
 
@@ -297,22 +297,22 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
     ASSERT_FALSE(nv.getVolatile());
 
     table->insertTuple(tuple);
-    TableIterator it = table->iterator();
     TableTuple iterTuple{schema};
-    while (it.next(iterTuple)) {
-        // Regular, TupleBlock-backed tuples are never volatile.
-        ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
-        ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
+    storage::for_each<PersistentTable::txn_iterator>(table->allocator(), [this, &iterTuple](void const* p) {
+         void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(p));
+         iterTuple.move(tupleData);
+         ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
+         ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
 
-        nv = iterTuple.getNValue(0);
-        ASSERT_FALSE(nv.getVolatile());
+         NValue nv = iterTuple.getNValue(0);
+         ASSERT_FALSE(nv.getVolatile());
 
-        nv = iterTuple.getNValue(1);
-        ASSERT_FALSE(nv.getVolatile());
+         nv = iterTuple.getNValue(1);
+         ASSERT_FALSE(nv.getVolatile());
 
-        nv = iterTuple.getNValue(2);
-        ASSERT_FALSE(nv.getVolatile());
-    }
+         nv = iterTuple.getNValue(2);
+         ASSERT_FALSE(nv.getVolatile());
+    });
 }
 
 TEST_F(TableTupleTest, HeaderDefaults) {

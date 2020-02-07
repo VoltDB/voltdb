@@ -747,6 +747,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 
     TableTuple conflict(m_schema);
     try {
