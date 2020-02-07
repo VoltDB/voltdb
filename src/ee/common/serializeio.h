@@ -427,6 +427,12 @@ public:
         m_position += length;
     }
 
+    void writeVarBinary(std::function<void(SerializeOutput&)> writer) {
+        int pos = reserveBytes(sizeof(int32_t));
+        writer(*this);
+        writeIntAt(pos, position() - pos - sizeof(int32_t));
+    }
+
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
     size_t reserveBytes(size_t length) {
         assureExpand(length);
