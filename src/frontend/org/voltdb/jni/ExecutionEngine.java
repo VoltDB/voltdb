@@ -920,6 +920,57 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract boolean externalStreamsEnabled();
 
+    /**
+     * Store a kipling group and its members in the system tables
+     *
+     * @param undoToken       to be used for this transaction
+     * @param serializedGroup kipling group serialized into a byte[]
+     */
+    public abstract void storeKiplingGroup(long undoToken, byte[] serializedGroup);
+
+    /**
+     * Delete a kiplng group, all members and all offsets
+     *
+     * @param undoToken to be used for this transaction
+     * @param groupId   ID of group to be dleted
+     */
+    public abstract void deleteKiplingGroup(long undoToken, String groupId);
+
+    /**
+     * Start or continue a fetch of all group from this site.
+     *
+     * If the Boolean in the return is {@code true} then there are more groups to fetch and this method should be called
+     * repeatedly with the last groupId returned until {@code false} is returned.
+     *
+     * @param maxResultSize for any result returned by this fetch
+     * @param groupId       non-inclusive start point for iterating over groups. {@code null} means start at begining
+     * @return A {@link Pair} indicating if there are more groups and the serialized groups
+     */
+    public abstract Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String groupId);
+
+    /**
+     * Commit topic partition offsets for a kipling group in the system tables
+     *
+     * @param spUniqueId     for this transaction
+     * @param undoToken      to be used for this transaction
+     * @param requestVersion Version of the kipling message making this request
+     * @param groupId        ID of the group
+     * @param offsets        serialized offsets to be stored
+     * @return response to requester
+     */
+    public abstract byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion,
+            String groupId, byte[] offsets);
+
+    /**
+     * Fetch topic partition offsets for a kipling group from the system tables
+     *
+     * @param requestVersion version of the kipling message making this request
+     * @param groupId        IF of group
+     * @param offsets        serialized offsets being requested
+     * @return response to requester
+     */
+    public abstract byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -1294,6 +1345,60 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public native static byte[] getTestDRBuffer(int drProtocolVersion, int partitionId,
                                                 int partitionKeyValues[], int flags[],
                                                 long startSequenceNumber);
+
+    // --------------------------------------------------------
+    // Kipling methods
+    // --------------------------------------------------------
+    /**
+     * Store a kipling group in the kipling system tables. The serialized group should be put in the m_psetBuffer
+     *
+     * @param pointer   to execution engine
+     * @param undoToken to use to be able to rollback the store
+     */
+    native static protected int nativeStoreKiplingGroup(long pointer, long undoToken);
+
+    /**
+     * Delete a kipling group, all members and offsets
+     *
+     * @param pointer   to execution engine
+     * @param undoToken to use to be able to rollback the delete
+     * @param groupId   of the group to delete
+     */
+    native static protected int nativeDeleteKiplingGroup(long pointer, long undoToken, byte[] groupId);
+
+    /**
+     * Start or continue a fetch of all groups from this site. The response will be in m_nextDeserializer
+     *
+     * @param pointer      to execution engine
+     * @param maxResponse  size for any response. If {@code <= 0} this is a continue of a fetch else a new fetch will be
+     *                     started
+     * @param startGroupId Non inclusive groupId from which to start fetching groups
+     * @return {@code true} if there are more groups to fetch
+     */
+    native static protected int nativeFetchKiplingGroups(long pointer, int maxResponse, byte[] startGroupId);
+
+    /**
+     * Commit topic partition offsets for the kipling group. The serialized offsets should be put in the m_psetBuffer
+     * and the response will be in m_nextDeserializer
+     *
+     * @param pointer        to execution engine
+     * @param spUniqueId     for this transaction
+     * @param undoToken      to use to be able to rollback the delete
+     * @param requestVersion of the kipling request
+     * @param groupId        of the group these offsets should be associated with
+     */
+    native static protected int nativeCommitKiplingGroupOffsets(long pointer, long spUniqueId, long undoToken,
+            short requestVersion, byte[] groupId);
+
+    /**
+     * Fetch topic partition offsets for a group. The serialized offsets being requested should be put in the
+     * m_psetBuffer and the response will be in m_nextDeserializer
+     *
+     * @param pointer        to execution engine
+     * @param requestVersion of the kipling request
+     * @param groupId        of the group to fetch offsets from
+     */
+    native static protected int nativeFetchKiplingGroupOffsets(long pointer, short requestVersion, byte[] groupId);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

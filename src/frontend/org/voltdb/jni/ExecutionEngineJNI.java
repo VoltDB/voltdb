@@ -1138,4 +1138,71 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public boolean externalStreamsEnabled() {
         return nativeExternalStreamsEnabled(pointer);
     }
+
+    @Override
+    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+        clearPsetAndEnsureCapacity(serializedGroup.length);
+        m_psetBuffer.put(serializedGroup);
+        checkErrorCode(nativeStoreKiplingGroup(pointer, undoToken));
+    }
+
+    @Override
+    public void deleteKiplingGroup(long undoToken, String groupId) {
+        checkErrorCode(nativeDeleteKiplingGroup(pointer, undoToken, groupId.getBytes(Constants.UTF8ENCODING)));
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+        byte[] groupIdBytes = startGroupId == null ? null : startGroupId.getBytes(Constants.UTF8ENCODING);
+        m_nextDeserializer.clear();
+        int result = nativeFetchKiplingGroups(pointer, maxResultSize, groupIdBytes);
+        if (result < 0) {
+            checkErrorCode(ERRORCODE_ERROR);
+        }
+        try {
+            return Pair.of(result != 0, readVarbinary(m_nextDeserializer));
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
+    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+            byte[] offsets) {
+        clearPsetAndEnsureCapacity(offsets.length);
+        m_psetBuffer.putInt(offsets.length);
+        m_psetBuffer.put(offsets);
+        m_nextDeserializer.clear();
+        checkErrorCode(nativeCommitKiplingGroupOffsets(pointer, spUniqueId, undoToken, requestVersion,
+                groupId.getBytes(Constants.UTF8ENCODING)));
+        try {
+            return readVarbinary(m_nextDeserializer);
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
+    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        clearPsetAndEnsureCapacity(offsets.length);
+        m_psetBuffer.putInt(offsets.length);
+        m_psetBuffer.put(offsets);
+        m_nextDeserializer.clear();
+        checkErrorCode(
+                nativeFetchKiplingGroupOffsets(pointer, requestVersion, groupId.getBytes(Constants.UTF8ENCODING)));
+        try {
+            return readVarbinary(m_nextDeserializer);
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {
+        try {
+            return (m_fallbackBuffer == null ? defaultDeserializer : new FastDeserializer(m_fallbackBuffer))
+                    .readVarbinary();
+        } finally {
+            m_fallbackBuffer = null;
+        }
+    }
 }

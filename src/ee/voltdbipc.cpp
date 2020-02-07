@@ -232,11 +232,26 @@ private:
 
     void sendException( int8_t errorCode);
 
+    /*
+     * If errorCode is 0 only the errorCode will be sent otherwise the errorCode and exception will be sent
+     * return true if an exception was sent
+     */
+    bool sendResponseOrException(uint8_t errorCode);
+
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
     void exportAction(struct ipc_command *cmd);
     void deleteMigratedRows(struct ipc_command *cmd);
     void getUSOForExportTable(struct ipc_command *cmd);
+
+    // ------------------------------------------------------
+    // Methods for kipling interface
+    // ------------------------------------------------------
+    void storeKiplingGroup(struct ipc_command *cmd);
+    void deleteKiplingGroup(struct ipc_command *cmd);
+    void fetchKiplingGroups(struct ipc_command *cmd);
+    void commitKiplingGroupOffsets(struct ipc_command *cmd);
+    void fetchKiplingGroupOffsets(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
@@ -388,6 +403,46 @@ typedef struct {
     int32_t tableNameLength;
     char tableName[0];
 }__attribute__((packed)) delete_migrated_rows;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t undoToken;
+    int32_t groupDataLength;
+    char groupData[0];
+}__attribute__((packed)) store_kipling_group;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t undoToken;
+    int32_t groupIdLength;
+    char groupId[0];
+}__attribute__((packed)) delete_kipling_group;
+
+typedef struct {
+    struct ipc_command cmd;
+    int32_t maxResultSize;
+    int32_t groupIdLength;
+    char startGroupId[0];
+}__attribute__((packed)) fetch_kipling_groups;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t uniqueId;
+    int64_t undoToken;
+    int16_t requestVersion;
+    int32_t groupIdLength;
+    int32_t offsetsLength;
+    char data[0]; // After groupId is offsets
+}__attribute__((packed)) commit_kipling_group_offsets;
+
+typedef struct {
+    struct ipc_command cmd;
+    int16_t requestVersion;
+    int32_t groupIdLength;
+    int32_t offsetsLength;
+    char data[0]; // After groupId is offsets
+}__attribute__((packed)) fetch_kipling_group_offsets;
+
 
 typedef struct {
     struct ipc_command cmd;
@@ -600,6 +655,26 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           deleteMigratedRows(cmd);
           result = kErrorCode_None;
           break;
+      case 35:
+          storeKiplingGroup(cmd);
+          result = kErrorCode_None;
+          break;
+      case 36:
+          deleteKiplingGroup(cmd);
+          result = kErrorCode_None;
+          break;
+      case 37:
+          fetchKiplingGroups(cmd);
+          result = kErrorCode_None;
+          break;
+      case 38:
+           commitKiplingGroupOffsets(cmd);
+           result = kErrorCode_None;
+           break;
+       case 39:
+           fetchKiplingGroupOffsets(cmd);
+           result = kErrorCode_None;
+           break;
       default:
         result = stub(cmd);
     }
@@ -995,6 +1070,15 @@ int VoltDBIPC::callJavaUserDefinedAggregateWorkerEnd() {
 
 int VoltDBIPC::callJavaUserDefinedAggregateCoordinatorEnd() {
     return callJavaUserDefinedHelper(kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd);
+}
+
+bool VoltDBIPC::sendResponseOrException(uint8_t errorCode) {
+    if (errorCode) {
+        sendException(errorCode);
+        return true;
+    }
+    writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
+    return false;
 }
 
 void VoltDBIPC::sendException(int8_t errorCode) {
@@ -1559,6 +1643,91 @@ void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
     char response[1];
     response[0] = result ? 1 : 0;
     writeOrDie(m_fd, (unsigned char*)response, sizeof(int8_t));
+}
+
+void VoltDBIPC::storeKiplingGroup(struct ipc_command *cmd) {
+    store_kipling_group *msg = (store_kipling_group*) cmd;
+    ReferenceSerializeInputBE in(msg->groupData, static_cast<int32_t>(ntohl(msg->groupDataLength)));
+    try {
+        sendResponseOrException((uint8_t) m_engine->storeKiplingGroup(ntohll(msg->undoToken), in));
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::deleteKiplingGroup(struct ipc_command *cmd) {
+    delete_kipling_group *msg = (delete_kipling_group*) cmd;
+
+    NValue groupId = ValueFactory::getTempStringValue(msg->groupId, static_cast<int32_t>(ntohl(msg->groupIdLength)));
+
+    try {
+        sendResponseOrException((uint8_t) m_engine->deleteKiplingGroup(ntohll(msg->undoToken), groupId));
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::fetchKiplingGroups(struct ipc_command *cmd) {
+    fetch_kipling_groups *msg = (fetch_kipling_groups*) cmd;
+    NValue startGroupId = ValueFactory::getTempStringValue(msg->startGroupId,
+            static_cast<int32_t>(ntohl(msg->groupIdLength)));
+
+    try {
+        int32_t result = m_engine->fetchKiplingGroups(static_cast<int32_t>(ntohl(msg->maxResultSize)), startGroupId);
+        uint8_t response = result < 0 ? 1 : 0;
+        if (sendResponseOrException(response)) {
+            return;
+        }
+
+        response = result > 0;
+        writeOrDie(m_fd, &response, sizeof(uint8_t));
+        const int32_t size = m_engine->getResultsSize();
+        writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::commitKiplingGroupOffsets(struct ipc_command *cmd) {
+    commit_kipling_group_offsets *msg = (commit_kipling_group_offsets*) cmd;
+
+    int32_t groupIdLength = static_cast<int32_t>(ntohl(msg->groupIdLength));
+    NValue groupId = ValueFactory::getTempStringValue(msg->data, groupIdLength);
+    ReferenceSerializeInputBE in(&msg->data[groupIdLength], static_cast<int32_t>(ntohl(msg->offsetsLength)));
+
+    try {
+        uint8_t result = (uint8_t) m_engine->commitKiplingGroupOffsets(
+                ntohll(msg->uniqueId), ntohll(msg->undoToken), static_cast<int16_t>(ntohs(msg->requestVersion)), groupId, in);
+
+        if (sendResponseOrException(result)) {
+            return;
+        }
+        const int32_t size = m_engine->getResultsSize();
+        writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::fetchKiplingGroupOffsets(struct ipc_command *cmd) {
+    fetch_kipling_group_offsets *msg = (fetch_kipling_group_offsets*) cmd;
+
+    int32_t groupIdLength = static_cast<int32_t>(ntohl(msg->groupIdLength));
+    NValue groupId = ValueFactory::getTempStringValue(msg->data, groupIdLength);
+    ReferenceSerializeInputBE in(&msg->data[groupIdLength], static_cast<int32_t>(ntohl(msg->offsetsLength)));
+
+    try {
+        uint8_t result = (uint8_t) m_engine->fetchKiplingGroupOffsets(static_cast<int16_t>(ntohs(msg->requestVersion)),
+                groupId, in);
+
+        if (sendResponseOrException(result)) {
+            return;
+        }
+        const int32_t size = m_engine->getResultsSize();
+        writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {

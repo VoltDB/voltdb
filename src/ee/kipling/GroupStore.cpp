@@ -100,7 +100,6 @@ bool GroupStore::fetchGroups(int maxResultSize, const NValue& startGroupId, Seri
 
 void GroupStore::commitOffsets(int64_t spUniqueId, int16_t requestVersion, const NValue& groupId,
         SerializeInputBE& offsets, SerializeOutput& out) {
-
     OffsetCommitResponse response;
     CheckedSerializeInput checkedIn(offsets);
 
