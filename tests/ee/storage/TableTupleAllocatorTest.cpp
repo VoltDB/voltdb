@@ -823,7 +823,7 @@ void testHookedCompactingChunks() {
     for(i = 0; i < NumTuples; ++i) {
         addresses[i] = alloc.insert(gen.get());
     }
-    alloc.template freeze<truth>();
+    auto iterp = alloc.template freeze<truth>();
     using const_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_iterator;
     using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
     auto const verify_snapshot_const = [&alloc_cref]() {
@@ -834,10 +834,6 @@ void testHookedCompactingChunks() {
         });
         assert(i == NumTuples);
     };
-    // baseline test on hooked compacting chunks: snapshot view == txn view
-    i = 0;
-    for_each<snapshot_iterator>(alloc, [&i](void const* p) { assert(Gen::same(p, i++)); });
-    assert(i == NumTuples);
     i = 0;
     fold<const_iterator>(alloc_cref, [&i](void const* p) { assert(Gen::same(p, i++)); });
     assert(i == NumTuples);
@@ -946,7 +942,14 @@ void testHookedCompactingChunks() {
     }
     verify_snapshot_const();
     // simulates actual snapshot process: memory clean up as we go
+    iterp.reset(static_cast<typename decltype(iterp)::element_type*>(nullptr));// TODO: fix behavior on iterp
     i = 0;
+//    while (! iterp->drained()) {                               // explicit use of snapshot RW iterator
+//        void const* p = **iterp;
+//        assert(Gen::same(p, i++));
+//        alloc.release(p);                                      // snapshot of the tuple finished
+//        ++*iterp;
+//    }
     for_each<snapshot_iterator>(alloc, [&alloc, &i](void const* p) {
                 assert(Gen::same(p, i++));
                 alloc.release(p);                          // snapshot of the tuple finished
