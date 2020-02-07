@@ -47,7 +47,8 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
     static final String SCHEMA =
             "CREATE TABLE kv (" +
                     "key bigint not null, " +
-                    "val bigint not null " +  // non-deterministic value (host ID)
+                    "val bigint not null, " +  // non-deterministic value (host ID)
+                    "PRIMARY KEY (key)" +
                     "); " +
                     "PARTITION TABLE kv ON COLUMN key;" +
                     "CREATE INDEX idx_kv ON kv(val);" +
@@ -139,7 +140,6 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
             int count = 0;
-            System.out.println(vt.toFormattedString());
             while(vt.advanceRow()) {
                 assert(vt.getLong(0) >= 50);
                 count++;
@@ -250,6 +250,37 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             shutDown(server);
         }
     }
+
+    @Test
+    public void testUpsert() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            for (int i = 0; i < 100; i++) {
+                client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
+            }
+            for (int i = 50; i < 110; i++) {
+                client.callProcedure("@AdHoc", "upsert into KV values(" + i + "," + 200 + ")");
+            }
+            VoltTable vt = client.callProcedure("@AdHoc", "select * from KV order by key").getResults()[0];
+            int count = 0;
+            while(vt.advanceRow()) {
+                long key = vt.getLong(0);
+                if(key < 50) {
+                    assert(vt.getLong(1) == key);
+                } else {
+                    assert(vt.getLong(1) == 200);
+                }
+                count++;
+            }
+            assert(count == 110);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
+        }
+    }
+
 
     @Test
     public void testInsertWithDelete() throws Exception {
