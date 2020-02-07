@@ -106,6 +106,10 @@ class Topend;
 class TheHashinator;
 class ExportTupleStream;
 
+namespace kipling {
+class GroupStore;
+}
+
 class TempTableTupleDeleter {
 public:
     void operator()(AbstractTempTable* tbl) const;
@@ -603,6 +607,33 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool externalStreamsEnabled();
 
+        /**
+         * Store a kipling group in the system tables
+         */
+        int32_t storeKiplingGroup(int64_t undoToken, SerializeInputBE& in);
+
+        /**
+         * Delete a kipling group and all related metadata
+         */
+        int32_t deleteKiplingGroup(int64_t undoToken, const NValue& groupId);
+
+        /**
+         * Start or continue a fetch of all kipling groups.
+         * Return 1 if there are more groups to fetch, 0 if there are no more groups or -1 if there was an error
+         */
+        int32_t fetchKiplingGroups(int32_t maxResultSize, const NValue& startGroupId);
+
+        /**
+         * Store topic parition offsets for a kipling group
+         */
+        int32_t commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
+                const NValue& groupId, SerializeInputBE& in);
+
+        /**
+         * Fetch topic parition offsets for a kipling group
+         */
+        int32_t fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -891,6 +922,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
+
+        std::unique_ptr<kipling::GroupStore> m_groupStore;
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
