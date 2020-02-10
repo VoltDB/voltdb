@@ -19,8 +19,9 @@ elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
     VOLTDB_LIB="$VOLTDB_BASE/lib"
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+    VOLTDB_BASE="`pwd`/../../.."
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
@@ -157,9 +158,27 @@ function bigjars() {
         echo -e `date`"      txnid-big-java1.jar, txnid-big-java2.jar already exist"
         echo -e `date`": Completed generation of ALL big-jar files."
         return
-    else
-        echo -e `date`": Beginning generation of jar files containing lots of Java classes..."
     fi
+
+    # voltdb (community) build has relevant tests 3 levels below the "base" (voltdb) directory
+    if [[ -d ${VOLTDB_BASE}/tests/test_apps/txnid-selfcheck2 ]]; then
+        VOLTDB_TEST="${VOLTDB_BASE}/tests/test_apps/txnid-selfcheck2"
+    # pro build has to find the tests below the adjacent voltdb (community) directory
+    elif [[ -d ${VOLTDB_BASE}/../../../../voltdb/tests/test_apps/txnid-selfcheck2 ]]; then
+        VOLTDB_TEST="${VOLTDB_BASE}/../../../../voltdb/tests/test_apps/txnid-selfcheck2"
+    fi
+    if [[ -e ${VOLTDB_TEST}/txnid-big-java1.jar && -e ${VOLTDB_TEST}/txnid-big-java2.jar ]]; then
+        set -e
+        cp -fv ${VOLTDB_TEST}/txnid-big-java1.jar ./txnid-big-java1.jar
+        cp -fv ${VOLTDB_TEST}/txnid-big-java2.jar ./txnid-big-java2.jar
+        echo -e `date`": No need to generate jar files containing lots of Java files:"
+        echo -e `date`"      txnid-big-java1.jar, txnid-big-java2.jar copied from/to:"
+        echo -e `date`"      ${VOLTDB_TEST}"
+        echo -e `date`"      "`pwd`
+        echo -e `date`": Completed generation of ALL big-jar files."
+        return
+    fi
+    echo -e `date`": Beginning generation of jar files containing lots of Java classes..."
 
 
     # make copies of the standard txnid.jar, to be added to below
@@ -188,7 +207,7 @@ function bigjars() {
             echo -e `date`": Completed compilation of SelectLE${i}${j}*.java"
         done
     done
-    echo -e `date`": Completed compilation of ALL Java files"
+    echo -e `date`": Completed compilation of all Java files"
 
     # add various Java source (.java) and compiled (.class) files to copies
     # of the standard txnid.jar;
