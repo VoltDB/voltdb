@@ -76,15 +76,11 @@ inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
             [tupleSize](size_t s) { return tupleSize * 32 <= s; }) / tupleSize * tupleSize;
 }
 
-inline size_t ChunkHolder::chunkSize() const noexcept {
-    return m_chunkSize;
-}
-
 // We remove member initialization from init list to save from
 // storing chunk size into object
 inline ChunkHolder::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
-    m_id(id), m_tupleSize(tupleSize), m_chunkSize(storageSize),
-    m_resource(new char[m_chunkSize]), m_end(m_resource.get() + m_chunkSize), m_next(m_resource.get()) {
+    m_id(id), m_tupleSize(tupleSize), m_resource(new char[storageSize]),
+    m_end(m_resource.get() + storageSize), m_next(m_resource.get()) {
     vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
 }
@@ -321,7 +317,8 @@ CompactingStorageTrait::LinearizedChunks::iterator() const noexcept {
 }
 
 template<typename C, typename E>
-inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept : m_tupleSize(tupleSize) {}
+inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept :
+m_tupleSize(tupleSize), m_chunkSize(ChunkHolder::chunkSize(tupleSize)) {}
 
 template<typename C, typename E>
 inline size_t NonCompactingChunks<C, E>::tupleSize() const noexcept {
@@ -341,8 +338,7 @@ inline void* NonCompactingChunks<C, E>::allocate() {
     if (iter == list_type::cend()) {        // all chunks are full
         list_type::emplace_back(
                 list_type::empty() ? 0 : list_type::back().id() + 1,
-                m_tupleSize,
-                list_type::empty() ? ChunkHolder::chunkSize(m_tupleSize) : list_type::front().chunkSize());
+                m_tupleSize, m_chunkSize);
         r = list_type::back().allocate();
     } else {
         r = iter->allocate();
@@ -455,7 +451,8 @@ inline size_t CompactingChunks::id() const noexcept {
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    trait(this), m_id(gen_id()), m_tupleSize(tupleSize), m_batched(*this) {}
+    trait(this), m_id(gen_id()), m_tupleSize(tupleSize),
+    m_chunkSize(ChunkHolder::chunkSize(tupleSize)), m_batched(*this) {}
 
 // returns non-null value only if in snapshot,
 // and the marked position is still in the first chunk.
@@ -497,14 +494,12 @@ size_t CompactingChunks::chunks() const noexcept {
 }
 
 size_t CompactingChunks::chunkSize() const noexcept {
-    return empty() ? ChunkHolder::chunkSize(m_tupleSize) :
-        list_type::front().chunkSize();
+    return m_chunkSize;
 }
 
 inline void* CompactingChunks::allocate() {
     if (empty() || back().full()) {                  // always allocates from tail
-        emplace_back(empty() ? 0 : back().id() + 1, m_tupleSize,
-                empty() ? ChunkHolder::chunkSize(m_tupleSize) : front().chunkSize());
+        emplace_back(empty() ? 0 : back().id() + 1, m_tupleSize, m_chunkSize);
     }
     ++m_allocs;
     return back().allocate();
@@ -723,7 +718,7 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
 size_t CompactingChunks::DelayedRemover::force() {
     auto hd = super::chunks().begin();
     auto const tupleSize = super::chunks().tupleSize(),
-        allocsPerChunk = hd->chunkSize() / tupleSize;
+        allocsPerChunk = super::chunks().chunkSize() / tupleSize;
     auto const total = m_move.size() + m_remove.size();
     if (total > 0) {
         // storage remapping and clean up

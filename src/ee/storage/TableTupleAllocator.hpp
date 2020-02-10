@@ -92,7 +92,6 @@ namespace voltdb {
         class ChunkHolder {
             size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            size_t const m_chunkSize;                  // free space for allocation
             unique_ptr<char[]> m_resource;
             void*const m_end;                          // indication of chunk capacity
         protected:
@@ -103,7 +102,6 @@ namespace voltdb {
             friend class CompactingChunks;      // for batch free
         public:
             static size_t chunkSize(size_t) noexcept;
-            size_t chunkSize() const noexcept;
             ChunkHolder(size_t id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
             void* allocate() noexcept;                 // returns NULL if this chunk is full.
@@ -223,6 +221,7 @@ namespace voltdb {
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             size_t const m_tupleSize;
+            size_t const m_chunkSize;
             size_t m_allocs = 0;
             NonCompactingChunks(EagerNonCompactingChunk const&) = delete;
             NonCompactingChunks(NonCompactingChunks&&) = delete;
@@ -382,6 +381,7 @@ namespace voltdb {
 
             size_t const m_id;                    // ensure injection relation to rw iterator
             size_t const m_tupleSize;
+            size_t const m_chunkSize;
             // used to keep track of end of 1st chunk when frozen:
             // needed for special case when there is a single
             // non-full chunk when snapshot started.
