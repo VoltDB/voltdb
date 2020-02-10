@@ -207,7 +207,7 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
+    virtual void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
                                 Pool* stringPool = NULL);
 
     /**

@@ -264,7 +264,8 @@ public:
     virtual void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
     virtual size_t getAccurateSizeToSerialize();
     virtual bool equals(voltdb::Table* other);
-
+    virtual void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
+            Pool* stringPool = NULL);
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------

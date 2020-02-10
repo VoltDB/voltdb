@@ -643,6 +643,7 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
     void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
     target.move(address);
     target.copyForPersistentInsert(source);
+    ++m_tupleCount;
     return target;
 }
 
@@ -655,6 +656,7 @@ void PersistentTable::finalizeDelete() {
         }
     }
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
+    m_tupleCount -= m_releaseBatch.size();
     map<void*, void*> movedTuples{};
     allocator().remove(m_releaseBatch, [this, &movedTuples](map<void*, void*> const& tuples) {
         movedTuples = tuples;
@@ -2185,6 +2187,26 @@ size_t PersistentTable::getAccurateSizeToSerialize() {
     vassert(written_count == m_tupleCount);
 
     return bytes;
+}
+
+void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
+                                   Pool *stringPool) {
+    int tupleCount = serialInput.readInt();
+    vassert(tupleCount >= 0);
+
+    int32_t serializedTupleCount = 0;
+    size_t tupleCountPosition = 0;
+    TableTuple target(m_schema);
+    for (int i = 0; i < tupleCount; ++i) {
+        void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
+        target.move(address);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
+        processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
+    }
+    m_tupleCount = tupleCount;
 }
 
 bool PersistentTable::equals(voltdb::Table *other) {
