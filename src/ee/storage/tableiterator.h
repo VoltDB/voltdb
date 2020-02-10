@@ -480,12 +480,11 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 
         const bool active = out.isActive();
         const bool pendingDelete = out.isPendingDelete();
-        const bool isPendingDeleteOnUndoRelease = out.isPendingDeleteOnUndoRelease();
 
         // Return this tuple only when this tuple is not marked as deleted.
         if (active) {
             ++m_foundTuples;
-            if (!(pendingDelete || isPendingDeleteOnUndoRelease)) {
+            if (!(pendingDelete)) {
                 return true;
             }
         }

@@ -258,12 +258,13 @@ public:
 
         TableTuple tuple(m_table->schema());
         size_t i = 0;
-        voltdb::TableIterator iterator = m_table->iterator();
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &i](void const* p) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(p));
+            tuple.move(tupleData);
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             m_values.push_back(value);
             m_valueSet.insert(std::pair<int64_t,size_t>(value, i++));
-        }
+        });
     }
 
     void addRandomUniqueTuples(Table *table, int numTuples, T_ValueSet *set = NULL) {
@@ -1156,7 +1157,6 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
     int tupleCount = 4;
 
     // Empty table has an assigned allocated tuple storage
-    ASSERT_EQ(1, m_table->allocatedBlockCount());
     char config[4];
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);

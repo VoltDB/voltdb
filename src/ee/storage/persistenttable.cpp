@@ -746,7 +746,6 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
 
     target.setActiveTrue();
     target.setPendingDeleteFalse();
-    target.setPendingDeleteOnUndoReleaseFalse();
     target.setInlinedDataIsVolatileFalse();
     target.setNonInlinedDataIsVolatileFalse();
 
@@ -833,7 +832,6 @@ void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& ta
 void PersistentTable::insertTupleForUndo(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
-    target.setPendingDeleteOnUndoReleaseFalse();
     --m_tuplesPinnedByUndo;
     --m_invisibleTuplesPendingDeleteCount;
 
@@ -1180,7 +1178,6 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         }
     }
     if (createUndoAction) {
-        target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
@@ -1743,7 +1740,6 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
                                  TableTuple& destinationTuple) {
     ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
     originalTuple.setActiveFalse();
-    vassert(!originalTuple.isPendingDeleteOnUndoRelease());
 
     /*
      * If the tuple is pending deletion then it isn't in any of the indexes.

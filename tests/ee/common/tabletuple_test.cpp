@@ -332,7 +332,6 @@ TEST_F(TableTupleTest, HeaderDefaults) {
     ASSERT_FALSE(theTuple.isActive());
     ASSERT_FALSE(theTuple.isDirty());
     ASSERT_FALSE(theTuple.isPendingDelete());
-    ASSERT_FALSE(theTuple.isPendingDeleteOnUndoRelease());
     ASSERT_TRUE(theTuple.inlinedDataIsVolatile());
     ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
 
@@ -341,7 +340,6 @@ TEST_F(TableTupleTest, HeaderDefaults) {
     ASSERT_FALSE(theTuple.isActive());
     ASSERT_FALSE(theTuple.isDirty());
     ASSERT_FALSE(theTuple.isPendingDelete());
-    ASSERT_FALSE(theTuple.isPendingDeleteOnUndoRelease());
     ASSERT_TRUE(theTuple.inlinedDataIsVolatile());
     ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
 }
