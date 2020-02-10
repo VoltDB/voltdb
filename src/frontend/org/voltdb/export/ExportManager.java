@@ -125,7 +125,6 @@ public class ExportManager implements ExportManagerInterface
     private int m_connCount = 0;
     private boolean m_startPolling = false;
     private SimpleClientResponseAdapter m_migratePartitionAdapter;
-    private SimpleClientResponseAdapter m_migrateRowAdapter;
     private ClientInterface m_ci;
 
     // Track the data sources being closed, and a lock allowing {@code canUpdateCatalog()}
@@ -178,12 +177,7 @@ public class ExportManager implements ExportManagerInterface
     public void startListeners(ClientInterface cif) {
         m_ci = cif;
 
-        // Initialize adapter for migrating rows
-        m_migrateRowAdapter = new SimpleClientResponseAdapter(
-                ClientInterface.MIGRATE_ROWS_DELETE_CID, "MigrateRowsAdapter");
-        m_ci.bindAdapter(m_migrateRowAdapter, null);
-
-        // Initialize adapter fpr partition leadership and start a listener
+        // Initialize adapter for partition leadership and start a listener
         m_migratePartitionAdapter = new SimpleClientResponseAdapter(
                 ClientInterface.EXPORT_MANAGER_CID, getClass().getSimpleName());
 
