@@ -34,7 +34,7 @@ import com.google.common.collect.ImmutableMap;
 /**
  *  Manager class that is the entry point for adding a time based or size based retention policy to a PBD.
  */
-class RetentionPolicyMgr {
+public class RetentionPolicyMgr {
     // TODO: Is there a way to avoid the static?
     private static final RetentionPolicyMgr s_instance = new RetentionPolicyMgr();
     public static RetentionPolicyMgr getInstance() {
@@ -90,7 +90,7 @@ class RetentionPolicyMgr {
     private TimeBasedRetentionPolicy addTimeBasedRetentionPolicy(PersistentBinaryDeque<?> pbd, Object... params) {
         assert(params.length == 1);
         assert(params[0]!=null && params[0] instanceof Long);
-        long retainMillis = ((Long) params[0]).intValue();
+        long retainMillis = ((Long) params[0]).longValue();
         assert (retainMillis > 0);
         return new TimeBasedRetentionPolicy(pbd, retainMillis);
     }
@@ -151,6 +151,11 @@ class RetentionPolicyMgr {
         public void stopPolicyEnforcement() {
             m_pbd.closeCursor(getCursorId());
             removeTaskFuture(m_pbd.getNonce());
+        }
+
+        @Override
+        public boolean isPolicyEnforced() {
+            return m_reader != null && m_reader.isOpen();
         }
     }
 
