@@ -230,7 +230,8 @@ namespace voltdb {
             NonCompactingChunks(size_t) noexcept;
             ~NonCompactingChunks() = default;
             size_t tupleSize() const noexcept;
-            size_t size() const noexcept;
+            size_t size() const noexcept;              // number of allocation requests, <= sum(allocated memory from system), considering modulo and non-full spaces
+            size_t chunks() const noexcept;            // number of chunks in the list
             void* allocate();
             void free(void*);
             bool tryFree(void*);                       // not an error if addr not found
@@ -432,7 +433,8 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
-            size_t size() const noexcept;              // used for table count executor
+            size_t size() const noexcept;              // number of allocation requested
+            size_t chunks() const noexcept;            // number of chunks
             size_t id() const noexcept;
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
