@@ -1332,7 +1332,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
             HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, this->schema());
             matched = (tableTuple.equalsNoSchemaCheck(tuple, &filter));
         } else if (lookupType != LOOKUP_FOR_UNDO && this->schema()->getUninlinedObjectColumnCount() != 0) {
-            matched =  (tableTuple.equalsNoSchemaCheck(tuple));
+            matched = (tableTuple.equalsNoSchemaCheck(tuple));
         } else {
              // Do an inline tuple byte comparison
              // to avoid matching duplicate tuples with different pointers to Object storage
@@ -2121,6 +2121,112 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
        return false;
    }
    return true;
+}
+
+void PersistentTable::serializeTo(SerializeOutput &serialOutput) {
+    // a placeholder for the total table size
+    std::size_t pos = serialOutput.position();
+    serialOutput.writeInt(-1);
+
+    serializeColumnHeaderTo(serialOutput);
+
+    // active tuple counts
+    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    int64_t written_count = 0;
+    TableTuple tuple(m_schema);
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),
+                    [this, &serialOutput, &written_count, &tuple](void* p) {
+          void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+          tuple.move(tupleAddress);
+          tuple.serializeTo(serialOutput);
+          ++written_count;
+      });
+    vassert(written_count == m_tupleCount);
+
+    // length prefix is non-inclusive
+    int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
+    vassert(sz > 0);
+    serialOutput.writeIntAt(pos, sz);
+}
+
+void PersistentTable::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
+    serializeColumnHeaderTo(serialOutput);
+
+    // active tuple counts
+    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    int64_t written_count = 0;
+    TableTuple tuple(m_schema);
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),
+                        [this, &serialOutput, &written_count, &tuple](void* p) {
+         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+         tuple.move(tupleAddress);
+         tuple.serializeTo(serialOutput);
+         ++written_count;
+    });
+    vassert(written_count == m_tupleCount);
+}
+
+size_t PersistentTable::getAccurateSizeToSerialize() {
+    // column header size
+    size_t bytes = getColumnHeaderSizeToSerialize();
+
+    // tuples
+    bytes += sizeof(int32_t);  // tuple count
+    int64_t written_count = 0;
+    TableTuple tuple(m_schema);
+    storage::for_each<PersistentTable::txn_iterator>(allocator(),
+                            [this, &written_count, &tuple, &bytes](void* p) {
+       void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+       tuple.move(tupleAddress);
+       bytes += tuple.serializationSize();  // tuple size
+       ++written_count;
+    });
+
+    vassert(written_count == m_tupleCount);
+
+    return bytes;
+}
+
+bool PersistentTable::equals(voltdb::Table *other) {
+    if (columnCount() != other->columnCount()) {
+        return false;
+    }
+
+    if (activeTupleCount() != other->activeTupleCount()) {
+        return false;
+    }
+
+    if (databaseId() != other->databaseId()) {
+        return false;
+    }
+
+    if (name() != other->name()) {
+        return false;
+    }
+
+    if (tableType() != other->tableType()) {
+        return false;
+    }
+
+    const voltdb::TupleSchema *otherSchema = other->schema();
+    if ( ! m_schema->equals(otherSchema)) {
+        return false;
+    }
+
+//    voltdb::TableIterator firstTI = iterator();
+//    voltdb::TableIterator secondTI = other->iterator();
+//    voltdb::TableTuple firstTuple(m_schema);
+//    voltdb::TableTuple secondTuple(otherSchema);
+//    while (firstTI.next(firstTuple)) {
+//        if ( ! secondTI.next(secondTuple)) {
+//            return false;
+//        }
+//
+//        if ( ! firstTuple.equals(secondTuple)) {
+//            return false;
+//        }
+//    }
+    return true;
 }
 
 } // namespace voltdb

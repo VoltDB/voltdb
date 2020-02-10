@@ -190,11 +190,11 @@ class Table {
     // ------------------------------------------------------------------
     size_t getColumnHeaderSizeToSerialize();
 
-    size_t getAccurateSizeToSerialize();
+    virtual size_t getAccurateSizeToSerialize();
 
-    void serializeTo(SerializeOutput& serialOutput);
+    virtual void serializeTo(SerializeOutput& serialOutput);
 
-    void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
+    virtual void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
 
     void serializeColumnHeaderTo(SerializeOutput& serialOutput);
 
@@ -290,7 +290,7 @@ class Table {
         throw SerializableEEException("May only use freeLastScannedBlock with instances of TempTable.");
     }
 
-    bool equals(voltdb::Table* other);
+    virtual bool equals(voltdb::Table* other);
     virtual voltdb::TableStats* getTableStats() = 0;
 
     // Return tuple blocks addresses

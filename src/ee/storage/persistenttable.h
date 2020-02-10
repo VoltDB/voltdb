@@ -260,6 +260,11 @@ public:
         throwFatalException("TableIterator is not applicable in PersistentTable");
     }
 
+    virtual void serializeTo(SerializeOutput& serialOutput);
+    virtual void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
+    virtual size_t getAccurateSizeToSerialize();
+    virtual bool equals(voltdb::Table* other);
+
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------

@@ -54,7 +54,6 @@ class TableTuple;
 struct tableutil {
 
     static bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
-    static bool getLastTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
     static void setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
     static bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
     static bool addDuplicateRandomTuples(voltdb::Table* table, int num_of_tuples);
