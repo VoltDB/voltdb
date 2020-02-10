@@ -23,6 +23,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.HashMap;
@@ -49,25 +50,50 @@ public class TestTimeBasedRetentionPolicy {
 
     PersistentBinaryDeque<ExtraHeaderMetadata> m_pbd;
 
-    @Test
+    @Test(timeout=60_000)
     public void testNoReadersOneSegment() throws Exception {
         // In this test, retention policy has only one segment to delete at a time.
         int segmentsCount = 5;
-        for (int i=0; i<segmentsCount; i++) {
-            if (i > 0) { // force new segment creation.
-                m_pbd.updateExtraHeader(null);
-            }
-            writeBuffers(2);
-            if (i > 0) {
-                assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-            }
-            Thread.sleep(s_retainMillis + 250);
-            assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-        }
+
+        // Write initial  segment, should never be deleted
+        long lastWrite = writeBuffers(2);
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        // Run common test with default timeout
+        lastWrite = commonNoReaderSegmentTest(lastWrite, segmentsCount, s_retainMillis);
 
         // last segment shouldn't get deleted
         Thread.sleep(s_retainMillis + 250);
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    private long commonNoReaderSegmentTest(long start, int segmentsCount, int retainMs) throws Exception {
+        long lastWrite = start;
+        for (int i=1; i<segmentsCount; i++) {
+            // force new segment creation.
+            m_pbd.updateExtraHeader(null);
+            lastWrite = writeBuffers(2);
+            assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+            long now = 0L;
+            long end = start + retainMs;
+            while(true) {
+                Thread.sleep(50);
+                if (TestPersistentBinaryDeque.getSortedDirectoryListing().size() == 1) {
+                    break;
+                }
+                now = System.currentTimeMillis();
+                assert (now < (end + retainMs / 4));
+            }
+
+            // We must not prune before the expected delay
+            now = System.currentTimeMillis();
+            System.out.println(String.format("start %d, end %d, now %d, pruned in %d",
+                    start, end, now, (now - start)));
+            assertTrue(now >= end);
+            start = lastWrite;
+        }
+        return lastWrite;
     }
 
     @Test
@@ -178,10 +204,13 @@ public class TestTimeBasedRetentionPolicy {
         }
     }
 
-    private void writeBuffers(int numBuffers) throws Exception {
+    private long writeBuffers(int numBuffers) throws Exception {
+        long lastWrite = 0L;
         for (int i=0; i<numBuffers; i++) {
             m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(64)) );
+            lastWrite = System.currentTimeMillis();
         }
+        return lastWrite;
     }
 
     @Before
