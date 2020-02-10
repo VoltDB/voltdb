@@ -352,10 +352,6 @@ public:
         return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_MASK;
     }
 
-    inline bool isPendingDeleteOnUndoRelease() const {
-        return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK;
-    }
-
     /** Is variable-length data stored inside the tuple volatile (could data
         change, or could storage be freed)? */
     inline bool inlinedDataIsVolatile() const {
@@ -512,15 +508,6 @@ private:
         // treat the first "value" as a boolean flag
         vassert(m_data);
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
-    }
-
-    inline void setPendingDeleteOnUndoReleaseTrue() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_ON_UNDO_RELEASE_MASK);
-    }
-    inline void setPendingDeleteOnUndoReleaseFalse() {
-        // treat the first "value" as a boolean flag
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_ON_UNDO_RELEASE_MASK);
     }
 
     inline void setPendingDeleteTrue() {
