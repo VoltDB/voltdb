@@ -69,31 +69,20 @@ inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
         0x100000/*1MB*/, 2 * 0x100000, 4 * 0x100000,  8 * 0x100000,
         0x10 * 0x100000
     }};
-    static LRU<512, size_t, size_t> lru{};
-    auto const* maybe_value = lru.get(tupleSize);
-    if (maybe_value != nullptr) {
-        return *maybe_value;
-    } else {
-        // we always pick smallest preferred chunk size to calculate
-        // how many tuples a chunk fits. The picked chunk should fit
-        // for > 4 allocations
-        auto const value = *find_if(preferred.cbegin(), preferred.cend(),
-                [tupleSize](size_t s) { return tupleSize * 4 <= s; })
-            / tupleSize * tupleSize;
-        lru.add(tupleSize, value);
-        return value;
-    }
+    // we always pick smallest preferred chunk size to calculate
+    // how many tuples a chunk fits. The picked chunk should fit
+    // for >= 32 allocations
+    return *find_if(preferred.cbegin(), preferred.cend(),
+            [tupleSize](size_t s) { return tupleSize * 32 <= s; }) / tupleSize * tupleSize;
 }
 
 // We remove member initialization from init list to save from
 // storing chunk size into object
-inline ChunkHolder::ChunkHolder(size_t id, size_t tupleSize): m_id(id), m_tupleSize(tupleSize) {
-    vassert(tupleSize <= 4 * 0x100000);    // individual tuple cannot exceeding 4MB
-    auto const size = chunkSize(m_tupleSize);
-    m_resource.reset(new char[size]);
-    m_next = m_resource.get();
+inline ChunkHolder::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
+    m_id(id), m_tupleSize(tupleSize), m_resource(new char[storageSize]),
+    m_end(m_resource.get() + storageSize), m_next(m_resource.get()) {
+    vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
-    const_cast<void*&>(m_end) = reinterpret_cast<char*>(m_next) + size;
 }
 
 inline size_t ChunkHolder::id() const noexcept {
@@ -141,7 +130,7 @@ inline size_t ChunkHolder::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t id, size_t s): ChunkHolder(id, s) {}
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s1, size_t s2, size_t s3) : ChunkHolder(s1, s2, s3) {}
 
 inline void* EagerNonCompactingChunk::allocate() noexcept {
     if (m_freed.empty()) {
@@ -175,7 +164,7 @@ inline bool EagerNonCompactingChunk::full() const noexcept {
     return ChunkHolder::full() && m_freed.empty();
 }
 
-inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t id, size_t tupleSize) : ChunkHolder(id, tupleSize) {}
+inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t s1, size_t s2, size_t s3) : ChunkHolder(s1, s2, s3) {}
 
 inline void LazyNonCompactingChunk::free(void* src) {
     vassert(src >= begin() && src < next());
@@ -328,7 +317,8 @@ CompactingStorageTrait::LinearizedChunks::iterator() const noexcept {
 }
 
 template<typename C, typename E>
-inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept : m_tupleSize(tupleSize) {}
+inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept :
+m_tupleSize(tupleSize), m_chunkSize(ChunkHolder::chunkSize(tupleSize)) {}
 
 template<typename C, typename E>
 inline size_t NonCompactingChunks<C, E>::tupleSize() const noexcept {
@@ -348,7 +338,7 @@ inline void* NonCompactingChunks<C, E>::allocate() {
     if (iter == list_type::cend()) {        // all chunks are full
         list_type::emplace_back(
                 list_type::empty() ? 0 : list_type::back().id() + 1,
-                m_tupleSize);
+                m_tupleSize, m_chunkSize);
         r = list_type::back().allocate();
     } else {
         r = iter->allocate();
@@ -383,7 +373,7 @@ template<typename C, typename E> inline bool NonCompactingChunks<C, E>::tryFree(
     return p != nullptr;
 }
 
-inline CompactingChunk::CompactingChunk(size_t id, size_t s) : ChunkHolder(id, s) {}
+inline CompactingChunk::CompactingChunk(size_t id, size_t s, size_t s2) : ChunkHolder(id, s, s2) {}
 
 inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chunk free(): update only on dst chunk
     vassert(contains(dst));
@@ -461,7 +451,8 @@ inline size_t CompactingChunks::id() const noexcept {
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    trait(this), m_id(gen_id()), m_tupleSize(tupleSize), m_batched(*this) {}
+    trait(this), m_id(gen_id()), m_tupleSize(tupleSize),
+    m_chunkSize(ChunkHolder::chunkSize(tupleSize)), m_batched(*this) {}
 
 // returns non-null value only if in snapshot,
 // and the marked position is still in the first chunk.
@@ -502,9 +493,13 @@ size_t CompactingChunks::chunks() const noexcept {
     return list_type::size();
 }
 
+size_t CompactingChunks::chunkSize() const noexcept {
+    return m_chunkSize;
+}
+
 inline void* CompactingChunks::allocate() {
     if (empty() || back().full()) {                  // always allocates from tail
-        emplace_back(empty() ? 0 : back().id() + 1, m_tupleSize);
+        emplace_back(empty() ? 0 : back().id() + 1, m_tupleSize, m_chunkSize);
     }
     ++m_allocs;
     return back().allocate();
@@ -723,8 +718,7 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
 size_t CompactingChunks::DelayedRemover::force() {
     auto hd = super::chunks().begin();
     auto const tupleSize = super::chunks().tupleSize(),
-        allocsPerTuple = (reinterpret_cast<char const*>(hd->end()) -
-                reinterpret_cast<char const*>(hd->begin())) / tupleSize;
+        allocsPerChunk = super::chunks().chunkSize() / tupleSize;
     auto const total = m_move.size() + m_remove.size();
     if (total > 0) {
         // storage remapping and clean up
@@ -736,16 +730,16 @@ size_t CompactingChunks::DelayedRemover::force() {
         auto const offset =
             reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
         // dangerous: direct manipulation on each offended chunks
-        for (auto wholeChunks = total / allocsPerTuple; wholeChunks > 0; --wholeChunks) {
+        for (auto wholeChunks = total / allocsPerChunk; wholeChunks > 0; --wholeChunks) {
             hd = super::pop();
         }
-        if (total >= allocsPerTuple) {       // any chunk released at all?
+        if (total >= allocsPerChunk) {       // any chunk released at all?
             reinterpret_cast<char*&>(hd->m_next) +=
                 reinterpret_cast<char const*>(hd->begin()) - reinterpret_cast<char const*>(hd->end()) + offset;
             // cannot possibly remove more entries than table already contains
             vassert(hd->next() >= hd->begin());
         }
-        auto const remBytes = (total % allocsPerTuple) * tupleSize;
+        auto const remBytes = (total % allocsPerChunk) * tupleSize;
         if (remBytes > 0) {          // need manual cursor adjustment on the remaining chunks
             auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
             if (remBytes >= rem) {

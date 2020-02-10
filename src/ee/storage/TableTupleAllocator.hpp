@@ -90,19 +90,19 @@ namespace voltdb {
          * Holder for a chunk, whether it is self-compacting or not.
          */
         class ChunkHolder {
-            static size_t chunkSize(size_t) noexcept;
             size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            unique_ptr<char[]> m_resource{};
-            void*const m_end = nullptr;                // indication of chunk capacity
+            unique_ptr<char[]> m_resource;
+            void*const m_end;                          // indication of chunk capacity
         protected:
-            void* m_next = nullptr;                    // tail of allocation
+            void* m_next;                              // tail of allocation
             ChunkHolder(ChunkHolder const&) = delete;  // non-copyable, non-assignable, non-moveable
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;      // for batch free
         public:
-            ChunkHolder(size_t id, size_t tupleSize);
+            static size_t chunkSize(size_t) noexcept;
+            ChunkHolder(size_t id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
             void* allocate() noexcept;                 // returns NULL if this chunk is full.
             bool contains(void const*) const;          // query if a table tuple is stored in current chunk
@@ -128,7 +128,7 @@ namespace voltdb {
             EagerNonCompactingChunk& operator=(EagerNonCompactingChunk const&) = delete;
             EagerNonCompactingChunk(EagerNonCompactingChunk&&) = delete;
         public:
-            EagerNonCompactingChunk(size_t, size_t);
+            EagerNonCompactingChunk(size_t, size_t, size_t);
             ~EagerNonCompactingChunk() = default;
             void* allocate() noexcept;
             void free(void*);
@@ -151,7 +151,7 @@ namespace voltdb {
             LazyNonCompactingChunk& operator=(LazyNonCompactingChunk const&) = delete;
             LazyNonCompactingChunk(LazyNonCompactingChunk&&) = delete;
         public:
-            LazyNonCompactingChunk(size_t, size_t);
+            LazyNonCompactingChunk(size_t, size_t, size_t);
             ~LazyNonCompactingChunk() = default;
             // void* allocate() noexcept; same as ChunkHolder
             // when contains(void const*) returns true, the addr may
@@ -221,6 +221,7 @@ namespace voltdb {
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             size_t const m_tupleSize;
+            size_t const m_chunkSize;
             size_t m_allocs = 0;
             NonCompactingChunks(EagerNonCompactingChunk const&) = delete;
             NonCompactingChunks(NonCompactingChunks&&) = delete;
@@ -243,7 +244,7 @@ namespace voltdb {
          * self-compacting chunk (with help from CompactingChunks to compact across a list)
          */
         struct CompactingChunk final : public ChunkHolder {
-            CompactingChunk(size_t id, size_t tupleSize);
+            CompactingChunk(size_t id, size_t tupleSize, size_t chunkSize);
             CompactingChunk(CompactingChunk&&) = delete;
             CompactingChunk(CompactingChunk const&) = delete;
             CompactingChunk& operator=(CompactingChunk const&) = delete;
@@ -380,6 +381,7 @@ namespace voltdb {
 
             size_t const m_id;                    // ensure injection relation to rw iterator
             size_t const m_tupleSize;
+            size_t const m_chunkSize;
             // used to keep track of end of 1st chunk when frozen:
             // needed for special case when there is a single
             // non-full chunk when snapshot started.
@@ -425,6 +427,8 @@ namespace voltdb {
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;
             size_t tupleSize() const noexcept;
+            size_t chunkSize() const noexcept;         // number of bytes per chunk
+            size_t chunks() const noexcept;            // number of chunks
             void* allocate();
             // frees a single tuple, and returns the tuple that gets copied
             // over the given address, which is at the tail of
@@ -434,7 +438,6 @@ namespace voltdb {
             // details.
             void* free(void*);
             size_t size() const noexcept;              // number of allocation requested
-            size_t chunks() const noexcept;            // number of chunks
             size_t id() const noexcept;
             void freeze(); void thaw();
             void const* endOfFirstChunk() const noexcept;
@@ -846,47 +849,6 @@ namespace voltdb {
             }
         }
     }
-
-    // utility
-    template<size_t N, typename key_type, typename value_type,
-        typename = typename std::enable_if<N >= 2>::type>
-    class LRU {
-        using map_type = std::map<key_type, value_type>;
-        using array_type = std::array<typename map_type::iterator, N>;
-
-        bool m_full = false;
-        map_type m_map{};
-        array_type m_iters{};
-        size_t m_insertPos = 0;
-        inline static void inc(size_t& s) noexcept {
-            s = (s + 1) % N;
-        }
-    public:
-#ifdef CENTOS7
-        inline LRU() : m_map(), m_iters() {}
-#else
-        inline LRU() = default;
-#endif
-        inline void add(key_type const& key, value_type const& value) {
-            if (m_full) {
-                m_iters[m_insertPos] = m_map.emplace_hint(
-                        m_map.erase(m_iters[m_insertPos]), key, value);
-                m_insertPos = (1 + m_insertPos) % N;
-            } else {          // not full
-                assert(m_insertPos < N);
-                m_iters[m_insertPos] = m_map.emplace_hint(
-                        m_map.end(), key, value);
-                if (++m_insertPos >= N) {
-                    m_full = true;
-                    m_insertPos = 0;
-                }
-            }
-        }
-        inline value_type const* get(key_type const& key) const {
-            auto const iter = m_map.find(key);
-            return iter == m_map.cend() ? nullptr : &iter->second;
-        }
-    };
 
     template<typename F1, typename F2>
     struct Compose {                                   // functor composer
