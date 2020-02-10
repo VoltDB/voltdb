@@ -26,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -2488,13 +2487,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     CreateMode.EPHEMERAL, tmLog, "remove replicas");
             if (errorMessage != null) {
                 tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
-                // If rejoining is progress, send a message to the rejoining node and shutdown it down
-                if (VoltZK.zkNodeExists(m_zk, VoltZK.rejoinInProgress)) {
-                    RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
-                    Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
-                    liveHids.remove(voltDB.getHostMessenger().getHostId());
-                    m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(Collections.max(liveHids), HostMessenger.CLIENT_INTERFACE_SITE_ID), new HashMismatchMessage());
-                }
+                return false;
             }
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@StopReplicas";
@@ -2527,6 +2520,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
             VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
+            // Send message to the client interfaces of other hosts. If there is no partition leaders on the host, shutdown
+            RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
+            Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
+            liveHids.remove(voltDB.getHostMessenger().getHostId());
+            for (Integer hostId : liveHids) {
+                final long ciHsid = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
+                m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
+            }
         }
         return false;
     }

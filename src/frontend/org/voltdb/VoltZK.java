@@ -557,9 +557,7 @@ public class VoltZK {
             case mpRepairInProgress:
                 break;
             case decommissionReplicasInProgress:
-                if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = ERROR_REJOIN;
-                } else if (blockers.contains(snapshotBlocker)) {
+                if (blockers.contains(snapshotBlocker)) {
                     errorMsg = "while snapshot is in progress";
                 }
                 break;
