@@ -336,6 +336,11 @@ inline size_t NonCompactingChunks<C, E>::tupleSize() const noexcept {
 }
 
 template<typename C, typename E>
+inline size_t NonCompactingChunks<C, E>::chunks() const noexcept {
+    return ChunkList<C>::size();
+}
+
+template<typename C, typename E>
 inline void* NonCompactingChunks<C, E>::allocate() {
     auto iter = find_if(list_type::begin(), list_type::end(),
             [](C const& c) { return ! c.full(); });
@@ -491,6 +496,10 @@ inline AllocPosition const& CompactingChunks::boundary() const noexcept {
 
 size_t CompactingChunks::size() const noexcept {
     return m_allocs;
+}
+
+size_t CompactingChunks::chunks() const noexcept {
+    return list_type::size();
 }
 
 inline void* CompactingChunks::allocate() {
