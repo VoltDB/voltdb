@@ -59,8 +59,17 @@ public class TestTimeBasedRetentionPolicy {
         long lastWrite = writeBuffers(2);
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
 
-        // Run common test with default timeout
+        // Run common test with default retention
         lastWrite = commonNoReaderSegmentTest(lastWrite, segmentsCount, s_retainMillis);
+
+        // Stop the current enforcement and start a new one with twice the previous retention
+        int newRetention = 2 * s_retainMillis;
+        m_pbd.stopRetentionPolicyEnforcement();
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(newRetention));
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // Run common test with new retention
+        lastWrite = commonNoReaderSegmentTest(lastWrite, segmentsCount, newRetention);
 
         // last segment shouldn't get deleted
         Thread.sleep(s_retainMillis + 250);
@@ -83,14 +92,12 @@ public class TestTimeBasedRetentionPolicy {
                     break;
                 }
                 now = System.currentTimeMillis();
-                assert (now < (end + retainMs / 4));
+                assert (now < (end + 250));
             }
 
             // We must not prune before the expected delay
             now = System.currentTimeMillis();
-            System.out.println(String.format("start %d, end %d, now %d, pruned in %d",
-                    start, end, now, (now - start)));
-            assertTrue(now >= end);
+            assertTrue(now + 250 >= end);
             start = lastWrite;
         }
         return lastWrite;
