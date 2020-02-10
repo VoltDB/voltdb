@@ -154,6 +154,10 @@ private:
     // Just say 0
     size_t allocatedBlockCount() const;
 
+    int64_t allocatedTupleCount() const;
+
+    uint32_t getTuplesPerBlock() const;
+
     TBPtr allocateNextBlock();
     virtual void nextFreeTuple(TableTuple *tuple);
 

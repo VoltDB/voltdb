@@ -412,8 +412,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
                                 "active undo quantum, and presumably an active transaction that should be there",
                                 m_name.c_str());
         }
-        emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
-        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+        emptyTable->m_tuplesPinnedByUndo = emptyTable->activeTupleCount();
+        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->activeTupleCount();
         // Create and register an undo action.
         UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
         SynchronizedThreadLock::addTruncateUndoAction(isReplicatedTable(), uq, undoAction, this);

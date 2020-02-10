@@ -94,27 +94,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_columnCount = schema->columnCount();
 
     m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
-#ifdef MEMCHECK
-    m_tuplesPerBlock = 1;
-    m_tableAllocationSize = m_tupleLength;
-#else
-    m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
-#ifdef USE_MMAP
-    if (m_tuplesPerBlock < 1) {
-        m_tuplesPerBlock = 1;
-        m_tableAllocationSize = nexthigher(m_tupleLength);
-    } else {
-        m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
-    }
-#else
-    if (m_tuplesPerBlock < 1) {
-        m_tuplesPerBlock = 1;
-        m_tableAllocationSize = m_tupleLength;
-    } else {
-        m_tableAllocationSize = m_tableAllocationTargetSize;
-    }
-#endif
-#endif
 
     // initialize column names
     m_columnNames.resize(m_columnCount);
@@ -137,9 +116,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
         }
     }
     m_tempTuple.setActiveTrue();
-
-    // set the data to be empty
-    m_tupleCount = 0;
 }
 
 // ------------------------------------------------------------------
@@ -238,7 +214,7 @@ size_t Table::getAccurateSizeToSerialize() {
         bytes += tuple.serializationSize();  // tuple size
         ++written_count;
     }
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 
     return bytes;
 }
@@ -343,7 +319,7 @@ void Table::serializeTo(SerializeOutput &serialOutput) {
     serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(activeTupleCount()));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
@@ -351,7 +327,7 @@ void Table::serializeTo(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
@@ -363,7 +339,7 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
     serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(activeTupleCount()));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
@@ -371,7 +347,7 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 }
 
 /**
