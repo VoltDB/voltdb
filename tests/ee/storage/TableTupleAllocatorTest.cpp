@@ -132,33 +132,6 @@ TEST_F(TableTupleAllocatorTest, RollingNumberComparison) {
 #undef RollingNumberComparisons
 }
 
-TEST_F(TableTupleAllocatorTest, HelloWorld) {
-    // Test on StringGen test util
-    /*
-    StringGen<16> gen;
-    for(auto c = 0; c < 500; ++c) {
-        cout<<c<<": "<<StringGen<16>::hex(gen.get());
-    }
-    */
-    // Test on LRU src util
-    voltdb::LRU<10, int, int> lru;
-    for(int i = 0; i < 10; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        ASSERT_TRUE(lru.get(i - 10));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-        ASSERT_FALSE(lru.get(i - 10));
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_EQ(*lru.get(i), i);
-    }
-}
-
 constexpr size_t TupleSize = 16;       // bytes per allocation
 constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHolder::chunkSize()
 constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in 256 chunks
@@ -490,69 +463,6 @@ TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
     }
 }
 
-template<typename Chunks, size_t NthBit>
-void testCustomizedIteratorCB() {
-    using masked_const_iterator = typename
-        IterableTableTupleChunks<Chunks, truth>::template iterator_cb_type<iterator_permission_type::ro>;
-    using masked_iterator = typename
-        IterableTableTupleChunks<Chunks, truth>::template iterator_cb_type<iterator_permission_type::rw>;
-    using const_iterator = typename IterableTableTupleChunks<Chunks, truth>::const_iterator;
-    using iterator = typename IterableTableTupleChunks<Chunks, truth>::iterator;
-    using Gen = StringGen<TupleSize>;
-    using Tag = NthBitChecker<NthBit>;
-    Gen gen;
-    Chunks alloc(TupleSize);
-    auto const& alloc_cref = alloc;
-    array<void*, NumTuples> addresses;
-    size_t i;
-    for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-
-    static Tag const tag{};
-    class Masker {                          // masks NthBit
-        unsigned char m_buf[TupleSize];
-    public:
-        static void* set(void* p) {         // overwrites
-            Tag::set(p);
-            assert(tag(p));
-            return p;
-        }
-        void const* operator()(void const* p) {  // provides a different view
-            memcpy(m_buf, p, TupleSize);
-            Tag::set(m_buf);
-            return m_buf;
-        }
-    } masker;
-    // test const_iterator on different view
-    fold<masked_const_iterator>(                               // different view
-            alloc_cref,
-            [](void const* p) { assert(tag(p)); },
-            masker);
-    i = 0;
-    fold<const_iterator>(alloc_cref, [&addresses, &i](void const* p) {
-            assert(Gen::same(addresses[i], i));                // with original content untouched
-            ++i;
-        });
-    assert(i == NumTuples);
-    // test iterator that overwrites
-    for_each<masked_iterator>(alloc, [](void* p) { assert(tag(p)); },
-            [&masker](void*p) { return masker.set(p); });      // using functor needs &masker = as_const(masker) in capture
-    fold<const_iterator>(alloc_cref, [](void const* p) { assert(tag(p)); });
-}
-
-/**
- * iterator that could either change its content (i.e. non-const
- * iterator), or that could provide a masked version of content
- * without changing its content (i.e. const iterator)
- */
-TEST_F(TableTupleAllocatorTest, TestIteratorCB) {
-    testCustomizedIteratorCB<NonCompactingChunks<EagerNonCompactingChunk>, 0>();
-    testCustomizedIteratorCB<NonCompactingChunks<LazyNonCompactingChunk>, 1>();
-    testCustomizedIteratorCB<CompactingChunks, 2>();
-    testCustomizedIteratorCB<CompactingChunks, 3>();
-}
-
 // expression template used to apply variadic NthBitChecker
 template<typename Tuple, size_t N> struct Apply {
     using Tag = typename tuple_element<N, Tuple>::type;
@@ -620,7 +530,7 @@ void testTxnHook() {
     using Hook = TxnPreHook<HookAlloc, RetainTrait>;
     DataAlloc alloc(TupleSize);
     auto const& alloc_cref = alloc;
-    Hook hook(TupleSize, alloc.boundary());
+    Hook hook(TupleSize);
     /**
      * We reserve 2 bits in the leading char to signify that this
      * tuple is newly inserted, thus invisible in snapshot view (bit#7),
@@ -672,13 +582,13 @@ void testTxnHook() {
                     assert(! insertionTag(p));
                     assert(! deletionUpdateTag(p));
                     assert(gen.same(p, i));
-                    assert(hook.reverted(p) == p);
+                    assert(hook(p) == p);
                     ++i;
                 }
             }, hook);
     assert(i == NumTuples);                                    // snapshot does not see newly inserted rows
     for(; i < NumTuples + InsertTuples; ++i) {
-        assert(hook.reverted(addresses[i]) == nullptr);
+        assert(hook(addresses[i]) == nullptr);
         assert(insertionTag(addresses[i]));
         InsertionTag::set(addresses[i]);
     }

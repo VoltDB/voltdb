@@ -25,7 +25,6 @@ package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.voltdb.utils.PbdSegmentName.PBD_SUFFIX;
-import static org.voltdb.utils.PbdSegmentName.VERSION_STR;
 
 import java.io.File;
 
@@ -37,9 +36,9 @@ public class TestPbdSegmentName {
 
     @Test
     public void testValidPbdName() {
-        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456_" + VERSION_STR + PBD_SUFFIX, "abc_def", 123,
+        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456" + PBD_SUFFIX, "abc_def", 123,
                 456, false);
-        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456_q_" + VERSION_STR + PBD_SUFFIX, "abc_def",
+        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456_q" + PBD_SUFFIX, "abc_def",
                 123, 456, true);
     }
 
@@ -63,27 +62,19 @@ public class TestPbdSegmentName {
     @Test
     public void testInvalidName() {
         for (String name : new String[] { PBD_SUFFIX, "abc" + PBD_SUFFIX,
-                "abcdefghijklmnopqrstuvwxqz_0000000123_" + VERSION_STR + PBD_SUFFIX,
-                "abc_abc_def_ghi_jkl_0000000123_" + VERSION_STR + PBD_SUFFIX,
-                "nonce_0000001234_0000000456_a_" + VERSION_STR + PBD_SUFFIX,
-                "_00000000123_00000000456_" + VERSION_STR + PBD_SUFFIX }) {
+                "abcdefghijklmnopqrstuvwxqz_0000000123" + PBD_SUFFIX,
+                "abc_abc_def_ghi_jkl_0000000123" + PBD_SUFFIX,
+                "nonce_0000001234_0000000456_a" + PBD_SUFFIX,
+                "_00000000123_00000000456" + PBD_SUFFIX }) {
             assertResult(PbdSegmentName.Result.INVALID_NAME, name);
         }
     }
 
     @Test
     public void testAsQuarantinedFile() {
-        assertEquals(new File("a/b/c/abc_def_0000000123_0000000456_q_" + VERSION_STR + PBD_SUFFIX),
+        assertEquals(new File("a/b/c/abc_def_0000000123_0000000456_q" + PBD_SUFFIX),
                 PbdSegmentName.asQuarantinedSegment(LOG,
-                        new File("a/b/c/abc_def_0000000123_0000000456_" + VERSION_STR + PBD_SUFFIX)).m_file);
-    }
-
-    @Test
-    public void testInvalidVersion() {
-        assertResult(PbdSegmentName.Result.INVALID_VERSION, "abc_def_0000000123_0000000456_NARV" + PBD_SUFFIX);
-        assertResult(PbdSegmentName.Result.INVALID_VERSION, "abc_def_0000000123_0000000456_q" + PBD_SUFFIX);
-        assertResult(PbdSegmentName.Result.INVALID_VERSION, "abc_def_0000000123_0000000456" + PBD_SUFFIX);
-
+                        new File("a/b/c/abc_def_0000000123_0000000456" + PBD_SUFFIX)).m_file);
     }
 
     @Test(expected = IllegalArgumentException.class)
