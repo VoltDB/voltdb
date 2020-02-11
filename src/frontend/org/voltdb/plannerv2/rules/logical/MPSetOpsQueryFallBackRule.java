@@ -18,6 +18,7 @@
 package org.voltdb.plannerv2.rules.logical;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -29,8 +30,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rules.logical.RelDistributionUtils.JoinState;
-
-import com.google.common.collect.Lists;
 
 /**
  * Rules that fallback a query with SetOp operator if it is multi-partitioned.
@@ -64,29 +63,25 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
         // his distribution is a SINGLETON.
         // In case of a single partitioned table without a filter we need to and an Exchange node
         // above this table.
-        // Perhaps there is room for improvements like pushing pushing down Exchange node
+        // Perhaps there is room for improvements like pushing down Exchange node
         // if partitioning column is part of SELECT columns for each statement
         RelDistribution newDistribution = RelDistributions.SINGLETON.with(
                 setOpState.getLiteral(), setOpState.isSP());
-        List<RelNode> inputs;
-        if (!setOpState.isSP() && setOpState.getLiteral() == null) {
-            inputs = Lists.newArrayList();
-            setOp.getInputs()
+        boolean isMP = !setOpState.isSP() && setOpState.getLiteral() == null;
+        List<RelNode> inputs = setOp.getInputs()
                 .stream()
-                .forEach(node -> {
+                .map(node -> {
                     RelDistribution dist = node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-                    if (!dist.getIsSP() && dist.getPartitionEqualValue() == null &&
-                            RelDistribution.Type.SINGLETON != dist.getType()) {
+                    boolean needExchange = isMP && RelDistribution.Type.SINGLETON != dist.getType();
+                    if (needExchange) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
-                                node.getTraitSet(), node, dist);
-                        inputs.add(exchange);
+                                    node.getTraitSet(), node, dist);
+                        return exchange;
                     } else {
-                        inputs.add(node);
+                        return node;
                     }
-                });
-        } else {
-            inputs = setOp.getInputs();
-        }
+                })
+                .collect(Collectors.toList());
         SetOp newSetOp = setOp.copy(setOp.getTraitSet().replace(newDistribution), inputs);
         call.transformTo(newSetOp);
     }

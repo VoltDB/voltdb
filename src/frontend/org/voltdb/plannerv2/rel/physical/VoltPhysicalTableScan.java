@@ -36,7 +36,6 @@ import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
-import org.voltdb.plannerv2.rules.physical.Constants;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -163,7 +162,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     }
 
     protected double estimateInitialRowCount(RelMetadataQuery mq) {
-        return Constants.MAX_TABLE_ROW_COUNT;
+        return getTable().getRowCount();
     }
 
     public RexNode getLimitRexNode() {

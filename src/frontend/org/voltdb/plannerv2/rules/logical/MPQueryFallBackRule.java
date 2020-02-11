@@ -91,22 +91,14 @@ public class MPQueryFallBackRule extends RelOptRule {
                         dist.getPartitionEqualValue() == null) {
                     // Create a new multi partitioned SINGLETON distribution for the coordinator fragment
                     RelDistribution topDist = RelDistributions.SINGLETON.with(dist.getPartitionEqualValue(), false);
-                    if (node instanceof VoltLogicalLimit) {
+                    if (node instanceof VoltLogicalLimit ||
+                            node instanceof VoltLogicalSort ||
+                            node instanceof VoltLogicalAggregate) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
+                        // Transforming COUNT, AVG aggregates for MP queries would happen during the physical transformation phase
                         RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
                         call.transformTo(coordinatorLimit);
-                    } else if (node instanceof VoltLogicalSort) {
-                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
-                                node.getTraitSet().replace(dist), node.getInput(), dist);
-                        RelNode coordinatorSort = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
-                        call.transformTo(coordinatorSort);
-                    } else if (node instanceof VoltLogicalAggregate) {
-                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
-                                node.getTraitSet().replace(dist), node.getInput(), dist);
-                        // COUNT, AVG, etc transformation would happen at a later phase
-                        RelNode coordinatorAggregate = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
-                        call.transformTo(coordinatorAggregate);
                     } else {
                         call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
                     }

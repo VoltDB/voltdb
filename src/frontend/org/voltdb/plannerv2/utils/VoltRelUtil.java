@@ -178,9 +178,9 @@ public class VoltRelUtil {
                     fragmentNode,
                     null, limit, false);
         } else {
-            // make a new limit by combining coordinator's limit and offset
+            // fragment's limit is coordinator's limit plus coordinator's offset
             // fragment's offset is always 0
-            RexNode combinedLimit = null;
+            final RexNode combinedLimit;
             RexBuilder builder = coordinatorLimit.getCluster().getRexBuilder();
 
             if (RexUtil.isLiteral(limit, true) && RexUtil.isLiteral(offset, true)) {

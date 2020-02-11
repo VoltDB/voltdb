@@ -178,7 +178,7 @@ final class RelDistributionUtils {
      * @param rightConj
      * @return
      */
-    private static Optional<Pair<Integer, Integer>> pairInputRefToIndePair(RexNode leftConj, RexNode rightConj) {
+    private static Optional<Pair<Integer, Integer>> pairInputRefToIndexPair(RexNode leftConj, RexNode rightConj) {
         if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
             return Optional.empty();
         } else {
@@ -193,7 +193,9 @@ final class RelDistributionUtils {
     }
 
     /**
-     * Given a pair of IS NULL expressions returns a pair corresponding column indexes (inner, outer)
+     * Given a pair of expressions returns an Optional pair corresponding column indexes (inner, outer)
+     * if both expressions are "IS NULL(column)" expression or an empty optional otherwise
+     *
      * @param leftConj
      * @param rightConj
      * @return
@@ -202,7 +204,7 @@ final class RelDistributionUtils {
         if (!(leftConj.isA(SqlKind.IS_NULL)) || !(rightConj.isA(SqlKind.IS_NULL))) {
             return Optional.empty();
         } else {
-            return pairInputRefToIndePair(((RexCall) leftConj).getOperands().get(0),
+            return pairInputRefToIndexPair(((RexCall) leftConj).getOperands().get(0),
                     ((RexCall) rightConj).getOperands().get(0));
         }
     }
@@ -220,7 +222,7 @@ final class RelDistributionUtils {
         if (joinCondition.isA(SqlKind.EQUALS)) {
             final RexNode leftConj = uncast(joinCondition.getOperands().get(0)),
                     rightConj = uncast(joinCondition.getOperands().get(1));
-            return pairInputRefToIndePair(leftConj, rightConj);
+            return pairInputRefToIndexPair(leftConj, rightConj);
         } else if (joinCondition.isA(SqlKind.CASE)) {
             // A T1.c1 IS NOTDISTINCT FROM T2.c2 condition get converted to a CASE expression
             // CASE

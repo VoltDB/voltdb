@@ -469,7 +469,7 @@ public class VoltRexUtil {
                 return ((Number) value).longValue();
             } else {
                 try {
-                    RexLiteral.stringValue(literal);
+                    return RexLiteral.stringValue(literal);
                 } catch(Exception ex) {
                 }
             }

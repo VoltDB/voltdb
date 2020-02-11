@@ -119,6 +119,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 transposeLimitSortExchange(call);
                 break;
             case AGGREGATE_EXCHANGE:
+            case CALC_AGGREGATE_EXCHANGE:
                 transposeAggregateExchange(call);
                 break;
         }
@@ -133,13 +134,11 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             .ifPresent(fragmentLimit -> {
                 // Build chain
                 Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-                VoltPhysicalLimit newCoordinatorLimit = new VoltPhysicalLimit(
-                        coordinatorLimit.getCluster(),
+                VoltPhysicalLimit newCoordinatorLimit = coordinatorLimit.copy(
                         coordinatorLimit.getTraitSet(),
                         newExchange,
                         coordinatorLimit.getOffset(),
-                        coordinatorLimit.getLimit(),
-                        true);
+                        coordinatorLimit.getLimit(), true);
                 call.transformTo(newCoordinatorLimit);
             });
     }
@@ -190,12 +189,11 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                     coordinatorSort.getCollation(),
                     coordinatorSort.offset,
                     coordinatorSort.fetch);
-                VoltPhysicalLimit newCoordinatorLimit = new VoltPhysicalLimit(
-                    coordinatorLimit.getCluster(),
-                    coordinatorLimit.getTraitSet(),
-                    newCoordinatorSort,
-                    coordinatorLimit.getOffset(),
-                    coordinatorLimit.getLimit(), true);
+                VoltPhysicalLimit newCoordinatorLimit = coordinatorLimit.copy(
+                        coordinatorLimit.getTraitSet(),
+                        newCoordinatorSort,
+                        coordinatorLimit.getOffset(),
+                        coordinatorLimit.getLimit(), true);
                 call.transformTo(newCoordinatorLimit);
             });
     }
