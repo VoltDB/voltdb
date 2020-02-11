@@ -2241,19 +2241,19 @@ bool PersistentTable::equals(voltdb::Table *other) {
         return false;
     }
 
-//    voltdb::TableIterator firstTI = iterator();
-//    voltdb::TableIterator secondTI = other->iterator();
-//    voltdb::TableTuple firstTuple(m_schema);
-//    voltdb::TableTuple secondTuple(otherSchema);
-//    while (firstTI.next(firstTuple)) {
-//        if ( ! secondTI.next(secondTuple)) {
-//            return false;
-//        }
-//
-//        if ( ! firstTuple.equals(secondTuple)) {
-//            return false;
-//        }
-//    }
+    voltdb::TableIterator firstTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
+    voltdb::TableTuple firstTuple(m_schema);
+    voltdb::TableTuple secondTuple(otherSchema);
+    while (firstTI.next(firstTuple)) {
+        if ( ! secondTI.next(secondTuple)) {
+            return false;
+        }
+
+        if ( ! firstTuple.equals(secondTuple)) {
+            return false;
+        }
+    }
     return true;
 }
 
