@@ -446,11 +446,11 @@ CompactingChunks::find(void const* p) const noexcept {
 
 inline void* CompactingChunks::allocate() {
     void* r;
-    if (empty()) {
-        r = emplace_back(0, m_tupleSize, m_chunkSize)->allocate();
-        m_txnFirstChunk = make_pair(begin(), begin()->next());
-    } else if (back().full()) {                  // always allocates from tail
+    if (empty() || back().full()) {
         r = emplace_back(lastChunkId()++, m_tupleSize, m_chunkSize)->allocate();
+        if (m_txnFirstChunk.second == nullptr) {                       // was empty
+            m_txnFirstChunk = make_pair(begin(), begin()->next());
+        }
     } else {
         r = back().allocate();
         if (back().id() == begin_txn().first->id()) {
@@ -485,7 +485,7 @@ void* CompactingChunks::free(void* dst) {
             memcpy(dst, src, tupleSize());
         }
         begin_txn().first = CompactingStorageTrait::releasable(begin_txn().first);
-        begin_txn().second = begin_txn().first->next();
+        begin_txn().second = end() == begin_txn().first ? nullptr : begin_txn().first->next();
         --m_allocs;
         return src;
     }
