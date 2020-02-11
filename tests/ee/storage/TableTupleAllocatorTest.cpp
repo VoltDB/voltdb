@@ -132,33 +132,6 @@ TEST_F(TableTupleAllocatorTest, RollingNumberComparison) {
 #undef RollingNumberComparisons
 }
 
-TEST_F(TableTupleAllocatorTest, HelloWorld) {
-    // Test on StringGen test util
-    /*
-    StringGen<16> gen;
-    for(auto c = 0; c < 500; ++c) {
-        cout<<c<<": "<<StringGen<16>::hex(gen.get());
-    }
-    */
-    // Test on LRU src util
-    voltdb::LRU<10, int, int> lru;
-    for(int i = 0; i < 10; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        ASSERT_TRUE(lru.get(i - 10));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-        ASSERT_FALSE(lru.get(i - 10));
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_EQ(*lru.get(i), i);
-    }
-}
-
 constexpr size_t TupleSize = 16;       // bytes per allocation
 constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHolder::chunkSize()
 constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in 256 chunks
@@ -1192,6 +1165,36 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2c
     }
     alloc.remove(batch, [](map<void*, void*> const&){});
     ASSERT_EQ(AllocsPerChunk - 4, alloc.size());
+}
+
+TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksStatistics) {
+    using HookAlloc = NonCompactingChunks<LazyNonCompactingChunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<gc_policy::never>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    auto constexpr N = AllocsPerChunk * 3 + 2;
+    array<void const*, N> addresses;
+    Alloc alloc(TupleSize);
+    ASSERT_EQ(TupleSize, alloc.tupleSize());
+    ASSERT_EQ(0, alloc.chunks());
+    ASSERT_EQ(0, alloc.size());
+    size_t i;
+    for(i = 0; i < N; ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    ASSERT_EQ(4, alloc.chunks());
+    ASSERT_EQ(N, alloc.size());
+    alloc.remove(const_cast<void*>(addresses[0]));             // single remove, twice
+    alloc.remove(const_cast<void*>(addresses[1]));
+    ASSERT_EQ(4, alloc.chunks());
+    ASSERT_EQ(N - 2, alloc.size());
+    // batch remove last 30 entries, compacts/removes head chunk
+    set<void*> s;
+    for(i = 2; i < AllocsPerChunk; ++i) {
+        s.emplace(const_cast<void*>(addresses[N - i + 1]));
+    }
+    alloc.remove(s, [](map<void*, void*> const&){});
+    ASSERT_EQ(3, alloc.chunks());
+    ASSERT_EQ(N - AllocsPerChunk, alloc.size());
 }
 
 template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
