@@ -330,19 +330,24 @@ bool CoveringCellIndex::checkForIndexChangeDo(const TableTuple *lhs, const Table
 bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string* reasonInvalid) const {
 
     // Make sure that each row in the table has a matching entry in the tuple map.
-    TableIterator tableIt = table->iterator();
     TableTuple tuple(table->schema());
-    while (tableIt.next(tuple)) {
+    bool ret = true;
+    storage::until<PersistentTable::txn_iterator>(table->allocator(),
+                           [this, &tuple, &ret, &reasonInvalid](void* p) {
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        tuple.move(tupleAddress);
         NValue nval = tuple.getNValue(m_columnIndex);
-        bool isNull = nval.isNull();
-
         TupleMapIterator tupleMapIt = m_tupleEntries.find(setKeyFromTuple(&tuple));
-        if (tupleMapIt.isEnd()) {
-            if (! isNull) {
-                *reasonInvalid = "Found non-null polygon not in tuple map";
-                return false;
-            }
+        if (tupleMapIt.isEnd() && !(nval.isNull())) {
+           *reasonInvalid = "Found non-null polygon not in tuple map";
+            ret = false;
+            return true;
         }
+        return false;
+    });
+
+    if (!ret) {
+       return false;
     }
 
     // Make sure that each entry in the tuple map is a valid row in the table,
