@@ -49,7 +49,9 @@ function cleanall() {
 function jars() {
     ant
     alt-jars
-    bigjars
+    if [[ -n "$BIGJARS" ]]; then
+        bigjars
+    fi
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -287,7 +289,7 @@ function init() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|init|async-benchmark|async-benchmark-help}"
+    echo "Usage: ./run.sh {clean|jars|bigjars|server|init|async-benchmark|async-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
