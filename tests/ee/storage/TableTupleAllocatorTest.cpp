@@ -132,33 +132,6 @@ TEST_F(TableTupleAllocatorTest, RollingNumberComparison) {
 #undef RollingNumberComparisons
 }
 
-TEST_F(TableTupleAllocatorTest, HelloWorld) {
-    // Test on StringGen test util
-    /*
-    StringGen<16> gen;
-    for(auto c = 0; c < 500; ++c) {
-        cout<<c<<": "<<StringGen<16>::hex(gen.get());
-    }
-    */
-    // Test on LRU src util
-    voltdb::LRU<10, int, int> lru;
-    for(int i = 0; i < 10; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_FALSE(lru.get(i));
-        ASSERT_TRUE(lru.get(i - 10));
-        lru.add(i, i);
-        ASSERT_EQ(*lru.get(i), i);
-        ASSERT_FALSE(lru.get(i - 10));
-    }
-    for(int i = 10; i < 20; ++i) {
-        ASSERT_EQ(*lru.get(i), i);
-    }
-}
-
 constexpr size_t TupleSize = 16;       // bytes per allocation
 constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHolder::chunkSize()
 constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in 256 chunks
