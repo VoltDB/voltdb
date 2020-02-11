@@ -177,11 +177,6 @@ class Table {
     virtual std::string tableType() const = 0;
 
     // Return a string containing info about this table
-    std::string debug() const {
-        return debug("");
-    }
-
-    // Return a string containing info about this table
     // (each line prefixed by the given string)
     virtual std::string debug(const std::string &spacer) const;
 

@@ -189,7 +189,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
     voltdb::TableTuple tupleBackup(m_tableSchema);
-    tupleBackup.move(new char[tupleBackup.tupleLength()]);
+    tupleBackup.move(new char[tupleBackup.tupleLength() + TUPLE_HEADER_SIZE]);
     tupleBackup.copyForPersistentInsert(tuple);
     StackCleaner cleaner(tupleBackup);
 
@@ -242,7 +242,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     // After calling undoUndoToken(), variable "tuple" is deactivated and the uninlined
     // data it contains maybe freed, the safe way is to copy the "tuple" before undo.
     voltdb::TableTuple tupleBackup(m_tableSchema);
-    tupleBackup.move(new char[tupleBackup.tupleLength()]);
+    tupleBackup.move(new char[tupleBackup.tupleLength() + TUPLE_HEADER_SIZE]);
     tupleBackup.copyForPersistentInsert(tuple);
     StackCleaner cleaner(tupleBackup);
 
@@ -304,14 +304,14 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
      * A backup copy of what the tuple looked like before updates
      */
     voltdb::TableTuple tupleBackup(m_tableSchema);
-    tupleBackup.move(new char[tupleBackup.tupleLength()]);
+    tupleBackup.move(new char[tupleBackup.tupleLength() + TUPLE_HEADER_SIZE]);
     tupleBackup.copyForPersistentInsert(tuple);
 
     /*
      * A copy of the tuple to modify and use as a source tuple when updating the new tuple.
      */
     voltdb::TableTuple tupleCopy(m_tableSchema);
-    tupleCopy.move(new char[tupleCopy.tupleLength()]);
+    tupleCopy.move(new char[tupleCopy.tupleLength() + TUPLE_HEADER_SIZE]);
     tupleCopy.copyForPersistentInsert(tuple);
 
     m_engine->setUndoToken(INT64_MIN + 2);

@@ -1239,27 +1239,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
     // A snapshot (background scan) in progress can still cause a hold-up.
     // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.
-    if (m_tableStreamer != NULL &&
-            ! m_tableStreamer->notifyTupleDelete(target)) {
-        // Mark it pending delete and let the snapshot land the finishing blow.
-
-        // This "already pending delete" guard prevents any
-        // (possible?) case of double-counting a doubly-applied pending delete
-        // before it gets ignored.
-        // This band-aid guard just keeps such a condition from becoming an
-        // inconvenience to a "testability feature" implemented in tableutil.cpp
-        // for the benefit of CopyOnWriteTest.cpp.
-        // Maybe it should just be an assert --
-        // maybe we are missing a final opportunity to detect the "inconceivable",
-        // which, if ignored, may leave a wake of mysterious and catastrophic side effects.
-        // There's always the option of setting a breakpoint on this return.
-        if (target.isPendingDelete()) {
-            return;
-        }
-
-        ++m_invisibleTuplesPendingDeleteCount;
-        target.setPendingDeleteTrue();
-        return;
+    if (m_tableStreamer != NULL) {
+         m_tableStreamer->notifyTupleDelete(target);
     }
 
     // No snapshot in progress cares, just whack it.
@@ -1306,6 +1287,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
+    --m_tupleCount;
     deleteTupleFinalize(target); // also frees object columns
 }
 
@@ -1482,10 +1464,16 @@ bool PersistentTable::equals(PersistentTable* other) {
 
 std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
-    buffer << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+
+    buffer << infoSpacer << tableType() << "(" << name() << "):\n";
+    buffer << infoSpacer << "\tNumber of Columns: " << columnCount() << "\n";
+    buffer << infoSpacer << "===========================================================\n";
+    buffer << infoSpacer << "\tCOLUMNS\n";
+    buffer << infoSpacer << m_schema->debug();
+        //buffer << infoSpacer << " - TupleSchema needs a \"debug\" method. Add one for output here.\n";
     if (m_shadowStream != nullptr) {
-        std::string infoSpacer = spacer + "  |";
-        buffer << infoSpacer << "\tSHADOW STREAM: " << m_shadowStream->debug() << "\n";
+        buffer << infoSpacer << "\tSHADOW STREAM: " << m_shadowStream->debug("") << "\n";
     }
 #ifdef VOLT_TRACE_ENABLED
     std::string infoSpacer = spacer + "  |";
@@ -1506,7 +1494,6 @@ std::string PersistentTable::debug(const std::string& spacer) const {
         }
     }
 #endif
-
     return buffer.str();
 }
 
@@ -1547,7 +1534,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
                 << expectedColumnCount
                 << ", but " << colcount << " given" << std::endl;
         message << "Expecting the following columns:" << std::endl;
-        message << debug() << std::endl;
+        message << debug("") << std::endl;
         message << "The following columns are given:" << std::endl;
         for (int i = 0; i < colcount; i++) {
             message << "column " << i << ": " << names[i]
@@ -2200,13 +2187,10 @@ void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
     for (int i = 0; i < tupleCount; ++i) {
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
-        target.setActiveTrue();
-        target.setDirtyFalse();
-        target.setPendingDeleteFalse();
         target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
         processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
+        ++m_tupleCount;
     }
-    m_tupleCount = tupleCount;
 }
 
 bool PersistentTable::equals(voltdb::Table *other) {

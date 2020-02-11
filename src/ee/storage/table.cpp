@@ -507,7 +507,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
                 << expectedColumnCount
                 << ", but " << colcount << " given" << std::endl;
         message << "Expecting the following columns:" << std::endl;
-        message << debug() << std::endl;
+        message << debug("") << std::endl;
         message << "The following columns are given:" << std::endl;
         for (int i = 0; i < colcount; i++) {
             message << "column " << i << ": " << names[i]
