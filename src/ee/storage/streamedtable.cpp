@@ -231,6 +231,14 @@ int64_t StreamedTable::allocatedTupleMemory() const {
     return 0;
 }
 
+int64_t StreamedTable::allocatedTupleCount() const {
+    return 0;
+}
+
+uint32_t StreamedTable::getTuplesPerBlock() const {
+    return 0;
+}
+
 /**
  * Get the current offset in bytes of the export stream for this Table
  * since startup.

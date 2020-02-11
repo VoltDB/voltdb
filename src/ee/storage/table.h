@@ -135,19 +135,11 @@ class Table {
         return m_tempTuple;
     }
 
-    int64_t allocatedTupleCount() const {
-        return allocatedBlockCount() * m_tuplesPerBlock;
-    }
+    virtual int64_t allocatedTupleCount() const = 0;
 
-    /**
-     * Includes tuples that are pending any kind of delete.
-     * Used by iterators to determine how many tuples to expect while scanning
-     */
-    virtual int64_t activeTupleCount() const { return m_tupleCount; }
+    virtual int64_t activeTupleCount() const = 0;
 
-    virtual int64_t allocatedTupleMemory() const {
-        return allocatedBlockCount() * m_tableAllocationSize;
-    }
+    virtual int64_t allocatedTupleMemory() const = 0;
 
     // Only counts persistent table usage, currently
     int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
@@ -258,6 +250,8 @@ class Table {
     virtual void flushOldTuples(int64_t timeInMillis) {
     }
 
+    virtual uint32_t getTuplesPerBlock() const = 0;
+
     /**
      * These metrics are needed by some iterators.
      */
@@ -266,9 +260,6 @@ class Table {
     }
     int getTableAllocationSize() const {
         return m_tableAllocationSize;
-    }
-    uint32_t getTuplesPerBlock() const {
-        return m_tuplesPerBlock;
     }
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
@@ -330,10 +321,8 @@ protected:
     // schema as array of string names
     std::vector<std::string> m_columnNames{};
 
-    uint32_t m_tupleCount = 0;
-    uint32_t m_tuplesPinnedByUndo = 0;
-    uint32_t m_columnCount = 0;
-    uint32_t m_tuplesPerBlock = 0;
+    uint64_t m_tuplesPinnedByUndo = 0;
+    uint64_t m_columnCount = 0;
     uint32_t m_tupleLength;
     int64_t m_nonInlinedMemorySize = 0;
 

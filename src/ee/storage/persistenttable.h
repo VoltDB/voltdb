@@ -253,11 +253,13 @@ public:
     }
 
     TableIterator iterator() {
-        throwFatalException("TableIterator is not applicable in PersistentTable");
+        vassert(m_dataStorage != nullptr);
+        return TableIterator(this, std::make_shared<txn_const_iterator>(*m_dataStorage));
     }
 
     TableIterator iteratorDeletingAsWeGo() {
-        throwFatalException("TableIterator is not applicable in PersistentTable");
+        vassert(m_dataStorage != nullptr);
+        return TableIterator(this, std::make_shared<txn_const_iterator>(*m_dataStorage));
     }
 
     virtual void serializeTo(SerializeOutput& serialOutput);
@@ -436,7 +438,28 @@ public:
         m_nonInlinedMemorySize -= bytes;
     }
 
-    size_t allocatedBlockCount() const { return 0; }
+    virtual int64_t allocatedTupleCount() const {
+        return allocatedBlockCount() * getTuplesPerBlock();
+    }
+
+    virtual size_t allocatedBlockCount() const {
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->chunks();
+    }
+
+    virtual int64_t activeTupleCount() const {
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->size();
+    }
+
+    virtual uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerChunk;
+    }
+
+    virtual int64_t allocatedTupleMemory() const {
+        vassert(m_dataStorage != nullptr);
+        return m_dataStorage->chunks() * m_tableAllocationSize;
+    }
 
     int visibleTupleCount() const {
         vassert(m_dataStorage != nullptr);
@@ -744,6 +767,9 @@ private:
     // table row count limit
     int m_tupleLimit;
 
+    // number of tuples per chunk
+    uint32_t m_tuplesPerChunk;
+
     // Executor vector to be executed when imminent insert will exceed
     // tuple limit
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
@@ -976,7 +1002,7 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
 }
 
 inline uint32_t PersistentTableSurgeon::getTupleCount() const {
-    return m_table.m_tupleCount;
+    return m_table.activeTupleCount();
 }
 
 inline void PersistentTableSurgeon::initTableStreamer(TableStreamerInterface* streamer) {

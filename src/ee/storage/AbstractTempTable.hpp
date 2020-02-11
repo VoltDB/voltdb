@@ -55,6 +55,26 @@ namespace voltdb {
  */
 class AbstractTempTable : public Table {
 public:
+    virtual void initializeWithColumns(TupleSchema* schema, std::vector<std::string> const& columnNames,
+            bool ownsTupleSchema) {
+        Table::initializeWithColumns(schema, columnNames, ownsTupleSchema);
+#ifdef MEMCHECK
+        m_tuplesPerBlock = 1;
+        m_tableAllocationSize = m_tupleLength;
+#else
+        m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
+        if (m_tuplesPerBlock < 1) {
+            m_tuplesPerBlock = 1;
+            m_tableAllocationSize = m_tupleLength;
+        } else {
+            m_tableAllocationSize = m_tableAllocationTargetSize;
+        }
+#endif
+
+        // set the data to be empty
+        m_tupleCount = 0;
+    }
+
     /** insert a tuple */
     virtual void insertTempTuple(TableTuple const& source) = 0;
 
@@ -71,6 +91,18 @@ public:
     /** Return a count of tuples in this table */
     virtual int64_t tempTableTupleCount() const { return m_tupleCount; }
 
+    virtual int64_t activeTupleCount() const { return m_tupleCount; }
+
+    virtual int64_t allocatedTupleMemory() const {
+        return allocatedBlockCount() * m_tableAllocationSize;
+    }
+
+    virtual int64_t allocatedTupleCount() const {
+        return allocatedBlockCount() * m_tuplesPerBlock;
+    }
+
+    uint32_t getTuplesPerBlock() const { return m_tuplesPerBlock; }
+
     /**
      * Swap the tuples in this table with the tuples in another table
      */
@@ -84,6 +116,9 @@ public:
 protected:
     AbstractTempTable(int tableAllocationTargetSize)
         : Table(tableAllocationTargetSize) { }
+
+    uint32_t m_tupleCount = 0;
+    uint32_t m_tuplesPerBlock = 0;
 };
 
 }
