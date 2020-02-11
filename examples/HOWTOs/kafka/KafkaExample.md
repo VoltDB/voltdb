@@ -8,14 +8,14 @@ You should review the section on [Understanding Export](https://docs.voltdb.com/
 
 There is also a section on [Understanding Import](https://docs.voltdb.com/UsingVoltDB/exportimport.php) which describes how the import feature works, and a section on [The Kafka Importer](https://docs.voltdb.com/UsingVoltDB/exportimportkafka.php) with more configuration details.
 
-This tutorial provides an example of VoltDB Export and Import using a local standalone Kafka instance such as you would install following the Kafka [Quickstart](https://kafka.apache.org/quickstart). It includes all the additional steps you can follow to create a stream in DDL and export records inserted into the stream to an automatically-generated topic in Kafka. It then uses that same topic to show how to configure the Kafka Importer to consume each record from a Kafka topic and pass it to a procedure in VoltDB, where it can be inserted into a table or additional transactional processing could be done. It uses VoltDB version 8.1, but it should work with all recent VoltDB versions. It uses Kafka version 2.11. This tutorial assumes a working knowledge of how to start a VoltDB node.
+This tutorial provides an example of VoltDB Export and Import using a local standalone Kafka instance such as you would install following the Kafka [Quickstart](https://kafka.apache.org/quickstart). It includes all the additional steps you can follow to create a stream in DDL and export records inserted into the stream to an automatically-generated topic in Kafka. It then uses that same topic to show how to configure the Kafka Importer to consume each record from a Kafka topic and pass it to a procedure in VoltDB, where it can be inserted into a table or additional transactional processing could be done. It uses VoltDB version 8.4, but it should work with all supported VoltDB versions. It uses Kafka version 1.1.0. This tutorial assumes a working knowledge of how to start a VoltDB node.
 
 
 Start up Kafka
 --------------
 
 
-1) Download the Kafka version 2.11 binary here: http://kafka.apache.org/downloads
+1) Download Kafka from here: http://kafka.apache.org/downloads
 
 2) Un-tar and cd into the Kafka directory:
 
