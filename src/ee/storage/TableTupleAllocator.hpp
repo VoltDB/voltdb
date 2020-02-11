@@ -188,8 +188,7 @@ namespace voltdb {
             // "override" writing behavior
             template<typename... Args> iterator emplace_back(Args&&...);
             void pop_front();
-            reference back();
-            const_reference back() const;
+            iterator last() const noexcept;
             // the O(log(n)) killer
             iterator const* find(void const*) const;
             iterator const* find(size_t) const;
@@ -368,6 +367,7 @@ namespace voltdb {
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
             size_t const m_tupleSize;
             pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};
+            AllocPosition m_txnBoundary;
             size_t const m_chunkSize;
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
@@ -423,6 +423,9 @@ namespace voltdb {
             void* free(void*);
             size_t size() const noexcept;              // number of allocation requested
             size_t id() const noexcept;
+            AllocPosition const& freeze();
+            AllocPosition const& boundary() const noexcept;           // txn boundary
+            void thaw();
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
             using list_type::iterator; using list_type::const_iterator;
@@ -626,6 +629,7 @@ namespace voltdb {
                 void advance();
                 container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
+                operator AllocPosition() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
                 iterator_type(container_type);
@@ -678,15 +682,15 @@ namespace voltdb {
                 iterator_cb_type(container_type, cb_type);
                 static iterator_cb_type begin(container_type, cb_type);
             };
+            // The following 2 typedefs are for testing purpose only.
             template<typename Trans> using iterator_cb = iterator_cb_type<Trans, iterator_permission_type::rw>;
             template<typename Trans> using const_iterator_cb = iterator_cb_type<Trans, iterator_permission_type::ro>;
 
             /**
              * This is the snapshot iterator for the client. The
-             * iterator_cb_type and time_traveling_iterator_type
-             * are intermediate abstractions that prepare for
-             * this type. Of course, you may create slightly
-             * different combinations in the same gist of
+             * iterator_cb_type is an intermediate abstraction that
+             * prepare for this type. Of course, you may create
+             * slightly different combinations in the same gist of
              * HookedCompactingChunks, and instantiate it to
              * hooked_iterator_type.
              *
@@ -704,6 +708,7 @@ namespace voltdb {
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 hooked_iterator_type(typename super::container_type);
+                bool drained() const noexcept;
                 static hooked_iterator_type begin(container_type);
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;

@@ -205,24 +205,9 @@ template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::size() c
     return m_size;
 }
 
-template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::reference
-ChunkList<Chunk, E>::back() {
-    if (super::empty()) {
-        throw underflow_error("Calling back() on empty ChunkList");
-    } else {
-        vassert(m_back != end());
-        return *m_back;
-    }
-}
-
-template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::const_reference
-ChunkList<Chunk, E>::back() const {
-    if (super::empty()) {
-        throw underflow_error("Calling back() on empty ChunkList");
-    } else {
-        vassert(m_back != end());
-        return *m_back;
-    }
+template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator
+ChunkList<Chunk, E>::last() const noexcept {
+    return m_back;
 }
 
 template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::add(
@@ -300,8 +285,8 @@ inline void* NonCompactingChunks<C, E>::allocate() {
             [](C const& c) { return ! c.full(); });
     void* r;
     if (iter == list_type::cend()) {        // all chunks are full
-        list_type::emplace_back(list_type::lastChunkId()++, m_tupleSize, m_chunkSize);
-        r = list_type::back().allocate();
+        r = list_type::emplace_back(list_type::lastChunkId()++,
+                m_tupleSize, m_chunkSize)->allocate();
     } else {
         if (iter->empty()) {
             --m_emptyChunks;
@@ -444,17 +429,27 @@ CompactingChunks::find(void const* p) const noexcept {
         nullptr : iter;
 }
 
+AllocPosition const& CompactingChunks::freeze() {
+    CompactingStorageTrait::freeze();
+    return m_txnBoundary = *last();
+}
+
+inline void CompactingChunks::thaw() {
+    CompactingStorageTrait::thaw();
+    m_txnBoundary = {};
+}
+
 inline void* CompactingChunks::allocate() {
     void* r;
-    if (empty() || back().full()) {
+    if (empty() || last()->full()) {
         r = emplace_back(lastChunkId()++, m_tupleSize, m_chunkSize)->allocate();
         if (m_txnFirstChunk.second == nullptr) {                       // was empty
             m_txnFirstChunk = make_pair(begin(), begin()->next());
         }
     } else {
-        r = back().allocate();
-        if (back().id() == begin_txn().first->id()) {
-            begin_txn().second = back().next();
+        r = last()->allocate();
+        if (last()->id() == begin_txn().first->id()) {
+            begin_txn().second = last()->next();
         }
     }
     ++m_allocs;
@@ -497,6 +492,10 @@ pair<typename CompactingChunks::list_type::iterator, void const*> const& Compact
 
 pair<typename CompactingChunks::list_type::iterator, void const*>& CompactingChunks::begin_txn() {
     return m_txnFirstChunk;
+}
+
+AllocPosition const& CompactingChunks::boundary() const noexcept {
+    return m_txnBoundary;
 }
 
 namespace batch_remove_aid {
@@ -679,7 +678,9 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
 }
 
 size_t CompactingChunks::DelayedRemover::force() {
-    auto hd = super::chunks().begin();
+    auto hd = super::chunks().begin_txn().second == nullptr ?                  // frozen?
+        super::chunks().begin() :
+        super::chunks().begin_txn().first;
     auto const tupleSize = super::chunks().tupleSize(),
         allocsPerChunk = super::chunks().chunkSize() / tupleSize;
     auto const total = m_move.size() + m_remove.size();
@@ -879,6 +880,13 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
     return m_cursor == o.m_cursor;
 }
 
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator AllocPosition() const noexcept {
+    return {m_cursor, m_iter};
+}
+
 /**
  * Helper to check if the iterator needs to advance to next
  * chunk. The only special occasion is snapshot view of
@@ -895,7 +903,7 @@ struct ChunkBoundary {
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
     inline void const* operator()(ChunkList const& l, Iter const& iter) const noexcept {
-        return l.back().id() == iter->id() ? iter->next() : iter->end();
+        return l.last()->id() == iter->id() ? iter->next() : iter->end();
     }
 };
 
@@ -1078,11 +1086,28 @@ namespace std {
         }
     };
 }
+
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) {
     return {c};
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
+    if (super::drained()) {
+        return true;
+    } else {
+        auto const& b = super::storage().boundary();
+        if (! b.empty()) {
+            return b.lastAlloc() == super::m_cursor ||
+                less<AllocPosition>()(b, *this);
+        } else {
+            return false;
+        }
+    }
 }
 
 template<unsigned char NthBit, typename E>
@@ -1248,11 +1273,10 @@ template<typename Hook, typename E>
 template<typename Tag> inline shared_ptr<typename
     IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
 HookedCompactingChunks<Hook, E>::freeze() {
-    using iterator_type = typename
-    IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator;
     Hook::freeze();
     CompactingChunks::freeze();
-    return make_shared<iterator_type>(*this);
+    return make_shared<typename
+        IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
 }
 
 template<typename Hook, typename E> inline void
