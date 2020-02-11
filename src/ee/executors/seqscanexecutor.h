@@ -53,6 +53,9 @@
 namespace voltdb {
     class AggregateExecutorBase;
     class InsertExecutor;
+    class CountingPostfilter;
+    class ProjectionPlanNode;
+    class ProgressMonitorProxy;
 
     class SeqScanExecutor : public AbstractExecutor {
         // These are logically local variables to p_execute.
@@ -77,7 +80,13 @@ namespace voltdb {
         bool p_init(AbstractPlanNode* abstract_node,
                     const ExecutorVector& executorVector);
         bool p_execute(const NValueArray& params);
+        void p_evalTuple(const TableTuple& tuple, TableTuple& temp_tuple,
+                CountingPostfilter& postfilter, ProjectionPlanNode* projectionNode,
+                ProgressMonitorProxy& pmp, int num_of_columns);
 
+#if   defined(VOLT_TRACE_ENABLED)
+        int m_tuple_ctr;
+#endif
     };
 }
 

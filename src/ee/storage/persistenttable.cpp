@@ -107,6 +107,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_allowNulls()
     , m_partitionColumn(partitionColumn)
     , m_tupleLimit(tupleLimit)
+    , m_tuplesPerChunk(0)
     , m_purgeExecutorVector()
     , m_views()
     , m_stats(this)
@@ -138,6 +139,22 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     vassert(schema != NULL);
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema);
+
+    // TODO: Pass m_tableAllocationSize as template parameter to m_dataStorage and then
+    //       uncomment this block remove the block below
+//#ifdef MEMCHECK
+//    m_tableAllocationSize = m_tupleLength;
+//    m_tuplesPerChunk = 1;
+//#else
+//    m_tuplesPerChunk = m_tableAllocationTargetSize / m_tupleLength;
+//    if (m_tuplesPerChunk < 1) {
+//        m_tuplesPerChunk = 1;
+//        m_tableAllocationSize = m_tupleLength;
+//    } else {
+//        m_tableAllocationSize = m_tableAllocationTargetSize;
+//    }
+//#endif
+
     // NOTE: we embed m_data pointer immediately after the
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
@@ -147,6 +164,13 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
         m_allowNulls[i] = columnInfo->allowNull;
     }
+
+#ifdef MEMCHECK
+    vassert(false); // see todo above.
+#else
+    m_tableAllocationSize = m_dataStorage->chunkSize();
+    m_tuplesPerChunk = m_tableAllocationSize / m_tupleLength;
+#endif
 }
 
 PersistentTable::~PersistentTable() {
@@ -643,7 +667,6 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
     void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
     target.move(address);
     target.copyForPersistentInsert(source);
-    ++m_tupleCount;
     return target;
 }
 
@@ -656,7 +679,7 @@ void PersistentTable::finalizeDelete() {
         }
     }
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
-    m_tupleCount -= m_releaseBatch.size();
+    m_releaseBatch.size();
     map<void*, void*> movedTuples{};
     allocator().remove(m_releaseBatch, [this, &movedTuples](map<void*, void*> const& tuples) {
         movedTuples = tuples;
@@ -1287,7 +1310,6 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
-    --m_tupleCount;
     deleteTupleFinalize(target); // also frees object columns
 }
 
@@ -2120,7 +2142,7 @@ void PersistentTable::serializeTo(SerializeOutput &serialOutput) {
     serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(activeTupleCount()));
     int64_t written_count = 0;
     TableTuple tuple(m_schema);
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
@@ -2130,7 +2152,7 @@ void PersistentTable::serializeTo(SerializeOutput &serialOutput) {
           tuple.serializeTo(serialOutput);
           ++written_count;
       });
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
@@ -2142,7 +2164,7 @@ void PersistentTable::serializeToWithoutTotalSize(SerializeOutput &serialOutput)
     serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(activeTupleCount()));
     int64_t written_count = 0;
     TableTuple tuple(m_schema);
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
@@ -2152,7 +2174,7 @@ void PersistentTable::serializeToWithoutTotalSize(SerializeOutput &serialOutput)
          tuple.serializeTo(serialOutput);
          ++written_count;
     });
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 }
 
 size_t PersistentTable::getAccurateSizeToSerialize() {
@@ -2171,7 +2193,7 @@ size_t PersistentTable::getAccurateSizeToSerialize() {
        ++written_count;
     });
 
-    vassert(written_count == m_tupleCount);
+    vassert(written_count == activeTupleCount());
 
     return bytes;
 }
@@ -2189,8 +2211,8 @@ void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         target.move(address);
         target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
         processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
-        ++m_tupleCount;
     }
+    vassert(tupleCount == activeTupleCount());
 }
 
 bool PersistentTable::equals(voltdb::Table *other) {

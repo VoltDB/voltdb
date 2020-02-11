@@ -63,21 +63,12 @@ public:
         m_tableAllocationSize = m_tupleLength;
 #else
         m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
-#ifdef USE_MMAP
-        if (m_tuplesPerBlock < 1) {
-            m_tuplesPerBlock = 1;
-            m_tableAllocationSize = nexthigher(m_tupleLength);
-        } else {
-            m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
-        }
-#else
         if (m_tuplesPerBlock < 1) {
             m_tuplesPerBlock = 1;
             m_tableAllocationSize = m_tupleLength;
         } else {
             m_tableAllocationSize = m_tableAllocationTargetSize;
         }
-#endif
 #endif
 
         // set the data to be empty

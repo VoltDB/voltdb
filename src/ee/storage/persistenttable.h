@@ -253,11 +253,13 @@ public:
     }
 
     TableIterator iterator() {
-        throwFatalException("TableIterator is not applicable in PersistentTable");
+        vassert(m_dataStorage != nullptr);
+        return TableIterator(this, std::make_shared<txn_const_iterator>(*m_dataStorage));
     }
 
     TableIterator iteratorDeletingAsWeGo() {
-        throwFatalException("TableIterator is not applicable in PersistentTable");
+        vassert(m_dataStorage != nullptr);
+        return TableIterator(this, std::make_shared<txn_const_iterator>(*m_dataStorage));
     }
 
     virtual void serializeTo(SerializeOutput& serialOutput);
@@ -442,7 +444,7 @@ public:
 
     virtual size_t allocatedBlockCount() const {
         vassert(m_dataStorage != nullptr);
-        return 0;// m_dataStorage->chunks();
+        return m_dataStorage->chunks();
     }
 
     virtual int64_t activeTupleCount() const {
@@ -451,13 +453,12 @@ public:
     }
 
     virtual uint32_t getTuplesPerBlock() const {
-        vassert(m_dataStorage != nullptr);
-        return 0; //m_dataStorage->chunkSize();
+        return m_tuplesPerChunk;
     }
 
     virtual int64_t allocatedTupleMemory() const {
         vassert(m_dataStorage != nullptr);
-        return m_dataStorage->size();
+        return m_dataStorage->chunks() * m_tableAllocationSize;
     }
 
     int visibleTupleCount() const {
