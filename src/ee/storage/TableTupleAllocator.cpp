@@ -243,8 +243,14 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::add(
 template<typename Chunk, typename E>
 template<typename... Args>
 inline typename ChunkList<Chunk, E>::iterator ChunkList<Chunk, E>::emplace_back(Args&&... args) {
+    if (super::empty()) {
+        super::emplace_front(forward<Args>(args)...);
+        m_back = super::begin();
+    } else {
+        m_back = super::emplace_after(m_back, forward<Args>(args)...);
+    }
+    add(m_back);
     ++m_size;
-    add(m_back = super::emplace_after(super::cend(), forward<Args>(args)...));
     return m_back;
 }
 
@@ -282,76 +288,6 @@ inline void ChunkList<Chunk, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
-}
-
-inline void CompactingStorageTrait::LinearizedChunks::emplace(
-        typename CompactingStorageTrait::list_type& o,
-        typename CompactingStorageTrait::list_type::iterator const& it) noexcept {
-    list_type::splice(end(), o, it);
-}
-
-inline typename CompactingStorageTrait::LinearizedChunks::reference
-CompactingStorageTrait::LinearizedChunks::top() {
-    return list_type::front();
-}
-
-inline typename CompactingStorageTrait::LinearizedChunks::const_reference
-CompactingStorageTrait::LinearizedChunks::top() const {
-    return list_type::front();
-}
-
-inline void CompactingStorageTrait::LinearizedChunks::pop() {
-    list_type::erase(list_type::begin());
-}
-
-inline CompactingStorageTrait::LinearizedChunks::ConstExtendedIteratorHelper::ConstExtendedIteratorHelper(
-       typename CompactingStorageTrait::LinearizedChunks const& c) noexcept : m_cont(c) {}
-
-inline void CompactingStorageTrait::LinearizedChunks::ConstExtendedIteratorHelper::reset() const noexcept {
-    m_val = nullptr;
-}
-
-inline void const*
-CompactingStorageTrait::LinearizedChunks::ConstExtendedIteratorHelper::operator()() const {
-    if (m_val == nullptr) {
-        m_iter = m_cont.cbegin();
-        return m_val = m_iter->begin();
-    } else if (m_iter == m_cont.cend()) {
-        return nullptr;
-    } else if (m_val == nullptr) {
-        return m_val = m_iter->begin();
-    } else {
-        reinterpret_cast<char const*&>(m_val) += m_iter->tupleSize();
-        return m_val >= m_iter->end() ?    // ugly cross-border adjustment
-            (++m_iter == m_cont.cend() ? nullptr : (m_val = m_iter->begin())) :
-            m_val;
-    }
-}
-
-inline void const* CompactingStorageTrait::LinearizedChunks::extendedIteratorHelper() {
-    if (! empty()) {
-        auto* r = top().allocate();       // NOTE: we are not really allocating here; what we are
-        if (r == nullptr) {                    // doing is iterating through the chunk holding tuple values
-            pop();                        // that are invisible to txn, but visible to snapshot.
-            return extendedIteratorHelper();
-        } else {
-            return r;
-        }
-    } else {
-        return nullptr;
-    }
-}
-
-// Helper of destructuring iterator
-inline typename CompactingStorageTrait::LinearizedChunks::iterator_type
-CompactingStorageTrait::LinearizedChunks::iterator() noexcept {
-    return [this]() { return extendedIteratorHelper(); };
-}
-
-inline typename CompactingStorageTrait::LinearizedChunks::iterator_type
-CompactingStorageTrait::LinearizedChunks::iterator() const noexcept {
-    m_iterHelper.reset();
-    return [this]() { return m_iterHelper(); };
 }
 
 template<typename C, typename E>
@@ -449,23 +385,34 @@ inline void CompactingStorageTrait::freeze() {
 
 inline void CompactingStorageTrait::thaw() {
     vassert(m_storage != nullptr);
-    if (m_frozen) {
+    if (m_frozen) {                        // release all chunks invisible to txn
+        auto const stop = m_storage->begin_txn().first->id();
+        while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
+            m_storage->pop_front();
+        }
         m_frozen = false;
     } else {
         throw logic_error("Double thaw detected");
     }
 }
 
-/**
- * Immediately free to OS when the tail is unused
- */
-inline typename CompactingStorageTrait::iterator CompactingStorageTrait::releasable(
-        typename CompactingStorageTrait::iterator iter) {
+inline void CompactingStorageTrait::release(
+        typename CompactingStorageTrait::list_type::iterator iter, void const* p) {
+    if (m_frozen && less_rolling(iter->id(), m_storage->begin_txn().first->id()) &&
+            reinterpret_cast<char const*>(p) + iter->tupleSize() >= iter->end()) {
+        vassert(iter == m_storage.begin());
+        m_storage->pop_front();
+    }
+}
+
+inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTrait::releasable(
+        typename CompactingStorageTrait::list_type::iterator iter) {
     vassert(m_storage != nullptr);
     if (iter->empty()) {
         auto iter_next = next(iter);
         if (! m_frozen) {                // safe to erase a Chunk unless frozen
-            m_storage->erase(iter);
+            vassert(iter == m_storage.begin());
+            m_storage->pop_front();
         }
         return iter_next;
     } else {
@@ -498,10 +445,9 @@ size_t CompactingChunks::chunks() const noexcept {
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
     auto const iter = list_type::find(p);
-    return iter != nullptr || less<CompactingChunks::list_type::iterator>()(
-            iter->id, begin_txn().first->id()) ?
-        nullptr :
-        iter;
+    return iter == nullptr ||
+        less<CompactingChunks::list_type::iterator>()(iter, begin_txn().first) ?
+        nullptr : iter;
 }
 
 inline void* CompactingChunks::allocate() {
@@ -665,7 +611,8 @@ struct CompactingIterator {
     using iterator_type = list_type::iterator;
     using value_type = pair<iterator_type, void*>;
 
-    CompactingIterator(list_type& c) noexcept : m_cont(c), m_iter(c.begin()),
+    CompactingIterator(list_type& c) noexcept : m_cont(c),
+        m_iter(static_cast<CompactingChunks&>(c).begin_txn().first),
         m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
     value_type operator*() const noexcept {
         return {m_iter, m_cursor};
@@ -707,7 +654,6 @@ private:
         }
     }
 };
-
 
 typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::prepare(bool dupCheck) {
     using namespace batch_remove_aid;
@@ -786,7 +732,6 @@ inline size_t CompactingChunks::tupleSize() const noexcept {
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
-template<typename Chunks, typename Tag, typename E> bool const IterableTableTupleChunks<Chunks, Tag, E>::FALSE_VALUE = false;
 
 /**
  * Is it permissible to create a new iterator for the given Chunk
@@ -870,14 +815,25 @@ template<iterator_permission_type perm, iterator_view_type view>
 typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::Constructible
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::s_constructible;
 
+template<typename Cont, iterator_view_type view, typename = Cont::Compact> struct iterator_begin {
+    typename Cont::iterator operator()(Cont c) const noexcept {
+        static_assert(is_lvalue_reference<Cont>::value, "Argument of iterator_begin() operator is not a reference");
+        return c.begin();
+    }
+};
+template<typename Cont> struct iterator_begin<Cont, iterator_view_type::txn, integral_constant<bool, true>> {
+    typename Cont::iterator operator()(Cont c) const noexcept {
+        static_assert(is_lvalue_reference<Cont>::value, "Argument of iterator_begin() operator is not a reference");
+        return c.begin_txn().first;
+    }
+};
+
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src,
-        bool const& f) :
-    m_offset(src.tupleSize()), m_storage(src), m_iter(m_storage.begin()),
-    m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())),
-    m_deletedSnapshot(f) {
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) :
+    m_offset(src.tupleSize()), m_storage(src), m_iter(iterator_begin<decltype(src), view>()(m_storage)),
+    m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->begin())) {
     // paranoid type check
     static_assert(is_lvalue_reference<container_type>::value,
             "IterableTableTupleChunks::iterator_type::container_type is not a reference");
@@ -920,16 +876,6 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::begin(
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::end(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type c) {
-    typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view> cur(c);
-    const_cast<void*&>(cur.m_cursor) = nullptr;
-    return cur;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view>
 inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator==(
         iterator_type<perm, view> const& o) const noexcept {
     return m_cursor == o.m_cursor;
@@ -943,27 +889,15 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
  */
 template<typename ChunkList, typename Iter, iterator_view_type view, typename Comp>
 struct ChunkBoundary {
-    inline void const* operator()(ChunkList const&, Iter const& iter, bool) const noexcept {
+    inline void const* operator()(ChunkList const&, Iter const& iter) const noexcept {
         return iter->next();
     }
 };
 
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
-    inline void const* operator()(ChunkList const& l, Iter const& iter, bool flag) const noexcept {
-        if (flag && iter == l.begin()) {
-            void const* end = reinterpret_cast<CompactingChunks const&>(l).endOfFirstChunk();
-            if (end != nullptr) {              // The first chunk in txn is the first chunk when snapshot started
-                return end;
-            } else if (l.size() > 1) {         // The first chunk when snapshot started had been "reclaimed" in txn view,
-                return iter->end();            // and the first chunk in current txn view is not the last chunk: frozen view needs
-                // (and is safe) to cover the whole first chunk
-            } else {                           // There is now a single chunk in txn view, which is not the first chunk
-                return iter->next();           // when we froze.
-            }
-        } else {
-            return iter->next();
-        }
+    inline void const* operator()(ChunkList const& l, Iter const& iter) const noexcept {
+        return l.back().id() == iter->id() ? iter->next() : iter->end();
     }
 };
 
@@ -980,7 +914,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         if (! m_storage.empty() && m_iter != m_storage.end()) {
             const_cast<void*&>(m_cursor) =
                 reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-            if (m_cursor < boundary(m_storage, m_iter, m_deletedSnapshot)) {
+            if (m_cursor < boundary(m_storage, m_iter)) {
                 finished = false;              // within chunk
             } else {
                 ++m_iter;                      // cross chunk
@@ -1037,21 +971,9 @@ IterableTableTupleChunks<Chunks, Tag, E>::begin(Chunks& c) {
 }
 
 template<typename Chunks, typename Tag, typename E>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::iterator
-IterableTableTupleChunks<Chunks, Tag, E>::end(Chunks& c) {
-    return iterator::end(c);
-}
-
-template<typename Chunks, typename Tag, typename E>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::const_iterator
 IterableTableTupleChunks<Chunks, Tag, E>::cbegin(Chunks const& c) {
     return const_iterator::begin(c);
-}
-
-template<typename Chunks, typename Tag, typename E>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::const_iterator
-IterableTableTupleChunks<Chunks, Tag, E>::cend(Chunks const& c) {
-    return const_iterator::end(c);
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -1061,100 +983,25 @@ IterableTableTupleChunks<Chunks, Tag, E>::begin(Chunks const& c) {
 }
 
 template<typename Chunks, typename Tag, typename E>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::const_iterator
-IterableTableTupleChunks<Chunks, Tag, E>::end(Chunks const& c) {
-    return cend(c);
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm>
-inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::iterator_cb_type(
+template<typename Trans, iterator_permission_type perm>
+inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::iterator_cb_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::cb_type cb,
-        bool const& f):
-    super(c, f), m_cb(cb) {}            // using snapshot view to set list iterator begin
+        Trans& cb): super(c), m_cb(trans) {}
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::value_type
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::operator*() noexcept {
+template<typename Trans, iterator_permission_type perm>
+inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::value_type
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::operator*() noexcept {
     return m_cb(super::operator*());
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<perm>::begin(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<perm>::cb_type cb) {
+template<typename Trans, iterator_permission_type perm>
+inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::begin(
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::container_type c,
+        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::cb_type cb) {
     return {c, cb};
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::history_type h) :
-    super(c, [&h](value_type c) { return const_cast<value_type>(h.reverted(const_cast<value_type>(c))); }, h.hasDeletes()),
-    m_extendingCb(c()),
-    m_extendingPtr(m_extendingCb()) {
-    if (m_extendingPtr != nullptr) {           // perform translation layer right away
-        m_extendingPtr = super::m_cb(const_cast<value_type>(m_extendingPtr));
-    }
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline bool IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::drained() const noexcept {
-    return super::drained() && m_extendingPtr == nullptr;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline void IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::advance() {
-    if (! drained()) {
-        if (m_extendingPtr != nullptr) {
-            m_extendingPtr = m_extendingCb();
-            if (m_extendingPtr != nullptr) {           // perform translation layer right away
-                m_extendingPtr = super::m_cb(const_cast<value_type>(m_extendingPtr));
-            }
-        } else {
-            super::advance();
-        }
-    }
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm> inline
-typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>&
-IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator++() {
-    advance();
-    return *this;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm> inline
-typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>
-IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator++(int) {
-    decltype(*this) copy(*this);
-    advance();
-    return copy;
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::value_type
-IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::operator*() noexcept {
-    return m_extendingPtr == nullptr ? super::operator*() : const_cast<void*>(m_extendingPtr);
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename Hook, iterator_permission_type perm>
-inline typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>
-IterableTableTupleChunks<Chunks, Tag, E>::time_traveling_iterator_type<Hook, perm>::begin(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::container_type c,
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template time_traveling_iterator_type<Hook, perm>::time_traveling_iterator_type::history_type h) {
-    return {c, h};
 }
 
 template<typename Chunks, typename Tag, typename E>
@@ -1394,7 +1241,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
-inline void const* TxnPreHook<Alloc, Trait, C, E>::reverted(void const* src) const {
+inline void const* TxnPreHook<Alloc, Trait, C, E>::operator()(void const* src) const {
     auto const pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }

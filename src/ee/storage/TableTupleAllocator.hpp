@@ -274,8 +274,6 @@ namespace voltdb {
          */
         class CompactingStorageTrait {
             using list_type = ChunkList<CompactingChunk>;
-            using iterator = typename list_type::iterator;
-            using const_iterator = typename list_type::const_iterator;
             /**
              * Linearized access order depending on shrink
              * direction, to ensure that chunks are accessed in
@@ -293,9 +291,14 @@ namespace voltdb {
              * Called after in-chunk operation completes, since this
              * operates on the level of list iterator, not void*.
              */
-            bool releasable(iterator);
-            function<void const*()> operator()() noexcept;
-            function<void const*()> operator()() const noexcept;
+            bool releasable(typename list_type::iterator);
+            /**
+             * Action associated with *snapshot RW iterator* when
+             * it has done visiting a tuple. If that tuple had
+             * been removed in txn view, then erase the
+             * containing chunk if possible
+             */
+            void release(typename list_type::iterator, void*);
         };
 
         /**
@@ -417,9 +420,11 @@ namespace voltdb {
             size_t size() const noexcept;              // number of allocation requested
             size_t chunks() const noexcept;            // number of chunks
             size_t id() const noexcept;
-            list_type::iterator const* find(void const*) const noexcept;      // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
+            // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
+            list_type::iterator const* find(void const*) const noexcept;
             void freeze(); void thaw();
             using list_type::empty; using list_type::end; using list_type::find;
+            using list_type::pop_front();
             using CompactingStorageTrait::freeze; using CompactingStorageTrait::thaw;
         };
 
@@ -512,7 +517,7 @@ namespace voltdb {
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             void add(CompactingChunks const&, ChangeType, void const*);
-            void const* reverted(void const*) const;               // revert history at this place!
+            void const* operator()(void const*) const;               // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
             // to hold value before change.
@@ -587,7 +592,6 @@ namespace voltdb {
             typename = typename enable_if<is_class<Tag>::value && is_chunks<Chunks>::value>::type>
         struct IterableTableTupleChunks final {
             using iterator_value_type = void*;         // constness-independent type being iterated over
-            static bool const FALSE_VALUE;             // default binding to iterator_type::m_deletedSnapshot when it is ignored.
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
             template<iterator_permission_type perm, iterator_view_type vtype>
@@ -616,18 +620,16 @@ namespace voltdb {
                     void remove(container_type);
                 } static s_constructible;
                 value_type m_cursor;
-                bool const& m_deletedSnapshot;        // has any tuple deletion occurred during snapshot process?
                 void advance();
                 container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
-                iterator_type(container_type, bool const& = FALSE_VALUE);
+                iterator_type(container_type);
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 ~iterator_type();
                 static iterator_type begin(container_type);
-                static iterator_type end(container_type);
                 bool operator==(iterator_type const&) const noexcept;
                 inline bool operator!=(iterator_type const& o) const noexcept {
                     return ! operator==(o);
@@ -644,11 +646,8 @@ namespace voltdb {
             using const_iterator = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
 
             static iterator begin(Chunks&);
-            static iterator end(Chunks&);
             static const_iterator cbegin(Chunks const&);
-            static const_iterator cend(Chunks const&);
             static const_iterator begin(Chunks const&);
-            static const_iterator end(Chunks const&);
 
             /**
              * Iterators with callback, applied when
@@ -662,45 +661,17 @@ namespace voltdb {
              * if call back may return NULL, the client must know
              * about it and skip/throw accordingly.
              */
-            template<iterator_permission_type perm>
+            template<typename Trans, iterator_permission_type perm>
             class iterator_cb_type : public iterator_type<perm, iterator_view_type::snapshot> {
                 using super = iterator_type<perm, iterator_view_type::snapshot>;
-            protected:
                 using value_type = typename super::value_type;
-                // call-back type: must be std::function since it's
-                // determined at run-time via history_type object
-                using cb_type = function<value_type(value_type)> const;
+                Trans& m_cb;
+            protected:
                 using container_type = typename super::container_type;
-                cb_type m_cb;
             public:
                 value_type operator*() noexcept;
-                iterator_cb_type(container_type, cb_type, bool const& = FALSE_VALUE);
-                static iterator_cb_type begin(container_type, cb_type);
+                iterator_cb_type(container_type, Trans&);
             };
-
-            template<typename Hook, iterator_permission_type perm>
-            class time_traveling_iterator_type : public iterator_cb_type<perm> {
-                using super = iterator_cb_type<perm>;
-                using history_type = typename add_lvalue_reference<typename conditional<
-                    perm == iterator_permission_type::ro, Hook const, Hook>::type>::type;
-                function<void const*()> const m_extendingCb;
-                void advance();
-            public:
-                using container_type = typename super::container_type;
-                using value_type = typename super::value_type;
-                static time_traveling_iterator_type begin(container_type, history_type);
-                value_type operator*() noexcept;
-                bool drained() const noexcept;
-                time_traveling_iterator_type& operator++();           // Need to redefine/shadow, since the polymorphism is meant to be used statically
-                time_traveling_iterator_type operator++(int);
-            protected:
-                void const* m_extendingPtr;
-                time_traveling_iterator_type(container_type, history_type);
-            };
-            template<typename Hook>
-            using iterator_cb = time_traveling_iterator_type<Hook, iterator_permission_type::rw>;
-            template<typename Hook>
-            using const_iterator_cb = time_traveling_iterator_type<Hook, iterator_permission_type::ro>;
 
             /**
              * This is the snapshot iterator for the client. The
@@ -719,8 +690,8 @@ namespace voltdb {
              * for where this is checked.
              */
             template<iterator_permission_type perm>
-            class hooked_iterator_type : public time_traveling_iterator_type<typename Chunks::hook_type, perm> {
-                using super = time_traveling_iterator_type<typename Chunks::hook_type, perm>;
+            class hooked_iterator_type : public iterator_cb_type<typename Chunks::hook_type, perm> {
+                using super = iterator_cb_type<typename Chunks::hook_type, perm>;
             public:
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
