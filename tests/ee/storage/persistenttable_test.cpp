@@ -220,8 +220,6 @@ protected:
     }
 
     void validateCounts(PersistentTable* table, size_t nTuples, size_t nIndexes) {
-        auto iterator = table->iterator();
-        ASSERT_EQ(nTuples > 0, iterator.hasNext());
         ASSERT_EQ(nTuples, table->activeTupleCount());
         ASSERT_EQ(nIndexes, table->indexCount());
         for (auto index : table->allIndexes()) {
@@ -239,15 +237,23 @@ private:
 namespace {
 
 template<class ValueType>
-TableTuple findTuple(Table* table, ValueType key) {
-    TableIterator iterator = table->iterator();
+TableTuple findTuple(PersistentTable* table, ValueType key) {
     TableTuple iterTuple(table->schema());
-    while (iterator.next(iterTuple)) {
-        if (Tools::nvalueCompare(iterTuple.getNValue(0), key) == 0) {
-            return iterTuple;
-        }
-    }
+    bool found = false;
+    storage::until<PersistentTable::txn_iterator>(table->allocator(),
+                              [&iterTuple, &key, &found](void* p) {
+       void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+       iterTuple.move(tupleAddress);
+       if (Tools::nvalueCompare(iterTuple.getNValue(0), key) == 0) {
+           found = true;
+           return true;
+       }
+       return false;
+    });
 
+    if (found) {
+       return iterTuple;
+    }
     return TableTuple(); // null tuple
 }
 
@@ -294,7 +300,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
 
     TableTuple tuple(schema);
-    auto iterator = table->iteratorDeletingAsWeGo();
+    //auto iterator = table->iteratorDeletingAsWeGo();
     const int timestampColIndex = table->getDRTimestampColumnIndex();
     BOOST_FOREACH(auto stdTuple, stdTuples) {
         TableTuple tuple = findTuple(table, std::get<0>(stdTuple));
@@ -321,7 +327,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     ASSERT_NE(drTimestampNew, drTimestampOrig);
 
     NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
-    iterator = table->iteratorDeletingAsWeGo();
+    //iterator = table->iteratorDeletingAsWeGo();
     for (int i = 0; i < 3; ++i) {
         StdTuple expectedTuple;
         if (i == 1) {
