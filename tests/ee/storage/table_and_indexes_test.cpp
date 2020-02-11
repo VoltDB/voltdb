@@ -509,10 +509,13 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Should have one row from the insert
     EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
-    TableIterator iterator = districtTableReplica->iterator();
-    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(districtTableReplica->schema());
-    iterator.next(nextTuple);
+    storage::for_each<PersistentTable::txn_iterator>(districtTableReplica->allocator(),
+                                      [this, &nextTuple](void* p) {
+       void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+       nextTuple.move(tupleAddress);
+    });
+
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
@@ -653,10 +656,12 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     //Should have one row from the insert
     EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
-    TableIterator iterator = districtTableReplica->iterator();
-    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(districtTableReplica->schema());
-    iterator.next(nextTuple);
+    storage::for_each<PersistentTable::txn_iterator>(districtTableReplica->allocator(),
+                                        [this, &nextTuple](void* p) {
+         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+         nextTuple.move(tupleAddress);
+      });
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
@@ -771,10 +776,13 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     //Should have one row from the insert
     EXPECT_EQ(1, customerTableReplica->activeTupleCount());
 
-    TableIterator iterator = customerTableReplica->iterator();
-    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(customerTableReplica->schema());
-    iterator.next(nextTuple);
+    storage::for_each<PersistentTable::txn_iterator>(customerTableReplica->allocator(),
+                                           [this, &nextTuple](void* p) {
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        nextTuple.move(tupleAddress);
+    });
+
     EXPECT_EQ(nextTuple.getNValue(20).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
