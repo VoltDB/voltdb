@@ -136,7 +136,7 @@ public class ExportRow {
      * @return the {@link ExportRow} instance carrying the data for the key columns
      */
     public ExportRow extractKey(List<String> keyColumnNames) {
-        String keyName = tableName + "-key";
+        String keyName = tableName + "_key";
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
         List<VoltType> colTypes = new ArrayList<>();
