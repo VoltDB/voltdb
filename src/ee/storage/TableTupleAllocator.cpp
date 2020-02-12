@@ -429,22 +429,22 @@ CompactingChunks::find(void const* p) const noexcept {
         nullptr : iter;
 }
 
-AllocPosition const& CompactingChunks::freeze() {
+inline void CompactingChunks::freeze() {
     CompactingStorageTrait::freeze();
-    return m_txnBoundary = *last();
+    m_frozenTxnBoundary = *last();
 }
 
 inline void CompactingChunks::thaw() {
     CompactingStorageTrait::thaw();
-    m_txnBoundary = {};
+    m_frozenTxnBoundary = {};
 }
 
 inline void* CompactingChunks::allocate() {
     void* r;
     if (empty() || last()->full()) {
         r = emplace_back(lastChunkId()++, m_tupleSize, m_chunkSize)->allocate();
-        if (m_txnFirstChunk.second == nullptr) {                       // was empty
-            m_txnFirstChunk = make_pair(begin(), begin()->next());
+        if (begin_txn().second == nullptr) {                       // was empty
+            begin_txn() = make_pair(begin(), begin()->next());
         }
     } else {
         r = last()->allocate();
@@ -486,16 +486,18 @@ void* CompactingChunks::free(void* dst) {
     }
 }
 
-pair<typename CompactingChunks::list_type::iterator, void const*> const& CompactingChunks::begin_txn() const {
+pair<typename CompactingChunks::list_type::iterator, void const*> const&
+CompactingChunks::begin_txn() const {
     return m_txnFirstChunk;
 }
 
-pair<typename CompactingChunks::list_type::iterator, void const*>& CompactingChunks::begin_txn() {
+pair<typename CompactingChunks::list_type::iterator, void const*>&
+CompactingChunks::begin_txn() {
     return m_txnFirstChunk;
 }
 
-AllocPosition const& CompactingChunks::boundary() const noexcept {
-    return m_txnBoundary;
+position_type const& CompactingChunks::frozenBoundary() const noexcept {
+    return m_frozenTxnBoundary;
 }
 
 namespace batch_remove_aid {
@@ -883,7 +885,7 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator AllocPosition() const noexcept {
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator position_type() const noexcept {
     return {m_cursor, m_iter};
 }
 
@@ -903,7 +905,18 @@ struct ChunkBoundary {
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
     inline void const* operator()(ChunkList const& l, Iter const& iter) const noexcept {
-        return l.last()->id() == iter->id() ? iter->next() : iter->end();
+        if (l.last()->id() != iter->id()) {
+            return iter->end();
+        } else if (l.size() == 1) {            // single chunk list
+            // safe cast derived from Comp
+            auto const& pos = reinterpret_cast<CompactingChunks const&>(l).frozenBoundary();
+            // invariant: if frozen, then must also be single chunk when freezing
+            vassert(pos.empty() || pos.lastChunkId() == iter->id());
+            return pos.empty() ?       // (not) frozen?
+                iter->next() : pos.address();
+        } else {
+            return iter->next();
+        }
     }
 };
 
@@ -1017,39 +1030,38 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::hooked_ite
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) :
 super(c, c) {}
 
-inline AllocPosition::AllocPosition(ChunkHolder const& c) noexcept :
-m_lastChunkId(c.id()), m_lastAlloc(c.next()) {}
+inline position_type::position_type(ChunkHolder const& c) noexcept : m_chunkId(c.id()), m_addr(c.next()) {}
 
-inline AllocPosition::AllocPosition(CompactingChunks const& c, void const* p) : m_lastAlloc(p) {
+inline position_type::position_type(CompactingChunks const& c, void const* p) : m_addr(p) {
     auto const* iterp = c.find(p);
     if (iterp == nullptr || ! ((*iterp)->contains(p) || (*iterp)->end() > p)) {
         // NOTE: it is possible that the txn view does not
         // contain the ptr, as the chunk has been removed. In
         // that case, we simply "empty" it, and note the
-        // semantics of less<AllocPosition>.
-        const_cast<void*&>(m_lastAlloc) = nullptr;
+        // semantics of less<position_type>.
+        const_cast<void*&>(m_addr) = nullptr;
     } else {
-        const_cast<size_t&>(m_lastChunkId) = (*iterp)->id();
+        const_cast<size_t&>(m_chunkId) = (*iterp)->id();
     }
 }
 
 template<typename iterator>
-inline AllocPosition::AllocPosition(void const* p, iterator const& iter) noexcept :
-m_lastChunkId(iter->id()), m_lastAlloc(p) {}
+inline position_type::position_type(void const* p, iterator const& iter) noexcept :
+m_chunkId(iter->id()), m_addr(p) {}
 
-inline size_t AllocPosition::lastChunkId() const noexcept {
-    return m_lastChunkId;
+inline size_t position_type::lastChunkId() const noexcept {
+    return m_chunkId;
 }
-inline void const* AllocPosition::lastAlloc() const noexcept {
-    return m_lastAlloc;
+inline void const* position_type::address() const noexcept {
+    return m_addr;
 }
-inline bool AllocPosition::empty() const noexcept {
-    return m_lastAlloc == nullptr;
+inline bool position_type::empty() const noexcept {
+    return m_addr == nullptr;
 }
 
-inline AllocPosition& AllocPosition::operator=(AllocPosition const& o) noexcept {
-    const_cast<size_t&>(m_lastChunkId) = o.lastChunkId();
-    m_lastAlloc = o.lastAlloc();
+inline position_type& position_type::operator=(position_type const& o) noexcept {
+    const_cast<size_t&>(m_chunkId) = o.lastChunkId();
+    m_addr = o.address();
     return *this;
 }
 
@@ -1064,20 +1076,20 @@ inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize) :
 
 namespace std {
     using namespace voltdb::storage;
-    template<> struct less<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
+    template<> struct less<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
             bool const e1 = lhs.empty(), e2 = rhs.empty();
             if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
                 return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
             } else {
                 auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
-                return (id1 == id2 && lhs.lastAlloc() < rhs.lastAlloc()) || less_rolling(id1, id2);
+                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
             }
         }
     };
-    template<> struct less_equal<AllocPosition> {
-        inline bool operator()(AllocPosition const& lhs, AllocPosition const& rhs) const noexcept {
-            return lhs.lastAlloc() == rhs.lastAlloc() || less<AllocPosition>()(lhs, rhs);
+    template<> struct less_equal<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
         }
     };
     template<> struct less<ChunkHolder> {
@@ -1097,17 +1109,9 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
-    if (super::drained()) {
-        return true;
-    } else {
-        auto const& b = super::storage().boundary();
-        if (! b.empty()) {
-            return b.lastAlloc() == super::m_cursor ||
-                less<AllocPosition>()(b, *this);
-        } else {
-            return false;
-        }
-    }
+    auto const& b = super::storage().frozenBoundary();
+    return super::drained() || (! b.empty() &&
+            (b.address() == super::m_cursor || less<position_type>()(b, *this)));
 }
 
 template<unsigned char NthBit, typename E>
@@ -1171,11 +1175,13 @@ TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
 
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API essential
-    if (m_last == nullptr) {
-        m_last = m_storage.allocate();
-        vassert(m_last != nullptr);
+    if (! m_changes.count(p)) {                                // make a copy only if the addr to be
+        if (m_last == nullptr) {                               // overwritten hadn't been logged
+            m_last = m_storage.allocate();
+            vassert(m_last != nullptr);
+        }
+        memcpy(m_last, p, m_storage.tupleSize());
     }
-    memcpy(m_last, p, m_storage.tupleSize());
 }
 
 template<typename Alloc, typename Trait, typename C, typename E>
@@ -1273,8 +1279,8 @@ template<typename Hook, typename E>
 template<typename Tag> inline shared_ptr<typename
     IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
 HookedCompactingChunks<Hook, E>::freeze() {
-    Hook::freeze();
     CompactingChunks::freeze();
+    Hook::freeze();
     return make_shared<typename
         IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
 }
@@ -1298,7 +1304,9 @@ HookedCompactingChunks<Hook, E>::update(void* dst) {
 
 template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::remove(void* dst) {
-    Hook::copy(dst);
+    if (! frozenBoundary().empty()) {
+        Hook::copy(dst);       // frozen: book keeping could be needed
+    }
     void const* src = CompactingChunks::free(dst);
     Hook::add(*this, Hook::ChangeType::Deletion, dst);
     return src;

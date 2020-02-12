@@ -1331,14 +1331,14 @@ void testSingleChunkSnapshot() {
     alloc.remove(const_cast<void*>(addresses[5]));
     alloc.remove(const_cast<void*>(addresses[10]));
     alloc.remove(const_cast<void*>(addresses[20]));
-    using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
     i = 0;
-    for_each<snapshot_iterator>(alloc, [&alloc, &i](void const* p) {
-        if (p != nullptr) {
-            assert(Gen::same(p, i++));
-            alloc.release(p);
-        }
-    });
+    for_each<typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator>(
+            alloc, [&alloc, &i](void const* p) {
+                if (p != nullptr) {
+                    assert(Gen::same(p, i++));
+                    alloc.release(p);
+                }
+            });
     assert(i == Number);
     alloc.thaw();
 }

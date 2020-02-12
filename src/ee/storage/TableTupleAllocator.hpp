@@ -336,20 +336,20 @@ namespace voltdb {
          * HookedCompactingChunks
          */
         class CompactingChunks;
-        class AllocPosition {
-            size_t const m_lastChunkId = 0;
-            void const* m_lastAlloc = nullptr;
+        class position_type {
+            size_t const m_chunkId = 0;
+            void const* m_addr = nullptr;
         public:
-            AllocPosition() noexcept = default;        // empty initiator
-            AllocPosition(CompactingChunks const&, void const*);
-            template<typename iterator> AllocPosition(void const*, iterator const&) noexcept;
-            AllocPosition(ChunkHolder const&) noexcept;
-            AllocPosition(AllocPosition const&) noexcept = default;
-            AllocPosition(AllocPosition&&) noexcept = default;
-            AllocPosition& operator=(AllocPosition const&) noexcept;
+            position_type() noexcept = default;        // empty initiator
+            position_type(CompactingChunks const&, void const*);
+            template<typename iterator> position_type(void const*, iterator const&) noexcept;
+            position_type(ChunkHolder const&) noexcept;
+            position_type(position_type const&) noexcept = default;
+            position_type(position_type&&) noexcept = default;
+            position_type& operator=(position_type const&) noexcept;
             size_t lastChunkId() const noexcept;
-            void const* lastAlloc() const noexcept;
-            bool empty() const noexcept;               // makes it behave like std::optional<AllocPosition>
+            void const* address() const noexcept;
+            bool empty() const noexcept;               // makes it behave like std::optional<position_type>
         };
 
         /**
@@ -366,8 +366,8 @@ namespace voltdb {
 
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
             size_t const m_tupleSize;
-            pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};
-            AllocPosition m_txnBoundary;
+            pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};     // (moving) left boundary for txn
+            position_type m_frozenTxnBoundary{};  // (frozen) left boundary for txn
             size_t const m_chunkSize;
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
@@ -423,8 +423,8 @@ namespace voltdb {
             void* free(void*);
             size_t size() const noexcept;              // number of allocation requested
             size_t id() const noexcept;
-            AllocPosition const& freeze();
-            AllocPosition const& boundary() const noexcept;           // txn boundary
+            void freeze();
+            position_type const& frozenBoundary() const noexcept;           // txn boundary
             void thaw();
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
@@ -629,7 +629,7 @@ namespace voltdb {
                 void advance();
                 container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
-                operator AllocPosition() const noexcept;
+                operator position_type() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
                 iterator_type(container_type);
