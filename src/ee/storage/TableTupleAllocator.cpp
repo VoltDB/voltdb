@@ -1319,8 +1319,8 @@ HookedCompactingChunks<Hook, E>::update(void* dst) {
 
 template<typename Hook, typename E> inline void const*
 HookedCompactingChunks<Hook, E>::remove(void* dst) {
-    if (! frozenBoundary().empty()) {
-        Hook::copy(dst);       // frozen: book keeping could be needed
+    if (frozen()) {
+        Hook::copy(dst);
     }
     void const* src = CompactingChunks::free(dst);
     Hook::add(*this, Hook::ChangeType::Deletion, dst);

@@ -1321,7 +1321,7 @@ void testSingleChunkSnapshot() {
         addresses[i] = alloc.allocate();
         memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
-    alloc.template freeze<truth>();                                     // single chunk, not full before freeze,
+    alloc.template freeze<truth>();                            // single chunk, not full before freeze,
     alloc.remove(const_cast<void*>(addresses[0]));             // then a few deletions
     alloc.remove(const_cast<void*>(addresses[5]));
     alloc.remove(const_cast<void*>(addresses[10]));
@@ -1329,10 +1329,8 @@ void testSingleChunkSnapshot() {
     i = 0;
     for_each<typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator>(
             alloc, [&alloc, &i](void const* p) {
-                if (p != nullptr) {
-                    assert(Gen::same(p, i++));
-                    alloc.release(p);
-                }
+                assert(Gen::same(p, i++));
+                alloc.release(p);
             });
     assert(i == Number);
     alloc.thaw();
