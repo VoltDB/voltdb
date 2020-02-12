@@ -429,6 +429,17 @@ CompactingChunks::find(void const* p) const noexcept {
         nullptr : iter;
 }
 
+inline void CompactingChunks::pop_front() {
+    // NOTE: we impose requirement that this API cannot be
+    // called when frozen. This "might" be relaxed, by adjusting
+    // txn bounday if frozen, if needed.
+    if (! frozenBoundary().empty()) {
+        throw logic_error("CompactingChunks::pop_front(): not applicable when frozen");
+    } else {
+        list_type::pop_front();
+    }
+}
+
 inline void CompactingChunks::freeze() {
     CompactingStorageTrait::freeze();
     m_frozenTxnBoundary = *last();
@@ -486,18 +497,22 @@ void* CompactingChunks::free(void* dst) {
     }
 }
 
-pair<typename CompactingChunks::list_type::iterator, void const*> const&
+inline pair<typename CompactingChunks::list_type::iterator, void const*> const&
 CompactingChunks::begin_txn() const {
     return m_txnFirstChunk;
 }
 
-pair<typename CompactingChunks::list_type::iterator, void const*>&
+inline pair<typename CompactingChunks::list_type::iterator, void const*>&
 CompactingChunks::begin_txn() {
     return m_txnFirstChunk;
 }
 
-position_type const& CompactingChunks::frozenBoundary() const noexcept {
+inline position_type const& CompactingChunks::frozenBoundary() const noexcept {
     return m_frozenTxnBoundary;
+}
+
+inline bool CompactingChunks::frozen() const noexcept {
+    return ! frozenBoundary().empty();
 }
 
 namespace batch_remove_aid {
@@ -911,7 +926,7 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_con
             // safe cast derived from Comp
             auto const& pos = reinterpret_cast<CompactingChunks const&>(l).frozenBoundary();
             // invariant: if frozen, then must also be single chunk when freezing
-            vassert(pos.empty() || pos.lastChunkId() == iter->id());
+            vassert(pos.empty() || pos.chunkId() == iter->id());
             return pos.empty() ?       // (not) frozen?
                 iter->next() : pos.address();
         } else {
@@ -1049,7 +1064,7 @@ template<typename iterator>
 inline position_type::position_type(void const* p, iterator const& iter) noexcept :
 m_chunkId(iter->id()), m_addr(p) {}
 
-inline size_t position_type::lastChunkId() const noexcept {
+inline size_t position_type::chunkId() const noexcept {
     return m_chunkId;
 }
 inline void const* position_type::address() const noexcept {
@@ -1060,7 +1075,7 @@ inline bool position_type::empty() const noexcept {
 }
 
 inline position_type& position_type::operator=(position_type const& o) noexcept {
-    const_cast<size_t&>(m_chunkId) = o.lastChunkId();
+    const_cast<size_t&>(m_chunkId) = o.chunkId();
     m_addr = o.address();
     return *this;
 }
@@ -1082,7 +1097,7 @@ namespace std {
             if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
                 return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
             } else {
-                auto const id1 = lhs.lastChunkId(), id2 = rhs.lastChunkId();
+                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
                 return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
             }
         }
@@ -1109,9 +1124,9 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
-    auto const& b = super::storage().frozenBoundary();
-    return super::drained() || (! b.empty() &&
-            (b.address() == super::m_cursor || less<position_type>()(b, *this)));
+    return super::drained() || (super::storage().frozen() &&
+            (super::storage().frozenBoundary().address() == super::m_cursor ||
+             less<position_type>()(super::storage().frozenBoundary(), *this)));
 }
 
 template<unsigned char NthBit, typename E>

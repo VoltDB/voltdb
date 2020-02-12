@@ -27,6 +27,7 @@
 #include <memory>
 #include <queue>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 // older GCC compilers incurs some efficiency loss
@@ -175,7 +176,7 @@ namespace voltdb {
             size_t m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
             map<void const*, typename super::iterator> m_byAddr{};
-            map<size_t, typename super::iterator> m_byId{};
+            unordered_map<size_t, typename super::iterator> m_byId{};
             void add(typename super::iterator);
         protected:
             size_t& lastChunkId();
@@ -347,7 +348,7 @@ namespace voltdb {
             position_type(position_type const&) noexcept = default;
             position_type(position_type&&) noexcept = default;
             position_type& operator=(position_type const&) noexcept;
-            size_t lastChunkId() const noexcept;
+            size_t chunkId() const noexcept;
             void const* address() const noexcept;
             bool empty() const noexcept;               // makes it behave like std::optional<position_type>
         };
@@ -378,7 +379,9 @@ namespace voltdb {
                 using map_type = map<list_type::iterator, vector<void*>>;
             protected:
                 CompactingChunks& chunks() noexcept;
-                list_type::iterator pop();             // force removing the chunk to be compacted from
+                // force "removing" the chunk to be compacted from, either by deleting (when not frozen), or
+                // adjusting m_txnFirstChunk.
+                list_type::iterator pop();
                 vector<void*> collect() const;
                 using map_type::clear;
             public:
@@ -425,11 +428,13 @@ namespace voltdb {
             size_t id() const noexcept;
             void freeze();
             position_type const& frozenBoundary() const noexcept;           // txn boundary
+            bool frozen() const noexcept;
             void thaw();
+            void pop_front();
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
             using list_type::iterator; using list_type::const_iterator;
-            using list_type::empty; using list_type::find; using list_type::pop_front;
+            using list_type::empty; using list_type::find;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::freeze; using CompactingStorageTrait::thaw;
         };
