@@ -113,7 +113,7 @@ public class ExportRow {
     /**
      * Extract a key from the {@link ExportRow} instance.
      * <p>
-     * Creates a special {@link ExportRowInstance} that contains a shallow copy
+     * Creates a special {@link ExportRow} instance that contains a shallow copy
      * of the columns that form the key of this row. The list of key column names
      * is passed-in and the returned row contains these columns in the same order
      * as the provided list (which may be different from the table order).
@@ -127,11 +127,16 @@ public class ExportRow {
      * The life-cycle of the returned {@link ExportRow} instance is intended to be short,
      * mainly to be used to feed decoders extending {@link RowDecoder}, in order to convert
      * the key to a target format e.g. CSV or AVRO.
+     * <p>
+     * The tableName generated for the key {@link ExportRow} is the source's tableName,
+     * with a "-key" suffix added: this is necessary to distinguish it from the values
+     * in whatever target namespace the row will be decoded into.
      *
      * @param keyColumnNames list of key column names in the desired order for the key
      * @return the {@link ExportRow} instance carrying the data for the key columns
      */
     public ExportRow extractKey(List<String> keyColumnNames) {
+        String keyName = tableName + "-key";
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
         List<VoltType> colTypes = new ArrayList<>();
@@ -185,7 +190,7 @@ public class ExportRow {
             colTypes.add(VoltType.INTEGER);
             colValues[INTERNAL_FIELD_COUNT] = new Integer(partitionId);
         }
-        return new ExportRow(tableName, colNames, colTypes, colLengths, colValues, null, -1, partitionId, generation);
+        return new ExportRow(keyName, colNames, colTypes, colLengths, colValues, null, -1, partitionId, generation);
     }
 
     // Temporary: only print schema, values omitted
