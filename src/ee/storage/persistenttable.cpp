@@ -687,33 +687,15 @@ void PersistentTable::finalizeDelete() {
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
     m_releaseBatch.size();
     map<void*, void*> movedTuples{};
-    allocator().remove(m_releaseBatch, [this, &movedTuples](map<void*, void*> const& tuples) {
+    allocator().remove(m_releaseBatch, [&movedTuples](map<void*, void*> const& tuples) {
         movedTuples = tuples;
     });
     m_releaseBatch.clear();
-    moveOnDelete(movedTuples);
-}
-
-void PersistentTable::moveOnDelete(map<void*, void*> const& tuples) {
-    TableTuple target(m_schema);
     TableTuple origin(m_schema);
-    for(auto const& p : tuples) {
+    for(auto const& p : movedTuples) {
         target.move(p.first);
-       origin.move(p.second);
-        BOOST_FOREACH (auto index, m_indexes) {
-            index->replaceEntryNoKeyChange(target, origin);
-        }
-        if (isTableWithMigrate(m_tableType)) {
-            uint16_t migrateColumnIndex = getMigrateColumnIndex();
-            NValue txnId = origin.getHiddenNValue(migrateColumnIndex);
-            if (!txnId.isNull()) {
-                migratingRemove(ValuePeeker::peekBigInt(txnId), origin);
-                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-            }
-        }
-        if (m_tableStreamer != NULL) {
-            m_tableStreamer->notifyTupleMovement(origin, target);
-        }
+        origin.move(p.second);
+        swapTuples(origin, target);
     }
 }
 
@@ -1759,51 +1741,20 @@ size_t PersistentTable::hashCode() {
 
 void PersistentTable::swapTuples(TableTuple& originalTuple,
                                  TableTuple& destinationTuple) {
-    ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
-    originalTuple.setActiveFalse();
 
-    /*
-     * If the tuple is pending deletion then it isn't in any of the indexes.
-     * However that contradicts the assertion above that the tuple is not
-     * pending deletion. In current Volt there is only one transaction executing
-     * at any given time and the commit always releases the undo quantum
-     * because there is no speculation. This situation should be impossible
-     * as the assertion above implies. It looks like this is forward thinking
-     * code for something that shouldn't happen right now.
-     *
-     * However this still isn't sufficient to actually work if speculation
-     * is implemented because moving the tuple will invalidate the pointer
-     * in the undo action for deleting the tuple. If the transaction ends
-     * up being rolled back it won't find the tuple! You would have to go
-     * back and update the undo action (how would you find it?) or
-     * not move the tuple.
-     */
-    if (!originalTuple.isPendingDelete()) {
-        BOOST_FOREACH (auto index, m_indexes) {
-            if (!index->replaceEntryNoKeyChange(destinationTuple, originalTuple)) {
-                throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
-            }
-        }
+    BOOST_FOREACH (auto index, m_indexes) {
+        index->replaceEntryNoKeyChange(destinationTuple, originalTuple);
     }
-
     if (isTableWithMigrate(m_tableType)) {
-        int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
-        if (migrateTxnId != INT64_NULL) {
-            MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
-
-            // The delete-pending tuple should have been removed from migrating index
-            if (originalTuple.isPendingDelete()) {
-                vassert(it == m_migratingRows.end());
-            } else {
-                 vassert(it != m_migratingRows.end());
-                 MigratingBatch& batch = it->second;
-                 void* addr = originalTuple.address();
-                 size_t found = batch.erase(addr);
-                 vassert(found == 1);
-                 batch.emplace(destinationTuple.address());
-            }
-        }
+        uint16_t migrateColumnIndex = getMigrateColumnIndex();
+        NValue txnId = originalTuple.getHiddenNValue(migrateColumnIndex);
+        if (!txnId.isNull()) {
+           migratingRemove(ValuePeeker::peekBigInt(txnId), originalTuple);
+           migratingAdd(ValuePeeker::peekBigInt(txnId), destinationTuple);
+       }
+    }
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
     }
 }
 

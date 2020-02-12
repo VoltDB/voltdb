@@ -685,7 +685,6 @@ private:
 
     void deleteTupleRelease(char* tuple);
     void deleteTupleFinalize(TableTuple& tuple);
-    void moveOnDelete(map<void*, void*> const& tuples);
 
     /**
      * Normally this will return the tuple storage to the free list.
@@ -1048,10 +1047,16 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
     MigratingBatch batch{};
     batch.insert(tuple.address());
     map<void*, void*> movedTuples{};
-    allocator().remove(batch, [this, &movedTuples](map<void*, void*> const& tuples) {
+    allocator().remove(batch, [&movedTuples](map<void*, void*> const& tuples) {
         movedTuples = tuples;
     });
-    moveOnDelete(movedTuples);
+    TableTuple target(m_schema);
+    TableTuple origin(m_schema);
+    for(auto const& p : movedTuples) {
+        target.move(p.first);
+        origin.move(p.second);
+        swapTuples(origin, target);
+    }
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
