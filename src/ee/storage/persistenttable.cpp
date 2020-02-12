@@ -686,17 +686,16 @@ void PersistentTable::finalizeDelete() {
 
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
     m_releaseBatch.size();
-    map<void*, void*> movedTuples{};
-    allocator().remove(m_releaseBatch, [&movedTuples](map<void*, void*> const& tuples) {
-        movedTuples = tuples;
+
+    allocator().remove(m_releaseBatch, [this, &target](map<void*, void*> const& tuples) {
+        TableTuple origin(m_schema);
+        for(auto const& p : tuples) {
+            target.move(p.first);
+            origin.move(p.second);
+            swapTuples(origin, target);
+         }
     });
     m_releaseBatch.clear();
-    TableTuple origin(m_schema);
-    for(auto const& p : movedTuples) {
-        target.move(p.first);
-        origin.move(p.second);
-        swapTuples(origin, target);
-    }
 }
 
 /*
