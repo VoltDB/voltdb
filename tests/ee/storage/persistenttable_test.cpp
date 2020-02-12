@@ -368,7 +368,6 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     engine->loadCatalog(0, catalogPayload());
     PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
-    ASSERT_EQ(1, table->allocatedBlockCount());
 
     beginWork();
     const int tuplesToInsert = 10;
@@ -376,10 +375,8 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     ASSERT_TRUE(added);
     commit();
 
-    size_t blockCount = table->allocatedBlockCount();
     table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
-    ASSERT_EQ(blockCount, table->allocatedBlockCount());
 
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
@@ -391,7 +388,6 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     // gets replaced with new cloned empty table
     table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
-    ASSERT_EQ(1, table->allocatedBlockCount());
 }
 
 TEST_F(PersistentTableTest, SwapTablesTest) {

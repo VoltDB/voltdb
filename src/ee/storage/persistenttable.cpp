@@ -671,13 +671,19 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
 }
 
 void PersistentTable::finalizeDelete() {
-    if (m_tableStreamer != NULL) {
-        TableTuple target(m_schema);
-        BOOST_FOREACH (auto toDelete, m_releaseBatch) {
-            target.move(toDelete);
-            m_tableStreamer->notifyTupleDelete(target);
-        }
-    }
+
+     TableTuple target(m_schema);
+     BOOST_FOREACH (auto toDelete, m_releaseBatch) {
+         target.move(toDelete);
+         if (m_tableStreamer != NULL) {
+              m_tableStreamer->notifyTupleDelete(target);
+         }
+         if (m_schema->getUninlinedObjectColumnCount() != 0) {
+              decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
+              target.freeObjectColumns();
+         }
+     }
+
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
     m_releaseBatch.size();
     map<void*, void*> movedTuples{};
@@ -685,11 +691,15 @@ void PersistentTable::finalizeDelete() {
         movedTuples = tuples;
     });
     m_releaseBatch.clear();
+    moveOnDelete(movedTuples);
+}
+
+void PersistentTable::moveOnDelete(map<void*, void*> const& tuples) {
     TableTuple target(m_schema);
     TableTuple origin(m_schema);
-    for(auto const& p : movedTuples) {
+    for(auto const& p : tuples) {
         target.move(p.first);
-        origin.move(p.second);
+       origin.move(p.second);
         BOOST_FOREACH (auto index, m_indexes) {
             index->replaceEntryNoKeyChange(target, origin);
         }
