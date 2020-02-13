@@ -75,7 +75,7 @@ public class SystemProcedureCatalog {
         private Durability durable = Durability.DURABLE;
         private boolean allowedInShutdown = false;
         private final boolean transactional;
-        private Restartability restartable;
+        private final Restartability restartable;
 
         static Builder createSp(String className, VoltType partitionParamType) {
             return createSp(className, 0, partitionParamType);
@@ -672,6 +672,19 @@ public class SystemProcedureCatalog {
                         false, false, false,  0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
+        builder.put("@StoreKiplingGroup", Builder
+                .createSp("org.voltdb.sysprocs.KiplingProcedures$StoreGroup", VoltType.STRING).commercial().build());
+        builder.put("@DeleteKiplingGroup", Builder
+                .createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteGroup", VoltType.STRING).commercial().build());
+        builder.put("@FetchKiplingGroups",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroups", -1, VoltType.INVALID).commercial()
+                        .readOnly().notDurable().build());
+        builder.put("@CommitKiplingGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$CommitGroupOffsets", VoltType.STRING)
+                        .commercial().build());
+        builder.put("@FetchKiplingGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroupOffsets", VoltType.STRING)
+                        .commercial().readOnly().build());
 
         listing = builder.build();
     }
