@@ -694,7 +694,7 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
     return *this;
 }
 
-size_t CompactingChunks::DelayedRemover::force() {
+size_t CompactingChunks::DelayedRemover::force(bool moved) {
     auto hd = super::chunks().begin_txn().second == nullptr ?                  // frozen?
         super::chunks().begin() :
         super::chunks().begin_txn().first;
@@ -702,10 +702,12 @@ size_t CompactingChunks::DelayedRemover::force() {
         allocsPerChunk = super::chunks().chunkSize() / tupleSize;
     auto const total = m_move.size() + m_remove.size();
     if (total > 0) {
-        // storage remapping and clean up
-        for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
+        if (! moved) {
+            // storage remapping and clean up
+            for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
                     memcpy(entry.first, entry.second, tupleSize);
-                });
+                    });
+        }
         m_move.clear();
         m_remove.clear();
         auto const offset =
@@ -1335,7 +1337,6 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 batch.add(p);
                 return batch;
             }).prepare(false);
-    cb(batch.movements());
     // hook registration
     for_each(batch.removed().cbegin(), batch.removed().cend(),
             [this](void* s) {
@@ -1347,7 +1348,14 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
-    auto const removed = batch.force();
+    // moves (i.e. memcpy) before call back
+    auto const tuple_size = tupleSize();
+    for_each(batch.movements().cbegin(), batch.movements().cend(),
+            [tuple_size](typename map<void*, void*>::value_type const& entry) {
+                memcpy(entry.first, entry.second, tuple_size);
+            });
+    cb(batch.movements());
+    auto const removed = batch.force(false);
     CompactingChunks::m_allocs -= removed;                     // adjust tuple count
     return removed;
 }
@@ -1372,7 +1380,7 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
-    auto const removed = CompactingChunks::m_batched.prepare(true).force();
+    auto const removed = CompactingChunks::m_batched.prepare(true).force(true);    // memcpy after remove_moves()
     CompactingChunks::m_allocs -= removed;
     return removed;
 }

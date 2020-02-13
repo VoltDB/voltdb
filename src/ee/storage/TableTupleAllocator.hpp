@@ -406,7 +406,7 @@ namespace voltdb {
                 map<void*, void*> const& movements() const;
                 set<void*> const& removed() const;
                 // Actuate batch remove
-                size_t force();
+                size_t force(bool);
             } m_batched;
         public:
             using Compact = integral_constant<bool, true>;
