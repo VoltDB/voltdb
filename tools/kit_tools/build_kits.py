@@ -108,18 +108,6 @@ def buildEnterprise(version):
 ################################################
 
 #
-def packagePro(version):
-    print "Making license"
-    licensee="VoltDB Pro Trial User " + version
-    licensefile = makeTrialLicense(licensee=licensee, days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
-    print "Repacking pro kit"
-    with cd(builddir + "/pro/obj/pro"):
-        run("mkdir pro_kit_staging")
-    with cd(builddir + "/pro/obj/pro/pro_kit_staging"):
-        run("tar xf ../voltdb-ent-%s.tar.gz" % version)
-        run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
-        run("cp %s/pro/%s voltdb-pro-%s/voltdb/license.xml" % (builddir, licensefile, version))
-        run("tar cvfz ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -360,9 +348,6 @@ if __name__ == "__main__":
             buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
             copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
-            packagePro(versionCentos)
-            makeSHA256SUM(versionCentos,"pro")
-            copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
             licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)
             copyTrialLicenseToReleaseDir(builddir + "/pro/" + licensefile, releaseDir)
 
