@@ -32,6 +32,7 @@ import java.util.stream.StreamSupport;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
@@ -40,6 +41,9 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 
 /*
@@ -314,5 +318,45 @@ public class VoltTableUtil {
      */
     public static Stream<VoltTableRow> stream(VoltTable table) {
         return StreamSupport.stream(new VoltTableSpliterator(table, 0, table.getRowCount()), false);
+    }
+
+    /**
+     * Split a large {@link ByteBuf} across multiple rows in a single {@link VoltTable}
+     *
+     * @param buf with data to put into the volt table
+     * @return {@link VoltTable} with {@code buf} split into multiple rows
+     */
+    public static VoltTable splitLargeBuffer(ByteBuf buf) {
+        // TODO make a ByteBuf which can be backed by a VoltTable
+        // There is a max column size so make sure to not go over it and slice up the data
+        VoltTable table = new VoltTable(new ColumnInfo("data", VoltType.VARBINARY));
+        while (buf.isReadable()) {
+            byte[] data = new byte[Math.min(VoltType.MAX_VALUE_LENGTH, buf.readableBytes())];
+            buf.readBytes(data);
+            table.addRow(data);
+        }
+        return table;
+    }
+
+    /**
+     * Rejoin multiple rows split by {@link #splitLargeBuffer(ByteBuf)} back into a single {@link ByteBuf}
+     *
+     * @param table With the data in it
+     * @return {@link ByteBuf} with data reassembled into one buffer
+     */
+    public static ByteBuf joinLargeBuffer(VoltTable table) {
+        ByteBuf buf;
+        if (table.getRowCount() == 1) {
+            boolean hasRow = table.advanceToRow(0);
+            assert hasRow;
+            buf = Unpooled.wrappedBuffer(table.getVarbinary(0));
+        } else {
+            CompositeByteBuf compositeBuf = Unpooled.compositeBuffer(table.getRowCount());
+            buf = compositeBuf;
+            while (table.advanceRow()) {
+                compositeBuf.addComponent(true, Unpooled.wrappedBuffer(table.getVarbinary(0)));
+            }
+        }
+        return buf;
     }
 }
