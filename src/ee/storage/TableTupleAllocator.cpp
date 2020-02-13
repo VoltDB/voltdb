@@ -194,6 +194,15 @@ inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(v
     }
 }
 
+template<typename Chunk, typename E>
+inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(size_t id) const {
+    if (m_byId.count(id)) {
+        return &m_byId.find(id)->second;
+    } else {
+        return nullptr;
+    }
+}
+
 template<typename Chunk, typename E> inline ChunkList<Chunk, E>::ChunkList(size_t tsize) noexcept :
 super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
 
@@ -207,12 +216,6 @@ template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::tupleSiz
 
 template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::chunkSize() const noexcept {
     return m_chunkSize;
-}
-
-template<typename Chunk, typename E>
-inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(size_t id) const {
-    auto const& iter = m_byId.find(id);
-    return iter == m_byId.cend() ? nullptr : iter;
 }
 
 template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::size() const noexcept {
@@ -349,16 +352,16 @@ inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chu
 
 inline void* CompactingChunk::free(void* dst) {                     // within-chunk free()
     vassert(contains(dst));
-    if (reinterpret_cast<char*>(dst) + tupleSize() == m_next) {     // last allocation on the chunk
+    if (reinterpret_cast<char*>(dst) + tupleSize() == next()) {     // last allocation on the chunk
         return free();
     } else {                               // free in the middle
         memcpy(dst, free(), tupleSize());
-        return m_next;
+        return next();
     }
 }
 
 inline void* CompactingChunk::free() {                               // within-chunk free() of last allocated
-    vassert(m_next > begin());
+    vassert(next() > begin());
     return reinterpret_cast<char*&>(m_next) -= tupleSize();
 }
 
@@ -435,6 +438,14 @@ size_t CompactingChunks::chunks() const noexcept {
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
     auto const iter = list_type::find(p);
+    return iter == nullptr ||
+        less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().first) ?
+        nullptr : iter;
+}
+
+inline typename CompactingChunks::list_type::iterator const*
+CompactingChunks::find(size_t id) const noexcept {
+    auto const iter = list_type::find(id);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().first) ?
         nullptr : iter;
@@ -623,9 +634,9 @@ struct CompactingIterator {
 
     CompactingIterator(list_type& c) noexcept : m_cont(c),
         m_iter(reinterpret_cast<CompactingChunks const&>(c).beginTxn().first),
-        m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
+        m_cursor(reinterpret_cast<char const*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
     value_type operator*() const noexcept {
-        return {m_iter, m_cursor};
+        return {m_iter, const_cast<void*>(m_cursor)};
     }
     bool drained() const noexcept {
         return m_cursor == nullptr;
@@ -648,12 +659,12 @@ struct CompactingIterator {
 private:
     list_type& m_cont;
     iterator_type m_iter;
-    void* m_cursor;
+    void const* m_cursor;
     void advance() {
         if (m_cursor == nullptr) {
             throw runtime_error("CompactingIterator drained");
         } else if (m_cursor > m_iter->begin()) {
-            reinterpret_cast<char*&>(m_cursor) -=
+            reinterpret_cast<char const*&>(m_cursor) -=
                 reinterpret_cast<CompactingChunks const&>(m_cont).tupleSize();
         } else if (++m_iter == m_cont.end()) {           // drained now
             m_cursor = nullptr;

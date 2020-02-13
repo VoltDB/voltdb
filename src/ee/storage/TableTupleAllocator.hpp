@@ -27,7 +27,6 @@
 #include <memory>
 #include <queue>
 #include <set>
-#include <unordered_map>
 #include <vector>
 
 // older GCC compilers incurs some efficiency loss
@@ -101,6 +100,7 @@ namespace voltdb {
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;              // for batch free
+            template<typename H, typename E> friend class HookedCompactingChunks;
         public:
             ChunkHolder(size_t id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
@@ -180,7 +180,7 @@ namespace voltdb {
             size_t m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
             map<void const*, typename super::iterator> m_byAddr{};
-            unordered_map<size_t, typename super::iterator> m_byId{};
+            map<size_t, typename super::iterator> m_byId{};
             void add(typename super::iterator);
         protected:
             size_t& lastChunkId();
@@ -375,7 +375,6 @@ namespace voltdb {
             static size_t gen_id();
 
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
-            char const* m_lastFreeFromHead = nullptr;       // arg of previous call to free(from_head, ?)
             pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};     // (moving) left boundary for txn
             position_type m_frozenTxnBoundary{};  // (frozen) right boundary for txn
             // the end of allocations when snapshot started: (block id, end ptr)
@@ -416,6 +415,7 @@ namespace voltdb {
                 // Actuate batch remove
                 size_t force(bool);
             } m_batched;
+            using list_type::last;
         public:
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;
@@ -431,6 +431,7 @@ namespace voltdb {
 
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
+            list_type::iterator const* find(size_t) const noexcept;
             pair<list_type::iterator, void const*> const& beginTxn() const noexcept;   // (moving) txn left boundary
             position_type const& endTxn_frozen() const noexcept;                       // txn left boundary when freezing
             pair<list_type::iterator, void const*>& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
@@ -565,6 +566,7 @@ namespace voltdb {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
+            char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
