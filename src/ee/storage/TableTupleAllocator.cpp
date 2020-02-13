@@ -55,7 +55,10 @@ template<typename T> inline void Stack<T>::clear() noexcept {
     m_size = 0;
 }
 
-inline size_t ChunkHolder::chunkSize(size_t tupleSize) noexcept {
+/**
+ * Implementation detail
+ */
+inline static size_t chunkSize(size_t tupleSize) noexcept {
     // preferred list of chunk sizes ranging from 4KB to 16MB.
     // For debug build, it starts with 512-byte block, which the
     // test logic assumes.
@@ -191,8 +194,19 @@ inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(v
     }
 }
 
-template<typename Chunk, typename E> size_t& ChunkList<Chunk, E>::lastChunkId() {
+template<typename Chunk, typename E> inline ChunkList<Chunk, E>::ChunkList(size_t tsize) noexcept :
+super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
+
+template<typename Chunk, typename E> inline size_t& ChunkList<Chunk, E>::lastChunkId() {
     return m_lastChunkId;
+}
+
+template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::tupleSize() const noexcept {
+    return m_tupleSize;
+}
+
+template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::chunkSize() const noexcept {
+    return m_chunkSize;
 }
 
 template<typename Chunk, typename E>
@@ -266,13 +280,8 @@ inline void ChunkList<Chunk, E>::clear() noexcept {
     super::clear();
 }
 
-template<typename C, typename E>
-inline NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept :
-m_tupleSize(tupleSize), m_chunkSize(ChunkHolder::chunkSize(tupleSize)) {}
-
-template<typename C, typename E> inline size_t NonCompactingChunks<C, E>::tupleSize() const noexcept {
-    return m_tupleSize;
-}
+template<typename C, typename E> inline
+NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept : list_type(tupleSize) {}
 
 template<typename C, typename E>
 inline size_t NonCompactingChunks<C, E>::chunks() const noexcept {
@@ -281,12 +290,13 @@ inline size_t NonCompactingChunks<C, E>::chunks() const noexcept {
 
 template<typename C, typename E>
 inline void* NonCompactingChunks<C, E>::allocate() {
+    // Linear search
     auto iter = find_if(list_type::begin(), list_type::end(),
             [](C const& c) { return ! c.full(); });
     void* r;
     if (iter == list_type::cend()) {        // all chunks are full
         r = list_type::emplace_back(list_type::lastChunkId()++,
-                m_tupleSize, m_chunkSize)->allocate();
+                list_type::tupleSize(), list_type::chunkSize())->allocate();
     } else {
         if (iter->empty()) {
             --m_emptyChunks;
@@ -361,7 +371,7 @@ inline void CompactingStorageTrait::freeze() {
 
 inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
-        auto const stop = reinterpret_cast<CompactingChunks*>(m_storage)->beginTxn().first->id();
+        auto const stop = reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn().first->id();
         while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
             m_storage->pop_front();
         }
@@ -374,7 +384,7 @@ inline void CompactingStorageTrait::thaw() {
 inline void CompactingStorageTrait::release(
         typename CompactingStorageTrait::list_type::iterator iter, void const* p) {
     if (m_frozen && less_rolling(iter->id(),
-                reinterpret_cast<CompactingChunks*>(m_storage)->beginTxn().first->id()) &&
+                reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn().first->id()) &&
             reinterpret_cast<char const*>(p) + iter->tupleSize() >= iter->end()) {
         vassert(iter == m_storage->begin());
         m_storage->pop_front();
@@ -406,8 +416,8 @@ inline size_t CompactingChunks::id() const noexcept {
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    CompactingStorageTrait(this), m_id(gen_id()), m_tupleSize(tupleSize),
-    m_chunkSize(ChunkHolder::chunkSize(tupleSize)), m_batched(*this) {}
+    list_type(tupleSize), CompactingStorageTrait(this), m_id(gen_id()),
+    m_batched(*this) {}
 
 size_t CompactingChunks::size() const noexcept {
     return m_allocs;
@@ -415,10 +425,6 @@ size_t CompactingChunks::size() const noexcept {
 
 size_t CompactingChunks::chunks() const noexcept {
     return list_type::size();
-}
-
-size_t CompactingChunks::chunkSize() const noexcept {
-    return m_chunkSize;
 }
 
 inline typename CompactingChunks::list_type::iterator const*
@@ -453,7 +459,7 @@ inline void CompactingChunks::thaw() {
 inline void* CompactingChunks::allocate() {
     void* r;
     if (empty() || last()->full()) {
-        r = emplace_back(lastChunkId()++, m_tupleSize, m_chunkSize)->allocate();
+        r = emplace_back(lastChunkId()++, list_type::tupleSize(), list_type::chunkSize())->allocate();
         if (beginTxn().second == nullptr) {                       // was empty
             beginTxn() = make_pair(begin(), begin()->next());
         }
@@ -622,7 +628,7 @@ struct CompactingIterator {
     using value_type = pair<iterator_type, void*>;
 
     CompactingIterator(list_type& c) noexcept : m_cont(c),
-        m_iter(reinterpret_cast<CompactingChunks&>(c).beginTxn().first),
+        m_iter(reinterpret_cast<CompactingChunks const&>(c).beginTxn().first),
         m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
     value_type operator*() const noexcept {
         return {m_iter, m_cursor};
@@ -738,10 +744,6 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
     auto const r = m_size;
     m_size = 0;
     return r;
-}
-
-inline size_t CompactingChunks::tupleSize() const noexcept {
-    return m_tupleSize;
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
