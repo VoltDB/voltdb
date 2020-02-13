@@ -254,7 +254,7 @@ namespace voltdb {
             void free(void*);
             bool tryFree(void*);                       // not an error if addr not found
             using list_type = ChunkList<Chunk>;
-            using list_type::iterator; using list_type::const_iterator;
+            using typename list_type::iterator; using typename list_type::const_iterator;
             using list_type::empty; using list_type::clear; using list_type::begin;
             using list_type::tupleSize; using list_type::chunkSize;
         };
