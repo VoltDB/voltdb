@@ -22,6 +22,7 @@
  */
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -94,6 +95,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(SCHEMA);
             builder.addLiteralSchema(PROCEDURES);
+            builder.setUseDDLSchema(true);
             server = new LocalCluster("TestDeterministicRowOrder.jar", sitesPerHost, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
             assertTrue("Catalog compilation failed", server.compile(builder));
@@ -123,6 +125,32 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    @Test
+    public void testCatalogUpdate() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            int rowCount = 200;
+            for (int i = 0; i < rowCount; i++) {
+                client.callProcedure("@AdHoc", "insert into KV values(" + i + "," + i + ")");
+                client.callProcedure("@AdHoc", "insert into FOO values(" + i + "," + i + ")");
+            }
+            VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+            assert(vt.asScalarLong() == rowCount);
+
+            assertEquals(ClientResponse.SUCCESS, client.callProcedure("@AdHoc", "ALTER TABLE KV ADD COLUMN c integer;").getStatus());
+            assertEquals(ClientResponse.SUCCESS, client.callProcedure("@AdHoc", "ALTER TABLE FOO ADD COLUMN c integer;").getStatus());
+            vt = client.callProcedure("@AdHoc", "select count(*) from KV").getResults()[0];
+            assert(vt.asScalarLong() == rowCount);
+            vt = client.callProcedure("@AdHoc", "select count(*) from FOO").getResults()[0];
+            assert(vt.asScalarLong() == rowCount);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
         }
     }
 

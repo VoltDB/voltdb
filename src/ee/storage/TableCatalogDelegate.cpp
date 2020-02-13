@@ -548,51 +548,30 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     }
 
     TableTuple scannedTuple(existingTable->schema());
-
     int64_t tuplesMigrated = 0;
 
-    // going to run until the source table has no allocated blocks
-    size_t blocksLeft = existingTable->allocatedBlockCount();
-    while (blocksLeft) {
-
-        TableIterator iterator(existingTable->iterator());
+    PersistentTable::txn_const_iterator itr =
+                       PersistentTable::txn_const_iterator::begin(existingTable->allocator());
+    while (!itr.drained()) {
+        void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(*itr));
+        scannedTuple.move(tupleData);
         TableTuple& tupleToInsert = newTable->tempTuple();
-
-        while (iterator.next(scannedTuple)) {
-
-            //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
-
-            // set the values from the old table or from defaults
-            for (int i = 0; i < columnCount; i++) {
-                if (columnSourceMap[i] >= 0) {
-                    NValue value = scannedTuple.getNValue(columnSourceMap[i]);
-                    if (columnExploded[i]) {
-                        value.allocateObjectFromPool();
-                    }
-                    tupleToInsert.setNValue(i, value);
-                }
-                else {
-                    tupleToInsert.setNValue(i, defaults[i]);
-                }
-            }
-
-            // insert into the new table
-            newTable->insertPersistentTuple(tupleToInsert, false);
-
-            // delete from the old table
-            existingTable->deleteTupleForSchemaChange(scannedTuple);
-
-            // note one tuple moved
-            ++tuplesMigrated;
-
-            // if a block was just deleted, start the iterator again on the next block
-            // this avoids using the block iterator over a changing set of blocks
-            size_t prevBlocksLeft = blocksLeft;
-            blocksLeft = existingTable->allocatedBlockCount();
-            if (blocksLeft < prevBlocksLeft) {
-                break;
+        for (int i = 0; i < columnCount; i++) {
+            if (columnSourceMap[i] >= 0) {
+               NValue value = scannedTuple.getNValue(columnSourceMap[i]);
+               if (columnExploded[i]) {
+                   value.allocateObjectFromPool();
+               }
+               tupleToInsert.setNValue(i, value);
+            } else {
+               tupleToInsert.setNValue(i, defaults[i]);
             }
         }
+        newTable->insertPersistentTuple(tupleToInsert, false);
+        //TO DO: delete as we go
+        //existingTable->deleteTupleForSchemaChange(scannedTuple);
+        ++tuplesMigrated;
+        itr++;
     }
 
     // release any memory held by the default values --
