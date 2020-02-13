@@ -361,7 +361,7 @@ inline void CompactingStorageTrait::freeze() {
 
 inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
-        auto const stop = reinterpret_cast<CompactingChunks*>(m_storage)->begin_txn().first->id();
+        auto const stop = reinterpret_cast<CompactingChunks*>(m_storage)->beginTxn().first->id();
         while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
             m_storage->pop_front();
         }
@@ -374,7 +374,7 @@ inline void CompactingStorageTrait::thaw() {
 inline void CompactingStorageTrait::release(
         typename CompactingStorageTrait::list_type::iterator iter, void const* p) {
     if (m_frozen && less_rolling(iter->id(),
-                reinterpret_cast<CompactingChunks*>(m_storage)->begin_txn().first->id()) &&
+                reinterpret_cast<CompactingChunks*>(m_storage)->beginTxn().first->id()) &&
             reinterpret_cast<char const*>(p) + iter->tupleSize() >= iter->end()) {
         vassert(iter == m_storage->begin());
         m_storage->pop_front();
@@ -425,7 +425,7 @@ inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
     auto const iter = list_type::find(p);
     return iter == nullptr ||
-        less<CompactingChunks::list_type::iterator>()(*iter, begin_txn().first) ?
+        less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().first) ?
         nullptr : iter;
 }
 
@@ -433,7 +433,7 @@ inline void CompactingChunks::pop_front() {
     // NOTE: we impose requirement that this API cannot be
     // called when frozen. This "might" be relaxed, by adjusting
     // txn bounday if frozen, if needed.
-    if (! frozenBoundary().empty()) {
+    if (! beginTxn_frozen().empty()) {
         throw logic_error("CompactingChunks::pop_front(): not applicable when frozen");
     } else {
         list_type::pop_front();
@@ -454,13 +454,13 @@ inline void* CompactingChunks::allocate() {
     void* r;
     if (empty() || last()->full()) {
         r = emplace_back(lastChunkId()++, m_tupleSize, m_chunkSize)->allocate();
-        if (begin_txn().second == nullptr) {                       // was empty
-            begin_txn() = make_pair(begin(), begin()->next());
+        if (beginTxn().second == nullptr) {                       // was empty
+            beginTxn() = make_pair(begin(), begin()->next());
         }
     } else {
         r = last()->allocate();
-        if (last()->id() == begin_txn().first->id()) {
-            begin_txn().second = last()->next();
+        if (last()->id() == beginTxn().first->id()) {
+            beginTxn().second = last()->next();
         }
     }
     ++m_allocs;
@@ -483,36 +483,36 @@ void* CompactingChunks::free(void* dst) {
             throw range_error(buf);
         }
     } else {
-        void* src = begin_txn().first->free();
+        void* src = beginTxn().first->free();
         auto& dst_iter = *pos;
-        if (dst_iter != begin_txn().first) {    // cross-chunk movement needed
+        if (dst_iter != beginTxn().first) {    // cross-chunk movement needed
             dst_iter->free(dst, src);        // memcpy()
         } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
             memcpy(dst, src, tupleSize());
         }
-        begin_txn().first = CompactingStorageTrait::releasable(begin_txn().first);
-        begin_txn().second = end() == begin_txn().first ? nullptr : begin_txn().first->next();
+        beginTxn().first = CompactingStorageTrait::releasable(beginTxn().first);
+        beginTxn().second = end() == beginTxn().first ? nullptr : beginTxn().first->next();
         --m_allocs;
         return src;
     }
 }
 
 inline pair<typename CompactingChunks::list_type::iterator, void const*> const&
-CompactingChunks::begin_txn() const {
+CompactingChunks::beginTxn() const noexcept {
     return m_txnFirstChunk;
 }
 
 inline pair<typename CompactingChunks::list_type::iterator, void const*>&
-CompactingChunks::begin_txn() {
+CompactingChunks::beginTxn() noexcept {
     return m_txnFirstChunk;
 }
 
-inline position_type const& CompactingChunks::frozenBoundary() const noexcept {
+inline position_type const& CompactingChunks::beginTxn_frozen() const noexcept {
     return m_frozenTxnBoundary;
 }
 
 inline bool CompactingChunks::frozen() const noexcept {
-    return ! frozenBoundary().empty();
+    return ! beginTxn_frozen().empty();
 }
 
 namespace batch_remove_aid {
@@ -559,9 +559,9 @@ inline CompactingChunks& CompactingChunks::BatchRemoveAccumulator::chunks() noex
 }
 
 inline typename CompactingChunks::list_type::iterator CompactingChunks::BatchRemoveAccumulator::pop() {
-    auto iter = m_self->begin_txn().first;
+    auto iter = m_self->beginTxn().first;
     reinterpret_cast<char*&>(iter->m_next) = reinterpret_cast<char*>(iter->begin());
-    return m_self->begin_txn().first = m_self->releasable(iter);
+    return m_self->beginTxn().first = m_self->releasable(iter);
 }
 
 inline vector<void*> CompactingChunks::BatchRemoveAccumulator::collect() const {
@@ -622,7 +622,7 @@ struct CompactingIterator {
     using value_type = pair<iterator_type, void*>;
 
     CompactingIterator(list_type& c) noexcept : m_cont(c),
-        m_iter(reinterpret_cast<CompactingChunks&>(c).begin_txn().first),
+        m_iter(reinterpret_cast<CompactingChunks&>(c).beginTxn().first),
         m_cursor(reinterpret_cast<char*>(m_iter->next()) - reinterpret_cast<CompactingChunks const&>(c).tupleSize()) {}
     value_type operator*() const noexcept {
         return {m_iter, m_cursor};
@@ -695,13 +695,10 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
 }
 
 size_t CompactingChunks::DelayedRemover::force(bool moved) {
-    auto hd = super::chunks().begin_txn().second == nullptr ?                  // frozen?
-        super::chunks().begin() :
-        super::chunks().begin_txn().first;
-    auto const tupleSize = super::chunks().tupleSize(),
-        allocsPerChunk = super::chunks().chunkSize() / tupleSize;
     auto const total = m_move.size() + m_remove.size();
     if (total > 0) {
+        auto const tupleSize = super::chunks().tupleSize(),
+             allocsPerChunk = super::chunks().chunkSize() / tupleSize;
         if (! moved) {
             // storage remapping and clean up
             for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
@@ -710,6 +707,8 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
         }
         m_move.clear();
         m_remove.clear();
+        auto hd = super::chunks().beginTxn().first;
+        vassert(hd != super::chunks().end());
         auto const offset =
             reinterpret_cast<char const*>(hd->next()) - reinterpret_cast<char const*>(hd->begin());
         // dangerous: direct manipulation on each offended chunks
@@ -734,6 +733,7 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
             vassert(hd->next() >= hd->begin());
         }
         super::clear();
+        super::chunks().m_allocs -= total;
     }
     auto const r = m_size;
     m_size = 0;
@@ -841,7 +841,7 @@ struct iterator_begin<Cont, perm, iterator_view_type::txn, integral_constant<boo
     using iterator = typename conditional<perm == iterator_permission_type::ro,
           typename Cont::const_iterator, typename Cont::iterator>::type;
     iterator operator()(Cont& c) const noexcept {
-        return c.begin_txn().first;
+        return c.beginTxn().first;
     }
 };
 
@@ -926,7 +926,7 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_con
             return iter->end();
         } else if (l.size() == 1) {            // single chunk list
             // safe cast derived from Comp
-            auto const& pos = reinterpret_cast<CompactingChunks const&>(l).frozenBoundary();
+            auto const& pos = reinterpret_cast<CompactingChunks const&>(l).beginTxn_frozen();
             // invariant: if frozen, then must also be single chunk when freezing
             vassert(pos.empty() || pos.chunkId() == iter->id());
             return pos.empty() ?       // (not) frozen?
@@ -1127,8 +1127,8 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
     return super::drained() || (super::storage().frozen() &&
-            (super::storage().frozenBoundary().address() == super::m_cursor ||
-             less<position_type>()(super::storage().frozenBoundary(), *this)));
+            (super::storage().beginTxn_frozen().address() == super::m_cursor ||
+             less<position_type>()(super::storage().beginTxn_frozen(), *this)));
 }
 
 template<unsigned char NthBit, typename E>
@@ -1355,9 +1355,7 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 memcpy(entry.first, entry.second, tuple_size);
             });
     cb(batch.movements());
-    auto const removed = batch.force(false);
-    CompactingChunks::m_allocs -= removed;                     // adjust tuple count
-    return removed;
+    return batch.force(false);
 }
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -1380,9 +1378,7 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
-    auto const removed = CompactingChunks::m_batched.prepare(true).force(true);    // memcpy after remove_moves()
-    CompactingChunks::m_allocs -= removed;
-    return removed;
+    return CompactingChunks::m_batched.prepare(true).force(true);    // memcpy after remove_moves()
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

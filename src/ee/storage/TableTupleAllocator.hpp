@@ -411,12 +411,24 @@ namespace voltdb {
         public:
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;
+            /**
+             * Queries
+             */
             size_t tupleSize() const noexcept;
             size_t chunkSize() const noexcept;         // number of bytes per chunk
             size_t chunks() const noexcept;            // number of chunks
+            bool frozen() const noexcept;
+            size_t size() const noexcept;              // number of allocation requested
+            size_t id() const noexcept;
+            // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
+            list_type::iterator const* find(void const*) const noexcept;
+            pair<list_type::iterator, void const*> const& beginTxn() const noexcept;   // (moving) txn left boundary
+            position_type const& beginTxn_frozen() const noexcept;              // txn left boundary when freezing
+            pair<list_type::iterator, void const*>& beginTxn() noexcept;
+            /**
+             * Memory operations
+             */
             void* allocate();
-            pair<list_type::iterator, void const*>& begin_txn();
-            pair<list_type::iterator, void const*> const& begin_txn() const;
             // frees a single tuple, and returns the tuple that gets copied
             // over the given address, which is at the tail of
             // first/last chunk; or nullptr when the address is
@@ -424,19 +436,17 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
-            size_t size() const noexcept;              // number of allocation requested
-            size_t id() const noexcept;
+            /**
+             * State changes
+             */
             void freeze();
-            position_type const& frozenBoundary() const noexcept;           // txn boundary
-            bool frozen() const noexcept;
             void thaw();
-            void pop_front();
-            // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
-            list_type::iterator const* find(void const*) const noexcept;
+            /**
+             * Auxillary others
+             */
+            void pop_front();                          // remove 1st chunk, allowed only when not frozen
             using list_type::iterator; using list_type::const_iterator;
-            using list_type::empty; using list_type::find;
-            using list_type::begin; using list_type::end;
-            using CompactingStorageTrait::freeze; using CompactingStorageTrait::thaw;
+            using list_type::empty; using list_type::begin; using list_type::end;
         };
 
         struct BaseHistoryRetainTrait {
