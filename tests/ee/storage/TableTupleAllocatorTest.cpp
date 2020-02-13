@@ -1369,8 +1369,98 @@ TestSingleChunkSnapshot1<EagerNonCompactingChunk> const TestSingleChunkSnapshot:
 TestSingleChunkSnapshot1<LazyNonCompactingChunk> const TestSingleChunkSnapshot::s2{};
 
 TEST_F(TableTupleAllocatorTest, TestSingleChunkSnapshot) {
-    TestSingleChunkSnapshot t;
-    t();
+    TestSingleChunkSnapshot()();
+}
+
+template<typename Chunk, gc_policy pol>
+using remove_direction = typename
+HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
+
+template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+void testRemovesFromEnds(size_t batch) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
+    using Gen = StringGen<TupleSize>;
+    using addresses_type = array<void const*, NumTuples>;
+    Alloc alloc(TupleSize);
+    addresses_type addresses;
+    Gen gen;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < NumTuples; ++i) {
+        memcpy(const_cast<void*>(addresses[i] = alloc.allocate()), gen.get(), TupleSize);
+    }
+    assert(alloc.size() == NumTuples);
+    // remove tests
+    if (dir == remove_direction<Chunk, pol>::from_head) {      // remove from head
+        for (i = 0; i < batch; ++i) {
+            alloc.remove(dir, addresses[i]);
+        }
+        alloc.remove(dir, nullptr);     // completion
+        assert(alloc.size() == NumTuples - batch);
+        fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc),
+                [&i](void const* p) { assert(Gen::same(p, i++)); });
+        assert(i == NumTuples);
+        alloc.template freeze<truth>();
+        try {                                                  // not allowed when frozen
+            alloc.remove(dir, nullptr);
+            assert(false);                                     // should have failed
+        } catch (logic_error const& e) {
+            assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
+        }
+    }
+}
+
+template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+struct TestRemovesFromEnds3 {
+    inline void operator()() const {
+        testRemovesFromEnds<Chunk, pol, dir>(0);
+        testRemovesFromEnds<Chunk, pol, dir>(NumTuples);
+        testRemovesFromEnds<Chunk, pol, dir>(AllocsPerChunk - 1);
+        testRemovesFromEnds<Chunk, pol, dir>(AllocsPerChunk);
+        testRemovesFromEnds<Chunk, pol, dir>(AllocsPerChunk + 1);
+        testRemovesFromEnds<Chunk, pol, dir>(AllocsPerChunk * 15 + 2);
+    }
+};
+
+template<typename Chunk, gc_policy pol> struct TestRemovesFromEnds2 {
+    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const s1;
+    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const s2;
+    using direction = typename
+        HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
+    inline void operator()() const {
+        s1();
+//        s2();
+    }
+};
+template<typename Chunk, gc_policy pol>
+TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const TestRemovesFromEnds2<Chunk, pol>::s1{};
+template<typename Chunk, gc_policy pol>
+TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const TestRemovesFromEnds2<Chunk, pol>::s2{};
+
+template<typename Chunk> struct TestRemovesFromEnds1 {
+    static TestRemovesFromEnds2<Chunk, gc_policy::never> const s1;
+    static TestRemovesFromEnds2<Chunk, gc_policy::always> const s2;
+    static TestRemovesFromEnds2<Chunk, gc_policy::batched> const s3;
+    inline void operator()() const {
+        s1();
+        s2();
+        s3();
+    }
+};
+template<typename Chunk> TestRemovesFromEnds2<Chunk, gc_policy::never> const TestRemovesFromEnds1<Chunk>::s1{};
+template<typename Chunk> TestRemovesFromEnds2<Chunk, gc_policy::always> const TestRemovesFromEnds1<Chunk>::s2{};
+template<typename Chunk> TestRemovesFromEnds2<Chunk, gc_policy::batched> const TestRemovesFromEnds1<Chunk>::s3{};
+
+struct TestRemovesFromEnds {
+    inline void operator()() const {
+        TestRemovesFromEnds1<EagerNonCompactingChunk>()();
+        TestRemovesFromEnds1<LazyNonCompactingChunk>()();
+    }
+};
+
+TEST_F(TableTupleAllocatorTest, TestRemovesFromEnds) {
+    TestRemovesFromEnds()();
 }
 
 #endif

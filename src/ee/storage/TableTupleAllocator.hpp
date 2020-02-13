@@ -167,7 +167,7 @@ namespace voltdb {
          * (i.e. ChunkHolder).
          *
          * Gives O(log(n)) search speed for
-         * std::forward_list<ChunkHolder>, search by void*, and O(1) by chunk id;
+         * std::forward_list<ChunkHolder>, search by void* and by chunk id;
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
@@ -252,7 +252,6 @@ namespace voltdb {
             size_t chunks() const noexcept;            // number of chunks in the list
             void* allocate();
             void free(void*);
-            bool tryFree(void*);                       // not an error if addr not found
             using list_type = ChunkList<Chunk>;
             using typename list_type::iterator; using typename list_type::const_iterator;
             using list_type::empty; using list_type::clear; using list_type::begin;
@@ -578,6 +577,17 @@ namespace voltdb {
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             void update(void*);                        // NOTE: this must be called prior to any memcpy operations happen
             void const* remove(void*);
+            /**
+             * Light weight free() operations from either end,
+             * involving no compaction.
+             *
+             * When removing from head direction, the last invocation must be
+             * followed by another new invocation as
+             * (remove_direction::from_head, nullptr). Forgetting to do so will
+             * result in uncleaned removal (i.e. part of remove calls are lost).
+             */
+            enum class remove_direction : char {from_head, from_tail};
+            void remove(remove_direction, void const*);
             /**
              * Batch removal using a single call
              * \arg #1: a set of allocation addresses to be
