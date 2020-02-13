@@ -370,13 +370,11 @@ public final class InvocationDispatcher {
         // check for allPartition invocation and provide a nice error if it's misused
         if (task.hasPartitionDestination()) {
             if (!catProc.getSinglepartition()
-                    || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)
-                    || catProc.getSystemproc()) {
+                    || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)) {
                 return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
                         "Invalid procedure for all-partition execution. "
                                 + "Targeted procedure must be partitioned on the first parameter "
-                                + "or be a directed procedure, "
-                                + "and must not be a system procedure.",
+                                + "or be a directed procedure.",
                         task.clientHandle);
             }
 
@@ -387,7 +385,7 @@ public final class InvocationDispatcher {
             }
 
             if (catProc.getPartitionparameter() == -1
-                    && task.getParams().size() == catProc.getParameters().size() + 1) {
+                    && !catProc.getSystemproc() && task.getParams().size() == catProc.getParameters().size() + 1) {
                 // Client provided a partition parameter for backwards compatibility so strip off the first parameter
                 Object[] params = task.getParams().toArray();
                 task.setParams(Arrays.copyOfRange(params, 1, params.length));

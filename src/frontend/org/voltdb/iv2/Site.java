@@ -46,6 +46,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
+import org.voltdb.KiplingSystemTableConnection;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
@@ -120,7 +121,7 @@ import com.google_voltpatches.common.collect.Lists;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
-public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, KiplingSystemTableConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger drLog = new VoltLogger("DRAGENT");
@@ -221,8 +222,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     private Map<Integer, Map<Integer, DRSiteDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
             new HashMap<>();
-    private long m_lastLocalSpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
-    private long m_lastLocalMpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
+    private long m_lastLocalSpUniqueId = -1L; // Only populated by the Site for ApplyBinaryLog Txns
+    private long m_lastLocalMpUniqueId = -1L; // Only populated by the Site for ApplyBinaryLog Txns
 
     // Current topology
     int m_partitionId;
@@ -249,8 +250,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private long m_latestUndoToken = 0L;
     private long m_latestUndoTxnId = Long.MIN_VALUE;
 
-    private long getNextUndoToken(long txnId)
+    private long getNextUndoToken()
     {
+        long txnId = m_currentTxnId;
         if (txnId != m_latestUndoTxnId) {
             m_latestUndoTxnId = txnId;
             return ++m_latestUndoToken;
@@ -484,7 +486,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 HiddenColumnFilter hiddenColumnFilter, boolean undo, byte[] predicates)
         {
             return m_ee.activateTableStream(tableId, type, hiddenColumnFilter,
-                    undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
+                    undo ? getNextUndoToken() : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -675,6 +677,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public InitiatorMailbox getInitiatorMailbox() {
             return m_initiatorMailbox;
         }
+
+        @Override
+        public KiplingSystemTableConnection getKiplingSystemTableConnection() {
+            return Site.this;
+        };
     };
 
     /** Create a new execution site and the corresponding EE */
@@ -1213,7 +1220,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                caller.createUndoToken() ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                caller.createUndoToken() ? getNextUndoToken() : Long.MAX_VALUE,
                 caller);
     }
 
@@ -1518,7 +1525,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                       long deletableTxnId)
     {
         return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
-                tableName, deletableTxnId, getNextUndoToken(m_currentTxnId));
+                tableName, deletableTxnId, getNextUndoToken());
     }
 
     @Override
@@ -1910,7 +1917,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throws EEException {
         try {
             return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                    remoteClusterId, getNextUndoToken(m_currentTxnId));
+                    remoteClusterId, getNextUndoToken());
         } catch(DRTableNotFoundException e) {
             e.setRemoteTxnUniqueId(remoteUniqueId);
             e.setCatalogVersion(getSystemProcedureExecutionContext().getCatalogVersion());
@@ -1982,7 +1989,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putLong(spHandle);
         // adding txnId and undoToken to make generateDREvent undoable
         paramBuffer.putLong(txnId);
-        paramBuffer.putLong(getNextUndoToken(m_currentTxnId));
+        paramBuffer.putLong(getNextUndoToken());
         paramBuffer.putInt(payloads.length);
         paramBuffer.put(payloads);
         m_ee.executeTask(TaskType.GENERATE_DR_EVENT, paramBuffer);
@@ -2024,5 +2031,30 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     public ServiceState getServiceState() {
         return m_serviceState;
+    }
+
+    @Override
+    public void storeGroup(byte[] groupMetadata) {
+        m_ee.storeKiplingGroup(getNextUndoToken(), groupMetadata);
+    }
+
+    @Override
+    public void deleteGroup(String groupId) {
+        m_ee.deleteKiplingGroup(getNextUndoToken(), groupId);
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchGroups(int maxResultSize, String startGroupId) {
+        return m_ee.fetchKiplingGroups(maxResultSize, startGroupId);
+    }
+
+    @Override
+    public byte[] commitGroupOffsets(long spHandle, short requestVersion, String groupId, byte[] offsets) {
+        return m_ee.commitKiplingGroupOffsets(spHandle, getNextUndoToken(), requestVersion, groupId, offsets);
+    }
+
+    @Override
+    public byte[] fetchGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        return m_ee.fetchKiplingGroupOffsets(requestVersion, groupId, offsets);
     }
 }
