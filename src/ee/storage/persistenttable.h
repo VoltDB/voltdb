@@ -219,9 +219,9 @@ private:
     void rollbackIndexChanges(TableTuple* tuple, int upto);
 
 public:
-    using Alloc = storage::HookedCompactingChunks<
-            storage::TxnPreHook<storage::NonCompactingChunks<storage::LazyNonCompactingChunk>,
-                storage::HistoryRetainTrait<storage::gc_policy::batched>>>;
+    using Hook = storage::TxnPreHook<storage::NonCompactingChunks<storage::LazyNonCompactingChunk>,
+                   storage::HistoryRetainTrait<storage::gc_policy::batched>>;
+    using Alloc = storage::HookedCompactingChunks<Hook>;
     using txn_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::iterator;
     using txn_const_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::const_iterator;
     using SnapshotIterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::hooked_iterator;

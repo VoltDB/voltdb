@@ -426,6 +426,7 @@ namespace voltdb {
             size_t chunks() const noexcept;            // number of chunks
             size_t size() const noexcept;              // number of allocation requested
             size_t id() const noexcept;
+            size_t chunkSize() const noexcept;
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::empty; using list_type::begin; using list_type::end;
 

@@ -435,6 +435,10 @@ size_t CompactingChunks::chunks() const noexcept {
     return list_type::size();
 }
 
+size_t CompactingChunks::chunkSize() const noexcept {
+    return list_type::chunkSize();
+}
+
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
     auto const iter = list_type::find(p);

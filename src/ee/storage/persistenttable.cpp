@@ -158,7 +158,8 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // NOTE: we embed m_data pointer immediately after the
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
-    m_dataStorage.reset(new Alloc{schema->tupleLength() + TUPLE_HEADER_SIZE});
+    size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
+    m_dataStorage.reset(new Alloc{tupleSize});
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
