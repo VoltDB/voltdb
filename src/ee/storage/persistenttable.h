@@ -225,6 +225,7 @@ public:
     using txn_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::iterator;
     using txn_const_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::const_iterator;
     using SnapshotIterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::hooked_iterator;
+    using remove_direction = storage::HookedCompactingChunks<Hook>::remove_direction;
 
     virtual ~PersistentTable();
     Alloc& allocator() noexcept {

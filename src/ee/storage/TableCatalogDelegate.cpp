@@ -550,11 +550,10 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     TableTuple scannedTuple(existingTable->schema());
     int64_t tuplesMigrated = 0;
 
-    PersistentTable::txn_const_iterator itr =
-                       PersistentTable::txn_const_iterator::begin(existingTable->allocator());
-    while (!itr.drained()) {
-        void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(*itr));
-        scannedTuple.move(tupleData);
+    storage::for_each<PersistentTable::txn_iterator>(existingTable->allocator(),
+        [&scannedTuple, &newTable, &existingTable, &tuplesMigrated, &defaults, &columnSourceMap, &columnExploded, &columnCount](void* p) {
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+        scannedTuple.move(tupleAddress);
         TableTuple& tupleToInsert = newTable->tempTuple();
         for (int i = 0; i < columnCount; i++) {
             if (columnSourceMap[i] >= 0) {
@@ -568,11 +567,10 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
             }
         }
         newTable->insertPersistentTuple(tupleToInsert, false);
-        //TO DO: delete as we go
-        //existingTable->deleteTupleForSchemaChange(scannedTuple);
+
+        existingTable->allocator().remove(PersistentTable::remove_direction::from_head, scannedTuple.address());
         ++tuplesMigrated;
-        itr++;
-    }
+    });
 
     // release any memory held by the default values --
     // normally you'd want this in a finally block, but since this code failing
