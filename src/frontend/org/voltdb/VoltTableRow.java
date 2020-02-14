@@ -610,6 +610,25 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the length of the varbinary value stored in the column specified by index.
+     *
+     * @param columnIndex Index of the column
+     * @return Length of the varbinary value stored in the specified column or {@code -1} if the value is {@code null}
+     */
+    public final int getVarbinaryLen(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.VARBINARY);
+        int offset = getOffset(columnIndex);
+        // Sanity check the varbinary size int position.
+        if (VARBINARY_LEN_SIZE > m_buffer.limit() - offset) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::getVarbinary: Can't read varbinary size as %d byte integer " +
+                    "from buffer with %d bytes remaining.",
+                    VARBINARY_LEN_SIZE, m_buffer.limit() - offset));
+        }
+        return m_buffer.getInt(offset);
+    }
+
+    /**
      * Retrieve the varbinary value stored in the column
      * specified by name. Avoid retrieving via this method as it is slower than specifying the
      * column by index. Use {@link #getVarbinary(int)} instead.
