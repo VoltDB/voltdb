@@ -1417,8 +1417,39 @@ void testRemovesFromEnds(size_t batch) {
             alloc.remove(dir, nullptr);
             assert(false);                                     // should have failed
         } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
+            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
+            alloc.thaw();
         }
+    } else {                                                   // remove from tail
+        alloc.template freeze<truth>();
+        try {                                                  // we forbid calling remove from head/tail when frozen
+            alloc.remove(dir, nullptr);
+        } catch (logic_error const& e) {
+            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
+            alloc.thaw();
+        }
+        for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
+            alloc.remove(dir, addresses[i]);
+        }
+        assert(alloc.size() == NumTuples - batch);
+        i = 0;
+        until<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc),
+                [batch, &i](void const* p) {
+                    assert(Gen::same(p, i));
+                    return ++i >= NumTuples - batch;
+                });
+        assert(i == NumTuples - batch);
+        i = 0;
+        fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
+                static_cast<Alloc const&>(alloc), [&i](void const* p) {
+                    assert(Gen::same(p, i++));
+                });
+        // NOTE: since these light-weight removes involves no
+        // compaction, what gets deleted (that would normaly move
+        // "1st" tuple to last, and in snapshot, the head chunk
+        // would be preserved) is now lost forever.
+        assert(i == NumTuples - batch);
     }
 }
 
@@ -1441,7 +1472,7 @@ template<typename Chunk, gc_policy pol> struct TestRemovesFromEnds2 {
         HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
     inline void operator()() const {
         s1();
-//        s2();
+        s2();
     }
 };
 template<typename Chunk, gc_policy pol>
