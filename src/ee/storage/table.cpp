@@ -427,6 +427,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         target.setActiveTrue();
         target.setDirtyFalse();
         target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
 
         target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
 

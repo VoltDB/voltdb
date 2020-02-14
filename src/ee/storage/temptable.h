@@ -206,6 +206,7 @@ inline void TempTable::insertTempTuple(TableTuple const& source) {
     target.copy(source); // tuple in freelist must be already cleared
     target.setActiveTrue();
     target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
     target.setInlinedDataIsVolatileFalse();
     target.setNonInlinedDataIsVolatileFalse();
 }

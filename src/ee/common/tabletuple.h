@@ -352,6 +352,10 @@ public:
         return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_MASK;
     }
 
+    inline bool isPendingDeleteOnUndoRelease() const {
+        return *(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK;
+    }
+
     /** Is variable-length data stored inside the tuple volatile (could data
         change, or could storage be freed)? */
     inline bool inlinedDataIsVolatile() const {
@@ -499,15 +503,24 @@ private:
        writer.omitEndingLineFeed();
        return writer.write(val);
     }
+
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
     }
-
     inline void setActiveFalse() {
         // treat the first "value" as a boolean flag
         vassert(m_data);
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
+    }
+
+    inline void setPendingDeleteOnUndoReleaseTrue() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(PENDING_DELETE_ON_UNDO_RELEASE_MASK);
+    }
+    inline void setPendingDeleteOnUndoReleaseFalse() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~PENDING_DELETE_ON_UNDO_RELEASE_MASK);
     }
 
     inline void setPendingDeleteTrue() {
@@ -536,7 +549,6 @@ private:
         // considered volatile.
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
     }
-
     /** Mark inlined variable length data in the tuple as not subject
         to change or deallocation. */
     inline void setInlinedDataIsVolatileFalse() {
@@ -550,7 +562,6 @@ private:
     inline void setNonInlinedDataIsVolatileTrue() {
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(NONINLINED_VOLATILE_MASK);
     }
-
     /** Mark non-inlined variable length data referenced from the
         tuple as not subject to change or deallocation. */
     inline void setNonInlinedDataIsVolatileFalse() {

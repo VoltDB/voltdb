@@ -337,8 +337,6 @@ public:
     // ------------------------------------------------------------------
     // PERSISTENT TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void deleteTupleForSchemaChange(TableTuple& target);
-
     void insertPersistentTuple(TableTuple const& source,
             bool fallible, bool ignoreTupleLimit = false);
 
@@ -616,6 +614,7 @@ public:
 
     void migratingAdd(int64_t txnId, TableTuple& tuple);
     bool migratingRemove(int64_t txnId, TableTuple& tuple);
+    bool migratingSwap(int64_t txnId, TableTuple& origtuple, TableTuple& desttuple);
     uint16_t getMigrateColumnIndex();
     /**
      * Delete the rows that have completed the migration process
@@ -1051,7 +1050,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
 inline void PersistentTable::deleteTailTupleStorage(TableTuple& tuple) {
     deleteTupleStorage(tuple);
 
-    allocator().remove(Alloc::remove_direction::from_tail, tuple);
+    allocator().remove(PersistentTable::remove_direction::from_tail, tuple.address());
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {

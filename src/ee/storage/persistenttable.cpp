@@ -763,6 +763,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
 
     target.setActiveTrue();
     target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
     target.setInlinedDataIsVolatileFalse();
     target.setNonInlinedDataIsVolatileFalse();
 
@@ -849,6 +850,7 @@ void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& ta
 void PersistentTable::insertTupleForUndo(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
+    target.setPendingDeleteOnUndoReleaseFalse();
     --m_tuplesPinnedByUndo;
     --m_invisibleTuplesPendingDeleteCount;
 
@@ -1195,6 +1197,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         }
     }
     if (createUndoAction) {
+        target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
@@ -1231,7 +1234,31 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
-    deleteTupleFinalize(target);
+    // For replicated table
+    // delete the tuple directly but preserve the deleted tuples to tempTable for cowIterator
+    // the same way as Update
+
+    // A snapshot (background scan) in progress can still cause a hold-up.
+    // notifyTupleDelete() defaults to returning true for all context types
+    // other than CopyOnWriteContext.
+    if (m_tableStreamer != NULL) {
+         m_tableStreamer->notifyTupleDelete(target);
+    }
+
+    // No snapshot in progress cares, just whack it.
+    deleteTupleStorage(target); // also frees object columns
+
+    MigratingBatch batch{};
+    batch.insert(target.address());
+    allocator().remove(batch,[this](map<void*, void*> const& tuples) {
+        TableTuple target(m_schema);
+        TableTuple origin(m_schema);
+        for(auto const& p : tuples) {
+           target.move(p.first);
+           origin.move(p.second);
+           swapTuples(origin, target);
+        }
+   });
 }
 
 
@@ -1241,6 +1268,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 void PersistentTable::deleteTupleRelease(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
+    target.setPendingDeleteOnUndoReleaseFalse();
     if (m_tableStreamer != NULL && ! m_tableStreamer->notifyTupleDelete(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
         if (!target.isPendingDelete()) {
@@ -1270,16 +1298,6 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
 
     // No snapshot in progress cares, just whack it.
     deleteTupleStorage(target); // also frees object columns
-}
-
-/**
- * Assumptions:
- * All tuples will be deleted in storage order.
- * Indexes and views have been destroyed first.
- */
-void PersistentTable::deleteTupleForSchemaChange(TableTuple& target) {
-    // free object columns along with empty tuple block storage
-    deleteTupleStorage(target);
 }
 
 /*
@@ -1312,7 +1330,15 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
-    deleteTupleFinalize(target); // also frees object columns
+
+    // A snapshot (background scan) in progress can still cause a hold-up.
+    // notifyTupleDelete() defaults to returning true for all context types
+    // other than CopyOnWriteContext.
+    if (m_tableStreamer != NULL) {
+         m_tableStreamer->notifyTupleDelete(target);
+    }
+
+    deleteTailTupleStorage(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType) {
@@ -1751,6 +1777,7 @@ size_t PersistentTable::hashCode() {
 
 void PersistentTable::swapTuples(TableTuple& originalTuple,
                                  TableTuple& destinationTuple) {
+    vassert(!originalTuple.isPendingDeleteOnUndoRelease());
 
     BOOST_FOREACH (auto index, m_indexes) {
         index->replaceEntryNoKeyChange(destinationTuple, originalTuple);
@@ -1759,8 +1786,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
         uint16_t migrateColumnIndex = getMigrateColumnIndex();
         NValue txnId = originalTuple.getHiddenNValue(migrateColumnIndex);
         if (!txnId.isNull()) {
-           migratingRemove(ValuePeeker::peekBigInt(txnId), originalTuple);
-           migratingAdd(ValuePeeker::peekBigInt(txnId), destinationTuple);
+            migratingSwap(ValuePeeker::peekBigInt(txnId), originalTuple, destinationTuple);
        }
     }
     if (m_tableStreamer != NULL) {
@@ -2073,6 +2099,20 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
         m_migratingRows.erase(it);
     }
     vassert(found == 1);
+    return found == 1;
+}
+
+bool PersistentTable::migratingSwap(int64_t txnId, TableTuple& origtuple, TableTuple& desttuple) {
+    vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
+    MigratingRows::iterator it = m_migratingRows.find(txnId);
+    if (it == m_migratingRows.end()) {
+        vassert(false);
+        return false;
+    }
+
+    size_t found = it->second.erase(origtuple.address());
+    auto const success = it->second.insert(desttuple.address());
+    vassert(found == 1 && success.second);
     return found == 1;
 }
 
