@@ -182,6 +182,7 @@ namespace voltdb {
             map<void const*, typename super::iterator> m_byAddr{};
             map<size_t, typename super::iterator> m_byId{};
             void add(typename super::iterator);
+            void remove(typename super::iterator);
         protected:
             size_t& lastChunkId();
             template<typename Pred> void remove_if(Pred p);
@@ -195,6 +196,7 @@ namespace voltdb {
             // "override" writing behavior
             template<typename... Args> iterator emplace_back(Args&&...);
             void pop_front();
+            void pop_back();
             void clear() noexcept;
             using super::begin; using super::end; using super::cbegin; using super::cend;
             using super::empty; using super::front;
@@ -416,6 +418,7 @@ namespace voltdb {
                 size_t force(bool);
             } m_batched;
             using list_type::last;
+            using list_type::pop_back;
         public:
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;
