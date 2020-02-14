@@ -650,10 +650,10 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
     try {
         m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
     } catch (ConstraintFailureException const& e) {
-        m_deltaTable->deleteTupleStorage(targetForDelta);
+        m_deltaTable->deleteTailTupleStorage(targetForDelta);
         throw;
     } catch (TupleStreamException const& e) {
-        m_deltaTable->deleteTupleStorage(targetForDelta);
+        m_deltaTable->deleteTailTupleStorage(targetForDelta);
         throw;
 
     }
@@ -719,10 +719,10 @@ void PersistentTable::insertPersistentTuple(TableTuple const& source, bool falli
     try {
         insertTupleCommon(source, target, fallible);
     } catch (TupleStreamException const& e) {
-        deleteTupleStorage(target); // also frees object columns
+        deleteTailTupleStorage(target); // also frees object columns
         throw;
     } catch (ConstraintFailureException const& e) {
-        deleteTupleStorage(target); // also frees object columns
+        deleteTailTupleStorage(target); // also frees object columns
         throw;
     }
 }
@@ -770,7 +770,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
     try {
         tryInsertOnAllIndexes(&target, &conflict);    // Also evaluates if the index update might throw
     } catch (std::exception const& e) {
-        deleteTupleStorage(target); // also frees object columns
+        deleteTailTupleStorage(target); // also frees object columns
         throw;
     }
     if (!conflict.isNullTuple()) {
@@ -824,7 +824,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
     //
     // (Note: we may hit a NOT NULL constraint violation, or any
     // types of constraint violation. In which case, we want to
-    // clean up by calling deleteTupleStorage, below)
+    // clean up by calling deleteTailTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
 }
 
@@ -861,7 +861,7 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     if (!conflict.isNullTuple()) {
         // First off, it should be impossible to violate a constraint when RESTORING an index to a
         // known good state via an UNDO of a delete.  So, assume that something is badly broken, here.
-        // It's probably safer NOT to do too much cleanup -- such as trying to call deleteTupleStorage --
+        // It's probably safer NOT to do too much cleanup -- such as trying to call deleteTailTupleStorage --
         // as there's no guarantee that it will improve things, and is likely just to tamper with
         // the crime scene.
         throwFatalException("Failed to insert tuple into table %s for undo:"
@@ -1634,9 +1634,9 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
         }
         serializedTupleCount++;
         tuple.serializeTo(*uniqueViolationOutput);
-        deleteTupleStorage(tuple);
+        deleteTailTupleStorage(tuple);
     } catch (TupleStreamException& e) {
-        deleteTupleStorage(tuple);
+        deleteTailTupleStorage(tuple);
         throw;
     }
     // TODO: we do not catch other types of exceptions, such as

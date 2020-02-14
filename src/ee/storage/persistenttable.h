@@ -692,6 +692,7 @@ private:
      * In the memcheck build it will return the storage to the heap.
      */
     void deleteTupleStorage(TableTuple& tuple);
+    void deleteTailTupleStorage(TableTuple& tuple);
 
     /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -1044,18 +1045,13 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
     }
+ }
 
-    MigratingBatch batch{};
-    batch.insert(tuple.address());
-    allocator().remove(batch,[this](map<void*, void*> const& tuples) {
-        TableTuple target(m_schema);
-        TableTuple origin(m_schema);
-        for(auto const& p : tuples) {
-           target.move(p.first);
-           origin.move(p.second);
-           swapTuples(origin, target);
-        }
-   });
+
+inline void PersistentTable::deleteTailTupleStorage(TableTuple& tuple) {
+    deleteTupleStorage(tuple);
+
+    allocator().remove(Alloc::remove_direction::from_tail, tuple);
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
