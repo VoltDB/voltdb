@@ -384,6 +384,10 @@ inline void CompactingStorageTrait::thaw() {
     }
 }
 
+inline bool CompactingStorageTrait::frozen() const noexcept {
+    return m_frozen;
+}
+
 inline void CompactingStorageTrait::release(
         typename CompactingStorageTrait::list_type::iterator iter, void const* p) {
     if (m_frozen && less_rolling(iter->id(),
@@ -448,7 +452,9 @@ CompactingChunks::find(size_t id) const noexcept {
 
 inline void CompactingChunks::freeze() {
     CompactingStorageTrait::freeze();
-    m_frozenTxnBoundary = *last();
+    if (last() != end()) {
+        m_frozenTxnBoundary = *last();
+    }
 }
 
 inline void CompactingChunks::thaw() {
@@ -515,10 +521,6 @@ CompactingChunks::beginTxn() noexcept {
 
 inline position_type const& CompactingChunks::endTxn_frozen() const noexcept {
     return m_frozenTxnBoundary;
-}
-
-inline bool CompactingChunks::frozen() const noexcept {
-    return ! endTxn_frozen().empty();
 }
 
 namespace batch_remove_aid {
@@ -732,11 +734,13 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
             auto const rem = reinterpret_cast<char*>(hd->next()) - reinterpret_cast<char*>(hd->begin());
             if (remBytes >= rem) {
                 hd = super::pop();
-                reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
+                if (hd != super::chunks().end()) {
+                    reinterpret_cast<char*&>(hd->m_next) -= remBytes - rem;
+                }
             } else {
                 reinterpret_cast<char*&>(hd->m_next) -= remBytes;
             }
-            vassert(hd->next() >= hd->begin());
+            vassert(hd == super::chunks().end() || hd->next() >= hd->begin());
         }
         super::clear();
         super::chunks().m_allocs -= total;
@@ -1391,14 +1395,14 @@ HookedCompactingChunks<Hook, E>::remove(
                         reinterpret_cast<char*&>(iter->m_next) = dst + offset;
                     } else {                                   // right on the boundary
                         pop_front();
-                        if (! empty()) {
-                            beginTxn() = {begin(), begin()->next()};
-                        } else {
-                            beginTxn() = {end(), nullptr};
-                        }
+                        beginTxn() = empty() ? make_pair(end(), nullptr) : make_pair(begin(), begin()->next());
                     }
                     m_lastFreeFromHead = nullptr;
                 }
+            } else if (empty()) {
+                snprintf(buf, sizeof buf, "HookedCompactingChunks::remove(from_head, %p): empty allocator", p);
+                buf[sizeof buf - 1] = 0;
+                throw underflow_error(buf);
             } else {
                 vassert((m_lastFreeFromHead == nullptr && p == beginTxn().first->begin()) ||       // called for the first time?
                         (beginTxn().first->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||// same chunk,
@@ -1413,17 +1417,23 @@ HookedCompactingChunks<Hook, E>::remove(
         case remove_direction::from_tail:
             // Undo insert: it is called in the exactly
             // opposite order of txn iterator.
-            vassert(reinterpret_cast<char const*>(p) + tupleSize() == CompactingChunks::last()->next());
-            if (frozen() && less<position_type>()(*CompactingChunks::last(), CompactingChunks::endTxn_frozen())) {
-                Hook::release(p);
+            if (empty()) {
+                snprintf(buf, sizeof buf, "HookedCompactingChunks::remove(from_tail, %p): empty allocator", p);
+                buf[sizeof buf - 1] = 0;
+                throw underflow_error(buf);
+            } else {
+                vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
+                if (frozen()) {
+                    release(p);
+                }
+                if (last()->begin() == (last()->m_next = const_cast<void*>(p))) {
+                    // delete last chunk
+                    auto const* iter = CompactingChunks::find(last()->id() - 1);
+                    vassert(iter != nullptr || empty());
+                    last() = iter == nullptr ? end() : *iter;
+                }
+                --CompactingChunks::m_allocs;
             }
-            if (CompactingChunks::last()->begin() == (CompactingChunks::last()->m_next = const_cast<void*>(p))) {
-                // delete last chunk
-                auto const* iter = CompactingChunks::find(CompactingChunks::last()->id() - 1);
-                vassert(iter != nullptr);
-                CompactingChunks::last() = *iter;
-            }
-            --CompactingChunks::m_allocs;
             break;
         default:;
     }

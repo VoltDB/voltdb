@@ -294,6 +294,7 @@ namespace voltdb {
             bool m_frozen = false;
         public:
             explicit CompactingStorageTrait(list_type*) noexcept;
+            bool frozen() const noexcept;
             void freeze(); void thaw();
             /**
              * post-action when free() is called, only useful when shrinking
@@ -421,12 +422,12 @@ namespace voltdb {
             /**
              * Queries
              */
-            bool frozen() const noexcept;
             size_t chunks() const noexcept;            // number of chunks
             size_t size() const noexcept;              // number of allocation requested
             size_t id() const noexcept;
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::empty; using list_type::begin; using list_type::end;
+            using CompactingStorageTrait::frozen;
 
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;

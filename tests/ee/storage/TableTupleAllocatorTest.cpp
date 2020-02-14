@@ -979,6 +979,16 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
 }
 
 template<typename Chunk, gc_policy pol>
+void testHookedCompactingChunksBatchRemove_single4() {         // correctness on txn view: single elem table, remove the only row
+    using HookAlloc = NonCompactingChunks<Chunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    Alloc alloc(TupleSize);
+    alloc.remove(set<void*>{alloc.allocate()}, [](map<void*, void*> const&){});
+    assert(alloc.empty());
+}
+
+template<typename Chunk, gc_policy pol>
 void testHookedCompactingChunksBatchRemove_multi1() {
     using HookAlloc = NonCompactingChunks<Chunk>;
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
@@ -1136,6 +1146,7 @@ template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
         testHookedCompactingChunksBatchRemove_single1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single2<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single3<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_single4<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi2<Chunk, pol>();
     }
