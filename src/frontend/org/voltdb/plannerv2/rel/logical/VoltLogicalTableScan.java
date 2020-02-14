@@ -31,7 +31,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-import org.voltdb.plannerv2.rules.physical.Constants;
 
 /**
  * Relational expression representing a scan of a {@link VoltTable}, in the logical phase.
@@ -84,7 +83,7 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        return Constants.MAX_TABLE_ROW_COUNT;
+        return getTable().getRowCount();
     }
 
 }

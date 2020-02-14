@@ -197,7 +197,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                         innerScan.getCluster(), innerScan.getTraitSet(), innerScan.getTable(),
                         innerScan.getVoltTable(), innerScan.getProgram(), index, accessPath,
                         innerScan.getLimitRexNode(), innerScan.getOffsetRexNode(), null,
-                        null, null, innerScan.getSplitCount(),
+                        null, null,
                         indexCollation, true);
                 final RelNode innerChild;
                 if (call.rels.length == 3) {

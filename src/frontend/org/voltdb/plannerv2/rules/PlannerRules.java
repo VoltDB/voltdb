@@ -43,6 +43,7 @@ import org.apache.calcite.tools.RuleSets;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalAggregateScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcAggregateMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalExchangeMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitJoinMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
@@ -63,6 +64,8 @@ import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
+import org.voltdb.plannerv2.rules.physical.VoltPExchangeRule;
+import org.voltdb.plannerv2.rules.physical.VoltPExchangeTransposeRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
@@ -239,6 +242,11 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
 
+            // Exchange Transpose Rules
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_SORT_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_SORT_EXCHANGE,
+
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,
             VoltPCalcScanToIndexRule.INSTANCE,
@@ -247,7 +255,8 @@ public class PlannerRules {
             VoltPSetOpsRule.INSTANCE_UNION,
             VoltPSetOpsRule.INSTANCE_INTERSECT,
             VoltPSetOpsRule.INSTANCE_EXCEPT,
-            VoltPValuesRule.INSTANCE
+            VoltPValuesRule.INSTANCE,
+            VoltPExchangeRule.INSTANCE
     );
 
     // Join Permutation rules are part of the PHYSICAL phase on a condition
@@ -272,7 +281,10 @@ public class PlannerRules {
             VoltPhysicalAggregateScanMergeRule.INSTANCE,
             VoltPhysicalLimitScanMergeRule.INSTANCE_LIMIT_SCAN,
             VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_JOIN,
-            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_CALC_JOIN
+            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_CALC_JOIN,
+            VoltPhysicalExchangeMergeRule.INSTANCE_LIMIT_MERGE_EXCHANGE,
+            VoltPhysicalExchangeMergeRule.INSTANCE_SORT_MERGE_EXCHANGE
+
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(

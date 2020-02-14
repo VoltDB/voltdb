@@ -82,7 +82,7 @@ class VoltPRelFactories {
                                 outputRowType, input.getCluster().getRexBuilder());
                 return new VoltPhysicalCalc(input.getCluster(),
                         input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                        input, program, 1);
+                        input, program);
             };
 
     /**
@@ -101,7 +101,7 @@ class VoltPRelFactories {
         final RexProgram program = programBuilder.getProgram();
         return new VoltPhysicalCalc(input.getCluster(),
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                input, program, 1);
+                input, program);
     };
 
     /**
@@ -133,7 +133,7 @@ class VoltPRelFactories {
         public RelNode createSort(RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
             return new VoltPhysicalSort(input.getCluster(),
                     input.getTraitSet().plus(collation).replace(VoltPhysicalRel.CONVENTION),
-                    input, collation, 1);
+                    input, collation, false);
         }
         @Override @Deprecated // to be removed before 2.0
         public RelNode createSort(
@@ -154,7 +154,7 @@ class VoltPRelFactories {
                             // Hash destroys ORDERING
                             input.getTraitSet().replace(RelCollations.EMPTY).replace(VoltPhysicalRel.CONVENTION),
                             input, indicator, groupSet, groupSets, aggCalls,
-                    null, 1, false);
+                    null, false);
 
     /**
      * Implementation of {@link RelFactories.SetOpFactory} that
@@ -171,11 +171,11 @@ class VoltPRelFactories {
                 .replace(VoltPhysicalRel.CONVENTION);
         switch (kind) {
             case UNION:
-                return new VoltPhysicalUnion(firstChild.getCluster(), traits, inputs, all, 1);
+                return new VoltPhysicalUnion(firstChild.getCluster(), traits, inputs, all);
             case EXCEPT:
-                return new VoltPhysicalMinus(firstChild.getCluster(), traits, inputs, all, 1);
+                return new VoltPhysicalMinus(firstChild.getCluster(), traits, inputs, all);
             case INTERSECT:
-                return new VoltPhysicalIntersect(firstChild.getCluster(), traits, inputs, all, 1);
+                return new VoltPhysicalIntersect(firstChild.getCluster(), traits, inputs, all);
             default:
                 throw new AssertionError("not a set op: " + kind);
         }
@@ -192,7 +192,7 @@ class VoltPRelFactories {
                                     .plus(VoltPhysicalRel.CONVENTION)
                                     .plus(RelCollations.EMPTY)
                                     .plus(RelDistributions.ANY),
-                            rowType, ImmutableList.copyOf(tuples), 1);
+                            rowType, ImmutableList.copyOf(tuples));
 
     // @TODO Scan Factory
 }

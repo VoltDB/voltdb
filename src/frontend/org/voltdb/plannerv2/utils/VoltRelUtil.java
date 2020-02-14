@@ -17,25 +17,43 @@
 
 package org.voltdb.plannerv2.utils;
 
-import com.google.common.base.Preconditions;
-import com.google_voltpatches.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Optional;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.rel.*;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rex.*;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexCallBinding;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.validate.SqlMonotonicity;
 import org.apache.calcite.util.mapping.Mappings;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 public class VoltRelUtil {
 
@@ -50,11 +68,6 @@ public class VoltRelUtil {
         Preconditions.checkNotNull(rel);
         RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);
-    }
-
-    public static int decideSplitCount(RelNode rel) {
-        return (rel instanceof VoltPhysicalRel) ?
-                ((VoltPhysicalRel) rel).getSplitCount() : 1;
     }
 
     /**
@@ -100,10 +113,25 @@ public class VoltRelUtil {
 
     public static CompiledPlan calciteToVoltDBPlan(VoltPhysicalRel rel, CompiledPlan compiledPlan) {
 
-        RexConverter.PARAM_COUNTER.reset();
-
-        AbstractPlanNode root = new SendPlanNode();
-        root.addAndLinkChild(rel.toPlanNode());
+        AbstractPlanNode root = rel.toPlanNode();
+        // if the root has a distribution other than SINGLETON
+        // and the partitioning value is not set
+        // we need to add an additional Receive / Send pair to collect
+        // partitions results
+        RelDistribution rootDist = rel.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        if (RelDistributions.SINGLETON.getType() != rootDist.getType()
+                && rootDist.getPartitionEqualValue() == null) {
+            SendPlanNode fragmentSend = new SendPlanNode();
+            fragmentSend.addAndLinkChild(root);
+            root = new ReceivePlanNode();
+            root.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(rel.getRowType(), 0));
+            root.setHaveSignificantOutputSchema(true);
+            root.addAndLinkChild(fragmentSend);
+        }
+        // Add final Send node to be the root
+        SendPlanNode coordinatorSend = new SendPlanNode();
+        coordinatorSend.addAndLinkChild(root);
+        root = coordinatorSend;
 
         compiledPlan.rootPlanGraph = root;
 
@@ -116,10 +144,59 @@ public class VoltRelUtil {
                 postPlannerVisitor.isOrderDeterministic(),  // is order deterministic
                 null); // no details on determinism
 
-        compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
+        compiledPlan.setStatementPartitioning(StatementPartitioning.inferPartitioning());
 
         compiledPlan.setParameters(postPlannerVisitor.getParameterValueExpressions());
 
+        compiledPlan.setPartitioningValue(VoltRexUtil.extractPartitioningValue(rootDist));
+
         return compiledPlan;
+    }
+
+    /**
+     * Given a coordinator's LIMIT node build a fragment's LIMIT node
+     *
+     * @param coordinatorLimit
+     * @param fragmentDist
+     * @param fragmentNode
+     * @return
+     */
+    public static Optional<VoltPhysicalLimit> buildFragmentLimit(VoltPhysicalLimit coordinatorLimit, RelDistribution fragmentDist, RelNode fragmentNode) {
+        RexNode limit = coordinatorLimit.getLimit();
+        RexNode offset = coordinatorLimit.getOffset();
+        // Can't push OFFEST only to fragments
+        if (limit == null) {
+            return Optional.empty();
+        }
+
+        VoltPhysicalLimit fragmentLimit = null;
+        if (offset == null) {
+            // Simply push the limit to fragments
+            fragmentLimit = new VoltPhysicalLimit(
+                    coordinatorLimit.getCluster(),
+                    coordinatorLimit.getTraitSet().replace(fragmentDist),
+                    fragmentNode,
+                    null, limit, false);
+        } else {
+            // fragment's limit is coordinator's limit plus coordinator's offset
+            // fragment's offset is always 0
+            final RexNode combinedLimit;
+            RexBuilder builder = coordinatorLimit.getCluster().getRexBuilder();
+
+            if (RexUtil.isLiteral(limit, true) && RexUtil.isLiteral(offset, true)) {
+                int intLimit = RexLiteral.intValue(limit);
+                int intOffset = RexLiteral.intValue(offset);
+                combinedLimit = builder.makeLiteral(intLimit + intOffset, limit.getType(), true);
+            } else {
+                combinedLimit = builder.makeCall(
+                        SqlStdOperatorTable.PLUS,
+                        offset,
+                        limit);
+            }
+            fragmentLimit = new VoltPhysicalLimit(
+                    coordinatorLimit.getCluster(), coordinatorLimit.getTraitSet().replace(fragmentDist), fragmentNode,
+                    null, combinedLimit, false);
+        }
+        return Optional.of(fragmentLimit);
     }
 }

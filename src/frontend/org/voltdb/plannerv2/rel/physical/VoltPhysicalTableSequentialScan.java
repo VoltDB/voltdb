@@ -49,16 +49,16 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
     public VoltPhysicalTableSequentialScan(
             RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable,
             RexProgram program, RexNode offset, RexNode limit, RelNode aggregate,
-            RelDataType preAggregateRowType, RexProgram preAggregateProgram, int splitCount) {
+            RelDataType preAggregateRowType, RexProgram preAggregateProgram) {
         super(cluster, traitSet, table, voltTable, program, offset, limit, aggregate, preAggregateRowType,
-                preAggregateProgram, splitCount);
+                preAggregateProgram);
     }
 
     public VoltPhysicalTableSequentialScan(
-            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable) {
         this(cluster, traitSet, table, voltTable,
                 RexProgram.createIdentity(voltTable.getRowType(cluster.getTypeFactory())), null,
-                null, null, null, null, splitCount);
+                null, null, null, null);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
     }
 
@@ -84,7 +84,7 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
     public AbstractVoltTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         return new VoltPhysicalTableSequentialScan(
                 getCluster(), traitSet, getTable(), getVoltTable(), getProgram(), offset, limit,
-                getAggregateRelNode(), getPreAggregateRowType(), getPreAggregateProgram(), m_splitCount);
+                getAggregateRelNode(), getPreAggregateRowType(), getPreAggregateProgram());
     }
 
     @Override
@@ -94,7 +94,7 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
                 getCluster(), traitSet, getTable(), getVoltTable(),
                 RexProgramBuilder.mergePrograms(newProgram, m_program, programRexBuilder),
                 getOffsetRexNode(), getLimitRexNode(), getAggregateRelNode(), getPreAggregateRowType(),
-                getPreAggregateProgram(), m_splitCount);
+                getPreAggregateProgram());
     }
 
     @Override
@@ -104,8 +104,7 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
         // Preserve the original program and row type
         return new VoltPhysicalTableSequentialScan(
                 getCluster(), traitSet, getTable(), getVoltTable(), RexProgram.createIdentity(aggregate.getRowType()),
-                getOffsetRexNode(), getLimitRexNode(), aggregate, getRowType(), getProgram(),
-                m_splitCount);
+                getOffsetRexNode(), getLimitRexNode(), aggregate, getRowType(), getProgram());
     }
 
     @Override

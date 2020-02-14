@@ -238,6 +238,12 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::add(
     m_byId.emplace(iter->id(), iter);
 }
 
+template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::remove(
+        typename ChunkList<Chunk, E>::iterator iter) {
+    m_byAddr.erase(iter->begin());
+    m_byId.erase(iter->id());
+}
+
 template<typename Chunk, typename E>
 template<typename... Args>
 inline typename ChunkList<Chunk, E>::iterator ChunkList<Chunk, E>::emplace_back(Args&&... args) {
@@ -265,6 +271,21 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_front(
     }
 }
 
+template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_back() {
+    if (super::empty()) {
+        throw underflow_error("pop_back() called on empty chunk list");
+    } else {
+        auto const* iterp = find(m_back->id() - 1);
+        if (iterp != nullptr) {            // original list contains more than 1 nodes
+            remove(m_back);
+            super::erase_after(m_back = *iterp);
+            --lastChunkId();
+        } else {
+            clear();
+        }
+    }
+}
+
 template<typename Chunk, typename E>
 template<typename Pred> inline void ChunkList<Chunk, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
@@ -286,6 +307,8 @@ inline void ChunkList<Chunk, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
+    m_back = end();
+    lastChunkId() = 0;
 }
 
 template<typename C, typename E> inline
@@ -374,9 +397,11 @@ inline void CompactingStorageTrait::freeze() {
 
 inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
-        auto const stop = reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn().first->id();
-        while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
-            m_storage->pop_front();
+        if (! m_storage->empty()) {
+            auto const stop = reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn().first->id();
+            while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
+                m_storage->pop_front();
+            }
         }
         m_frozen = false;
     } else {
@@ -1372,6 +1397,9 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::remove(
         typename HookedCompactingChunks<Hook, E>::remove_direction dir, void const* p) {
+    if (frozen()) {
+        throw logic_error("Cannot remove from head or tail when frozen");
+    }
     switch (dir) {
         case remove_direction::from_head:
             // Schema change: it is called in the same
@@ -1380,9 +1408,7 @@ HookedCompactingChunks<Hook, E>::remove(
             // NOTE: since we only do chunk-wise drop, any reads
             // from the allocator when these dispersed calls are
             // occurring *will* get spurious data.
-            if(frozen()) {
-                throw logic_error("Cannot remove from head when frozen");
-            } else if (p == nullptr) {                         // marks completion
+            if (p == nullptr) {                         // marks completion
                 if (m_lastFreeFromHead != nullptr && beginTxn().first->contains(m_lastFreeFromHead)) {
                     // effects deletions in 1st chunk
                     auto& iter = beginTxn().first;
@@ -1427,14 +1453,8 @@ HookedCompactingChunks<Hook, E>::remove(
                 throw underflow_error(buf);
             } else {
                 vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
-                if (frozen()) {
-                    release(p);
-                }
-                if (last()->begin() == (last()->m_next = const_cast<void*>(p))) {
-                    // delete last chunk
-                    auto const* iter = CompactingChunks::find(last()->id() - 1);
-                    vassert(iter != nullptr || empty());
-                    last() = iter == nullptr ? end() : *iter;
+                if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
+                    pop_back();
                 }
                 --CompactingChunks::m_allocs;
             }

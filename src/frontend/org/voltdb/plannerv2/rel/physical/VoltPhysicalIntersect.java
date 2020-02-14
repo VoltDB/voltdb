@@ -27,6 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Intersect;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rel.util.PlanNodeUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 import com.google.common.base.Preconditions;
 
@@ -39,8 +41,6 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     /**
      * Creates a VoltPhysicalIntersect.
      *
@@ -50,19 +50,13 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalIntersect(
-            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override public VoltPhysicalIntersect copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
-        return new VoltPhysicalIntersect(getCluster(), traitSet, inputs, all, m_splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
+        return new VoltPhysicalIntersect(getCluster(), traitSet, inputs, all);
     }
 
     @Override
@@ -80,6 +74,11 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
         double rowCount = estimateRowCount(mq);
         double cpu = PlanCostUtil.computeSetOpCost(getInputs(), mq);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        return PlanNodeUtil.setOpToPlanNode(this);
     }
 
 }
