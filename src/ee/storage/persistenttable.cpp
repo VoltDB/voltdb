@@ -1239,6 +1239,16 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
  * This entry point is triggered by the successful release of an UndoDeleteAction.
  */
 void PersistentTable::deleteTupleRelease(char* tuple) {
+    TableTuple target(m_schema);
+    target.move(tuple);
+    if (m_tableStreamer != NULL && ! m_tableStreamer->notifyTupleDelete(target)) {
+        // Mark it pending delete and let the snapshot land the finishing blow.
+        if (!target.isPendingDelete()) {
+            ++m_invisibleTuplesPendingDeleteCount;
+            target.setPendingDeleteTrue();
+        }
+        return;
+    }
     m_releaseBatch.insert(tuple);
 }
 
