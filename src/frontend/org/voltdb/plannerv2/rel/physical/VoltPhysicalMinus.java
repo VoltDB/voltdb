@@ -27,6 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Minus;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rel.util.PlanNodeUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 import com.google.common.base.Preconditions;
 
@@ -38,8 +40,6 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     /**
      * Creates a VoltPhysicalMinus.
      *
@@ -49,14 +49,13 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalMinus(
-            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override public VoltPhysicalMinus copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
-        return new VoltPhysicalMinus(getCluster(), traitSet, inputs, all, m_splitCount);
+        return new VoltPhysicalMinus(getCluster(), traitSet, inputs, all);
     }
 
     @Override
@@ -74,8 +73,8 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
     }
 
     @Override
-    public int getSplitCount() {
-        return m_splitCount;
+    public AbstractPlanNode toPlanNode() {
+        return PlanNodeUtil.setOpToPlanNode(this);
     }
 
 }

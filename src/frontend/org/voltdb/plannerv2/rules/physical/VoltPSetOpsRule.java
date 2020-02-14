@@ -48,26 +48,26 @@ public class VoltPSetOpsRule extends RelOptRule {
     private enum MatchType {
         UNION_TYPE {
             @Override
-            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs, int splitCount) {
-                return new VoltPhysicalUnion(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all, splitCount);
+            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs) {
+                return new VoltPhysicalUnion(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all);
             }
         },
 
         INTERSECT_TYPE {
             @Override
-            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs, int splitCount) {
-                return new VoltPhysicalIntersect(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all, splitCount);
+            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs) {
+                return new VoltPhysicalIntersect(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all);
             }
         },
 
         EXCEPT_TYPE {
             @Override
-            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs, int splitCount) {
-                return new VoltPhysicalMinus(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all, splitCount);
+            public RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs) {
+                return new VoltPhysicalMinus(setOp.getCluster(), convertedTraits, convertedInputs, setOp.all);
             }
         };
 
-        public abstract RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs, int splitCount);
+        public abstract RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs);
     }
 
     private final MatchType m_matchType;
@@ -83,9 +83,7 @@ public class VoltPSetOpsRule extends RelOptRule {
         List<RelNode> inputs = setOp.getInputs();
         RelTraitSet convertedTraits = setOp.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
         List<RelNode> convertedInputs = convertList(inputs, VoltPhysicalRel.CONVENTION);
-        // @TODO For now, the split count for a SetOp is simply the count of its child statements
-        int splitCount = convertedInputs.size();
-        RelNode convertedSetOP = m_matchType.convertToVoltPhysical(setOp, convertedTraits, convertedInputs, splitCount);
+        RelNode convertedSetOP = m_matchType.convertToVoltPhysical(setOp, convertedTraits, convertedInputs);
         call.transformTo(convertedSetOP);
     }
 }

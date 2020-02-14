@@ -50,8 +50,6 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
     // HAVING expression
     final private RexNode m_postPredicate;
 
-    final private int m_splitCount;
-
     // TRUE if this aggregate relation is part of a coordinator tree.
     // The indicator may be useful during the Exchange Transform rule when a coordinator aggregate
     // differs from a fragment one
@@ -69,7 +67,6 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      */
     VoltPhysicalAggregate(
@@ -81,18 +78,15 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            int splitCount,
             boolean isCoordinatorAggr) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
         m_postPredicate = havingExpression;
-        m_splitCount = splitCount;
         m_isCoordinatorAggr = isCoordinatorAggr;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("split", m_splitCount);
         pw.item("coordinator", m_isCoordinatorAggr);
         pw.itemIf("having", m_postPredicate, m_postPredicate != null);
         return pw;
@@ -101,7 +95,6 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
     @Override
     protected String computeDigest() {
         String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
         digest += "_coordinator_" + m_isCoordinatorAggr;
         if (m_postPredicate != null) {
             digest += m_postPredicate.toString();
@@ -144,7 +137,6 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      * @return A cloned {@link VoltPhysicalAggregate}.
      */
@@ -157,16 +149,10 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            int splitCount,
             boolean isCoordinatorAggr);
 
     public RexNode getPostPredicate() {
         return m_postPredicate;
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
     }
 
     public boolean getIsCoordinatorAggr() {

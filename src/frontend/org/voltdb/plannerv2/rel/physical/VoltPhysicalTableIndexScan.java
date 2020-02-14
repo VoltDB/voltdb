@@ -78,10 +78,10 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     public VoltPhysicalTableIndexScan(
             RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltDBTable, RexProgram program,
             Index index, AccessPath accessPath, RexNode offset, RexNode limit, RelNode aggregate,
-            RelDataType preAggregateRowType, RexProgram preAggregateProgram, int splitCount,
+            RelDataType preAggregateRowType, RexProgram preAggregateProgram,
             RelCollation indexCollation, boolean isInlinedInnerScan) {
         super(cluster, traitSet, table, voltDBTable, updateProgram(program, accessPath),
-              offset, limit, aggregate, preAggregateRowType, preAggregateProgram, splitCount);
+              offset, limit, aggregate, preAggregateRowType, preAggregateProgram);
         Preconditions.checkNotNull(index, "index is null");
         Preconditions.checkNotNull(accessPath, "access path is null");
         Preconditions.checkNotNull(indexCollation, "index collation is null");
@@ -179,7 +179,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         return new VoltPhysicalTableIndexScan(
                 getCluster(), traitSet, getTable(), getVoltTable(), getProgram(),
                 getIndex(), getAccessPath(), offset, limit, getAggregateRelNode(),
-                getPreAggregateRowType(), getPreAggregateProgram(), getSplitCount(),
+                getPreAggregateRowType(), getPreAggregateProgram(),
                 m_indexCollation, m_isInlinedInnerScan);
     }
 
@@ -201,7 +201,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         // Adjust the collation for a new program
         return new VoltPhysicalTableIndexScan(getCluster(), traitSet, getTable(), getVoltTable(), mergedProgram,
                 getIndex(), getAccessPath(), getOffsetRexNode(), getLimitRexNode(), getAggregateRelNode(),
-                getPreAggregateRowType(), getPreAggregateProgram(), getSplitCount(),
+                getPreAggregateRowType(), getPreAggregateProgram(),
                 VoltRexUtil.adjustCollationForProgram(rexBuilder, mergedProgram,m_indexCollation),
                 m_isInlinedInnerScan);
     }
@@ -214,12 +214,7 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
         return new VoltPhysicalTableIndexScan(getCluster(), traitSet, getTable(), getVoltTable(),
                 RexProgram.createIdentity(aggregate.getRowType()),
                 getIndex(), getAccessPath(), getOffsetRexNode(), getLimitRexNode(), aggregate, getRowType(),
-                getProgram(), getSplitCount(), m_indexCollation, m_isInlinedInnerScan);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
+                getProgram(), m_indexCollation, m_isInlinedInnerScan);
     }
 
     public RelCollation getIndexCollation() {

@@ -19,8 +19,6 @@ package org.voltdb.plannerv2.utils;
 
 import java.util.*;
 
-import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.Lists;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
@@ -31,6 +29,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -46,6 +45,9 @@ import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Lists;
 
 public class VoltRexUtil {
 
@@ -450,4 +452,28 @@ public class VoltRexUtil {
                 });
     }
 
+    /**
+     * Extract partitioning object if any from a RelDistribution object
+     * Since only integer, string, or byte array column can be a partitioning column
+     * the partitioning value should be either Long or String
+     *
+     * @param dist
+     * @return Partitioning object (Long or String) or null
+     */
+    public static Object extractPartitioningValue(RelDistribution dist) {
+        RexNode partitioningNode = dist.getPartitionEqualValue();
+        if (partitioningNode instanceof RexLiteral) {
+            RexLiteral literal = (RexLiteral) partitioningNode;
+            Comparable value = literal.getValue();
+            if (value instanceof Number) {
+                return ((Number) value).longValue();
+            } else {
+                try {
+                    return RexLiteral.stringValue(literal);
+                } catch(Exception ex) {
+                }
+            }
+        }
+        return null;
+    }
 }

@@ -21,40 +21,39 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
- * Convert LogicalSort to a collation that would be propagated by Calcite and recreated back
- * a VoltPhysicalSort at the later stage
+ * VoltDB physical rule that transform {@link VoltLogicalExchange} to {@link VoltPhysicalExchange}.
  *
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltPSortRule extends RelOptRule {
+public class VoltPExchangeRule extends RelOptRule {
 
-    // TODO: I don't understand the purpose of this rule. I removed it from our ruleset.
-    public static final VoltPSortRule INSTANCE = new VoltPSortRule();
+    public static final VoltPExchangeRule INSTANCE = new VoltPExchangeRule();
 
-    VoltPSortRule() {
-        super(operand(VoltLogicalSort.class, VoltLogicalRel.CONVENTION, any()));
-    }
-
-    @Override
-    public boolean matches(RelOptRuleCall call) {
-        VoltLogicalSort sort = call.rel(0);
-        // Can convert to the collation trait only if there is no limit/offset
-        // The limit/offset should be separated to a RelNode during LogicalSort conversion
-        return sort.offset == null && sort.fetch == null;
+    VoltPExchangeRule() {
+        super(operand(VoltLogicalExchange.class,
+                VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalSort sort = call.rel(0);
-        RelNode input = sort.getInput();
-        RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltPhysicalRel.CONVENTION);
-        RelNode convertedInput = convert(input, convertedTraits);
-        call.transformTo(convertedInput);
+        VoltLogicalExchange exchange = call.rel(0);
+        RelNode input = exchange.getInput();
+        RelTraitSet convertedTraits = exchange.getTraitSet()
+                .replace(VoltPhysicalRel.CONVENTION).simplify();
+        RelNode convertedInput = convert(input,
+                input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
+
+        call.transformTo(new VoltPhysicalExchange(
+                exchange.getCluster(),
+                convertedTraits,
+                convertedInput,
+                exchange.getDistribution()));
     }
 }

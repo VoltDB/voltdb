@@ -49,7 +49,6 @@ public class VoltPValuesRule extends RelOptRule {
                 .simplify();
 
         call.transformTo(new VoltPhysicalValues(values.getCluster(),
-                convertedTraits, values.getRowType(), values.getTuples(),
-                Constants.VALUES_SPLIT_COUNT));
+                convertedTraits, values.getRowType(), values.getTuples()));
     }
 }

@@ -612,7 +612,7 @@ public class TestUnionSuite extends RegressionSuite {
             final String msg = ex.getMessage();
             if (USING_CALCITE) {
                 assertTrue(msg.contains("invalid ORDER BY expression") ||
-                        msg.equals("class org.apache.calcite.sql.SqlDynamicParam: "));
+                        msg.contains("class org.apache.calcite.sql.SqlDynamicParam: "));
             } else {
                 assertTrue(msg.contains("invalid ORDER BY expression"));
             }

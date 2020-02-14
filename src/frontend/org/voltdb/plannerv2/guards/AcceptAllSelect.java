@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class AcceptAllSelect extends CalciteCompatibilityCheck {
     private static final Pattern IGNORE_PATTERN;
+    private static final Pattern SELECT_PATTERN;
 
     static {
         // TODO: MICROS is a keyword in the TO_TIMESTAMP() function.
@@ -41,10 +42,14 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         String pattern = String.format(".*Column (%s) not found in any table.*",
                 StringUtils.join(ignoreList, "|"));
         IGNORE_PATTERN = Pattern.compile(pattern, Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
+
+        final String selectStart = "( *\\( *)*(SELECT)";
+        SELECT_PATTERN = Pattern.compile(selectStart, Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
+
     }
 
     @Override protected final boolean doCheck(String sql) {
-        return sql.toUpperCase().startsWith("SELECT");
+        return SELECT_PATTERN.matcher(sql).find();
     }
 
     /**

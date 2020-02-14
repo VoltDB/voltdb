@@ -57,7 +57,6 @@ public class VoltPhysicalLimitSerialAggregateMergeRule extends RelOptRule {
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
                 aggregate.getPostPredicate(),
-                aggregate.getSplitCount(),
                 aggregate.getIsCoordinatorAggr(),
                 limitOffset.getOffset(),
                 limitOffset.getLimit());
