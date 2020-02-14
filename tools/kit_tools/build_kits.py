@@ -100,7 +100,7 @@ def makeReleaseDir(releaseDir):
 # BUILD THE COMMUNITY VERSION
 ################################################
 
-def buildCommunity():
+def buildCommunity(ee_only=False):
     if build_mac:
         packageMacLib="true"
     else:
@@ -108,7 +108,11 @@ def buildCommunity():
     with cd(builddir + "/voltdb"):
         run("pwd")
         run("git status")
-        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
+        if ee_only:
+            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (packageMacLib,  build_args))
+        else:
+            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
+
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -345,7 +349,7 @@ if __name__ == "__main__":
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
                 versionMac = checkoutCode(voltdbTreeish, None, None, args.gitloc)
-                buildCommunity()
+                buildCommunity(ee_only=True)
         except Exception as e:
             print traceback.format_exc()
             print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
