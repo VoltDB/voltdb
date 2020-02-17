@@ -78,6 +78,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -269,9 +270,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "9.2";
+    static final String m_defaultVersionString = "9.3.beta2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q9.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q9.3.beta2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1538,6 +1539,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
+            ExportManagerInterface.instance().startListeners(m_clientInterface);
             m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
                     m_config.m_startAction == StartAction.JOIN,
                     // Task manager is read only if db is paused or this is a replica
@@ -1848,7 +1850,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                checkExportStreamLeadership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1944,18 +1945,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
             //The new leader is down, on old leader host:
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
-        }
-    }
-
-    // Check to see if stream master is colocated with partition leader.
-    private void checkExportStreamLeadership() {
-        for (Initiator initiator : m_iv2Initiators.values()) {
-            if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                SpInitiator spInitiator = (SpInitiator)initiator;
-                if (spInitiator.isLeader()) {
-                    ExportManagerInterface.instance().becomeLeader(spInitiator.getPartitionId());
-                }
-            }
         }
     }
 
@@ -2395,14 +2384,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
-
-        // export stream master check
-        m_periodicWorks.add(scheduleWork(new Runnable() {
-            @Override
-            public void run() {
-                checkExportStreamLeadership();
-            }
-        }, 0, 1, TimeUnit.MINUTES));
 
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
@@ -4368,9 +4349,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // as at this juncture the initial truncation snapshot is already complete
         ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
 
-        // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-        ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
-
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
 
@@ -4602,9 +4580,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
             ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
-
-            // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
-            ExportManagerInterface.instance().clientInterfaceStarted(m_clientInterface);
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData();

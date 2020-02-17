@@ -17,13 +17,19 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+
+import com.google.common.collect.Lists;
 
 /**
  * Rules that fallback a query with Join operator if it is multi-partitioned.
@@ -53,13 +59,34 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         // The query is SP, and the distributions of any partitioned tables had been set.
         final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
                 innerDist = RelDistributionUtils.getDistribution(inner);
-        final boolean isEitherParitioned =
-                outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED ||
-                        innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final boolean isOuterParitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final boolean isInnerParitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
         final RelDistribution intermediate =
-                isEitherParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
-        final RelDistribution newDist = intermediate
-                .with(joinState.getLiteral(), joinState.isSP());
-        call.transformTo(join.copy(join.getTraitSet().replace(newDist), join.getInputs()));
+                isOuterParitioned || isInnerParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
+        final RelDistribution newDist;
+        List<RelNode> newInputs;
+        // If we have a LEFT / RIGHT / FULL join and its outer node is replicated while the other one is
+        // partitioned we need to collect all the rows from the partitioned table prior joining them
+        // with the replicated ones to guarantee the join correctness.
+        // That means that we need to insert an Exchange node above the partitioned child and
+        // make the join distribution itself to be a SINGLETON
+        if ((JoinRelType.LEFT == join.getJoinType() || JoinRelType.FULL == join.getJoinType())
+                && !isOuterParitioned && isInnerParitioned) {
+            newDist = RelDistributions.SINGLETON.with(innerDist.getPartitionEqualValue(), false);
+            VoltLogicalExchange innerExchange = new VoltLogicalExchange(inner.getCluster(),
+                    inner.getTraitSet(), inner, innerDist);
+            newInputs = Lists.newArrayList(outer, innerExchange);
+        } else if((JoinRelType.RIGHT == join.getJoinType() || JoinRelType.FULL == join.getJoinType())
+                && isOuterParitioned && !isInnerParitioned) {
+            newDist = RelDistributions.SINGLETON.with(outerDist.getPartitionEqualValue(), false);
+            VoltLogicalExchange outerExchange = new VoltLogicalExchange(outer.getCluster(),
+                    outer.getTraitSet(), outer, outerDist);
+            newInputs = Lists.newArrayList(outerExchange, inner);
+        } else {
+            newDist = intermediate
+                    .with(joinState.getLiteral(), joinState.isSP());
+            newInputs = join.getInputs();
+        }
+        call.transformTo(join.copy(join.getTraitSet().replace(newDist), newInputs));
     }
 }

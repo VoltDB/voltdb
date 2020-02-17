@@ -112,7 +112,7 @@ public class ExportRabbitMQVerifier {
                     startTime = now;
                 } else if (now - startTime > MAX_STALL_TIMEOUT_SECS*1000) {
                     success = false;
-                    log.error(String.format("export stalled for %d minutes, failing", MAX_STALL_TIMEOUT_SECS));
+                    log.error(String.format("export stalled for %d seconds, failing", MAX_STALL_TIMEOUT_SECS));
                     break;
                 }
                 Thread.sleep(5000);
