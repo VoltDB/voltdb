@@ -684,7 +684,6 @@ private:
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
     void deleteTupleRelease(char* tuple);
-    void deleteTupleFinalize(TableTuple& tuple);
 
     /**
      * Normally this will return the tuple storage to the free list.
