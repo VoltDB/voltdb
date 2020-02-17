@@ -112,39 +112,6 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-void SeqScanExecutor::p_evalTuple(const TableTuple& tuple, TableTuple& temp_tuple,
-        CountingPostfilter& postfilter, ProjectionPlanNode* projectionNode,
-        ProgressMonitorProxy& pmp, int num_of_columns) {
-    VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", &tuple,
-               tuple.debug(input_table->name()).c_str(),
-               ++m_tuple_ctr, input_table->activeTupleCount());
-    pmp.countdownProgress();
-
-    //
-    // For each tuple we need to evaluate it against our predicate and limit/offset
-    //
-    if (postfilter.eval(&tuple, nullptr)) {
-        //
-        // Nested Projection
-        // Project (or replace) values from input tuple
-        //
-        if (projectionNode != nullptr) {
-            VOLT_TRACE("inline projection...");
-            // Project the scanned table row onto
-            // the columns of the select list in the
-            // select statement.
-            for (int ctr = 0; ctr < num_of_columns; ctr++) {
-                NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&tuple, nullptr);
-                temp_tuple.setNValue(ctr, value);
-            }
-            this->outputTuple(temp_tuple);
-        } else {
-            this->outputTuple(tuple);
-        }
-        pmp.countdownProgress();
-    }
-}
-
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     vassert(node);
@@ -166,7 +133,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         vassert(node->isPersistentTableScan());
         input_table = node->getTargetTable();
     }
-    PersistentTable* persistentInputTable = dynamic_cast<PersistentTable*>(input_table);
 
     vassert(input_table);
 
@@ -277,20 +243,35 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 #if   defined(VOLT_TRACE_ENABLED)
         m_tuple_ctr = 0;
 #endif
-        if (persistentInputTable) {
-            PersistentTable::txn_const_iterator itr =
-                    PersistentTable::txn_const_iterator::begin(persistentInputTable->allocator());
-            while (postfilter.isUnderLimit() && !itr.drained()) {
-                void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(*itr));
-                tuple.move(tupleData);
-                p_evalTuple(tuple, temp_tuple, postfilter, projectionNode, pmp, num_of_columns);
-                itr++;
-            }
-        }
-        else {
-            TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-            while (postfilter.isUnderLimit() && iterator.next(tuple)) {
-                p_evalTuple(tuple, temp_tuple, postfilter, projectionNode, pmp, num_of_columns);
+        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+        while (postfilter.isUnderLimit() && iterator.next(tuple)) {
+            VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", &tuple,
+                       tuple.debug(input_table->name()).c_str(),
+                       ++m_tuple_ctr, input_table->activeTupleCount());
+            pmp.countdownProgress();
+
+            //
+            // For each tuple we need to evaluate it against our predicate and limit/offset
+            //
+            if (postfilter.eval(&tuple, nullptr)) {
+                //
+                // Nested Projection
+                // Project (or replace) values from input tuple
+                //
+                if (projectionNode != nullptr) {
+                    VOLT_TRACE("inline projection...");
+                    // Project the scanned table row onto
+                    // the columns of the select list in the
+                    // select statement.
+                    for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                        NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&tuple, nullptr);
+                        temp_tuple.setNValue(ctr, value);
+                    }
+                    this->outputTuple(temp_tuple);
+                } else {
+                    this->outputTuple(tuple);
+                }
+                pmp.countdownProgress();
             }
         }
 

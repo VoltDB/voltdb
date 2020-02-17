@@ -1280,26 +1280,6 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
     m_releaseBatch.insert(tuple);
 }
 
-/**
- * Actually follow through with a "delete" -- this is common code between UndoDeleteAction release and the
- * all-at-once infallible deletes that bypass Undo processing.
- */
-void PersistentTable::deleteTupleFinalize(TableTuple& target) {
-    // For replicated table
-    // delete the tuple directly but preserve the deleted tuples to tempTable for cowIterator
-    // the same way as Update
-
-    // A snapshot (background scan) in progress can still cause a hold-up.
-    // notifyTupleDelete() defaults to returning true for all context types
-    // other than CopyOnWriteContext.
-    if (m_tableStreamer != NULL) {
-         m_tableStreamer->notifyTupleDelete(target);
-    }
-
-    // No snapshot in progress cares, just whack it.
-    deleteTupleStorage(target); // also frees object columns
-}
-
 /*
  * Delete a tuple by looking it up via table scan or a primary key
  * index lookup. An undo initiated delete like deleteTupleForUndo
@@ -1360,27 +1340,28 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
         TableTuple tableTuple(this->schema());
         tableTuple.move(tupleAddress);
-        bool matched = false;
-        if (lookupType == LOOKUP_FOR_DR && this->schema()->hiddenColumnCount()) {
-            // Force column compare for DR so we can easily use the filter
-            HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, this->schema());
-            matched = (tableTuple.equalsNoSchemaCheck(tuple, &filter));
-        } else if (lookupType != LOOKUP_FOR_UNDO && this->schema()->getUninlinedObjectColumnCount() != 0) {
-            matched = (tableTuple.equalsNoSchemaCheck(tuple));
-        } else {
-             // Do an inline tuple byte comparison
-             // to avoid matching duplicate tuples with different pointers to Object storage
-             // -- which would cause erroneous releases of the wrong Object storage copy.
-             char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
-             char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
-             matched = (::memcmp(tableTupleData, tupleData, tuple_length) == 0);
+        if (!tableTuple.isPendingDeleteOnUndoRelease()) {
+            bool matched = false;
+            if (lookupType == LOOKUP_FOR_DR && this->schema()->hiddenColumnCount()) {
+                // Force column compare for DR so we can easily use the filter
+                HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, this->schema());
+                matched = (tableTuple.equalsNoSchemaCheck(tuple, &filter));
+            } else if (lookupType != LOOKUP_FOR_UNDO && this->schema()->getUninlinedObjectColumnCount() != 0) {
+                matched = (tableTuple.equalsNoSchemaCheck(tuple));
+            } else {
+                // Do an inline tuple byte comparison
+                // to avoid matching duplicate tuples with different pointers to Object storage
+                // -- which would cause erroneous releases of the wrong Object storage copy.
+                char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
+                char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
+                matched = (::memcmp(tableTupleData, tupleData, tuple_length) == 0);
+            }
+            if (matched) {
+                matchedTuple.move(tableTuple.address());
+                return true;
+            }
         }
-        if (matched) {
-            matchedTuple.move(tableTuple.address());
-            return true;
-        } else {
-            return false;
-        }
+        return false;
      });
      return matchedTuple;
 }
