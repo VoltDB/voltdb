@@ -70,6 +70,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
@@ -192,6 +193,8 @@ public class AsyncExportClient
     // TBD: add MIGRATE (5), though not relevant in this test (yet)
     private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
     private static final AtomicLongArray QueuedTransactionCounts = new AtomicLongArray(4);
+    private static final AtomicLong NoConnectionsExceptionsCount = new AtomicLong(0);
+    private static final AtomicLong OtherProcCallExceptionCount = new AtomicLong(0);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
@@ -322,18 +325,28 @@ public class AsyncExportClient
                 // Table with Export
                 if (config.usetableexport) {
                     for (long op = 1; op < 4; op++) {
-                        QueuedTransactionCounts.incrementAndGet((int) op);
-                        try {
-                            clientRef.get().callProcedure(
-                                    new TableExportCallback(rowId.get(), op),
-                                    "TableExport",
-                                    currentRowId,
-                                    op);
-                        }
-                        catch (Exception e) {
-                            log.fatal("Exception: " + e);
-                            e.printStackTrace();
-                            System.exit(-1);
+                        long retries = 4;
+                        while (retries-- > 0) {
+                            try {
+                                clientRef.get().callProcedure(
+                                        new TableExportCallback(rowId.get(), op),
+                                        "TableExport",
+                                        currentRowId,
+                                        op);
+                                QueuedTransactionCounts.incrementAndGet((int) op);
+                                break;
+                            }
+                            catch (NoConnectionsException e) {
+                                log.info("Exception: " + e);
+                                e.printStackTrace();
+                                NoConnectionsExceptionsCount.incrementAndGet();
+                            }
+                            catch (Exception e) {
+                                log.info("Exception: " + e);
+                                e.printStackTrace();
+                                OtherProcCallExceptionCount.incrementAndGet();
+                            }
+                            Thread.sleep(3000);
                         }
                     }
                 }
