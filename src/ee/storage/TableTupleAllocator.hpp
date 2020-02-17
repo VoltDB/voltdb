@@ -591,7 +591,8 @@ namespace voltdb {
             void const* remove(void*);
             /**
              * Light weight free() operations from either end,
-             * involving no compaction.
+             * involving no compaction. Removing from head when
+             * frozen is forbidden.
              *
              * When removing from head direction, the last invocation must be
              * followed by another new invocation as

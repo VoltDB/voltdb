@@ -776,7 +776,7 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
         size_t size = ptrs.size();
         if (dupCheck && size != set<void*>(ptrs.cbegin(), ptrs.cend()).size()) {
             throw runtime_error("Duplicate addresses detected");
-        } else {
+        } else if (! ptrs.empty()) {
             vector<void*> addrToRemove{};
             addrToRemove.reserve(size);
             for (auto iter = CompactingIterator(super::chunks()); ! iter.drained();) {
@@ -790,8 +790,8 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
             m_remove = intersection(ptrs, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
             m_move = build_map(subtract(super::sorted(), m_remove),
                     subtract(addrToRemove, m_remove));
-            m_prepared = true;
         }
+        m_prepared = true;
     }
     return *this;
 }
@@ -1461,8 +1461,8 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direction dir, void const* p) {
-    if (frozen()) {
-        throw logic_error("Cannot remove from head or tail when frozen");
+    if (frozen() && dir == remove_direction::from_head) {
+        throw logic_error("Cannot remove from head when frozen");
     } else {
         free(dir, p);
     }

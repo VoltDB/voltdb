@@ -1413,17 +1413,11 @@ void testRemovesFromEnds(size_t batch) {
             alloc.remove(dir, nullptr);
             assert(false);                                     // should have failed
         } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
+            assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
             alloc.thaw();
         }
     } else {                                                   // remove from tail
         alloc.template freeze<truth>();
-        try {                                                  // we forbid calling remove from head/tail when frozen
-            alloc.remove(dir, nullptr);
-        } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
-            alloc.thaw();
-        }
         for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1446,6 +1440,7 @@ void testRemovesFromEnds(size_t batch) {
         // "1st" tuple to last, and in snapshot, the head chunk
         // would be preserved) is now lost forever.
         assert(i == NumTuples - batch);
+        alloc.thaw();
     }
 }
 
