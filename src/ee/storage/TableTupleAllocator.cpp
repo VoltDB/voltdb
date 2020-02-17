@@ -534,6 +534,71 @@ void* CompactingChunks::free(void* dst) {
     }
 }
 
+inline void CompactingChunks::free(typename CompactingChunks::remove_direction dir, void const* p) {
+    switch (dir) {
+        case remove_direction::from_head:
+            // Schema change: it is called in the same
+            // order as txn iterator.
+            //
+            // NOTE: since we only do chunk-wise drop, any reads
+            // from the allocator when these dispersed calls are
+            // occurring *will* get spurious data.
+            if (p == nullptr) {                         // marks completion
+                if (m_lastFreeFromHead != nullptr && beginTxn().first->contains(m_lastFreeFromHead)) {
+                    // effects deletions in 1st chunk
+                    auto& iter = beginTxn().first;
+                    vassert(reinterpret_cast<char const*>(iter->next()) >= m_lastFreeFromHead + tupleSize());
+                    auto const offset = reinterpret_cast<char const*>(iter->next()) - m_lastFreeFromHead - tupleSize();
+                    if (offset) {                              // some memory ops are unavoidable
+                        char* dst = reinterpret_cast<char*>(iter->begin());
+                        char const* src = reinterpret_cast<char const*>(iter->next()) - offset;
+                        if (dst + offset < src) {
+                            memcpy(dst, src, offset);
+                        } else {
+                            memmove(dst, src, offset);
+                        }
+                        reinterpret_cast<char*&>(iter->m_next) = dst + offset;
+                    } else {                                   // right on the boundary
+                        pop_front();
+                        beginTxn() = empty() ? make_pair(end(), nullptr) : make_pair(begin(), begin()->next());
+                    }
+                    m_lastFreeFromHead = nullptr;
+                }
+            } else if (empty()) {
+                snprintf(buf, sizeof buf, "CompactingChunks::remove(from_head, %p): empty allocator", p);
+                buf[sizeof buf - 1] = 0;
+                throw underflow_error(buf);
+            } else {
+                vassert((m_lastFreeFromHead == nullptr && p == beginTxn().first->begin()) ||       // called for the first time?
+                        (beginTxn().first->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||// same chunk,
+                        next(beginTxn().first)->begin() == p);                                     // or next chunk
+                if (! beginTxn().first->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
+                    pop_front();
+                    beginTxn() = {begin(), begin()->next()};
+                }
+                --m_allocs;
+            }
+            break;
+        case remove_direction::from_tail:
+            // Undo insert: it is called in the exactly
+            // opposite order of txn iterator.
+            if (empty()) {
+                snprintf(buf, sizeof buf, "CompactingChunks::remove(from_tail, %p): empty allocator", p);
+                buf[sizeof buf - 1] = 0;
+                throw underflow_error(buf);
+            } else {
+                vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
+                if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
+                    pop_back();
+                }
+                --m_allocs;
+            }
+            break;
+        default:;
+    }
+}
+
+
 inline pair<typename CompactingChunks::list_type::iterator, void const*> const&
 CompactingChunks::beginTxn() const noexcept {
     return m_txnFirstChunk;
@@ -1226,7 +1291,7 @@ inline HistoryRetainTrait<gc_policy::batched>::HistoryRetainTrait(
         HistoryRetainTrait::cb_type const& cb): BaseHistoryRetainTrait(cb) {}
 
 inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
-    if (++m_size == BatchSize) {
+    if (++m_size == static_cast<unsigned char>(gc_policy::batched)) {
         for_each(m_batched.begin(), m_batched.end(), m_cb);
         m_batched.clear();
         m_size = 0;
@@ -1391,71 +1456,11 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
 }
 
 template<typename Hook, typename E> inline void
-HookedCompactingChunks<Hook, E>::remove(
-        typename HookedCompactingChunks<Hook, E>::remove_direction dir, void const* p) {
+HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direction dir, void const* p) {
     if (frozen()) {
         throw logic_error("Cannot remove from head or tail when frozen");
-    }
-    switch (dir) {
-        case remove_direction::from_head:
-            // Schema change: it is called in the same
-            // order as txn iterator.
-            //
-            // NOTE: since we only do chunk-wise drop, any reads
-            // from the allocator when these dispersed calls are
-            // occurring *will* get spurious data.
-            if (p == nullptr) {                         // marks completion
-                if (m_lastFreeFromHead != nullptr && beginTxn().first->contains(m_lastFreeFromHead)) {
-                    // effects deletions in 1st chunk
-                    auto& iter = beginTxn().first;
-                    auto const offset = reinterpret_cast<char const*>(iter->next()) - m_lastFreeFromHead - tupleSize();
-                    vassert(offset >= 0);
-                    if (offset) {                              // some memory ops are unavoidable
-                        char* dst = reinterpret_cast<char*>(iter->begin());
-                        char const* src = reinterpret_cast<char const*>(iter->next()) - offset;
-                        if (dst + offset < src) {
-                            memmove(dst, src, offset);
-                        } else {
-                            memcpy(dst, src, offset);
-                        }
-                        reinterpret_cast<char*&>(iter->m_next) = dst + offset;
-                    } else {                                   // right on the boundary
-                        pop_front();
-                        beginTxn() = empty() ? make_pair(end(), nullptr) : make_pair(begin(), begin()->next());
-                    }
-                    m_lastFreeFromHead = nullptr;
-                }
-            } else if (empty()) {
-                snprintf(buf, sizeof buf, "HookedCompactingChunks::remove(from_head, %p): empty allocator", p);
-                buf[sizeof buf - 1] = 0;
-                throw underflow_error(buf);
-            } else {
-                vassert((m_lastFreeFromHead == nullptr && p == beginTxn().first->begin()) ||       // called for the first time?
-                        (beginTxn().first->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||// same chunk,
-                        next(beginTxn().first)->begin() == p);                                     // or next chunk
-                if (! beginTxn().first->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
-                    pop_front();
-                    beginTxn() = {begin(), begin()->next()};
-                }
-                --CompactingChunks::m_allocs;
-            }
-            break;
-        case remove_direction::from_tail:
-            // Undo insert: it is called in the exactly
-            // opposite order of txn iterator.
-            if (empty()) {
-                snprintf(buf, sizeof buf, "HookedCompactingChunks::remove(from_tail, %p): empty allocator", p);
-                buf[sizeof buf - 1] = 0;
-                throw underflow_error(buf);
-            } else {
-                vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
-                if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
-                    pop_back();
-                }
-                --CompactingChunks::m_allocs;
-            }
-            break;
-        default:;
+    } else {
+        free(dir, p);
     }
 }
 

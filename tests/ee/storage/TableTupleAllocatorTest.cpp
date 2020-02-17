@@ -1383,11 +1383,7 @@ TEST_F(TableTupleAllocatorTest, TestSingleChunkSnapshot) {
     TestSingleChunkSnapshot()();
 }
 
-template<typename Chunk, gc_policy pol>
-using remove_direction = typename
-HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
-
-template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+template<typename Chunk, gc_policy pol, CompactingChunks::remove_direction dir>
 void testRemovesFromEnds(size_t batch) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
@@ -1402,7 +1398,7 @@ void testRemovesFromEnds(size_t batch) {
     }
     assert(alloc.size() == NumTuples);
     // remove tests
-    if (dir == remove_direction<Chunk, pol>::from_head) {      // remove from head
+    if (dir == CompactingChunks::remove_direction::from_head) {      // remove from head
         for (i = 0; i < batch; ++i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1453,7 +1449,7 @@ void testRemovesFromEnds(size_t batch) {
     }
 }
 
-template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+template<typename Chunk, gc_policy pol, CompactingChunks::remove_direction dir>
 struct TestRemovesFromEnds3 {
     inline void operator()() const {
         testRemovesFromEnds<Chunk, pol, dir>(0);
@@ -1466,19 +1462,17 @@ struct TestRemovesFromEnds3 {
 };
 
 template<typename Chunk, gc_policy pol> struct TestRemovesFromEnds2 {
-    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const s1;
-    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const s2;
-    using direction = typename
-        HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
+    static TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_head> const s1;
+    static TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_tail> const s2;
     inline void operator()() const {
         s1();
         s2();
     }
 };
 template<typename Chunk, gc_policy pol>
-TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const TestRemovesFromEnds2<Chunk, pol>::s1{};
+TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_head> const TestRemovesFromEnds2<Chunk, pol>::s1{};
 template<typename Chunk, gc_policy pol>
-TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const TestRemovesFromEnds2<Chunk, pol>::s2{};
+TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_tail> const TestRemovesFromEnds2<Chunk, pol>::s2{};
 
 template<typename Chunk> struct TestRemovesFromEnds1 {
     static TestRemovesFromEnds2<Chunk, gc_policy::never> const s1;
@@ -1503,6 +1497,24 @@ struct TestRemovesFromEnds {
 
 TEST_F(TableTupleAllocatorTest, TestRemovesFromEnds) {
     TestRemovesFromEnds()();
+}
+
+TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    void* addr = alloc.allocate();
+    ASSERT_EQ(addr, alloc.remove(addr));
+    // empty: reallocate
+    memcpy(addr = alloc.allocate(), gen.get(), TupleSize);
+    size_t i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc), [addr, this, &i](void const* p) {
+                ASSERT_EQ(addr, p);
+                ASSERT_TRUE(Gen::same(p, i++));
+            });
+    ASSERT_EQ(1, i);
 }
 
 #endif
