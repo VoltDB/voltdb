@@ -321,8 +321,8 @@ public class StreamBlockQueue {
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 try {
                     final long startSequenceNumber = b.getLong();
-                    // If after the truncation point is the first row in the block, the entire block is to be discarded
-                    if (startSequenceNumber >= truncationSeqNo) {
+                    // If the truncation is before the first row in the block, the entire block is to be discarded
+                    if (startSequenceNumber > truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
                     b.getLong(); // committedSequenceNumber
