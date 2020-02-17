@@ -594,6 +594,9 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
                 if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
                     pop_back();
+                    if (empty()) {
+                        beginTxn() = {end(), nullptr};
+                    }
                 }
                 --m_allocs;
             }
