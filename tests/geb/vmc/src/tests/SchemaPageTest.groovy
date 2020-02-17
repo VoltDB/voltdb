@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -384,7 +384,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
-            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2019 VoltDB Inc. All rights reserved.".toLowerCase())
+            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2020 VoltDB Inc. All rights reserved.".toLowerCase())
         }
     }
 
