@@ -58,21 +58,6 @@ public:
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                      std::vector<int> &retPositions);
 
-    /**
-     * Optional tuple insert handler.
-     */
-    virtual bool notifyTupleInsert(TableTuple &tuple);
-
-    /**
-     * Optional tuple update handler.
-     */
-    virtual bool notifyTupleUpdate(TableTuple &tuple);
-
-    /**
-     * Optional tuple delete handler.
-     */
-    virtual bool notifyTupleDelete(TableTuple &tuple);
-
 private:
 
     /**

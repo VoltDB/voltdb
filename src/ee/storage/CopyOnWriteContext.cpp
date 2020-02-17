@@ -131,7 +131,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     // or the byte count threshold is hit.
     bool yield = false;
     while (!yield) {
-        bool hasMore = table.nextSnapshotTuple(tuple);
+        bool hasMore = table.nextTuple(tuple);
         if (!tuple.isNullTuple()) {
              m_tuplesRemaining--;
              if (m_tuplesRemaining < 0) {
@@ -168,18 +168,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
     // Done when the table scan is finished and iteration is complete.
     return retValue;
-}
-
-bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
-    return false;
-}
-
-bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {
-    return false;
-}
-
-bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
-    return false;
 }
 
 }

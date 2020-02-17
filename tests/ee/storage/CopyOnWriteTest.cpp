@@ -408,19 +408,21 @@ public:
         }
 
         size_t numTuples = 0;
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &numTuples](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             if (tuple.isDirty()) {
                 printf("Tuple %d is active and dirty\n",
-                       ValuePeeker::peekAsInteger(tuple.getNValue(0)));
+                                  ValuePeeker::peekAsInteger(tuple.getNValue(0)));
             }
             numTuples++;
             if (tuple.isDirty()) {
                 printf("Dirty tuple is %p, %d, %d\n", tuple.address(), ValuePeeker::peekAsInteger(tuple.getNValue(0)), ValuePeeker::peekAsInteger(tuple.getNValue(1)));
             }
             ASSERT_FALSE(tuple.isDirty());
-        }
+        });
+
         if (tupleCount > 0 and numTuples != tupleCount) {
             printf("Expected %lu tuples, received %lu\n", numTuples, tupleCount);
             ASSERT_EQ(numTuples, tupleCount);
@@ -431,20 +433,19 @@ public:
     }
 
     void getTableValueSet(T_ValueSet &set) {
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &set](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             const std::pair<T_ValueSet::iterator, bool> p =
-                    set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+                           set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
             }
-            if (!inserted) {
-                ASSERT_TRUE(inserted);
-            }
-        }
+            ASSERT_TRUE(inserted);
+        });
     }
 
     // Avoid the need to make each individual test a friend by exposing
@@ -641,17 +642,17 @@ public:
         // Check for dirty tuples.
         context("check dirty");
         int numTuples = 0;
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &numTuples](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             if (tuple.isDirty()) {
-                error("Found tuple %d is active and dirty at end of COW",
-                      ValuePeeker::peekAsInteger(tuple.getNValue(0)));
+               error("Found tuple %d is active and dirty at end of COW",
+                                 ValuePeeker::peekAsInteger(tuple.getNValue(0)));
             }
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
-        }
-
+        });
         // If deleting check the tuples remaining in the table.
         if (doDelete) {
             ASSERT_EQ(numTuples, nskipped);
@@ -736,45 +737,46 @@ public:
 
     void checkIndex(const std::string &tag, ElasticIndex *index, StreamPredicateList &predicates, bool directKey) {
         ASSERT_NE(NULL, index);
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
         T_ValueSet rejected;
         T_ValueSet missing;
         T_ValueSet extra;
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(),
+            [this, &tuple, &accepted, &rejected, &missing, &extra, &directKey, &predicates, &index](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             bool isAccepted = true;
             for (StreamPredicateList::iterator ipred = predicates.begin();
-                 ipred != predicates.end(); ++ipred) {
-                if (ipred->eval(&tuple).isFalse()) {
-                    isAccepted = false;
-                    break;
-                }
+                               ipred != predicates.end(); ++ipred) {
+                 if (ipred->eval(&tuple).isFalse()) {
+                     isAccepted = false;
+                     break;
+                 }
             }
             T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
             bool isIndexed;
             if (directKey) {
-                // Direct key tests synthesize keys with NULL tuple addresses.
-                int32_t hash = MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0);
-                ElasticIndexKey key(hash, (char *) NULL);
-                isIndexed = index->exists(key);
-            }
-            else {
-                isIndexed = index->has(*m_table, tuple);
+                 // Direct key tests synthesize keys with NULL tuple addresses.
+                 int32_t hash = MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0);
+                 ElasticIndexKey key(hash, (char *) NULL);
+                 isIndexed = index->exists(key);
+            } else {
+                 isIndexed = index->has(*m_table, tuple);
             }
             if (isAccepted) {
-                accepted.insert(value);
-                if (!isIndexed) {
-                    missing.insert(value);
-                }
+                 accepted.insert(value);
+                 if (!isIndexed) {
+                     missing.insert(value);
+                 }
+            } else {
+                 rejected.insert(value);
+                 if (isIndexed) {
+                     extra.insert(value);
+                 }
             }
-            else {
-                rejected.insert(value);
-                if (isIndexed) {
-                    extra.insert(value);
-                }
-            }
-        }
+         });
+
         if (missing.size() > 0 || extra.size() > 0) {
             size_t ninitialMIA = 0;
             size_t ninsertedMIA = 0;
@@ -1239,18 +1241,19 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &originalTuples](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             const std::pair<T_ValueSet::iterator, bool> p =
-            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+                        originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
-                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                printf("Failed to insert %d\n", primaryKey);
+                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                 printf("Failed to insert %d\n", primaryKey);
             }
             ASSERT_TRUE(inserted);
-        }
+        });
 
         char config[4];
         ::memset(config, 0, 4);
@@ -1307,18 +1310,19 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &originalTuples](void const* t) {
+            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+            tuple.move(tupleData);
             const std::pair<T_ValueSet::iterator, bool> p =
-            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+                  originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
             }
             ASSERT_TRUE(inserted);
-        }
+        });
 
         char config[4];
         ::memset(config, 0, 4);
@@ -1422,24 +1426,25 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("precalculate");
 
         // Map original tuples to expected partitions.
-        voltdb::TableIterator iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
-            int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
-            int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
-            if (ipart != skippedPartition) {
-                bool inserted = expected[ipart].insert(value).second;
-                if (!inserted) {
-                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                    error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
-                }
-                ASSERT_TRUE(inserted);
-            }
-            else {
-                totalSkipped++;
-            }
-        }
+        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(),
+             [this, &tuple, &partCol, &expected, &totalSkipped, &skippedPartition, &iteration](void const* t) {
+             void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(t));
+             tuple.move(tupleData);
+             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
+             int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
+             if (ipart != skippedPartition) {
+                  bool inserted = expected[ipart].insert(value).second;
+                  if (!inserted) {
+                      int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                      error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
+                  }
+                  ASSERT_TRUE(inserted);
+             } else {
+                  totalSkipped++;
+             }
+        });
 
         context("activate");
 
