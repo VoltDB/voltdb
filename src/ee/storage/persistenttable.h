@@ -337,8 +337,6 @@ public:
     // ------------------------------------------------------------------
     // PERSISTENT TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void deleteTupleForSchemaChange(TableTuple& target);
-
     void insertPersistentTuple(TableTuple const& source,
             bool fallible, bool ignoreTupleLimit = false);
 
@@ -616,6 +614,7 @@ public:
 
     void migratingAdd(int64_t txnId, TableTuple& tuple);
     bool migratingRemove(int64_t txnId, TableTuple& tuple);
+    bool migratingSwap(int64_t txnId, TableTuple& origtuple, TableTuple& desttuple);
     uint16_t getMigrateColumnIndex();
     /**
      * Delete the rows that have completed the migration process
@@ -692,6 +691,7 @@ private:
      * In the memcheck build it will return the storage to the heap.
      */
     void deleteTupleStorage(TableTuple& tuple);
+    void deleteTailTupleStorage(TableTuple& tuple);
 
     /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -1044,18 +1044,13 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
     }
+ }
 
-    MigratingBatch batch{};
-    batch.insert(tuple.address());
-    allocator().remove(batch,[this](map<void*, void*> const& tuples) {
-        TableTuple target(m_schema);
-        TableTuple origin(m_schema);
-        for(auto const& p : tuples) {
-           target.move(p.first);
-           origin.move(p.second);
-           swapTuples(origin, target);
-        }
-   });
+
+inline void PersistentTable::deleteTailTupleStorage(TableTuple& tuple) {
+    deleteTupleStorage(tuple);
+
+    allocator().remove(PersistentTable::remove_direction::from_tail, tuple.address());
  }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {

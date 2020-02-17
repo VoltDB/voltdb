@@ -414,7 +414,7 @@ inline size_t TableIterator::advance(TableTuple& out, size_t const off) {
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {
-    if (m_foundTuples < m_activeTuples) {
+    while (m_foundTuples < m_activeTuples) {
         /** Table chunklist iterator for persistent tables */
         txn_const_iterator &itr = *m_state.m_persChunkListIterator;
         vassert(!itr.drained());
@@ -422,7 +422,9 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         out.move(tupleData);
         itr++;
         m_foundTuples++;
-        return true;
+        if (!out.isPendingDeleteOnUndoRelease()) {
+            return true;
+        }
     }
 
     return false;
