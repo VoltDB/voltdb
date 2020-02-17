@@ -1499,6 +1499,24 @@ TEST_F(TableTupleAllocatorTest, TestRemovesFromEnds) {
     TestRemovesFromEnds()();
 }
 
+TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    void* addr = alloc.allocate();
+    ASSERT_EQ(addr, alloc.remove(addr));
+    // empty: reallocate
+    memcpy(addr = alloc.allocate(), gen.get(), TupleSize);
+    size_t i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc), [addr, this, &i](void const* p) {
+                ASSERT_EQ(addr, p);
+                ASSERT_TRUE(Gen::same(p, i++));
+            });
+    ASSERT_EQ(1, i);
+}
+
 #endif
 
 int main() {

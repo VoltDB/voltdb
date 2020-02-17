@@ -553,9 +553,9 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         char* dst = reinterpret_cast<char*>(iter->begin());
                         char const* src = reinterpret_cast<char const*>(iter->next()) - offset;
                         if (dst + offset < src) {
-                            memmove(dst, src, offset);
-                        } else {
                             memcpy(dst, src, offset);
+                        } else {
+                            memmove(dst, src, offset);
                         }
                         reinterpret_cast<char*&>(iter->m_next) = dst + offset;
                     } else {                                   // right on the boundary
