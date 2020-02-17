@@ -24,11 +24,14 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.voltdb.VoltType;
 import org.voltdb.compiler.DDLCompiler;
+import org.voltdb.exportclient.decode.RowDecoder;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -105,6 +108,89 @@ public class ExportRow {
 
     public Long getTimestamp() {
         return (Long)values[EXPORT_TIMESTAMP_COLUMN];
+    }
+
+    /**
+     * Extract a key from the {@link ExportRow} instance.
+     * <p>
+     * Creates a special {@link ExportRow} instance that contains a shallow copy
+     * of the columns that form the key of this row. The list of key column names
+     * is passed-in and the returned row contains these columns in the same order
+     * as the provided list (which may be different from the table order).
+     * <p>
+     * In order to remain compatible with {@link RowDecoder} operation, the internal
+     * columns are also copied ahead of the key columns, but the data won't be used.
+     * <p>
+     * If the list of key column names is empty, the returned key is the partition column,
+     * and if there is no partition column, a fake column is created, carrying the partitionId.
+     * <p>
+     * The life-cycle of the returned {@link ExportRow} instance is intended to be short,
+     * mainly to be used to feed decoders extending {@link RowDecoder}, in order to convert
+     * the key to a target format e.g. CSV or AVRO.
+     * <p>
+     * The tableName generated for the key {@link ExportRow} is the source's tableName,
+     * with a "-key" suffix added: this is necessary to distinguish it from the values
+     * in whatever target namespace the row will be decoded into.
+     *
+     * @param keyColumnNames list of key column names in the desired order for the key
+     * @return the {@link ExportRow} instance carrying the data for the key columns
+     */
+    public ExportRow extractKey(List<String> keyColumnNames) {
+        String keyName = tableName + "_key";
+        List<String> colNames = new ArrayList<>();
+        List<Integer> colLengths = new ArrayList<>();
+        List<VoltType> colTypes = new ArrayList<>();
+
+        // Determine key column count and allocate array of values
+        boolean hasCols = keyColumnNames != null && !keyColumnNames.isEmpty();
+        int nCols =  hasCols ? keyColumnNames.size() : 1;
+        nCols += INTERNAL_FIELD_COUNT;
+        Object[] colValues = new Object[nCols];
+
+        // Always copy the internal fields for {@link RowDecoder} compatibility
+        for (int i = 0; i < INTERNAL_FIELD_COUNT; i++) {
+            colNames.add(names.get(i));
+            colLengths.add(lengths.get(i));
+            colTypes.add(types.get(i));
+            colValues[i] = values[i];
+        }
+
+        // Build key data
+        if (hasCols) {
+            // Use the listed key columns, in the order specified
+            Map<String, Integer> colMap = new HashMap<>();
+            for (int i = 0; i < names.size(); i++) {
+                String colName = names.get(i);
+                if (keyColumnNames.contains(colName)) {
+                    assert !colMap.containsKey(colName) : colName + ": duplicate key column name";
+                    colMap.put(colName, i);
+                }
+            }
+            for (int i = 0; i < keyColumnNames.size(); i++) {
+                Integer iCol = colMap.get(keyColumnNames.get(i));
+                assert iCol != null : "Unable to find key column " + keyColumnNames.get(i);
+
+                colNames.add(names.get(iCol));
+                colLengths.add(lengths.get(iCol));
+                colTypes.add(types.get(iCol));
+                colValues[INTERNAL_FIELD_COUNT + i] = values[iCol];
+            }
+        }
+        else if (partitionValue != null) {
+            // Use the partition column value
+            colNames.add(names.get(partitionColIndex));
+            colLengths.add(lengths.get(partitionColIndex));
+            colTypes.add(types.get(partitionColIndex));
+            colValues[INTERNAL_FIELD_COUNT] = partitionValue;
+        }
+        else {
+            // Use a fake column with the partition
+            colNames.add("partitionId");
+            colLengths.add(VoltType.INTEGER.getLengthInBytesForFixedTypes());
+            colTypes.add(VoltType.INTEGER);
+            colValues[INTERNAL_FIELD_COUNT] = new Integer(partitionId);
+        }
+        return new ExportRow(keyName, colNames, colTypes, colLengths, colValues, null, -1, partitionId, generation);
     }
 
     // Temporary: only print schema, values omitted

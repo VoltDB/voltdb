@@ -17,9 +17,15 @@
 
 package org.voltdb.export;
 
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
@@ -30,14 +36,9 @@ import org.apache.kafka.common.errors.SerializationException;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
 /**
  * Serializer for converting {@link ExportRow} to Avro format byte array as well as
@@ -59,22 +60,21 @@ public class ExportAvroSerializer {
      * in the schema registry.
      *
      * @param exportRow
-     * @param topic
+     * @param schemaName
      * @return The serialize byte array in Avro format.
      */
-    public byte[] serialize(ExportRow exportRow, String topic) {
-        AvroDecoder decoder = m_decoderMap.computeIfAbsent(topic, k -> new AvroDecoder.Builder().build());
+    public byte[] serialize(ExportRow exportRow, String schemaName) {
+        AvroDecoder decoder = m_decoderMap.computeIfAbsent(schemaName, k -> new AvroDecoder.Builder().build());
         GenericRecord avroRecord = decoder.decode(exportRow.generation, exportRow.tableName, exportRow.types,
                 exportRow.names, null, exportRow.values);
 
-        return serialize(topic, avroRecord);
+        return serialize(schemaName, avroRecord);
     }
 
-    private byte[] serialize(String topic, GenericRecord avroRecord) {
+    private byte[] serialize(String schemaName, GenericRecord avroRecord) {
         if (avroRecord == null) {
             return null;
         }
-        String schemaName = "kipling-" + topic + "-value";
         Schema schema = avroRecord.getSchema();
         try {
             // register the schema if not registered, return the schema id.
