@@ -111,6 +111,7 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -1203,12 +1204,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public byte[] loadTable(TransactionState state, String tableName,
             VoltTable data, LoadTableCaller caller) throws VoltAbortException
     {
+        // Try to find the tableId first in the catalog then in the system tables
+        int tableId;
         Table table = m_context.database.getTables().getIgnoreCase(tableName);
         if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database");
+            SnapshotTableInfo info = SystemTable.getTableInfo(tableName);
+            if (info == null) {
+                throw new VoltAbortException("table '" + tableName + "' does not exist in database");
+            }
+            tableId = info.getTableId();
+        } else {
+            tableId = table.getRelativeIndex();
         }
 
-        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, table.getRelativeIndex(), data, caller);
+        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, tableId, data, caller);
     }
 
     @Override

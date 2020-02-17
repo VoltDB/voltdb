@@ -484,18 +484,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return jsObj.toString();
     }
 
-    private void doDupRestore(Client client, String nonce) throws Exception {
-        doDupRestore(client, VoltDB.instance().getHostMessenger().getZK(), nonce);
+    public static void doDupRestore(Client client, String nonce) throws Exception {
+        doDupRestore(client, TMPDIR, nonce);
     }
 
-    private void doDupRestore(Client client, ZooKeeper zk, String nonce) throws Exception {
+    public static void doDupRestore(Client client, String path, String nonce) throws Exception {
         VoltTable[] results;
 
         // Now check that doing a restore and logging duplicates works.
 
         JSONObject jsObj = new JSONObject();
         jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
-        jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
+        jsObj.put(SnapshotUtil.JSON_PATH, path);
         // Set isRecover = true so we won't get errors in restore result.
         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
 
@@ -1034,7 +1034,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                  * Test that the cluster doesn't goes down if you do a restore with dups
                  */
                 ZooKeeper zk = ZKUtil.getClient(lc.zkinterface(0), 5000, Sets.<Long>newHashSet());
-                doDupRestore(client, zk, TESTNONCE);
+                doDupRestore(client, TESTNONCE);
                 lc.shutDownExternal();
                 long start = System.currentTimeMillis();
                 while(!lc.areAllNonLocalProcessesDead()) {
