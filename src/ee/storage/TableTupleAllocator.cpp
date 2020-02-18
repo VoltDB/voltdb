@@ -81,18 +81,18 @@ inline static size_t chunkSize(size_t tupleSize) noexcept {
 
 // We remove member initialization from init list to save from
 // storing chunk size into object
-inline ChunkHolder::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
-    m_id(id), m_tupleSize(tupleSize), m_resource(new char[storageSize]),
+template<typename Alloc> inline ChunkHolder<Alloc>::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
+    m_id(id), m_tupleSize(tupleSize), m_resource(storageSize),
     m_end(m_resource.get() + storageSize), m_next(m_resource.get()) {
     vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
 }
 
-inline size_t ChunkHolder::id() const noexcept {
+template<typename Alloc> inline size_t ChunkHolder<Alloc>::id() const noexcept {
     return m_id;
 }
 
-inline void* ChunkHolder::allocate() noexcept {
+template<typename Alloc> inline void* ChunkHolder<Alloc>::allocate() noexcept {
     if (next() >= end()) {                 // chunk is full
         return nullptr;
     } else {
@@ -102,42 +102,42 @@ inline void* ChunkHolder::allocate() noexcept {
     }
 }
 
-inline bool ChunkHolder::contains(void const* addr) const {
+template<typename Alloc> inline bool ChunkHolder<Alloc>::contains(void const* addr) const {
     // check alignment
     vassert(addr < begin() || addr >= end() || 0 ==
             (reinterpret_cast<char const*>(addr) - reinterpret_cast<char*const>(begin())) % m_tupleSize);
     return addr >= begin() && addr < next();
 }
 
-inline bool ChunkHolder::full() const noexcept {
+template<typename Alloc> inline bool ChunkHolder<Alloc>::full() const noexcept {
     return next() == end();
 }
 
-inline bool ChunkHolder::empty() const noexcept {
+template<typename Alloc> inline bool ChunkHolder<Alloc>::empty() const noexcept {
     return next() == begin();
 }
 
-inline void* const ChunkHolder::begin() const noexcept {
+template<typename Alloc> inline void* const ChunkHolder<Alloc>::begin() const noexcept {
     return reinterpret_cast<void*>(m_resource.get());
 }
 
-inline void* const ChunkHolder::end() const noexcept {
+template<typename Alloc> inline void* const ChunkHolder<Alloc>::end() const noexcept {
     return m_end;
 }
 
-inline void* const ChunkHolder::next() const noexcept {
+template<typename Alloc> inline void* const ChunkHolder<Alloc>::next() const noexcept {
     return m_next;
 }
 
-inline size_t ChunkHolder::tupleSize() const noexcept {
+template<typename Alloc> inline size_t ChunkHolder<Alloc>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s1, size_t s2, size_t s3) : ChunkHolder(s1, s2, s3) {}
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
 
 inline void* EagerNonCompactingChunk::allocate() noexcept {
     if (m_freed.empty()) {
-        return ChunkHolder::allocate();
+        return super::allocate();
     } else {                               // allocate from free list first, in LIFO order
         auto* r = m_freed.top();
         vassert(r < next() && r >= begin());
@@ -159,15 +159,15 @@ inline void EagerNonCompactingChunk::free(void* src) {
 }
 
 inline bool EagerNonCompactingChunk::empty() const noexcept {
-    return ChunkHolder::empty() || tupleSize() * m_freed.size() ==
+    return super::empty() || tupleSize() * m_freed.size() ==
         reinterpret_cast<char const*>(next()) - reinterpret_cast<char const*>(begin());
 }
 
 inline bool EagerNonCompactingChunk::full() const noexcept {
-    return ChunkHolder::full() && m_freed.empty();
+    return super::full() && m_freed.empty();
 }
 
-inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t s1, size_t s2, size_t s3) : ChunkHolder(s1, s2, s3) {}
+inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
 
 inline void LazyNonCompactingChunk::free(void* src) {
     vassert(src >= begin() && src < next());
@@ -353,14 +353,14 @@ template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(voi
         vassert(*iterp != list_type::end());
         (*iterp)->free(src);
         if ((*iterp)->empty() && ++m_emptyChunks >= CHUNK_REMOVAL_THRESHOLD) {
-            list_type::remove_if([](ChunkHolder const& c) { return c.empty(); });
+            list_type::remove_if([](ChunkHolder<> const& c) { return c.empty(); });
             m_emptyChunks = 0;
         }
         --m_allocs;
     }
 }
 
-inline CompactingChunk::CompactingChunk(size_t id, size_t s, size_t s2) : ChunkHolder(id, s, s2) {}
+inline CompactingChunk::CompactingChunk(size_t id, size_t s, size_t s2) : super(id, s, s2) {}
 
 inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chunk free(): update only on dst chunk
     vassert(contains(dst));
@@ -1174,7 +1174,7 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::hooked_ite
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) :
 super(c, c) {}
 
-inline position_type::position_type(ChunkHolder const& c) noexcept : m_chunkId(c.id()), m_addr(c.next()) {}
+inline position_type::position_type(ChunkHolder<> const& c) noexcept : m_chunkId(c.id()), m_addr(c.next()) {}
 
 inline position_type::position_type(CompactingChunks const& c, void const* p) : m_addr(p) {
     auto const* iterp = c.find(p);
@@ -1227,8 +1227,8 @@ namespace std {
             return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
         }
     };
-    template<> struct less<ChunkHolder> {
-        inline bool operator()(ChunkHolder const& lhs, ChunkHolder const& rhs) const noexcept {
+    template<> struct less<ChunkHolder<>> {
+        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
             return less_rolling(lhs.id(), rhs.id());
         }
     };

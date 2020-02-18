@@ -94,12 +94,24 @@ namespace voltdb {
         };
 
         /**
+         * Adaptor allowing for customized memory allocation
+         * behavior.
+         */
+        class StdAllocator : private unique_ptr<char[]> {
+            using super = unique_ptr<char[]>;
+        public:
+            StdAllocator(size_t n) : super(new char[n]) {}
+            using super::get;
+        };
+
+        /**
          * Holder for a chunk, whether it is self-compacting or not.
          */
+        template<typename Alloc = StdAllocator>
         class ChunkHolder {
             size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            unique_ptr<char[]> m_resource;
+            Alloc m_resource;
             void*const m_end;                          // indication of chunk capacity
         protected:
             void* m_next;                              // tail of allocation
@@ -107,7 +119,6 @@ namespace voltdb {
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;              // for batch free
-            template<typename H, typename E> friend class HookedCompactingChunks;
         public:
             ChunkHolder(size_t id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
@@ -129,7 +140,8 @@ namespace voltdb {
          * Since we are keeping a free list of hole spaces, it is
          * only economic to use when tupleSize is large.
          */
-        class EagerNonCompactingChunk final: public ChunkHolder {
+        class EagerNonCompactingChunk final: public ChunkHolder<> {
+            using super = ChunkHolder<>;
             Stack<void*> m_freed{};
             EagerNonCompactingChunk(EagerNonCompactingChunk const&) = delete;
             EagerNonCompactingChunk& operator=(EagerNonCompactingChunk const&) = delete;
@@ -152,7 +164,8 @@ namespace voltdb {
          * locations and achieve faster free() at the cost of lower
          * utilization.
          */
-        class LazyNonCompactingChunk final: public ChunkHolder {
+        class LazyNonCompactingChunk final: public ChunkHolder<> {
+            using super = ChunkHolder<>;
             size_t m_freed = 0;
             LazyNonCompactingChunk(LazyNonCompactingChunk const&) = delete;
             LazyNonCompactingChunk& operator=(LazyNonCompactingChunk const&) = delete;
@@ -178,7 +191,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            typename = typename enable_if<is_base_of<ChunkHolder, Chunk>::value>::type>
+            typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
             size_t const m_tupleSize;
@@ -242,7 +255,7 @@ namespace voltdb {
          * weaker than compacting chunks.
          */
         template<typename Chunk,
-            typename = typename enable_if<is_base_of<ChunkHolder, Chunk>::value>::type>
+            typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             static auto constexpr CHUNK_REMOVAL_THRESHOLD = 64lu;    // iterate list and remove empty chunks when there are so many
@@ -270,7 +283,8 @@ namespace voltdb {
         /**
          * self-compacting chunk (with help from CompactingChunks to compact across a list)
          */
-        struct CompactingChunk final : public ChunkHolder {
+        struct CompactingChunk final : public ChunkHolder<> {
+            using super = ChunkHolder<>;
             CompactingChunk(size_t id, size_t tupleSize, size_t chunkSize);
             CompactingChunk(CompactingChunk&&) = delete;
             CompactingChunk(CompactingChunk const&) = delete;
@@ -362,7 +376,7 @@ namespace voltdb {
             position_type() noexcept = default;        // empty initiator
             position_type(CompactingChunks const&, void const*);
             template<typename iterator> position_type(void const*, iterator const&) noexcept;
-            position_type(ChunkHolder const&) noexcept;
+            position_type(ChunkHolder<> const&) noexcept;
             position_type(position_type const&) noexcept = default;
             position_type(position_type&&) noexcept = default;
             position_type& operator=(position_type const&) noexcept;
