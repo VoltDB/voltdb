@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,14 @@ namespace voltdb {
          * batched: it deletes in a batch style when fixed
          *       number of entries had been reverted. Kind-of lazy.
          */
-        enum class gc_policy: char {never, always, batched};
+        enum class gc_policy: unsigned char {
+            never, always, batched =
+#ifdef NDEBUG
+                numeric_limits<unsigned char>::max()
+#else
+                16                                     // for eecheck only
+#endif
+        };
 
         /**
          * More efficient stack than STL (which was backed by
@@ -377,6 +384,7 @@ namespace voltdb {
             static size_t gen_id();
 
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
+            char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};     // (moving) left boundary for txn
             position_type m_frozenTxnBoundary{};  // (frozen) right boundary for txn
             // the end of allocations when snapshot started: (block id, end ptr)
@@ -450,6 +458,12 @@ namespace voltdb {
             // details.
             void* free(void*);
             /**
+             * Light weight free() operations from either end,
+             * involving no compaction.
+             */
+            enum class remove_direction : char {from_head, from_tail};
+            void free(remove_direction, void const*);
+            /**
              * State changes
              */
             void freeze();
@@ -487,12 +501,6 @@ namespace voltdb {
         };
 
         template<> struct HistoryRetainTrait<gc_policy::batched> : BaseHistoryRetainTrait {
-            static constexpr auto const BatchSize =
-#ifdef NDEBUG
-512lu;
-#else
-16lu;          // for eecheck only
-#endif
             size_t m_size = 0;
             forward_list<void const*> m_batched{};
             HistoryRetainTrait(cb_type const&);
@@ -549,7 +557,7 @@ namespace voltdb {
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             void add(CompactingChunks const&, ChangeType, void const*);
-            void const* operator()(void const*) const;               // revert history at this place!
+            void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
             // to hold value before change.
@@ -569,7 +577,6 @@ namespace voltdb {
             using CompactingChunks::allocate; using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
-            char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
@@ -583,14 +590,14 @@ namespace voltdb {
             void const* remove(void*);
             /**
              * Light weight free() operations from either end,
-             * involving no compaction.
+             * involving no compaction. Removing from head when
+             * frozen is forbidden.
              *
              * When removing from head direction, the last invocation must be
              * followed by another new invocation as
              * (remove_direction::from_head, nullptr). Forgetting to do so will
              * result in uncleaned removal (i.e. part of remove calls are lost).
              */
-            enum class remove_direction : char {from_head, from_tail};
             void remove(remove_direction, void const*);
             /**
              * Batch removal using a single call

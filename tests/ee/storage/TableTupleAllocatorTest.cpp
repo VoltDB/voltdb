@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1383,11 +1383,7 @@ TEST_F(TableTupleAllocatorTest, TestSingleChunkSnapshot) {
     TestSingleChunkSnapshot()();
 }
 
-template<typename Chunk, gc_policy pol>
-using remove_direction = typename
-HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
-
-template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+template<typename Chunk, gc_policy pol, CompactingChunks::remove_direction dir>
 void testRemovesFromEnds(size_t batch) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>;
     using Gen = StringGen<TupleSize>;
@@ -1402,7 +1398,7 @@ void testRemovesFromEnds(size_t batch) {
     }
     assert(alloc.size() == NumTuples);
     // remove tests
-    if (dir == remove_direction<Chunk, pol>::from_head) {      // remove from head
+    if (dir == CompactingChunks::remove_direction::from_head) {      // remove from head
         for (i = 0; i < batch; ++i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1417,17 +1413,11 @@ void testRemovesFromEnds(size_t batch) {
             alloc.remove(dir, nullptr);
             assert(false);                                     // should have failed
         } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
+            assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
             alloc.thaw();
         }
     } else {                                                   // remove from tail
         alloc.template freeze<truth>();
-        try {                                                  // we forbid calling remove from head/tail when frozen
-            alloc.remove(dir, nullptr);
-        } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head or tail when frozen"));
-            alloc.thaw();
-        }
         for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1450,10 +1440,11 @@ void testRemovesFromEnds(size_t batch) {
         // "1st" tuple to last, and in snapshot, the head chunk
         // would be preserved) is now lost forever.
         assert(i == NumTuples - batch);
+        alloc.thaw();
     }
 }
 
-template<typename Chunk, gc_policy pol, remove_direction<Chunk, pol> dir>
+template<typename Chunk, gc_policy pol, CompactingChunks::remove_direction dir>
 struct TestRemovesFromEnds3 {
     inline void operator()() const {
         testRemovesFromEnds<Chunk, pol, dir>(0);
@@ -1466,19 +1457,17 @@ struct TestRemovesFromEnds3 {
 };
 
 template<typename Chunk, gc_policy pol> struct TestRemovesFromEnds2 {
-    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const s1;
-    static TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const s2;
-    using direction = typename
-        HookedCompactingChunks<TxnPreHook<NonCompactingChunks<Chunk>, HistoryRetainTrait<pol>>>::remove_direction;
+    static TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_head> const s1;
+    static TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_tail> const s2;
     inline void operator()() const {
         s1();
         s2();
     }
 };
 template<typename Chunk, gc_policy pol>
-TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_head> const TestRemovesFromEnds2<Chunk, pol>::s1{};
+TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_head> const TestRemovesFromEnds2<Chunk, pol>::s1{};
 template<typename Chunk, gc_policy pol>
-TestRemovesFromEnds3<Chunk, pol, remove_direction<Chunk, pol>::from_tail> const TestRemovesFromEnds2<Chunk, pol>::s2{};
+TestRemovesFromEnds3<Chunk, pol, CompactingChunks::remove_direction::from_tail> const TestRemovesFromEnds2<Chunk, pol>::s2{};
 
 template<typename Chunk> struct TestRemovesFromEnds1 {
     static TestRemovesFromEnds2<Chunk, gc_policy::never> const s1;
@@ -1503,6 +1492,24 @@ struct TestRemovesFromEnds {
 
 TEST_F(TableTupleAllocatorTest, TestRemovesFromEnds) {
     TestRemovesFromEnds()();
+}
+
+TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    void* addr = alloc.allocate();
+    ASSERT_EQ(addr, alloc.remove(addr));
+    // empty: reallocate
+    memcpy(addr = alloc.allocate(), gen.get(), TupleSize);
+    size_t i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc), [addr, this, &i](void const* p) {
+                ASSERT_EQ(addr, p);
+                ASSERT_TRUE(Gen::same(p, i++));
+            });
+    ASSERT_EQ(1, i);
 }
 
 #endif
