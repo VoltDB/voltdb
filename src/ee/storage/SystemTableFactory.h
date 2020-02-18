@@ -50,7 +50,7 @@ public:
 
     // Add an index to the table. unique must be true for the index to be a primary key
     void addIndex(PersistentTable *table, const std::string suffix, const std::vector<int32_t> &columns,
-            bool unique = true, bool primary = true) const;
+            bool unique = true, bool primary = true, AbstractExpression* predicate = nullptr) const;
 private:
     // Member variables
     int32_t m_compactionThreshold;
