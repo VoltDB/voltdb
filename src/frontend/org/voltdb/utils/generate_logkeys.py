@@ -79,4 +79,4 @@ for line in open( "voltdb_logstrings.properties", 'r' ).readlines():
         f.write( "    " )
         f.write( parts[0].strip() )
         f.write( ",\n" )
-f.write ("    NOT_USED;\n}")
+f.write ("    NOT_USED;\n}\n")
