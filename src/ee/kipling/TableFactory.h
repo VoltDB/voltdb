@@ -24,7 +24,8 @@ namespace voltdb { namespace kipling {
 // Static classes to describe the different system tables
 struct GroupTable {
     static const std::string name;
-    static const std::string indexName;
+    static const std::string pkIndexName;
+    static const std::string standaloneGroupIndexName;
 
     enum class Column : int8_t {
         ID = 0, COMMIT_TIMESTAMP, GENERATION, LEADER, PROTOCOL

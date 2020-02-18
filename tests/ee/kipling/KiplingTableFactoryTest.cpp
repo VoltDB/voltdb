@@ -72,9 +72,15 @@ TEST_F(KiplingTableFactoryTest, KiplingGroup) {
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupTable::Column::LEADER));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupTable::Column::PROTOCOL));
 
-    TableIndex *index = table->index(GroupTable::indexName);
+    TableIndex *index = table->index(GroupTable::pkIndexName);
     EXPECT_TRUE(index);
     EXPECT_EQ(index, table->primaryKeyIndex());
+    EXPECT_EQ(1, index->getColumnIndices().size());
+    EXPECT_EQ(static_cast<int>(GroupTable::Column::ID), index->getColumnIndices()[0]);
+
+    index = table->index(GroupTable::standaloneGroupIndexName);
+    EXPECT_TRUE(index);
+    EXPECT_NE(index, table->primaryKeyIndex());
     EXPECT_EQ(1, index->getColumnIndices().size());
     EXPECT_EQ(static_cast<int>(GroupTable::Column::ID), index->getColumnIndices()[0]);
 

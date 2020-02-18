@@ -23,13 +23,28 @@
 namespace voltdb { namespace kipling {
 
 const std::string GroupTable::name = "_kipling_group";
-const std::string GroupTable::indexName = GroupTable::name + "_pkey";
+const std::string GroupTable::pkIndexName = GroupTable::name + "_pkey";
+const std::string GroupTable::standaloneGroupIndexName = GroupTable::name + "_standalone_index";
 
 const std::string GroupMemberTable::name = "_kipling_group_member";
 const std::string GroupMemberTable::indexName = GroupMemberTable::name + "_index";
 
 const std::string GroupOffsetTable::name = "_kipling_group_offset";
 const std::string GroupOffsetTable::indexName = GroupOffsetTable::name + "_pkey";
+
+/*
+ * Abstract expression implementation for testing if a group tuple represents a  standalone group
+ */
+class GroupTableStandalonePredicate : public AbstractExpression {
+    NValue eval(const TableTuple* tuple, const TableTuple* unused = nullptr) const override {
+        NValue protocol = tuple->getNValue(static_cast<int32_t>(GroupTable::Column::PROTOCOL));
+        return protocol.isNull() ? NValue::getTrue() : NValue::getFalse();
+    }
+
+    std::string debugInfo(const std::string &spacer) const override {
+        return spacer + "GroupTableStandalonePredicate";
+    }
+};
 
 /*
  * Create a table for tracking kipling groups equivalent to
@@ -49,7 +64,10 @@ PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
     std::vector<int32_t> pkeyColumns = { static_cast<int32_t>(GroupTable::Column::ID) };
 
     PersistentTable* table = factory.createTable(GroupTable::name, schema, columnNames, 0);
-    factory.addIndex(table, GroupTable::indexName, pkeyColumns);
+    factory.addIndex(table, GroupTable::pkIndexName, pkeyColumns);
+    factory.addIndex(table, GroupTable::standaloneGroupIndexName, pkeyColumns, true, false,
+            new GroupTableStandalonePredicate());
+
     return table;
 }
 
