@@ -231,8 +231,6 @@ CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAME
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
