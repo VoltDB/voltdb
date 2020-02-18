@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,14 +122,14 @@ public class VoltPSortScanToIndexRule extends RelOptRule {
                             scan.getTable(), scan.getVoltTable(), scan.getProgram(),
                             index, accessPath, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                             scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                            scan.getSplitCount(), indexCollation, false);
+                            indexCollation, false);
 
                     final RelNode result;
                     if (calc == null) {
                         result = indexScan;
                     } else { // The new Calc collation must match the original Sort collation
                         result = calc.copy(calc.getTraitSet().replace(origSortCollation),
-                                indexScan, calc.getProgram(), calc.getSplitCount());
+                                indexScan, calc.getProgram());
                     }
                     if (equivRel == null) {
                         equivRel = result;

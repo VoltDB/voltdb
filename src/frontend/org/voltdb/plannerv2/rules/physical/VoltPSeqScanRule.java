@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistribution.Type;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -49,15 +48,12 @@ public class VoltPSeqScanRule extends RelOptRule {
 
         // Table distribution
         RelDistribution tableDist = tableScan.getTable().getDistribution();
-        int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
-                1 : Constants.DISTRIBUTED_SPLIT_COUNT;
 
         VoltPhysicalTableSequentialScan scanRel = new VoltPhysicalTableSequentialScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),
                 tableScan.getTable(),
-                tableScan.getVoltTable(),
-                scanSplitCount);
+                tableScan.getVoltTable());
 
         call.transformTo(scanRel);
     }

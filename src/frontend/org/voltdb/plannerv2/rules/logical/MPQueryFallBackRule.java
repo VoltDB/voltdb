@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import org.aeonbits.owner.util.Collections;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistribution;
@@ -28,6 +29,10 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalExchange;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
 
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
@@ -80,7 +85,26 @@ public class MPQueryFallBackRule extends RelOptRule {
                 } else {
                     dist = childDist;
                 }
-                call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                // Nodes that require LogicalExchange for a multi-partitioned query-
+                // Sort, Limit, Aggregate
+                if (RelDistributions.SINGLETON.getType() != dist.getType() &&
+                        dist.getPartitionEqualValue() == null) {
+                    // Create a new multi partitioned SINGLETON distribution for the coordinator fragment
+                    RelDistribution topDist = RelDistributions.SINGLETON.with(dist.getPartitionEqualValue(), false);
+                    if (node instanceof VoltLogicalLimit ||
+                            node instanceof VoltLogicalSort ||
+                            node instanceof VoltLogicalAggregate) {
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
+                                node.getTraitSet().replace(dist), node.getInput(), dist);
+                        // Transforming COUNT, AVG aggregates for MP queries would happen during the physical transformation phase
+                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
+                        call.transformTo(coordinatorLimit);
+                    } else {
+                        call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                    }
+                } else {
+                    call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                }
             }
         }
     }

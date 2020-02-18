@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,20 +43,20 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
      */
     public VoltPhysicalSerialAggregate(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate, int splitCount,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate,
             boolean isCoordinatorAggr, RexNode offset, RexNode limit) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
-                splitCount, isCoordinatorAggr);
+                isCoordinatorAggr);
         m_offset = offset;
         m_limit = limit;
     }
 
     public VoltPhysicalSerialAggregate(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate, int splitCount,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate,
             boolean isCoordinatorAggr) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
-                splitCount, isCoordinatorAggr);
+                isCoordinatorAggr);
         m_offset = null;
         m_limit = null;
     }
@@ -75,16 +75,16 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
         return new VoltPhysicalSerialAggregate(
                 getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls, getPostPredicate(),
-                getSplitCount(), getIsCoordinatorAggr(), m_offset, m_limit);
+                getIsCoordinatorAggr(), m_offset, m_limit);
     }
 
     @Override
     public VoltPhysicalSerialAggregate copy(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode havingExpression, int splitCount,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode havingExpression,
             boolean isCoordinatorAggr) {
         return new VoltPhysicalSerialAggregate(
-                cluster, traitSet, input, indicator, groupSet, groupSets, aggCalls, havingExpression, splitCount,
+                cluster, traitSet, input, indicator, groupSet, groupSets, aggCalls, havingExpression,
                 isCoordinatorAggr, m_offset, m_limit);
     }
 

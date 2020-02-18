@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
@@ -43,7 +44,6 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -313,15 +313,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
                 }
-            }
-            // Tag along and become the export master too
-            // leave the export on the former leader, now a replica
-            if (!migratePartitionLeader && lastLeaderHSId != m_initiatorMailbox.getHSId()) {
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Export Manager has been notified that local partition " +
-                            m_partitionId + " to accept export stream mastership.");
-                }
-                ExportManagerInterface.instance().becomeLeader(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

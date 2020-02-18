@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -261,11 +260,6 @@ public class PlannerTool {
         // As of 9.0, only SP AdHoc queries are using this new planner.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
-        final RelDistribution distribution = transformed.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-        if (! distribution.getIsSP()) { // defer SP/MP detection outside MP_FALLBACK phase
-            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-        }
-
         // Transform RIGHT Outer joins to LEFT ones
         transformed = VoltPlanner.transformHep(Phase.LOGICAL_JOIN, transformed);
 
@@ -316,6 +310,8 @@ public class PlannerTool {
                 task.getParsedQuery());
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
+        core.setPartitioningParamValue(plan.getPartitioningValue());
+
         // TODO Calcite ready: enable when we are ready
         throw new PlannerFallbackException("planSqlCalcite not ready");
         // return new AdHocPlannedStatement(plan, core);
@@ -419,7 +415,11 @@ public class PlannerTool {
             return joinCount < DEFAULT_MAX_JOIN_TABLES;
         }
 
-         @Override
+        public boolean hasJoins() {
+            return joinCount > 0;
+        }
+
+        @Override
         public RelNode visit(LogicalJoin join) {
             ++joinCount;
             return super.visit(join);

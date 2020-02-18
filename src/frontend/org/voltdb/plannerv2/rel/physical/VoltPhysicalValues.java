@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
@@ -41,33 +40,19 @@ import com.google.common.collect.ImmutableList;
  * @since 9.0
  */
 public class VoltPhysicalValues extends Values implements VoltPhysicalRel {
-    private final int m_splitCount;
 
     public VoltPhysicalValues(RelOptCluster cluster,
                               RelTraitSet traitSet,
                               RelDataType rowType,
-                              ImmutableList<ImmutableList<RexLiteral>> tuples,
-                              int splitCount) {
+                              ImmutableList<ImmutableList<RexLiteral>> tuples) {
         super(cluster, rowType, tuples, traitSet);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override
     public VoltPhysicalValues copy(RelTraitSet traitSet, List<RelNode> inputs) {
         return new VoltPhysicalValues(getCluster(),
-                traitSet, rowType, tuples, m_splitCount);
-    }
-
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        return super.explainTerms(pw)
-                .item("split", m_splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
+                traitSet, rowType, tuples);
     }
 
     @Override

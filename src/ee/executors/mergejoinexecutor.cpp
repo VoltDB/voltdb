@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,6 +60,7 @@ using namespace voltdb;
 
 const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
 const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
+const static int8_t SKIPPED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 2);
 
 // Helper class to iterate over either a temp table or
 // a persistent table using its index
@@ -89,16 +90,39 @@ struct TableCursor {
         return table;
     }
 
+    void updateTupleFilter(TableTuple& tuple, int status) {
+        if (needTableTupleFilter) {
+            tableTupleFilter.updateTuple(tuple, status);
+        }
+    }
+
+    TableTupleFilter& getTupleFilter() {
+        return tableTupleFilter;
+    }
+
 protected:
-    TableCursor(Table* nodeTable) : table(nodeTable) {}
+    TableCursor(Table* nodeTable, bool needTupleFilter) :
+        table(nodeTable),
+        tableTupleFilter(),
+        needTableTupleFilter(needTupleFilter) {
+            if (needTableTupleFilter) {
+                tableTupleFilter.init(table);
+            }
+        }
+
     Table* table;
+    // TableTupleFilter for outer joins to keep track of tuples that were skipped because they fail a predicate
+    // or match tuples from another join's node
+    TableTupleFilter tableTupleFilter;
+    // Indicator whether we need to keep track of matched / skipped tuples
+    bool needTableTupleFilter;
 };
 
 // A Temp Table Cursor
 struct TempTableCursor : public TableCursor {
 
-    TempTableCursor(AbstractPlanNode* childNode, Table* childTable) :
-        TableCursor(childTable),
+    TempTableCursor(AbstractPlanNode* childNode, Table* childTable, bool needTableTupleFilter) :
+        TableCursor(childTable, needTableTupleFilter),
         tempTableIterator(childTable->iteratorDeletingAsWeGo()) {
         vassert(childNode);
         vassert(childTable);
@@ -120,8 +144,9 @@ private:
 
 // IndexScan Cursor
 struct IndexTableCursor : public TableCursor {
-    IndexTableCursor(IndexScanPlanNode* indexNode, PersistentTable* persistTable):
-        TableCursor(persistTable), tableIndex(persistTable->index(indexNode->getTargetIndexName())),
+    IndexTableCursor(IndexScanPlanNode* indexNode, PersistentTable* persistTable, bool needTableTupleFilter):
+        TableCursor(persistTable, needTableTupleFilter),
+        tableIndex(persistTable->index(indexNode->getTargetIndexName())),
         indexCursor(tableIndex->getTupleSchema()),
         post_expression(indexNode->getPredicate()),
         projectionNode(dynamic_cast<ProjectionPlanNode*>(indexNode->getInlinePlanNode(PlanNodeType::Projection))) {
@@ -150,15 +175,11 @@ struct IndexTableCursor : public TableCursor {
             while (getNextTupleDo(tuple)) {
                 if (post_expression->eval(tuple, NULL).isTrue()) {
                     return true;
+                } else if (needTableTupleFilter) {
+                    // Mark the tuple as skipped so it would not be added to the output table for outer joins
+                    tableTupleFilter.updateTuple(*tuple, SKIPPED_TUPLE);
                 }
             }
-//             bool hasMore = false;
-//             do {
-//                 hasMore = getNextTupleDo(tuple);
-//                 if (hasMore && post_expression->eval(tuple, NULL).isTrue()) {
-//                     return true;
-//                 }
-//             } while (hasMore);
             return false;
         } else {
             return getNextTupleDo(tuple);
@@ -187,14 +208,16 @@ private:
 
 // Helper method to instantiate either an Index or Temp table's cursor
 // depending on the type of the node
-std::unique_ptr<TableCursor> buildTableCursor(AbstractPlanNode* node, Table* nodeTable) {
+std::unique_ptr<TableCursor> buildTableCursor(AbstractPlanNode* node, Table* nodeTable, bool needTableTupleFilter = false) {
     if (node->getPlanNodeType() == PlanNodeType::IndexScan) {
         auto* indexNode = dynamic_cast<IndexScanPlanNode*>(node);
         vassert(dynamic_cast<PersistentTable*>(indexNode->getTargetTable()));
-        return std::unique_ptr<TableCursor>(new IndexTableCursor(indexNode,
-                static_cast<PersistentTable*>(indexNode->getTargetTable())));
+        return std::unique_ptr<TableCursor>(
+            new IndexTableCursor(indexNode,
+                static_cast<PersistentTable*>(indexNode->getTargetTable()),
+                needTableTupleFilter));
     } else {
-        return std::unique_ptr<TableCursor>(new TempTableCursor(node, nodeTable));
+        return std::unique_ptr<TableCursor>(new TempTableCursor(node, nodeTable, needTableTupleFilter));
     }
 }
 
@@ -223,7 +246,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     vassert(!node->getChildren().empty());
     AbstractPlanNode* outerNode = node->getChildren()[0];
     Table* outerTable = node->getInputTable();
-    auto outerCursorPtr = buildTableCursor(outerNode, outerTable);
+    auto outerCursorPtr = buildTableCursor(outerNode, outerTable, (m_joinType != JOIN_TYPE_INNER));
 
     // inner table is guaranteed to be an index scan over a persistent table
     auto* innerIndexNode = dynamic_cast<IndexScanPlanNode*>(
@@ -232,7 +255,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     auto* persistTable = dynamic_cast<PersistentTable*>(innerIndexNode->getTargetTable());
     vassert(persistTable);
 
-    IndexTableCursor innerCursor(innerIndexNode, persistTable);
+    IndexTableCursor innerCursor(innerIndexNode, persistTable, m_joinType == JOIN_TYPE_FULL);
 
     // NULL tuples for left and full joins
     p_init_null_tuples(outerTable, innerCursor.getTable());
@@ -259,18 +282,6 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *wherePredicate = node->getWherePredicate();
     tracePredicate("Where", wherePredicate);
-
-    // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
-    TableTupleFilter outerTableFilter;
-    if (m_joinType != JOIN_TYPE_INNER) { // Prepopulate the view with all inner tuples
-        outerTableFilter.init(outerCursorPtr->getTable());
-    }
-
-    // The table filter to keep track of outer tuples that don't match any of outer tuples for FULL and LEFT joins
-    TableTupleFilter innerTableFilter;
-    if (m_joinType == JOIN_TYPE_FULL) { // Prepopulate the view with all inner tuples
-        innerTableFilter.init(innerCursor.getTable());
-    }
 
     auto* limitNode = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
     int limit = CountingPostfilter::NO_LIMIT;
@@ -307,15 +318,11 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
         // it can't match any of inner tuples
         if (preJoinPredicate == nullptr || preJoinPredicate->eval(&outerTuple, nullptr).isTrue()) {
             if (equalJoinPredicate->eval(&outerTuple, &innerTuple).isTrue()) {
-                // The outer tuple passed the join predicate
-                if (m_joinType != JOIN_TYPE_INNER) { // Mark it as matched
-                    outerTableFilter.updateTuple(outerTuple, MATCHED_TUPLE);
-                }
+                // The outer tuple passed the join predicate. Mark it as matched
+                outerCursorPtr->updateTupleFilter(outerTuple, MATCHED_TUPLE);
 
-                // The inner tuple passed the join predicate
-                if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
-                    innerTableFilter.updateTuple(innerTuple, MATCHED_TUPLE);
-                }
+                // The inner tuple passed the join predicate. Mark it as matched
+                innerCursor.updateTupleFilter(innerTuple, MATCHED_TUPLE);
 
                 // Filter the joined tuple
                 if (postfilter.eval(&outerTuple, &innerTuple)) {
@@ -331,12 +338,10 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
                         && innerCursorTmp.getNextTuple(&innerTupleTmp)
                         && equalJoinPredicate->eval(&outerTuple, &innerTupleTmp).isTrue()) {
                     pmp.countdownProgress();
-                    if (m_joinType != JOIN_TYPE_INNER) { // Mark it as matched
-                        outerTableFilter.updateTuple(outerTuple, MATCHED_TUPLE);
-                    }
-                    if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
-                        innerTableFilter.updateTuple(innerTupleTmp, MATCHED_TUPLE);
-                    }
+                    // Mark outer tuple as matched
+                    outerCursorPtr->updateTupleFilter(outerTuple, MATCHED_TUPLE);
+                    // Mark inner tuple as matched
+                    innerCursor.updateTupleFilter(innerTupleTmp, MATCHED_TUPLE);
                     // Filter the joined tuple
                     if (postfilter.eval(&outerTuple, &innerTupleTmp)) {
                         // Matched! Complete the joined tuple with the inner column values.
@@ -353,12 +358,10 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
                         outerCursorPtrTmp->getNextTuple(&outerTupleTmp) &&
                         equalJoinPredicate->eval(&outerTupleTmp, &innerTuple).isTrue()) {
                     pmp.countdownProgress();
-                    if (m_joinType != JOIN_TYPE_INNER) { // Mark it as matched
-                        outerTableFilter.updateTuple(outerTupleTmp, MATCHED_TUPLE);
-                    }
-                    if (m_joinType == JOIN_TYPE_FULL) { // Mark it as matched
-                        innerTableFilter.updateTuple(innerTuple, MATCHED_TUPLE);
-                    }
+                    // Mark outer tuple as matched
+                    outerCursorPtr->updateTupleFilter(outerTupleTmp, MATCHED_TUPLE);
+                    // Mark inner tuple as matched
+                    innerCursor.updateTupleFilter(innerTuple, MATCHED_TUPLE);
 
                     // Filter the joined tuple
                     if (postfilter.eval(&outerTupleTmp, &innerTuple)) {
@@ -385,39 +388,41 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
         // This is an outer join. Add all unmatched outer tuples that pass the filter
         innerCursor.populateJoinTuple(joinTuple, nullInnerTuple, outerCols);
 
+        TableTupleFilter& outerTableFilter = outerCursorPtr->getTupleFilter();
         auto const endItr = outerTableFilter.end<UNMATCHED_TUPLE>();
-            for (auto itr = outerTableFilter.begin<UNMATCHED_TUPLE>();
-                    itr != endItr && postfilter.isUnderLimit(); ++itr) {
-                // Restore the tuple value
-                outerTuple.move(reinterpret_cast<char*>(outerTableFilter.getTupleAddress(*itr)));
-                // Still needs to pass the filter
-                vassert(outerTuple.isActive());
-                if (postfilter.eval(&outerTuple, &nullInnerTuple)) {
-                    // Passed! Complete the joined tuple with the inner column values.
-                    outerCursorPtr->populateJoinTuple(joinTuple, outerTuple, 0);
-                    outputTuple(postfilter, joinTuple, pmp);
-                }
+        for (auto itr = outerTableFilter.begin<UNMATCHED_TUPLE>();
+                itr != endItr && postfilter.isUnderLimit(); ++itr) {
+            // Restore the tuple value
+            outerTuple.move(reinterpret_cast<char*>(outerTableFilter.getTupleAddress(*itr)));
+            // Still needs to pass the filter
+            vassert(outerTuple.isActive());
+            if (postfilter.eval(&outerTuple, &nullInnerTuple)) {
+                // Passed! Complete the joined tuple with the inner column values.
+                outerCursorPtr->populateJoinTuple(joinTuple, outerTuple, 0);
+                outputTuple(postfilter, joinTuple, pmp);
             }
+        }
      }
      if (m_joinType == JOIN_TYPE_FULL) {
         // This is a full join. Add all unmatched inner tuples that pass the filter
-            // Preset outer columns to null
-            const TableTuple& nullOuterTuple = m_null_outer_tuple.tuple();
-            joinTuple.setNValues(0, nullOuterTuple, 0, outerCols);
+        // Preset outer columns to null
+        const TableTuple& nullOuterTuple = m_null_outer_tuple.tuple();
+        joinTuple.setNValues(0, nullOuterTuple, 0, outerCols);
 
-            auto const endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
-            for (auto itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
-                    itr != endItr && postfilter.isUnderLimit(); ++itr) {
-                // Restore the tuple value
-                innerTuple.move(reinterpret_cast<char*>(innerTableFilter.getTupleAddress(*itr)));
-                // Still needs to pass the filter
-                vassert(innerTuple.isActive());
-                if (postfilter.eval(&nullOuterTuple, &innerTuple)) {
-                    // Passed! Complete the joined tuple with the inner column values.
-                    innerCursor.populateJoinTuple(joinTuple, innerTuple, outerCols);
-                    outputTuple(postfilter, joinTuple, pmp);
-                }
+        TableTupleFilter& innerTableFilter = innerCursor.getTupleFilter();
+        auto const endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
+        for (auto itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
+                itr != endItr && postfilter.isUnderLimit(); ++itr) {
+            // Restore the tuple value
+            innerTuple.move(reinterpret_cast<char*>(innerTableFilter.getTupleAddress(*itr)));
+            // Still needs to pass the filter
+            vassert(innerTuple.isActive());
+            if (postfilter.eval(&nullOuterTuple, &innerTuple)) {
+                // Passed! Complete the joined tuple with the inner column values.
+                innerCursor.populateJoinTuple(joinTuple, innerTuple, outerCols);
+                outputTuple(postfilter, joinTuple, pmp);
             }
+        }
     }
 
     if (m_aggExec != nullptr) {

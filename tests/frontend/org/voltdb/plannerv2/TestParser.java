@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,7 +52,18 @@ public class TestParser extends Plannerv2TestCase {
     public void testIdentifierQuoting() {
         // by default double quote is used as identifier delimiter
         m_tester.sql("select \"i\" from R2").pass();
-        m_tester.sql("select [i] from R2").exception("Encountered \"[\" at line 1, column 8*");
-        m_tester.sql("select `i` from R2").exception("Encountered \"`\" at line 1, column 8*");
+        m_tester.sql("select [i] from R2")
+        .exception("Encountered(.*)at line 1, column 8(.*)")
+        .pass();
+        m_tester.sql("select `i` from R2")
+        .exception("Lexical error at line 1, column 8.  Encountered: \"`\"(.*), after : \"\"")
+        .pass();
+    }
+
+    public void testUnsupportedSelectTop() {
+        // Calcite does not support SELECT TOP 2 * from T
+        m_tester.sql("select TOP 2 * from R2")
+        .exception("(.*)Encountered \"2\" at line 1, column 12(.*)")
+        .pass();
     }
 }

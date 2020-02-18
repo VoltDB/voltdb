@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltPhysicalLimit}.
@@ -50,7 +49,6 @@ public class VoltPLimitRule extends RelOptRule {
                 .replace(VoltPhysicalRel.CONVENTION).simplify();
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
-        int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
         call.transformTo(new VoltPhysicalLimit(
                 limitOffset.getCluster(),
@@ -58,6 +56,6 @@ public class VoltPLimitRule extends RelOptRule {
                 convertedInput,
                 limitOffset.getOffset(),
                 limitOffset.getLimit(),
-                splitCount));
+                false));
     }
 }

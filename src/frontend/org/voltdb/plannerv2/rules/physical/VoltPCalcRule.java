@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link VoltLogicalCalc} to {@link VoltPhysicalCalc}.
@@ -46,9 +45,8 @@ public class VoltPCalcRule extends RelOptRule {
         final RelNode input = calc.getInput();
         final RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
-        final int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
         call.transformTo(new VoltPhysicalCalc(
                 calc.getCluster(), calc.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                convertedInput, calc.getProgram(), splitCount));
+                convertedInput, calc.getProgram()));
     }
 }

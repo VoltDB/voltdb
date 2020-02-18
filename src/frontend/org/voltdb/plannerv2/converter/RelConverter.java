@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 package org.voltdb.plannerv2.converter;
 
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlKind;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.types.JoinType;
 
 public class RelConverter {
@@ -34,6 +36,21 @@ public class RelConverter {
             case INNER: return JoinType.INNER;
             // to passify the compiler
             default: return JoinType.INNER;
+        }
+    }
+
+    /**
+     * Convert Calcite SetOp type to a corresponding Volt one
+     * @param kind
+     * @param all
+     * @return ParsedUnionStmt.UnionType
+     */
+    public static ParsedUnionStmt.UnionType convertSetOpType(SqlKind kind, boolean all) {
+        switch (kind) {
+            case UNION: return (all)? ParsedUnionStmt.UnionType.UNION_ALL : ParsedUnionStmt.UnionType.UNION;
+            case EXCEPT: return (all)? ParsedUnionStmt.UnionType.EXCEPT_ALL : ParsedUnionStmt.UnionType.EXCEPT;
+            case INTERSECT: return (all)? ParsedUnionStmt.UnionType.INTERSECT_ALL : ParsedUnionStmt.UnionType.INTERSECT;
+            default: return ParsedUnionStmt.UnionType.NOUNION;
         }
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.compiler.PlannerTool.JoinCounter;
 import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -47,10 +48,14 @@ import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -171,13 +176,18 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 throw new AssertionError("Unexpected exception thrown: " + m_sap.sql, ex);
             } else if (ex instanceof SqlParseException){
                 String errMessage = ex.getMessage();
-                if (errMessage == null || ! ex.getMessage().matches(m_expectedException)) {
+                if (errMessage == null || ! checkExMatch(m_expectedException)) {
                     throw new AssertionError("Exception thrown not matching the pattern: "
                             + m_expectedException, ex);
                 }
             } else {
                 SqlTests.checkEx(ex, m_expectedException, m_sap, SqlTests.Stage.VALIDATE);
             }
+        }
+        private boolean checkExMatch(String errMessage) {
+            Pattern p = Pattern.compile(m_expectedException);
+            Matcher m = p.matcher(errMessage);
+            return m.find();
         }
     }
 
@@ -249,25 +259,26 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void pass() throws AssertionError {
             super.pass();
             final RelDistribution distribution = transform();
-            assertTrue("Got SINGLETON distribution without partition equal value",
-                    distribution.getIsSP());
+            if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                anyMatch(m_expectedTransforms, actualTransform);
+            }
+
         }
 
         @Override public void fail() {
             super.pass();
             try {
                 final RelDistribution distribution = transform();
-                assertFalse("Expected fall back:\nGot distribution type " +
-                                distribution.getType().name() +
-                                " with partition equal value = " +
-                                (distribution.getPartitionEqualValue() == null ? "null" :
-                                        distribution.getPartitionEqualValue().toString()),
-                        distribution.getIsSP());
+                if (m_ruleSetIndex == PlannerRules.Phase.MP_FALLBACK.ordinal() && ! m_expectedTransforms.isEmpty()) {
+                    String actualTransform = RelOptUtil.toString(m_transformedNode);
+                    anyMatch(m_expectedTransforms, actualTransform);
+                }
+                assertFalse("Expected to fail but passed", true);
             } catch (PlanningErrorException e) {    // transform stage is allowed to throw:
                 // See RelDistributionUtils#isJoinSP()
-                assertEquals("SQL error while compiling query: This query is not plannable.  "
-                                + "The planner cannot guarantee that all rows would be in a single partition.",
-                        e.getMessage());
+                assertTrue(e.getMessage().startsWith(
+                        "SQL error while compiling query:"));
             }
         }
     }
@@ -325,7 +336,14 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 }
                 if (! m_expectedVoltPlanJsons.isEmpty()) {
                     assertTrue(m_transformedNode instanceof VoltPhysicalRel);
-                    AbstractPlanNode voltPlan = ((VoltPhysicalRel)m_transformedNode).toPlanNode();
+                    CompiledPlan compiledPlan = new CompiledPlan(false);
+                    calciteToVoltDBPlan((VoltPhysicalRel) m_transformedNode, compiledPlan);
+                    AbstractPlanNode voltPlan = compiledPlan.rootPlanGraph;
+                    try {
+                        voltPlan.validate();
+                    } catch (Exception ex) {
+                        assertTrue(false);
+                    }
                     PlanNodeList planNodeList = new PlanNodeList(voltPlan, false);
                     anyMatch(m_expectedVoltPlanJsons, planNodeList.toJSONString());
                 }

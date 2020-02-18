@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.6
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2019 VoltDB Inc.
+# Copyright (C) 2008-2020 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following

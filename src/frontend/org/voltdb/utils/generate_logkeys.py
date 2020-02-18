@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2019 VoltDB Inc.
+# Copyright (C) 2008-2020 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,7 @@ import os
 
 gpl_header = \
 """/* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -79,4 +79,4 @@ for line in open( "voltdb_logstrings.properties", 'r' ).readlines():
         f.write( "    " )
         f.write( parts[0].strip() )
         f.write( ",\n" )
-f.write ("    NOT_USED;\n}")
+f.write ("    NOT_USED;\n}\n")

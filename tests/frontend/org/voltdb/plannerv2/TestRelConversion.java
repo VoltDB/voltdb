@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,12 @@
 
 package org.voltdb.plannerv2;
 
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlKind;
+import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.plannerv2.converter.RelConverter;
+import org.voltdb.types.JoinType;
+
 public class TestRelConversion extends Plannerv2TestCase {
 
     ConversionTester m_tester = new ConversionTester();
@@ -41,5 +47,22 @@ public class TestRelConversion extends Plannerv2TestCase {
         m_tester.sql("select i from R2")
                 .plan("Root {kind: SELECT, rel: LogicalProject#2, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}")
                 .pass();
+    }
+
+    public void testSetOpTypeConversion() {
+        assertEquals(ParsedUnionStmt.UnionType.UNION, RelConverter.convertSetOpType(SqlKind.UNION, false));
+        assertEquals(ParsedUnionStmt.UnionType.UNION_ALL, RelConverter.convertSetOpType(SqlKind.UNION, true));
+        assertEquals(ParsedUnionStmt.UnionType.EXCEPT, RelConverter.convertSetOpType(SqlKind.EXCEPT, false));
+        assertEquals(ParsedUnionStmt.UnionType.EXCEPT_ALL, RelConverter.convertSetOpType(SqlKind.EXCEPT, true));
+        assertEquals(ParsedUnionStmt.UnionType.INTERSECT, RelConverter.convertSetOpType(SqlKind.INTERSECT, false));
+        assertEquals(ParsedUnionStmt.UnionType.INTERSECT_ALL, RelConverter.convertSetOpType(SqlKind.INTERSECT, true));
+        assertEquals(ParsedUnionStmt.UnionType.NOUNION, RelConverter.convertSetOpType(SqlKind.PLUS, false));
+    }
+
+    public void testJoinTypeConversion() {
+        assertEquals(JoinType.FULL, RelConverter.convertJointType(JoinRelType.FULL));
+        assertEquals(JoinType.INNER, RelConverter.convertJointType(JoinRelType.INNER));
+        assertEquals(JoinType.LEFT, RelConverter.convertJointType(JoinRelType.LEFT));
+        assertEquals(JoinType.RIGHT, RelConverter.convertJointType(JoinRelType.RIGHT));
     }
 }

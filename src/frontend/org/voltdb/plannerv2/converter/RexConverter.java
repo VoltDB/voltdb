@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.calcite.rel.type.RelDataType;
@@ -71,21 +70,6 @@ import com.google_voltpatches.common.base.Preconditions;
  */
 public class RexConverter {
     private RexConverter() {}
-
-    // used to keep track of a RexDynamicParam's index.
-    public static class DynamicParamCounter {
-        private final AtomicInteger m_nextIndex;
-        DynamicParamCounter() {
-            m_nextIndex = new AtomicInteger(0);
-        }
-        public void reset() {
-            m_nextIndex.set(0);
-        }
-        public int getAndIncrement() {
-            return m_nextIndex.getAndIncrement();
-        }
-    }
-    public static final DynamicParamCounter PARAM_COUNTER = new DynamicParamCounter();
 
     public static void setType(AbstractExpression ae, RelDataType rdt) {
         VoltType vt = ColumnTypes.getVoltType(rdt.getSqlTypeName());
@@ -290,6 +274,7 @@ public class RexConverter {
                         ExpressionType.OPERATOR_IS_NULL,
                         aeOperands.get(0),
                         null);
+                RexConverter.setType(isnullexpr, VoltType.BOOLEAN, PRECISION_NOT_SPECIFIED);
                 ae = new OperatorExpression(
                         ExpressionType.OPERATOR_NOT,
                         isnullexpr,
@@ -304,6 +289,7 @@ public class RexConverter {
                 RexConverter.setType(ae, call.getType());
                 break;
             case CASE:
+            case COALESCE:
                 ae = buildCaseWhenExpression(aeOperands, 0, call.getType());
                 break;
 //            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
@@ -601,7 +587,7 @@ public class RexConverter {
         @Override
         public ParameterValueExpression visitDynamicParam(RexDynamicParam inputParam) {
             ParameterValueExpression pve = new ParameterValueExpression();
-            pve.setParameterIndex(PARAM_COUNTER.getAndIncrement());
+            pve.setParameterIndex(inputParam.getIndex());
             RexConverter.setType(pve, inputParam.getType());
             return pve;
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,9 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
-import com.google.common.collect.ImmutableMap;
-import com.google_voltpatches.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
@@ -36,9 +37,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.base.Preconditions;
 
 
 /**
@@ -88,7 +88,7 @@ public class VoltPAggregateRule extends RelOptRule {
         final RelNode serialAggr = new VoltPhysicalSerialAggregate(
                 aggregate.getCluster(), convertedAggrTraits, convert(input, convertedInputTraits), aggregate.indicator,
                 aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList(), null,
-                1, false);
+                false);
         // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
         // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
         // that both (a new sort and the serial aggregate) relations are equivalent to the original
@@ -97,7 +97,7 @@ public class VoltPAggregateRule extends RelOptRule {
         if (hasGroupBy(aggregate)) {
             final VoltPhysicalSort sort = new VoltPhysicalSort(
                     aggregate.getCluster(), convertedAggrTraits, serialAggr,
-                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE), 1);
+                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE), false);
             call.transformTo(sort, ImmutableMap.of(serialAggr, aggregate));
         } else {
             call.transformTo(serialAggr);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,6 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
-import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.base.Preconditions;
@@ -86,8 +85,11 @@ public class VoltTable implements TranslatableTable {
 
     @Override public Statistic getStatistic() {
         return new Statistic() {
+            //Rough estimate for number of rows in a table
+            static public final double ESTIMATE_TABLE_ROW_COUNT = 1000000.;
+
             @Override public Double getRowCount() {
-                return null;
+                return ESTIMATE_TABLE_ROW_COUNT;
             }
             @Override public boolean isKey(ImmutableBitSet columns) {
                 return false;

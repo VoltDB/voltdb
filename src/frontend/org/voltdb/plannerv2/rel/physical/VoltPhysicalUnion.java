@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rel.util.PlanNodeUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 import com.google.common.base.Preconditions;
 
@@ -38,8 +40,6 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     /**
      * Creates a VoltPhysicalUnion.
      *
@@ -49,14 +49,13 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalUnion(
-            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override public VoltPhysicalUnion copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
-        return new VoltPhysicalUnion(getCluster(), traitSet, inputs, all, m_splitCount);
+        return new VoltPhysicalUnion(getCluster(), traitSet, inputs, all);
     }
 
     @Override
@@ -73,8 +72,8 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
     }
 
     @Override
-    public int getSplitCount() {
-        return m_splitCount;
+    public AbstractPlanNode toPlanNode() {
+        return PlanNodeUtil.setOpToPlanNode(this);
     }
 
 }

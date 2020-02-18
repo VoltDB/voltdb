@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,15 +39,6 @@ public interface VoltPhysicalRel extends RelNode {
     default AbstractPlanNode toPlanNode() {
         throw new CalcitePlanningException("Not implemented!");
     }
-
-    /**
-     * Return number of concurrent processes that this VoltPhysicalRel will be executed in.
-     * If this rel/plan node belongs to a coordinator then its split count is 1
-     * For a fragment rel/node the split count = a number of hosts * number of sites per host
-     *
-     * @return Split count
-     */
-    int getSplitCount();
 
     /**
      * Return a child VoltDBRel node in a specified position

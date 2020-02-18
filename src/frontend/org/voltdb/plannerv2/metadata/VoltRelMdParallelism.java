@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,15 @@
 
 package org.voltdb.plannerv2.metadata;
 
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMdParallelism;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.BuiltInMethod;
-import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
  * VoltDB implementations of the
@@ -34,15 +36,24 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
  */
 public class VoltRelMdParallelism extends RelMdParallelism {
 
+    public static final int DISTRIBUTED_SPLIT_COUNT = 30;
+
     public static final RelMetadataProvider SOURCE =
             ReflectiveRelMetadataProvider.reflectiveSource(
                     new VoltRelMdParallelism(), BuiltInMethod.SPLIT_COUNT.method);
 
+    /**
+     * Return number of concurrent processes that this VoltPhysicalRel will be executed in.
+     * If this rel/plan node belongs to a coordinator then its split count is 1
+     * For a fragment rel/node the split count = a number of hosts * number of sites per host
+     *
+     * @return Split count
+     */
     @Override public Integer splitCount(RelNode rel, RelMetadataQuery mq) {
-        if (rel instanceof VoltPhysicalRel) {
-            return ((VoltPhysicalRel) rel).getSplitCount();
-        } else {
-            return 1;
-        }
+        RelDistribution distribution = rel.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        return (distribution == null ||
+                RelDistributions.ANY.getType() == distribution.getType() ||
+                RelDistributions.SINGLETON.getType() == distribution.getType()) ?
+                        1 : DISTRIBUTED_SPLIT_COUNT;
     }
 }

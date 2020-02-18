@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,6 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
@@ -164,7 +163,7 @@ public interface ExportManagerInterface {
     public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin);
 
-    public void becomeLeader(int partitionId);
+    public void startListeners(ClientInterface cif);
 
     public void shutdown();
 
@@ -194,7 +193,6 @@ public interface ExportManagerInterface {
 
     public void sync();
 
-    public void clientInterfaceStarted(ClientInterface clientInterface);
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb);
 
     public ExportMode getExportMode();

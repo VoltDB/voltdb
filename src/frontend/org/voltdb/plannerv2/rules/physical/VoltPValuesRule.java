@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,7 +49,6 @@ public class VoltPValuesRule extends RelOptRule {
                 .simplify();
 
         call.transformTo(new VoltPhysicalValues(values.getCluster(),
-                convertedTraits, values.getRowType(), values.getTuples(),
-                Constants.VALUES_SPLIT_COUNT));
+                convertedTraits, values.getRowType(), values.getTuples()));
     }
 }

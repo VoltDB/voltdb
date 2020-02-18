@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,12 @@
  */
 
 package org.voltdb.plannerv2.rel.physical;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
@@ -40,57 +46,32 @@ import org.voltdb.plannodes.OrderByPlanNode;
 
 import com.google.common.base.Preconditions;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
-    private final int m_splitCount;
+    // In a partitioned query Limit could be pushed down to fragments
+    // by the LimitExchange Transpose Rule -
+    // Limit / RenNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
 
     public VoltPhysicalSort(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, int splitCount) {
-        this(cluster, traitSet, input, collation, null, null, splitCount);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation,
+            boolean isPushedDown) {
+        this(cluster, traitSet, input, collation, null, null, isPushedDown);
     }
 
     private VoltPhysicalSort(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset,
-            RexNode limit, int splitCount) {
+            RexNode limit, boolean isPushedDown) {
         super(cluster, traitSet, input, collation, offset, limit);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
+        m_isPushedDown = isPushedDown;
     }
 
     @Override
     public VoltPhysicalSort copy(
             RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit) {
-        return copy(traitSet, input, collation, offset, limit, m_splitCount);
-    }
-
-    public VoltPhysicalSort copy(
-            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit, splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
-        return digest;
-    }
-
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("split", m_splitCount);
-        return pw;
+        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit, m_isPushedDown);
     }
 
     @Override
@@ -134,6 +115,13 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     }
 
     @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("pusheddown", m_isPushedDown);
+        return pw;
+    }
+
+    @Override
     public AbstractPlanNode toPlanNode() {
         final AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
         final LimitPlanNode lpn;
@@ -156,4 +144,10 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
             return lpn;
         }
     }
+
+    public boolean isPushedDown() {
+        return m_isPushedDown;
+    }
+
+
 }

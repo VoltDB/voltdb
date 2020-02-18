@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -173,7 +173,45 @@ final class RelDistributionUtils {
     }
 
     /**
-     * For the condition of form "T1.c1 = T2.c2", the c1/c2 indexes are based on the joined table with columns coming
+     * Given a pair of RexInputRef returns a pair corresponding column indexes (inner, outer)
+     * @param leftConj
+     * @param rightConj
+     * @return
+     */
+    private static Optional<Pair<Integer, Integer>> pairInputRefToIndexPair(RexNode leftConj, RexNode rightConj) {
+        if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
+            return Optional.empty();
+        } else {
+            final int col1 = ((RexInputRef) leftConj).getIndex(),
+                    col2 = ((RexInputRef) rightConj).getIndex();
+            if (col1 < col2) {
+                return Optional.of(Pair.of(col1, col2));
+            } else {
+                return Optional.of(Pair.of(col2, col1));
+            }
+        }
+    }
+
+    /**
+     * Given a pair of expressions returns an Optional pair corresponding column indexes (inner, outer)
+     * if both expressions are "IS NULL(column)" expression or an empty optional otherwise
+     *
+     * @param leftConj
+     * @param rightConj
+     * @return
+     */
+    private static Optional<Pair<Integer, Integer>> pairIsNullToIndePair(RexNode leftConj, RexNode rightConj) {
+        if (!(leftConj.isA(SqlKind.IS_NULL)) || !(rightConj.isA(SqlKind.IS_NULL))) {
+            return Optional.empty();
+        } else {
+            return pairInputRefToIndexPair(((RexCall) leftConj).getOperands().get(0),
+                    ((RexCall) rightConj).getOperands().get(0));
+        }
+    }
+
+    /**
+     * For the condition of form "T1.c1 = T2.c2" or "T1.c1 IS NOTDISTINCT FROM T2.c2",
+     * the c1/c2 indexes are based on the joined table with columns coming
      * from both tables. Return [c1, c2] such that c1 < c2 (i.e. if they come from different table, then c1 comes from
      * outer table and c2 from inner table).
      * For other forms of join condition, return null.
@@ -181,22 +219,30 @@ final class RelDistributionUtils {
      * @return ordered indexes of column references.
      */
     private static Optional<Pair<Integer, Integer>> getJoiningColumns(RexCall joinCondition) {
-        if (! joinCondition.isA(SqlKind.EQUALS)) {
-            return Optional.empty();
-        } else {
+        if (joinCondition.isA(SqlKind.EQUALS)) {
             final RexNode leftConj = uncast(joinCondition.getOperands().get(0)),
                     rightConj = uncast(joinCondition.getOperands().get(1));
-            if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
-                return Optional.empty();
-            } else {
-                final int col1 = ((RexInputRef) leftConj).getIndex(),
-                        col2 = ((RexInputRef) rightConj).getIndex();
-                if (col1 < col2) {
-                    return Optional.of(Pair.of(col1, col2));
-                } else {
-                    return Optional.of(Pair.of(col2, col1));
+            return pairInputRefToIndexPair(leftConj, rightConj);
+        } else if (joinCondition.isA(SqlKind.CASE)) {
+            // A T1.c1 IS NOTDISTINCT FROM T2.c2 condition get converted to a CASE expression
+            // CASE
+            //      WHEN T1.c1 IS NULL THEN t2.c2 IS NULL
+            //      WHEN T2.c2 IS NULL THEN t1.c1 IS NULL
+            //      ELSE NOT NULL CAST(T1.C1) = NOT NULL CAST(T2.C2)
+            // END
+            int operandsCount = joinCondition.getOperands().size();
+            RexNode last = joinCondition.getOperands().get(operandsCount - 1);
+            if (operandsCount == 5 && last instanceof RexCall) {
+                Optional<Pair<Integer, Integer>> p1 = pairIsNullToIndePair(joinCondition.getOperands().get(0), joinCondition.getOperands().get(1));
+                Optional<Pair<Integer, Integer>> p2 = pairIsNullToIndePair(joinCondition.getOperands().get(2), joinCondition.getOperands().get(3));
+                Optional<Pair<Integer, Integer>> p3 = getJoiningColumns((RexCall)last);
+                if (p1.equals(p2) && p1.equals(p3)) {
+                    return p3;
                 }
             }
+            return Optional.empty();
+        } else {
+            return Optional.empty();
         }
     }
 
@@ -506,33 +552,30 @@ final class RelDistributionUtils {
         JoinState finalSetOpState = setOpNodes.stream().reduce(
                 initSetOpState,
                 (currentState, nextChild) -> {
-                    final RelDistribution nextDist = getDistribution(nextChild);
-                    if (!currentState.isSP() || !nextDist.getIsSP()) {
-                        // Either accumulated state or the next child is a MP and the whole result is MP
-                        return new JoinState(false, currentState.getLiteral(), currentState.getPartCols());
-                    } else {
-                        // Accumulated state and the next child are both SP.
-                        // Make sure their partitioning values are compatible
-                        RexNode currentPartitioningValue = currentState.getLiteral();
-                        RexNode nextPartitioningValue = nextDist.getPartitionEqualValue();
-                        if (currentPartitioningValue != null && nextPartitioningValue != null) {
-                            if (currentPartitioningValue.equals(nextPartitioningValue)) {
-                                // Same partitioning value
-                                return currentState;
-                            } else {
-                                // Partitioning values do not match. SetOp is MP
-                                return new JoinState(false, currentPartitioningValue, currentState.getPartCols());
-                            }
-                        } else {
-                            if (currentPartitioningValue == null) {
-                                // All previous nodes were replicated and the next one is a MP with non-null
-                                // partitioning value
-                                return new JoinState(true, nextPartitioningValue, Sets.newHashSet(nextDist.getKeys()));
-                            } else {
-                                // The next child is replicated
-                                return currentState;
+                    RelDistribution nextDist = getDistribution(nextChild);
+                    final boolean currentIsPartitioned = !currentState.getPartCols().isEmpty(),
+                            nextIsPartitioned = nextDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !nextDist.getIsSP();
+                    if (!currentIsPartitioned && !nextIsPartitioned) {
+                        // SP SetOP so far. Combined partitioning state is still the same
+                        return currentState;
+                    } else if (currentIsPartitioned) {
+                        if (nextIsPartitioned) {
+                            // The current state and the next child are both MP.
+                            // Need to make sure they have compatible partitioning
+                            RexNode currentPartValue = currentState.getLiteral();
+                            RexNode nextPartValue = nextDist.getPartitionEqualValue();
+                            if (currentPartValue == null || !currentPartValue.equals(nextPartValue)) {
+                                throw new PlanningErrorException("SQL error while compiling query: " +
+                                        "Statements are too complex in set operation using multiple partitioned tables.");
                             }
                         }
+                        // Either the next child is SP or partitioning values match
+                        return currentState;
+                    } else {
+                        assert (nextIsPartitioned);
+                        // All previous children are SP and this is the first MP one
+                        final Set<Integer> nextPartColumns = getPartitionColumns(nextChild);
+                        return new JoinState(false, nextDist.getPartitionEqualValue(), nextPartColumns);
                     }
                 },
                 (currentState, nextState) -> nextState);
@@ -575,10 +618,23 @@ final class RelDistributionUtils {
                         innerPartColumns.stream().map(col -> col + outerTableColumns).collect(Collectors.toSet()),
                 combinedPartColumns = new HashSet<>(outerPartColumns);
         combinedPartColumns.addAll(adjustedInnerPartColumns);
-        final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
-                innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
+        final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !outerDist.getIsSP(),
+                innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED || !innerDist.getIsSP(),
                 outerHasPartitionKey = outerDist.getPartitionEqualValue() != null,
-                innerHasPartitionKey = innerDist.getPartitionEqualValue() != null;
+                innerHasPartitionKey = innerDist.getPartitionEqualValue() != null,
+                outerHasExchange = outerDist.getType() == RelDistribution.Type.SINGLETON && !outerDist.getIsSP(),
+                innerHasExchange = innerDist.getType() == RelDistribution.Type.SINGLETON && !innerDist.getIsSP();
+
+        if ((outerHasExchange && innerIsPartitioned) ||
+                (innerHasExchange && outerIsPartitioned)) {
+            // Both relations are partitioned; and one of them already has an Exchange node.
+            // Since a join is distributed and would also require an Exchange node to be added
+            // on top it, the final plan would have two Exchanges resulting in more than one
+            // coordinator fragment.
+            throw new PlanningErrorException("SQL error while compiling query: " +
+                    "This join is too complex using multiple partitioned tables");
+        }
+
         final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());
         switch (join.getJoinType()) {
             case INNER:
@@ -589,6 +645,16 @@ final class RelDistributionUtils {
                             // join condition might be false (TestBooleanLiteralsSuite)
                             return new JoinState(true, srcLitera, combinedPartColumns);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
+                            // if outer and / or inner  has partitioning key they better match
+                            // because the join's condition is a LITERAL and doesn't have an equality expression
+                            // involving partitioning columns
+                            if ((outerHasPartitionKey &&
+                                    !outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) ||
+                                    (innerHasPartitionKey &&
+                                            !innerDist.getPartitionEqualValue().equals(outerDist.getPartitionEqualValue()))) {
+                                throw new PlanningErrorException("SQL error while compiling query: " +
+                                        "Outer and inner statements use conflicting partitioned table filters.");
+                            }
                             return new JoinState(
                                     outerDist.getIsSP() && innerDist.getIsSP() && (! outerHasPartitionKey ||   // either outer is replicated (SINGLE); or partitioned with a key
                                             outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())),
@@ -615,6 +681,11 @@ final class RelDistributionUtils {
                                 outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) {
                             // Both relations are partitioned with keys, and they are equal --> SP
                             return new JoinState(true, srcLitera, combinedPartColumns);
+                        } else if (outerIsPartitioned && innerIsPartitioned) {
+                            // Both are partitioned but thepartitioning columns don't match
+                            // and no partitioning filters. Not plannable
+                            throw new PlanningErrorException("SQL error while compiling query: " +
+                                    "This join is too complex using multiple partitioned tables");
                         } else {
                             return new JoinState(false, srcLitera, combinedPartColumns);
                         }
@@ -700,7 +771,23 @@ final class RelDistributionUtils {
                 } else { // else Both are replicated or SP subqueries: SP
                     return new JoinState(true, srcLitera, combinedPartColumns);
                 }
-            default: // Not inner-join type involving at least a partitioned table
+            default: // Outer join type involving at least a partitioned table
+                // If both sides are partitioned they better be joined on the respective
+                // partitioning columns
+                if (outerIsPartitioned && innerIsPartitioned) {
+                    assert join.getCondition() instanceof RexCall;
+                    final RexCall joinCondition = (RexCall) join.getCondition();
+                    final Set<Set<Integer>> joinColumnSets = getAllJoiningColumns(joinCondition);
+                    // Check that partition columns must be in equal-relations
+                    final Set<Integer> equalPartitionColumns =
+                            searchEqualPartitionColumns(
+                                    joinColumnSets, outerPartColumns, innerPartColumns, outerTableColumns);
+                    if (equalPartitionColumns.isEmpty()) {
+                        throw new PlanningErrorException("SQL error while compiling query: " +
+                                "This query is not plannable.  " +
+                                "The planner cannot guarantee that all rows would be in a single partition.");
+                    }
+                }
                 return new JoinState(!outerIsPartitioned && !innerIsPartitioned, srcLitera, combinedPartColumns);
         }
     }

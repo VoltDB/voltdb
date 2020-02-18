@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexProgram;
@@ -30,7 +29,6 @@ import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
 import com.google.common.base.Preconditions;
@@ -44,41 +42,15 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
 
-    private final int m_splitCount;
-
     public VoltPhysicalCalc(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
-        m_splitCount = splitCount;
     }
 
     @Override
     public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
-        return new VoltPhysicalCalc(getCluster(), traitSet, child, program, m_splitCount);
-    }
-
-    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program, int splitCount) {
-        return new VoltPhysicalCalc(getCluster(), traitSet, child, program, splitCount);
-    }
-
-    @Override
-    public int getSplitCount() {
-        return m_splitCount;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
-        return digest;
-    }
-
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("split", m_splitCount);
-        return pw;
+        return new VoltPhysicalCalc(getCluster(), traitSet, child, program);
     }
 
     @Override

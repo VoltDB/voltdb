@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -81,9 +81,6 @@ public class AsyncExportClient
     static VoltLogger log = new VoltLogger("ExportClient");
     // Transactions between catalog swaps.
     public static long CATALOG_SWAP_INTERVAL = 500000;
-
-    // used by table export (change data capture) mode
-    // String queuedOp[] = {"INSERT", "DELETE", "UPDATE" };
 
     static class AsyncCallback implements ProcedureCallback
     {
@@ -196,7 +193,6 @@ public class AsyncExportClient
     private static final AtomicLong NoConnectionsExceptionsCount = new AtomicLong(0);
     private static final AtomicLong OtherProcCallExceptionCount = new AtomicLong(0);
 
-    private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
 
     // Connection reference
@@ -241,7 +237,6 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "catalog_swap", "Swap catalogs from the client", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
@@ -253,7 +248,6 @@ public class AsyncExportClient
             config = new ConnectionConfig(apph);
 
             // Retrieve parameters
-            final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             // Validate parameters
@@ -315,9 +309,7 @@ public class AsyncExportClient
 
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
-            int swap_count = 0;
             Random r = new Random();
-            boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
                 long currentRowId = rowId.incrementAndGet();
@@ -364,14 +356,6 @@ public class AsyncExportClient
                         e.printStackTrace();
                         System.exit(-1);
                     }
-                }
-
-                swap_count++;
-                if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
-                {
-                    log.info("Changing catalogs...");
-                    clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
-                    first_cat = !first_cat;
                 }
             }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,6 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount,
             boolean isCoordinatorAggr) {
         super(cluster,
                 traitSet,
@@ -53,29 +52,6 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                splitCount,
-                isCoordinatorAggr);
-    }
-
-    public VoltPhysicalHashAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate,
-            boolean isCoordinatorAggr) {
-        this(cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                1,
                 isCoordinatorAggr);
     }
 
@@ -99,32 +75,8 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 getPostPredicate(),
-                getSplitCount(),
                 getIsCoordinatorAggr());
     }
-
-    public VoltPhysicalHashAggregate copy(RelTraitSet traitSet,
-                                          RelNode input,
-                                          boolean indicator,
-                                          ImmutableBitSet groupSet,
-                                          List<ImmutableBitSet> groupSets,
-                                          List<AggregateCall> aggCalls,
-                                          int splitCount,
-                                          boolean isCoordinatorAggr
-    ) {
-        return new VoltPhysicalHashAggregate(
-                getCluster(),
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                getPostPredicate(),
-                splitCount,
-                isCoordinatorAggr);
-    }
-
 
     @Override
     public VoltPhysicalHashAggregate copy(
@@ -136,7 +88,6 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            int splitCount,
             boolean isCoordinatorAggr) {
         return new VoltPhysicalHashAggregate(
                 cluster,
@@ -147,7 +98,6 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 havingExpression,
-                splitCount,
                 isCoordinatorAggr);
 
     }

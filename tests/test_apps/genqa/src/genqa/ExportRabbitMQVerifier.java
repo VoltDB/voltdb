@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,7 +112,7 @@ public class ExportRabbitMQVerifier {
                     startTime = now;
                 } else if (now - startTime > MAX_STALL_TIMEOUT_SECS*1000) {
                     success = false;
-                    log.error(String.format("export stalled for %d minutes, failing", MAX_STALL_TIMEOUT_SECS));
+                    log.error(String.format("export stalled for %d seconds, failing", MAX_STALL_TIMEOUT_SECS));
                     break;
                 }
                 Thread.sleep(5000);

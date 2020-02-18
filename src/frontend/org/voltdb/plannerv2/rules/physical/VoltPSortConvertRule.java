@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import org.apache.calcite.rel.core.Sort;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
-import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link Sort} to {@link VoltPhysicalSort}.
@@ -43,12 +42,11 @@ public class VoltPSortConvertRule extends ConverterRule {
     @Override
     public RelNode convert(RelNode rel) {
         final Sort sort = (Sort) rel;
-        final RelTraitSet traits = sort.getInput().getTraitSet().replace(VoltPhysicalRel.CONVENTION);
+        final RelTraitSet traits = sort.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
         final RelNode input = sort.getInput();
         final RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
-        final int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
         return new VoltPhysicalSort(sort.getCluster(), traits.plus(sort.getCollation()), convertedInput,
-                sort.getCollation(), splitCount);
+                sort.getCollation(), false);
     }
 }

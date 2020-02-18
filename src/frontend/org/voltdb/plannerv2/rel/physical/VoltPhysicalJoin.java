@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,7 +83,6 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone)
                 .itemIf("whereCondition", whereCondition, whereCondition != null)
-                .item("split", 1)
                 .itemIf("offset", m_offset, m_offset != null)
                 .itemIf("limit", m_limit, m_limit != null);
     }
@@ -108,12 +107,6 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
 
     public List<RelDataTypeField> getSystemFieldList() {
         return systemFieldList;
-    }
-
-    // NOTE: we set this to 1 for SP queries.
-    @Override
-    public int getSplitCount() {
-        return 1;
     }
 
     protected void setOutputSchema(AbstractJoinPlanNode node) {

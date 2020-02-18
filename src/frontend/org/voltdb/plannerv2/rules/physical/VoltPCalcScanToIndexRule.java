@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,9 @@ import java.util.Optional;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLocalRef;
@@ -97,12 +99,16 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
                 } catch (JSONException e) {
                     indexCollation = null;
                 }
+                // Make sure we preserve Calc's distribution including partitioning value
+                // within a new index scan
+                RelTraitSet scanTraits = scan.getTraitSet().replace(
+                        calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE));
                 Preconditions.checkNotNull(indexCollation);
                 final RelNode nextIndexScan = new VoltPhysicalTableIndexScan(
-                        scan.getCluster(), scan.getTraitSet(), scan.getTable(), scan.getVoltTable(),
+                        scan.getCluster(), scanTraits, scan.getTable(), scan.getVoltTable(),
                         mergedProgram, index, accessPathData.left, scan.getLimitRexNode(), scan.getOffsetRexNode(),
                         scan.getAggregateRelNode(), scan.getPreAggregateRowType(), scan.getPreAggregateProgram(),
-                        scan.getSplitCount(), indexCollation, false);
+                        indexCollation, false);
                 equiv.put(nextIndexScan, calc);
             });
         }

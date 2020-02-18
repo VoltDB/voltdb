@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -197,7 +197,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                         innerScan.getCluster(), innerScan.getTraitSet(), innerScan.getTable(),
                         innerScan.getVoltTable(), innerScan.getProgram(), index, accessPath,
                         innerScan.getLimitRexNode(), innerScan.getOffsetRexNode(), null,
-                        null, null, innerScan.getSplitCount(),
+                        null, null,
                         indexCollation, true);
                 final RelNode innerChild;
                 if (call.rels.length == 3) {

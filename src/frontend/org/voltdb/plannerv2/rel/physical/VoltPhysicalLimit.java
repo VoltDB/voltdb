@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -43,25 +42,30 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     private final RexNode m_offset;
     private final RexNode m_limit;
 
-    private final int m_splitCount;
+    // In a partitioned query Limit could be pushed down to fragments
+    // by the LimitExchange Transpose Rule -
+    // Limit / RenNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
 
     public VoltPhysicalLimit(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit,
+            boolean isPushedDown) {
         super(cluster, traitSet, input);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
         m_limit = limit;
-        m_splitCount = splitCount;
+        m_isPushedDown = isPushedDown;
     }
 
     public VoltPhysicalLimit copy(
-            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, splitCount);
+            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, boolean isPushedDown) {
+        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, isPushedDown);
     }
 
     @Override
     public VoltPhysicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
-        return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
+        return copy(traitSet, sole(inputs), m_offset, m_limit, m_isPushedDown);
     }
 
     public RexNode getOffset() {
@@ -72,20 +76,17 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         return m_limit;
     }
 
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("split", m_splitCount);
-        pw.itemIf("limit", m_limit, m_limit != null);
-        pw.itemIf("offset", m_offset, m_offset != null);
-        return pw;
+    public boolean isPushedDown() {
+        return m_isPushedDown;
     }
 
     @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_split_" + m_splitCount;
-        return digest;
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.itemIf("limit", m_limit, m_limit != null);
+        pw.itemIf("offset", m_offset, m_offset != null);
+        pw.item("pusheddown", m_isPushedDown);
+        return pw;
     }
 
     @Override
@@ -103,19 +104,8 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     }
 
     @Override
-    public int getSplitCount() {
-        return m_splitCount;
-    }
-
-    @Override
     public AbstractPlanNode toPlanNode() {
-        final LimitPlanNode lpn = new LimitPlanNode();
-        if (m_limit != null) {
-            lpn.setLimit(RexLiteral.intValue(m_limit));
-        }
-        if (m_offset != null) {
-            lpn.setOffset(RexLiteral.intValue(m_offset));
-        }
+        final LimitPlanNode lpn = toPlanNode(m_limit, m_offset);
 
         if (this.getInput() != null) {
             // Limit is not inlined
@@ -131,7 +121,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (limit != null) {
             if (limit instanceof RexDynamicParam) {
                 lpn.setLimit(-1);
-                lpn.setLimitParameterIndex(RexConverter.PARAM_COUNTER.getAndIncrement());
+                lpn.setLimitParameterIndex(((RexDynamicParam) limit).getIndex());
             } else {
                 lpn.setLimit(RexLiteral.intValue(limit));
             }
@@ -139,7 +129,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (offset != null) {
             if (offset instanceof RexDynamicParam) {
                 lpn.setOffset(0);
-                lpn.setOffsetParameterIndex(RexConverter.PARAM_COUNTER.getAndIncrement());
+                lpn.setOffsetParameterIndex(((RexDynamicParam) offset).getIndex());
             } else {
                 lpn.setOffset(RexLiteral.intValue(offset));
             }
