@@ -688,6 +688,7 @@ namespace voltdb {
                 void advance();
                 container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
+                list_iterator_type& list_iterator() noexcept;
                 operator position_type() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
@@ -714,6 +715,25 @@ namespace voltdb {
             static iterator begin(Chunks&);
             static const_iterator cbegin(Chunks const&);
             static const_iterator begin(Chunks const&);
+
+            /**
+             * Special iterator that survives multiple txns.
+             */
+            class elastic_iterator :
+                iterator_type<iterator_permission_type::ro, iterator_view_type::txn> {
+                using super = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
+                using container_type = typename super::container_type;
+                using value_type = typename super::value_type;
+                size_t m_chunkId;
+                void refresh();
+            public:
+                elastic_iterator(container_type);
+                static elastic_iterator begin(container_type);
+                bool drained() noexcept;
+                elastic_iterator& operator++();
+                elastic_iterator operator++(int);
+                value_type operator*();
+            };
 
             /**
              * Iterators with callback, applied when

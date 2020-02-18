@@ -984,6 +984,13 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::list_iterat
 }
 
 template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::list_iterator_type&
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::list_iterator() noexcept {
+    return m_iter;
+}
+
+template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::begin(
@@ -1109,7 +1116,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator++(int) {
-    decltype(*this) copy(*this);
+    decltype(*this) const copy(*this);
     advance();
     return copy;
 }
@@ -1125,6 +1132,77 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::drained() const noexcept {
     return m_cursor == nullptr;
+}
+
+template<typename Chunks, typename Tag, typename E> inline
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::elastic_iterator(
+        typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) :
+    super(c), m_chunkId(super::list_iterator()->id()) {}
+
+template<typename Chunks, typename Tag, typename E> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::begin(
+        typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) {
+    return {c};
+}
+
+template<typename Chunks, typename Tag, typename E> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
+    if (super::drained()) {
+        return true;
+    } else if (super::storage().empty() ||
+            less<position_type>()(*super::storage().last(), *this)) {
+        super::m_cursor = nullptr;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+template<typename Chunks, typename Tag, typename E> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::refresh() {
+    if (! drained()) {
+        auto const& indexBeg = super::storage().beginTxn().first;
+        if (less_rolling(m_chunkId, indexBeg.id())) {         // current chunk list iterator is stale
+            m_chunkId = (super::list_iterator() = indexBeg)->id();
+            super::m_cursor = super::list_iterator()->begin();
+        } else if (! super::list_iterator().contains(super::m_cursor)) {
+            // Current chunk has been partially compacted,
+            // to the extent that cursor position is stale
+            super::m_cursor =
+                ++super::list_iterator() == super::storage().end() ?        // drained
+                nullptr : super::list_iterator()->begin();
+        }
+    }
+}
+
+template<typename Chunks, typename Tag, typename E> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::super::value_type
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::operator*() {
+    refresh();
+    return super::operator*();
+}
+
+template<typename Chunks, typename Tag, typename E> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator&
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::operator++() {
+    refresh();
+    super::advance();
+    if (! drained()) {
+        m_chunkId = super::list_iterator()->id();
+    }
+}
+
+template<typename Chunks, typename Tag, typename E> inline
+typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::operator++(int) {
+    decltype(*this) const copy(*this);
+    refresh();
+    super::advance();
+    if (! drained()) {
+        m_chunkId = super::list_iterator()->id();
+    }
+    return copy;
 }
 
 template<typename Chunks, typename Tag, typename E>
