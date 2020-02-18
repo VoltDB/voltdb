@@ -168,8 +168,8 @@ public class KafkaImportBenchmark {
         @Option(desc = "password.")
         String password = "";
 
-        @Option(desc = "Disenable topology awareness")
-        boolean no_topologyaware = false;
+        @Option(desc = "Enable topology awareness")
+        boolean topologyaware = false;
 
         @Override
         public void validate() {
@@ -229,10 +229,9 @@ public class KafkaImportBenchmark {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
+        clientConfig.setReconnectOnConnectionLoss(true);
 
-        if (config.no_topologyaware) {
-            clientConfig.setReconnectOnConnectionLoss(true);
-        } else {
+        if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }
 
