@@ -31,9 +31,7 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 
 /*
- * adapted from JiggleSinglePartitionWithDeletionExport.java. not sure what's jiggling so left that off this class name
- *
- * the difference is tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
+ * tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
  */
 public class TableExport extends VoltProcedure {
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM export_partitioned_table_loopback WHERE rowid = ? ORDER BY rowid"); // don't try these on a STREAM

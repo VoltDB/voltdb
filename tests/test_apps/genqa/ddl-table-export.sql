@@ -225,18 +225,14 @@ CREATE TABLE  export_replicated_table EXPORT TO TARGET abc ON insert, delete, up
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 
--- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
--- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
+
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
--- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
--- CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;

@@ -356,7 +356,6 @@ CREATE INDEX export_replicated_table_jdbc_idx ON  export_replicated_table_jdbc(t
 
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
-CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
 
