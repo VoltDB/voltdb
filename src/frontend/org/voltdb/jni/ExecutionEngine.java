@@ -55,6 +55,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
@@ -971,6 +972,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets);
 
+    /**
+     * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
+     * deleteOlderThan
+     *
+     * @param undoToken       to be used for this transaction
+     * @param deleteOlderThan timestamp to use to select what offsets should be deleted
+     */
+    public abstract void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -1354,6 +1364,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * @param pointer   to execution engine
      * @param undoToken to use to be able to rollback the store
+     * @return 0 on succes otherwise 1
      */
     native static protected int nativeStoreKiplingGroup(long pointer, long undoToken);
 
@@ -1363,6 +1374,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer   to execution engine
      * @param undoToken to use to be able to rollback the delete
      * @param groupId   of the group to delete
+     * @return 0 on success otherwise 1
      */
     native static protected int nativeDeleteKiplingGroup(long pointer, long undoToken, byte[] groupId);
 
@@ -1373,7 +1385,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param maxResponse  size for any response. If {@code <= 0} this is a continue of a fetch else a new fetch will be
      *                     started
      * @param startGroupId Non inclusive groupId from which to start fetching groups
-     * @return {@code true} if there are more groups to fetch
+     * @return 0 on success otherwise 1
      */
     native static protected int nativeFetchKiplingGroups(long pointer, int maxResponse, byte[] startGroupId);
 
@@ -1383,9 +1395,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * @param pointer        to execution engine
      * @param spUniqueId     for this transaction
-     * @param undoToken      to use to be able to rollback the delete
+     * @param undoToken      to use to be able to rollback the commit
      * @param requestVersion of the kipling request
      * @param groupId        of the group these offsets should be associated with
+     * @return 0 on success otherwise 1
      */
     native static protected int nativeCommitKiplingGroupOffsets(long pointer, long spUniqueId, long undoToken,
             short requestVersion, byte[] groupId);
@@ -1397,8 +1410,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer        to execution engine
      * @param requestVersion of the kipling request
      * @param groupId        of the group to fetch offsets from
+     * @return 0 on success otherwise 1
      */
     native static protected int nativeFetchKiplingGroupOffsets(long pointer, short requestVersion, byte[] groupId);
+
+    /**
+     * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
+     * deleteOlderThan
+     *
+     * @param pointer         to execution engine
+     * @param undoToken       to use to be able to rollback the delete
+     * @param deleteOlderThan timestamp to use to select what offsets should be deleted
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeDeleteExpiredKiplingOffsets(long pointer, long undoToken, long deleteOlderThan);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

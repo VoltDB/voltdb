@@ -634,6 +634,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int32_t fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
 
+        /*
+         * Delete expired offsets of standalone groups
+         */
+        int32_t deleteExpiredKiplingOffsets(int64_t undoToken, int64_t deleteOlderThan);
+
     private:
         /*
          * Tasks dispatched by executeTask

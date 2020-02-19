@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.types.TimestampType;
 
 public interface KiplingSystemTableConnection {
     /**
@@ -65,4 +66,12 @@ public interface KiplingSystemTableConnection {
      * @return response to requester
      */
     byte[] fetchGroupOffsets(short requestVersion, String groupId, byte[] offsets);
+
+    /**
+     * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
+     * deleteOlderThan
+     *
+     * @param deleteOlderThan timestamp to use to select what offsets should be deleted
+     */
+    void deleteExpiredOffsets(TimestampType deleteOlderThan);
 }

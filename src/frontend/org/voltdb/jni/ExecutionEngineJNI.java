@@ -50,6 +50,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.SerializationHelper;
 
 
@@ -1195,6 +1196,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         } catch (IOException e) {
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+        checkErrorCode(nativeDeleteExpiredKiplingOffsets(pointer, undoToken, deleteOlderThan.getTime()));
     }
 
     private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {

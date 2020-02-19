@@ -112,6 +112,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SystemTable;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -2065,5 +2066,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public byte[] fetchGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
         return m_ee.fetchKiplingGroupOffsets(requestVersion, groupId, offsets);
+    }
+
+    @Override
+    public void deleteExpiredOffsets(TimestampType deleteOlderThan) {
+        m_ee.deleteExpiredKiplingOffsets(getNextUndoToken(), deleteOlderThan);
     }
 }
