@@ -3193,6 +3193,17 @@ int32_t VoltDBEngine::fetchKiplingGroupOffsets(int16_t requestVersion, const NVa
     return 1;
 }
 
+int32_t VoltDBEngine::deleteExpiredKiplingOffsets(int64_t undoToken, int64_t deleteOlderThan) {
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->deleteExpiredOffsets(deleteOlderThan);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
 void VoltDBEngine::loadBuiltInJavaFunctions() {
     // Hard code the info of format_timestamp function
     UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();

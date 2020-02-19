@@ -1758,5 +1758,20 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetch
     return 1;
 }
 
-
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeDeleteExpiredKiplingOffsets
+ * Signature: (JJJ)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteExpiredKiplingOffsets
+  (JNIEnv *env, jclass clazz, jlong pointer, jlong undoToken, jlong deleteOlderThan) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        return engine->deleteExpiredKiplingOffsets(undoToken, deleteOlderThan);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
 /** @} */ // end of JNI doxygen group

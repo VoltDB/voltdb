@@ -252,6 +252,7 @@ private:
     void fetchKiplingGroups(struct ipc_command *cmd);
     void commitKiplingGroupOffsets(struct ipc_command *cmd);
     void fetchKiplingGroupOffsets(struct ipc_command *cmd);
+    void deleteExpiredKiplingOffsets(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
@@ -443,6 +444,11 @@ typedef struct {
     char data[0]; // After groupId is offsets
 }__attribute__((packed)) fetch_kipling_group_offsets;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t undoToken;
+    int64_t deleteOlderThan;
+}__attribute__((packed)) delete_expired_kipling_offsets;
 
 typedef struct {
     struct ipc_command cmd;
@@ -657,23 +663,21 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 35:
           storeKiplingGroup(cmd);
-          result = kErrorCode_None;
           break;
       case 36:
           deleteKiplingGroup(cmd);
-          result = kErrorCode_None;
           break;
       case 37:
           fetchKiplingGroups(cmd);
-          result = kErrorCode_None;
           break;
       case 38:
            commitKiplingGroupOffsets(cmd);
-           result = kErrorCode_None;
            break;
        case 39:
            fetchKiplingGroupOffsets(cmd);
-           result = kErrorCode_None;
+           break;
+       case 40:
+           deleteExpiredKiplingOffsets(cmd);
            break;
       default:
         result = stub(cmd);
@@ -1725,6 +1729,16 @@ void VoltDBIPC::fetchKiplingGroupOffsets(struct ipc_command *cmd) {
         }
         const int32_t size = m_engine->getResultsSize();
         writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::deleteExpiredKiplingOffsets(struct ipc_command *cmd) {
+    delete_expired_kipling_offsets *msg = (delete_expired_kipling_offsets*) cmd;
+    try {
+        sendResponseOrException(
+                (uint8_t) m_engine->deleteExpiredKiplingOffsets(ntohll(msg->undoToken), ntohll(msg->deleteOlderThan)));
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }

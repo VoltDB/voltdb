@@ -37,6 +37,7 @@ import org.voltdb.exceptions.SQLException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.types.TimestampType;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -304,6 +305,11 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
         throw new UnsupportedOperationException();
     }
 

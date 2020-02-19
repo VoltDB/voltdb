@@ -54,6 +54,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
@@ -146,7 +147,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , DeleteKiplingGroup(36)
         , FetchKiplingGroups(37)
         , CommitKiplingGroupOffsets(38)
-        , FetchKiplingGroupOffsets(39);
+        , FetchKiplingGroupOffsets(39)
+        , DeleteExpiredKiplingOffsets(40);
 
         Commands(final int id) {
             m_id = id;
@@ -2130,6 +2132,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.readStatusByte();
             int length = m_connection.readInt();
             return m_connection.getBytes(length).array();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+        verifyDataCapacity(Long.BYTES * 2);
+
+        m_data.clear();
+        m_data.putInt(Commands.DeleteExpiredKiplingOffsets.m_id);
+        m_data.putLong(undoToken);
+        m_data.putLong(deleteOlderThan.getTime());
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
         } catch (final IOException e) {
             e.printStackTrace();
             throw new RuntimeException(e);

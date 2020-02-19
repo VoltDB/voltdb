@@ -685,6 +685,9 @@ public class SystemProcedureCatalog {
         builder.put("@FetchKiplingGroupOffsets",
                 Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroupOffsets", VoltType.STRING)
                         .commercial().readOnly().build());
+        builder.put("@DeleteExpiredKiplingOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteExpiredOffsets", -1, VoltType.INVALID)
+                        .commercial().build());
 
         listing = builder.build();
     }
