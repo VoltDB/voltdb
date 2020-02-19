@@ -22,8 +22,11 @@
 namespace voltdb {
 namespace kipling {
 
-void GroupOffset::visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(GroupOffset&)> visitor) {
-    PersistentTable* table = tables.getGroupOffsetTable();
+/*
+ * Internal visit which visits the tuples of all offsets for the given groupId
+ */
+void GroupOffset::visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(TableTuple&)> visitor) {
+    PersistentTable *table = tables.getGroupOffsetTable();
     TableIndex *index = table->primaryKeyIndex();
 
     TableTuple searchKey(index->getKeySchema());
@@ -37,13 +40,37 @@ void GroupOffset::visitAll(const GroupTables& tables, const NValue& groupId, std
     index->moveToKeyOrGreater(&searchKey, cursor);
 
     TableTuple next;
-    while (!(next = index->nextValue(cursor)).isNullTuple()) {
-        if (next.getNValue(static_cast<int32_t>(GroupOffsetTable::Column::GROUP_ID)) != groupId) {
-            break;
-        }
+    while (!(next = index->nextValue(cursor)).isNullTuple()
+            && next.getNValue(static_cast<int32_t>(GroupOffsetTable::Column::GROUP_ID)) == groupId) {
+        visitor(next);
+    }
+}
 
-        GroupOffset offset(tables, next, groupId);
+void GroupOffset::visitAll(const GroupTables& tables, const NValue& groupId,
+        std::function<void(const GroupOffset&)> visitor) {
+    visitAll(tables, groupId, [&tables, &groupId, &visitor](TableTuple& tuple) {
+        GroupOffset offset(tables, tuple, groupId);
         visitor(offset);
+    });
+}
+
+void GroupOffset::deleteIf(const GroupTables& tables, const NValue& groupId,
+        std::function<bool(const GroupOffset&)> predicate) {
+    std::vector<GroupOffset*> toDelete;
+
+    visitAll(tables, groupId, [&tables, &groupId, &predicate, &toDelete](TableTuple& tuple) {
+        GroupOffset *offset = new GroupOffset(tables, tuple, groupId);
+        if (predicate(*offset)) {
+            toDelete.push_back(offset);
+        } else {
+            delete offset;
+        }
+    });
+
+    for (auto offset : toDelete) {
+        offset->markForDelete();
+        offset->commit(0L);
+        delete offset;
     }
 }
 

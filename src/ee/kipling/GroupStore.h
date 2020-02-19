@@ -88,6 +88,12 @@ public:
     void fetchOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& topicPartitions,
             SerializeOutput& out);
 
+    /**
+     * Delete the offsets of standalone groups which are older than the given timestmap
+     * @param deleteOlderThan any offsets older than this will be deleted
+     */
+    void deleteExpiredOffsets(const int64_t deleteOlderThan);
+
     // Satisfy the GroupTables interface
     PersistentTable* getGroupTable() const override { return m_group; }
     PersistentTable* getGroupMemberTable() const override { return m_groupMember; }

@@ -119,6 +119,28 @@ TEST_F(GroupOrmTest, GroupInsert) {
     upsertGroup(groupId, 1, 2, leader, protocol);
 
     EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+    ASSERT_EQ(0, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+}
+
+TEST_F(GroupOrmTest, GroupStandaloneInsert) {
+    NValue groupId = ValueFactory::getTempStringValue("myGroupId");
+
+    Group group(*this, groupId);
+    EXPECT_FALSE(group.isInTable());
+    EXPECT_FALSE(group.isDirty());
+
+    EXPECT_EQ(0, getGroupTable()->activeTupleCount());
+
+    upsertGroup(groupId, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+    EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+    ASSERT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+
+    int count = 0;
+    Group::visitStandaloneGroups(*this, [this, groupId, &count] (const NValue &actualGroupId) mutable {
+        ASSERT_EQ(groupId, actualGroupId);
+        ++count;
+    });
+    ASSERT_EQ(1, count);
 }
 
 /*
@@ -156,31 +178,64 @@ TEST_F(GroupOrmTest, GroupUpdate) {
     protocol = ValueFactory::getTempStringValue("MyProtocol");
     upsertGroup(groupId, timestamp, generationId, leader, protocol);
     EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+
+    // Convert to standalone group and back
+    EXPECT_EQ(0, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+    upsertGroup(groupId, timestamp, generationId, leader, ValueFactory::getNullStringValue());
+    EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+    EXPECT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+
+    upsertGroup(groupId, timestamp, generationId, leader, protocol);
+    EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+    EXPECT_EQ(0, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
 }
 
 /*
  * Test deleting a group
  */
 TEST_F(GroupOrmTest, GroupDelete) {
-    NValue groupId = ValueFactory::getTempStringValue("myGroupId");
+    NValue groupId1 = ValueFactory::getTempStringValue("myGroupId1");
+    NValue groupId2 = ValueFactory::getTempStringValue("myGroupId2");
     NValue leader = ValueFactory::getTempStringValue("leader");
     NValue protocol = ValueFactory::getTempStringValue("protocol");
 
     EXPECT_EQ(0, getGroupTable()->activeTupleCount());
 
-    upsertGroup(groupId, 1, 2, leader, protocol);
+    upsertGroup(groupId1, 1, 2, leader, protocol);
+    // Create standalone group
+    upsertGroup(groupId2, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
 
-    Group group(*this, groupId);
-    group.markForDelete();
-    EXPECT_TRUE(group.isDirty());
-    EXPECT_TRUE(group.isDeleted());
+    // Delete standalone group
+    EXPECT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+    Group group2(*this, groupId2);
+    group2.markForDelete();
+    EXPECT_TRUE(group2.isDirty());
+    EXPECT_TRUE(group2.isDeleted());
+
+    EXPECT_EQ(2, getGroupTable()->activeTupleCount());
+    group2.commit();
+    EXPECT_EQ(1, getGroupTable()->activeTupleCount());
+    EXPECT_EQ(0, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
+
+    {
+        Group lookedUp(*this, groupId2);
+        EXPECT_FALSE(lookedUp.isInTable());
+    }
+
+    // Delete regular group
+    Group group1(*this, groupId1);
+    group1.markForDelete();
+    EXPECT_TRUE(group1.isDirty());
+    EXPECT_TRUE(group1.isDeleted());
 
     EXPECT_EQ(1, getGroupTable()->activeTupleCount());
-    group.commit();
+    group1.commit();
     EXPECT_EQ(0, getGroupTable()->activeTupleCount());
 
-    Group lookedUp(*this, groupId);
-    EXPECT_FALSE(lookedUp.isInTable());
+    {
+        Group lookedUp(*this, groupId1);
+        EXPECT_FALSE(lookedUp.isInTable());
+    }
 }
 
 /*
@@ -548,7 +603,7 @@ TEST_F(GroupOrmTest, VisitAllOffsets) {
     }
 
     int offsetCount = 0;
-    GroupOffset::visitAll(*this, groupId, [&groupId, &topic, &offsetCount, this] (GroupOffset& offset) {
+    GroupOffset::visitAll(*this, groupId, [&groupId, &topic, &offsetCount, this] (const GroupOffset& offset) {
         ASSERT_EQ(groupId, offset.getGroupId());
         ASSERT_EQ(topic, offset.getTopic());
         ASSERT_EQ(15, offset.getOffset());

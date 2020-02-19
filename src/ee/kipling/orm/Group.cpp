@@ -38,6 +38,20 @@ void Group::upsert(const GroupTables& tables, SerializeInputBE& groupMetadata) {
     group.commit();
 }
 
+void Group::visitStandaloneGroups(const GroupTables& tables, std::function<void(const NValue&)> visitor) {
+    PersistentTable* table = tables.getGroupTable();
+    TableIndex* index = table->index(GroupTable::standaloneGroupIndexName);
+
+    IndexCursor cursor(table->schema());
+    index->moveToEnd(true, cursor);
+    TableTuple tuple(table->schema());
+
+    while (!(tuple = index->nextValue(cursor)).isNullTuple()) {
+        NValue groupId = tuple.getNValue(static_cast<int32_t>(GroupTable::Column::ID));
+        visitor(groupId);
+    }
+}
+
 Group::Group(const GroupTables& tables, TableTuple& tuple) :
         GroupOrmBase(tables, tuple, tuple.getNValue(static_cast<int32_t>(GroupTable::Column::ID))) {}
 
@@ -126,6 +140,13 @@ bool Group::hasMember(bool includeDeleted) {
 }
 
 void Group::commit(int64_t timestamp) {
+    if (willUpdate()) {
+        // This really shouldn't happen but just in case handling transitions to and from standalone group
+        TableIndex* index = getTable()->index(GroupTable::standaloneGroupIndexName);
+        if (index->checkForIndexChange(&getUpdateTuple(), &getTableTuple())) {
+            addUpdatedIndex(index);
+        }
+    }
     GroupOrmBase::commit(timestamp);
 
     for (auto entry = m_members.begin(); entry != m_members.end(); ++entry) {

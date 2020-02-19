@@ -27,7 +27,17 @@ namespace kipling {
 
 class GroupOffset: public GroupOrmBase {
 public:
-    static void visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(GroupOffset&)> visitor);
+    /*
+     * Visit all offsets for a groupId. Each offset will be passed to the visitor
+     */
+    static void visitAll(const GroupTables& tables, const NValue& groupId,
+            std::function<void(const GroupOffset&)> visitor);
+
+    /*
+     * Delete offsets for a groupId which match the given predicate
+     */
+    static void deleteIf(const GroupTables &tables, const NValue &groupId,
+            std::function<bool(const GroupOffset&)> predicate);
 
     GroupOffset(const GroupTables& tables, const NValue& groupId, const NValue& topic, int32_t partition);
 
@@ -69,7 +79,7 @@ public:
     /**
      * Returns the timestmap for when this groffsetoup was last committed or -1 if this offset was never committed
      */
-    const int64_t getCommitTimestamp() {
+    const int64_t getCommitTimestamp() const {
         return isInTable() ? ValuePeeker::peekTimestamp(getNValue(GroupOffsetTable::Column::COMMIT_TIMESTAMP)) : -1;
     }
 
@@ -86,6 +96,8 @@ protected:
     PersistentTable* getTable() const override { return m_tables.getGroupOffsetTable(); }
 
 private:
+    static void visitAll(const GroupTables& tables, const NValue& groupId, std::function<void(TableTuple&)> visitor);
+
     GroupOffset(const GroupTables& tables, TableTuple& tuple, const NValue& groupId);
 
     // Name of topic

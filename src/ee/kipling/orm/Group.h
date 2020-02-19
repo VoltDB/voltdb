@@ -33,6 +33,14 @@ class Group : public GroupOrmBase {
 public:
     static void upsert(const GroupTables& tables, SerializeInputBE& group);
 
+    /**
+     * Visit all groups which are "standalone" groups. That is groups which are only storing offsets in the system
+     * tables and will never have any members.
+     *
+     * @param visitor which will be passed the groupId for each standalone group
+     */
+    static void visitStandaloneGroups(const GroupTables& tables, std::function<void(const NValue&)> visitor);
+
     Group(const GroupTables& tables, TableTuple& tuple);
 
     Group(const GroupTables& tables, const NValue& groupId);
