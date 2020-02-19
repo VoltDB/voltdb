@@ -34,8 +34,7 @@ void GroupOrmBase::commit(int64_t timestamp) {
         m_tableTuple.move(nullptr);
     } else {
         // Perform standard update
-        std::vector<TableIndex*> indexes(m_updatedIndexes.begin(), m_updatedIndexes.end());
-        getTable()->updateTupleWithSpecificIndexes(m_tableTuple, m_update, indexes);
+        getTable()->updateTupleWithSpecificIndexes(m_tableTuple, m_update, m_updatedIndexes);
     }
 
     // Update performed so clear state and prepare for other potential updates

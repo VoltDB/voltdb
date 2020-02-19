@@ -59,10 +59,7 @@ void GroupStore::deleteGroup(const NValue& groupId) {
     group.markForDelete();
     group.commit();
 
-    GroupOffset::visitAll(*this, groupId, [] (GroupOffset &offset) {
-        offset.markForDelete();
-        offset.commit(0);
-    });
+    GroupOffset::deleteIf(*this, groupId, [] (const GroupOffset &offset) { return true; });
 }
 
 bool GroupStore::fetchGroups(int maxResultSize, const NValue& startGroupId, SerializeOutput& out) {
@@ -130,7 +127,7 @@ void GroupStore::fetchOffsets(int16_t requestVersion, const NValue& groupId, Ser
     if (topicCount == 0) {
         OffsetFetchResponseTopic* responseTopic = nullptr;
 
-        GroupOffset::visitAll(*this, groupId, [&response, &responseTopic] (GroupOffset& offset) {
+        GroupOffset::visitAll(*this, groupId, [&response, &responseTopic] (const GroupOffset& offset) {
             if (responseTopic == nullptr || responseTopic->topic() != offset.getTopic()) {
                 responseTopic = &response.addTopic(offset.getTopic());
             }
@@ -159,6 +156,18 @@ void GroupStore::fetchOffsets(int16_t requestVersion, const NValue& groupId, Ser
     }
 
     out.writeVarBinary([&response, requestVersion](SerializeOutput &out) { response.write(requestVersion, out); });
+}
+
+
+void GroupStore::deleteExpiredOffsets(const int64_t deleteOlderThan) {
+    Group::visitStandaloneGroups(*this, [this, &deleteOlderThan] (const NValue& groupId) {
+        /* This could be optimized by having an index on (groupId, commitTimestamp) but that would have to index all
+         * groups so not sure if that is better or not
+         */
+        GroupOffset::deleteIf(*this, groupId, [deleteOlderThan] (const GroupOffset& offset) {
+            return offset.getCommitTimestamp() < deleteOlderThan;
+        });
+    });
 }
 
 } }

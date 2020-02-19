@@ -59,7 +59,7 @@ public:
         validateGroupCommited(m_groupStore, update);
     }
 
-    void commitOffsets(const NValue& groupId, const CommitOffsets& offsets) {
+    void commitOffsets(const NValue& groupId, const CommitOffsets& offsets, int64_t timestamp = 0L) {
         char scratch[1024];
         {
             ReferenceSerializeOutput out(scratch, sizeof(scratch));
@@ -80,7 +80,7 @@ public:
         // It is ok if in == out since the write occurs after the complete read
         ReferenceSerializeInputBE in(scratch, sizeof(scratch));
         ReferenceSerializeOutput out(scratch, sizeof(scratch));
-        m_groupStore.commitOffsets(0L, static_cast<int16_t>(7), groupId, in, out);
+        m_groupStore.commitOffsets(timestamp, static_cast<int16_t>(7), groupId, in, out);
 
         for (auto entry : offsets) {
             for (auto partition : entry.second) {
@@ -509,6 +509,66 @@ TEST_F(GroupStoreTest, BadMessages) {
         FAIL("should have thrown SerializableEEException");
     } catch (const SerializableEEException &e) {}
     ASSERT_EQ(0, out.position());
+}
+
+/*
+ * Test that deleting expired offsets only deletes offsets for standalone groups that have expired
+ */
+TEST_F(GroupStoreTest, DeleteExpiredOffsets) {
+    NValue regularGroupId = ValueFactory::getTempStringValue("regular");
+    NValue standaloneGroupId = ValueFactory::getTempStringValue("standalone");
+
+    Group regular(m_groupStore, regularGroupId, 1, 2, ValueFactory::getTempStringValue("leader"),
+            ValueFactory::getTempStringValue("protocol"));
+    upsertGroup(regular);
+
+    Group standalone(m_groupStore, standaloneGroupId, 1, 2, ValueFactory::getNullStringValue(),
+            ValueFactory::getNullStringValue());
+    upsertGroup(standalone);
+
+    std::vector<NValue> topics = { ValueFactory::getTempStringValue("topic1"), ValueFactory::getTempStringValue(
+            "topic2"), ValueFactory::getTempStringValue("topic3") };
+    std::unordered_set<int> allPartitions = { 1, 2, 3, 4 };
+
+    for (int partition : allPartitions) {
+        CommitOffsets offsets;
+        std::vector<OffsetCommitRequestPartition> partitions = { OffsetCommitRequestPartition(partition,
+                partition * 100, 0, "") };
+        for (auto topic : topics) {
+            offsets.emplace(topic, partitions);
+        }
+        commitOffsets(regularGroupId, offsets, partition * 100);
+        commitOffsets(standaloneGroupId, offsets, partition * 100);
+    }
+
+    std::function<void(const NValue&, int, std::unordered_set<int>)> validateOffsets = [this](const NValue& groupId,
+            int topicCount, std::unordered_set<int> expectedPartitions) {
+        int offsetCount = 0;
+        GroupOffset::visitAll(m_groupStore, groupId,
+                [this, &expectedPartitions, &offsetCount](const GroupOffset& offset) {
+                    ASSERT_EQ(1, expectedPartitions.count(offset.getPartition()));
+                    ++offsetCount;
+                });
+        ASSERT_EQ(topicCount * expectedPartitions.size(), offsetCount);
+    };
+
+    validateOffsets(regularGroupId, topics.size(), allPartitions);
+    validateOffsets(standaloneGroupId, topics.size(), allPartitions);
+
+    // Shouldn't delete any
+    m_groupStore.deleteExpiredOffsets(0);
+    validateOffsets(regularGroupId, topics.size(), allPartitions);
+    validateOffsets(standaloneGroupId, topics.size(), allPartitions);
+
+    // Should only delete the first 2 partitions from standalone group
+    m_groupStore.deleteExpiredOffsets(201);
+    validateOffsets(regularGroupId, topics.size(), allPartitions);
+    validateOffsets(standaloneGroupId, topics.size(), { 3, 4 });
+
+    // Should delete all offsets from standalone group
+    m_groupStore.deleteExpiredOffsets(1000);
+    validateOffsets(regularGroupId, topics.size(), allPartitions);
+    validateOffsets(standaloneGroupId, topics.size(), { });
 }
 
 int main() {

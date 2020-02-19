@@ -140,7 +140,7 @@ protected:
      * This method usually does not need to be called unless one of the modified entries in the tuple is part of an index.
      */
     void addUpdatedIndex(TableIndex* index) {
-        m_updatedIndexes.insert(index);
+        m_updatedIndexes.push_back(index);
     }
 
     /**
@@ -154,9 +154,6 @@ protected:
      */
     virtual PersistentTable* getTable() const = 0;
 
-    // Class which holds all of the tables for groups
-    const GroupTables& m_tables;
-
     /**
      * Read a string out of in. This does not copy the data but just refers to the data from in
      */
@@ -169,7 +166,7 @@ protected:
         return ValueFactory::getTempStringValue(in.getRawPointer(length), length);
     }
 
-    /***
+    /**
      * Read a byte array from in. This does not copy the data but just refers to the data from in
      */
     static inline NValue readBytes(SerializeInputBE& in) {
@@ -180,6 +177,24 @@ protected:
 
         return ValueFactory::getTempBinaryValue(in.getRawPointer(length), length);
     }
+
+    const TableTuple& getTableTuple() const {
+        return m_tableTuple;
+    }
+
+    const TableTuple& getUpdateTuple() const {
+        return m_update;
+    }
+
+    /**
+     * Return true if commit() will perform an update when invoked
+     */
+    bool willUpdate() {
+        return isDirty() && isInTable() && !m_update.isNullTuple();
+    }
+
+    // Class which holds all of the tables for groups
+    const GroupTables& m_tables;
 
 private:
     // Delete copy constructor and operator so that free of update tuple memory cannot be double freed
@@ -201,7 +216,7 @@ private:
     // Tuple which will be in the table after this instance is committed
     TableTuple m_update;
     // List of indexes which need to updated when the update is committed.
-    std::unordered_set<TableIndex*> m_updatedIndexes;
+    std::vector<TableIndex*> m_updatedIndexes;
     // Whether or not this instance needs to be committed
     bool m_dirty;
     // ID of the group
