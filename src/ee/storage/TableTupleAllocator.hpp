@@ -94,12 +94,24 @@ namespace voltdb {
         };
 
         /**
+         * Adaptor allowing for customized memory allocation
+         * behavior.
+         */
+        class StdAllocator : private unique_ptr<char[]> {
+            using super = unique_ptr<char[]>;
+        public:
+            StdAllocator(size_t n) : super(new char[n]) {}
+            using super::get;
+        };
+
+        /**
          * Holder for a chunk, whether it is self-compacting or not.
          */
-        class ChunkHolder {
+        template<typename Alloc = StdAllocator>
+        class ChunkHolder : private Alloc {
+            using super = Alloc;
             size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            unique_ptr<char[]> m_resource;
             void*const m_end;                          // indication of chunk capacity
         protected:
             void* m_next;                              // tail of allocation
@@ -107,7 +119,6 @@ namespace voltdb {
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;              // for batch free
-            template<typename H, typename E> friend class HookedCompactingChunks;
         public:
             ChunkHolder(size_t id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
@@ -129,7 +140,8 @@ namespace voltdb {
          * Since we are keeping a free list of hole spaces, it is
          * only economic to use when tupleSize is large.
          */
-        class EagerNonCompactingChunk final: public ChunkHolder {
+        class EagerNonCompactingChunk final: public ChunkHolder<> {
+            using super = ChunkHolder<>;
             Stack<void*> m_freed{};
             EagerNonCompactingChunk(EagerNonCompactingChunk const&) = delete;
             EagerNonCompactingChunk& operator=(EagerNonCompactingChunk const&) = delete;
@@ -152,7 +164,8 @@ namespace voltdb {
          * locations and achieve faster free() at the cost of lower
          * utilization.
          */
-        class LazyNonCompactingChunk final: public ChunkHolder {
+        class LazyNonCompactingChunk final: public ChunkHolder<> {
+            using super = ChunkHolder<>;
             size_t m_freed = 0;
             LazyNonCompactingChunk(LazyNonCompactingChunk const&) = delete;
             LazyNonCompactingChunk& operator=(LazyNonCompactingChunk const&) = delete;
@@ -178,7 +191,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            typename = typename enable_if<is_base_of<ChunkHolder, Chunk>::value>::type>
+            typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
             size_t const m_tupleSize;
@@ -242,7 +255,7 @@ namespace voltdb {
          * weaker than compacting chunks.
          */
         template<typename Chunk,
-            typename = typename enable_if<is_base_of<ChunkHolder, Chunk>::value>::type>
+            typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class NonCompactingChunks final : private ChunkList<Chunk> {
             template<typename Chunks, typename Tag, typename E> friend class IterableTableTupleChunks;
             static auto constexpr CHUNK_REMOVAL_THRESHOLD = 64lu;    // iterate list and remove empty chunks when there are so many
@@ -270,7 +283,8 @@ namespace voltdb {
         /**
          * self-compacting chunk (with help from CompactingChunks to compact across a list)
          */
-        struct CompactingChunk final : public ChunkHolder {
+        struct CompactingChunk final : public ChunkHolder<> {
+            using super = ChunkHolder<>;
             CompactingChunk(size_t id, size_t tupleSize, size_t chunkSize);
             CompactingChunk(CompactingChunk&&) = delete;
             CompactingChunk(CompactingChunk const&) = delete;
@@ -362,7 +376,7 @@ namespace voltdb {
             position_type() noexcept = default;        // empty initiator
             position_type(CompactingChunks const&, void const*);
             template<typename iterator> position_type(void const*, iterator const&) noexcept;
-            position_type(ChunkHolder const&) noexcept;
+            position_type(ChunkHolder<> const&) noexcept;
             position_type(position_type const&) noexcept = default;
             position_type(position_type&&) noexcept = default;
             position_type& operator=(position_type const&) noexcept;
@@ -378,6 +392,21 @@ namespace voltdb {
          * the non-empty allocation from the head to freed space.
          */
         class CompactingChunks : private ChunkList<CompactingChunk>, private CompactingStorageTrait {
+        public:
+            class TxnLeftBoundary final {
+                ChunkList<CompactingChunk> const& m_chunks;
+                typename ChunkList<CompactingChunk>::iterator m_iter;
+                void const* m_next;
+            public:
+                TxnLeftBoundary(ChunkList<CompactingChunk>&) noexcept;
+                typename ChunkList<CompactingChunk>::iterator const& iterator() const noexcept;
+                typename ChunkList<CompactingChunk>::iterator& iterator() noexcept;
+                typename ChunkList<CompactingChunk>::iterator const&
+                    iterator(ChunkList<CompactingChunk>::iterator const&) noexcept;
+                void const*& next() noexcept;
+                bool empty() const noexcept;
+            };
+        private:
             template<typename Chunks, typename Tag, typename E> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             static size_t s_id;
@@ -385,12 +414,16 @@ namespace voltdb {
 
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
-            pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};     // (moving) left boundary for txn
+            TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
             position_type m_frozenTxnBoundary{};  // (frozen) right boundary for txn
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
+            // helpers to guarantee object invariant
+            typename list_type::iterator releasable();
+            void pop_front();
+            void pop_back();
             class BatchRemoveAccumulator : private map<list_type::iterator, vector<void*>> {
                 CompactingChunks* m_self;
                 using map_type = map<list_type::iterator, vector<void*>>;
@@ -443,9 +476,9 @@ namespace voltdb {
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
             list_type::iterator const* find(size_t) const noexcept;
-            pair<list_type::iterator, void const*> const& beginTxn() const noexcept;   // (moving) txn left boundary
+            TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
+            TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             position_type const& endTxn_frozen() const noexcept;                       // txn left boundary when freezing
-            pair<list_type::iterator, void const*>& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             /**
              * Memory operations
              */
@@ -471,7 +504,7 @@ namespace voltdb {
             /**
              * Auxillary others
              */
-            using list_type::iterator; using list_type::const_iterator; using list_type::pop_front;
+            using list_type::iterator; using list_type::const_iterator;
         };
 
         struct BaseHistoryRetainTrait {
@@ -674,6 +707,7 @@ namespace voltdb {
                 void advance();
                 container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
+                list_iterator_type& list_iterator() noexcept;
                 operator position_type() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
@@ -700,6 +734,25 @@ namespace voltdb {
             static iterator begin(Chunks&);
             static const_iterator cbegin(Chunks const&);
             static const_iterator begin(Chunks const&);
+
+            /**
+             * Special iterator that survives multiple txns.
+             */
+            class elastic_iterator :
+                iterator_type<iterator_permission_type::ro, iterator_view_type::txn> {
+                using super = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
+                using container_type = typename super::container_type;
+                using value_type = typename super::value_type;
+                size_t m_chunkId;
+                void refresh();
+            public:
+                elastic_iterator(container_type);
+                static elastic_iterator begin(container_type);
+                bool drained() noexcept;
+                elastic_iterator& operator++();
+                elastic_iterator operator++(int);
+                value_type operator*();
+            };
 
             /**
              * Iterators with callback, applied when
