@@ -82,8 +82,8 @@ inline static size_t chunkSize(size_t tupleSize) noexcept {
 // We remove member initialization from init list to save from
 // storing chunk size into object
 template<typename Alloc> inline ChunkHolder<Alloc>::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
-    m_id(id), m_tupleSize(tupleSize), m_resource(storageSize),
-    m_end(m_resource.get() + storageSize), m_next(m_resource.get()) {
+    super(storageSize), m_id(id), m_tupleSize(tupleSize),
+    m_end(super::get() + storageSize), m_next(super::get()) {
     vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
 }
@@ -118,7 +118,7 @@ template<typename Alloc> inline bool ChunkHolder<Alloc>::empty() const noexcept 
 }
 
 template<typename Alloc> inline void* const ChunkHolder<Alloc>::begin() const noexcept {
-    return reinterpret_cast<void*>(m_resource.get());
+    return reinterpret_cast<void*>(super::get());
 }
 
 template<typename Alloc> inline void* const ChunkHolder<Alloc>::end() const noexcept {
@@ -662,7 +662,10 @@ inline CompactingChunks& CompactingChunks::BatchRemoveAccumulator::chunks() noex
 inline typename CompactingChunks::list_type::iterator CompactingChunks::BatchRemoveAccumulator::pop() {
     auto iter = m_self->beginTxn().first;
     reinterpret_cast<char*&>(iter->m_next) = reinterpret_cast<char*>(iter->begin());
-    return m_self->beginTxn().first = m_self->releasable(iter);
+    if (m_self->end() == (m_self->beginTxn().first = m_self->releasable(iter))) {
+        m_self->beginTxn().second = nullptr;
+    }
+    return m_self->beginTxn().first;
 }
 
 inline vector<void*> CompactingChunks::BatchRemoveAccumulator::collect() const {
@@ -1399,8 +1402,8 @@ TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
 
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API essential
-    if (! m_changes.count(p)) {                                // make a copy only if the addr to be
-        if (m_last == nullptr) {                               // overwritten hadn't been logged
+    if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
+        if (m_last == nullptr) {                                      // overwritten hadn't been logged
             m_last = m_storage.allocate();
             vassert(m_last != nullptr);
         }
@@ -1440,6 +1443,7 @@ template<typename Alloc, typename Trait, typename C, typename E> inline void Txn
         m_copied.clear();
         m_storage.clear();
         m_hasDeletes = m_recording = false;
+        m_last = nullptr;
     } else {
         throw logic_error("Double thaw detected");
     }

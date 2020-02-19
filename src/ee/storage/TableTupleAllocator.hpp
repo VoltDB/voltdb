@@ -108,10 +108,10 @@ namespace voltdb {
          * Holder for a chunk, whether it is self-compacting or not.
          */
         template<typename Alloc = StdAllocator>
-        class ChunkHolder {
+        class ChunkHolder : private Alloc {
+            using super = Alloc;
             size_t const m_id;                         // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            Alloc m_resource;
             void*const m_end;                          // indication of chunk capacity
         protected:
             void* m_next;                              // tail of allocation
