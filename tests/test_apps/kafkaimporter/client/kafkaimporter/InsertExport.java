@@ -24,6 +24,7 @@ package client.kafkaimporter;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.logging.Level;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -47,7 +48,8 @@ public class InsertExport {
         try {
             m_client.callProcedure(new InsertCallback(m_export_sp, key, value), m_export_sp, key, value);
         } catch (NoConnectionsException e) {
-            log.warn("NoConnectionsException calling stored procedure" + m_export_sp);
+            log.rateLimitedLog(10, Level.WARN, e, "%s", m_export_sp);
+            // log.warn("NoConnectionsException calling stored procedure" + m_export_sp);
             try {
                 Thread.sleep(3);
             } catch (InterruptedException ex) { }
@@ -82,8 +84,8 @@ public class InsertExport {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 if (!clientResponse.getStatusString().contains("Server is paused and is available in read-only mode") &&
                         !clientResponse.getStatusString().contains("was lost before a response was received")) {
-                    String msg = String.format("%s k: %12d, v: %12d callback fault: %s", proc, key, value, clientResponse.getStatusString());
-                    log.warn(msg);
+                    log.rateLimitedLog(10, Level.WARN, null, "%s k: %12d, v: %12d callback fault: %s",
+                            proc, key, value, clientResponse.getStatusString());
                 }
             } else {
                 m_rowsAdded.incrementAndGet();
