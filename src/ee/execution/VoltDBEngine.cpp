@@ -3174,7 +3174,7 @@ int32_t VoltDBEngine::commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undo
     setUndoToken(undoToken);
     resetReusedResultOutputBuffer();
     try {
-        m_groupStore->commitOffsets(spUniqueId, requestVersion, groupId, in, m_resultOutput);
+        m_groupStore->commitOffsets(UniqueId::ts(spUniqueId), requestVersion, groupId, in, m_resultOutput);
         return 0;
     } catch (const SerializableEEException& e) {
         serializeException(e);
