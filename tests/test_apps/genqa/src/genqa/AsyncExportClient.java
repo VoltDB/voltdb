@@ -457,8 +457,8 @@ public class AsyncExportClient
                           // +TransactionCounts.get(UPDATE_NEW)
                           );
 
-                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
-                log.info("\nEXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
+                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_CDC");
+                log.info("\nEXPORT_PARTITIONED_TABLE_CDC count: " + export_table_count);
 
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {

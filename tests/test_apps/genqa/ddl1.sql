@@ -35,41 +35,6 @@ PARTITION TABLE partitioned_table ON COLUMN rowid;
 CREATE INDEX IX_partitioned_table_rowid_group
     ON partitioned_table ( rowid_group );
 
--- Target for loopback import with metadata, the first 6 columns
-CREATE TABLE partitioned_table_with_metadata
-(
-  VOLT_TRANSACTION_ID       BIGINT
-, VOLT_EXPORT_TIMESTAMP     BIGINT
-, VOLT_EXPORT_SEQUENCE_NUMBER BIGINT
-, VOLT_PARTITION_ID         BIGINT
-, VOLT_SITE_ID              BIGINT
-, VOLT_EXPORT_OPERATION     TINYINT
-, txnid                     BIGINT        DEFAULT 0 NOT NULL
-, rowid                     BIGINT        NOT NULL
-, rowid_group               TINYINT       NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT       NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT      NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER       NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT        NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT         NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)   NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)  NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-);
-PARTITION TABLE partitioned_table_with_metadata ON COLUMN rowid;
-
 -- Grouping view over Partitioned Data Table
 CREATE VIEW partitioned_table_group
 (
@@ -82,7 +47,8 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
-CREATE TABLE export_partitioned_table_loopback EXPORT TO TARGET loopback_target ON insert, update, delete
+-- Change data capture (CDC) table used with "tableexport" test cases
+CREATE TABLE export_partitioned_table_cdc EXPORT TO TARGET kafka_target ON insert, update, delete
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -108,7 +74,7 @@ CREATE TABLE export_partitioned_table_loopback EXPORT TO TARGET loopback_target 
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table_loopback ON COLUMN rowid;
+PARTITION TABLE export_partitioned_table_cdc ON COLUMN rowid;
 
 -- Export Table for Partitioned Data Table deletions
 CREATE STREAM export_partitioned_table_kafka PARTITION ON COLUMN rowid EXPORT TO TARGET kafka_target
@@ -446,7 +412,7 @@ CREATE STREAM export_replicated_table_jdbc EXPORT TO TARGET jdbc_target
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_replicated_table_loopback EXPORT TO TARGET loopback_target ON insert, update, delete
+CREATE TABLE export_replicated_table_cdc EXPORT TO TARGET kafka_target ON insert, update, delete
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -486,12 +452,10 @@ CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 F
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 
-CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_loopback COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_cdc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TableExport;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
--- CREATE PROCEDURE insert_with_metadata PARTITION ON TABLE partitioned_table_with_metadata COLUMN rowid parameter 7 AS insert into partitioned_table_with_metadata
---     values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Export Stream with extra Geo columns
 CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT TO TARGET jdbc_target
@@ -598,37 +562,4 @@ CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table_jdbc COLUMN row
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;
 -- CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
-
--- lookup table for export metadata operations
-CREATE TABLE export_op_type
-(
-  OP_NAME    VARCHAR(32)
-, OP_NUM     TINYINT
-);
-
--- Grouping view over Partitioned Data Export Op Codes
-CREATE VIEW partitioned_table_group_ops
-(
-  VOLT_EXPORT_OPERATION
-, record_count
-)
-AS
-   SELECT VOLT_EXPORT_OPERATION
-        , COUNT(*)
-     FROM partitioned_table_with_metadata
- GROUP BY VOLT_EXPORT_OPERATION;
-
-CREATE PROCEDURE export_op_summary AS
-    SELECT export_op_type.op_name as OPERATION, partitioned_table_group_ops.record_count AS TOT_COUNT
-    FROM  partitioned_table_group_ops, export_op_type
-    WHERE export_op_type.op_num = partitioned_table_group_ops.VOLT_EXPORT_OPERATION;
-
 END_OF_BATCH
-
--- following SQL can't be in a batch, so initialize this convenience table after the batch is complete.
--- the following dml is commented out since it causes a problem with "voltdb init --schema ...
--- INSERT INTO export_op_type VALUES('INSERT', 1);
--- INSERT INTO export_op_type VALUES('DELETE', 2);
--- INSERT INTO export_op_type VALUES('UPDATE (BEFORE)', 3);
--- INSERT INTO export_op_type VALUES('UPDATE (AFTER)', 4);
--- INSERT INTO export_op_type VALUES('MIGRATION', 5);
