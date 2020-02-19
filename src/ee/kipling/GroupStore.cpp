@@ -98,7 +98,7 @@ bool GroupStore::fetchGroups(int maxResultSize, const NValue& startGroupId, Seri
     return !next.isNullTuple();
 }
 
-void GroupStore::commitOffsets(int64_t spUniqueId, int16_t requestVersion, const NValue& groupId,
+void GroupStore::commitOffsets(int64_t timestamp, int16_t requestVersion, const NValue& groupId,
         SerializeInputBE& offsets, SerializeOutput& out) {
     OffsetCommitResponse response;
     CheckedSerializeInput checkedIn(offsets);
@@ -113,7 +113,7 @@ void GroupStore::commitOffsets(int64_t spUniqueId, int16_t requestVersion, const
             OffsetCommitRequestPartition partition(requestVersion, checkedIn);
             GroupOffset offset(*this, groupId, topic, partition.partitionIndex());
             offset.update(partition);
-            offset.commit(UniqueId::ts(spUniqueId));
+            offset.commit(timestamp);
             responseTopic.addPartition(partition.partitionIndex());
         }
     }
