@@ -392,6 +392,21 @@ namespace voltdb {
          * the non-empty allocation from the head to freed space.
          */
         class CompactingChunks : private ChunkList<CompactingChunk>, private CompactingStorageTrait {
+        public:
+            class TxnLeftBoundary final {
+                ChunkList<CompactingChunk> const& m_chunks;
+                typename ChunkList<CompactingChunk>::iterator m_iter;
+                void const* m_next;
+            public:
+                TxnLeftBoundary(ChunkList<CompactingChunk>&) noexcept;
+                typename ChunkList<CompactingChunk>::iterator const& iterator() const noexcept;
+                typename ChunkList<CompactingChunk>::iterator& iterator() noexcept;
+                typename ChunkList<CompactingChunk>::iterator const&
+                    iterator(ChunkList<CompactingChunk>::iterator const&) noexcept;
+                void const*& next() noexcept;
+                bool empty() const noexcept;
+            };
+        private:
             template<typename Chunks, typename Tag, typename E> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             static size_t s_id;
@@ -399,12 +414,16 @@ namespace voltdb {
 
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
-            pair<list_type::iterator, void const*> m_txnFirstChunk{list_type::end(), nullptr};     // (moving) left boundary for txn
+            TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
             position_type m_frozenTxnBoundary{};  // (frozen) right boundary for txn
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
+            // helpers to guarantee object invariant
+            typename list_type::iterator releasable();
+            void pop_front();
+            void pop_back();
             class BatchRemoveAccumulator : private map<list_type::iterator, vector<void*>> {
                 CompactingChunks* m_self;
                 using map_type = map<list_type::iterator, vector<void*>>;
@@ -457,9 +476,9 @@ namespace voltdb {
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             list_type::iterator const* find(void const*) const noexcept;
             list_type::iterator const* find(size_t) const noexcept;
-            pair<list_type::iterator, void const*> const& beginTxn() const noexcept;   // (moving) txn left boundary
+            TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
+            TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             position_type const& endTxn_frozen() const noexcept;                       // txn left boundary when freezing
-            pair<list_type::iterator, void const*>& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             /**
              * Memory operations
              */
@@ -485,7 +504,7 @@ namespace voltdb {
             /**
              * Auxillary others
              */
-            using list_type::iterator; using list_type::const_iterator; using list_type::pop_front;
+            using list_type::iterator; using list_type::const_iterator;
         };
 
         struct BaseHistoryRetainTrait {
