@@ -824,6 +824,24 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Return all snapshotable materialized views
+     * @param database
+     * @return
+     */
+    public static List<Table> getAllSnapshotableViews(org.voltdb.catalog.Database database)
+    {
+        ArrayList<Table> tlist = new ArrayList<>();
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            if (isSnapshotablePersistentTableView(database, t) ||
+                    isSnapshotableStreamedTableView(database, t)) {
+                tlist.add(t);
+            }
+        }
+        return tlist;
+    }
+
+    /**
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *

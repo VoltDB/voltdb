@@ -1908,6 +1908,24 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         return checksum;
     }
 
+    public boolean hasSameContentsWithOrder(VoltTable other) {
+        assert(verifyTableInvariants());
+        if (this == other) {
+            return true;
+        }
+
+        int mypos = m_buffer.position();
+        int theirpos = other.m_buffer.position();
+        if (mypos != theirpos) {
+            return false;
+        }
+        long checksum1 = ClientUtils.cheesyBufferCheckSumWithOrder(m_buffer);
+        long checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
+        boolean checksum = (checksum1 == checksum2);
+        assert(verifyTableInvariants());
+        return checksum;
+    }
+
     /**
      *  An unreliable version of {@link java.lang.Object#equals(Object)} that should not be used. Only
      *  present for unit testing.
