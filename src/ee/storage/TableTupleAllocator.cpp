@@ -1151,7 +1151,7 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator++(int) {
-    decltype(*this) const copy(*this);
+    decltype(*this) copy(*this);
     advance();
     return copy;
 }
@@ -1179,19 +1179,6 @@ typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::begin(
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) {
     return {c};
-}
-
-template<typename Chunks, typename Tag, typename E> inline bool
-IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
-    if (super::drained()) {
-        return true;
-    } else if (super::storage().empty() ||
-            less<position_type>()(*super::storage().last(), *this)) {
-        super::m_cursor = nullptr;
-        return true;
-    } else {
-        return false;
-    }
 }
 
 template<typename Chunks, typename Tag, typename E> inline void
@@ -1345,6 +1332,19 @@ namespace std {
             return less_rolling(lhs.id(), rhs.id());
         }
     };
+}
+
+template<typename Chunks, typename Tag, typename E> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
+    if (super::drained()) {
+        return true;
+    } else if (super::storage().empty() ||
+            less<position_type>()(*super::storage().last(), *this)) {
+        super::m_cursor = nullptr;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 template<typename Chunks, typename Tag, typename E>
