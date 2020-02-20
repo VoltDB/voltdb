@@ -48,6 +48,13 @@ public:
                 kipling::TableFactory::createGroupOffset(m_factory));
     }
 
+    virtual ~GroupStoreTest() {
+        delete m_context;
+        delete m_pool;
+        delete m_topend;
+        voltdb::globalDestroyOncePerProcess();
+    }
+
     void upsertGroup(Group& update) {
         char scratch[1024];
         ReferenceSerializeOutput out(scratch, sizeof(scratch));
@@ -147,9 +154,9 @@ TEST_F(GroupStoreTest, StoreGroup) {
 
     // Insert group
     {
-        char scratch[128];
+        RandomData scratch(128);
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
         ASSERT_EQ(0, m_groupStore.getGroupTable()->activeTupleCount());
         ASSERT_EQ(0, m_groupStore.getGroupMemberTable()->activeTupleCount());
@@ -162,10 +169,10 @@ TEST_F(GroupStoreTest, StoreGroup) {
 
     // Update group with one more member
     {
-        char scratch[128];
+        RandomData scratch(128);
 
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
         upsertGroup(group);
 
@@ -188,11 +195,11 @@ TEST_F(GroupStoreTest, StoreGroup) {
         NValue groupId2 = ValueFactory::getTempStringValue("groupId2");
         Group group2(m_groupStore, groupId2, 1000, 5, leader, protocol);
 
-        char scratch[128];
+        RandomData scratch(128);
         group2.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
         group2.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
         upsertGroup(group2);
 
@@ -333,7 +340,7 @@ TEST_F(GroupStoreTest, DeleteGroup) {
     NValue protocol = ValueFactory::getTempStringValue("protocol");
 
     // Insert group and offsets
-    char scratch[128];
+    RandomData scratch(128);
     std::vector<NValue> topics = { ValueFactory::getTempStringValue("topic1"), ValueFactory::getTempStringValue(
             "topic2"), ValueFactory::getTempStringValue("topic3") };
     std::vector<OffsetCommitRequestPartition> partitions = {
@@ -345,9 +352,9 @@ TEST_F(GroupStoreTest, DeleteGroup) {
     {
         Group group(m_groupStore, groupId, 1000, 5, leader, protocol);
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
         upsertGroup(group);
 
@@ -364,9 +371,9 @@ TEST_F(GroupStoreTest, DeleteGroup) {
     {
         Group group(m_groupStore, groupId2, 1000, 5, leader, protocol);
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
         upsertGroup(group);
 
@@ -412,23 +419,23 @@ TEST_F(GroupStoreTest, FetchGroups) {
     int maxSize = 0;
     int totalSize = 0;
     for (int i = 0; i < 20; ++i) {
-        char scratch[128];
+        RandomData scratch(128);
 
-        int len = ::snprintf(scratch, sizeof(scratch), "groupId_%d", i);
-        NValue groupId = ValueFactory::getTempStringValue(scratch, len);
-        len = ::snprintf(scratch, sizeof(scratch), "leaderId_%d", i);
-        NValue leader = ValueFactory::getTempStringValue(scratch, len);;
-        len = ::snprintf(scratch, sizeof(scratch), "protocol_%d", i);
-        NValue protocol = ValueFactory::getTempStringValue(scratch, len);
+        int len = ::snprintf(&scratch, scratch.len(), "groupId_%d", i);
+        NValue groupId = ValueFactory::getTempStringValue(&scratch, len);
+        len = ::snprintf(&scratch, scratch.len(), "leaderId_%d", i);
+        NValue leader = ValueFactory::getTempStringValue(&scratch, len);;
+        len = ::snprintf(&scratch, scratch.len(), "protocol_%d", i);
+        NValue protocol = ValueFactory::getTempStringValue(&scratch, len);
         Group* group = new Group(m_groupStore, groupId, 1000, 5, leader, protocol);
         groups[group->getGroupId()].reset(group);
 
         for (int j = 0 ; j < 10; ++j) {
-            int len = ::snprintf(scratch, sizeof(scratch), "memberId_%d", i);
-            NValue memberId = ValueFactory::getTempStringValue(scratch, len);
+            int len = ::snprintf(&scratch, scratch.len(), "memberId_%d", i);
+            NValue memberId = ValueFactory::getTempStringValue(&scratch, len);
             group->getOrCreateMember(memberId).update(200, 500, memberId,
-                    ValueFactory::getTempBinaryValue(scratch, sizeof(scratch) - j),
-                    ValueFactory::getTempBinaryValue(scratch, sizeof(scratch) - (j * 2)));
+                    ValueFactory::getTempBinaryValue(&scratch, scratch.len() - j),
+                    ValueFactory::getTempBinaryValue(&scratch, scratch.len() - (j * 2)));
         }
 
         int serializedSize = group->serializedSize();
