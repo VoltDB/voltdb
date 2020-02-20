@@ -1639,7 +1639,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 consoleLogLimited.log(warnMsg, EstTime.currentTimeMillis() );
                 SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
                 if (snmp != null) {
-		    snmp.streamBlocked(warnMsg);
+                    snmp.streamBlocked(warnMsg);
                 }
             }
         }

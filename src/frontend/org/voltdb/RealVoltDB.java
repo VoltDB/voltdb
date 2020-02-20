@@ -4214,8 +4214,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void halt() {
         SnmpTrapSender snmp = getSnmpTrapSender();
         if (snmp != null) {
-	    snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down because of @StopNode");
-	    snmp.shutdown();
+            snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down because of @StopNode");
+            snmp.shutdown();
         }
         Thread shutdownThread = new Thread() {
             @Override
