@@ -313,7 +313,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
 
     // For a materialized view don't optimize truncate,
     // this needs more work - ENG-10323.
-    if (m_isMaterialized) {
+    // A catalog may not be present for tests, go through this path
+    if (m_isMaterialized || engine->getCatalog() == nullptr) {
         /* // enable to debug
         std::cout << "DEBUG: truncating view table (retail) "
                   << activeTupleCount()
