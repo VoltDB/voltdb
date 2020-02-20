@@ -31,8 +31,8 @@ import org.voltdb.VoltTable;
 
 public class JiggleSinglePartition extends VoltProcedure {
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 rowid FROM partitioned_table WHERE rowid = ?");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO partitioned_table (rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)");
-    public final SQLStmt update = new SQLStmt("UPDATE partitioned_table SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO partitioned_table (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    public final SQLStmt update = new SQLStmt("UPDATE partitioned_table SET txnid = ?, type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_not_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM partitioned_table WHERE rowid = ?");
 
     public VoltTable[] run(long rowid, long ignore)
@@ -54,9 +54,12 @@ public class JiggleSinglePartition extends VoltProcedure {
                 voltQueueSQL(delete, rowid);
             else
             {
+                // TODO I am guessing that the partitioned_table data is not validated with
+                //   the txnid since the updated did not include it until I added it here
                 SampleRecord record = new SampleRecord(rowid, rand);
                 voltQueueSQL(
                               update
+                            , txid
                             , record.type_null_tinyint
                             , record.type_not_null_tinyint
                             , record.type_null_smallint
@@ -87,6 +90,7 @@ public class JiggleSinglePartition extends VoltProcedure {
                 SampleRecord record = new SampleRecord(rowid, rand);
                 voltQueueSQL(
                               insert
+                            , txid
                             , rowid
                             , record.rowid_group
                             , record.type_null_tinyint
