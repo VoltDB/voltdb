@@ -10,38 +10,51 @@ DEPLOYMENT=deployment.xml
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot log
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
+# compile the source code for the client into jarfiles
+function jars() {
     mkdir -p obj
+    # compile java source
     javac -classpath $CLASSPATH -d obj \
-        src/schemachange/*.java
+        src/${APPNAME}/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit 1; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 # run the client that drives the example
 function client() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -ea -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
         --targetrowcount=100000 \
@@ -56,7 +69,7 @@ function _auto_run() {
     srccompile || exit 1
     catalog || exit 1
     voltdb_daemon_start $APPNAME.jar $HOST deployment.xml $LICENSE || exit 1
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    java -ea -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient --servers=localhost $OPTIONS
     if [ $? -eq 0 ]; then
         echo SUCCESS
@@ -81,7 +94,7 @@ function auto_quick() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client|...}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|client|...}"
     echo "                {...|auto_smoke|auto_quick}"
 }
 

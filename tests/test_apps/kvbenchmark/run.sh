@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
+# these are usually the same, but not in this case
 APPNAME="kvbenchmark"
+APPDIR="kvbench"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -40,45 +42,28 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
-}
-
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $APPCLASSPATH -d obj \
-        src/kvbench/*.java \
-        src/kvbench/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the kvbenchmark application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# remove everything from "clean" as well as the jarfiles
-function cleanall() {
-    ant clean
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot statement-plans catalog-report.html log
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-    ant
+    mkdir -p obj
+    # compile java source
+    javac -classpath $APPCLASSPATH -d obj \
+        src/${APPDIR}/*.java \
+        src/${APPDIR}/procedures/*.java
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPDIR}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e kvbenchmark.jar ]; then
+    if [ ! -e ${APPNAME}.jar ]; then
         jars;
     fi
 }
@@ -98,14 +83,25 @@ function server() {
         VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
     fi
     # truncate the voltdb log
-    [[ -d log && -w log ]] && > log/volt.log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
+    echo "export VOLTDB_OPTS=\"${VOLTDB_OPTS}\""
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    export VOLTDB_OPTS="${VOLTDB_OPTS}"
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
+}
+
+# initialize the DB by running the DDL file; should be unnecessary if the
+# VoltDB server was started using the 'server' function above
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
@@ -117,13 +113,20 @@ function client() {
 # Use this target for argument help
 function sync-benchmark-help() {
     jars-ifneeded
-    java -classpath obj:$APPCLASSPATH:obj kvbench.SyncBenchmark --help
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar ${APPDIR}.SyncBenchmark --help
+}
+
+# Multi-threaded synchronous benchmark sample
+# Use this target for argument help
+function http-benchmark-help() {
+    jars-ifneeded
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar ${APPDIR}.HTTPBenchmark --help
 }
 
 function sync-benchmark() {
     jars-ifneeded
-    java -classpath kvbenchmark.jar:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        kvbench.SyncBenchmark \
+    java -classpath ${APPNAME}.jar:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        ${APPDIR}.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -140,8 +143,8 @@ function sync-benchmark() {
 
 function http-benchmark() {
     jars-ifneeded
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        kvbench.HTTPBenchmark \
+    java -classpath ${APPCLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$LOG4J \
+        ${APPDIR}.HTTPBenchmark \
         --displayinterval=5 \
         --duration=10 \
         --servers=localhost \
@@ -156,13 +159,8 @@ function http-benchmark() {
         --csvfile=periodic.csv.gz
 }
 
-function init() {
-    jars-ifneeded
-    sqlcmd < ddl.sql
-}
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|sync-benchmark|sync-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|client|sync-benchmark[-help]|http-benchmark[-help]}"
 }
 
 # Run the target passed as the first arg on the command line

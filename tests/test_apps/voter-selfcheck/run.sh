@@ -36,138 +36,122 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot log
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
+# compile the source code for procedures and the client into jarfiles
+function jars() {
     mkdir -p obj
+    # compile java source
     javac -classpath $CLASSPATH -d obj \
-        src/voter/*.java \
-        src/voter/procedures/*.java
+        src/${APPNAME}/*.java \
+        src/${APPNAME}/procedures/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command lines: "
+    echo
+    echo "${VOLTDB} init -C deployment$1.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment$1.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
-
 
 # run the voltdb server locally
 function secure-server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-secure.xml -l $LICENSE -H $HOST $APPNAME.jar
+    server -secure
 }
 
 function masked-server() {
-    $VOLTDB mask deployment-secure.xml deployment-masked.xml
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-masked.xml -l $LICENSE -H $HOST $APPNAME.jar
+    ${VOLTDB} mask deployment-secure.xml deployment-masked.xml
+    server -masked
 }
-
-
 
 # run the client that drives the example
 function client() {
     async-benchmark
 }
 
-# Asynchronous benchmark sample
-# Use this target for argument help
-function async-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voter.AsyncBenchmark --help
-}
-
-function async-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voter.AsyncBenchmark \
+# generic benchmark function called by all the FOO-benchmark functions below,
+# with various class names and extra arguments
+function benchmark() {
+    jars-ifneeded
+    CLASSNAME=${1}Benchmark
+    shift
+    java -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$LOG4J \
+        voter.${CLASSNAME} \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
         --contestants=6 \
         --maxvotes=2 \
+        $@
+}
+
+# Asynchronous benchmark sample
+# Use this target for argument help
+function async-benchmark-help() {
+    jars-ifneeded
+    java -classpath ${CLASSPATH}:${APPNAME}.jar voter.AsyncBenchmark --help
+}
+
+function async-benchmark() {
+    benchmark Async \
         --ratelimit=100000 \
-        --autotune=false \
+        --autotune=false $@ \
         --latencytarget=10
 }
 
 function secure-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voter.AsyncBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
-        --contestants=6 \
-        --maxvotes=2 \
-        --ratelimit=100000 \
-        --autotune=false \
-        --username=myuser \
-        --password=voltdbuser \
-        --latencytarget=10
+    async-benchmark --username=myuser --password=voltdbuser
 }
-
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voter.SyncBenchmark --help
+    jars-ifneeded
+    java -classpath ${CLASSPATH}:${APPNAME}.jar voter.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voter.SyncBenchmark \
-        --threads=40 \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
-        --contestants=6 \
-        --maxvotes=2
+    benchmark Sync --threads=40
 }
 
 # JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voter.JDBCBenchmark --help
+    jars-ifneeded
+    java -classpath ${CLASSPATH}:${APPNAME}.jar voter.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voter.JDBCBenchmark \
-        --threads=40 \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
-        --contestants=6 \
-        --maxvotes=2
+    benchmark JDBC --threads=40
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|[secure-]server|masked-server|client|...}"
+    echo "       {...|[a]sync-benchmark[-help]|secure-benchmark|jdbc-benchmark[-help]}"
 }
 
 # Run the target passed as the first arg on the command line
