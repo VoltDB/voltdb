@@ -917,11 +917,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (isClusterComplete) {
                 m_mailbox.send(ciHsid, message);
             }
-            // Send message to the client interfaces of other hosts. If a host does not host any partition leaders,
-            // the host will be shutdown.
-            if (hostMessenger.getHostId() != hostId) {
-                m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
-            }
         }
     }
 

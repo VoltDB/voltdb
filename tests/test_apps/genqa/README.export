@@ -12,7 +12,7 @@ Quick hacky description on running the long-running export test.
 ./run.sh catalog
 
 TO RUN remote Export Client Test:
-- You'll need 4(four) terminals:
+- You'll need 3(three) terminals:
 
     -- In 1, run the server:
     ./run.sh server-legacy
@@ -20,18 +20,14 @@ TO RUN remote Export Client Test:
     ./run.sh export-tofile
     -- In 3, start the app client:
     ./run.sh async-export
-    -- In 4, start the verifier:
-    ./run.sh export-verify
 
 TO RUN onserver Export Client Test:
-- You'll need 4(four) terminals:
+- You'll need 2(two) terminals:
 
     -- In 1, run the server:
     ./run.sh server
     -- In 2, run the export client:
     ./run.sh async-export
-    -- In 3, start the app client:
-    ./run.sh export-on-server-verify
 
 TO RUN onserver Export to kafka Client Test:
 - You'll need 3(three) terminals:
