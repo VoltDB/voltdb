@@ -74,7 +74,7 @@ bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::Tab
               return false;
            });
     }
-    return !out.isNullTuple();
+    return (!out.isNullTuple() && !out.isPendingDeleteOnUndoRelease());
 }
 
 void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple) {
