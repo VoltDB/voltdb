@@ -59,14 +59,20 @@ namespace voltdb {
 
 bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out) {
     int64_t cnt = table->visibleTupleCount();
+    auto size = table->activeTupleCount();
+    vassert(cnt <= size);
     if (cnt > 0) {
         int64_t idx = rand() % cnt;
         int64_t count = 0;
         storage::until<PersistentTable::txn_const_iterator>(table->allocator(),
                                    [&out, &count, idx](const void* p) {
+              void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
+              out.move(tupleAddress);
+              if (out.isPendingDeleteOnUndoRelease()) {
+                  out.move(NULL);
+                  return false;
+              }
               if (count == idx) {
-                  void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
-                  out.move(tupleAddress);
                   ++count;
                   return true;
               }
