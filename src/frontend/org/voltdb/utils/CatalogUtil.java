@@ -133,6 +133,7 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -1367,7 +1368,11 @@ public abstract class CatalogUtil {
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
-        TopicsType topics = deployment.getTopics();
+        KiplingType k = deployment.getKipling();
+        if (k == null) {
+            return Pair.of(null, null);
+        }
+        TopicsType topics = k.getTopics();
         if (topics == null) {
             return Pair.of(null, null);
         }
@@ -2927,6 +2932,7 @@ public abstract class CatalogUtil {
         List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
         // sort in natural order
         Collections.sort(children, new Comparator<String>() {
+            @Override
             public int compare(String o1, String o2) {
                 return Integer.valueOf(o1) - Integer.valueOf(o2);
             }
