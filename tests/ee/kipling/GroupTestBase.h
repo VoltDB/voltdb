@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <random>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -29,6 +30,52 @@
 
 using namespace voltdb;
 using namespace voltdb::kipling;
+
+// Utility class to wrap a char[] of random data
+class RandomData {
+public:
+    RandomData(size_t len) : m_len(len), m_data(new char[len]) {
+        uint64_t *data = (uint64_t*) m_data;
+        int len64 = len / sizeof(uint64_t);
+        for (int i = 0; i < len64; ++i) {
+            data[i] = s_mte();
+        }
+
+        int remainder = len % sizeof(uint64_t);
+        if (remainder > 0) {
+            uint64_t val = s_mte();
+            for (int i = 0; i < remainder; ++i) {
+                m_data[len - 1 - i] = (char) (val & 0xFF);
+                val >>= sizeof(char);
+            }
+        }
+    }
+
+    ~RandomData() {
+        delete[] m_data;
+    }
+
+    char& operator[](int offset) {
+        vassert(offset < m_len);
+        return m_data[offset];
+    }
+
+    char* operator&() {
+        return m_data;
+    }
+
+    size_t len() {
+        return m_len;
+    }
+
+private:
+    static std::mt19937_64 s_mte;
+
+    size_t m_len;
+    char *m_data;
+};
+
+std::mt19937_64 RandomData::s_mte;
 
 class GroupTestBase : public Test {
 public:

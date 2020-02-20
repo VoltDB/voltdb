@@ -259,21 +259,21 @@ TEST_F(GroupOrmTest, AddMembers) {
     EXPECT_EQ(0, getGroupMemberTable()->activeTupleCount());
     // Add first member
     {
-        char scratch[128];
+        RandomData scratch(128);
         Group group(*this, groupId);
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, ValueFactory::getNullStringValue(),
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
         upsertGroup(group);
         EXPECT_EQ(1, getGroupMemberTable()->activeTupleCount());
     }
 
     // Add second member
     {
-        char scratch[128];
+        RandomData scratch(128);
         NValue instanceId = ValueFactory::getTempStringValue("instanceId");
         Group group(*this, groupId);
         group.getOrCreateMember(generateGroupMemberid()).update(1000, 2000, instanceId,
-                ValueFactory::getTempBinaryValue(scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
+                ValueFactory::getTempBinaryValue(&scratch, 64), ValueFactory::getTempBinaryValue(&scratch[64], 64));
         upsertGroup(group);
         EXPECT_EQ(2, getGroupMemberTable()->activeTupleCount());
     }
@@ -289,12 +289,12 @@ TEST_F(GroupOrmTest, UpdateMembers) {
     NValue instanceId = ValueFactory::getTempStringValue("instanceId");
 
     Group group(*this, groupId, 1, 2, leader, protocol);
-    char scratch[128];
+    RandomData scratch(128);
     GroupMember& member1 = group.getOrCreateMember(generateGroupMemberid());
-    member1.update(1000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(scratch, 64),
+    member1.update(1000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(&scratch, 64),
             ValueFactory::getTempBinaryValue(&scratch[64], 64));
     GroupMember &member2 = group.getOrCreateMember(generateGroupMemberid());
-    member2.update(1000, 2000, instanceId, ValueFactory::getTempBinaryValue(scratch, 64),
+    member2.update(1000, 2000, instanceId, ValueFactory::getTempBinaryValue(&scratch, 64),
             ValueFactory::getTempBinaryValue(&scratch[64], 64));
     EXPECT_NE(member1, member2);
 
@@ -302,9 +302,9 @@ TEST_F(GroupOrmTest, UpdateMembers) {
 
     // Update timeouts
     {
-        member1.update(5000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(scratch, 64),
+        member1.update(5000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(&scratch, 64),
                 ValueFactory::getTempBinaryValue(&scratch[64], 64));
-        member2.update(1000, 10000, instanceId, ValueFactory::getTempBinaryValue(scratch, 64),
+        member2.update(1000, 10000, instanceId, ValueFactory::getTempBinaryValue(&scratch, 64),
                 ValueFactory::getTempBinaryValue(&scratch[64], 64));
     }
 
@@ -319,11 +319,11 @@ TEST_F(GroupOrmTest, UpdateMembers) {
 
     // Update protocol metadata and assignments
     {
-        char scratch2[128] = { 5 };
-        member1.update(5000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(scratch2, 128),
+        RandomData scratch2(128);
+        member1.update(5000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(&scratch2, 128),
                 ValueFactory::getTempBinaryValue(&scratch[64], 64));
-        member2.update(1000, 10000, instanceId, ValueFactory::getTempBinaryValue(scratch, 64),
-                ValueFactory::getTempBinaryValue(scratch2, 128));
+        member2.update(1000, 10000, instanceId, ValueFactory::getTempBinaryValue(&scratch, 64),
+                ValueFactory::getTempBinaryValue(&scratch2, 128));
     }
 
     // members looked up are not equal before commit
@@ -346,12 +346,12 @@ TEST_F(GroupOrmTest, DeleteMembers) {
     NValue instanceId = ValueFactory::getTempStringValue("instanceId");
 
     Group group(*this, groupId, 1, 2, leader, protocol);
-    char scratch[128];
+    RandomData scratch(128);
     GroupMember& member1 = group.getOrCreateMember(generateGroupMemberid());
-    member1.update(1000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(scratch, 64),
+    member1.update(1000, 2000, ValueFactory::getNullStringValue(), ValueFactory::getTempBinaryValue(&scratch, 64),
             ValueFactory::getTempBinaryValue(&scratch[64], 64));
     GroupMember &member2 = group.getOrCreateMember(generateGroupMemberid());
-    member2.update(1000, 2000, instanceId, ValueFactory::getTempBinaryValue(scratch, 64),
+    member2.update(1000, 2000, instanceId, ValueFactory::getTempBinaryValue(&scratch, 64),
             ValueFactory::getTempBinaryValue(&scratch[64], 64));
 
     upsertGroup(group);
