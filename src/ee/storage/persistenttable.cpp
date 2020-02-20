@@ -1248,7 +1248,6 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
             ++m_invisibleTuplesPendingDeleteCount;
             target.setPendingDeleteTrue();
         }
-        return;
     }
     m_releaseBatch.insert(tuple);
 }
