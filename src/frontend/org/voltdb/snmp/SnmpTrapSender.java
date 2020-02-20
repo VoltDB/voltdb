@@ -25,11 +25,16 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
  */
 public interface SnmpTrapSender {
 
-    //From deployment build the Snmp sender.
+    // From deployment build the SNMP sender.
     public void initialize(SnmpType snmpType, HostMessenger hm, int clusterId);
     public void shutdown();
-    //Update Snmp properties.
+
+    // Update SNMP properties.
     public void notifyOfCatalogUpdate(SnmpType snmpType);
+
+    // Methods to send specific SNMP traps, where enabled.
+    // At the discretion of the implementation, a log message may
+    // also be written.
     public void crash(String msg);
     public void hostDown(FaultLevel level, int hostId, String msg);
     public void hostUp(String msg);
