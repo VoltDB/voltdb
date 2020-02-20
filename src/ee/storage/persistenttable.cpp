@@ -1227,9 +1227,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         TableTuple target(m_schema);
         TableTuple origin(m_schema);
         for(auto const& p : tuples) {
-           target.move(p.first);
-           origin.move(p.second);
-           swapTuples(origin, target);
+            target.move(p.first);
+            origin.move(p.second);
+            swapTuples(origin, target);
         }
    });
 }

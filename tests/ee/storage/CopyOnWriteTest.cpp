@@ -1175,7 +1175,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
     ::srand (8000);
-    int tupleCount = 10;
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
