@@ -346,6 +346,7 @@ public class VoltTableUtil {
      */
     public static ByteBuf joinLargeBuffer(VoltTable table) {
         ByteBuf buf;
+        table.resetRowPosition();
         if (table.getRowCount() == 1) {
             boolean hasRow = table.advanceToRow(0);
             assert hasRow;
