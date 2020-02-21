@@ -92,7 +92,12 @@ public:
     }
     inline static bool same(void const* dst, size_t state) {
         static unsigned char buf[len+1];
-        return ! memcmp(dst, query(state, buf), len);
+//        return ! memcmp(dst, query(state, buf), len);
+        bool const eq = ! memcmp(dst, query(state, buf), len);
+        if (! eq) {
+            printf("Expect %s, got %s", hex(state).c_str(), hex(dst).c_str());
+        }
+        return eq;
     }
     static string hex(unsigned char const* src) {
         static char n[7];
@@ -1510,6 +1515,184 @@ TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
                 ASSERT_TRUE(Gen::same(p, i++));
             });
     ASSERT_EQ(1, i);
+}
+
+// Test that it should work without txn in progress
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic0) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    size_t i;
+    for(i = 0; i < NumTuples; ++i) {
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::elastic_iterator>(
+            static_cast<Alloc const&>(alloc), [&i, this](void const* p) {
+                ASSERT_TRUE(Gen::same(p, i++));
+            });
+    ASSERT_EQ(NumTuples, i);
+}
+
+// Test that it should work with insertions
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic1) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    size_t i;
+    for(i = 0; i < NumTuples/ 2; ++i) {
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    for (i = 0; i < NumTuples / 2; ++i) {                      // iterator advance, then insertion in a loop
+        ASSERT_TRUE(Gen::same(*iter++, i));
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    while (! iter.drained()) {
+        ASSERT_TRUE(Gen::same(*iter++, i++));
+    }
+    ASSERT_EQ(NumTuples / 2, i);                       // won't see any newly inserted values
+}
+
+// Test that it should work with normal, compacting removals that only eats what had
+// been iterated
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic2) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    for (i = 0; i < NumTuples && ! iter.drained(); ++iter) {                      // iterator advance, then delete previous iterated tuple
+        // expensive O(n) check (actually almost O(AllocsPerChunk))
+        void const* pp = *iter;
+        bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+        ASSERT_TRUE(matched);
+        try {
+            alloc.remove(const_cast<void*>(addresses[i++]));
+        } catch (range_error const&) {                         // OK bc. compaction
+            continue;
+        }
+    }
+}
+
+// Test that it should work with normal, compacting removals in
+// opposite direction of the/any iterator
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic3) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    for (i = 0; i < (NumTuples - AllocsPerChunk) / 2 && ! iter.drained(); ++i, ++iter) {
+        void const* pp = *iter;
+        bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+        ASSERT_TRUE(matched);
+        alloc.remove(const_cast<void*>(addresses[NumTuples - i - 1]));
+    }
+    while (! iter.drained()) {
+        void const* pp = *iter;
+        bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+        ASSERT_TRUE(matched);
+        ++iter;
+        ++i;
+    }
+//    ASSERT_EQ(NumTuples, i);
+}
+
+// Test that it should work with lightweight, non-compacting removals that only eats
+// what had been iterated
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic4) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    for (i = 0; i < NumTuples; ++i) {
+        ASSERT_TRUE(Gen::same(*iter++, i));
+        // Removing from head, unless forced by calling again
+        // with NULL next, would not have any effect except
+        // removing crosses boundary. This means that we are
+        // iterating over values that actually should *not* be
+        // visible (i.e. garbage). But that is ok, since we are
+        // not forcing it every time (in which case it becomes
+        // normal, compacting removal).
+        alloc.remove(CompactingChunks::remove_direction::from_head, addresses[i]);
+    }
+    ASSERT_TRUE(iter.drained());
+}
+
+// Test that it should work with lightweight, non-compacting removals from tail
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic5) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    for (i = 0; i < NumTuples && ! iter.drained(); ++i) {
+        ASSERT_TRUE(Gen::same(*iter++, i));
+        // Removing from head, unless forced by calling again
+        // with NULL next, would not have any effect except
+        // removing crosses boundary. This means that we are
+        // iterating over values that actually should *not* be
+        // visible (i.e. garbage). But that is ok, since we are
+        // not forcing it every time (in which case it becomes
+        // normal, compacting removal).
+        alloc.remove(CompactingChunks::remove_direction::from_tail, addresses[NumTuples - i - 1]);
+    }
+    ASSERT_TRUE(iter.drained());
+    ASSERT_EQ(NumTuples / 2, i);
+}
+
+TEST_F(TableTupleAllocatorTest, TestSnapshotIteratorOnNonFull1stChunk) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    // Remove last 10, making 1st chunk non-full
+    for (i = 0; i < 10; ++i) {
+        alloc.remove(const_cast<void*>(addresses[NumTuples - i - 1]));
+    }
+    alloc.template freeze<truth>();
+    i = 0;
+    auto const beg = addresses.begin(), end = prev(addresses.end(), 10);
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
+            static_cast<Alloc const&>(alloc), [this, &i, &beg, &end] (void const* p) {
+                ASSERT_TRUE(end != find(beg, end, p) ||
+                        end != find_if(beg, end, [p](void const* pp) { return ! memcmp(p, pp, TupleSize); }));
+                ++i;
+            });
+    ASSERT_EQ(i, NumTuples - 10);
+    alloc.thaw();
 }
 
 #endif

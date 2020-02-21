@@ -633,7 +633,7 @@ SnapshotCompletionInterest, Promotable
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
         for (Snapshot e : snapshots.values()) {
-            SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e);
+            SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e, m_snapshotErrLogStr, m_hostId);
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
@@ -731,13 +731,12 @@ SnapshotCompletionInterest, Promotable
         return infoWithMinHostId;
     }
 
-    private SnapshotInfo checkSnapshotIsComplete(Long key, Snapshot s)
-    {
+    public static SnapshotInfo checkSnapshotIsComplete(Long key, Snapshot s, StringBuilder sb, int hostId) {
         int partitionCount = -1;
         for (TableFiles tf : s.m_tableFiles.values()) {
             // Check if the snapshot is complete
             if (tf.m_completed.stream().anyMatch(b->!b)) {
-                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                sb.append("\nRejected snapshot ")
                                    .append(s.getNonce())
                                    .append(" because it was not completed.");
                 return null;
@@ -753,7 +752,7 @@ SnapshotCompletionInterest, Promotable
                 if (partitionCount == -1) {
                     partitionCount = count;
                 } else if (count != partitionCount) {
-                    m_snapshotErrLogStr.append("\nRejected snapshot ")
+                    sb.append("\nRejected snapshot ")
                                     .append(s.getNonce())
                                     .append(" because it had the wrong partition count ")
                                     .append(count)
@@ -765,7 +764,7 @@ SnapshotCompletionInterest, Promotable
         }
 
         if (s.m_digests.isEmpty()) {
-            m_snapshotErrLogStr.append("\nRejected snapshot ")
+            sb.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because it had no valid digest file.");
             return null;
@@ -815,7 +814,7 @@ SnapshotCompletionInterest, Promotable
         }
         catch (IOException ioe)
         {
-            m_snapshotErrLogStr.append("\nUnable to read digest file: ")
+            sb.append("\nUnable to read digest file: ")
                             .append(digest.getAbsolutePath())
                             .append(" due to: ")
                             .append(ioe.getMessage());
@@ -823,7 +822,7 @@ SnapshotCompletionInterest, Promotable
         }
         catch (JSONException je)
         {
-            m_snapshotErrLogStr.append("\nUnable to extract catalog CRC from digest: ")
+            sb.append("\nUnable to extract catalog CRC from digest: ")
                             .append(digest.getAbsolutePath())
                             .append(" due to: ")
                             .append(je.getMessage());
@@ -831,7 +830,7 @@ SnapshotCompletionInterest, Promotable
         }
 
         if (s.m_catalogFile == null) {
-            m_snapshotErrLogStr.append("\nRejected snapshot ")
+            sb.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because it had no catalog.");
             return null;
@@ -841,7 +840,7 @@ SnapshotCompletionInterest, Promotable
             byte[] bytes = MiscUtils.fileToBytes(s.m_catalogFile);
             InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
             if (jarfile.getCRC() != catalog_crc) {
-                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                sb.append("\nRejected snapshot ")
                                 .append(s.getNonce())
                                 .append(" because catalog CRC did not match digest.");
                 return null;
@@ -861,14 +860,14 @@ SnapshotCompletionInterest, Promotable
             // If there are still "normal" tables apart from the snapshotted tables and
             // optionally snapshotted views, we have no choice but fail the restore.
             if (! fullTableNames.isEmpty()) {
-                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                sb.append("\nRejected snapshot ")
                                    .append(s.getNonce())
                                    .append(" because this is a partial snapshot.")
                                    .append(" Tables missing in snapshot: " + fullTableNames);
                 return null;
             }
         } catch (IOException ioe) {
-            m_snapshotErrLogStr.append("\nRejected snapshot ")
+            sb.append("\nRejected snapshot ")
                                .append(s.getNonce())
                                .append(" because catalog file could not be validated");
             return null;
@@ -877,7 +876,7 @@ SnapshotCompletionInterest, Promotable
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, newPartitionCount, catalog_crc, m_hostId, instanceId,
+                    partitionCount, newPartitionCount, catalog_crc, hostId, instanceId,
                     digestTableNames, s.m_stype, elasticOperationMetadata);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
