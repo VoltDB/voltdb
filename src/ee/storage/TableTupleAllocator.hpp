@@ -383,6 +383,7 @@ namespace voltdb {
             size_t chunkId() const noexcept;
             void const* address() const noexcept;
             bool empty() const noexcept;               // makes it behave like std::optional<position_type>
+            bool operator==(position_type const&) const noexcept;
         };
 
         /**
@@ -406,8 +407,18 @@ namespace voltdb {
                 void const*& next() noexcept;
                 bool empty() const noexcept;
             };
+            class FrozenTxnBoundaries final {
+                position_type m_left{}, m_right{};
+            public:
+                FrozenTxnBoundaries() noexcept = default;
+                FrozenTxnBoundaries(ChunkList<CompactingChunk> const&) noexcept;
+                position_type const& left() const noexcept;
+                position_type const& right() const noexcept;
+                position_type& right() noexcept;
+                void clear();
+            };
         private:
-            template<typename Chunks, typename Tag, typename E> friend struct IterableTableTupleChunks;
+            template<typename, typename, typename> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
             static size_t s_id;
             static size_t gen_id();
@@ -415,7 +426,7 @@ namespace voltdb {
             size_t const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
-            position_type m_frozenTxnBoundary{};  // (frozen) right boundary for txn
+            FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
@@ -460,6 +471,7 @@ namespace voltdb {
             } m_batched;
             using list_type::last;
             using list_type::pop_back;
+            position_type& frozenRight() noexcept;  // txn right boundary when freezing. Need to be adjusted for LW tail removal
         public:
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;
@@ -478,7 +490,7 @@ namespace voltdb {
             list_type::iterator const* find(size_t) const noexcept;
             TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
             TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
-            position_type const& endTxn_frozen() const noexcept;                       // txn left boundary when freezing
+            FrozenTxnBoundaries const& frozenBoundaries() const noexcept;  // txn boundaries when freezing
             /**
              * Memory operations
              */
@@ -676,6 +688,7 @@ namespace voltdb {
             typename = typename enable_if<is_class<Tag>::value && is_chunks<Chunks>::value>::type>
         struct IterableTableTupleChunks final {
             using iterator_value_type = void*;         // constness-independent type being iterated over
+            using chunk_type = Chunks;
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
             template<iterator_permission_type perm, iterator_view_type vtype>
@@ -691,6 +704,8 @@ namespace voltdb {
                 using list_iterator_type = typename conditional<perm == iterator_permission_type::ro,
                       typename Chunks::list_type::const_iterator, typename Chunks::list_type::iterator>::type;
                 list_iterator_type m_iter;
+                bool const m_hasTxnInvisibleChunks;    // can be true only if in snapshot view, is frozen, and contains chunks
+                // only visible to snapshot
             protected:
                 using value_type = typename super::value_type;
                 // ctor arg type
@@ -737,21 +752,25 @@ namespace voltdb {
 
             /**
              * Special iterator that survives multiple txns.
+             * The enclosing Chunks type must be compacting.
              */
-            class elastic_iterator :
-                iterator_type<iterator_permission_type::ro, iterator_view_type::txn> {
+            class elastic_iterator : iterator_type<iterator_permission_type::ro, iterator_view_type::txn> {
                 using super = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
                 using container_type = typename super::container_type;
+                template<typename, typename, typename> friend class ElasticIterator_refresh;
                 using value_type = typename super::value_type;
+                position_type const m_txnBoundary;
                 size_t m_chunkId;
                 void refresh();
-            public:
                 elastic_iterator(container_type);
+            public:
+                using constness = typename super::constness;
                 static elastic_iterator begin(container_type);
                 bool drained() noexcept;
                 elastic_iterator& operator++();
                 elastic_iterator operator++(int);
                 value_type operator*();
+                position_type const& txnBoundary() const noexcept;
             };
 
             /**
@@ -865,14 +884,15 @@ namespace voltdb {
          */
         template<typename iterator_type, typename Fun, typename Chunks,
             typename = typename enable_if<is_chunks<Chunks>::value && iterator_type::constness::value == is_const<Chunks>::value>::type>
-        inline void until(Chunks& c, Fun&& f) {
+        inline bool until(Chunks& c, Fun&& f) {
             for (auto iter = iterator_type::begin(c); ! iter.drained();) {
                 auto* addr = *iter;
                 ++iter;
                 if (f(addr)) {
-                    break;
+                    return true;
                 }
             }
+            return false;
         }
 
         // versions for multi-ary iterator constructors
@@ -895,16 +915,17 @@ namespace voltdb {
         }
 
         template<typename iterator_type, typename Fun, typename Chunks, typename... Args>
-        inline void until(Chunks& c, Fun&& f, Args&&... args) {
+        inline bool until(Chunks& c, Fun&& f, Args&&... args) {
             static_assert(iterator_type::constness::value == is_const<Chunks>::value,
                     "until(): constness of Chunks and iterator should be the same");
             for (auto iter = iterator_type::begin(c, forward<Args&&>(args)...); ! iter.drained();) {
                 auto* addr = *iter;
                 ++iter;
                 if (f(addr)) {
-                    break;
+                    return true;
                 }
             }
+            return false;
         }
     }
 
