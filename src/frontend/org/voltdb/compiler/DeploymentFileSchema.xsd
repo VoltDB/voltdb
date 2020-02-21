@@ -55,7 +55,6 @@
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
       <xs:element name="kipling" minOccurs="0" maxOccurs="1" type="kiplingType" />
       <xs:element name="schemaregistryurl" minOccurs="0" maxOccurs="1" type="xs:string" />
-      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType"/>
     </xs:all>
   </xs:complexType>
 
@@ -573,6 +572,9 @@
   </xs:complexType>
 
   <xs:complexType name="kiplingType">
+    <xs:sequence>
+      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType"/>
+    </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="false" />
     <xs:attribute name="port" default="9092">
       <xs:simpleType>

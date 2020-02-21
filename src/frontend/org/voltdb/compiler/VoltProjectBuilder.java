@@ -340,7 +340,6 @@ public class VoltProjectBuilder {
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
     private KiplingType m_kiplingConfiguration;
-    private TopicDefaultsType m_topicDefaults;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -420,11 +419,19 @@ public class VoltProjectBuilder {
     }
 
     public TopicDefaultsType getTopicDefaults() {
-        if (m_topicDefaults == null) {
-            // Note: defaults with no explicit retention policies are ok
-            m_topicDefaults = new TopicDefaultsType();
+        KiplingType k = getKiplingConfiguration();
+        TopicsType t = k.getTopics();
+        if (t == null) {
+            t = new TopicsType();
+            k.setTopics(t);
         }
-        return m_topicDefaults;
+        TopicDefaultsType d = t.getDefaults();
+        if (d == null) {
+            // Note: defaults with no explicit retention policies are ok
+            d = new TopicDefaultsType();
+            t.setDefaults(d);
+        }
+        return d;
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -1403,7 +1410,6 @@ public class VoltProjectBuilder {
 
         deployment.setFeatures(m_featureOptions);
         setKiplingConfiguration(deployment);
-        setTopicConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1420,16 +1426,6 @@ public class VoltProjectBuilder {
         if (m_kiplingConfiguration != null) {
             deployment.setKipling(m_kiplingConfiguration);
         }
-    }
-
-    private void setTopicConfiguration(DeploymentType deployment) {
-        // FIXME: may be extended to handle a list of topic profiles
-        if (m_topicDefaults == null) {
-            return;
-        }
-        TopicsType topics = new TopicsType();
-        topics.setDefaults(m_topicDefaults);
-        deployment.setTopics(topics);
     }
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
