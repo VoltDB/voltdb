@@ -1234,6 +1234,31 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::begin(
     return {c};
 }
 
+namespace std {                                    // Need to declare these before using (for Mac clang++)
+    using namespace voltdb::storage;
+    template<> struct less<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            bool const e1 = lhs.empty(), e2 = rhs.empty();
+            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
+                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
+            } else {
+                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
+                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
+            }
+        }
+    };
+    template<> struct less_equal<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
+        }
+    };
+    template<> struct less<ChunkHolder<>> {
+        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
+            return less_rolling(lhs.id(), rhs.id());
+        }
+    };
+}
+
 // Helper for elastic_iterator::refresh() on compacting chunks.
 // 1. Since C++17, we will be able to inline these less-graceful
 // workarounds with if-constexpr.
@@ -1243,26 +1268,33 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::begin(
 template<typename IterableTableTupleChunks, typename ElasticIterator,
     typename Compact = typename IterableTableTupleChunks::chunk_type::Compact>
 struct ElasticIterator_refresh {
-    inline void operator()(ElasticIterator const&) const {
+    inline void operator()(ElasticIterator const&, size_t const&,
+            typename IterableTableTupleChunks::chunk_type const&,
+            typename IterableTableTupleChunks::chunk_type::list_type::const_iterator&,
+            void const*&) const {
         throw logic_error("elastic_iterator can only iterate over compacting chunks");
     }
 };
 
 template<typename I, typename ElasticIterator>
 struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>> {
-    inline void operator()(ElasticIterator& iter) const {
+    inline void operator()(ElasticIterator& iter, size_t& chunkId,
+            typename I::chunk_type const& storage,
+            ChunkList<CompactingChunk>::const_iterator& chunkIter,
+            void const*& cursor) const {
         if (! iter.drained()) {
-            auto const& indexBeg = iter.storage().beginTxn().iterator();
-            if (less_rolling(iter.m_chunkId, indexBeg->id())) {         // current chunk list iterator is stale
-                iter.m_chunkId = (iter.list_iterator() = indexBeg)->id();
-                iter.m_cursor = iter.list_iterator()->begin();
-            } else if (! iter.list_iterator()->contains(iter.m_cursor)) {
+            auto const& indexBeg = storage.beginTxn().iterator();
+            if (less_rolling(chunkId, indexBeg->id())) {
+                // current chunk list iterator is stale
+                chunkId = (chunkIter = indexBeg)->id();
+                cursor = chunkIter->begin();
+            } else if (! chunkIter->contains(cursor)) {
                 // Current chunk has been partially compacted,
                 // to the extent that cursor position is stale
-                iter.m_cursor =
-                    ++iter.list_iterator() == iter.storage().end() ||
+                cursor =
+                    ++chunkIter == storage.end() ||
                     less<position_type>()(iter.txnBoundary(), iter) ?        // drained
-                    nullptr : iter.list_iterator()->begin();
+                    nullptr : chunkIter->begin();
             }
         }
     }
@@ -1271,9 +1303,9 @@ struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>
 template<typename Chunks, typename Tag, typename E> inline void
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::refresh() {
     static constexpr ElasticIterator_refresh<
-        IterableTableTupleChunks<Chunks, Tag, E>, typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator>
-        const refresher{};
-    refresher(*this);
+        IterableTableTupleChunks<Chunks, Tag, E>,
+        typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator> refresher{};
+    refresher(*this, m_chunkId, super::storage(), super::list_iterator(), super::m_cursor);
 }
 
 template<typename Chunks, typename Tag, typename E> inline position_type const&
@@ -1394,31 +1426,6 @@ inline position_type& position_type::operator=(position_type const& o) noexcept 
     const_cast<size_t&>(m_chunkId) = o.chunkId();
     m_addr = o.address();
     return *this;
-}
-
-namespace std {
-    using namespace voltdb::storage;
-    template<> struct less<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            bool const e1 = lhs.empty(), e2 = rhs.empty();
-            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
-                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
-            } else {
-                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
-                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
-            }
-        }
-    };
-    template<> struct less_equal<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
-        }
-    };
-    template<> struct less<ChunkHolder<>> {
-        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
-            return less_rolling(lhs.id(), rhs.id());
-        }
-    };
 }
 
 template<typename Chunks, typename Tag, typename E> inline bool

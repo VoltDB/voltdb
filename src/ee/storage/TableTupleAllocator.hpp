@@ -757,7 +757,6 @@ namespace voltdb {
             class elastic_iterator : iterator_type<iterator_permission_type::ro, iterator_view_type::txn> {
                 using super = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
                 using container_type = typename super::container_type;
-                template<typename, typename, typename> friend class ElasticIterator_refresh;
                 using value_type = typename super::value_type;
                 position_type const m_txnBoundary;
                 size_t m_chunkId;
@@ -771,6 +770,7 @@ namespace voltdb {
                 elastic_iterator operator++(int);
                 value_type operator*();
                 position_type const& txnBoundary() const noexcept;
+                using super::operator position_type;
             };
 
             /**
