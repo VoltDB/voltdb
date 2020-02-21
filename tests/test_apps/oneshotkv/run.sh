@@ -83,7 +83,7 @@ function client() {
 }
 
 function oneshot-benchmark() {
-    srccompile
+    jars-ifneeded
     java -classpath ${APPCLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$LOG4J \
         oneshotkv.OneShotBenchmark \
         --displayinterval=5 \

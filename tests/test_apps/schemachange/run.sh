@@ -53,7 +53,7 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    srccompile
+    jars-ifneeded
     java -ea -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
@@ -66,8 +66,7 @@ function client() {
 # sets a trap to kill the server before the script exits.
 function _auto_run() {
     local OPTIONS="$@"
-    srccompile || exit 1
-    catalog || exit 1
+    jars || exit 1
     voltdb_daemon_start $APPNAME.jar $HOST deployment.xml $LICENSE || exit 1
     java -ea -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient --servers=localhost $OPTIONS
