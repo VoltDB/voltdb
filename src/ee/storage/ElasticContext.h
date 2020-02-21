@@ -20,9 +20,7 @@
 #include <vector>
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include "storage/ElasticScanner.h"
 #include "storage/TableStreamerContext.h"
-#include "storage/TupleBlock.h"
 #include "storage/TableStreamer.h"
 
 class DummyElasticTableStreamer;
@@ -73,11 +71,6 @@ public:
     virtual bool notifyTupleInsert(TableTuple &tuple);
 
     /**
-     * Optional tuple update handler.
-     */
-    virtual bool notifyTupleUpdate(TableTuple &tuple);
-
-    /**
      * Optional tuple delete handler.
      */
     virtual bool notifyTupleDelete(TableTuple &tuple);
@@ -114,11 +107,6 @@ private:
     void setTuplesPerCall(size_t nTuplesPerCall) {
         m_nTuplesPerCall = nTuplesPerCall;
     }
-
-    /**
-     * Scanner for retrieving rows.
-     */
-    boost::scoped_ptr<ElasticScanner> m_scanner;
 
     /**
      * Predicate strings retained in case they may need to be re-applied post-"TRUNCATE TABLE".

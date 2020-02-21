@@ -22,6 +22,7 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
 #include "common/debuglog.h"
 #include "common/types.h"
 #include "common/ids.h"
@@ -117,7 +118,7 @@ public:
     ElasticIndex::const_iterator indexEnd() const;
     boost::shared_ptr<ElasticIndexTupleRangeIterator>
             getIndexTupleRangeIterator(ElasticIndexHashRange const& range);
-    void activateSnapshot();
+    void activateSnapshot(TableStreamType streamType);
     void printIndex(std::ostream& os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple& tuple) const;
 
@@ -198,6 +199,7 @@ public:
     using txn_const_iterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::const_iterator;
     using SnapshotIterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::hooked_iterator;
     using remove_direction = storage::HookedCompactingChunks<Hook>::remove_direction;
+    using ElasticIndexIterator = storage::IterableTableTupleChunks<Alloc, storage::truth>::elastic_iterator;
 
     virtual ~PersistentTable();
     Alloc& allocator() noexcept {
@@ -290,6 +292,10 @@ public:
 
     int uniqueIndexCount() const {
         return static_cast<int>(m_uniqueIndexes.size());
+    }
+
+    bool elasticIndexScanComplete() const {
+        return (m_elasticIt.get() == nullptr);
     }
 
     // returned via shallow vector copy -- seems good enough.
@@ -388,12 +394,12 @@ public:
                        TableStreamType streamType,
                        std::vector<int>& retPositions);
 
-    void activateSnapshot();
+    void activateSnapshot(TableStreamType streamType);
 
     /**
      * return true if no more tuples to be snasphsotted
      */
-    bool nextTuple(TableTuple& tuple);
+    bool nextTuple(TableTuple& tuple, TableStreamType streamType);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
@@ -755,6 +761,7 @@ private:
     // STORAGE TRACKING
     std::unique_ptr<Alloc> m_dataStorage;
     std::shared_ptr<SnapshotIterator> m_snapIt;
+    std::shared_ptr<ElasticIndexIterator> m_elasticIt ;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -837,8 +844,8 @@ inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
     m_table.insertTupleForUndo(tuple);
 }
 
-inline void PersistentTableSurgeon::activateSnapshot() {
-    m_table.activateSnapshot();
+inline void PersistentTableSurgeon::activateSnapshot(TableStreamType streamType) {
+    m_table.activateSnapshot(streamType);
 }
 
 inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,

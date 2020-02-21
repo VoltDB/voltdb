@@ -85,7 +85,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
         return ACTIVATION_FAILED;
     }
 
-    m_surgeon.activateSnapshot();
+    m_surgeon.activateSnapshot(TABLE_STREAM_SNAPSHOT);
     return ACTIVATION_SUCCEEDED;
 }
 
@@ -97,7 +97,7 @@ CopyOnWriteContext::handleReactivation(TableStreamType streamType)
 {
     // Not support multiple snapshot streams.
     if (streamType == TABLE_STREAM_SNAPSHOT) {
-     return ACTIVATION_FAILED;
+        return ACTIVATION_FAILED;
     }
     return ACTIVATION_UNSUPPORTED;
 }
@@ -131,7 +131,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     // or the byte count threshold is hit.
     bool yield = false;
     while (!yield) {
-        bool hasMore = table.nextTuple(tuple);
+        bool hasMore = table.nextTuple(tuple, TABLE_STREAM_SNAPSHOT);
         if (!hasMore) {
             yield = true;
         } else {

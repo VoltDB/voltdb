@@ -95,7 +95,8 @@ ElasticContext::handleActivation(TableStreamType streamType) {
             return ACTIVATION_SUCCEEDED;
         }
         m_surgeon.createIndex();
-        m_scanner.reset(new ElasticScanner(getTable(), m_surgeon.getData()));
+        //activate elastic index iterator
+        getTable().activateSnapshot(TABLE_STREAM_ELASTIC_INDEX);
         m_indexActive = true;
         return ACTIVATION_SUCCEEDED;
     }
@@ -129,7 +130,6 @@ ElasticContext::handleActivation(TableStreamType streamType) {
             //compare against the old predicate
             m_predicates.clear();
             m_surgeon.dropIndex();
-            m_scanner.reset();
             m_indexActive = false;
         }
         return ACTIVATION_SUCCEEDED;
@@ -175,7 +175,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     // Table changes are tracked through notifications.
     size_t i = 0;
     TableTuple tuple(getTable().schema());
-    while (m_scanner->next(tuple)) {
+    while (getTable().nextTuple(tuple, TABLE_STREAM_ELASTIC_INDEX)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
@@ -185,8 +185,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
         }
     }
 
-    // Done with indexing?
-    bool indexingComplete = m_scanner->isScanComplete();
+    bool indexingComplete = getTable().elasticIndexScanComplete();
     if (indexingComplete) {
         m_surgeon.setIndexingComplete();
     }
@@ -204,13 +203,6 @@ bool ElasticContext::notifyTupleInsert(TableTuple &tuple) {
             m_surgeon.indexAdd(tuple);
         }
     }
-    return true;
-}
-
-/**
- * Tuple update handler is not currently needed.
- */
-bool ElasticContext::notifyTupleUpdate(TableTuple &tuple) {
     return true;
 }
 

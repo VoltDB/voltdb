@@ -36,7 +36,6 @@
 #include "indexes/tableindexfactory.h"
 #include "storage/DRTupleStream.h"
 #include "storage/ElasticContext.h"
-#include "storage/ElasticScanner.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -472,10 +471,6 @@ public:
 
     int64_t doStreamMore(TableStreamType streamType) {
         return m_table->streamMore(*m_outputStreams, streamType, m_retPositions);
-    }
-
-    boost::shared_ptr<ElasticScanner> getElasticScanner() {
-        return boost::shared_ptr<ElasticScanner>(new ElasticScanner(*m_table, m_table->m_surgeon.getData()));
     }
 
     void context(const std::string msg, ...) {
@@ -949,7 +944,6 @@ public:
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getPredicateSerializeInput(predicateStrings);
         bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, HiddenColumnFilter::NONE, 0, m_tableId, *predicateInput);
         ASSERT_TRUE(ok);
-
         // Force index streaming to need multiple streamMore() calls.
         voltdb::ElasticContext *context = getElasticContext();
         ASSERT_NE(NULL, context);
@@ -1626,58 +1620,6 @@ public:
     int m_icycle;
 };
 
-// Test the elastic scanner.
-TEST_F(CopyOnWriteTest, ElasticScanner) {
-
-    const int NUM_PARTITIONS = 1;
-    const int TUPLES_PER_BLOCK = 50;
-    const int NUM_INITIAL = 300;
-    const int NUM_CYCLES = 300;
-    const int FREQ_INSERT = 1;
-    const int FREQ_DELETE = 10;
-    const int FREQ_UPDATE = 5;
-    const int FREQ_COMPACTION = 100;
-
-    ElasticTableScrambler tableScrambler(*this,
-                                         NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
-                                         FREQ_INSERT, FREQ_DELETE,
-                                         FREQ_UPDATE, FREQ_COMPACTION);
-
-    tableScrambler.initialize();
-
-    TableTuple tuple(m_table->schema());
-
-    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(*this, 0, TABLE_STREAM_ELASTIC_INDEX);
-    boost::shared_ptr<TableStreamerInterface> dummyStreamerPtr(dummyStreamer);
-    boost::shared_ptr<ElasticScanner>scanner = getElasticScanner();
-    std::vector<std::string> predicateStrings;
-    doActivateStream(TABLE_STREAM_ELASTIC_INDEX, dummyStreamerPtr, predicateStrings, true);
-
-    bool scanComplete = false;
-
-    // Mutate/scan loop.
-    for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
-        // Periodically delete, insert, update, compact, etc..
-        tableScrambler.scramble();
-
-        scanComplete = !scanner->next(tuple);
-        if (scanComplete) {
-            break;
-        }
-        T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
-        m_returns.insert(value);
-    }
-
-    // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
-    if (!scanComplete) {
-        while (scanner->next(tuple)) {
-            T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
-            m_returns.insert(value);
-        }
-    }
-
-    checkScanner();
-}
 
 /**
  * Dummy pass-through elastic TableStreamer for testing the index.
@@ -1834,7 +1776,6 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
         // Generate the elastic index.
         streamElasticIndex(predicateStrings1, true);
-
         // Do some scrambling.
         for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
             tableScrambler.scramble();

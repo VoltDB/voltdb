@@ -27,7 +27,6 @@
 #include "common/types.h"
 #include "storage/TableStreamerInterface.h"
 #include "storage/TupleBlock.h"
-#include "storage/ElasticScanner.h"
 #include "storage/TableStreamerContext.h"
 
 class CopyOnWriteTest;

@@ -1782,21 +1782,34 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
     return mispartitionedRows;
 }
 
-void PersistentTable::activateSnapshot() {
-   vassert(m_snapIt.get() == nullptr);
-   m_snapIt = allocator().template freeze<storage::truth>();
+void PersistentTable::activateSnapshot(TableStreamType streamType) {
+   if (streamType == TABLE_STREAM_SNAPSHOT) {
+       vassert(m_snapIt.get() == nullptr);
+       m_snapIt = allocator().template freeze<storage::truth>();
+   } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+       m_elasticIt = std::make_shared<ElasticIndexIterator>(allocator());
+   }
 }
 
-bool PersistentTable::nextTuple(TableTuple& tuple) {
-     if (m_snapIt->drained()) {
-       allocator().thaw();
-       m_snapIt.reset();
-       return false;
+bool PersistentTable::nextTuple(TableTuple& tuple, TableStreamType streamType) {
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
+       if (m_snapIt->drained()) {
+          allocator().thaw();
+          m_snapIt.reset();
+          return false;
+       }
+       auto *p = **m_snapIt;
+       tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
+       ++*m_snapIt;
+    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+       if (m_elasticIt->drained()) {
+         m_elasticIt.reset();
+         return false;
+       }
+       auto *p = **m_elasticIt;
+       tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
+       ++*m_elasticIt;
     }
-
-    auto *p = **m_snapIt;
-    tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
-    ++*m_snapIt;
     return true;
 }
 

@@ -257,7 +257,6 @@ SET (VOLTDB_SRC
   storage/ElasticContext.cpp
   storage/ElasticIndex.cpp
   storage/ElasticIndexReadContext.cpp
-  storage/ElasticScanner.cpp
   storage/ExportTupleStream.cpp
   storage/LargeTempTable.cpp
   storage/LargeTempTableBlock.cpp
