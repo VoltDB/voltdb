@@ -1647,9 +1647,7 @@ HookedCompactingChunks<Hook, E>::thaw() {
 }
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
-    void* r = CompactingChunks::allocate();
-    Hook::add(*this, Hook::ChangeType::Insertion, r);
-    return r;
+    return CompactingChunks::allocate();
 }
 
 template<typename Hook, typename E> inline void
