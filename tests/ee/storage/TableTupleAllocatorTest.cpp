@@ -1573,7 +1573,7 @@ TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic2) {
         // expensive O(n) check (actually almost O(AllocsPerChunk))
         void const* pp = *iter;
         bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
-                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+                static_cast<Alloc const&>(alloc), [pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
         ASSERT_TRUE(matched);
         try {
             alloc.remove(const_cast<void*>(addresses[i++]));
@@ -1599,14 +1599,14 @@ TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic3) {
     for (i = 0; i < (NumTuples - AllocsPerChunk) / 2 && ! iter.drained(); ++i, ++iter) {
         void const* pp = *iter;
         bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
-                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+                static_cast<Alloc const&>(alloc), [pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
         ASSERT_TRUE(matched);
         alloc.remove(const_cast<void*>(addresses[NumTuples - i - 1]));
     }
     while (! iter.drained()) {
         void const* pp = *iter;
         bool const matched = until<IterableTableTupleChunks<Alloc, truth>::const_iterator>(
-                static_cast<Alloc const&>(alloc), [this, pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
+                static_cast<Alloc const&>(alloc), [pp] (void const* p) { return ! memcmp(pp, p, TupleSize); });
         ASSERT_TRUE(matched);
         ++iter;
         ++i;

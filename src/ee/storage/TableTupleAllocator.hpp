@@ -620,7 +620,7 @@ namespace voltdb {
          */
         template<typename Hook, typename E = typename enable_if<Hook::is_hook::value>::type>
         class HookedCompactingChunks : public CompactingChunks, public Hook {
-            using CompactingChunks::allocate; using CompactingChunks::free;// hide details
+            using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
         public:
@@ -762,8 +762,8 @@ namespace voltdb {
                 position_type const m_txnBoundary;
                 size_t m_chunkId;
                 void refresh();
-                elastic_iterator(container_type);
             public:
+                elastic_iterator(container_type);
                 using constness = typename super::constness;
                 static elastic_iterator begin(container_type);
                 bool drained() noexcept;
