@@ -585,6 +585,31 @@ void* CompactingChunks::free(void* dst) {
     }
 }
 
+namespace std {                                    // Need to declare these before using (for Mac clang++)
+    using namespace voltdb::storage;
+    template<> struct less<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            bool const e1 = lhs.empty(), e2 = rhs.empty();
+            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
+                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
+            } else {
+                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
+                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
+            }
+        }
+    };
+    template<> struct less_equal<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
+        }
+    };
+    template<> struct less<ChunkHolder<>> {
+        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
+            return less_rolling(lhs.id(), rhs.id());
+        }
+    };
+}
+
 inline void CompactingChunks::free(typename CompactingChunks::remove_direction dir, void const* p) {
     switch (dir) {
         case remove_direction::from_head:
@@ -641,13 +666,8 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
                     pop_back();
                 }
-                if (frozen()) {
-                    if (empty()) {
-                        m_frozenTxnBoundaries.right() = {};
-                    } else {
-                        m_frozenTxnBoundaries.right() = *last();
-                    }
-                }
+                vassert(! frozen() || empty() ||
+                        less_equal<position_type>()(m_frozenTxnBoundaries.right(), *last()));
                 --m_allocs;
             }
             break;
@@ -1123,19 +1143,27 @@ struct ChunkBoundary {
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
     inline void const* operator()(ChunkList const& l, Iter const& iter, bool hasTxnInvisibleChunks) const noexcept {
-        auto const& boundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
-        if (boundaries.left().empty()) {        // not frozen
+        auto const& frozenBoundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
+        if (frozenBoundaries.left().empty()) {        // not frozen
             return iter->next();
         } else {
-            auto const leftId = boundaries.left().chunkId(),
-                 rightId = boundaries.right().chunkId(),
+            auto const leftId = frozenBoundaries.left().chunkId(),
+                 rightId = frozenBoundaries.right().chunkId(),
+                 txnBeginChunkId = reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator()->id(),
                  iterId = iter->id();
-            if(less_rolling(leftId, iterId)) {  // in chunk visible to frozen iterator only
-                return iter->end();
+            if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
+                if (less_rolling(iterId, rightId)) {
+                    return iter->end();
+                } else {
+                    vassert(iterId == rightId);
+                    return frozenBoundaries.right().address();
+                }
             } else if (leftId == iterId) {      // in the left boundary of frozen state
-                return hasTxnInvisibleChunks ? iter->end() : boundaries.left().address();
+                return hasTxnInvisibleChunks ? iter->end() : frozenBoundaries.left().address();
             } else if (rightId == iterId) {     // in the right boundary
-                return boundaries.right().address();
+                return frozenBoundaries.right().address();
+            } else if (txnBeginChunkId == iterId) {
+                return iter->end();
             } else {
                 return iter->next();
             }
@@ -1246,31 +1274,6 @@ typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::begin(
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) {
     return {c};
-}
-
-namespace std {                                    // Need to declare these before using (for Mac clang++)
-    using namespace voltdb::storage;
-    template<> struct less<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            bool const e1 = lhs.empty(), e2 = rhs.empty();
-            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
-                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
-            } else {
-                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
-                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
-            }
-        }
-    };
-    template<> struct less_equal<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
-        }
-    };
-    template<> struct less<ChunkHolder<>> {
-        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
-            return less_rolling(lhs.id(), rhs.id());
-        }
-    };
 }
 
 // Helper for elastic_iterator::refresh() on compacting chunks.
@@ -1457,14 +1460,16 @@ template<typename Chunks, typename Tag, typename E> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
     if (super::drained()) {
         return true;
-    } else if (super::storage().empty() ||
-            less<position_type>()(*super::storage().last(), *this) ||
-            less<position_type>()(m_txnBoundary, *this) ||
-            m_txnBoundary == *this) {
-        super::m_cursor = nullptr;
-        return true;
     } else {
-        return false;
+        if (super::storage().empty() ||
+                less<position_type>()(*super::storage().last(), *this) ||
+                less<position_type>()(m_txnBoundary, *this) ||
+                m_txnBoundary == *this) {
+            super::m_cursor = nullptr;
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 

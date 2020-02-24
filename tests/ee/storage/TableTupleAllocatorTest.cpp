@@ -78,8 +78,7 @@ public:
         return query(m_state++);
     }
     inline unsigned char* fill(unsigned char* dst) {
-        memcpy(dst, get(), sizeof m_queryBuf);
-        dst[len] = 0;
+        memcpy(dst, get(), len);
         return dst;
     }
     inline void* fill(void* dst) {
@@ -92,7 +91,6 @@ public:
     }
     inline static bool same(void const* dst, size_t state) {
         static unsigned char buf[len+1];
-//        return ! memcmp(dst, query(state, buf), len);
         bool const eq = ! memcmp(dst, query(state, buf), len);
         if (! eq) {
             printf("Expect %s, got %s", hex(state).c_str(), hex(dst).c_str());
@@ -715,8 +713,7 @@ TestTxnHook1<NonCompactingChunks<EagerNonCompactingChunk>> const TestTxnHook::sC
 TestTxnHook1<NonCompactingChunks<LazyNonCompactingChunk>> const TestTxnHook::sChain2{};
 
 TEST_F(TableTupleAllocatorTest, TestTxnHook) {
-    TestTxnHook tst;
-    tst();
+    TestTxnHook()();
 }
 
 /**
@@ -1067,11 +1064,6 @@ void testHookedCompactingChunksBatchRemove_multi2() {
                 assert(p == nullptr || Gen::same(p, i++));
             });
         assert(i == NumTuples);
-        i = 0;
-        for_each<snapshot_iterator>(alloc, [&i](void const* p) {
-                assert(p == nullptr || Gen::same(p, i++));
-                });
-        assert(i == NumTuples);
     };
     alloc.template freeze<truth>();
 
@@ -1185,8 +1177,7 @@ TestHookedCompactingChunks1<EagerNonCompactingChunk> const TestHookedCompactingC
 TestHookedCompactingChunks1<LazyNonCompactingChunk> const TestHookedCompactingChunks::s2{};
 
 TEST_F(TableTupleAllocatorTest, TestHookedCompactingChunks) {
-    TestHookedCompactingChunks t;
-    t();
+    TestHookedCompactingChunks()();
 }
 
 /**
@@ -1317,10 +1308,9 @@ struct TestInterleavedCompactingChunks {
 TestInterleavedCompactingChunks1<EagerNonCompactingChunk> const TestInterleavedCompactingChunks::s1{};
 TestInterleavedCompactingChunks1<LazyNonCompactingChunk> const TestInterleavedCompactingChunks::s2{};
 
-TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
-    TestInterleavedCompactingChunks t;
-    t();
-}
+//TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
+//    TestInterleavedCompactingChunks()();
+//}
 
 template<typename Chunk, gc_policy pol>
 void testSingleChunkSnapshot() {
@@ -1422,7 +1412,6 @@ void testRemovesFromEnds(size_t batch) {
             alloc.thaw();
         }
     } else {                                                   // remove from tail
-        alloc.template freeze<truth>();
         for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1435,17 +1424,6 @@ void testRemovesFromEnds(size_t batch) {
                     return ++i >= NumTuples - batch;
                 });
         assert(i == NumTuples - batch);
-        i = 0;
-        fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
-                static_cast<Alloc const&>(alloc), [&i](void const* p) {
-                    assert(Gen::same(p, i++));
-                });
-        // NOTE: since these light-weight removes involves no
-        // compaction, what gets deleted (that would normaly move
-        // "1st" tuple to last, and in snapshot, the head chunk
-        // would be preserved) is now lost forever.
-        assert(i == NumTuples - batch);
-        alloc.thaw();
     }
 }
 
@@ -1661,7 +1639,7 @@ TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic5) {
         // iterating over values that actually should *not* be
         // visible (i.e. garbage). But that is ok, since we are
         // not forcing it every time (in which case it becomes
-        // normal, compacting removal).
+        // normal, compacting removal). TODO: memcheck
         alloc.remove(CompactingChunks::remove_direction::from_tail, addresses[NumTuples - i - 1]);
     }
     ASSERT_TRUE(iter.drained());
