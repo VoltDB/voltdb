@@ -1412,7 +1412,6 @@ void testRemovesFromEnds(size_t batch) {
             alloc.thaw();
         }
     } else {                                                   // remove from tail
-        alloc.template freeze<truth>();
         for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
             alloc.remove(dir, addresses[i]);
         }
@@ -1425,17 +1424,6 @@ void testRemovesFromEnds(size_t batch) {
                     return ++i >= NumTuples - batch;
                 });
         assert(i == NumTuples - batch);
-        i = 0;
-        fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
-                static_cast<Alloc const&>(alloc), [&i](void const* p) {
-                    assert(Gen::same(p, i++));
-                });
-        // NOTE: since these light-weight removes involves no
-        // compaction, what gets deleted (that would normaly move
-        // "1st" tuple to last, and in snapshot, the head chunk
-        // would be preserved) is now lost forever.
-        assert(i == NumTuples - batch);
-        alloc.thaw();
     }
 }
 
@@ -1631,7 +1619,7 @@ TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic4) {
     ASSERT_TRUE(iter.drained());
 }
 
- Test that it should work with lightweight, non-compacting removals from tail
+// Test that it should work with lightweight, non-compacting removals from tail
 TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic5) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     using Gen = StringGen<TupleSize>;
