@@ -82,8 +82,8 @@ inline static size_t chunkSize(size_t tupleSize) noexcept {
 // We remove member initialization from init list to save from
 // storing chunk size into object
 template<typename Alloc> inline ChunkHolder<Alloc>::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
-    super(storageSize), m_id(id), m_tupleSize(tupleSize),
-    m_end(super::get() + storageSize), m_next(super::get()) {
+    Alloc(storageSize), m_id(id), m_tupleSize(tupleSize),
+    m_end(Alloc::get() + storageSize), m_next(Alloc::get()) {
     vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
 }
@@ -118,7 +118,7 @@ template<typename Alloc> inline bool ChunkHolder<Alloc>::empty() const noexcept 
 }
 
 template<typename Alloc> inline void* const ChunkHolder<Alloc>::begin() const noexcept {
-    return reinterpret_cast<void*>(super::get());
+    return reinterpret_cast<void*>(Alloc::get());
 }
 
 template<typename Alloc> inline void* const ChunkHolder<Alloc>::end() const noexcept {
@@ -133,7 +133,7 @@ template<typename Alloc> inline size_t ChunkHolder<Alloc>::tupleSize() const noe
     return m_tupleSize;
 }
 
-inline EagerNonCompactingChunk::EagerNonCompactingChunk(size_t s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
+inline EagerNonCompactingChunk::EagerNonCompactingChunk(id_type s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
 
 inline void* EagerNonCompactingChunk::allocate() noexcept {
     if (m_freed.empty()) {
@@ -167,7 +167,7 @@ inline bool EagerNonCompactingChunk::full() const noexcept {
     return super::full() && m_freed.empty();
 }
 
-inline LazyNonCompactingChunk::LazyNonCompactingChunk(size_t s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
+inline LazyNonCompactingChunk::LazyNonCompactingChunk(id_type s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
 
 inline void LazyNonCompactingChunk::free(void* src) {
     vassert(src >= begin() && src < next());
@@ -184,8 +184,9 @@ inline void LazyNonCompactingChunk::free(void* src) {
     }
 }
 
-template<typename Chunk, typename E>
-inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(void const* k) const {
+template<typename Chunk, typename Col, typename E>
+inline typename ChunkList<Chunk, Col, E>::iterator const*
+ChunkList<Chunk, Col, E>::find(void const* k) const {
     if (! m_byAddr.empty()) {
         auto const& iter = prev(m_byAddr.upper_bound(k));                    // find first entry whose begin() > k
         return iter != m_byAddr.cend() && iter->second->contains(k) ? &iter->second : nullptr;
@@ -194,56 +195,65 @@ inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(v
     }
 }
 
-template<typename Chunk, typename E>
-inline typename ChunkList<Chunk, E>::iterator const* ChunkList<Chunk, E>::find(size_t id) const {
+template<typename Chunk, typename Col, typename E>
+inline typename ChunkList<Chunk, Col, E>::iterator const*
+ChunkList<Chunk, Col, E>::find(id_type id) const {
     auto const iter = m_byId.find(id);
     return iter == m_byId.cend() ? nullptr : &iter->second;
 }
 
-template<typename Chunk, typename E> inline ChunkList<Chunk, E>::ChunkList(size_t tsize) noexcept :
+template<typename Chunk, typename Col, typename E> inline
+ChunkList<Chunk, Col, E>::ChunkList(size_t tsize) noexcept :
 super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
 
-template<typename Chunk, typename E> inline size_t& ChunkList<Chunk, E>::lastChunkId() {
+template<typename Chunk, typename Col, typename E> inline id_type&
+ChunkList<Chunk, Col, E>::lastChunkId() {
     return m_lastChunkId;
 }
 
-template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::tupleSize() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::chunkSize() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::chunkSize() const noexcept {
     return m_chunkSize;
 }
 
-template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::size() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::size() const noexcept {
     return m_size;
 }
 
-template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator const&
-ChunkList<Chunk, E>::last() const noexcept {
+template<typename Chunk, typename Col, typename E> inline
+typename ChunkList<Chunk, Col, E>::iterator const&
+ChunkList<Chunk, Col, E>::last() const noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator&
-ChunkList<Chunk, E>::last() noexcept {
+template<typename Chunk, typename Col, typename E> inline
+typename ChunkList<Chunk, Col, E>::iterator&
+ChunkList<Chunk, Col, E>::last() noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::add(
-        typename ChunkList<Chunk, E>::iterator iter) {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::add(typename ChunkList<Chunk, Col, E>::iterator iter) {
     m_byAddr.emplace(iter->begin(), iter);
     m_byId.emplace(iter->id(), iter);
 }
 
-template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::remove(
-        typename ChunkList<Chunk, E>::iterator iter) {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::remove(
+        typename ChunkList<Chunk, Col, E>::iterator iter) {
     m_byAddr.erase(iter->begin());
     m_byId.erase(iter->id());
 }
 
-template<typename Chunk, typename E>
-template<typename... Args>
-inline typename ChunkList<Chunk, E>::iterator ChunkList<Chunk, E>::emplace_back(Args&&... args) {
+template<typename Chunk, typename Col, typename E>
+template<typename... Args> inline typename ChunkList<Chunk, Col, E>::iterator
+ChunkList<Chunk, Col, E>::emplace_back(Args&&... args) {
     if (super::empty()) {
         super::emplace_front(forward<Args>(args)...);
         m_back = super::begin();
@@ -255,7 +265,8 @@ inline typename ChunkList<Chunk, E>::iterator ChunkList<Chunk, E>::emplace_back(
     return m_back;
 }
 
-template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_front() {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::pop_front() {
     if (super::empty()) {
         throw underflow_error("pop_front() called on empty chunk list");
     } else {
@@ -268,7 +279,8 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_front(
     }
 }
 
-template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_back() {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::pop_back() {
     if (super::empty()) {
         throw underflow_error("pop_back() called on empty chunk list");
     } else {
@@ -283,8 +295,8 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_back()
     }
 }
 
-template<typename Chunk, typename E>
-template<typename Pred> inline void ChunkList<Chunk, E>::remove_if(Pred pred) {
+template<typename Chunk, typename Col, typename E>
+template<typename Pred> inline void ChunkList<Chunk, Col, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
         if (pred(*iter)) {
             vassert(m_byAddr.count(iter->begin()));
@@ -299,8 +311,8 @@ template<typename Pred> inline void ChunkList<Chunk, E>::remove_if(Pred pred) {
     super::remove_if(pred);
 }
 
-template<typename Chunk, typename E>
-inline void ChunkList<Chunk, E>::clear() noexcept {
+template<typename Chunk, typename Col, typename E>
+inline void ChunkList<Chunk, Col, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
@@ -357,7 +369,7 @@ template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(voi
     }
 }
 
-inline CompactingChunk::CompactingChunk(size_t id, size_t s, size_t s2) : super(id, s, s2) {}
+inline CompactingChunk::CompactingChunk(id_type id, size_t s, size_t s2) : super(id, s, s2) {}
 
 inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chunk free(): update only on dst chunk
     vassert(contains(dst));
@@ -434,7 +446,7 @@ inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTra
     }
 }
 
-size_t CompactingChunks::s_id = 0;
+id_type CompactingChunks::s_id = 0;
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     list_type(tupleSize), CompactingStorageTrait(this), m_id(gen_id()),
@@ -467,11 +479,11 @@ inline bool CompactingChunks::TxnLeftBoundary::empty() const noexcept {
     return m_next == nullptr;
 }
 
-size_t CompactingChunks::gen_id() {
+id_type CompactingChunks::gen_id() {
     return s_id++;
 }
 
-inline size_t CompactingChunks::id() const noexcept {
+inline id_type CompactingChunks::id() const noexcept {
     return m_id;
 }
 
@@ -496,7 +508,7 @@ CompactingChunks::find(void const* p) const noexcept {
 }
 
 inline typename CompactingChunks::list_type::iterator const*
-CompactingChunks::find(size_t id) const noexcept {
+CompactingChunks::find(id_type id) const noexcept {
     auto const iter = list_type::find(id);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
@@ -924,7 +936,7 @@ template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks
 template<iterator_view_type, iterator_permission_type,
     typename container_type, typename = typename container_type::Compact>
 struct IteratorPermissible {
-    void operator()(set<size_t> const&, container_type) const noexcept {
+    void operator()(set<id_type> const&, container_type) const noexcept {
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
     }
 };
@@ -935,7 +947,7 @@ struct IteratorPermissible {
 template<typename container_type>
 struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_type::rw,
     container_type, integral_constant<bool, true>> {
-    void operator()(set<size_t>& exists, container_type cont) const {
+    void operator()(set<id_type>& exists, container_type cont) const {
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
         auto iter = exists.find(cont.id());
         if (iter == exists.end()) {            // add entry
@@ -955,7 +967,7 @@ struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_typ
 template<iterator_view_type, iterator_permission_type,
     typename container_type, typename = typename container_type::Compact>
 struct IteratorDeregistration {
-    void operator()(set<size_t> const&, container_type) const noexcept {       // No-op for irrelavent types
+    void operator()(set<id_type> const&, container_type) const noexcept {       // No-op for irrelavent types
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
     }
 };
@@ -963,7 +975,7 @@ struct IteratorDeregistration {
 template<typename container_type>
 struct IteratorDeregistration<iterator_view_type::snapshot, iterator_permission_type::rw,
     container_type, integral_constant<bool, true>> {
-    void operator()(set<size_t>& m, container_type cont) const {
+    void operator()(set<id_type>& m, container_type cont) const {
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
         auto iter = m.find(cont.id());
         if (iter != m.end()) {
@@ -1229,7 +1241,9 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 template<typename Chunks, typename Tag, typename E> inline
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::elastic_iterator(
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) :
-    super(c), m_txnBoundary(*c.last()), m_chunkId(super::list_iterator()->id()) {}
+    super(c), m_empty(c.empty()),
+    m_txnBoundary(m_empty ? decltype(m_txnBoundary){} : *c.last()),
+    m_chunkId(m_empty ? 0 : super::list_iterator()->id()) {}
 
 template<typename Chunks, typename Tag, typename E> inline
 typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
@@ -1272,8 +1286,9 @@ namespace std {                                    // Need to declare these befo
 template<typename IterableTableTupleChunks, typename ElasticIterator,
     typename Compact = typename IterableTableTupleChunks::chunk_type::Compact>
 struct ElasticIterator_refresh {
-    inline void operator()(ElasticIterator const&, size_t const&,
+    inline void operator()(ElasticIterator const&, bool, id_type const&,
             typename IterableTableTupleChunks::chunk_type const&,
+            typename IterableTableTupleChunks::chunk_type::iterator const&, position_type const&,
             typename IterableTableTupleChunks::chunk_type::list_type::const_iterator&,
             void const*&) const {
         throw logic_error("elastic_iterator can only iterate over compacting chunks");
@@ -1282,11 +1297,20 @@ struct ElasticIterator_refresh {
 
 template<typename I, typename ElasticIterator>
 struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>> {
-    inline void operator()(ElasticIterator& iter, size_t& chunkId,
+    inline void operator()(ElasticIterator& iter, bool& isEmpty, id_type& chunkId,
             typename I::chunk_type const& storage,
+            typename I::chunk_type::iterator const& last, position_type const& boundary,
             ChunkList<CompactingChunk>::const_iterator& chunkIter,
             void const*& cursor) const {
-        if (! iter.drained()) {
+        if (isEmpty) {                             // last time checked, allocator was empty
+            isEmpty = storage.empty();             // check again,
+            if (! isEmpty) {   // if it has something now, set cursor to 1st
+                chunkIter = storage.beginTxn().iterator();
+                chunkId = chunkIter->id();
+                cursor = chunkIter->begin();
+                const_cast<position_type&>(boundary) = *last;
+            }
+        } else if (! iter.drained()) {
             auto const& indexBeg = storage.beginTxn().iterator();
             if (less_rolling(chunkId, indexBeg->id())) {
                 // current chunk list iterator is stale
@@ -1309,7 +1333,8 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::refresh() {
     static constexpr ElasticIterator_refresh<
         IterableTableTupleChunks<Chunks, Tag, E>,
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator> refresher{};
-    refresher(*this, m_chunkId, super::storage(), super::list_iterator(), super::m_cursor);
+    refresher(*this, m_empty, m_chunkId, super::storage(), super::storage().last(), m_txnBoundary,
+            super::list_iterator(), super::m_cursor);
 }
 
 template<typename Chunks, typename Tag, typename E> inline position_type const&
@@ -1405,7 +1430,7 @@ inline position_type::position_type(CompactingChunks const& c, void const* p) : 
         // semantics of less<position_type>.
         const_cast<void*&>(m_addr) = nullptr;
     } else {
-        const_cast<size_t&>(m_chunkId) = (*iterp)->id();
+        const_cast<remove_const<decltype(m_chunkId)>::type&>(m_chunkId) = (*iterp)->id();
     }
 }
 
@@ -1413,7 +1438,7 @@ template<typename iterator>
 inline position_type::position_type(void const* p, iterator const& iter) noexcept :
 m_chunkId(iter->id()), m_addr(p) {}
 
-inline size_t position_type::chunkId() const noexcept {
+inline id_type position_type::chunkId() const noexcept {
     return m_chunkId;
 }
 inline void const* position_type::address() const noexcept {
@@ -1427,7 +1452,7 @@ inline bool position_type::operator==(position_type const& o) const noexcept {
 }
 
 inline position_type& position_type::operator=(position_type const& o) noexcept {
-    const_cast<size_t&>(m_chunkId) = o.chunkId();
+    const_cast<id_type&>(m_chunkId) = o.chunkId();
     m_addr = o.address();
     return *this;
 }
