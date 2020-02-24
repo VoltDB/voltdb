@@ -188,6 +188,10 @@ public class SnapshotComparer {
                     System.err.println("Error: Directories and Host number does not match.");
                     printHelpAndQuit(1);
                 }
+                if (!local && username.isEmpty()) {
+                    System.err.println("Error: Does not specify username.");
+                    printHelpAndQuit(1);
+                }
             } else {
                 // TODO: better UI for specify target snapshot
                 for (int i = 0; i < args.length; i++) {
@@ -278,6 +282,13 @@ public class SnapshotComparer {
                         }
                         i++;
                         targetHosts = args[i].split(",");
+                    } else if (arg.equalsIgnoreCase("--user")) {
+                        if (i + 1 >= args.length) {
+                            System.err.println("Error: Not enough args following --user");
+                            printHelpAndQuit(1);
+                        }
+                        i++;
+                        username = args[i];
                     }
                 }
                 if (sourceNonce == null || sourceNonce.isEmpty()) {
@@ -298,6 +309,10 @@ public class SnapshotComparer {
                         || (targetDirs == null) || (targetHosts == null) || (targetDirs.length == 0)
                                 || (targetDirs.length != targetHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
+                    printHelpAndQuit(1);
+                }
+                if (!local && username.isEmpty()) {
+                    System.err.println("Error: Does not specify username.");
                     printHelpAndQuit(1);
                 }
             }
