@@ -174,6 +174,14 @@ public class SnapshotComparer {
                         username = args[i];
                     }
                 }
+                if (sourceNonce == null || sourceNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (local == null) {
+                    System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
+                    printHelpAndQuit(1);
+                }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
                                 || (sourceDirs.length != sourceHosts.length))) {
@@ -271,6 +279,18 @@ public class SnapshotComparer {
                         i++;
                         targetHosts = args[i].split(",");
                     }
+                }
+                if (sourceNonce == null || sourceNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify source snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (targetNonce == null || targetNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify comparing snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (local == null) {
+                    System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
+                    printHelpAndQuit(1);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
