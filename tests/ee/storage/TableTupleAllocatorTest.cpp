@@ -1668,6 +1668,25 @@ TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic5) {
     ASSERT_EQ(NumTuples / 2, i);
 }
 
+// Test that it should work when iterator created when allocator
+// is empty
+TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic6) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    auto iter = IterableTableTupleChunks<Alloc, truth>::elastic_iterator::begin(alloc);
+    Gen gen;
+    size_t i;
+    for (i = 0; i < AllocsPerChunk * 2; ++i) {
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    for (i = 0; i < AllocsPerChunk * 2; ++i) {
+        ASSERT_TRUE(Gen::same(*iter++, i));
+    }
+    ASSERT_TRUE(iter.drained());
+    ASSERT_EQ(AllocsPerChunk * 2, i);
+}
+
 TEST_F(TableTupleAllocatorTest, TestSnapshotIteratorOnNonFull1stChunk) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     using Gen = StringGen<TupleSize>;
