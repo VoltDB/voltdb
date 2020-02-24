@@ -1225,7 +1225,9 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 template<typename Chunks, typename Tag, typename E> inline
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::elastic_iterator(
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::container_type c) :
-    super(c), m_txnBoundary(*c.last()), m_chunkId(super::list_iterator()->id()) {}
+    super(c), m_empty(c.empty()),
+    m_txnBoundary(m_empty ? decltype(m_txnBoundary){} : *c.last()),
+    m_chunkId(m_empty ? 0 : super::list_iterator()->id()) {}
 
 template<typename Chunks, typename Tag, typename E> inline
 typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
@@ -1268,8 +1270,9 @@ namespace std {                                    // Need to declare these befo
 template<typename IterableTableTupleChunks, typename ElasticIterator,
     typename Compact = typename IterableTableTupleChunks::chunk_type::Compact>
 struct ElasticIterator_refresh {
-    inline void operator()(ElasticIterator const&, size_t const&,
+    inline void operator()(ElasticIterator const&, bool, size_t const&,
             typename IterableTableTupleChunks::chunk_type const&,
+            typename IterableTableTupleChunks::chunk_type::iterator const&, position_type const&,
             typename IterableTableTupleChunks::chunk_type::list_type::const_iterator&,
             void const*&) const {
         throw logic_error("elastic_iterator can only iterate over compacting chunks");
@@ -1278,11 +1281,20 @@ struct ElasticIterator_refresh {
 
 template<typename I, typename ElasticIterator>
 struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>> {
-    inline void operator()(ElasticIterator& iter, size_t& chunkId,
+    inline void operator()(ElasticIterator& iter, bool& isEmpty, size_t& chunkId,
             typename I::chunk_type const& storage,
+            typename I::chunk_type::iterator const& last, position_type const& boundary,
             ChunkList<CompactingChunk>::const_iterator& chunkIter,
             void const*& cursor) const {
-        if (! iter.drained()) {
+        if (isEmpty) {                             // last time checked, allocator was empty
+            isEmpty = storage.empty();             // check again,
+            if (! isEmpty) {   // if it has something now, set cursor to 1st
+                chunkIter = storage.beginTxn().iterator();
+                chunkId = chunkIter->id();
+                cursor = chunkIter->begin();
+                const_cast<position_type&>(boundary) = *last;
+            }
+        } else if (! iter.drained()) {
             auto const& indexBeg = storage.beginTxn().iterator();
             if (less_rolling(chunkId, indexBeg->id())) {
                 // current chunk list iterator is stale
@@ -1305,7 +1317,8 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::refresh() {
     static constexpr ElasticIterator_refresh<
         IterableTableTupleChunks<Chunks, Tag, E>,
         typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator> refresher{};
-    refresher(*this, m_chunkId, super::storage(), super::list_iterator(), super::m_cursor);
+    refresher(*this, m_empty, m_chunkId, super::storage(), super::storage().last(), m_txnBoundary,
+            super::list_iterator(), super::m_cursor);
 }
 
 template<typename Chunks, typename Tag, typename E> inline position_type const&

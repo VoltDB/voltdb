@@ -758,6 +758,7 @@ namespace voltdb {
                 using super = iterator_type<iterator_permission_type::ro, iterator_view_type::txn>;
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
+                bool m_empty;                          // is allocator empty at instance construction time?
                 position_type const m_txnBoundary;
                 size_t m_chunkId;
                 void refresh();
