@@ -1444,14 +1444,19 @@ template<typename Chunks, typename Tag, typename E> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
     if (super::drained()) {
         return true;
-    } else if (super::storage().empty() ||
-            less<position_type>()(*super::storage().last(), *this) ||
-            less<position_type>()(m_txnBoundary, *this) ||
-            m_txnBoundary == *this) {
-        super::m_cursor = nullptr;
-        return true;
     } else {
-        return false;
+        refresh();
+        if (super::drained()) {
+            return true;
+        } else if (super::storage().empty() ||
+                less<position_type>()(*super::storage().last(), *this) ||
+                less<position_type>()(m_txnBoundary, *this) ||
+                m_txnBoundary == *this) {
+            super::m_cursor = nullptr;
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 
