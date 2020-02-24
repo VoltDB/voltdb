@@ -182,9 +182,9 @@ namespace voltdb {
             // bool empty() const noexcept is identical to ChunkHolder.
         };
 
-        template<typename Key, typename Value> struct StdCollections {
-            using set = std::set<Key>;
-            using map = std::map<Key, Value>;
+        struct StdCollections {
+            template<typename K> using set = std::set<K>;
+            template<typename K, typename V> using map = std::map<K, V>;
         };
 
         /**
@@ -195,9 +195,7 @@ namespace voltdb {
          * std::forward_list<ChunkHolder>, search by void* and by chunk id;
          * and limit insertion to tail and erase to front.
          */
-        template<typename Chunk,
-            typename Collectible1 = StdCollections<void const*, typename forward_list<Chunk>::iterator>,
-            typename Collectible2 = StdCollections<id_type, typename forward_list<Chunk>::iterator>,
+        template<typename Chunk, typename Col = StdCollections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -206,8 +204,8 @@ namespace voltdb {
             size_t m_size = 0;
             id_type m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
-            typename Collectible1::map m_byAddr{};
-            typename Collectible2::map m_byId{};
+            typename Col::template map<void const*, typename forward_list<Chunk>::iterator> m_byAddr{};
+            typename Col::template map<id_type, typename forward_list<Chunk>::iterator> m_byId{};
             void add(typename super::iterator);
             void remove(typename super::iterator);
         protected:
@@ -560,12 +558,11 @@ namespace voltdb {
             is_same<typename remove_const<T>::type, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
             is_base_of<CompactingChunks, typename remove_const<T>::type>::value>;
 
-        template<typename Alloc, typename Trait,
-            typename Collections = StdCollections<void const*, void const*>,
+        template<typename Alloc, typename Trait, typename Collections = StdCollections,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
-            using set = typename Collections::set;
-            using map = typename Collections::map;
+            using set = typename Collections::template set<void const*>;
+            using map = typename Collections::template map<void const*, void const*>;
             map m_changes{};                // addr in persistent storage under change => addr storing before-change content
             set m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
