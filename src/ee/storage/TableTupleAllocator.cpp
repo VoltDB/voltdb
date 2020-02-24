@@ -184,9 +184,9 @@ inline void LazyNonCompactingChunk::free(void* src) {
     }
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E>
-inline typename ChunkList<Chunk, Col1, Col2, E>::iterator const*
-ChunkList<Chunk, Col1, Col2, E>::find(void const* k) const {
+template<typename Chunk, typename Col, typename E>
+inline typename ChunkList<Chunk, Col, E>::iterator const*
+ChunkList<Chunk, Col, E>::find(void const* k) const {
     if (! m_byAddr.empty()) {
         auto const& iter = prev(m_byAddr.upper_bound(k));                    // find first entry whose begin() > k
         return iter != m_byAddr.cend() && iter->second->contains(k) ? &iter->second : nullptr;
@@ -195,65 +195,65 @@ ChunkList<Chunk, Col1, Col2, E>::find(void const* k) const {
     }
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E>
-inline typename ChunkList<Chunk, Col1, Col2, E>::iterator const*
-ChunkList<Chunk, Col1, Col2, E>::find(id_type id) const {
+template<typename Chunk, typename Col, typename E>
+inline typename ChunkList<Chunk, Col, E>::iterator const*
+ChunkList<Chunk, Col, E>::find(id_type id) const {
     auto const iter = m_byId.find(id);
     return iter == m_byId.cend() ? nullptr : &iter->second;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline
-ChunkList<Chunk, Col1, Col2, E>::ChunkList(size_t tsize) noexcept :
+template<typename Chunk, typename Col, typename E> inline
+ChunkList<Chunk, Col, E>::ChunkList(size_t tsize) noexcept :
 super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline id_type&
-ChunkList<Chunk, Col1, Col2, E>::lastChunkId() {
+template<typename Chunk, typename Col, typename E> inline id_type&
+ChunkList<Chunk, Col, E>::lastChunkId() {
     return m_lastChunkId;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline size_t
-ChunkList<Chunk, Col1, Col2, E>::tupleSize() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline size_t
-ChunkList<Chunk, Col1, Col2, E>::chunkSize() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::chunkSize() const noexcept {
     return m_chunkSize;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline size_t
-ChunkList<Chunk, Col1, Col2, E>::size() const noexcept {
+template<typename Chunk, typename Col, typename E> inline size_t
+ChunkList<Chunk, Col, E>::size() const noexcept {
     return m_size;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline
-typename ChunkList<Chunk, Col1, Col2, E>::iterator const&
-ChunkList<Chunk, Col1, Col2, E>::last() const noexcept {
+template<typename Chunk, typename Col, typename E> inline
+typename ChunkList<Chunk, Col, E>::iterator const&
+ChunkList<Chunk, Col, E>::last() const noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline
-typename ChunkList<Chunk, Col1, Col2, E>::iterator&
-ChunkList<Chunk, Col1, Col2, E>::last() noexcept {
+template<typename Chunk, typename Col, typename E> inline
+typename ChunkList<Chunk, Col, E>::iterator&
+ChunkList<Chunk, Col, E>::last() noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline void
-ChunkList<Chunk, Col1, Col2, E>::add(typename ChunkList<Chunk, Col1, Col2, E>::iterator iter) {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::add(typename ChunkList<Chunk, Col, E>::iterator iter) {
     m_byAddr.emplace(iter->begin(), iter);
     m_byId.emplace(iter->id(), iter);
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline void
-ChunkList<Chunk, Col1, Col2, E>::remove(
-        typename ChunkList<Chunk, Col1, Col2, E>::iterator iter) {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::remove(
+        typename ChunkList<Chunk, Col, E>::iterator iter) {
     m_byAddr.erase(iter->begin());
     m_byId.erase(iter->id());
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E>
-template<typename... Args> inline typename ChunkList<Chunk, Col1, Col2, E>::iterator
-ChunkList<Chunk, Col1, Col2, E>::emplace_back(Args&&... args) {
+template<typename Chunk, typename Col, typename E>
+template<typename... Args> inline typename ChunkList<Chunk, Col, E>::iterator
+ChunkList<Chunk, Col, E>::emplace_back(Args&&... args) {
     if (super::empty()) {
         super::emplace_front(forward<Args>(args)...);
         m_back = super::begin();
@@ -265,8 +265,8 @@ ChunkList<Chunk, Col1, Col2, E>::emplace_back(Args&&... args) {
     return m_back;
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline void
-ChunkList<Chunk, Col1, Col2, E>::pop_front() {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::pop_front() {
     if (super::empty()) {
         throw underflow_error("pop_front() called on empty chunk list");
     } else {
@@ -279,8 +279,8 @@ ChunkList<Chunk, Col1, Col2, E>::pop_front() {
     }
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E> inline void
-ChunkList<Chunk, Col1, Col2, E>::pop_back() {
+template<typename Chunk, typename Col, typename E> inline void
+ChunkList<Chunk, Col, E>::pop_back() {
     if (super::empty()) {
         throw underflow_error("pop_back() called on empty chunk list");
     } else {
@@ -295,8 +295,8 @@ ChunkList<Chunk, Col1, Col2, E>::pop_back() {
     }
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E>
-template<typename Pred> inline void ChunkList<Chunk, Col1, Col2, E>::remove_if(Pred pred) {
+template<typename Chunk, typename Col, typename E>
+template<typename Pred> inline void ChunkList<Chunk, Col, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
         if (pred(*iter)) {
             vassert(m_byAddr.count(iter->begin()));
@@ -311,8 +311,8 @@ template<typename Pred> inline void ChunkList<Chunk, Col1, Col2, E>::remove_if(P
     super::remove_if(pred);
 }
 
-template<typename Chunk, typename Col1, typename Col2, typename E>
-inline void ChunkList<Chunk, Col1, Col2, E>::clear() noexcept {
+template<typename Chunk, typename Col, typename E>
+inline void ChunkList<Chunk, Col, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
