@@ -260,7 +260,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
 
     // Short-circuit an empty scan
     if (m_node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug("").c_str());
+        VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
         if (m_aggExec != nullptr) {
             m_aggExec->p_execute_finish();
         } else if (m_insertExec != nullptr) {
@@ -533,7 +533,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     } else if (m_insertExec != nullptr) {
         m_insertExec->p_execute_finish();
     }
-    VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug("").c_str());
+    VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
 }
 

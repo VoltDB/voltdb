@@ -407,7 +407,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params) {
     tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
     m_outputTable->insertTuple(tmptup);
 
-    VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug("").c_str());
+    VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
 }
 
