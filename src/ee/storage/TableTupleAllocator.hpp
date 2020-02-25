@@ -213,6 +213,7 @@ namespace voltdb {
             template<typename Pred> void remove_if(Pred p);
             typename super::iterator& last() noexcept;
         public:
+            using collections = Col;
             using iterator = typename super::iterator;
             using const_iterator = typename super::const_iterator;
             using reference = typename super::reference;
@@ -272,7 +273,7 @@ namespace voltdb {
         protected:
             size_t& emptyChunks();
         public:
-            using Compact = integral_constant<bool, false>;
+            using Compact = false_type;
             NonCompactingChunks(size_t) noexcept;
             ~NonCompactingChunks() = default;
             size_t size() const noexcept;              // number of allocation requests, <= sum(allocated memory from system), considering modulo and non-full spaces
@@ -414,7 +415,6 @@ namespace voltdb {
                 FrozenTxnBoundaries(ChunkList<CompactingChunk> const&) noexcept;
                 position_type const& left() const noexcept;
                 position_type const& right() const noexcept;
-                position_type& right() noexcept;
                 void clear();
             };
         private:
@@ -435,9 +435,10 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
-            class BatchRemoveAccumulator : private map<list_type::iterator, vector<void*>> {
+            class BatchRemoveAccumulator :
+                private list_type::collections::template map<list_type::iterator, vector<void*>> {
+                using map_type = list_type::collections::template map<list_type::iterator, vector<void*>>;
                 CompactingChunks* m_self;
-                using map_type = map<list_type::iterator, vector<void*>>;
             protected:
                 CompactingChunks& chunks() noexcept;
                 // force "removing" the chunk to be compacted from, either by deleting (when not frozen), or
@@ -454,26 +455,29 @@ namespace voltdb {
             size_t m_allocs = 0;
             class DelayedRemover : protected BatchRemoveAccumulator {
                 using super = BatchRemoveAccumulator;
+                template<typename K, typename V> using map_type = list_type::collections::template map<K, V>;
+                template<typename K> using set_type = list_type::collections::template set<K>;
                 size_t m_size = 0;
                 bool m_prepared = false;
-                set<void*> m_remove{};
-                map<void*, void*> m_move{};
+                set_type<void*> m_remove{};
+                map_type<void*, void*> m_move{};
             public:
                 explicit DelayedRemover(CompactingChunks&);
                 // Register a single allocation to be removed later
                 size_t add(void*);
                 // Memory movements (src to be removed => dst to be copied over) due to batch remove
                 DelayedRemover& prepare(bool);
-                map<void*, void*> const& movements() const;
-                set<void*> const& removed() const;
+                map_type<void*, void*> const& movements() const;
+                set_type<void*> const& removed() const;
                 // Actuate batch remove
                 size_t force(bool);
             } m_batched;
             using list_type::last;
             using list_type::pop_back;
-            position_type& frozenRight() noexcept;  // txn right boundary when freezing. Need to be adjusted for LW tail removal
         public:
-            using Compact = integral_constant<bool, true>;
+            using Compact = true_type;
+            // for use in HookedCompactingChunks::remove() [batch mode]:
+            using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
             CompactingChunks(size_t tupleSize) noexcept;
             /**
              * Queries
@@ -591,7 +595,7 @@ namespace voltdb {
             void remove(void const*);
         public:
             enum class ChangeType : char {Update, Insertion, Deletion};
-            using is_hook = integral_constant<bool, true>;
+            using is_hook = true_type;
             TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
@@ -652,12 +656,13 @@ namespace voltdb {
              * occurs. Map for removed addr => addr that fills in
              * the removed address
              */
-            size_t remove(set<void*> const&, function<void(map<void*, void*>const&)> const&);
+            size_t remove(set<void*> const&,
+                    function<void(typename CompactingChunks::DelayedRemover_movments_type)> const&);
             /**
              * Batch removal using separate calls
              */
             size_t remove_add(void*);
-            map<void*, void*>const& remove_moves();
+            typename CompactingChunks::DelayedRemover_movments_type remove_moves();
             size_t remove_force();
         };
 

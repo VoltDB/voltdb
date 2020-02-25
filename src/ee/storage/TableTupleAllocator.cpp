@@ -600,7 +600,7 @@ namespace std {                                    // Need to declare these befo
     };
     template<> struct less_equal<position_type> {
         inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
+            return ! less<position_type>()(rhs, lhs);
         }
     };
     template<> struct less<ChunkHolder<>> {
@@ -703,16 +703,8 @@ inline position_type const& CompactingChunks::FrozenTxnBoundaries::right() const
     return m_right;
 }
 
-inline position_type& CompactingChunks::FrozenTxnBoundaries::right() noexcept {
-    return m_right;
-}
-
 inline typename CompactingChunks::FrozenTxnBoundaries const& CompactingChunks::frozenBoundaries() const noexcept {
     return m_frozenTxnBoundaries;
-}
-
-inline position_type& CompactingChunks::frozenRight() noexcept {
-    return m_frozenTxnBoundaries.right();
 }
 
 namespace batch_remove_aid {
@@ -807,11 +799,13 @@ inline size_t CompactingChunks::DelayedRemover::add(void* p) {
     }
 }
 
-inline map<void*, void*> const& CompactingChunks::DelayedRemover::movements() const{
+inline typename CompactingChunks::list_type::collections::map<void*, void*> const&
+CompactingChunks::DelayedRemover::movements() const{
     return m_move;
 }
 
-inline set<void*> const& CompactingChunks::DelayedRemover::removed() const{
+inline typename CompactingChunks::list_type::collections::set<void*> const&
+CompactingChunks::DelayedRemover::removed() const{
     return m_remove;
 }
 //
@@ -962,7 +956,7 @@ struct IteratorPermissible {
  */
 template<typename container_type>
 struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, integral_constant<bool, true>> {
+    container_type, true_type> {
     void operator()(set<id_type>& exists, container_type cont) const {
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
         auto iter = exists.find(cont.id());
@@ -990,7 +984,7 @@ struct IteratorDeregistration {
 
 template<typename container_type>
 struct IteratorDeregistration<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, integral_constant<bool, true>> {
+    container_type, true_type> {
     void operator()(set<id_type>& m, container_type cont) const {
         static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
         auto iter = m.find(cont.id());
@@ -1035,7 +1029,7 @@ struct iterator_begin {
     }
 };
 template<typename Cont, iterator_permission_type perm>
-struct iterator_begin<Cont, perm, iterator_view_type::txn, integral_constant<bool, true>> {
+struct iterator_begin<Cont, perm, iterator_view_type::txn, true_type> {
     using iterator = typename conditional<perm == iterator_permission_type::ro,
           typename Cont::const_iterator, typename Cont::iterator>::type;
     iterator operator()(Cont& c) const noexcept {
@@ -1051,7 +1045,7 @@ struct HasTxnInvisibleChunks {
 };
 
 template<typename Chunks>
-struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, true_type> {
     inline bool operator()(Chunks const& c) const noexcept {
         return c.frozen() && (c.empty() ||
                 less_rolling(c.frozenBoundaries().left().chunkId(), c.begin()->id()));
@@ -1141,7 +1135,7 @@ struct ChunkBoundary {
 };
 
 template<typename ChunkList, typename Iter>
-struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
     inline void const* operator()(ChunkList const& l, Iter const& iter, bool hasTxnInvisibleChunks) const noexcept {
         auto const& frozenBoundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
         if (frozenBoundaries.left().empty()) {        // not frozen
@@ -1185,7 +1179,7 @@ struct ChunkDeleter {
 };
 
 template<typename ChunkList, typename Iter>
-struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, true_type> {
     inline void operator()(ChunkList& l, Iter& iter) const noexcept {
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
@@ -1295,7 +1289,7 @@ struct ElasticIterator_refresh {
 };
 
 template<typename I, typename ElasticIterator>
-struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>> {
+struct ElasticIterator_refresh<I, ElasticIterator, true_type> {
     inline void operator()(ElasticIterator& iter, bool& isEmpty, id_type& chunkId,
             typename I::chunk_type const& storage,
             typename I::chunk_type::iterator const& last, position_type const& boundary,
@@ -1461,10 +1455,11 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
     if (super::drained()) {
         return true;
     } else {
-        if (super::storage().empty() ||
-                less<position_type>()(*super::storage().last(), *this) ||
-                less<position_type>()(m_txnBoundary, *this) ||
-                m_txnBoundary == *this) {
+        auto const& s = super::storage();
+        if (s.empty() ||
+                less_rolling(s.last()->id(), m_chunkId) ||             // effectively less<position_type>()(*s.last(), *this);
+                (s.last()->id() == m_chunkId && s.last()->next() <= super::m_cursor) ||    // but that could cause use-after-release
+                less_equal<position_type>()(m_txnBoundary, *this)) {
             super::m_cursor = nullptr;
             return true;
         } else {
@@ -1705,7 +1700,8 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
 }
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove(
-        set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
+        set<void*> const& src,
+        function<void(CompactingChunks::DelayedRemover_movments_type)> const& cb) {
     using Remover = typename CompactingChunks::DelayedRemover;
     auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
             [](Remover& batch, void* p) {
@@ -1726,7 +1722,7 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     // moves (i.e. memcpy) before call back
     auto const tuple_size = tupleSize();
     for_each(batch.movements().cbegin(), batch.movements().cend(),
-            [tuple_size](typename map<void*, void*>::value_type const& entry) {
+            [tuple_size](pair<void*, void*> const& entry) {
                 memcpy(entry.first, entry.second, tuple_size);
             });
     cb(batch.movements());
@@ -1737,7 +1733,8 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     return CompactingChunks::m_batched.add(p);
 }
 
-template<typename Hook, typename E> inline map<void*, void*> const& HookedCompactingChunks<Hook, E>::remove_moves() {
+template<typename Hook, typename E> inline typename
+CompactingChunks::DelayedRemover_movments_type HookedCompactingChunks<Hook, E>::remove_moves() {
     return CompactingChunks::m_batched.prepare(true).movements();
 }
 
