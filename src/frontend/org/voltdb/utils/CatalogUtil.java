@@ -824,6 +824,24 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Return all snapshotable materialized views
+     * @param database
+     * @return
+     */
+    public static List<Table> getAllSnapshotableViews(org.voltdb.catalog.Database database)
+    {
+        ArrayList<Table> tlist = new ArrayList<>();
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            if (isSnapshotablePersistentTableView(database, t) ||
+                    isSnapshotableStreamedTableView(database, t)) {
+                tlist.add(t);
+            }
+        }
+        return tlist;
+    }
+
+    /**
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *
@@ -2728,26 +2746,36 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Change the state of given ZK node that represents catalog version from PENDING to COMPLETE, delete
+     * ZK nodes that those catalog version are lower than the given version.
+     * No-op if the state has been COMPLETE already.
+     * @param zk
+     * @param version
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
     public static void publishCatalog(ZooKeeper zk, int version) throws KeeperException, InterruptedException {
         String path = VoltZK.catalogbytes + "/" + version;
         Stat stat = new Stat();
         byte[] data = zk.getData(path, false, stat);
         ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int) + txnId (long)
         byte status = buffer.get();
-        assert (status == (byte)ZKCatalogStatus.PENDING.ordinal());
-        int catalogSegmentCount = buffer.getInt();
-        // Rewrite the flag
-        buffer.position(0);
-        buffer.put((byte)ZKCatalogStatus.COMPLETE.ordinal());
-        buffer.putInt(catalogSegmentCount);
-        zk.setData(path, buffer.array(), stat.getVersion());
+        if (status == (byte)ZKCatalogStatus.PENDING.ordinal()) {
+            int catalogSegmentCount = buffer.getInt();
+            // Rewrite the flag
+            buffer.position(0);
+            buffer.put((byte)ZKCatalogStatus.COMPLETE.ordinal());
+            buffer.putInt(catalogSegmentCount);
+            zk.setData(path, buffer.array(), stat.getVersion());
 
-        // delete all previous versions
-        List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
-        for (String child : children) {
-            int priorVersion = Integer.parseInt(child);
-            if (priorVersion < version) {
-                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+            // delete all previous versions
+            List<String> children = zk.getChildren(VoltZK.catalogbytes, false);
+            for (String child : children) {
+                int priorVersion = Integer.parseInt(child);
+                if (priorVersion < version) {
+                    ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, child));
+                }
             }
         }
     }
@@ -2839,7 +2867,7 @@ public abstract class CatalogUtil {
     /**
      * Find the latest catalog version stored under /db/catalogbytes ZK directory, the qualified version's
      * catalog status must meet the value specified by {@code expectedFlag}. If {@code expectedFlag} is
-     * {@code null}, the highest catalog version stored in ZK will be returned, no matter what the status it is.
+     * {@code null}, the highest catalog version stored in ZK will be returned, no matter what the status is.
      * @param zk
      * @param expectedFlag  {@code Complete}, {@code Pending} or {@code null}
      * @param expectedTxnId Ignore the check if {@code expectedTxnId} is -1
@@ -3021,25 +3049,17 @@ public abstract class CatalogUtil {
                              params[12]);           // hasSecurityUserChange
     }
 
-    public static Pair<Integer, Boolean> getMatchingOrHighestCatalogVersionNumber(ZooKeeper zk, long txnId) {
+    public static int getZKCatalogVersion(ZooKeeper zk, long txnId) {
         Pair<String, Integer> catalogPair = null;
-        boolean match = true;
         try {
-            // First see if somebody created the version node for us
             catalogPair = findLatestViableCatalog(zk, null, txnId);
-            // If not find the highest catalog version node
-            if (catalogPair == null) {
-                match = false;
-                catalogPair = findLatestViableCatalog(zk, null, -1);
-            }
-        } catch (KeeperException | InterruptedException ignore) {}
-        if (catalogPair != null) {
-            // Split the version number part from /db/catalogbytes/<version>
-            String version = catalogPair.getFirst().substring(catalogPair.getFirst().lastIndexOf('/') + 1);
-            return new Pair<>(Integer.parseInt(version), match);
-        } else {
-           return new Pair<>(VoltDB.instance().getCatalogContext().catalogVersion, match);
+        } catch (KeeperException | InterruptedException ignore) {
+            VoltDB.crashLocalVoltDB("Unable to retrieve ZK catalog node", false, null);
         }
+        assert (catalogPair != null);
+        // Split the version number part from /db/catalogbytes/<version>
+        String version = catalogPair.getFirst().substring(catalogPair.getFirst().lastIndexOf('/') + 1);
+        return Integer.parseInt(version);
     }
 
     /**
