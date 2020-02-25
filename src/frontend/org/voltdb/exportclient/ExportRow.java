@@ -49,20 +49,20 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  */
 public class ExportRow {
 
-    public List<String> names;
+    public final List<String> names;
     public final Object[] values;
-    public List<VoltType> types;
-    public List<Integer> lengths;
+    public final List<VoltType> types;
+    public final List<Integer> lengths;
     public final int partitionColIndex;
     public final Object partitionValue;
     //Partition id is here for convenience.
     public final int partitionId;
-    public String tableName;
+    public final String tableName;
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
     public static final int EXPORT_TIMESTAMP_COLUMN = 1;
     public static final int INTERNAL_OPERATION_COLUMN = 5;
-    public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE };
+    public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE }
 
     public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,
             Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
