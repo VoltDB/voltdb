@@ -414,7 +414,6 @@ namespace voltdb {
                 FrozenTxnBoundaries(ChunkList<CompactingChunk> const&) noexcept;
                 position_type const& left() const noexcept;
                 position_type const& right() const noexcept;
-                position_type& right() noexcept;
                 void clear();
             };
         private:
@@ -471,7 +470,6 @@ namespace voltdb {
             } m_batched;
             using list_type::last;
             using list_type::pop_back;
-            position_type& frozenRight() noexcept;  // txn right boundary when freezing. Need to be adjusted for LW tail removal
         public:
             using Compact = integral_constant<bool, true>;
             CompactingChunks(size_t tupleSize) noexcept;

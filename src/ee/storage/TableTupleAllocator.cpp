@@ -703,16 +703,8 @@ inline position_type const& CompactingChunks::FrozenTxnBoundaries::right() const
     return m_right;
 }
 
-inline position_type& CompactingChunks::FrozenTxnBoundaries::right() noexcept {
-    return m_right;
-}
-
 inline typename CompactingChunks::FrozenTxnBoundaries const& CompactingChunks::frozenBoundaries() const noexcept {
     return m_frozenTxnBoundaries;
-}
-
-inline position_type& CompactingChunks::frozenRight() noexcept {
-    return m_frozenTxnBoundaries.right();
 }
 
 namespace batch_remove_aid {
