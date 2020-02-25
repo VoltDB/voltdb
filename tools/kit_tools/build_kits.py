@@ -24,9 +24,8 @@ defaultlicensedays = 70 #default trial license length
 # Returns checkout Success (boolean)
 
 def repoCheckout(repo, treeish):
-    print repo
-    print treeish
     #Try a shallow clone (only works with branch names)
+    print "Trying a shallow single branch clone"
     result = run("git clone -q %s --depth=1 --branch %s --single-branch "% (repo, treeish), warn_only=True)
     if result.failed:
         #Maybe it was a sha and needs a full clone
@@ -36,9 +35,10 @@ def repoCheckout(repo, treeish):
         except ValueError:
             return False
         #Okay, it's hex, so lets try a real clone + checkout
+        print "Trying a full repo clone"
         run("git clone -q %s" % repo)
-        directory = repo.split("/")[-1]
-        result = run("cd %s; git checkout %s" % directory, treeish , warn_only=True)
+        directory = repo.split("/")[-1].split(".")[0]
+        result = run("cd %s; git checkout %s" % (directory, treeish), warn_only=True)
         if result.failed:
             return False
     return True
