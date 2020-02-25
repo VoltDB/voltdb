@@ -70,7 +70,7 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     tmptup.setNValue(0, ValueFactory::getBigIntValue(rowCounts));
     output_table->insertTuple(tmptup);
 
-    VOLT_DEBUG("\n%s\n", output_table->debug().c_str());
+    VOLT_DEBUG("\n%s\n", output_table->debug("").c_str());
     VOLT_DEBUG("Finished Table Counting");
 
     return true;
