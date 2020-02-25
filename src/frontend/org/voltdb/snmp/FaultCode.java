@@ -35,7 +35,7 @@ public enum FaultCode {
     STATISTICS_CLEAR,
     PAUSE,
     RESUME,
-    STEAM_BLOCKED;
+    STREAM_BLOCKED;
 
     public final static List<FaultCode> values = ImmutableList.copyOf(values());
 
