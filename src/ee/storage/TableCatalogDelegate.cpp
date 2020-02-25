@@ -787,6 +787,7 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
                 nowFields.push_back(col->index());
                 break;
             }
+            /* fall through */ // gcc-7 needs this comment.
             // else, fall through to default case
         default:
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,

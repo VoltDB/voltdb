@@ -47,11 +47,11 @@ CRC32CFunctionPtr detectBestCRC32C() {
  *
  * Copyright (c) 2004-2006 Intel Corporation - All Rights Reserved
  *
- * This software program is licensed subject to the BSD License, 
+ * This software program is licensed subject to the BSD License,
  * available at http://www.opensource.org/licenses/bsd-license.html
  *
  * Abstract: The main routine
- * 
+ *
  --*/
 
 uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
@@ -66,7 +66,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
 
     length -= initial_bytes;
     size_t running_length = length & ~(sizeof(uint64_t) - 1);
-    size_t end_bytes = length - running_length; 
+    size_t end_bytes = length - running_length;
 
     for (size_t li = 0; li < running_length/8; li++) {
         crc ^= *(const uint32_t*) p_buf;
@@ -75,7 +75,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
                 crc_tableil8_o80[(crc >> 8) & 0x000000FF];
         uint32_t term2 = crc >> 16;
         crc = term1 ^
-              crc_tableil8_o72[term2 & 0x000000FF] ^ 
+              crc_tableil8_o72[term2 & 0x000000FF] ^
               crc_tableil8_o64[(term2 >> 8) & 0x000000FF];
         term1 = crc_tableil8_o56[(*(const uint32_t *)p_buf) & 0x000000FF] ^
                 crc_tableil8_o48[((*(const uint32_t *)p_buf) >> 8) & 0x000000FF];
@@ -136,21 +136,25 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     switch (length) {
         case 7:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
+            /* fall through */ // gcc-7 needs this comment.
         case 6:
             crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             p_buf += 2;
+            /* fall through */ // gcc-7 needs this comment.
         // case 5 is below: 4 + 1
         case 4:
             crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             break;
         case 3:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
+            /* fall through */ // gcc-7 needs this comment.
         case 2:
             crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             break;
         case 5:
             crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             p_buf += 4;
+            /* fall through */ // gcc-7 needs this comment.
         case 1:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf);
             break;

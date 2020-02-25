@@ -140,21 +140,34 @@ int32_t MurmurHash3_x64_128 ( const void * key, const int len,
   switch(len & 15)
   {
   case 15: k2 ^= uint64_t(tail[14]) << 48;
+      /* fall through */ // gcc-7 needs this comment.
   case 14: k2 ^= uint64_t(tail[13]) << 40;
+      /* fall through */ // gcc-7 needs this comment.
   case 13: k2 ^= uint64_t(tail[12]) << 32;
+      /* fall through */ // gcc-7 needs this comment.
   case 12: k2 ^= uint64_t(tail[11]) << 24;
+      /* fall through */ // gcc-7 needs this comment.
   case 11: k2 ^= uint64_t(tail[10]) << 16;
+      /* fall through */ // gcc-7 needs this comment.
   case 10: k2 ^= uint64_t(tail[ 9]) << 8;
+      /* fall through */ // gcc-7 needs this comment.
   case  9: k2 ^= uint64_t(tail[ 8]) << 0;
            k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
-
+           /* fall through */ // gcc-7 needs this comment.
   case  8: k1 ^= uint64_t(tail[ 7]) << 56;
+      /* fall through */ // gcc-7 needs this comment.
   case  7: k1 ^= uint64_t(tail[ 6]) << 48;
+      /* fall through */ // gcc-7 needs this comment.
   case  6: k1 ^= uint64_t(tail[ 5]) << 40;
+      /* fall through */ // gcc-7 needs this comment.
   case  5: k1 ^= uint64_t(tail[ 4]) << 32;
+      /* fall through */ // gcc-7 needs this comment.
   case  4: k1 ^= uint64_t(tail[ 3]) << 24;
+      /* fall through */ // gcc-7 needs this comment.
   case  3: k1 ^= uint64_t(tail[ 2]) << 16;
+      /* fall through */ // gcc-7 needs this comment.
   case  2: k1 ^= uint64_t(tail[ 1]) << 8;
+      /* fall through */ // gcc-7 needs this comment.
   case  1: k1 ^= uint64_t(tail[ 0]) << 0;
            k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
   };
@@ -218,7 +231,9 @@ uint32_t MurmurHash3_x86_32 ( const void * key, uint32_t len,
   switch(len & 3)
   {
   case 3: k1 ^= tail[2] << 16;
+      /* fall through */ // gcc-7 needs this comment.
   case 2: k1 ^= tail[1] << 8;
+      /* fall through */ // gcc-7 needs this comment.
   case 1: k1 ^= tail[0];
           k1 *= c1; k1 = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
   };
