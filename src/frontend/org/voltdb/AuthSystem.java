@@ -283,11 +283,9 @@ public class AuthSystem {
          * Get group names.
          * @return group name array
          */
-        public final String[] getGroupNames() {
-            String[] groupNames = new String[m_groups.size()];
-            for (int i = 0; i < m_groups.size(); ++i) {
-                groupNames[i] = m_groups.get(i).m_name;
-            }
+        public final List<String> getGroupNames() {
+            List<String> groupNames = new ArrayList<>(m_groups.size());
+            m_groups.forEach(g -> groupNames.add(g.m_name));
             return groupNames;
         }
 
@@ -670,13 +668,13 @@ public class AuthSystem {
         return m_users.get(name);
     }
 
-    public String[] getGroupNamesForUser(String userName) {
+    public List<String> getGroupNamesForUser(String userName) {
         if (userName == null) {
-            return new String[] {};
+            return new ArrayList<>();
         }
         AuthUser user = getUser(userName);
         if (user == null) {
-            return new String[] {};
+            return new ArrayList<>();
         }
         return user.getGroupNames();
     }
