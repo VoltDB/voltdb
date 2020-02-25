@@ -257,6 +257,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(7, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 7:
       {
           NValue nv = ValueFactory::getStringValue("ABCDEabcde"); // 10 char
@@ -264,6 +265,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(6, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 6:
       {
           NValue nv = ValueFactory::getDecimalValueFromString("-12.34");
@@ -271,6 +273,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(5, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 5:
       {
           NValue nv = ValueFactory::getTimestampValue(9999);
@@ -278,6 +281,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(4, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 4:
       {
           NValue nv = ValueFactory::getBigIntValue(1024);
@@ -285,6 +289,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(3, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 3:
       {
           NValue nv = ValueFactory::getIntegerValue(512);
@@ -292,6 +297,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(2, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 2:
       {
           NValue nv = ValueFactory::getSmallIntValue(256);
@@ -299,6 +305,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(1, nv, NULL);
           nv.free();
       }
+      /* fall through */ // gcc-7 needs this comment.
       case 1:
       {
           NValue nv = ValueFactory::getTinyIntValue(120);
