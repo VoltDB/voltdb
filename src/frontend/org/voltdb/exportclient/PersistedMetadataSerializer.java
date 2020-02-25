@@ -26,11 +26,9 @@ import org.voltdb.utils.BinaryDequeDeferredSerializer;
  * @author rdykiel
  *
  */
-public class ExportRowSchemaSerializer extends BinaryDequeDeferredSerializer<ExportRowSchema> {
-
+public class PersistedMetadataSerializer extends BinaryDequeDeferredSerializer<PersistedMetadata> {
     @Override
-    public ExportRowSchema read(ByteBuffer buffer) throws IOException {
-        return ExportRowSchema.deserialize(buffer);
+    public PersistedMetadata read(ByteBuffer buffer) throws IOException {
+        return PersistedMetadata.deserialize(buffer);
     }
-
 }

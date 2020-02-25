@@ -61,6 +61,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
@@ -198,7 +199,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private static class PollTask {
-        private SettableFuture<AckingContainer> m_pollFuture;
+        private final SettableFuture<AckingContainer> m_pollFuture;
 
         public PollTask(SettableFuture<AckingContainer> fut) {
             m_pollFuture = fut;
@@ -769,10 +770,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 // Create a block to offer: NOTE this block should not
                 // be used for anything else than offering, as it doesn't have metadata.
-                BinaryDequeReader.Entry<ExportRowSchema> entry = new BinaryDequeReader.Entry<ExportRowSchema>() {
+                BinaryDequeReader.Entry<PersistedMetadata> entry = new BinaryDequeReader.Entry<PersistedMetadata>() {
 
                     @Override
-                    public ExportRowSchema getExtraHeader() {
+                    public PersistedMetadata getExtraHeader() {
                         return null;
                     }
 

@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.BinaryDequeReader;
 
@@ -55,8 +56,8 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
-    public StreamBlock(BinaryDequeReader.Entry<ExportRowSchema> entry, long startSequenceNumber, long committedSequenceNumber,
-            int rowCount, long uniqueId, boolean isPersisted) {
+    public StreamBlock(BinaryDequeReader.Entry<PersistedMetadata> entry, long startSequenceNumber,
+            long committedSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
         assert(entry != null);
         m_entry  = entry;
         m_startSequenceNumber = startSequenceNumber;
@@ -86,7 +87,7 @@ public class StreamBlock {
     }
 
     public ExportRowSchema getSchema() {
-        return m_entry.getExtraHeader();
+        return m_entry.getExtraHeader().getSchema();
     }
 
     public long startSequenceNumber() {
@@ -151,11 +152,11 @@ public class StreamBlock {
     }
 
     private final long m_startSequenceNumber;
-    private long m_committedSequenceNumber;
+    private final long m_committedSequenceNumber;
     private final int m_rowCount;
     private final long m_uniqueId;
     private final long m_totalSize;
-    private BinaryDequeReader.Entry<ExportRowSchema> m_entry;
+    private final BinaryDequeReader.Entry<PersistedMetadata> m_entry;
     // index of the last row that has been released.
     private int m_releaseOffset = -1;
 
