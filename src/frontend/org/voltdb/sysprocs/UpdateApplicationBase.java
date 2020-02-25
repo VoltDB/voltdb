@@ -569,7 +569,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
         }
 
-        // catalog update will wait for snap shot to be completed, which will block site thread.
+        // catalog update will wait for snapshot to be completed, which will block site thread.
         if (ccr.requiresSnapshotIsolation && VoltZK.hasHostsSnapshotting(zk)) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Snapshot in progress. Please retry catalog update later.";

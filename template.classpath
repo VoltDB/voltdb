@@ -86,6 +86,7 @@
 	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.27.Final.jar"/>
 	<classpathentry kind="lib" path="lib/netty-all-4.1.43.Final.jar"/>
 	<classpathentry kind="lib" path="lib/cron-java8-1.5.jar"/>
+	<classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
 	<classpathentry kind="lib" path="lib/kafka-avro-serializer-3.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/kafka-schema-registry-client-5.3.2.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>

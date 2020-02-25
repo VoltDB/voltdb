@@ -70,6 +70,7 @@ public interface NodeSettings extends Settings {
     public File getExportOverflow();
 
     @Key(EXPORT_CURSOR_PATH_KEY)
+    @DefaultValue("export_cursor") // must match value in voltdb/compiler/DeploymentFileSchema.xsd
     public File getExportCursor();
 
     @Key(DR_OVERFLOW_PATH_KEY)

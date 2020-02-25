@@ -31,9 +31,7 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 
 /*
- * adapted from JiggleSinglePartitionWithDeletionExport.java. not sure what's jiggling so left that off this class name
- *
- * the difference is tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
+ * tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
  */
 public class TableExport extends VoltProcedure {
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM export_partitioned_table_loopback WHERE rowid = ? ORDER BY rowid"); // don't try these on a STREAM
@@ -42,7 +40,6 @@ public class TableExport extends VoltProcedure {
 
     public final SQLStmt update = new SQLStmt("UPDATE export_partitioned_table_loopback SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM export_partitioned_table_loopback WHERE rowid = ?");
-    // public final SQLStmt export = new SQLStmt("INSERT INTO export_partitioned_table_loopback (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp, type_not_null_timestamp, type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(long rowid, long ignore)
     {

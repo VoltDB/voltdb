@@ -717,7 +717,7 @@ public class SnapshotUtil {
         private final String m_nonce;
         private InstanceId m_instanceId = null;
         private long m_txnId;
-        private List<Integer> m_missingPartitions = new ArrayList<Integer>();
+        private final List<Integer> m_missingPartitions = new ArrayList<Integer>();
     }
 
     /**
@@ -756,7 +756,7 @@ public class SnapshotUtil {
             }
             return false;
         }
-    };
+    }
 
     /**
      * Filter that looks for files related to a specific snapshot.
