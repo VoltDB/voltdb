@@ -28,7 +28,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 import org.voltdb.exportclient.ExportRowSchema;
-import org.voltdb.exportclient.ExportRowSchemaSerializer;
+import org.voltdb.exportclient.PersistedMetadata;
+import org.voltdb.exportclient.PersistedMetadataSerializer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
@@ -89,7 +90,7 @@ public class StreamBlockQueue {
     /**
      * A deque for persisting data to disk both for persistence and as a means of overflowing storage
      */
-    private BinaryDeque<ExportRowSchema> m_persistentDeque;
+    private BinaryDeque<PersistedMetadata> m_persistentDeque;
 
     private final String m_nonce;
     private final String m_path;
@@ -97,7 +98,7 @@ public class StreamBlockQueue {
     private final String m_streamName;
     // The initial generation id of the stream that SBQ currently represents.
     private long m_initialGenerationId;
-    private BinaryDequeReader<ExportRowSchema> m_reader;
+    private BinaryDequeReader<PersistedMetadata> m_reader;
 
     public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId)
             throws java.io.IOException {
@@ -141,7 +142,7 @@ public class StreamBlockQueue {
      */
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
 
-        BinaryDequeReader.Entry<ExportRowSchema> entry = null;
+        BinaryDequeReader.Entry<PersistedMetadata> entry = null;
         StreamBlock block = null;
         try {
             entry = m_reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
@@ -258,7 +259,7 @@ public class StreamBlockQueue {
     }
 
     public void updateSchema(ExportRowSchema schema) throws IOException {
-        m_persistentDeque.updateExtraHeader(schema);
+        m_persistentDeque.updateExtraHeader(new PersistedMetadata(schema));
     }
 
     /*
@@ -391,16 +392,16 @@ public class StreamBlockQueue {
     }
 
     public boolean deleteStaleBlocks(long generationId) throws IOException {
-        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
+        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<PersistedMetadata>() {
 
             @Override
-            public boolean isStale(ExportRowSchema extraHeader) {
-                assert (extraHeader != null);
-                boolean fromOlderGeneration = extraHeader.initialGenerationId < generationId;
+            public boolean isStale(PersistedMetadata metadata) {
+                assert (metadata != null);
+                ExportRowSchema schema = metadata.getSchema();
+                boolean fromOlderGeneration = schema.initialGenerationId < generationId;
                 if (exportLog.isDebugEnabled() && fromOlderGeneration) {
-                    exportLog.debug("Delete PBD segments of " +
-                            (extraHeader.tableName + "_" + extraHeader.partitionId) +
-                            " from older generation " + extraHeader.initialGenerationId);
+                    exportLog.debug("Delete PBD segments of " + schema.tableName + "_" + schema.partitionId
+                            + " from older generation " + schema.initialGenerationId);
                 }
                 return fromOlderGeneration;
             }
@@ -429,10 +430,10 @@ public class StreamBlockQueue {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
         ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
+        PersistedMetadataSerializer serializer = new PersistedMetadataSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
+                .initialExtraHeader(new PersistedMetadata(schema), serializer)
                 .compression(!DISABLE_COMPRESSION)
                 .deleteExisting(deleteExisting)
                 .build();
@@ -452,7 +453,7 @@ public class StreamBlockQueue {
             try {
                 super.finalize();
             } catch (Throwable ex) {
-               ;
+
             }
         }
     }

@@ -39,7 +39,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.VoltFile;
 
@@ -71,10 +71,10 @@ public class TestStreamBlockQueue extends TestCase {
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
         g_seqNo += 100;
         BBContainer cont = DBBPool.wrapBB(getFilledBuffer(fillValue));
-        BinaryDequeReader.Entry<ExportRowSchema> entry = new BinaryDequeReader.Entry<ExportRowSchema>() {
+        BinaryDequeReader.Entry<PersistedMetadata> entry = new BinaryDequeReader.Entry<PersistedMetadata>() {
 
             @Override
-            public ExportRowSchema getExtraHeader() {
+            public PersistedMetadata getExtraHeader() {
                 return null;
             }
 
