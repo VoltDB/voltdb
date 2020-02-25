@@ -600,7 +600,7 @@ namespace std {                                    // Need to declare these befo
     };
     template<> struct less_equal<position_type> {
         inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
+            return ! less<position_type>()(rhs, lhs);
         }
     };
     template<> struct less<ChunkHolder<>> {
@@ -1453,10 +1453,11 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
     if (super::drained()) {
         return true;
     } else {
-        if (super::storage().empty() ||
-                less<position_type>()(*super::storage().last(), *this) ||
-                less<position_type>()(m_txnBoundary, *this) ||
-                m_txnBoundary == *this) {
+        auto const& s = super::storage();
+        if (s.empty() ||
+                less_rolling(s.last()->id(), m_chunkId) ||             // effectively less<position_type>()(*s.last(), *this);
+                (s.last()->id() == m_chunkId && s.last()->next() <= super::m_cursor) ||    // but that could cause use-after-release
+                less_equal<position_type>()(m_txnBoundary, *this)) {
             super::m_cursor = nullptr;
             return true;
         } else {
