@@ -198,7 +198,7 @@ ChunkList<Chunk, Col, E>::find(void const* k) const {
 template<typename Chunk, typename Col, typename E>
 inline typename ChunkList<Chunk, Col, E>::iterator const*
 ChunkList<Chunk, Col, E>::find(id_type id) const {
-    auto const iter = m_byId.find(id);
+    auto const& iter = m_byId.find(id);
     return iter == m_byId.cend() ? nullptr : &iter->second;
 }
 
@@ -497,7 +497,7 @@ size_t CompactingChunks::chunks() const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
-    auto const iter = list_type::find(p);
+    auto const& iter = list_type::find(p);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
@@ -505,7 +505,7 @@ CompactingChunks::find(void const* p) const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(id_type id) const noexcept {
-    auto const iter = list_type::find(id);
+    auto const& iter = list_type::find(id);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
@@ -724,7 +724,7 @@ namespace batch_remove_aid {
      */
     template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
         for (auto const& entry : inter) {
-            auto const iter = find(src.begin(), src.end(), entry);
+            auto const& iter = find(src.begin(), src.end(), entry);
             vassert(iter != src.end());
             src.erase(iter);
         }
@@ -939,85 +939,34 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 
 /**
- * Is it permissible to create a new iterator for the given Chunk
- * list type? We need to ensure that at most one RW iterator can
- * be created at the same time for a compacting chunk list.
- */
-template<iterator_view_type, iterator_permission_type,
-    typename container_type, typename = typename container_type::Compact>
-struct IteratorPermissible {
-    void operator()(set<id_type> const&, container_type) const noexcept {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-    }
-};
-
-/**
- * Specialization for rw snapshot iterator: check & update map
- */
-template<typename container_type>
-struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, true_type> {
-    void operator()(set<id_type>& exists, container_type cont) const {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-        auto iter = exists.find(cont.id());
-        if (iter == exists.end()) {            // add entry
-            exists.emplace_hint(iter, cont.id());
-        } else {
-            snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", cont.id());
-            buf[sizeof buf - 1] = 0;
-            throw logic_error(buf);
-        }
-    }
-};
-
-/**
- * Correctly de-registers a rw snapshot iterator, allowing one to
- * be created later.
- */
-template<iterator_view_type, iterator_permission_type,
-    typename container_type, typename = typename container_type::Compact>
-struct IteratorDeregistration {
-    void operator()(set<id_type> const&, container_type) const noexcept {       // No-op for irrelavent types
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-    }
-};
-
-template<typename container_type>
-struct IteratorDeregistration<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, true_type> {
-    void operator()(set<id_type>& m, container_type cont) const {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-        auto iter = m.find(cont.id());
-        if (iter != m.end()) {
-            // TODO: we need to also guard against "double deletion" case;
-            // but eecheck is currently failing mysteriously
-            m.erase(iter);
-        }
-    }
-};
-
-/**
  * The implementation just forward IteratorPermissible
  */
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::validate(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator{};
-    validator(m_inUse, src);
+template<typename C> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::validate(C src) {
+    static_assert(is_reference<C>::value, "Type C must be reference");
+    auto const& iter = m_inUse.find(src.id());
+    if (iter == m_inUse.end()) {            // add entry
+        m_inUse.emplace_hint(iter, src.id());
+    } else {
+        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", src.id());
+        buf[sizeof buf - 1] = 0;
+        throw logic_error(buf);
+    }
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::remove(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg{};
-    dereg(m_inUse, src);
+template<typename C> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::remove(C src) {
+    static_assert(is_reference<C>::value, "Type C must be reference");
+    // TODO: we need to also guard against "double deletion" case;
+    // but eecheck is currently failing mysteriously
+    m_inUse.erase(src.id());
 }
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
-typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::Constructible
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::constructible_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::s_constructible;
 
 template<typename Cont, iterator_permission_type perm, iterator_view_type view, typename = typename Cont::Compact>
@@ -1164,7 +1113,6 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
         }
     }
 };
-
 
 /**
  * Action when iterator is done with current chunk.
@@ -1540,8 +1488,9 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 template<typename Alloc, typename Trait, typename C, typename E>
 inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize) :
     Trait([this](void const* key) {
-                if (m_changes.count(key)) {
-                    m_changes.erase(key);
+                auto const& iter = m_changes.find(key);
+                if (iter != m_changes.cend()) {
+                    m_changes.erase(iter);
                     m_copied.erase(key);
                     m_storage.free(const_cast<void*>(key));
                 }
@@ -1643,7 +1592,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
 
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void const* TxnPreHook<Alloc, Trait, C, E>::operator()(void const* src) const {
-    auto const pos = m_changes.find(src);
+    auto const& pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }
 

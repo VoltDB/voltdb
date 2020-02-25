@@ -473,7 +473,6 @@ namespace voltdb {
                 size_t force(bool);
             } m_batched;
             using list_type::last;
-            using list_type::pop_back;
         public:
             using Compact = true_type;
             // for use in HookedCompactingChunks::remove() [batch mode]:
@@ -571,8 +570,8 @@ namespace voltdb {
             set m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
             bool m_hasDeletes = false;      // observer for iterator::advance()
-            Alloc m_storage;
             void* m_last = nullptr;         // last allocation by copy(void const*);
+            Alloc m_storage;
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -695,6 +694,22 @@ namespace voltdb {
             using chunk_type = Chunks;
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
+
+            /**
+             * Static, possibly no-op checkers for snapshot rw
+             * iterator on compacting chunks
+             */
+            template<typename C>struct EmptyConstructible {
+                inline constexpr void validate(C) const noexcept {}
+                inline constexpr void remove(C) const noexcept {}
+            };
+            template<typename C> class Constructible {
+                set<id_type> m_inUse{};
+            public:
+                void validate(C);
+                void remove(C);
+            };
+
             template<iterator_permission_type perm, iterator_view_type vtype>
             class iterator_type : public std::iterator<forward_iterator_tag,
                 typename conditional<perm == iterator_permission_type::ro, void const*, iterator_value_type>::type> {
@@ -716,12 +731,10 @@ namespace voltdb {
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
                     Chunks const, Chunks>::type>::type;
-                class Constructible {
-                    set<id_type> m_inUse{};
-                public:
-                    void validate(container_type);
-                    void remove(container_type);
-                } static s_constructible;
+                using constructible_type = typename conditional<
+                    Chunks::Compact::value && vtype == iterator_view_type::snapshot && perm == iterator_permission_type::rw,
+                          Constructible<container_type>, EmptyConstructible<container_type>>::type;
+                constructible_type static s_constructible;
                 value_type m_cursor;
                 void advance();
                 container_type storage() const noexcept;
