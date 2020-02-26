@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.catalog.Table;
+import org.voltdb.serdes.EncodeFormat;
 
 /**
  * Class which holds all of the metadata which is persisted with export rows within a PBD. Primarily it holds the schema
@@ -28,20 +30,38 @@ import org.voltcore.utils.DeferredSerialization;
 public class PersistedMetadata implements DeferredSerialization {
     private static short LATEST_VERSION = 1;
     private final ExportRowSchema m_schema;
+    private final EncodeFormat m_format;
 
     static PersistedMetadata deserialize(ByteBuffer buf) throws IOException {
         short version = buf.getShort();
         if (version != LATEST_VERSION) {
             throw new IOException("Unsupported serialization version: " + version);
         }
-        return new PersistedMetadata(ExportRowSchema.deserialize(buf));
+        EncodeFormat format = EncodeFormat.byId(buf.get());
+        return new PersistedMetadata(format, ExportRowSchema.deserialize(buf));
     }
 
-    public PersistedMetadata(ExportRowSchema schema) {
+    public PersistedMetadata(Table table, int partitionId, long initialGenerationId, long generationId) {
+        m_format = table.getIstopic() ? EncodeFormat.checkedValueOf(table.getTopicformat()) : EncodeFormat.INVALID;
+        m_schema = ExportRowSchema.create(table, partitionId, initialGenerationId, generationId);
+    }
+
+    private PersistedMetadata(EncodeFormat format, ExportRowSchema schema) {
         super();
+        m_format = format;
         this.m_schema = schema;
     }
 
+    /**
+     * @return The configured {@link EncodeFormat} for this topic
+     */
+    public EncodeFormat getEncodingFormat() {
+        return m_format;
+    }
+
+    /**
+     * @return The {@link ExportRowSchema} associated with this metadata
+     */
     public ExportRowSchema getSchema() {
         return m_schema;
     }
@@ -49,6 +69,7 @@ public class PersistedMetadata implements DeferredSerialization {
     @Override
     public void serialize(ByteBuffer buf) throws IOException {
         buf.putShort(LATEST_VERSION);
+        buf.put(m_format.getId());
         m_schema.serialize(buf);
     }
 
@@ -58,6 +79,7 @@ public class PersistedMetadata implements DeferredSerialization {
 
     @Override
     public int getSerializedSize() throws IOException {
-        return Short.BYTES + m_schema.getSerializedSize();
+        // Version + format ID + schema size
+        return Short.BYTES + Byte.BYTES + m_schema.getSerializedSize();
     }
 }

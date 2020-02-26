@@ -258,8 +258,8 @@ public class StreamBlockQueue {
         }
     }
 
-    public void updateSchema(ExportRowSchema schema) throws IOException {
-        m_persistentDeque.updateExtraHeader(new PersistedMetadata(schema));
+    public void updateSchema(PersistedMetadata metadata) throws IOException {
+        m_persistentDeque.updateExtraHeader(metadata);
     }
 
     /*
@@ -429,11 +429,11 @@ public class StreamBlockQueue {
     private void constructPBD(long genId, boolean deleteExisting) throws IOException {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
+        PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, m_initialGenerationId, genId);
         PersistedMetadataSerializer serializer = new PersistedMetadataSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(new PersistedMetadata(schema), serializer)
+                .initialExtraHeader(metadata, serializer)
                 .compression(!DISABLE_COMPRESSION)
                 .deleteExisting(deleteExisting)
                 .build();

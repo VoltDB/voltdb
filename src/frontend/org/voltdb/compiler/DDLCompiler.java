@@ -1638,11 +1638,11 @@ public class DDLCompiler {
             table.setTopicprofile(topicProfileName);
         }
         String topicFormatName = node.attributes.get(SQLParser.CAPTURE_TOPIC_FORMAT);
+        EncodeFormat format = EncodeFormat.CSV;
         if (topicFormatName != null) {
             try {
                 // Parse the format in an unchecked fashion and handle exceptions
-                EncodeFormat format = EncodeFormat.valueOf(EncodeFormat.class, topicFormatName);
-                table.setTopicformat(format.name());
+                format = EncodeFormat.valueOf(topicFormatName);
             }
             catch (Exception ex) {
                 throw compiler.new VoltCompilerException(
@@ -1650,6 +1650,7 @@ public class DDLCompiler {
                                 topicFormatName, table.getTypeName(), EncodeFormat.valueSet()));
             }
         }
+        table.setTopicformat(format.name());
         String topicKeyColumnNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
         if (topicKeyColumnNames != null) {
             List<String> definedColumns = new ArrayList<>();
