@@ -138,6 +138,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/tabletuple_export_test
   storage/tabletuplefilter_test
   storage/TempTableLimitsTest
+  storage/TableTupleAllocatorTest
   structures/CompactingHashTest
   structures/CompactingMapBenchmark
   structures/CompactingMapIndexCountTest
@@ -157,7 +158,6 @@ SET(VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS
   memleaktests/still_reachable_losses
   memleaktests/possible_losses
   memleaktests/rw_deleted
-  storage/TableTupleAllocatorTest
 )
 #
 # These are expected to fail.  There are none of

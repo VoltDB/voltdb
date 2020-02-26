@@ -198,7 +198,7 @@ ChunkList<Chunk, Col, E>::find(void const* k) const {
 template<typename Chunk, typename Col, typename E>
 inline typename ChunkList<Chunk, Col, E>::iterator const*
 ChunkList<Chunk, Col, E>::find(id_type id) const {
-    auto const iter = m_byId.find(id);
+    auto const& iter = m_byId.find(id);
     return iter == m_byId.cend() ? nullptr : &iter->second;
 }
 
@@ -604,7 +604,7 @@ namespace std {                                    // Need to declare these befo
     };
     template<> struct less_equal<position_type> {
         inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return lhs.address() == rhs.address() || less<position_type>()(lhs, rhs);
+            return ! less<position_type>()(rhs, lhs);
         }
     };
     template<> struct less<ChunkHolder<>> {
@@ -707,16 +707,8 @@ inline position_type const& CompactingChunks::FrozenTxnBoundaries::right() const
     return m_right;
 }
 
-inline position_type& CompactingChunks::FrozenTxnBoundaries::right() noexcept {
-    return m_right;
-}
-
 inline typename CompactingChunks::FrozenTxnBoundaries const& CompactingChunks::frozenBoundaries() const noexcept {
     return m_frozenTxnBoundaries;
-}
-
-inline position_type& CompactingChunks::frozenRight() noexcept {
-    return m_frozenTxnBoundaries.right();
 }
 
 namespace batch_remove_aid {
@@ -736,7 +728,7 @@ namespace batch_remove_aid {
      */
     template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
         for (auto const& entry : inter) {
-            auto const iter = find(src.begin(), src.end(), entry);
+            auto const& iter = find(src.begin(), src.end(), entry);
             vassert(iter != src.end());
             src.erase(iter);
         }
@@ -811,11 +803,13 @@ inline size_t CompactingChunks::DelayedRemover::add(void* p) {
     }
 }
 
-inline map<void*, void*> const& CompactingChunks::DelayedRemover::movements() const{
+inline typename CompactingChunks::list_type::collections::map<void*, void*> const&
+CompactingChunks::DelayedRemover::movements() const{
     return m_move;
 }
 
-inline set<void*> const& CompactingChunks::DelayedRemover::removed() const{
+inline typename CompactingChunks::list_type::collections::set<void*> const&
+CompactingChunks::DelayedRemover::removed() const{
     return m_remove;
 }
 //
@@ -949,85 +943,34 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 
 /**
- * Is it permissible to create a new iterator for the given Chunk
- * list type? We need to ensure that at most one RW iterator can
- * be created at the same time for a compacting chunk list.
- */
-template<iterator_view_type, iterator_permission_type,
-    typename container_type, typename = typename container_type::Compact>
-struct IteratorPermissible {
-    void operator()(set<id_type> const&, container_type) const noexcept {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-    }
-};
-
-/**
- * Specialization for rw snapshot iterator: check & update map
- */
-template<typename container_type>
-struct IteratorPermissible<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, integral_constant<bool, true>> {
-    void operator()(set<id_type>& exists, container_type cont) const {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-        auto iter = exists.find(cont.id());
-        if (iter == exists.end()) {            // add entry
-            exists.emplace_hint(iter, cont.id());
-        } else {
-            snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", cont.id());
-            buf[sizeof buf - 1] = 0;
-            throw logic_error(buf);
-        }
-    }
-};
-
-/**
- * Correctly de-registers a rw snapshot iterator, allowing one to
- * be created later.
- */
-template<iterator_view_type, iterator_permission_type,
-    typename container_type, typename = typename container_type::Compact>
-struct IteratorDeregistration {
-    void operator()(set<id_type> const&, container_type) const noexcept {       // No-op for irrelavent types
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-    }
-};
-
-template<typename container_type>
-struct IteratorDeregistration<iterator_view_type::snapshot, iterator_permission_type::rw,
-    container_type, integral_constant<bool, true>> {
-    void operator()(set<id_type>& m, container_type cont) const {
-        static_assert(is_lvalue_reference<container_type>::value, "container_type should be reference type");
-        auto iter = m.find(cont.id());
-        if (iter != m.end()) {
-            // TODO: we need to also guard against "double deletion" case;
-            // but eecheck is currently failing mysteriously
-            m.erase(iter);
-        }
-    }
-};
-
-/**
  * The implementation just forward IteratorPermissible
  */
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::validate(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorPermissible<view, perm, container_type, typename Chunks::Compact> const validator{};
-    validator(m_inUse, src);
+template<typename C> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::validate(C src) {
+    static_assert(is_reference<C>::value, "Type C must be reference");
+    auto const& iter = m_inUse.find(src.id());
+    if (iter == m_inUse.end()) {            // add entry
+        m_inUse.emplace_hint(iter, src.id());
+    } else {
+        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", src.id());
+        buf[sizeof buf - 1] = 0;
+        throw logic_error(buf);
+    }
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::Constructible::remove(
-        typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) {
-    static IteratorDeregistration<view, perm, container_type, typename Chunks::Compact> const dereg{};
-    dereg(m_inUse, src);
+template<typename C> inline void
+IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::remove(C src) {
+    static_assert(is_reference<C>::value, "Type C must be reference");
+    // TODO: we need to also guard against "double deletion" case;
+    // but eecheck is currently failing mysteriously
+    m_inUse.erase(src.id());
 }
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
-typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::Constructible
+typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::constructible_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::s_constructible;
 
 template<typename Cont, iterator_permission_type perm, iterator_view_type view, typename = typename Cont::Compact>
@@ -1039,7 +982,7 @@ struct iterator_begin {
     }
 };
 template<typename Cont, iterator_permission_type perm>
-struct iterator_begin<Cont, perm, iterator_view_type::txn, integral_constant<bool, true>> {
+struct iterator_begin<Cont, perm, iterator_view_type::txn, true_type> {
     using iterator = typename conditional<perm == iterator_permission_type::ro,
           typename Cont::const_iterator, typename Cont::iterator>::type;
     iterator operator()(Cont& c) const noexcept {
@@ -1055,7 +998,7 @@ struct HasTxnInvisibleChunks {
 };
 
 template<typename Chunks>
-struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, true_type> {
     inline bool operator()(Chunks const& c) const noexcept {
         return c.frozen() && (c.empty() ||
                 less_rolling(c.frozenBoundaries().left().chunkId(), c.begin()->id()));
@@ -1145,7 +1088,7 @@ struct ChunkBoundary {
 };
 
 template<typename ChunkList, typename Iter>
-struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
     inline void const* operator()(ChunkList const& l, Iter const& iter, bool hasTxnInvisibleChunks) const noexcept {
         auto const& frozenBoundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
         if (frozenBoundaries.left().empty()) {        // not frozen
@@ -1175,7 +1118,6 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, integral_con
     }
 };
 
-
 /**
  * Action when iterator is done with current chunk.
  * When using snapshot RW iterator on compacting chunks, this means
@@ -1189,7 +1131,7 @@ struct ChunkDeleter {
 };
 
 template<typename ChunkList, typename Iter>
-struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, integral_constant<bool, true>> {
+struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, true_type> {
     inline void operator()(ChunkList& l, Iter& iter) const noexcept {
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
@@ -1299,7 +1241,7 @@ struct ElasticIterator_refresh {
 };
 
 template<typename I, typename ElasticIterator>
-struct ElasticIterator_refresh<I, ElasticIterator, integral_constant<bool, true>> {
+struct ElasticIterator_refresh<I, ElasticIterator, true_type> {
     inline void operator()(ElasticIterator& iter, bool& isEmpty, id_type& chunkId,
             typename I::chunk_type const& storage,
             typename I::chunk_type::iterator const& last, position_type const& boundary,
@@ -1465,10 +1407,11 @@ IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
     if (super::drained()) {
         return true;
     } else {
-        if (super::storage().empty() ||
-                less<position_type>()(*super::storage().last(), *this) ||
-                less<position_type>()(m_txnBoundary, *this) ||
-                m_txnBoundary == *this) {
+        auto const& s = super::storage();
+        if (s.empty() ||
+                less_rolling(s.last()->id(), m_chunkId) ||             // effectively less<position_type>()(*s.last(), *this);
+                (s.last()->id() == m_chunkId && s.last()->next() <= super::m_cursor) ||    // but that could cause use-after-release
+                less_equal<position_type>()(m_txnBoundary, *this)) {
             super::m_cursor = nullptr;
             return true;
         } else {
@@ -1549,8 +1492,9 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 template<typename Alloc, typename Trait, typename C, typename E>
 inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize) :
     Trait([this](void const* key) {
-                if (m_changes.count(key)) {
-                    m_changes.erase(key);
+                auto const& iter = m_changes.find(key);
+                if (iter != m_changes.cend()) {
+                    m_changes.erase(iter);
                     m_copied.erase(key);
                     m_storage.free(const_cast<void*>(key));
                 }
@@ -1652,7 +1596,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
 
 template<typename Alloc, typename Trait, typename C, typename E>
 inline void const* TxnPreHook<Alloc, Trait, C, E>::operator()(void const* src) const {
-    auto const pos = m_changes.find(src);
+    auto const& pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }
 
@@ -1709,7 +1653,8 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
 }
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove(
-        set<void*> const& src, function<void(map<void*, void*>const&)> const& cb) {
+        set<void*> const& src,
+        function<void(CompactingChunks::DelayedRemover_movments_type)> const& cb) {
     using Remover = typename CompactingChunks::DelayedRemover;
     auto batch = accumulate(src.cbegin(), src.cend(), Remover{*this},
             [](Remover& batch, void* p) {
@@ -1730,7 +1675,7 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     // moves (i.e. memcpy) before call back
     auto const tuple_size = tupleSize();
     for_each(batch.movements().cbegin(), batch.movements().cend(),
-            [tuple_size](typename map<void*, void*>::value_type const& entry) {
+            [tuple_size](pair<void*, void*> const& entry) {
                 memcpy(entry.first, entry.second, tuple_size);
             });
     cb(batch.movements());
@@ -1741,7 +1686,8 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     return CompactingChunks::m_batched.add(p);
 }
 
-template<typename Hook, typename E> inline map<void*, void*> const& HookedCompactingChunks<Hook, E>::remove_moves() {
+template<typename Hook, typename E> inline typename
+CompactingChunks::DelayedRemover_movments_type HookedCompactingChunks<Hook, E>::remove_moves() {
     return CompactingChunks::m_batched.prepare(true).movements();
 }
 
