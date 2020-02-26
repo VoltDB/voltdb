@@ -425,6 +425,9 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         if (!out.isPendingDeleteOnUndoRelease()) {
             return true;
         }
+        else {
+            out.move(NULL);
+        }
     }
 
     return false;

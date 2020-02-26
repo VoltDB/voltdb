@@ -131,7 +131,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     // or the byte count threshold is hit.
     bool yield = false;
     while (!yield) {
-        bool hasMore = table.nextTuple(tuple, TABLE_STREAM_SNAPSHOT);
+        bool hasMore = table.nextSnapshotTuple(tuple, TABLE_STREAM_SNAPSHOT);
         if (!hasMore) {
             yield = true;
         } else {

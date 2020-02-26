@@ -1174,6 +1174,9 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
 
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
+    const time_t seed = time(NULL);
+    std::cout << "Seed " << seed << std::endl;
+    srand(static_cast<unsigned int>(seed));
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {

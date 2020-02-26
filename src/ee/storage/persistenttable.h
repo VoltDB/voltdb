@@ -397,9 +397,9 @@ public:
     void activateSnapshot(TableStreamType streamType);
 
     /**
-     * return true if no more tuples to be snasphsotted
+     * return true if no more tuples can be streamed to the snapshot
      */
-    bool nextTuple(TableTuple& tuple, TableStreamType streamType);
+    bool nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

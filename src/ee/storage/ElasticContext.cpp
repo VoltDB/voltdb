@@ -175,7 +175,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     // Table changes are tracked through notifications.
     size_t i = 0;
     TableTuple tuple(getTable().schema());
-    while (getTable().nextTuple(tuple, TABLE_STREAM_ELASTIC_INDEX)) {
+    while (getTable().nextSnapshotTuple(tuple, TABLE_STREAM_ELASTIC_INDEX)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
