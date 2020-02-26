@@ -66,6 +66,7 @@ import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcScanToIndexRule;
 import org.voltdb.plannerv2.rules.physical.VoltPExchangeRule;
 import org.voltdb.plannerv2.rules.physical.VoltPExchangeTransposeRule;
+import org.voltdb.plannerv2.rules.physical.VoltPHashToSerialAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinCommuteRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinPushThroughJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
@@ -241,6 +242,12 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_CALC_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
+
+            // Aggregate Rules
+            VoltPHashToSerialAggregateRule.INSTANCE_AGGR_CALC_INDEX_SCAN,
+            VoltPHashToSerialAggregateRule.INSTANCE_AGGR_INDEX_SCAN,
+            VoltPHashToSerialAggregateRule.INSTANCE_AGGR_CALC_SEQ_SCAN,
+            VoltPHashToSerialAggregateRule.INSTANCE_AGGR_SEQ_SCAN,
 
             // Exchange Transpose Rules
             VoltPExchangeTransposeRule.INSTANCE_LIMIT_EXCHANGE,
