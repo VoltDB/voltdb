@@ -1479,7 +1479,6 @@ std::string PersistentTable::debug(const std::string& spacer) const {
         buffer << infoSpacer << "\tSHADOW STREAM: " << m_shadowStream->debug("") << "\n";
     }
 #ifdef VOLT_TRACE_ENABLED
-    std::string infoSpacer = spacer + "  |";
     buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes
@@ -1497,6 +1496,13 @@ std::string PersistentTable::debug(const std::string& spacer) const {
         }
     }
 #endif
+    TableTuple tuple(schema());
+    TableIterator it = const_cast<PersistentTable *>(this)->iterator();
+    while (it.next(tuple)) {
+        buffer << tuple.debug("");
+        buffer << "\n";
+    }
+
     return buffer.str();
 }
 

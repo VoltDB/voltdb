@@ -49,7 +49,8 @@
 
 #include "common/ids.h"
 #include "common/types.h"
-
+#include "TableTupleFilter.h"
+#include "PersistentTableTupleFilter.h"
 #include <string>
 #include <vector>
 
@@ -85,6 +86,8 @@ public:
             voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,
             const std::vector<std::string> &columnNames, ExportTupleStream* mockWrapper = NULL,
             bool exportEnabled = false);
+
+    static TableTupleFilter* getTableTupleFilter(Table* table);
 
     /**
      * Creates an empty temp table with given name and columns.

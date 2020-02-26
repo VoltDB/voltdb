@@ -60,6 +60,7 @@
 #include "storage/tabletuplefilter.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
+#include "storage/tablefactory.h"
 
 using namespace std;
 using namespace voltdb;
@@ -223,10 +224,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
-    TableTupleFilter innerTableFilter;
+    TableTupleFilter* innerTableFilter = NULL;
     if (m_joinType == JOIN_TYPE_FULL) {
-        // Prepopulate the set with all inner tuples
-        innerTableFilter.init(inner_table);
+        // Prepopulate the view with all inner tuples
+       innerTableFilter = TableFactory::getTableTupleFilter(inner_table);
     }
 
     TableTuple join_tuple;
@@ -471,7 +472,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
                         // The inner tuple passed the join conditions
                         if (m_joinType == JOIN_TYPE_FULL) {
                             // Mark inner tuple as matched
-                            innerTableFilter.updateTuple(inner_tuple, MATCHED_TUPLE);
+                            innerTableFilter->updateTuple(inner_tuple, MATCHED_TUPLE);
                         }
                         // Still need to pass where filtering
                         if (postfilter.eval(&outer_tuple, &inner_tuple)) {
@@ -522,11 +523,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, num_of_outer_cols);
 
-        TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
-        for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
+        TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter->end<UNMATCHED_TUPLE>();
+        for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter->begin<UNMATCHED_TUPLE>();
                 itr != endItr && postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
-            uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
+            uint64_t tupleAddr = innerTableFilter->getTupleAddress(*itr);
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
             vassert(inner_tuple.isActive());
@@ -547,7 +548,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
         m_aggExec->p_execute_finish();
     }
 
-    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug("").c_str());
+    if (innerTableFilter != NULL) {
+         delete innerTableFilter;
+    }
+
+    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
     VOLT_TRACE("Finished NestLoopIndex");
     return true;
 }

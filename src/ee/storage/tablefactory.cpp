@@ -92,6 +92,17 @@ Table* TableFactory::getPersistentTable(
     return table;
 }
 
+TableTupleFilter* TableFactory::getTableTupleFilter(Table* table) {
+   TableTupleFilter* filter = NULL;
+   if (table->tableType().compare("PersistentTable") == 0) {
+       filter = new PersistentTableTupleFilter();
+   } else {
+       filter = new TableTupleFilter();
+   }
+   filter->init(table);
+   return filter;
+
+}
 // This is a convenient wrapper for test only.
 StreamedTable* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,

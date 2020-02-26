@@ -150,9 +150,6 @@ class TableTupleFilter {
 public:
     const static uint64_t INVALID_INDEX = std::numeric_limits<uint64_t>::max();
 private:
-    // Tuples (active and not active)
-    std::vector<char> m_tuples{};
-
     // Collection of table blocks addresses
     std::vector<uint64_t> m_blocks{};
 
@@ -173,34 +170,14 @@ private:
     // lookups in m_blockIndexes
     uint64_t m_prevBlockIndex = INVALID_INDEX;
 
-    // Index of the last ACTIVE tuple in the underlying table
-    uint64_t m_lastActiveTupleIndex = INVALID_INDEX;
-
-    void init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength);
-
-    uint64_t getTupleIndex(const TableTuple& tuple) {
-        uint64_t tupleAddress = reinterpret_cast<uint64_t>(tuple.address());
-        uint64_t blockIndex = findBlockIndex(tupleAddress);
-        return (tupleAddress - m_prevBlockAddress) / m_tupleLength + blockIndex;
-    }
-
-    /**
-     * Initialize an active tuple by setting its value to ACTIVE_TUPLE and advance last active tuple index.
-     * This method should be called only once during the initialization.
-     * To update tuple value use updateTuple method
-     */
-    void initActiveTuple(const TableTuple& tuple) {
-        uint64_t tupleIdx = getTupleIndex(tuple);
-        vassert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
-        m_tuples[tupleIdx] = ACTIVE_TUPLE;
-        // Advance last active tuple index if necessary
-        if (empty() || m_lastActiveTupleIndex < tupleIdx) {
-            m_lastActiveTupleIndex = tupleIdx;
-        }
-    }
+    virtual void init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength);
 
     uint64_t findBlockIndex(uint64_t tupleAddress);
-
+protected:
+    // Tuples (active and not active)
+    std::vector<char> m_tuples{};
+    // Index of the last ACTIVE tuple in the underlying table
+    uint64_t m_lastActiveTupleIndex = INVALID_INDEX;
 public:
     constexpr static int8_t INACTIVE_TUPLE  = -1;
     constexpr static int8_t ACTIVE_TUPLE    =  0;
@@ -210,16 +187,18 @@ public:
      */
     TableTupleFilter() = default;
 
+    virtual ~TableTupleFilter() { }
+
     /**
      * Initialize TableTupleFilter from a table by setting the value for all active tuples
      * to ACTIVE_TUPLE(0) and advancing the last active tuple index
      */
-    void init(Table* table);
+    virtual void init(Table* table);
 
     /**
      * Update an active tuple and return the tuple index
      */
-    uint64_t updateTuple(const TableTuple& tuple, char marker) {
+    virtual uint64_t updateTuple(const TableTuple& tuple, char marker) {
         uint64_t tupleIdx = getTupleIndex(tuple);
         vassert(tupleIdx <= m_lastActiveTupleIndex && ! empty());
         vassert(m_tuples[tupleIdx] != INACTIVE_TUPLE);
@@ -227,9 +206,30 @@ public:
         return tupleIdx;
     }
 
+    virtual uint64_t getTupleIndex(const TableTuple& tuple) {
+         uint64_t tupleAddress = reinterpret_cast<uint64_t>(tuple.address());
+         uint64_t blockIndex = findBlockIndex(tupleAddress);
+         return (tupleAddress - m_prevBlockAddress) / m_tupleLength + blockIndex;
+    }
+
     size_t getLastActiveTupleIndex() const {
         return m_lastActiveTupleIndex;
     }
+
+    /**
+      * Initialize an active tuple by setting its value to ACTIVE_TUPLE and advance last active tuple index.
+      * This method should be called only once during the initialization.
+      * To update tuple value use updateTuple method
+      */
+     void initActiveTuple(const TableTuple& tuple) {
+         uint64_t tupleIdx = getTupleIndex(tuple);
+         vassert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
+         m_tuples[tupleIdx] = ACTIVE_TUPLE;
+         // Advance last active tuple index if necessary
+         if (empty() || m_lastActiveTupleIndex < tupleIdx) {
+             m_lastActiveTupleIndex = tupleIdx;
+         }
+     }
 
     /**
      * Returns the tuple value
@@ -242,7 +242,7 @@ public:
     /**
      * Returns the tuple address
      */
-    uint64_t getTupleAddress(size_t tupleIdx) {
+    virtual uint64_t getTupleAddress(size_t tupleIdx) {
         vassert(tupleIdx < m_tuples.size());
         size_t blockIdx = tupleIdx / m_tuplesPerBlock;
         vassert(blockIdx < m_blocks.size());

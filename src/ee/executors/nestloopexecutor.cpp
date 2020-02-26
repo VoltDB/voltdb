@@ -47,6 +47,7 @@
 #include "executors/aggregateexecutor.h"
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
+#include "storage/tablefactory.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/limitnode.h"
 
@@ -125,10 +126,10 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     }
 
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
-    TableTupleFilter innerTableFilter;
+    TableTupleFilter* innerTableFilter = NULL;
     if (m_joinType == JOIN_TYPE_FULL) {
         // Prepopulate the view with all inner tuples
-        innerTableFilter.init(inner_table);
+        innerTableFilter = TableFactory::getTableTupleFilter(inner_table);
     }
 
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PlanNodeType::Limit));
@@ -184,7 +185,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     // The inner tuple passed the join predicate
                     if (m_joinType == JOIN_TYPE_FULL) {
                         // Mark it as matched
-                        innerTableFilter.updateTuple(inner_tuple, MATCHED_TUPLE);
+                        innerTableFilter->updateTuple(inner_tuple, MATCHED_TUPLE);
                     }
                     // Filter the joined tuple
                     if (postfilter.eval(&outer_tuple, &inner_tuple)) {
@@ -217,11 +218,12 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, outer_cols);
 
-        TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
-        for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
+        TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter->end<UNMATCHED_TUPLE>();
+        for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter->begin<UNMATCHED_TUPLE>();
                 itr != endItr && postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
-            uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
+            uint64_t tupleAddr = innerTableFilter->getTupleAddress(*itr);
+            std::cout << " #" << (char *)(tupleAddr) << std::endl;
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
             vassert(inner_tuple.isActive());
@@ -237,5 +239,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         m_aggExec->p_execute_finish();
     }
 
+    if (innerTableFilter != NULL) {
+        delete innerTableFilter;
+    }
     return (true);
 }

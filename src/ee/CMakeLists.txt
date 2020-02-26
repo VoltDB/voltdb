@@ -278,6 +278,7 @@ SET (VOLTDB_SRC
   storage/table.cpp
   storage/tablefactory.cpp
   storage/tabletuplefilter.cpp
+  storage/PersistentTableTupleFilter.cpp
   storage/tableutil.cpp
   storage/temptable.cpp
   structures/CompactingPool.cpp

@@ -245,9 +245,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 #endif
         TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         while (postfilter.isUnderLimit() && iterator.next(tuple)) {
-            VOLT_TRACE("INPUT TUPLE (%p): %s, %d/%lu\n", &tuple,
-                       tuple.debug(input_table->name()).c_str(),
-                       ++m_tuple_ctr, input_table->activeTupleCount());
             pmp.countdownProgress();
 
             //

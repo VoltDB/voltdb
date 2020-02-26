@@ -54,6 +54,7 @@
 #include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
+#include "storage/tablefactory.h"
 
 using namespace std;
 using namespace voltdb;
@@ -65,7 +66,19 @@ const static int8_t SKIPPED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 2);
 // Helper class to iterate over either a temp table or
 // a persistent table using its index
 struct TableCursor {
+    TableCursor(Table* nodeTable, bool needTupleFilter) :
+        table(nodeTable),
+        tableTupleFilter(nullptr),
+        needTableTupleFilter(needTupleFilter) {
+        if (needTableTupleFilter) {
+            tableTupleFilter = TableFactory::getTableTupleFilter(nodeTable);
+        }
+    }
+
     virtual ~TableCursor() {
+        if (tableTupleFilter != nullptr) {
+            delete tableTupleFilter;
+        }
     }
 
     // This is a helper function to get the "next tuple"
@@ -92,28 +105,22 @@ struct TableCursor {
 
     void updateTupleFilter(TableTuple& tuple, int status) {
         if (needTableTupleFilter) {
-            tableTupleFilter.updateTuple(tuple, status);
+            tableTupleFilter->updateTuple(tuple, status);
         }
     }
 
-    TableTupleFilter& getTupleFilter() {
-        return tableTupleFilter;
+    TableTupleFilter& getTupleFilter() noexcept {
+        vassert(tableTupleFilter);
+        return *tableTupleFilter;
     }
 
 protected:
-    TableCursor(Table* nodeTable, bool needTupleFilter) :
-        table(nodeTable),
-        tableTupleFilter(),
-        needTableTupleFilter(needTupleFilter) {
-            if (needTableTupleFilter) {
-                tableTupleFilter.init(table);
-            }
-        }
+
 
     Table* table;
     // TableTupleFilter for outer joins to keep track of tuples that were skipped because they fail a predicate
     // or match tuples from another join's node
-    TableTupleFilter tableTupleFilter;
+    TableTupleFilter* tableTupleFilter;
     // Indicator whether we need to keep track of matched / skipped tuples
     bool needTableTupleFilter;
 };
@@ -128,6 +135,9 @@ struct TempTableCursor : public TableCursor {
         vassert(childTable);
         VOLT_TRACE("<MJ Child PlanNode> %s", childNode->debug().c_str());
         VOLT_TRACE("<MJ Child table :\n %s>", table->debug().c_str());
+    }
+
+    virtual ~TempTableCursor() {
     }
 
     bool getNextTuple(TableTuple* tuple) override {
@@ -158,6 +168,8 @@ struct IndexTableCursor : public TableCursor {
         VOLT_TRACE("<MJ Index Child table :\n %s>", table->debug().c_str());
     }
 
+    virtual ~IndexTableCursor() {}
+
     void populateJoinTuple(TableTuple& joinTuple, const TableTuple& childTuple, int startIndex) const override {
         if (numOfProjectColumns == -1) {
             joinTuple.setNValues(startIndex, childTuple, 0, getColumnCount());
@@ -177,7 +189,7 @@ struct IndexTableCursor : public TableCursor {
                     return true;
                 } else if (needTableTupleFilter) {
                     // Mark the tuple as skipped so it would not be added to the output table for outer joins
-                    tableTupleFilter.updateTuple(*tuple, SKIPPED_TUPLE);
+                    tableTupleFilter->updateTuple(*tuple, SKIPPED_TUPLE);
                 }
             }
             return false;
