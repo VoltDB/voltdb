@@ -170,7 +170,7 @@ private:
     // lookups in m_blockIndexes
     uint64_t m_prevBlockIndex = INVALID_INDEX;
 
-    virtual void init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength);
+    void init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength);
 
     uint64_t findBlockIndex(uint64_t tupleAddress);
 protected:
