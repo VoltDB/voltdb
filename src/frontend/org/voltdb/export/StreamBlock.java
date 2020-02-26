@@ -90,6 +90,10 @@ public class StreamBlock {
         return m_entry.getExtraHeader().getSchema();
     }
 
+    public PersistedMetadata getMetadata() {
+        return m_entry.getExtraHeader();
+    }
+
     public long startSequenceNumber() {
         return m_startSequenceNumber;
     }

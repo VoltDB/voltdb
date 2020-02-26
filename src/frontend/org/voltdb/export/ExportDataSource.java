@@ -60,7 +60,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
-import org.voltdb.exportclient.ExportRowSchema;
 import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
@@ -1724,9 +1723,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    ExportRowSchema schema =
-                            ExportRowSchema.create(table, m_partitionId, m_committedBuffers.getGenerationIdCreated(), genId);
-                    m_committedBuffers.updateSchema(schema);
+                    PersistedMetadata metadata = new PersistedMetadata(table, m_partitionId,
+                            m_committedBuffers.getGenerationIdCreated(), genId);
+                    m_committedBuffers.updateSchema(metadata);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
                 }
