@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.AccountExpiredException;
@@ -284,9 +286,7 @@ public class AuthSystem {
          * @return group name array
          */
         public final List<String> getGroupNames() {
-            List<String> groupNames = new ArrayList<>(m_groups.size());
-            m_groups.forEach(g -> groupNames.add(g.m_name));
-            return groupNames;
+            return m_groups.stream().map(g -> g.m_name).collect(Collectors.toList());
         }
 
         public boolean authorizeConnector(String connectorClass) {
@@ -670,11 +670,11 @@ public class AuthSystem {
 
     public List<String> getGroupNamesForUser(String userName) {
         if (userName == null) {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
         AuthUser user = getUser(userName);
         if (user == null) {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
         return user.getGroupNames();
     }
