@@ -700,8 +700,8 @@ namespace voltdb {
              * iterator on compacting chunks
              */
             template<typename C>struct EmptyConstructible {
-                inline constexpr void validate(C) const noexcept {}
-                inline constexpr void remove(C) const noexcept {}
+                inline constexpr bool validate(C) const noexcept {return false;}
+                inline constexpr bool remove(C) const noexcept {return false;}
             };
             template<typename C> class Constructible {
                 set<id_type> m_inUse{};
