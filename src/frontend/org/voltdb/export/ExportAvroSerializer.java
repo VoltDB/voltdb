@@ -112,7 +112,7 @@ public class ExportAvroSerializer {
             avro.setSchemaregistryurl("");
         }
 
-        // update the serializer config if the schema_register_url in the deployment file changes
+        // update the serializer config if the schema_registry url in the deployment file changes
         if (m_avro == null || !Objects.equals(m_avro.getSchemaregistryurl(), avro.getSchemaregistryurl())) {
             m_avro = avro;
             // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
