@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -28,10 +27,8 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Index;
@@ -192,21 +189,6 @@ public class VoltPHashToSerialAggregateRule extends RelOptRule {
         Preconditions.checkState(groupBy.asList().size() <= targets.length);
         int firstMiss = Arrays.asList(targets).indexOf(-1);
         return firstMiss == -1 || firstMiss > groupBy.size();
-    }
-
-    private RelCollation buildGroupByCollation(VoltPhysicalHashAggregate aggr) {
-        // Build a collation that represents each GROUP BY expression.
-        // This collation implies that this serial aggregate requires its input
-        // to be sorted in an order that is one of permutations of the fields from this collation
-        ImmutableBitSet groupBy = aggr.getGroupSet();
-        List<RelDataTypeField> rowTypeList = aggr.getRowType().getFieldList();
-        List<RelFieldCollation> collationFields = new ArrayList<>();
-        for (int index = groupBy.nextSetBit(0); index != -1;
-             index = groupBy.nextSetBit(index + 1)) {
-            Preconditions.checkState(index < rowTypeList.size());
-            collationFields.add(new RelFieldCollation(index));
-        }
-        return RelCollations.of(collationFields.toArray(new RelFieldCollation[collationFields.size()]));
     }
 
     private void aggrSeqScan(RelOptRuleCall call) {
