@@ -20,8 +20,6 @@ package org.voltdb.export;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +31,7 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.common.errors.SerializationException;
+import org.voltdb.compiler.deploymentfile.AvroType;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 
@@ -47,12 +46,12 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
 public class ExportAvroSerializer {
     private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>(); // (topic -> decoder) mapping
 
-    private String m_schemaRegistryUrl;
+    private AvroType m_avro;
     private SchemaRegistryClient m_schemaRegistryClient;
     private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
-    public ExportAvroSerializer(String schemaRegistryUrl) {
-        updateConfig(schemaRegistryUrl);
+    public ExportAvroSerializer(AvroType avro) {
+        updateConfig(avro);
     }
 
     /**
@@ -104,15 +103,20 @@ public class ExportAvroSerializer {
     }
 
     /**
-     * Handling the change of the {@code SchemaRegistryUrl} in the deployment file.
+     * Handling the change of the {@link AvroType} in the deployment file.
      */
-    public synchronized void updateConfig(String schemaRegistryUrl) {
+    public synchronized void updateConfig(AvroType avro) {
+        if (avro == null) {
+            // Use a default config talking to no-one
+            avro = new AvroType();
+            avro.setSchemaregistryurl("");
+        }
+
         // update the serializer config if the schema_register_url in the deployment file changes
-        if (!Objects.equals(m_schemaRegistryUrl, schemaRegistryUrl)) {
-            m_schemaRegistryUrl = schemaRegistryUrl;
-            List<String> baseUrls = Arrays.asList(schemaRegistryUrl.split(","));
+        if (m_avro == null || !Objects.equals(m_avro.getSchemaregistryurl(), avro.getSchemaregistryurl())) {
+            m_avro = avro;
             // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            m_schemaRegistryClient = new CachedSchemaRegistryClient(baseUrls, 10000);
+            m_schemaRegistryClient = new CachedSchemaRegistryClient(m_avro.getSchemaregistryurl().trim(), 10000);
         }
     }
 }
