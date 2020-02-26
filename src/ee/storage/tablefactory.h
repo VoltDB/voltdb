@@ -49,7 +49,7 @@
 
 #include "common/ids.h"
 #include "common/types.h"
-#include "TableTupleFilter.h"
+#include "tabletuplefilter.h"
 #include "PersistentTableTupleFilter.h"
 #include <string>
 #include <vector>

@@ -659,7 +659,6 @@ void PersistentTable::finalizeDelete() {
      }
 
     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
-    m_releaseBatch.size();
 
     allocator().remove(m_releaseBatch, [this, &target](map<void*, void*> const& tuples) {
         TableTuple origin(m_schema);
