@@ -792,6 +792,17 @@ public class TestGroupBySuite extends RegressionSuite {
         }
     }
 
+    // ENG-18549
+    // GROUP BY doesn't allow ? in aggregate functions, doesn't treat ? as constant
+    public void testGroupByWithParameterizeInAggregateExpression() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        String sql1 = "SELECT A, CAST(1 as integer) + count(B) from R2 group by A;";
+        VoltTable vt1 = client.callProcedure("@Explain", sql1).getResults()[0];
+        String sql2 = "SELECT A, CAST(? as integer) + count(B) from R2 group by A;";
+        VoltTable vt2 = client.callProcedure("@Explain", sql2).getResults()[0];
+        assertTablesAreEqual("Plans for two sqls should be same", vt1, vt2);
+    }
+
     //
     // Suite builder boilerplate
     //

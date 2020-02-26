@@ -548,6 +548,13 @@ public class Expression {
                 return true;
             }
         }
+        // For ENG-18549
+        // treat ? as constant value, allow ? in aggregate functions
+        // TODO: this fix only lift the restriction for cast function
+        // generalize to other functions in the future if needed
+        if (opType == OpTypes.CAST && nodes.length == 1 && nodes[0].opType == OpTypes.DYNAMIC_PARAM) {
+            return true;
+        }
 
         switch (opType) {
 
