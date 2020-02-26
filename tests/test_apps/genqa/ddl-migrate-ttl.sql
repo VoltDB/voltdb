@@ -17,7 +17,7 @@ CREATE TABLE partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -63,7 +63,7 @@ CREATE TABLE export_partitioned_table_kafka MIGRATE TO TARGET kafka_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -92,7 +92,7 @@ CREATE TABLE export_partitioned_table_rabbit MIGRATE TO TARGET rabbit_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -107,8 +107,7 @@ CREATE TABLE export_partitioned_table_rabbit MIGRATE TO TARGET rabbit_target
 PARTITION TABLE export_partitioned_table_rabbit ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_rabbit_idx ON  export_partitioned_table_rabbit(type_not_null_timestamp)  where not migrating;
 
-
-CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
+CREATE TABLE export_partitioned_table_file MIGRATE TO TARGET file_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -122,7 +121,7 @@ CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -137,7 +136,7 @@ CREATE TABLE export_partitioned_table_file MIGRATE to TARGET file_target
 PARTITION TABLE export_partitioned_table_file ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_file_idx ON  export_partitioned_table_file(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_partitioned_table_jdbc MIGRATE to TARGET jdbc_target
+CREATE TABLE export_partitioned_table_jdbc MIGRATE TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -151,7 +150,7 @@ CREATE TABLE export_partitioned_table_jdbc MIGRATE to TARGET jdbc_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -180,7 +179,7 @@ CREATE TABLE export_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -208,7 +207,7 @@ CREATE TABLE export_mirror_replicated_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -257,7 +256,7 @@ CREATE TABLE export_replicated_table_kafka MIGRATE TO TARGET kafka_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -285,7 +284,7 @@ CREATE TABLE export_replicated_table_rabbit MIGRATE TO TARGET rabbit_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -313,7 +312,7 @@ CREATE TABLE export_replicated_table_file MIGRATE TO TARGET file_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -341,7 +340,7 @@ CREATE TABLE export_replicated_table_jdbc MIGRATE TO TARGET jdbc_target
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -379,7 +378,7 @@ CREATE STREAM export_geo_partitioned_table_jdbc PARTITION ON COLUMN rowid EXPORT
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
@@ -412,7 +411,7 @@ CREATE TABLE export_geo_mirror_partitioned_table
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     default now NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
