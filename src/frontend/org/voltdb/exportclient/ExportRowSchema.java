@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.voltdb.VoltType;
@@ -94,9 +93,9 @@ public class ExportRowSchema extends ExportRow {
      */
     public static ExportRowSchema create(Table table, int partitionId, long initialGenerationId, long generationId) {
 
-        List<String> colNames = new LinkedList<>();
-        List<VoltType> colTypes = new LinkedList<>();
-        List<Integer> colSizes = new LinkedList<>();
+        ImmutableList.Builder<String> colNames = ImmutableList.builder();
+        ImmutableList.Builder<VoltType> colTypes = ImmutableList.builder();
+        ImmutableList.Builder<Integer> colSizes = ImmutableList.builder();
 
         // Add the meta-column definitions
         colNames.addAll(META_COL_NAMES);
@@ -110,7 +109,7 @@ public class ExportRowSchema extends ExportRow {
             colSizes.add(c.getSize());
         }
 
-        return new ExportRowSchema(table.getTypeName(), colNames, colTypes, colSizes,
+        return new ExportRowSchema(table.getTypeName(), colNames.build(), colTypes.build(), colSizes.build(),
                 partitionId, initialGenerationId, generationId);
     }
 
