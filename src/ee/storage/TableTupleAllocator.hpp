@@ -431,8 +431,8 @@ namespace voltdb {
         public:
             static ChunksIdValidatorImpl& instance();
             id_type id();                       // unique id generator
-            void validate(id_type);
-            void remove(id_type);
+            bool validate(id_type);
+            bool remove(id_type);
         };
         using ChunksIdValidator =
 #ifdef NDEBUG                                          // release build: don't do actual validations

@@ -629,11 +629,12 @@ ChunksIdValidatorImpl ChunksIdValidatorImpl::s_singleton{};
 /**
  * The implementation just forward IteratorPermissible
  */
-inline void ChunksIdValidatorImpl::validate(id_type id) {
+inline bool ChunksIdValidatorImpl::validate(id_type id) {
     lock_guard<mutex> g{m_mapMutex};
     auto const& iter = m_inUse.find(id);
     if (iter == m_inUse.end()) {            // add entry
         m_inUse.emplace_hint(iter, id);
+        return true;
     } else {
         snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", id);
         buf[sizeof buf - 1] = 0;
@@ -641,11 +642,12 @@ inline void ChunksIdValidatorImpl::validate(id_type id) {
     }
 }
 
-inline void ChunksIdValidatorImpl::remove(id_type id) {
+inline bool ChunksIdValidatorImpl::remove(id_type id) {
     // TODO: we need to also guard against "double deletion" case;
     // but eecheck is currently failing mysteriously
     lock_guard<mutex> g{m_mapMutex};
     m_inUse.erase(id);
+    return true;
 }
 
 inline ChunksIdValidatorImpl& ChunksIdValidatorImpl::instance() {
