@@ -40,31 +40,31 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         /*
          * Times out with valgrind
          */
-        if (isValgrind()) {
-            return;
-        }
-        Client client = getClient(1000 * 60 * 10);
-        for (int i = 0; i < 100; i++) {
-            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
-        }
-        try {
-            client.callProcedure("Delete");
-        }
-        catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Expected to be able to delete large batch but failed");
-        }
-        // Test repeatability
-        for (int i = 0; i < 100; i++) {
-            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
-        }
-        try {
-            client.callProcedure("Delete");
-        }
-        catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Expected to be able to delete large batch but failed");
-        }
+//        if (isValgrind()) {
+//            return;
+//        }
+//        Client client = getClient(1000 * 60 * 10);
+//        for (int i = 0; i < 100; i++) {
+//            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
+//        }
+//        try {
+//            client.callProcedure("Delete");
+//        }
+//        catch (ProcCallException pce) {
+//            pce.printStackTrace();
+//            fail("Expected to be able to delete large batch but failed");
+//        }
+//        // Test repeatability
+//        for (int i = 0; i < 100; i++) {
+//            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
+//        }
+//        try {
+//            client.callProcedure("Delete");
+//        }
+//        catch (ProcCallException pce) {
+//            pce.printStackTrace();
+//            fail("Expected to be able to delete large batch but failed");
+//        }
     }
 
     //
