@@ -69,6 +69,7 @@ public:
     virtual ~StreamedTable();
 
     void notifyQuantumRelease();
+    void finalizeDelete() {}
 
     // virtual Table functions
     // Return a table iterator BY VALUE
