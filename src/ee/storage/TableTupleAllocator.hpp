@@ -76,8 +76,8 @@ namespace voltdb {
          * accelerate searches and modification on chunk list
          */
         enum class collections_enum_type : char {
-            standard_collections,
-            btx_collections
+            std_collections,
+            stx_collections
         };
 
         /**
@@ -220,16 +220,50 @@ namespace voltdb {
         /**
          * B+ tree map/set
          */
-        struct BtxCollections {
-            template<typename K> struct set : private stx::btree_set<K> {
+        struct StxCollections {
+            template<typename K> class set : private stx::btree_set<K> {
+                using super = stx::btree_set<K>;
+            public:
+                using value_type = typename super::value_type;
+                using iterator = typename super::iterator;
+                using const_iterator = typename super::const_iterator;
+                using super::begin; using super::end;
+                using super::empty; using super::clear; using super::erase;
+                using super::count; using super::find; using super::size;
+                using super::upper_bound; using super::lower_bound;
+                set() = default;
+                set(initializer_list<value_type>);
+                template<typename InputIt> set(InputIt, InputIt);
+                set<K>& operator=(set<K> const&) = default;
+                const_iterator cbegin() const;
+                const_iterator cend() const;
+                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
             };
-            template<typename K, typename V> struct map : private stx::btree_map<K, V> {
+            template<typename K, typename V> class map : private stx::btree_map<K, V> {
+                using super = stx::btree_map<K, V>;
+            public:
+                using key_type = typename super::key_type;
+                using mapped_type = typename super::data_type;
+                using value_type = typename super::value_type;
+                using iterator = typename super::iterator;
+                using const_iterator = typename super::const_iterator;
+                using super::begin; using super::end;
+                using super::empty; using super::clear; using super::erase;
+                using super::count; using super::find; using super::size;
+                using super::upper_bound; using super::lower_bound;
+                map() = default;;
+                map(initializer_list<value_type>);
+                template<typename InputIt> map(InputIt, InputIt);
+                map<K, V>& operator=(map<K, V> const&) = default;
+                const_iterator cbegin() const;
+                const_iterator cend() const;
+                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
             };
         };
 
         template<collections_enum_type E>
-        using Collections = typename conditional<E == collections_enum_type::standard_collections,
-              StdCollections, BtxCollections>::type;
+        using Collections = typename conditional<E == collections_enum_type::std_collections,
+              StdCollections, StxCollections>::type;
 
         /**
          * Homogeneous-sized singly-linked list of memory holders
@@ -240,7 +274,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            collections_enum_type CE = collections_enum_type::standard_collections,
+            collections_enum_type CE = collections_enum_type::std_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -249,8 +283,8 @@ namespace voltdb {
             size_t m_size = 0;
             id_type m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
-            typename Collections<CE>::template map<void const*, typename forward_list<Chunk>::iterator> m_byAddr{};
-            typename Collections<CE>::template map<id_type, typename forward_list<Chunk>::iterator> m_byId{};
+            typename Collections<CE>::template map<void const*, typename super::iterator> m_byAddr{};
+            typename Collections<CE>::template map<id_type, typename super::iterator> m_byId{};
             void add(typename super::iterator);
             void remove(typename super::iterator);
         protected:
@@ -325,10 +359,11 @@ namespace voltdb {
             size_t chunks() const noexcept;            // number of chunks in the list
             void* allocate();
             void free(void*);
-            id_type id() const noexcept { return 0; }              // dummy function
+            bool empty() const noexcept;               // NOTE: with batched lazy chunk removal (CHUNK_REMOVAL_THRESHOLD), this cannot check on ChunkList emptiness
+            id_type id() const noexcept { return 0; }  // dummy function
             using list_type = ChunkList<Chunk>;
             using typename list_type::iterator; using typename list_type::const_iterator;
-            using list_type::empty; using list_type::clear; using list_type::begin;
+            using list_type::clear; using list_type::begin;
             using list_type::tupleSize; using list_type::chunkSize;
         };
 

@@ -205,6 +205,54 @@ inline void LazyNonCompactingChunk::free(void* src) {
     }
 }
 
+template<typename K> inline StxCollections::set<K>::set(
+        initializer_list<typename StxCollections::set<K>::value_type> l) : super() {
+    copy(l.begin(), l.end(), inserter(*this, end()));
+}
+
+template<typename K>
+template<typename InputIt> inline StxCollections::set<K>::set(InputIt from, InputIt to) : super(from, to) {}
+
+template<typename K> inline
+typename StxCollections::set<K>::const_iterator StxCollections::set<K>::cbegin() const {
+    return super::begin();
+}
+
+template<typename K> inline
+typename StxCollections::set<K>::const_iterator StxCollections::set<K>::cend() const {
+    return super::end();
+}
+
+template<typename K>
+template<typename... Args> inline
+pair<typename StxCollections::set<K>::iterator, bool> StxCollections::set<K>::emplace(Args&&... args) {
+    return super::insert(value_type{forward<Args>(args)...});
+}
+
+template<typename K, typename V>
+template<typename InputIt> inline StxCollections::map<K, V>::map(InputIt from, InputIt to) : super(from, to) {}
+
+template<typename K, typename V> inline StxCollections::map<K, V>::map(
+        initializer_list<typename StxCollections::map<K, V>::value_type> l) : super() {
+    copy(l.begin(), l.end(), inserter(*this, end()));
+}
+
+template<typename K, typename V> inline
+typename StxCollections::map<K, V>::const_iterator StxCollections::map<K, V>::cbegin() const {
+    return super::begin();
+}
+
+template<typename K, typename V> inline
+typename StxCollections::map<K, V>::const_iterator StxCollections::map<K, V>::cend() const {
+    return super::end();
+}
+
+template<typename K, typename V>
+template<typename... Args> inline
+pair<typename StxCollections::map<K, V>::iterator, bool> StxCollections::map<K, V>::emplace(Args&&... args) {
+    return super::insert(value_type{forward<Args>(args)...});
+}
+
 template<typename Chunk, collections_enum_type CE, typename E>
 inline typename ChunkList<Chunk, CE, E>::iterator const*
 ChunkList<Chunk, CE, E>::find(void const* k) const {
@@ -344,9 +392,12 @@ inline void ChunkList<Chunk, CE, E>::clear() noexcept {
 template<typename C, typename E> inline
 NonCompactingChunks<C, E>::NonCompactingChunks(size_t tupleSize) noexcept : list_type(tupleSize) {}
 
-template<typename C, typename E>
-inline size_t NonCompactingChunks<C, E>::chunks() const noexcept {
+template<typename C, typename E> inline size_t NonCompactingChunks<C, E>::chunks() const noexcept {
     return ChunkList<C>::size();
+}
+
+template<typename C, typename E> inline bool NonCompactingChunks<C, E>::empty() const noexcept {
+    return m_allocs == 0;
 }
 
 template<typename C, typename E>
@@ -512,7 +563,7 @@ size_t CompactingChunks::chunks() const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
-    auto const iter = list_type::find(p);
+    auto const* iter = list_type::find(p);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
@@ -520,7 +571,7 @@ CompactingChunks::find(void const* p) const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(id_type id) const noexcept {
-    auto const iter = list_type::find(id);
+    auto const* iter = list_type::find(id);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
@@ -762,21 +813,22 @@ inline typename CompactingChunks::FrozenTxnBoundaries const& CompactingChunks::f
 }
 
 namespace batch_remove_aid {
-    template<typename T, typename Cont1> inline static set<T>
-    intersection(Cont1 const& t1, set<T> const&& t2) {
-        return accumulate(t1.cbegin(), t1.cend(), set<T>{}, [&t2](set<T>& acc, T const& e) {
-                if (t2.count(e)) {
-                    acc.emplace(e);
-                }
-                return acc;
-            });
+    template<typename Cont1, typename Set> inline static Set
+    intersection(Cont1 const& t1, Set const&& t2) {
+        return accumulate(t1.cbegin(), t1.cend(), Set{},
+                [&t2](Set& acc, typename Set::value_type const& e) {
+                    if (t2.count(e)) {
+                        acc.emplace(e);
+                    }
+                    return acc;
+                });
     }
 
     /**
      * Assuming that inter \subset src, removes all elements from
      * src, keeping the rest in order.
      */
-    template<typename T> inline static vector<T> subtract(vector<T> src, set<T> const& inter) {
+    template<typename T, typename Set> inline static vector<T> subtract(vector<T> src, Set const& inter) {
         for (auto const& entry : inter) {
             auto const& iter = find(src.begin(), src.end(), entry);
             vassert(iter != src.end());
@@ -785,13 +837,17 @@ namespace batch_remove_aid {
         return src;
     }
 
-    template<typename T1, typename T2> inline
-    static map<T1, T2> build_map(vector<T1> const&& v1, vector<T2> const&& v2) {
+    template<typename Map> inline
+    static Map build_map(vector<typename Map::key_type> const&& v1, vector<typename Map::mapped_type> const&& v2) {
         vassert(v1.size() == v2.size());
-        return inner_product(v1.cbegin(), v1.cend(), v2.cbegin(), map<void*, void*>{},
-                [](map<void*, void*>& acc, pair<void*, void*> const& entry)
-                { acc.emplace(entry); return acc; },
-                [](void* p1, void* p2) { return make_pair(p1, p2); });
+        return inner_product(v1.cbegin(), v1.cend(), v2.cbegin(), Map{},
+                [] (Map& acc, typename Map::value_type const& entry) {
+                    acc.emplace(entry);
+                    return acc;
+                },
+                [] (typename Map::key_type const& p1, typename Map::mapped_type const& p2) {
+                    return make_pair(p1, p2);
+                });
     }
 }
 
@@ -920,7 +976,7 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
         // This check is spared in the single-call batch-free API
         auto const ptrs = super::collect();
         size_t size = ptrs.size();
-        if (dupCheck && size != set<void*>(ptrs.cbegin(), ptrs.cend()).size()) {
+        if (dupCheck && size != set_type<void*>(ptrs.cbegin(), ptrs.cend()).size()) {
             throw runtime_error("Duplicate addresses detected");
         } else if (! ptrs.empty()) {
             vector<void*> addrToRemove{};
@@ -933,8 +989,8 @@ typename CompactingChunks::DelayedRemover& CompactingChunks::DelayedRemover::pre
                     break;
                 }
             }
-            m_remove = intersection(ptrs, set<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
-            m_move = build_map(subtract(super::sorted(), m_remove),
+            m_remove = intersection(ptrs, set_type<void*>(addrToRemove.cbegin(), addrToRemove.cend()));
+            m_move = build_map<map_type<void*, void*>>(subtract(super::sorted(), m_remove),
                     subtract(addrToRemove, m_remove));
         }
         m_prepared = true;
@@ -949,8 +1005,9 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
              allocsPerChunk = super::chunks().chunkSize() / tupleSize;
         if (! moved) {
             // storage remapping and clean up
-            for_each(m_move.cbegin(), m_move.cend(), [tupleSize](typename map<void*, void*>::value_type const& entry) {
-                    memcpy(entry.first, entry.second, tupleSize);
+            std::for_each(m_move.cbegin(), m_move.cend(),
+                    [tupleSize](typename map_type<void*, void*>::value_type const& entry) {
+                        memcpy(entry.first, entry.second, tupleSize);
                     });
         }
         m_move.clear();
@@ -1681,19 +1738,19 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 return batch;
             }).prepare(false);
     // hook registration
-    for_each(batch.removed().cbegin(), batch.removed().cend(),
+    std::for_each(batch.removed().cbegin(), batch.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
                 Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
-    for_each(batch.movements().cbegin(), batch.movements().cend(),
+    std::for_each(batch.movements().cbegin(), batch.movements().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
             });
     // moves (i.e. memcpy) before call back
     auto const tuple_size = tupleSize();
-    for_each(batch.movements().cbegin(), batch.movements().cend(),
+    std::for_each(batch.movements().cbegin(), batch.movements().cend(),
             [tuple_size](pair<void*, void*> const& entry) {
                 memcpy(entry.first, entry.second, tuple_size);
             });
@@ -1712,12 +1769,13 @@ CompactingChunks::DelayedRemover_movments_type HookedCompactingChunks<Hook, E>::
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force() {
     // hook registration
-    for_each(CompactingChunks::m_batched.removed().cbegin(), CompactingChunks::m_batched.removed().cend(),
+    std::for_each(CompactingChunks::m_batched.removed().cbegin(),
+            CompactingChunks::m_batched.removed().cend(),
             [this](void* s) {
                 Hook::copy(s);
                 Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
-    for_each(remove_moves().cbegin(), remove_moves().cend(),
+    std::for_each(remove_moves().cbegin(), remove_moves().cend(),
             [this](pair<void*, void*> const& entry) {
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
