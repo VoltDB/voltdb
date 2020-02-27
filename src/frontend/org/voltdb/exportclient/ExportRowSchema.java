@@ -123,41 +123,15 @@ public class ExportRowSchema extends ExportRow {
      *
      * @param other the other schema to compare
      * @return true if same schema regardless of generations and tableName
+     * @throws NullPointerException if {@code other} is {@code null}
      */
     public boolean sameSchema(ExportRowSchema other) {
 
         if (other == this) {
             return true;
         }
-        if (!(other instanceof ExportRowSchema)) {
-            return false;
-        }
-        if (this.names.size() != other.names.size()) {
-            return false;
-        }
 
-        // Note: valid instances assume those different members have same size
-        // Note: schemas are not identical if columns have different order
-        Iterator<String> itNames = this.names.iterator();
-        Iterator<VoltType> itTypes = this.types.iterator();
-        Iterator<Integer> itSizes = this.lengths.iterator();
-
-        Iterator<String> itONames = other.names.iterator();
-        Iterator<VoltType> itOTypes = other.types.iterator();
-        Iterator<Integer> itOSizes = other.lengths.iterator();
-
-        while(itNames.hasNext()) {
-            if (!itNames.next().equals(itONames.next())) {
-                return false;
-            }
-            if (!itTypes.next().equals(itOTypes.next())) {
-                return false;
-            }
-            if (!itSizes.next().equals(itOSizes.next())) {
-                return false;
-            }
-        }
-        return true;
+        return names.equals(other.names) && types.equals(other.types) && lengths.equals(other.lengths);
     }
 
     /**
