@@ -52,6 +52,7 @@ CLIENTLOG="clientlog"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput sp.jar voltdbroot exportdata clientlog log build
+    rm -f ddl1.sql ddl-migrate-ttl.sql ddl-migrate-nottl.sql
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
@@ -73,9 +74,19 @@ function srccompile() {
     if [ $? != 0 ]; then exit; fi
 }
 
+# generate sql fils from templates
+function generateddl() {
+    set -x
+    ../ddlgen-tool.py ddl1.tmplt > ddl1.sql
+    ../ddlgen-tool.py ddl-migrate-ttl.tmplt > ddl-migrate-ttl.sql
+    ../ddlgen-tool.py ddl-migrate-nottl.tmplt > ddl-migrate-nottl.sql
+    set +x
+}
+
 # build an application catalog
 function jars() {
     srccompile
+    generateddl
 
     # stop if compilation fails
     rm -rf $EXPORTDATA
