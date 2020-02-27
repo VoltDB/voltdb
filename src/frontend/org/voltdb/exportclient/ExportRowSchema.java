@@ -27,7 +27,6 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
@@ -230,11 +229,10 @@ public class ExportRowSchema extends ExportRow {
                 8 + // initial generation id
                 8 + // generation id
                 4 + // partition id
-                4 + /* table name length */
-                tableName.getBytes(Constants.UTF8ENCODING).length +
+                SerializationHelper.calculateSerializedSize(tableName) +
                 4; // column count
         for (String colName : this.names) {
-            size += 4 /* colName len */ + colName.getBytes(Constants.UTF8ENCODING).length + 1 /* value type */
+            size += SerializationHelper.calculateSerializedSize(colName) + 1 /* value type */
                     + 4 /* value len */;
         }
         return size;
