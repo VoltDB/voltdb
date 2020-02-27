@@ -29,6 +29,8 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <stx/btree_map>
+#include <stx/btree_set>
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
@@ -59,6 +61,23 @@ namespace voltdb {
 #else
                 16                                     // for eecheck only
 #endif
+        };
+
+        /**
+         * Heap memory allocator candidates backing ChunkHolder
+         */
+        enum class allocator_enum_type : char {
+            standard_allocator,
+            thread_local_pool
+        };
+
+        /**
+         * Collection of tree/map implementations, mainly used to help
+         * accelerate searches and modification on chunk list
+         */
+        enum class collections_enum_type : char {
+            standard_collections,
+            btx_collections
         };
 
         /**
@@ -108,14 +127,6 @@ namespace voltdb {
             ThreadLocalPoolAllocator(size_t);
             ~ThreadLocalPoolAllocator();
             char* get() const noexcept;
-        };
-
-        /**
-         * Heap memory allocator candidates backing ChunkHolder
-         */
-        enum class allocator_enum_type : char {
-            standard_allocator,
-            thread_local_pool
         };
 
         template<allocator_enum_type alloc>
@@ -207,6 +218,20 @@ namespace voltdb {
         };
 
         /**
+         * B+ tree map/set
+         */
+        struct BtxCollections {
+            template<typename K> struct set : private stx::btree_set<K> {
+            };
+            template<typename K, typename V> struct map : private stx::btree_map<K, V> {
+            };
+        };
+
+        template<collections_enum_type E>
+        using Collections = typename conditional<E == collections_enum_type::standard_collections,
+              StdCollections, BtxCollections>::type;
+
+        /**
          * Homogeneous-sized singly-linked list of memory holders
          * (i.e. ChunkHolder).
          *
@@ -214,7 +239,8 @@ namespace voltdb {
          * std::forward_list<ChunkHolder>, search by void* and by chunk id;
          * and limit insertion to tail and erase to front.
          */
-        template<typename Chunk, typename Col = StdCollections,
+        template<typename Chunk,
+            collections_enum_type CE = collections_enum_type::standard_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -223,8 +249,8 @@ namespace voltdb {
             size_t m_size = 0;
             id_type m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
-            typename Col::template map<void const*, typename forward_list<Chunk>::iterator> m_byAddr{};
-            typename Col::template map<id_type, typename forward_list<Chunk>::iterator> m_byId{};
+            typename Collections<CE>::template map<void const*, typename forward_list<Chunk>::iterator> m_byAddr{};
+            typename Collections<CE>::template map<id_type, typename forward_list<Chunk>::iterator> m_byId{};
             void add(typename super::iterator);
             void remove(typename super::iterator);
         protected:
@@ -232,7 +258,7 @@ namespace voltdb {
             template<typename Pred> void remove_if(Pred p);
             typename super::iterator& last() noexcept;
         public:
-            using collections = Col;
+            using collections = Collections<CE>;
             using iterator = typename super::iterator;
             using const_iterator = typename super::const_iterator;
             using reference = typename super::reference;

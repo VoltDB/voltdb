@@ -205,9 +205,9 @@ inline void LazyNonCompactingChunk::free(void* src) {
     }
 }
 
-template<typename Chunk, typename Col, typename E>
-inline typename ChunkList<Chunk, Col, E>::iterator const*
-ChunkList<Chunk, Col, E>::find(void const* k) const {
+template<typename Chunk, collections_enum_type CE, typename E>
+inline typename ChunkList<Chunk, CE, E>::iterator const*
+ChunkList<Chunk, CE, E>::find(void const* k) const {
     if (! m_byAddr.empty()) {
         auto const& iter = prev(m_byAddr.upper_bound(k));                    // find first entry whose begin() > k
         return iter != m_byAddr.cend() && iter->second->contains(k) ? &iter->second : nullptr;
@@ -216,65 +216,65 @@ ChunkList<Chunk, Col, E>::find(void const* k) const {
     }
 }
 
-template<typename Chunk, typename Col, typename E>
-inline typename ChunkList<Chunk, Col, E>::iterator const*
-ChunkList<Chunk, Col, E>::find(id_type id) const {
+template<typename Chunk, collections_enum_type CE, typename E>
+inline typename ChunkList<Chunk, CE, E>::iterator const*
+ChunkList<Chunk, CE, E>::find(id_type id) const {
     auto const& iter = m_byId.find(id);
     return iter == m_byId.cend() ? nullptr : &iter->second;
 }
 
-template<typename Chunk, typename Col, typename E> inline
-ChunkList<Chunk, Col, E>::ChunkList(size_t tsize) noexcept :
+template<typename Chunk, collections_enum_type CE, typename E> inline
+ChunkList<Chunk, CE, E>::ChunkList(size_t tsize) noexcept :
 super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
 
-template<typename Chunk, typename Col, typename E> inline id_type&
-ChunkList<Chunk, Col, E>::lastChunkId() {
+template<typename Chunk, collections_enum_type CE, typename E> inline id_type&
+ChunkList<Chunk, CE, E>::lastChunkId() {
     return m_lastChunkId;
 }
 
-template<typename Chunk, typename Col, typename E> inline size_t
-ChunkList<Chunk, Col, E>::tupleSize() const noexcept {
+template<typename Chunk, collections_enum_type CE, typename E> inline size_t
+ChunkList<Chunk, CE, E>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-template<typename Chunk, typename Col, typename E> inline size_t
-ChunkList<Chunk, Col, E>::chunkSize() const noexcept {
+template<typename Chunk, collections_enum_type CE, typename E> inline size_t
+ChunkList<Chunk, CE, E>::chunkSize() const noexcept {
     return m_chunkSize;
 }
 
-template<typename Chunk, typename Col, typename E> inline size_t
-ChunkList<Chunk, Col, E>::size() const noexcept {
+template<typename Chunk, collections_enum_type CE, typename E> inline size_t
+ChunkList<Chunk, CE, E>::size() const noexcept {
     return m_size;
 }
 
-template<typename Chunk, typename Col, typename E> inline
-typename ChunkList<Chunk, Col, E>::iterator const&
-ChunkList<Chunk, Col, E>::last() const noexcept {
+template<typename Chunk, collections_enum_type CE, typename E> inline
+typename ChunkList<Chunk, CE, E>::iterator const&
+ChunkList<Chunk, CE, E>::last() const noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename Col, typename E> inline
-typename ChunkList<Chunk, Col, E>::iterator&
-ChunkList<Chunk, Col, E>::last() noexcept {
+template<typename Chunk, collections_enum_type CE, typename E> inline
+typename ChunkList<Chunk, CE, E>::iterator&
+ChunkList<Chunk, CE, E>::last() noexcept {
     return m_back;
 }
 
-template<typename Chunk, typename Col, typename E> inline void
-ChunkList<Chunk, Col, E>::add(typename ChunkList<Chunk, Col, E>::iterator iter) {
+template<typename Chunk, collections_enum_type CE, typename E> inline void
+ChunkList<Chunk, CE, E>::add(typename ChunkList<Chunk, CE, E>::iterator iter) {
     m_byAddr.emplace(iter->begin(), iter);
     m_byId.emplace(iter->id(), iter);
 }
 
-template<typename Chunk, typename Col, typename E> inline void
-ChunkList<Chunk, Col, E>::remove(
-        typename ChunkList<Chunk, Col, E>::iterator iter) {
+template<typename Chunk, collections_enum_type CE, typename E> inline void
+ChunkList<Chunk, CE, E>::remove(
+        typename ChunkList<Chunk, CE, E>::iterator iter) {
     m_byAddr.erase(iter->begin());
     m_byId.erase(iter->id());
 }
 
-template<typename Chunk, typename Col, typename E>
-template<typename... Args> inline typename ChunkList<Chunk, Col, E>::iterator
-ChunkList<Chunk, Col, E>::emplace_back(Args&&... args) {
+template<typename Chunk, collections_enum_type CE, typename E>
+template<typename... Args> inline typename ChunkList<Chunk, CE, E>::iterator
+ChunkList<Chunk, CE, E>::emplace_back(Args&&... args) {
     if (super::empty()) {
         super::emplace_front(forward<Args>(args)...);
         m_back = super::begin();
@@ -286,8 +286,8 @@ ChunkList<Chunk, Col, E>::emplace_back(Args&&... args) {
     return m_back;
 }
 
-template<typename Chunk, typename Col, typename E> inline void
-ChunkList<Chunk, Col, E>::pop_front() {
+template<typename Chunk, collections_enum_type CE, typename E> inline void
+ChunkList<Chunk, CE, E>::pop_front() {
     if (super::empty()) {
         throw underflow_error("pop_front() called on empty chunk list");
     } else {
@@ -300,8 +300,8 @@ ChunkList<Chunk, Col, E>::pop_front() {
     }
 }
 
-template<typename Chunk, typename Col, typename E> inline void
-ChunkList<Chunk, Col, E>::pop_back() {
+template<typename Chunk, collections_enum_type CE, typename E> inline void
+ChunkList<Chunk, CE, E>::pop_back() {
     if (super::empty()) {
         throw underflow_error("pop_back() called on empty chunk list");
     } else {
@@ -316,8 +316,8 @@ ChunkList<Chunk, Col, E>::pop_back() {
     }
 }
 
-template<typename Chunk, typename Col, typename E>
-template<typename Pred> inline void ChunkList<Chunk, Col, E>::remove_if(Pred pred) {
+template<typename Chunk, collections_enum_type CE, typename E>
+template<typename Pred> inline void ChunkList<Chunk, CE, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
         if (pred(*iter)) {
             vassert(m_byAddr.count(iter->begin()));
@@ -332,8 +332,8 @@ template<typename Pred> inline void ChunkList<Chunk, Col, E>::remove_if(Pred pre
     super::remove_if(pred);
 }
 
-template<typename Chunk, typename Col, typename E>
-inline void ChunkList<Chunk, Col, E>::clear() noexcept {
+template<typename Chunk, collections_enum_type CE, typename E>
+inline void ChunkList<Chunk, CE, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
