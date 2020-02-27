@@ -7,6 +7,6 @@
     <security enabled="true" />
     <users>
       <user name="myuser" password="voltdbuser"  roles="dbuser" />
-      <user name="myadmin" password="voltdbadmin"  roles="adminuser" />
+      <user name="myadmin" password="voltdbadmin"  roles="ADMINISTRATOR" />
     </users>
 </deployment>
