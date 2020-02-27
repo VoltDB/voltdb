@@ -48,6 +48,7 @@ public:
     SynchronizedDummyUndoQuantumReleaseInterest() { }
     virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
     void notifyQuantumRelease();
+    void finalizeDelete();
 };
 
 class PersistentTable;

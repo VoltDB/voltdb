@@ -67,17 +67,26 @@ void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
     {
         ExecuteWithMpMemory usingMpMemory;
         m_realInterest->notifyQuantumRelease();
-     }
-     SynchronizedThreadLock::signalLowestSiteFinished();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedUndoQuantumReleaseInterest::finalizeDelete() {
-   if (m_realInterest != nullptr) {
-      m_realInterest->finalizeDelete();
-   }
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realInterest->finalizeDelete();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+}
+
+
+void SynchronizedDummyUndoQuantumReleaseInterest::finalizeDelete() {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }

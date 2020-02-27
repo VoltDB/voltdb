@@ -23,6 +23,7 @@ class UndoQuantumReleaseInterest {
 public:
     UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1) {}
     virtual void notifyQuantumRelease() = 0;
+    virtual void finalizeDelete() = 0;
     virtual ~UndoQuantumReleaseInterest() {}
 
     inline bool isNewReleaseInterest(int64_t currentUndoToken) {
@@ -35,7 +36,6 @@ public:
         }
     }
     inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
-    virtual void finalizeDelete() {}
 private:
     int64_t m_lastSeenUndoToken;
 };
