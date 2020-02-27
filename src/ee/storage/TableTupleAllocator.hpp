@@ -30,11 +30,6 @@
 #include <vector>
 #include "common/ThreadLocalPool.h"
 
-// older GCC compilers incurs some efficiency loss
-#if defined(__GNUC__) && (__GNUC__ <= 4)
-#define CENTOS7
-#endif
-
 namespace voltdb {
     namespace storage {
         using namespace std;
