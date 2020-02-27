@@ -274,7 +274,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            collections_enum_type CE = collections_enum_type::std_collections,
+            collections_enum_type CE = collections_enum_type::stx_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
