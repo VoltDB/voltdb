@@ -518,7 +518,7 @@ size_t CompactingChunks::chunks() const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(void const* p) const noexcept {
-    auto const& iter = list_type::find(p);
+    auto const iter = list_type::find(p);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
@@ -526,7 +526,7 @@ CompactingChunks::find(void const* p) const noexcept {
 
 inline typename CompactingChunks::list_type::iterator const*
 CompactingChunks::find(id_type id) const noexcept {
-    auto const& iter = list_type::find(id);
+    auto const iter = list_type::find(id);
     return iter == nullptr ||
         less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
         nullptr : iter;
