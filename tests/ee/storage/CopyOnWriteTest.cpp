@@ -254,16 +254,6 @@ public:
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
-
-        TableTuple tuple(m_table->schema());
-        size_t i = 0;
-        storage::for_each<PersistentTable::txn_iterator>(m_table->allocator(), [this, &tuple, &i](void const* p) {
-            void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(p));
-            tuple.move(tupleData);
-            int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
-            m_values.push_back(value);
-            m_valueSet.insert(std::pair<int64_t,size_t>(value, i++));
-        });
     }
 
     void addRandomUniqueTuples(Table *table, int numTuples, T_ValueSet *set = NULL) {
@@ -1384,9 +1374,6 @@ TEST_F(CopyOnWriteTest, MultiStream) {
 
     for (size_t iteration = 0; iteration < NUM_REPETITIONS; iteration++) {
 
-        // The last repetition does the delete after streaming.
-        bool doDelete = (iteration == NUM_REPETITIONS - 1);
-
         iterate();
 
         int totalInserted = 0;              // Total tuple counter.
@@ -1406,10 +1393,10 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
             if (i != skippedPartition) {
-                strings[i] = generatePredicateString(i, doDelete);
+                strings[i] = generatePredicateString(i, false);
             }
             else {
-                strings[i] = generatePredicateString(-1, doDelete);
+                strings[i] = generatePredicateString(-1, false);
             }
         }
 
@@ -1502,14 +1489,12 @@ TEST_F(CopyOnWriteTest, MultiStream) {
             }
 
             // Mutate the table.
-            if (!doDelete) {
-                for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
-                    doRandomTableMutation(m_table);
-                }
+            for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
+               doRandomTableMutation(m_table);
             }
         }
 
-        checkMultiCOW(expected, actual, doDelete, tupleCount, totalSkipped);
+        checkMultiCOW(expected, actual, false, tupleCount, totalSkipped);
     }
 }
 
