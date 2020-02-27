@@ -118,6 +118,7 @@ public class SystemProcedureCatalog {
                 throw new IllegalArgumentException("RO not supported for MP transactions");
             }
             readOnly = true;
+            durable = Durability.NOT_APPLICABLE;
             return this;
         }
 
@@ -230,7 +231,7 @@ public class SystemProcedureCatalog {
         }
 
         public boolean isDurable() {
-            return durable == Durability.DURABLE;
+            return !readOnly && durable == Durability.DURABLE;
         }
 
         public boolean isRestartable() {
