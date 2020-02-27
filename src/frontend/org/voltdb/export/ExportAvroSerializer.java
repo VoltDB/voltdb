@@ -109,14 +109,14 @@ public class ExportAvroSerializer {
         if (avro == null) {
             // Use a default config talking to no-one
             avro = new AvroType();
-            avro.setSchemaregistryurl("");
+            avro.setRegistry("");
         }
 
         // update the serializer config if the schema_registry url in the deployment file changes
-        if (m_avro == null || !Objects.equals(m_avro.getSchemaregistryurl(), avro.getSchemaregistryurl())) {
+        if (m_avro == null || !Objects.equals(m_avro.getRegistry(), avro.getRegistry())) {
             m_avro = avro;
             // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            m_schemaRegistryClient = new CachedSchemaRegistryClient(m_avro.getSchemaregistryurl().trim(), 10000);
+            m_schemaRegistryClient = new CachedSchemaRegistryClient(m_avro.getRegistry().trim(), 10000);
         }
     }
 }

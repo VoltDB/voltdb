@@ -1324,7 +1324,7 @@ public abstract class CatalogUtil {
             return;
         }
 
-        String registryUrl = avro.getSchemaregistryurl();
+        String registryUrl = avro.getRegistry();
         assert registryUrl != null : "deployment syntax must require URL";
         try {
             URL url = new URL(registryUrl);
