@@ -467,10 +467,8 @@ inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTra
     }
 }
 
-id_type CompactingChunks::s_id = 0;
-
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    list_type(tupleSize), CompactingStorageTrait(this), m_id(gen_id()),
+    list_type(tupleSize), CompactingStorageTrait(this),
     m_txnFirstChunk(*this), m_batched(*this) {}
 
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk>& chunks) noexcept :
@@ -498,10 +496,6 @@ inline void const*& CompactingChunks::TxnLeftBoundary::next() noexcept {
 
 inline bool CompactingChunks::TxnLeftBoundary::empty() const noexcept {
     return m_next == nullptr;
-}
-
-id_type CompactingChunks::gen_id() {
-    return s_id++;
 }
 
 inline id_type CompactingChunks::id() const noexcept {
@@ -629,6 +623,45 @@ namespace std {                                    // Need to declare these befo
             return less_rolling(lhs.id(), rhs.id());
         }
     };
+}
+
+ChunksIdValidatorImpl ChunksIdValidatorImpl::s_singleton{};
+/**
+ * The implementation just forward IteratorPermissible
+ */
+inline bool ChunksIdValidatorImpl::validate(id_type id) {
+    lock_guard<mutex> g{m_mapMutex};
+    auto const& iter = m_inUse.find(id);
+    if (iter == m_inUse.end()) {            // add entry
+        m_inUse.emplace_hint(iter, id);
+        return true;
+    } else {
+        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", id);
+        buf[sizeof buf - 1] = 0;
+        throw logic_error(buf);
+    }
+}
+
+inline bool ChunksIdValidatorImpl::remove(id_type id) {
+    // TODO: we need to also guard against "double deletion" case;
+    // but eecheck is currently failing mysteriously
+    lock_guard<mutex> g{m_mapMutex};
+    m_inUse.erase(id);
+    return true;
+}
+
+inline ChunksIdValidatorImpl& ChunksIdValidatorImpl::instance() {
+    return s_singleton;
+}
+
+inline id_type ChunksIdValidatorImpl::id() {
+    return m_id++;
+}
+
+ChunksIdNonValidator ChunksIdNonValidator::s_singleton{};
+
+inline ChunksIdNonValidator& ChunksIdNonValidator::instance() {
+    return s_singleton;
 }
 
 inline void CompactingChunks::free(typename CompactingChunks::remove_direction dir, void const* p) {
@@ -959,37 +992,6 @@ size_t CompactingChunks::DelayedRemover::force(bool moved) {
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
 
-/**
- * The implementation just forward IteratorPermissible
- */
-template<typename Chunks, typename Tag, typename E>
-template<typename C> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::validate(C src) {
-    static_assert(is_reference<C>::value, "Type C must be reference");
-    auto const& iter = m_inUse.find(src.id());
-    if (iter == m_inUse.end()) {            // add entry
-        m_inUse.emplace_hint(iter, src.id());
-    } else {
-        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", src.id());
-        buf[sizeof buf - 1] = 0;
-        throw logic_error(buf);
-    }
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<typename C> inline void
-IterableTableTupleChunks<Chunks, Tag, E>::Constructible<C>::remove(C src) {
-    static_assert(is_reference<C>::value, "Type C must be reference");
-    // TODO: we need to also guard against "double deletion" case;
-    // but eecheck is currently failing mysteriously
-    m_inUse.erase(src.id());
-}
-
-template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view>
-typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::constructible_type
-IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::s_constructible;
-
 template<typename Cont, iterator_permission_type perm, iterator_view_type view, typename = typename Cont::Compact>
 struct iterator_begin {
     using iterator = typename conditional<perm == iterator_permission_type::ro,
@@ -1035,7 +1037,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iter
             "IterableTableTupleChunks::iterator_type::container_type is not a reference");
     static_assert(is_pointer<value_type>::value,
             "IterableTableTupleChunks::value_type is not a pointer");
-    s_constructible.validate(src);
+    constructible_type::instance().validate(src.id());
     while (m_cursor != nullptr && ! s_tagger(m_cursor)) {
         advance();         // calibrate to first non-skipped position
     }
@@ -1044,7 +1046,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iter
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::~iterator_type() {
-    s_constructible.remove(static_cast<container_type>(m_storage));
+    constructible_type::instance().remove(static_cast<container_type>(m_storage).id());
 }
 
 template<typename Chunks, typename Tag, typename E>
