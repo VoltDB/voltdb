@@ -861,20 +861,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throwable = ex2;
         }
         // Getting here means the execution was not successful.
-        try {
-            assert(throwable != null);
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-            // But you never know.
-            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
-                resizeUDFBuffer(errorMsg.length + 4);
-            }
-            m_udfBuffer.clear();
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        assert(throwable != null);
+        byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+        // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+        // But you never know.
+        if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+            resizeUDFBuffer(errorMsg.length + 4);
         }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        m_udfBuffer.clear();
+        SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
         return -1;
     }
 
@@ -887,20 +882,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     private void handleUDAFError(Throwable throwable) {
         // Getting here means the execution was not successful.
-        try {
-            assert(throwable != null);
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-            // But you never know.
-            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
-                resizeUDFBuffer(errorMsg.length + 4);
-            }
-            m_udfBuffer.clear();
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        assert(throwable != null);
+        byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+        // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+        // But you never know.
+        if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+            resizeUDFBuffer(errorMsg.length + 4);
         }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        m_udfBuffer.clear();
+        SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
     }
 
     private void resizeUDAFBuffer(Object returnValue, VoltType returnType) {
