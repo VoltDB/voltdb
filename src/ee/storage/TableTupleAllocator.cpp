@@ -25,6 +25,19 @@ using namespace voltdb::storage;
 
 static char buf[128];
 
+inline ThreadLocalPoolAllocator::ThreadLocalPoolAllocator(size_t n) : m_blkSize(n),
+    m_base(reinterpret_cast<char*>(allocateExactSizedObject(m_blkSize))) {
+    vassert(m_base != nullptr);
+}
+
+inline ThreadLocalPoolAllocator::~ThreadLocalPoolAllocator() {
+    freeExactSizedObject(m_blkSize, const_cast<char*>(m_base));
+}
+
+inline char* ThreadLocalPoolAllocator::get() const noexcept {
+    return const_cast<char*>(m_base);
+}
+
 template<typename T>
 template<typename... Args>
 inline typename Stack<T>::reference Stack<T>::emplace(Args&&... args) {
@@ -81,18 +94,18 @@ inline static size_t chunkSize(size_t tupleSize) noexcept {
 
 // We remove member initialization from init list to save from
 // storing chunk size into object
-template<typename Alloc> inline ChunkHolder<Alloc>::ChunkHolder(size_t id, size_t tupleSize, size_t storageSize) :
-    Alloc(storageSize), m_id(id), m_tupleSize(tupleSize),
-    m_end(Alloc::get() + storageSize), m_next(Alloc::get()) {
+template<allocator_enum_type T> inline ChunkHolder<T>::ChunkHolder(id_type id, size_t tupleSize, size_t storageSize) :
+    allocator_type<T>(storageSize), m_id(id), m_tupleSize(tupleSize),
+    m_end(allocator_type<T>::get() + storageSize), m_next(allocator_type<T>::get()) {
     vassert(tupleSize <= 4 * 0x100000);
     vassert(m_next != nullptr);
 }
 
-template<typename Alloc> inline size_t ChunkHolder<Alloc>::id() const noexcept {
+template<allocator_enum_type T> inline id_type ChunkHolder<T>::id() const noexcept {
     return m_id;
 }
 
-template<typename Alloc> inline void* ChunkHolder<Alloc>::allocate() noexcept {
+template<allocator_enum_type T> inline void* ChunkHolder<T>::allocate() noexcept {
     if (next() >= end()) {                 // chunk is full
         return nullptr;
     } else {
@@ -102,35 +115,43 @@ template<typename Alloc> inline void* ChunkHolder<Alloc>::allocate() noexcept {
     }
 }
 
-template<typename Alloc> inline bool ChunkHolder<Alloc>::contains(void const* addr) const {
+template<allocator_enum_type T> inline bool ChunkHolder<T>::contains(void const* addr) const {
     // check alignment
     vassert(addr < begin() || addr >= end() || 0 ==
             (reinterpret_cast<char const*>(addr) - reinterpret_cast<char*const>(begin())) % m_tupleSize);
     return addr >= begin() && addr < next();
 }
 
-template<typename Alloc> inline bool ChunkHolder<Alloc>::full() const noexcept {
+template<allocator_enum_type T> inline bool ChunkHolder<T>::full() const noexcept {
     return next() == end();
 }
 
-template<typename Alloc> inline bool ChunkHolder<Alloc>::empty() const noexcept {
+template<allocator_enum_type T> inline bool ChunkHolder<T>::empty() const noexcept {
     return next() == begin();
 }
 
-template<typename Alloc> inline void* const ChunkHolder<Alloc>::begin() const noexcept {
-    return reinterpret_cast<void*>(Alloc::get());
+template<allocator_enum_type T> inline void* const ChunkHolder<T>::begin() const noexcept {
+    return reinterpret_cast<void*>(allocator_type<T>::get());
 }
 
-template<typename Alloc> inline void* const ChunkHolder<Alloc>::end() const noexcept {
+template<allocator_enum_type T> inline void* const ChunkHolder<T>::end() const noexcept {
     return m_end;
 }
 
-template<typename Alloc> inline void* const ChunkHolder<Alloc>::next() const noexcept {
+template<allocator_enum_type T> inline void* const ChunkHolder<T>::next() const noexcept {
     return m_next;
 }
 
-template<typename Alloc> inline size_t ChunkHolder<Alloc>::tupleSize() const noexcept {
+template<allocator_enum_type T> inline size_t ChunkHolder<T>::tupleSize() const noexcept {
     return m_tupleSize;
+}
+
+template<allocator_enum_type T> inline allocator_type<T>& ChunkHolder<T>::get_allocator() noexcept {
+    return *this;
+}
+
+template<allocator_enum_type T> inline allocator_type<T> const& ChunkHolder<T>::get_allocator() const noexcept {
+    return *this;
 }
 
 inline EagerNonCompactingChunk::EagerNonCompactingChunk(id_type s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
