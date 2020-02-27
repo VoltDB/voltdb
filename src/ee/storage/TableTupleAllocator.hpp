@@ -28,11 +28,7 @@
 #include <queue>
 #include <set>
 #include <vector>
-
-// older GCC compilers incurs some efficiency loss
-#if defined(__GNUC__) && (__GNUC__ <= 4)
-#define CENTOS7
-#endif
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
     namespace storage {
@@ -104,13 +100,33 @@ namespace voltdb {
             using super::get;
         };
 
-        using id_type = size_t;                        // chunk id type
+        class ThreadLocalPoolAllocator : private ThreadLocalPool {
+            size_t const m_blkSize;
+            char const* m_base;
+        public:
+            ThreadLocalPoolAllocator(size_t);
+            ~ThreadLocalPoolAllocator();
+            char* get() const noexcept;
+        };
+
         /**
-         * Holder for a chunk, whether it is self-compacting or not.
+         * Heap memory allocator candidates backing ChunkHolder
          */
-        template<typename Alloc = StdAllocator>
-        class ChunkHolder : private Alloc {
-            id_type const m_id;                         // chunk id
+        enum class allocator_enum_type : char {
+            standard_allocator,
+            thread_local_pool
+        };
+
+        template<allocator_enum_type alloc>
+        using allocator_type = typename conditional<
+            alloc == allocator_enum_type::standard_allocator,
+            StdAllocator, ThreadLocalPoolAllocator>::type;
+
+        using id_type = size_t;                        // chunk id type
+
+        template<allocator_enum_type T = allocator_enum_type::standard_allocator>
+        class ChunkHolder : private allocator_type<T> {
+            id_type const m_id;                        // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
             void*const m_end;                          // indication of chunk capacity
         protected:
@@ -131,6 +147,8 @@ namespace voltdb {
             void*const next() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
+            allocator_type<T>& get_allocator() noexcept;
+            allocator_type<T> const& get_allocator() const noexcept;
         };
 
         /**
