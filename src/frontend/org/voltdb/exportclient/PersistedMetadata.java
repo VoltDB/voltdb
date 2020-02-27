@@ -18,10 +18,15 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Table;
 import org.voltdb.serdes.EncodeFormat;
+import org.voltdb.utils.SerializationHelper;
+
+import com.google.common.base.Splitter;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Class which holds all of the metadata which is persisted with export rows within a PBD. Primarily it holds the schema
@@ -29,8 +34,9 @@ import org.voltdb.serdes.EncodeFormat;
  */
 public class PersistedMetadata implements DeferredSerialization {
     private static short LATEST_VERSION = 1;
-    private final ExportRowSchema m_schema;
     private final EncodeFormat m_format;
+    private final List<String> m_keyColumns;
+    private final ExportRowSchema m_schema;
 
     static PersistedMetadata deserialize(ByteBuffer buf) throws IOException {
         short version = buf.getShort();
@@ -38,18 +44,40 @@ public class PersistedMetadata implements DeferredSerialization {
             throw new IOException("Unsupported serialization version: " + version);
         }
         EncodeFormat format = EncodeFormat.byId(buf.get());
-        return new PersistedMetadata(format, ExportRowSchema.deserialize(buf));
+        List<String> keyColumns;
+        // keyCount is stored as unsigned byte
+        int keyCount = (buf.get() & 0xFF);
+        if (keyCount > 0) {
+            ImmutableList.Builder<String> builder = ImmutableList.builder();
+            for (int i = 0; i < keyCount; ++i) {
+                builder.add(SerializationHelper.getString(buf));
+            }
+            keyColumns = builder.build();
+        } else {
+            keyColumns = ImmutableList.of();
+        }
+        return new PersistedMetadata(format, keyColumns, ExportRowSchema.deserialize(buf));
     }
 
     public PersistedMetadata(Table table, int partitionId, long initialGenerationId, long generationId) {
         m_format = table.getIstopic() ? EncodeFormat.checkedValueOf(table.getTopicformat()) : EncodeFormat.INVALID;
+        String keyColumns = table.getTopickeycolumnnames();
+        if (keyColumns == null) {
+            m_keyColumns = ImmutableList.of();
+        } else {
+            m_keyColumns = ImmutableList.copyOf(Splitter.on(',').trimResults().omitEmptyStrings().split(keyColumns));
+            if (m_keyColumns.size() > 0xFF) {
+                throw new IllegalArgumentException("Maximum number of key columns exceeded: " + m_keyColumns.size());
+            }
+        }
         m_schema = ExportRowSchema.create(table, partitionId, initialGenerationId, generationId);
     }
 
-    private PersistedMetadata(EncodeFormat format, ExportRowSchema schema) {
+    private PersistedMetadata(EncodeFormat format, List<String> keyColumns, ExportRowSchema schema) {
         super();
         m_format = format;
-        this.m_schema = schema;
+        m_keyColumns = keyColumns;
+        m_schema = schema;
     }
 
     /**
@@ -57,6 +85,13 @@ public class PersistedMetadata implements DeferredSerialization {
      */
     public EncodeFormat getEncodingFormat() {
         return m_format;
+    }
+
+    /**
+     * @return The list of columns which should be used as the key when formatted as a topic
+     */
+    public List<String> getKeyColumns() {
+        return m_keyColumns;
     }
 
     /**
@@ -70,6 +105,8 @@ public class PersistedMetadata implements DeferredSerialization {
     public void serialize(ByteBuffer buf) throws IOException {
         buf.putShort(LATEST_VERSION);
         buf.put(m_format.getId());
+        buf.put((byte) m_keyColumns.size());
+        m_keyColumns.forEach(v -> SerializationHelper.writeString(v, buf));
         m_schema.serialize(buf);
     }
 
@@ -79,7 +116,9 @@ public class PersistedMetadata implements DeferredSerialization {
 
     @Override
     public int getSerializedSize() throws IOException {
-        // Version + format ID + schema size
-        return Short.BYTES + Byte.BYTES + m_schema.getSerializedSize();
+        // Version + format ID + keyColumnCount + serializedKeys size + schema size
+        return Short.BYTES + Byte.BYTES + Byte.BYTES
+                + m_keyColumns.stream().mapToInt(SerializationHelper::calculateSerializedSize).sum()
+                + m_schema.getSerializedSize();
     }
 }

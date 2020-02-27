@@ -142,7 +142,7 @@ public class ExportRow {
         List<VoltType> colTypes = new ArrayList<>();
 
         // Determine key column count and allocate array of values
-        boolean hasCols = keyColumnNames != null && !keyColumnNames.isEmpty();
+        boolean hasCols = !keyColumnNames.isEmpty();
         int nCols =  hasCols ? keyColumnNames.size() : 1;
         nCols += INTERNAL_FIELD_COUNT;
         Object[] colValues = new Object[nCols];
@@ -207,8 +207,7 @@ public class ExportRow {
     }
 
     // Note: used to decode schemas in encoded rows produced by {@code ExportEncoder.encodeRow}
-    public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize,
-            int partitionId, long generation) throws IOException {
+    public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize, int partitionId, long generation) {
         String tableName = ExportRow.decodeString(bb);
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
