@@ -124,6 +124,10 @@ public class ExportAvroSerializer {
      */
     public synchronized void updateConfig(AvroType avro) {
         if (avro == null) {
+            if (m_schemaRegistryClient != null) {
+                m_schemaRegistryClient.reset();
+                m_schemaRegistryClient = null;
+            }
             m_decoderMap.clear();
             m_avro = avro;
             return;
