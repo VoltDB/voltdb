@@ -54,7 +54,7 @@
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
       <xs:element name="kipling" minOccurs="0" maxOccurs="1" type="kiplingType" />
-      <xs:element name="schemaregistryurl" minOccurs="0" maxOccurs="1" type="xs:string" />
+      <xs:element name="avro" minOccurs="0" maxOccurs="1" type="avroType" />
     </xs:all>
   </xs:complexType>
 
@@ -571,6 +571,14 @@
     <xs:attribute name="option" type="xs:string" use="required"/>
   </xs:complexType>
 
+  <!-- <avro> -->
+  <xs:complexType name="avroType">
+    <xs:attribute name="registry" type="xs:string" use="required"/>
+    <xs:attribute name="namespace" type="xs:string" default="org.voltdb"/>
+    <xs:attribute name="prefix" type="xs:string" default=""/>
+  </xs:complexType>
+
+  <!-- <kipling> -->
   <xs:complexType name="kiplingType">
     <xs:sequence>
       <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType"/>
@@ -600,6 +608,7 @@
       <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
       <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
+    <xs:attribute name="threadpool" type="xs:string" default=""/>
   </xs:complexType>
 
   <xs:complexType name="topicDefaultsType">

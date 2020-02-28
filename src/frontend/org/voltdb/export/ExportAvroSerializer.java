@@ -20,8 +20,6 @@ package org.voltdb.export;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +31,7 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.common.errors.SerializationException;
+import org.voltdb.compiler.deploymentfile.AvroType;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
 
@@ -43,16 +42,20 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
 /**
  * Serializer for converting {@link ExportRow} to Avro format byte array as well as
  * register the schema in the schema registry.
+ * <p>
+ * Synchronization: the implementation must be thread-safe as it may be called
+ * from multiple {@link SubscriberSession} instances executing in a thread pool.
  */
 public class ExportAvroSerializer {
-    private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>(); // (topic -> decoder) mapping
+    // Map of <avroSubject, AvroDecoder>
+    private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>();
 
-    private String m_schemaRegistryUrl;
+    private AvroType m_avro;
     private SchemaRegistryClient m_schemaRegistryClient;
     private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
-    public ExportAvroSerializer(String schemaRegistryUrl) {
-        updateConfig(schemaRegistryUrl);
+    public ExportAvroSerializer(AvroType avro) {
+        updateConfig(avro);
     }
 
     /**
@@ -64,21 +67,23 @@ public class ExportAvroSerializer {
      * @return The serialize byte array in Avro format.
      */
     public byte[] serialize(ExportRow exportRow, String schemaName) {
-        AvroDecoder decoder = m_decoderMap.computeIfAbsent(schemaName, k -> new AvroDecoder.Builder().build());
+        String avroSubject = getAvroSubjectName(schemaName);
+        AvroDecoder decoder = m_decoderMap.computeIfAbsent(
+                avroSubject, k -> new AvroDecoder.Builder().packageName(getAvroNamespace()).build());
         GenericRecord avroRecord = decoder.decode(exportRow.generation, exportRow.tableName, exportRow.types,
                 exportRow.names, null, exportRow.values);
 
-        return serialize(schemaName, avroRecord);
+        return serialize(avroSubject, avroRecord);
     }
 
-    private byte[] serialize(String schemaName, GenericRecord avroRecord) {
+    private byte[] serialize(String avroSubject, GenericRecord avroRecord) {
         if (avroRecord == null) {
             return null;
         }
         Schema schema = avroRecord.getSchema();
         try {
             // register the schema if not registered, return the schema id.
-            int schemaId = m_schemaRegistryClient.register(schemaName, schema);
+            int schemaId = m_schemaRegistryClient.register(avroSubject, schema);
             // serialize to bytes
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             out.write(0);
@@ -99,20 +104,68 @@ public class ExportAvroSerializer {
         }
     }
 
+    /**
+     * Cleanup the decoders when a topic is dropped.
+     * <p>
+     * Note: the map of decoders is keyed by avro subject names: for every topic
+     * we have 2 avro subjects (for the value and the key). This method assumes
+     * that the key name for a topic has the suffix defined by the implementation
+     * of {@link ExportRow#extractKey(java.util.List)}
+     *
+     * @param topicName
+     */
     public void dropTopic(String topicName) {
-        m_decoderMap.remove(topicName);
+        m_decoderMap.remove(getAvroSubjectName(topicName));
+        m_decoderMap.remove(getAvroSubjectName(topicName + ExportRow.KEY_SUFFIX));
     }
 
     /**
-     * Handling the change of the {@code SchemaRegistryUrl} in the deployment file.
+     * Handling the change of the {@link AvroType} in the deployment file.
      */
-    public synchronized void updateConfig(String schemaRegistryUrl) {
-        // update the serializer config if the schema_register_url in the deployment file changes
-        if (!Objects.equals(m_schemaRegistryUrl, schemaRegistryUrl)) {
-            m_schemaRegistryUrl = schemaRegistryUrl;
-            List<String> baseUrls = Arrays.asList(schemaRegistryUrl.split(","));
-            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            m_schemaRegistryClient = new CachedSchemaRegistryClient(baseUrls, 10000);
+    public synchronized void updateConfig(AvroType avro) {
+        if (avro == null) {
+            if (m_schemaRegistryClient != null) {
+                m_schemaRegistryClient.reset();
+                m_schemaRegistryClient = null;
+            }
+            m_decoderMap.clear();
+            m_avro = avro;
+            return;
         }
+
+        // update the serializer config if the schema_registry url in the deployment file changes
+        if (m_avro == null || !Objects.equals(m_avro.getRegistry(), avro.getRegistry())) {
+            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
+            if (m_schemaRegistryClient != null) {
+                m_schemaRegistryClient.reset();
+            }
+            m_schemaRegistryClient = new CachedSchemaRegistryClient(avro.getRegistry().trim(), 10000);
+        }
+
+        // Clear all the decoders if the prefix or schema changes
+        if (m_avro == null || !Objects.equals(m_avro.getPrefix(), avro.getPrefix())
+                || !Objects.equals(m_avro.getNamespace(), avro.getNamespace())) {
+            m_decoderMap.clear();
+        }
+        m_avro = avro;
     }
+
+    /**
+     * Use the configured prefix to build the avro subject name that
+     * identifies the schema. Changing the prefix creates new avro subjects.
+     *
+     * @param schemaName
+     * @return
+     */
+    private synchronized String getAvroSubjectName(String schemaName) {
+        return m_avro.getPrefix() + schemaName;
+    }
+
+    /**
+     * @return the configured namespace
+     */
+    private synchronized String getAvroNamespace() {
+        return m_avro.getNamespace();
+    }
+
 }

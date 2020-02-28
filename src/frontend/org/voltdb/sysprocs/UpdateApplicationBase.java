@@ -52,6 +52,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
 import org.voltdb.exceptions.PlanningErrorException;
@@ -239,9 +240,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            // Topic configuration is not compiled into the catalog and cannot be validated
+            // Kipling configuration is not compiled into the catalog and cannot be validated
             // by the CatalogDiffEngine, so validate the changes here.
-            if (!validateTopicUpdates(dt, context.getDeployment(), retval)) {
+            if (!validateKiplingUpdates(dt, context.getDeployment(), retval)) {
                 return retval;
             }
 
@@ -303,17 +304,43 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     /**
-     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * Validate that the Kipling changes to the existing configuration are valid; otherwise set
      * an appropriate error message in the passed-in {@link CatalogChangeResult}
      *
      * @param newDep    new deployment
      * @param curDep    current deployment
-     * @param result    catalog change result (may be updated
-     * @return          {@code true} if topics are valid
+     * @param result    catalog change result (may be updated)
+     * @return          {@code true} if Kipling is valid
      */
-    private static boolean validateTopicUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
+    private static boolean validateKiplingUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
         CompoundErrors errors = new CompoundErrors();
 
+        KiplingType newKt = newDep.getKipling();
+        KiplingType curKt = curDep.getKipling();
+        if (newKt != null && curKt != null) {
+            if (newKt.getPort() != curKt.getPort()) {
+                errors.addErrorMessage("Kipling port number cannot be changed");
+            }
+        }
+        validateTopicUpdates(newDep, curDep, errors);
+
+        if (errors.hasErrors()) {
+            result.errorMsg = errors.getErrorMessage();
+        }
+        return !errors.hasErrors();
+    }
+
+    /**
+     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * appropriate error message in the passed-in {@link CompoundErrors}
+     *
+     * @param newDep    new deployment
+     * @param curDep    current deployment
+     * @param errors    {@link CompoundErrors}, updated on errors
+     * @return          {@code true} if topics are valid
+     */
+    private static void validateTopicUpdates(DeploymentType newDep, DeploymentType curDep,
+            CompoundErrors errors ) {
         Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep, errors);
         TopicDefaultsType newDefaults = newTopics.getFirst();
         Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
@@ -338,10 +365,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
             }
         }
-        if (errors.hasErrors()) {
-            result.errorMsg = errors.getErrorMessage();
-        }
-        return !errors.hasErrors();
     }
 
     /**

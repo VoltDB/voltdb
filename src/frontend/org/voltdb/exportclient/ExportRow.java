@@ -31,7 +31,6 @@ import java.util.Map;
 
 import org.voltdb.VoltType;
 import org.voltdb.compiler.DDLCompiler;
-import org.voltdb.exportclient.decode.RowDecoder;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -63,6 +62,7 @@ public class ExportRow {
     public static final int EXPORT_TIMESTAMP_COLUMN = 1;
     public static final int INTERNAL_OPERATION_COLUMN = 5;
     public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE }
+    public static final String KEY_SUFFIX = "_key";
 
     public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,
             Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
@@ -129,14 +129,20 @@ public class ExportRow {
      * the key to a target format e.g. CSV or AVRO.
      * <p>
      * The tableName generated for the key {@link ExportRow} is the source's tableName,
-     * with a "-key" suffix added: this is necessary to distinguish it from the values
-     * in whatever target namespace the row will be decoded into.
+     * with a constant key suffix added: this is necessary to distinguish it from the
+     * values in whatever target namespace the row will be decoded into.
      *
+     * @param keySuffix the string to append to the table name
      * @param keyColumnNames list of key column names in the desired order for the key
      * @return the {@link ExportRow} instance carrying the data for the key columns
      */
+    /**
+     *
+     * @param keyColumnNames
+     * @return
+     */
     public ExportRow extractKey(List<String> keyColumnNames) {
-        String keyName = tableName + "_key";
+        String keyName = tableName + KEY_SUFFIX;
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
         List<VoltType> colTypes = new ArrayList<>();
