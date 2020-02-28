@@ -301,6 +301,13 @@ public class Plannerv2TestCase extends PlannerTestCase {
     public class PhysicalConversionRulesTester extends OuterJoinRulesTester {
         @Override public void pass() throws AssertionError {
             super.pass();
+
+            // Need to transform Aggregate (AVG) to (SUN / COUNT) in case of MP queries
+            RelDistribution mpTrait =  m_transformedNode.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+            if(RelDistribution.Type.SINGLETON != mpTrait.getType() || !mpTrait.getIsSP()) {
+                m_transformedNode = VoltPlanner.transformHep(Phase.LOGICAL_AGGREGATE, m_transformedNode);
+            }
+
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
             RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
                     replace(RelDistributions.ANY);

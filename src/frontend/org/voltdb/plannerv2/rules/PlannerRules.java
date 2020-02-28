@@ -51,6 +51,7 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateReduceFunctionsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateCalcMergeRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcJoinMergeRule;
@@ -108,6 +109,11 @@ public class PlannerRules {
         LOGICAL_JOIN {
             @Override public RuleSet getRules() {
                 return PlannerRules.HEP_LOGICAL_JOIN;
+            }
+        },
+        LOGICAL_AGGREGATE {
+            @Override public RuleSet getRules() {
+                return PlannerRules.HEP_LOGICAL_AGGREGATE;
             }
         },
         PHYSICAL_CONVERSION {
@@ -221,6 +227,11 @@ public class PlannerRules {
             VoltLCalcJoinMergeRule.INSTANCE
     );
 
+    private static final RuleSet HEP_LOGICAL_AGGREGATE = RuleSets.ofList(
+            // Rewrites AVG as SUM / COUNT to support MP aggregated queries
+            VoltLAggregateReduceFunctionsRule.INSTANCE
+    );
+
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
 
@@ -298,6 +309,7 @@ public class PlannerRules {
             Programs.listOf(LOGICAL,
                     MP_FALLBACK,
                     HEP_LOGICAL_JOIN,
+                    HEP_LOGICAL_AGGREGATE,
                     PHYSICAL_CONVERSION,
                     PHYSICAL_CONVERSION_WITH_JOIN_COMMUTE,
                     INLINE)

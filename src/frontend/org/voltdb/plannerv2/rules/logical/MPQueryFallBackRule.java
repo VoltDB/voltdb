@@ -97,8 +97,8 @@ public class MPQueryFallBackRule extends RelOptRule {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
                                 node.getTraitSet().replace(dist), node.getInput(), dist);
                         // Transforming COUNT, AVG aggregates for MP queries would happen during the physical transformation phase
-                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
-                        call.transformTo(coordinatorLimit);
+                        RelNode coordinatorNode = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
+                        call.transformTo(coordinatorNode);
                     } else {
                         call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
                     }

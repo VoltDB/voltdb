@@ -125,4 +125,34 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testDistributedAvgAggregate1() {
+        m_tester.sql("SELECT avg(P1.si) FROM P1")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):SMALLINT], EXPR$0=[$t7])\n" +
+                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], coordinator=[false], type=[serial])\n" +
+                "    VoltPhysicalExchange(distribution=[hash])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregate2() {
+        m_tester.sql("SELECT avg(P1.si) FROM P1 WHERE P1.I = 9")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):SMALLINT], EXPR$0=[$t7])\n" +
+                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], coordinator=[false], type=[serial])\n" +
+                "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], SI=[$t1], $condition=[$t7])\n" +
+                "      VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testReplicatedAvgAggregate() {
+        m_tester.sql("SELECT avg(R1.si) FROM R1 ")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[AVG($0)], coordinator=[false], type=[serial])\n" +
+                "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
 }
