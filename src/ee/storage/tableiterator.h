@@ -422,7 +422,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         out.move(tupleData);
         itr++;
         m_foundTuples++;
-        if (!out.isPendingDeleteOnUndoRelease()) {
+        if (!(out.isPendingDelete() || out.isPendingDeleteOnUndoRelease())) {
             return true;
         }
         else {
