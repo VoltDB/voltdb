@@ -1338,8 +1338,31 @@ public abstract class CatalogUtil {
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         CompoundErrors errors = new CompoundErrors();
 
+        // If topics have a threadpool name, validate it exists
+        TopicsType topicsType = getTopicsType(deployment);
+        if (topicsType == null) {
+            return;
+        }
+        String thPoolName = topicsType.getThreadpool();
+        if (!StringUtils.isEmpty(thPoolName)) {
+            ThreadPoolsType tp = deployment.getThreadpools();
+            if (tp == null) {
+                errors.addErrorMessage(String.format(
+                        "Topics use a thread pool %s and no thread pools are configured in deployment.",
+                        thPoolName));
+            }
+            else {
+                boolean exists = tp.getPool().stream().anyMatch(i -> i.getName().equals(thPoolName));
+                if (!exists) {
+                    errors.addErrorMessage(String.format(
+                            "Topics use a thread pool %s that is not configured in deployment.",
+                            thPoolName));
+                }
+            }
+        }
+
         // Validate topics in deployment file
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment, errors);
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(topicsType, errors);
         TopicDefaultsType defaults = topics.getFirst();
         Map<String, TopicProfileType> profileMap = topics.getSecond();
 
@@ -1389,6 +1412,20 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Get the {@link TopicsType} element or null
+     *
+     * @param deployment
+     * @return
+     */
+    public static final TopicsType getTopicsType(DeploymentType deployment) {
+        KiplingType k = deployment.getKipling();
+        if (k == null) {
+            return null;
+        }
+        return k.getTopics();
+    }
+
+    /**
      * Get the topics defined in deployment file: defaults, and map of profiles, keyed CASE INSENSITIVE
      *
      * @param deployment
@@ -1398,14 +1435,15 @@ public abstract class CatalogUtil {
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
-        KiplingType k = deployment.getKipling();
-        if (k == null) {
-            return Pair.of(null, null);
-        }
-        TopicsType topics = k.getTopics();
+        TopicsType topics = getTopicsType(deployment);
         if (topics == null) {
             return Pair.of(null, null);
         }
+        return getDeploymentTopics(topics, errors);
+    }
+
+    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+            TopicsType topics, CompoundErrors errors) {
 
         TopicDefaultsType defaults = topics.getDefaults();
         List<TopicProfileType> profiles = topics.getProfile();
