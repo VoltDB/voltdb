@@ -1340,23 +1340,22 @@ public abstract class CatalogUtil {
 
         // If topics have a threadpool name, validate it exists
         TopicsType topicsType = getTopicsType(deployment);
-        if (topicsType == null) {
-            return;
-        }
-        String thPoolName = topicsType.getThreadpool();
-        if (!StringUtils.isEmpty(thPoolName)) {
-            ThreadPoolsType tp = deployment.getThreadpools();
-            if (tp == null) {
-                errors.addErrorMessage(String.format(
-                        "Topics use a thread pool %s and no thread pools are configured in deployment.",
-                        thPoolName));
-            }
-            else {
-                boolean exists = tp.getPool().stream().anyMatch(i -> i.getName().equals(thPoolName));
-                if (!exists) {
+        if (topicsType != null) {
+            String thPoolName = topicsType.getThreadpool();
+            if (!StringUtils.isEmpty(thPoolName)) {
+                ThreadPoolsType tp = deployment.getThreadpools();
+                if (tp == null) {
                     errors.addErrorMessage(String.format(
-                            "Topics use a thread pool %s that is not configured in deployment.",
+                            "Topics use a thread pool %s and no thread pools are configured in deployment.",
                             thPoolName));
+                }
+                else {
+                    boolean exists = tp.getPool().stream().anyMatch(i -> i.getName().equals(thPoolName));
+                    if (!exists) {
+                        errors.addErrorMessage(String.format(
+                                "Topics use a thread pool %s that is not configured in deployment.",
+                                thPoolName));
+                    }
                 }
             }
         }
@@ -1444,6 +1443,10 @@ public abstract class CatalogUtil {
 
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             TopicsType topics, CompoundErrors errors) {
+
+        if (topics == null) {
+            return Pair.of(null, null);
+        }
 
         TopicDefaultsType defaults = topics.getDefaults();
         List<TopicProfileType> profiles = topics.getProfile();
