@@ -82,7 +82,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
-    private boolean m_replicatedTableTarget;
+    private final boolean m_replicatedTableTarget;
     // input and output threads
     private final SnapshotSender m_sender;
     private final StreamSnapshotAckReceiver m_ackReceiver;
@@ -517,6 +517,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     chunkC = tupleData.call();
                     chunk = chunkC.b();
                 } catch (Exception e) {
+                    setWriteFailed(e);
                     return Futures.immediateFailedFuture(e);
                 }
 
@@ -757,5 +758,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (m_writeFailed.compareAndSet(null, exception)) {
             notifyAll();
         }
+    }
+
+    /**
+     * @param tableId ID of table
+     * @return serialized schema for {@code tableId} or {@code null} if the schema has already been sent
+     */
+    protected byte[] getSchema(int tableId) {
+        return m_schemas.get(tableId).getSecond();
     }
 }
