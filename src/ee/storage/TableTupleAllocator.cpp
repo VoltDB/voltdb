@@ -254,21 +254,35 @@ pair<typename StxCollections::map<K, V>::iterator, bool> StxCollections::map<K, 
 }
 
 template<typename Chunk, collections_enum_type CE, typename E>
-inline typename ChunkList<Chunk, CE, E>::iterator const*
+inline pair<bool, typename ChunkList<Chunk, CE, E>::iterator>
 ChunkList<Chunk, CE, E>::find(void const* k) const {
-    if (! m_byAddr.empty()) {
-        auto const& iter = prev(m_byAddr.upper_bound(k));                    // find first entry whose begin() > k
-        return iter != m_byAddr.cend() && iter->second->contains(k) ? &iter->second : nullptr;
-    } else {
-        return nullptr;
+    // NOTE: this is a hacky method signature, and hacky way to
+    // get around. Normally, we need to overload 2 versions of
+    // find: one const-method that returns a const-iterator, and
+    // one non-const-method that returns a normal iterator.
+    // However, doing this would require downstream API
+    // (CompactingChunks::find), and a couple more places to do
+    // the same, and TxnLeftBoundary, etc. to maintain two sets
+    // of iterators.
+    auto* mutable_this = const_cast<ChunkList<Chunk, CE, E>*>(this);
+    auto r = make_pair(! m_byAddr.empty(), mutable_this->end());
+    if (r.first) {
+        // find first entry whose begin() > k
+        auto iter = prev(mutable_this->m_byAddr.upper_bound(k));
+        if (iter != mutable_this->m_byAddr.end()) {
+            r.second = iter->second;
+        }
     }
+    return r;
 }
 
 template<typename Chunk, collections_enum_type CE, typename E>
-inline typename ChunkList<Chunk, CE, E>::iterator const*
+inline pair<bool, typename ChunkList<Chunk, CE, E>::iterator>
 ChunkList<Chunk, CE, E>::find(id_type id) const {
-    auto const& iter = m_byId.find(id);
-    return iter == m_byId.cend() ? nullptr : &iter->second;
+    auto* mutable_this = const_cast<ChunkList<Chunk, CE, E>*>(this);
+    auto const& iter = mutable_this->m_byId.find(id);
+    auto const found = iter != mutable_this->m_byId.end();
+    return {found, found ? iter->second : mutable_this->end()};
 }
 
 template<typename Chunk, collections_enum_type CE, typename E> inline
@@ -353,10 +367,10 @@ ChunkList<Chunk, CE, E>::pop_back() {
     if (super::empty()) {
         throw underflow_error("pop_back() called on empty chunk list");
     } else {
-        auto const* iterp = find(m_back->id() - 1);
-        if (iterp != nullptr) {            // original list contains more than 1 nodes
+        auto const iter = find(m_back->id() - 1);
+        if (iter.first) {            // original list contains more than 1 nodes
             remove(m_back);
-            super::erase_after(m_back = *iterp);
+            super::erase_after(m_back = iter.second);
             --lastChunkId();
         } else {
             clear();
@@ -425,15 +439,14 @@ template<typename C, typename E> inline size_t NonCompactingChunks<C, E>::size()
 }
 
 template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(void* src) {
-    auto* iterp = list_type::find(src);
-    if (iterp == nullptr) {
+    auto const iter = list_type::find(src);
+    if (! iter.first) {
         snprintf(buf, sizeof buf, "NonCompactingChunks cannot free address %p", src);
         buf[sizeof buf - 1] = 0;
         throw runtime_error(buf);
     } else {
-        vassert(*iterp != list_type::end());
-        (*iterp)->free(src);
-        if ((*iterp)->empty() && ++m_emptyChunks >= CHUNK_REMOVAL_THRESHOLD) {
+        iter.second->free(src);
+        if (iter.second->empty() && ++m_emptyChunks >= CHUNK_REMOVAL_THRESHOLD) {
             list_type::remove_if([](ChunkHolder<> const& c) { return c.empty(); });
             m_emptyChunks = 0;
         }
@@ -561,20 +574,21 @@ size_t CompactingChunks::chunks() const noexcept {
     return list_type::size();
 }
 
-inline typename CompactingChunks::list_type::iterator const*
-CompactingChunks::find(void const* p) const noexcept {
-    auto const* iter = list_type::find(p);
-    return iter == nullptr ||
-        less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
-        nullptr : iter;
+inline pair<bool, typename CompactingChunks::list_type::iterator>
+CompactingChunks::find(void const* p) noexcept {
+    auto const iter = list_type::find(p);
+    return ! iter.first ||
+        less<CompactingChunks::list_type::iterator>()(iter.second, beginTxn().iterator()) ?
+        make_pair(false, list_type::end()) :
+        iter;
 }
 
-inline typename CompactingChunks::list_type::iterator const*
-CompactingChunks::find(id_type id) const noexcept {
-    auto const* iter = list_type::find(id);
-    return iter == nullptr ||
-        less<CompactingChunks::list_type::iterator>()(*iter, beginTxn().iterator()) ?
-        nullptr : iter;
+inline pair<bool, typename CompactingChunks::list_type::iterator>
+CompactingChunks::find(id_type id) noexcept {
+    auto const iter = list_type::find(id);
+    return ! iter.first ||
+        less<CompactingChunks::list_type::iterator>()(iter.second, beginTxn().iterator()) ?
+        make_pair(false, list_type::end()) : iter;
 }
 
 inline typename CompactingChunks::list_type::iterator CompactingChunks::releasable() {
@@ -623,8 +637,8 @@ inline void* CompactingChunks::allocate() {
 }
 
 void* CompactingChunks::free(void* dst) {
-    auto* pos = find(dst);                 // binary search in txn region
-    if (pos == nullptr) {
+    auto pos = find(dst);                 // binary search in txn region
+    if (! pos.first) {
         if (cbegin()->next() == dst) {
             // When shrinking from head, since e.g. for_each<iterator_type>(...)
             // retrieves the address, advances iterator, then calls callable,
@@ -639,7 +653,7 @@ void* CompactingChunks::free(void* dst) {
         }
     } else {
         void* src = beginTxn().iterator()->free();
-        auto& dst_iter = *pos;
+        auto& dst_iter = pos.second;
         if (dst_iter != beginTxn().iterator()) {    // cross-chunk movement needed
             dst_iter->free(dst, src);        // memcpy()
         } else if (src != dst) {             // within-chunk movement (not happened in the previous free() call)
@@ -897,14 +911,14 @@ inline vector<void*> CompactingChunks::BatchRemoveAccumulator::sorted() {
 inline CompactingChunks::DelayedRemover::DelayedRemover(CompactingChunks& s) : super(&s) {}
 
 inline size_t CompactingChunks::DelayedRemover::add(void* p) {
-    auto const* iter = super::chunks().find(p);
-    if (iter == nullptr) {
+    auto const iter = super::chunks().find(p);
+    if (! iter.first) {
         snprintf(buf, sizeof buf, "CompactingChunk::DelayedRemover::add(%p): invalid address", p);
         buf[sizeof buf - 1] = 0;
         throw range_error(buf);
     } else {
         m_prepared = false;
-        super::insert(*iter, p);
+        super::insert(iter.second, p);
         return ++m_size;
     }
 }
@@ -1443,15 +1457,15 @@ super(c, c) {}
 inline position_type::position_type(ChunkHolder<> const& c) noexcept : m_chunkId(c.id()), m_addr(c.next()) {}
 
 inline position_type::position_type(CompactingChunks const& c, void const* p) : m_addr(p) {
-    auto const* iterp = c.find(p);
-    if (iterp == nullptr || ! ((*iterp)->contains(p) || (*iterp)->end() > p)) {
+    auto const iter = const_cast<CompactingChunks&>(c).find(p);
+    if (! iter.first || ! (iter.second->contains(p) || iter.second->end() > p)) {
         // NOTE: it is possible that the txn view does not
         // contain the ptr, as the chunk has been removed. In
         // that case, we simply "empty" it, and note the
         // semantics of less<position_type>.
         const_cast<void*&>(m_addr) = nullptr;
     } else {
-        const_cast<remove_const<decltype(m_chunkId)>::type&>(m_chunkId) = (*iterp)->id();
+        const_cast<remove_const<decltype(m_chunkId)>::type&>(m_chunkId) = iter.second->id();
     }
 }
 

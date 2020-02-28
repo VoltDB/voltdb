@@ -176,9 +176,9 @@ TEST_F(TableTupleAllocatorTest, TestChunkListFind) {
         addresses[i] = alloc.allocate();
     }
     for(auto i = 0; i < addresses.size(); ++i) {
-        auto const* iter = alloc.find(addresses[i]);
-        ASSERT_NE(iter, nullptr);
-        ASSERT_TRUE((*iter)->contains(addresses[i]));
+        auto const iter = alloc.find(addresses[i]);
+        ASSERT_TRUE(iter.first);
+        ASSERT_TRUE(iter.second->contains(addresses[i]));
     }
 }
 

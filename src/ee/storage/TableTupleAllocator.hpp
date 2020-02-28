@@ -274,7 +274,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            collections_enum_type CE = collections_enum_type::std_collections,
+            collections_enum_type CE = collections_enum_type::stx_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -313,8 +313,8 @@ namespace voltdb {
             size_t chunkSize() const noexcept;
             iterator const& last() const noexcept;
             // the O(log(n)) killer
-            iterator const* find(void const*) const;
-            iterator const* find(id_type) const;
+            pair<bool, iterator> find(void const*) const;
+            pair<bool, iterator> find(id_type) const;
         };
 
         /**
@@ -603,8 +603,8 @@ namespace voltdb {
             using CompactingStorageTrait::frozen;
 
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
-            list_type::iterator const* find(void const*) const noexcept;
-            list_type::iterator const* find(id_type) const noexcept;
+            pair<bool, list_type::iterator> find(void const*) noexcept;
+            pair<bool, list_type::iterator> find(id_type) noexcept;
             TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
             TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             FrozenTxnBoundaries const& frozenBoundaries() const noexcept;  // txn boundaries when freezing
