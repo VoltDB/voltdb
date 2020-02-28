@@ -725,20 +725,13 @@ public class ExportToFileClient extends ExportClientBase {
          */
         @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
-            try {
-                m_writer.flush();
-            }
-            catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
-            finally {
-                m_batchLock.readLock().unlock();
-                if (m_writer.checkError()) {
-                    rateLimitedLogError(m_logger, "Failed to flush file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
-                            "'. Export file may be unavailable/unwritable, or not enough space.");
-                    m_writer.resetWriter();
-                    throw new RestartBlockException("Failed to complete the block.", true);
-                }
+            m_batchLock.readLock().unlock();
+            // checkError on PrintWriter inside m_writer also does the flush, so no need to call flush explicitly
+            if (m_writer.checkError()) {
+                rateLimitedLogWarn(m_logger, "Failed to flush file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
+                        "'. Export file may be unavailable/unwritable, or not enough space.");
+                m_writer.resetWriter();
+                throw new RestartBlockException("Failed to complete the block.", true);
             }
         }
 
