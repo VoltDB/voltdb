@@ -57,4 +57,11 @@ public interface ElasticService {
      * @return {@code true} if partitions can be removed from the system
      */
     boolean canRemovePartitions();
+
+    /**
+     * Add a new {@link BalancePartitionsListener} that will be called during balance partitions transactions
+     *
+     * @param listener to be added
+     */
+    void addBalancePartitionsListener(BalancePartitionsListener listener);
 }
