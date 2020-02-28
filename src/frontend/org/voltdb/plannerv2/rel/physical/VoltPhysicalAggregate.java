@@ -17,7 +17,8 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -43,17 +44,18 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhysicalRel {
 
     // HAVING expression
     final private RexNode m_postPredicate;
 
-    // TRUE if this aggregate relation is part of a coordinator tree.
-    // The indicator may be useful during the Exchange Transform rule when a coordinator aggregate
-    // differs from a fragment one
-    final private boolean m_isCoordinatorAggr;
+    // In a partitioned query Aggregate could be pushed down to fragments
+    // by the Aggregate Exchange Transpose Rule -
+    // Aggregate / Exchange / RelNode => Coordinator Aggregate / Exchange / Fragment Aggregate / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
 
     /**
      * Constructor.
@@ -67,7 +69,7 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
+     * @param isPushedDown If this aggregate was already pushed down through an Exchange node.
      */
     VoltPhysicalAggregate(
             RelOptCluster cluster,
@@ -78,28 +80,18 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            boolean isCoordinatorAggr) {
+            boolean isPushedDown) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
         m_postPredicate = havingExpression;
-        m_isCoordinatorAggr = isCoordinatorAggr;
+        m_isPushedDown = isPushedDown;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("coordinator", m_isCoordinatorAggr);
+        pw.item("pusheddown", m_isPushedDown);
         pw.itemIf("having", m_postPredicate, m_postPredicate != null);
         return pw;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += "_coordinator_" + m_isCoordinatorAggr;
-        if (m_postPredicate != null) {
-            digest += m_postPredicate.toString();
-        }
-        return digest;
     }
 
     @Override
@@ -155,8 +147,8 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
         return m_postPredicate;
     }
 
-    public boolean getIsCoordinatorAggr() {
-        return m_isCoordinatorAggr;
+    public boolean isPushedDown() {
+        return m_isPushedDown;
     }
 
     protected abstract AggregatePlanNode getAggregatePlanNode();

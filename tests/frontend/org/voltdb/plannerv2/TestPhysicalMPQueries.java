@@ -180,7 +180,7 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
 
     public void testPartitionedWithAggregate9() {
         m_tester.sql("select max(P1.I) from P1 where I = 8")
-        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], coordinator=[false], type=[serial])\n" +
+        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], pusheddown=[false], type=[serial])\n" +
                     "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[8], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
                     "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
         .pass();

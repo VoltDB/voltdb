@@ -43,7 +43,7 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            boolean isCoordinatorAggr) {
+            boolean isPushedDown) {
         super(cluster,
                 traitSet,
                 child,
@@ -52,7 +52,7 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                isCoordinatorAggr);
+                isPushedDown);
     }
 
     @Override
@@ -75,7 +75,7 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 getPostPredicate(),
-                getIsCoordinatorAggr());
+                isPushedDown());
     }
 
     @Override
@@ -88,7 +88,7 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            boolean isCoordinatorAggr) {
+            boolean isPushedDown) {
         return new VoltPhysicalHashAggregate(
                 cluster,
                 traitSet,
@@ -98,7 +98,7 @@ public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
                 groupSets,
                 aggCalls,
                 havingExpression,
-                isCoordinatorAggr);
+                isPushedDown);
 
     }
 

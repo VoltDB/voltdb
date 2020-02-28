@@ -298,7 +298,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         // ENG-15719
         // CREATE INDEX partial_idx_8 ON c (b) WHERE abs(a) > 0; PARTIAL_IDX_8
         m_tester.sql("SELECT COUNT(b) FROM c WHERE abs(a) > 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, C]], expr#0..6=[{inputs}], " +
                         "expr#7=[ABS($t0)], expr#8=[0], expr#9=[>($t7, $t8)], B=[$t1], $condition=[$t9], index=[PARTIAL_IDX_8_INVALIDGTE0_0])\n")
                 .pass();
@@ -553,7 +553,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         //CREATE INDEX partial_idx_7 ON c (g) where g is not null;
         // skipNull predicate is redundant and eliminated
         m_tester.sql("select count(*) from c where g > 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, C]], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t6, $t7)], $f0=[$t7], $condition=[$t8], index=[PARTIAL_IDX_7_INVALIDGT1_0])\n")
                 .pass();
@@ -572,7 +572,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         //CREATE INDEX partial_idx_6 ON c (g) where g < 0;
         // skipNull predicate is redundant and eliminated
         m_tester.sql("select count(*) from c where g < 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, C]], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[<($t6, $t7)], $f0=[$t7], $condition=[$t8], index=[PARTIAL_IDX_6_INVALIDLT1_0])\n")
                 .pass();
@@ -591,7 +591,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         // CREATE UNIQUE INDEX z_full_idx_a ON c (a);
         // skipNull is required - full index
         m_tester.sql("select count(*) from c where a > 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, C]], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t0, $t7)], $f0=[$t7], $condition=[$t8], index=[Z_FULL_IDX_A_INVALIDGT1_0])\n")
                 .pass();
@@ -610,7 +610,7 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
         // CREATE INDEX partial_idx_3 ON c (b) where d > 0;
         // skipNull is required - index predicate is not NULL-rejecting for column B
         m_tester.sql("select count(*) from c where b > 0 and d > 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, C]], expr#0..6=[{inputs}], expr#7=[0], " +
                         "expr#8=[>($t1, $t7)], expr#9=[>($t3, $t7)], expr#10=[AND($t8, $t9)], $f0=[$t7], $condition=[$t10], " +
                         "index=[PARTIAL_IDX_3_INVALIDGT1_0])\n")

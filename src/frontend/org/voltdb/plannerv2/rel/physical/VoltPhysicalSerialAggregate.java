@@ -44,9 +44,9 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
     public VoltPhysicalSerialAggregate(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate,
-            boolean isCoordinatorAggr, RexNode offset, RexNode limit) {
+            boolean isPushedDown, RexNode offset, RexNode limit) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
-                isCoordinatorAggr);
+                isPushedDown);
         m_offset = offset;
         m_limit = limit;
     }
@@ -54,9 +54,9 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
     public VoltPhysicalSerialAggregate(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate,
-            boolean isCoordinatorAggr) {
+            boolean isPushedDown) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
-                isCoordinatorAggr);
+                isPushedDown);
         m_offset = null;
         m_limit = null;
     }
@@ -75,17 +75,17 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
         return new VoltPhysicalSerialAggregate(
                 getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls, getPostPredicate(),
-                getIsCoordinatorAggr(), m_offset, m_limit);
+                isPushedDown(), m_offset, m_limit);
     }
 
     @Override
     public VoltPhysicalSerialAggregate copy(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode input, boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode havingExpression,
-            boolean isCoordinatorAggr) {
+            boolean isPushedDown) {
         return new VoltPhysicalSerialAggregate(
                 cluster, traitSet, input, indicator, groupSet, groupSets, aggCalls, havingExpression,
-                isCoordinatorAggr, m_offset, m_limit);
+                isPushedDown, m_offset, m_limit);
     }
 
     @Override
