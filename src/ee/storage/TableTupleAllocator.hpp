@@ -81,6 +81,65 @@ namespace voltdb {
         };
 
         /**
+         * Global switch of collections type
+         */
+        constexpr static collections_enum_type const
+            collections_type = collections_enum_type::std_collections;
+
+        struct StdCollections {
+            template<typename K> using set = std::set<K>;
+            template<typename K, typename V> using map = std::map<K, V>;
+        };
+
+        /**
+         * B+ tree map/set
+         */
+        struct StxCollections {
+            template<typename K> class set : private stx::btree_set<K> {
+                using super = stx::btree_set<K>;
+            public:
+                using value_type = typename super::value_type;
+                using iterator = typename super::iterator;
+                using const_iterator = typename super::const_iterator;
+                using super::begin; using super::end;
+                using super::empty; using super::clear; using super::erase;
+                using super::count; using super::find; using super::size;
+                using super::upper_bound;
+                set() = default;
+                set(initializer_list<value_type>);
+                template<typename InputIt> set(InputIt, InputIt);
+                set<K>& operator=(set<K> const&) = default;
+                const_iterator cbegin() const;
+                const_iterator cend() const;
+                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
+            };
+            template<typename K, typename V> class map : private stx::btree_map<K, V> {
+                using super = stx::btree_map<K, V>;
+            public:
+                using key_type = typename super::key_type;
+                using mapped_type = typename super::data_type;
+                using value_type = typename super::value_type;
+                using iterator = typename super::iterator;
+                using const_iterator = typename super::const_iterator;
+                using super::begin; using super::end;
+                using super::empty; using super::clear; using super::erase;
+                using super::count; using super::find; using super::size;
+                using super::upper_bound;
+                map() = default;;
+                map(initializer_list<value_type>);
+                template<typename InputIt> map(InputIt, InputIt);
+                map<K, V>& operator=(map<K, V> const&) = default;
+                const_iterator cbegin() const;
+                const_iterator cend() const;
+                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
+            };
+        };
+
+        template<collections_enum_type E>
+        using Collections = typename conditional<E == collections_enum_type::std_collections,
+              StdCollections, StxCollections>::type;
+
+        /**
          * More efficient stack than STL (which was backed by
          * deque), backed by forward_list.
          */
@@ -134,7 +193,8 @@ namespace voltdb {
             alloc == allocator_enum_type::standard_allocator,
             StdAllocator, ThreadLocalPoolAllocator>::type;
 
-        using id_type = size_t;                        // chunk id type
+        using id_type = typename conditional<                        // chunk id type, based on the global switch
+            collections_type == collections_enum_type::std_collections, size_t, uint32_t>::type;
 
         template<allocator_enum_type T = allocator_enum_type::standard_allocator>
         class ChunkHolder : private allocator_type<T> {
@@ -148,6 +208,7 @@ namespace voltdb {
             ChunkHolder(ChunkHolder&&) = delete;
             friend class CompactingChunks;              // for batch free
         public:
+            constexpr static allocator_enum_type const enum_type = T;
             ChunkHolder(id_type id, size_t tupleSize, size_t chunkSize);
             ~ChunkHolder() = default;
             void* allocate() noexcept;                 // returns NULL if this chunk is full.
@@ -212,59 +273,6 @@ namespace voltdb {
             // bool empty() const noexcept is identical to ChunkHolder.
         };
 
-        struct StdCollections {
-            template<typename K> using set = std::set<K>;
-            template<typename K, typename V> using map = std::map<K, V>;
-        };
-
-        /**
-         * B+ tree map/set
-         */
-        struct StxCollections {
-            template<typename K> class set : private stx::btree_set<K> {
-                using super = stx::btree_set<K>;
-            public:
-                using value_type = typename super::value_type;
-                using iterator = typename super::iterator;
-                using const_iterator = typename super::const_iterator;
-                using super::begin; using super::end;
-                using super::empty; using super::clear; using super::erase;
-                using super::count; using super::find; using super::size;
-                using super::upper_bound; using super::lower_bound;
-                set() = default;
-                set(initializer_list<value_type>);
-                template<typename InputIt> set(InputIt, InputIt);
-                set<K>& operator=(set<K> const&) = default;
-                const_iterator cbegin() const;
-                const_iterator cend() const;
-                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
-            };
-            template<typename K, typename V> class map : private stx::btree_map<K, V> {
-                using super = stx::btree_map<K, V>;
-            public:
-                using key_type = typename super::key_type;
-                using mapped_type = typename super::data_type;
-                using value_type = typename super::value_type;
-                using iterator = typename super::iterator;
-                using const_iterator = typename super::const_iterator;
-                using super::begin; using super::end;
-                using super::empty; using super::clear; using super::erase;
-                using super::count; using super::find; using super::size;
-                using super::upper_bound; using super::lower_bound;
-                map() = default;;
-                map(initializer_list<value_type>);
-                template<typename InputIt> map(InputIt, InputIt);
-                map<K, V>& operator=(map<K, V> const&) = default;
-                const_iterator cbegin() const;
-                const_iterator cend() const;
-                template<typename...Args> pair<iterator, bool> emplace(Args&&...);
-            };
-        };
-
-        template<collections_enum_type E>
-        using Collections = typename conditional<E == collections_enum_type::std_collections,
-              StdCollections, StxCollections>::type;
-
         /**
          * Homogeneous-sized singly-linked list of memory holders
          * (i.e. ChunkHolder).
@@ -274,7 +282,6 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            collections_enum_type CE = collections_enum_type::stx_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -283,8 +290,8 @@ namespace voltdb {
             size_t m_size = 0;
             id_type m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
-            typename Collections<CE>::template map<void const*, typename super::iterator> m_byAddr{};
-            typename Collections<CE>::template map<id_type, typename super::iterator> m_byId{};
+            typename Collections<collections_type>::template map<void const*, typename super::iterator> m_byAddr{};
+            typename Collections<collections_type>::template map<id_type, typename super::iterator> m_byId{};
             void add(typename super::iterator const&);
             void remove(typename super::iterator const&);
         protected:
@@ -292,7 +299,7 @@ namespace voltdb {
             template<typename Pred> void remove_if(Pred p);
             typename super::iterator& last() noexcept;
         public:
-            using collections = Collections<CE>;
+            using collections = Collections<collections_type>;
             using iterator = typename super::iterator;
             using const_iterator = typename super::const_iterator;
             using reference = typename super::reference;
@@ -675,13 +682,13 @@ namespace voltdb {
             is_same<typename remove_const<T>::type, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
             is_base_of<CompactingChunks, typename remove_const<T>::type>::value>;
 
-        template<typename Alloc, typename Trait, typename Collections = StdCollections,
+        template<typename Alloc, typename Trait,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
-            using set = typename Collections::template set<void const*>;
-            using map = typename Collections::template map<void const*, void const*>;
-            map m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            set m_copied{};                 // addr in persistent storage that we keep a local copy
+            using set_type = typename Collections<collections_type>::template set<void const*>;
+            using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
+            map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
+            set_type m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
             bool m_hasDeletes = false;      // observer for iterator::advance()
             void* m_last = nullptr;         // last allocation by copy(void const*);

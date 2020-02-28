@@ -253,9 +253,8 @@ pair<typename StxCollections::map<K, V>::iterator, bool> StxCollections::map<K, 
     return super::insert(value_type{forward<Args>(args)...});
 }
 
-template<typename Chunk, collections_enum_type CE, typename E>
-inline pair<bool, typename ChunkList<Chunk, CE, E>::iterator>
-ChunkList<Chunk, CE, E>::find(void const* k) const {
+template<typename Chunk, typename E>
+inline pair<bool, typename ChunkList<Chunk, E>::iterator> ChunkList<Chunk, E>::find(void const* k) const {
     // NOTE: this is a hacky method signature, and hacky way to
     // get around. Normally, we need to overload 2 versions of
     // find: one const-method that returns a const-iterator, and
@@ -264,7 +263,7 @@ ChunkList<Chunk, CE, E>::find(void const* k) const {
     // (CompactingChunks::find), and a couple more places to do
     // the same, and TxnLeftBoundary, etc. to maintain two sets
     // of iterators.
-    auto* mutable_this = const_cast<ChunkList<Chunk, CE, E>*>(this);
+    auto* mutable_this = const_cast<ChunkList<Chunk, E>*>(this);
     auto r = make_pair(! m_byAddr.empty(), mutable_this->end());
     if (r.first) {
         // find first entry whose begin() > k
@@ -276,67 +275,58 @@ ChunkList<Chunk, CE, E>::find(void const* k) const {
     return r;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E>
-inline pair<bool, typename ChunkList<Chunk, CE, E>::iterator>
-ChunkList<Chunk, CE, E>::find(id_type id) const {
-    auto* mutable_this = const_cast<ChunkList<Chunk, CE, E>*>(this);
+template<typename Chunk, typename E> inline pair<bool, typename ChunkList<Chunk, E>::iterator>
+ChunkList<Chunk, E>::find(id_type id) const {
+    auto* mutable_this = const_cast<ChunkList<Chunk, E>*>(this);
     auto const& iter = mutable_this->m_byId.find(id);
     auto const found = iter != mutable_this->m_byId.end();
     return {found, found ? iter->second : mutable_this->end()};
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline
-ChunkList<Chunk, CE, E>::ChunkList(size_t tsize) noexcept :
+template<typename Chunk, typename E> inline ChunkList<Chunk, E>::ChunkList(size_t tsize) noexcept :
 super(), m_tupleSize(tsize), m_chunkSize(::chunkSize(m_tupleSize)) {}
 
-template<typename Chunk, collections_enum_type CE, typename E> inline id_type&
-ChunkList<Chunk, CE, E>::lastChunkId() {
+template<typename Chunk, typename E> inline id_type& ChunkList<Chunk, E>::lastChunkId() {
     return m_lastChunkId;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline size_t
-ChunkList<Chunk, CE, E>::tupleSize() const noexcept {
+template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::tupleSize() const noexcept {
     return m_tupleSize;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline size_t
-ChunkList<Chunk, CE, E>::chunkSize() const noexcept {
+template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::chunkSize() const noexcept {
     return m_chunkSize;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline size_t
-ChunkList<Chunk, CE, E>::size() const noexcept {
+template<typename Chunk, typename E> inline size_t ChunkList<Chunk, E>::size() const noexcept {
     return m_size;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline
-typename ChunkList<Chunk, CE, E>::iterator const&
-ChunkList<Chunk, CE, E>::last() const noexcept {
+template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator const&
+ChunkList<Chunk, E>::last() const noexcept {
     return m_back;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline
-typename ChunkList<Chunk, CE, E>::iterator&
-ChunkList<Chunk, CE, E>::last() noexcept {
+template<typename Chunk, typename E> inline typename ChunkList<Chunk, E>::iterator&
+ChunkList<Chunk, E>::last() noexcept {
     return m_back;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline void
-ChunkList<Chunk, CE, E>::add(typename ChunkList<Chunk, CE, E>::iterator const& iter) {
+template<typename Chunk, typename E> inline void
+ChunkList<Chunk, E>::add(typename ChunkList<Chunk, E>::iterator const& iter) {
     m_byAddr.emplace(iter->begin(), iter);
     m_byId.emplace(iter->id(), iter);
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline void
-ChunkList<Chunk, CE, E>::remove(
-        typename ChunkList<Chunk, CE, E>::iterator const& iter) {
+template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::remove(
+        typename ChunkList<Chunk, E>::iterator const& iter) {
     m_byAddr.erase(iter->begin());
     m_byId.erase(iter->id());
 }
 
-template<typename Chunk, collections_enum_type CE, typename E>
-template<typename... Args> inline typename ChunkList<Chunk, CE, E>::iterator
-ChunkList<Chunk, CE, E>::emplace_back(Args&&... args) {
+template<typename Chunk, typename E>
+template<typename... Args> inline typename ChunkList<Chunk, E>::iterator
+ChunkList<Chunk, E>::emplace_back(Args&&... args) {
     if (super::empty()) {
         super::emplace_front(forward<Args>(args)...);
         m_back = super::begin();
@@ -348,8 +338,7 @@ ChunkList<Chunk, CE, E>::emplace_back(Args&&... args) {
     return m_back;
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline void
-ChunkList<Chunk, CE, E>::pop_front() {
+template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_front() {
     if (super::empty()) {
         throw underflow_error("pop_front() called on empty chunk list");
     } else {
@@ -362,8 +351,7 @@ ChunkList<Chunk, CE, E>::pop_front() {
     }
 }
 
-template<typename Chunk, collections_enum_type CE, typename E> inline void
-ChunkList<Chunk, CE, E>::pop_back() {
+template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_back() {
     if (super::empty()) {
         throw underflow_error("pop_back() called on empty chunk list");
     } else {
@@ -378,8 +366,8 @@ ChunkList<Chunk, CE, E>::pop_back() {
     }
 }
 
-template<typename Chunk, collections_enum_type CE, typename E>
-template<typename Pred> inline void ChunkList<Chunk, CE, E>::remove_if(Pred pred) {
+template<typename Chunk, typename E>
+template<typename Pred> inline void ChunkList<Chunk, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
         if (pred(*iter)) {
             vassert(m_byAddr.count(iter->begin()));
@@ -394,8 +382,8 @@ template<typename Pred> inline void ChunkList<Chunk, CE, E>::remove_if(Pred pred
     super::remove_if(pred);
 }
 
-template<typename Chunk, collections_enum_type CE, typename E>
-inline void ChunkList<Chunk, CE, E>::clear() noexcept {
+template<typename Chunk, typename E> inline void
+ChunkList<Chunk, E>::clear() noexcept {
     m_byId.clear();
     m_byAddr.clear();
     super::clear();
@@ -701,7 +689,9 @@ inline bool ChunksIdValidatorImpl::validate(id_type id) {
         m_inUse.emplace_hint(iter, id);
         return true;
     } else {
-        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu", id);
+        snprintf(buf, sizeof buf,
+                "Cannot create RW snapshot iterator on chunk list id %lu",
+                static_cast<size_t>(id));
         buf[sizeof buf - 1] = 0;
         throw logic_error(buf);
     }
@@ -888,13 +878,31 @@ inline vector<void*> CompactingChunks::BatchRemoveAccumulator::collect() const {
             });
 }
 
+/**
+ * B+ tree does not allow in-place modification of "data" value
+ * of an iterator, unlike std::map
+ */
+template<typename Iter, collections_enum_type E> struct BatchRemoveMapValueRetriever {
+    inline vector<void*>& operator()(Iter& iter) const noexcept {
+        return iter->second;
+    }
+};
+
+template<typename Iter> struct BatchRemoveMapValueRetriever<Iter, collections_enum_type::stx_collections> {
+    inline vector<void*>& operator()(Iter& iter) const noexcept {
+        return iter.data();
+    }
+};
+
 inline void CompactingChunks::BatchRemoveAccumulator::insert(
         typename CompactingChunks::list_type::iterator key, void* p) {
+    constexpr static BatchRemoveMapValueRetriever<typename map_type::iterator, collections_type>
+        const retriever{};
     auto iter = find(key);
     if (iter == end()) {
         emplace(key, vector<void*>{p});
     } else {
-        iter->second.emplace_back(p);
+        retriever(iter).emplace_back(p);
     }
 }
 
@@ -1579,11 +1587,11 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize) :
+template<typename Alloc, typename Trait, typename E>
+inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
     Trait([this](void const* key) {
                 auto const& iter = m_changes.find(key);
-                if (iter != m_changes.cend()) {
+                if (iter != m_changes.end()) {
                     m_changes.erase(iter);
                     m_copied.erase(key);
                     m_storage.free(const_cast<void*>(key));
@@ -1591,13 +1599,13 @@ inline TxnPreHook<Alloc, Trait, C, E>::TxnPreHook(size_t tupleSize) :
             }),
     m_storage(tupleSize) {}
 
-template<typename Alloc, typename Trait, typename C, typename E> inline bool const&
-TxnPreHook<Alloc, Trait, C, E>::hasDeletes() const noexcept {
+template<typename Alloc, typename Trait, typename E> inline bool const&
+TxnPreHook<Alloc, Trait, E>::hasDeletes() const noexcept {
     return m_hasDeletes;
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API essential
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essential
     if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
         if (m_last == nullptr) {                                      // overwritten hadn't been logged
             m_last = m_storage.allocate();
@@ -1607,9 +1615,9 @@ inline void TxnPreHook<Alloc, Trait, C, E>::copy(void const* p) {     // API ess
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::add(CompactingChunks const& t,
-        typename TxnPreHook<Alloc, Trait, C, E>::ChangeType type, void const* dst) {
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::add(CompactingChunks const& t,
+        typename TxnPreHook<Alloc, Trait, E>::ChangeType type, void const* dst) {
     if (m_recording) {     // ignore changes beyond boundary
         switch (type) {
             case ChangeType::Update:
@@ -1625,7 +1633,7 @@ inline void TxnPreHook<Alloc, Trait, C, E>::add(CompactingChunks const& t,
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E> inline void TxnPreHook<Alloc, Trait, C, E>::freeze() {
+template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
     if (m_recording) {
         throw logic_error("Double freeze detected");
     } else {
@@ -1633,7 +1641,7 @@ template<typename Alloc, typename Trait, typename C, typename E> inline void Txn
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E> inline void TxnPreHook<Alloc, Trait, C, E>::thaw() {
+template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::thaw() {
     if (m_recording) {
         m_changes.clear();
         m_copied.clear();
@@ -1645,8 +1653,8 @@ template<typename Alloc, typename Trait, typename C, typename E> inline void Txn
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void* TxnPreHook<Alloc, Trait, C, E>::_copy(void const* src, bool) {
+template<typename Alloc, typename Trait, typename E>
+inline void* TxnPreHook<Alloc, Trait, E>::_copy(void const* src, bool) {
     void* dst = m_storage.allocate();
     vassert(dst != nullptr);
     memcpy(dst, src, m_storage.tupleSize());
@@ -1654,16 +1662,16 @@ inline void* TxnPreHook<Alloc, Trait, C, E>::_copy(void const* src, bool) {
     return dst;
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::update(void const* dst) {
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::update(void const* dst) {
     // src tuple from temp table written to dst in persistent storage
     if (m_recording && ! m_changes.count(dst)) {
         m_changes.emplace(dst, _copy(dst, false));
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* dst) {
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::insert(void const* dst) {
     if (m_recording && ! m_changes.count(dst)) {
         // for insertions, since previous memory is unused, there
         // is nothing to keep track of. Just mark the position as
@@ -1672,8 +1680,8 @@ inline void TxnPreHook<Alloc, Trait, C, E>::insert(void const* dst) {
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::remove(void const* src) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
@@ -1684,14 +1692,14 @@ inline void TxnPreHook<Alloc, Trait, C, E>::remove(void const* src) {
     }
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void const* TxnPreHook<Alloc, Trait, C, E>::operator()(void const* src) const {
+template<typename Alloc, typename Trait, typename E>
+inline void const* TxnPreHook<Alloc, Trait, E>::operator()(void const* src) const {
     auto const& pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
 }
 
-template<typename Alloc, typename Trait, typename C, typename E>
-inline void TxnPreHook<Alloc, Trait, C, E>::release(void const* src) {
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::release(void const* src) {
     Trait::remove(src);
 }
 
