@@ -308,14 +308,14 @@ ChunkList<Chunk, CE, E>::last() noexcept {
 }
 
 template<typename Chunk, collections_enum_type CE, typename E> inline void
-ChunkList<Chunk, CE, E>::add(typename ChunkList<Chunk, CE, E>::iterator iter) {
+ChunkList<Chunk, CE, E>::add(typename ChunkList<Chunk, CE, E>::iterator const& iter) {
     m_byAddr.emplace(iter->begin(), iter);
     m_byId.emplace(iter->id(), iter);
 }
 
 template<typename Chunk, collections_enum_type CE, typename E> inline void
 ChunkList<Chunk, CE, E>::remove(
-        typename ChunkList<Chunk, CE, E>::iterator iter) {
+        typename ChunkList<Chunk, CE, E>::iterator const& iter) {
     m_byAddr.erase(iter->begin());
     m_byId.erase(iter->id());
 }

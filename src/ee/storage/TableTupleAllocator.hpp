@@ -274,7 +274,7 @@ namespace voltdb {
          * and limit insertion to tail and erase to front.
          */
         template<typename Chunk,
-            collections_enum_type CE = collections_enum_type::stx_collections,
+            collections_enum_type CE = collections_enum_type::std_collections,
             typename = typename enable_if<is_base_of<ChunkHolder<>, Chunk>::value>::type>
         class ChunkList : private forward_list<Chunk> {
             using super = forward_list<Chunk>;
@@ -285,8 +285,8 @@ namespace voltdb {
             typename super::iterator m_back = super::end();
             typename Collections<CE>::template map<void const*, typename super::iterator> m_byAddr{};
             typename Collections<CE>::template map<id_type, typename super::iterator> m_byId{};
-            void add(typename super::iterator);
-            void remove(typename super::iterator);
+            void add(typename super::iterator const&);
+            void remove(typename super::iterator const&);
         protected:
             id_type& lastChunkId();
             template<typename Pred> void remove_if(Pred p);
