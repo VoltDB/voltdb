@@ -221,7 +221,9 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
         TableTuple inputTuple(this->schema());
         inputTuple.move(tupleAddress);
-        this->deleteTuple(inputTuple, fallible);
+        if (!inputTuple.isPendingDeleteOnUndoRelease()) {
+            this->deleteTuple(inputTuple, fallible);
+        }
     });
 }
 
