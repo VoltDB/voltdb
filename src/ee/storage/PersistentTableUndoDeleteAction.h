@@ -26,7 +26,7 @@ namespace voltdb {
 
 class PersistentTableUndoDeleteAction: public UndoReleaseAction {
     char *m_tuple;
-    PersistentTableSurgeon *m_table;
+    PersistentTable *m_table;
 
     virtual ~PersistentTableUndoDeleteAction() { }
 
@@ -41,9 +41,12 @@ class PersistentTableUndoDeleteAction: public UndoReleaseAction {
      * Release any resources held by the undo action. It will not need to be undone in the future.
      * In this case free the strings associated with the tuple.
      */
-    virtual void release() { m_table->deleteTupleRelease(m_tuple); }
+    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests){
+        m_table->deleteTupleRelease(m_tuple);
+        deleteInterests.insert(dynamic_cast<UndoQuantumReleaseInterest*>(m_table));
+    }
 public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
+    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTable *table)
         : m_tuple(deletedTuple), m_table(table) {}
 };
 

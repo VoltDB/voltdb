@@ -133,21 +133,17 @@ namespace voltdb
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             vassert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
-            std::set<UndoQuantumReleaseInterest*> releaseInterests{};
+            std::set<UndoQuantumReleaseInterest*> deleteInterests{};
             while (!m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
-                std::list<UndoQuantumReleaseInterest*> interests = undoQuantum->getUndoQuantumReleaseInterest();
-                BOOST_FOREACH (auto interest, interests) {
-                   releaseInterests.insert(interest);
-                }
                 if (undoQuantumToken > undoToken) {
                     break;
                 }
 
                 m_undoQuantums.pop_front();
                 // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = UndoQuantum::release(std::move(*undoQuantum));
+                Pool *pool = UndoQuantum::release(std::move(*undoQuantum), deleteInterests);
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
@@ -158,7 +154,7 @@ namespace voltdb
                     break;
                 }
             }
-            BOOST_FOREACH (auto interest, releaseInterests) {
+            BOOST_FOREACH (auto interest, deleteInterests) {
                 interest->finalizeDelete();
             }
         }

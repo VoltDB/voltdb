@@ -1173,7 +1173,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
-              *uq->getPool(), target.address(), &m_surgeon);
+              *uq->getPool(), target.address(), this);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
         if (isTableWithExportDeletes(m_tableType)) {
             vassert(m_shadowStream != nullptr);

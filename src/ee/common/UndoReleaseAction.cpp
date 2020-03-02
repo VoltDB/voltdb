@@ -32,12 +32,12 @@ void SynchronizedUndoReleaseAction::undo() {
     SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
-void SynchronizedUndoReleaseAction::release() {
+void SynchronizedUndoReleaseAction::release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
+        m_realAction->release(deleteInterests);
     }
     SynchronizedThreadLock::signalLowestSiteFinished();
 }
@@ -53,12 +53,12 @@ void SynchronizedUndoOnlyAction::undo() {
 
 }
 
-void SynchronizedReleaseOnlyAction::release() {
+void SynchronizedReleaseOnlyAction::release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
+        m_realAction->release(deleteInterests);
     }
     SynchronizedThreadLock::signalLowestSiteFinished();
 }
@@ -69,7 +69,7 @@ void SynchronizedDummyUndoReleaseAction::undo() {
 
 }
 
-void SynchronizedDummyUndoReleaseAction::release() {
+void SynchronizedDummyUndoReleaseAction::release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
@@ -79,7 +79,7 @@ void SynchronizedDummyUndoOnlyAction::undo() {
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
-void SynchronizedDummyReleaseOnlyAction::release() {
+void SynchronizedDummyReleaseOnlyAction::release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
     vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }

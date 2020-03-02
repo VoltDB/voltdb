@@ -62,7 +62,7 @@ public:
      * to be undone in the future. In this case the string allocations
      * of the old tuple must be released.
      */
-    virtual void release() {
+    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
         NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns);
     }
     virtual ~PersistentTableUndoUpdateAction() { }

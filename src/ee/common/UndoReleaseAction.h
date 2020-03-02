@@ -20,9 +20,11 @@
 #define UNDORELEASEACTION_H_
 
 #include <cstdlib>
+#include <set>
 
 namespace voltdb {
 class UndoQuantum;
+class UndoQuantumReleaseInterest;
 
 /*
  * Abstract base class for all classes generated to undo changes to the system.
@@ -45,7 +47,7 @@ public:
     /*
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
-    virtual void release() = 0;
+    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) = 0;
 
     /*
      * Generate a synchronized Version of UndoAction
@@ -62,7 +64,7 @@ public:
     /*
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
-    void release() {}
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {}
 
     virtual UndoReleaseAction* getSynchronizedUndoAction(UndoQuantum* currUQ);
     virtual UndoReleaseAction* getDummySynchronizedUndoAction(UndoQuantum* currUQ);
@@ -89,7 +91,7 @@ public:
 
     void undo();
 
-    void release();
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests);
 
 private:
     UndoReleaseAction *m_realAction;
@@ -111,7 +113,7 @@ public:
     SynchronizedReleaseOnlyAction(ReleaseOnlyAction *realAction) : m_realAction(realAction) {}
     virtual ~SynchronizedReleaseOnlyAction() {delete m_realAction;}
 
-    void release();
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests);
 
 private:
     ReleaseOnlyAction *m_realAction;
@@ -124,7 +126,7 @@ public:
 
     void undo();
 
-    void release();
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests);
 };
 
 class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
@@ -140,7 +142,7 @@ public:
     SynchronizedDummyReleaseOnlyAction() { }
     virtual ~SynchronizedDummyReleaseOnlyAction() { }
 
-    void release();
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests);
 };
 
 }

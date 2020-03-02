@@ -54,13 +54,14 @@ private:
      * and free the strings associated with each
      * tuple in the original table.
      */
-    virtual void release() {
+    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
         //It's very important not to add anything else to this release method
         //Put all the implementation in truncateTableRelease
         //The reason is that truncateTableRelease is called directly when a binary log
         //truncate record is being applied and it must do all the work and not leave
         //something undone because it didn't go through this undo action
         m_emptyTable->truncateTableRelease(m_originalTable);
+        deleteInterests.erase(dynamic_cast<UndoQuantumReleaseInterest*>(m_originalTable));
     }
 
 private:

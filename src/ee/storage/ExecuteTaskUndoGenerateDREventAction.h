@@ -38,7 +38,7 @@ public:
         , m_payloads(payloads)
     { }
 
-    void release() {
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
         // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
         // Here XOR is used for the type check and the stream started check. On one hand, stream should not
         // generate any event other than DR_STREAM_START if it is not started yet, on the other hand,

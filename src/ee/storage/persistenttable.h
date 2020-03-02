@@ -598,6 +598,8 @@ public:
      * Delete the rows that have completed the migration process
      */
     bool deleteMigratedRows(int64_t deletableTxnId);
+    void insertTupleForUndo(char* tuple);
+    void deleteTupleRelease(char* tuple);
 
 private:
     // Zero allocation size uses defaults.
@@ -652,16 +654,12 @@ private:
     void doInsertTupleCommon(TableTuple const& source, TableTuple& target,
             bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
 
-    void insertTupleForUndo(char* tuple);
-
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
                             bool revertIndexes,
                             bool fromMigrate);
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
-
-    void deleteTupleRelease(char* tuple);
 
     /**
      * Normally this will return the tuple storage to the free list.

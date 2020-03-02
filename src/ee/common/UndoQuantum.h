@@ -22,6 +22,7 @@
 #include <common/debuglog.h>
 #include <string.h>
 #include <list>
+#include <set>
 
 #include "common/Pool.hpp"
 #include "common/VoltContainer.hpp"
@@ -112,10 +113,10 @@ public:
      * tuples in a table, then does a truncate. You do not want to delete that
      * table before all the inserts and deletes are released.
      */
-    static Pool* release(UndoQuantum&& quantum) {
+    static Pool* release(UndoQuantum&& quantum, std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
         for (auto i = quantum.m_undoActions.begin();
              i != quantum.m_undoActions.end(); ++i) {
-            (*i)->release();
+            (*i)->release(deleteInterests);
             delete *i;
         }
         for(auto cur = quantum.m_interests.begin(); cur != quantum.m_interests.end(); ++cur) {
@@ -142,7 +143,6 @@ public:
     inline const UndoReleaseAction* getLastUndoActionForTest() { return m_undoActions.back(); }
 
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
-    inline std::list<UndoQuantumReleaseInterest*> getUndoQuantumReleaseInterest() { return m_interests;}
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*> m_undoActions;
