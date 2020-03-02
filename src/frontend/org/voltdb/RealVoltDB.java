@@ -270,9 +270,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "9.3.beta2";
+    static final String m_defaultVersionString = "9.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q9.3.beta2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q9.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
