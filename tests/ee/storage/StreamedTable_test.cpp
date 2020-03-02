@@ -27,13 +27,14 @@
 #include <vector>
 #include <deque>
 #include "harness.h"
+#include <set>
 
 #include "common/executorcontext.hpp"
 #include "common/Pool.hpp"
 #include "common/UndoQuantum.h"
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
-
+#include "common/UndoQuantumReleaseInterest.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
@@ -123,7 +124,8 @@ public:
     void nextQuantum(int i, int64_t tokenOffset)
     {
         // Takes advantage of "grey box test" friend privileges on UndoQuantum.
-       UndoQuantum::release(std::move(*m_quantum));
+        std::set<UndoQuantumReleaseInterest*> deleteInterests{};
+        UndoQuantum::release(std::move(*m_quantum), deleteInterests);
         m_quantum = createInstanceFromPool<UndoQuantum>(*m_pool, i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
         m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0, false);
@@ -177,7 +179,8 @@ TEST_F(StreamedTableTest, BaseCase) {
 
         m_table->insertTuple(*m_tuple);
     }
-    UndoQuantum::release(std::move(*m_quantum));
+    std::set<UndoQuantumReleaseInterest*> deleteInterests{};
+    UndoQuantum::release(std::move(*m_quantum), deleteInterests);
     // a negative flush implies "now". this helps valgrind heap block test
     m_table->flushOldTuples(-1);
 

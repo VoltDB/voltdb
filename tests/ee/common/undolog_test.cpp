@@ -25,12 +25,15 @@
 #include "common/UndoLog.h"
 #include "common/UndoQuantum.h"
 #include "common/Pool.hpp"
+#include "common/UndoQuantumReleaseInterest.h"
 #include <vector>
 #include <stdint.h>
+#include <set>
 
 static int staticReleaseIndex = 0;
 static int staticUndoneIndex = 0;
 
+using namespace voltdb;
 class MockUndoActionHistory {
 public:
     MockUndoActionHistory() : m_released(false), m_undone(false), m_releasedIndex(-1), m_undoneIndex(-1) {}
@@ -40,7 +43,7 @@ public:
     int m_undoneIndex;
 };
 
-class MockUndoAction : public voltdb::UndoReleaseAction {
+class MockUndoAction : public UndoReleaseAction {
 public:
     MockUndoAction(MockUndoActionHistory *history) : m_history(history) {}
 
@@ -49,7 +52,7 @@ public:
         m_history->m_undoneIndex = staticUndoneIndex++;
     }
 
-    void release() {
+    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
         m_history->m_released = true;
         m_history->m_releasedIndex = staticReleaseIndex++;
     }
