@@ -34,6 +34,7 @@ import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -60,41 +61,23 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                     "description VARCHAR(200)," +
                    "PRIMARY KEY (id));" +
                    "PARTITION TABLE bigfoo ON COLUMN id;" +
-                   "CREATE INDEX bigindex ON bigfoo (ts);";
+                   "CREATE INDEX bigindex ON bigfoo (ts);"+
+            "CREATE TABLE PR(id INTEGER NOT NULL, value VARCHAR(1000), " +
+            "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
+            "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
+            "PRIMARY KEY (id)); ";
 
     Client client;
     final int sitesPerHost = 2;
     final int hostCount = 2;
     final int kfactor = 1;
-    public static class TestProc extends VoltProcedure {
-        public final SQLStmt stmt1 = new SQLStmt("DELETE FROM KV WHERE KEY < 10;");
-        public final SQLStmt stmt2 = new SQLStmt("DELETE FROM FOO WHERE KEY < 10;");
-        public final SQLStmt stmt3 = new SQLStmt("DELETE FROM KV WHERE KEY < 30;");
-        public final SQLStmt stmt4 = new SQLStmt("DELETE FROM FOO WHERE KEY < 30;");
-        public final SQLStmt stmt5 = new SQLStmt("DELETE FROM KV WHERE KEY < 60;");
-
-        public VoltTable[] run() {
-            voltQueueSQL(stmt1);
-            voltExecuteSQL(false);
-            voltQueueSQL(stmt2);
-            voltExecuteSQL(false);
-            voltQueueSQL(stmt3);
-            voltExecuteSQL(false);
-            voltQueueSQL(stmt4);
-            voltExecuteSQL(false);
-            voltQueueSQL(stmt5);
-            return voltExecuteSQL(true);
-         }
-    }
-    private static  final String PROCEDURES =
-            "CREATE PROCEDURE FROM CLASS org.voltdb.TestDeterministicRowOrder$TestProc;" ;
-    LocalCluster createCluster() throws IOException {
+   LocalCluster createCluster() throws IOException {
         LocalCluster server = null;
         VoltFile.resetSubrootForThisProcess();
         try {
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(SCHEMA);
-            builder.addLiteralSchema(PROCEDURES);
+            builder.addStmtProcedure("deletePR", "delete from PR where id = ?");
             builder.setUseDDLSchema(true);
             server = new LocalCluster("TestDeterministicRowOrder.jar", sitesPerHost, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
@@ -128,7 +111,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
     public void testCatalogUpdate() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -154,7 +137,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
     public void testBatchDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -190,7 +173,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
     public void testUpdate() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -253,7 +236,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
     public void testTruncateDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -279,7 +262,37 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
+   public void testDeleteReplicatedTableWithUninlineableObjects() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            String filler = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            final int MAX_ROWS = 10;
+            // insert baseline rows
+            System.out.printf("Inserting %d rows into the primary table and the view\n", MAX_ROWS);
+            for (int i = 0; i < MAX_ROWS; i++) {
+                client.callProcedure("PR.insert", i, String.valueOf(i),
+                        filler, filler, filler, filler, filler, filler, filler, filler);
+            }
+            client.drain();
+            VoltTable t = client.callProcedure("@AdHoc", "select Count(*) from PR").getResults()[0];
+            assert(t.asScalarLong() == MAX_ROWS);
+            System.out.printf("Deleting rows\n");
+            for (int i = 0; i < MAX_ROWS/2; i++) {
+                client.callProcedure("deletePR", i);
+            }
+            client.drain();
+            t = client.callProcedure("@AdHoc", "select Count(*) from PR").getResults()[0];
+            assert(t.asScalarLong() == (MAX_ROWS/2));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
+        }
+    }
+
+   @Test
     public void testUpsert() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
@@ -310,7 +323,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
     }
 
 
-    @Test
+   @Test
     public void testInsertWithDelete() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         createCluster();
@@ -361,7 +374,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         }
     }
 
-    @Test
+   @Test
     public void testSnapshotSaveAndRestore() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
