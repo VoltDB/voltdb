@@ -56,6 +56,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
@@ -979,4 +980,17 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setMasterOnly() {}
+
+    @Override
+    public void registerCatalogValidator(CatalogValidator validator) {
+    }
+
+    @Override
+    public void unregisterCatalogValidator(CatalogValidator validator) {
+    }
+
+    @Override
+    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+        return true;
+    }
 }

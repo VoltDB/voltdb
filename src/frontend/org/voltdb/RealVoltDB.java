@@ -66,6 +66,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -136,6 +137,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -392,6 +394,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
     private Long m_lastLogUpdateTxnId = 0L;
+    private CopyOnWriteArrayList<CatalogValidator> m_catalogValidators = new CopyOnWriteArrayList<>();
 
     /**
      * Startup snapshot nonce taken on shutdown --save
@@ -3895,6 +3898,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if(tempJar.exists()) {
             tempJar.delete();
         }
+    }
+
+    @Override
+    public void registerCatalogValidator(CatalogValidator validator) {
+        m_catalogValidators.add(validator);
+    }
+
+    @Override
+    public void unregisterCatalogValidator(CatalogValidator validator) {
+        m_catalogValidators.remove(validator);
+    }
+
+    @Override
+    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+        for (CatalogValidator validator : m_catalogValidators) {
+            if (!validator.validateDeploymentUpdates(newDep, curDep, ccr)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     @Override
