@@ -548,16 +548,18 @@ public class Expression {
                 return true;
             }
         }
-        // For ENG-18549
-        // treat ? as constant value, allow ? in aggregate functions
-        // TODO: this fix only lift the restriction for cast function
-        // generalize to other functions in the future if needed
-        if (opType == OpTypes.CAST && nodes.length == 1 && nodes[0].opType == OpTypes.DYNAMIC_PARAM) {
-            return true;
-        }
 
         switch (opType) {
-
+            // For ENG-18549
+            // treat ? as constant value, allow ? in aggregate functions
+            // TODO: this fix only lift the restriction for cast function
+            // generalize to other functions in the future if needed
+            case OpTypes.CAST:
+                assert(1 == nodes.length);
+                if (nodes[0].opType == OpTypes.DYNAMIC_PARAM) {
+                    return true;
+                }
+                break;
             case OpTypes.LIKE :
             case OpTypes.MATCH_SIMPLE :
             case OpTypes.MATCH_PARTIAL :
