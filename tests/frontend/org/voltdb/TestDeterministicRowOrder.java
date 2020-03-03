@@ -34,7 +34,6 @@ import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -63,8 +62,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                    "PARTITION TABLE bigfoo ON COLUMN id;" +
                    "CREATE INDEX bigindex ON bigfoo (ts);"+
             "CREATE TABLE PR(id INTEGER NOT NULL, value VARCHAR(1000), " +
-            "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
-            "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
+            "e1 VARCHAR(63)," +
             "PRIMARY KEY (id)); ";
 
     Client client;
@@ -267,13 +265,9 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         VoltFile.resetSubrootForThisProcess();
         LocalCluster server = createCluster();
         try {
-            String filler = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
             final int MAX_ROWS = 10;
-            // insert baseline rows
-            System.out.printf("Inserting %d rows into the primary table and the view\n", MAX_ROWS);
             for (int i = 0; i < MAX_ROWS; i++) {
-                client.callProcedure("PR.insert", i, String.valueOf(i),
-                        filler, filler, filler, filler, filler, filler, filler, filler);
+                client.callProcedure("PR.insert", i, String.valueOf(i),"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             }
             client.drain();
             VoltTable t = client.callProcedure("@AdHoc", "select Count(*) from PR").getResults()[0];
