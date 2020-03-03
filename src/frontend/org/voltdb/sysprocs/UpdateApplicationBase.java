@@ -239,6 +239,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
+            VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval);
             // Kipling configuration is not compiled into the catalog and cannot be validated
             // by the CatalogDiffEngine, so validate the changes here.
             if (!validateKiplingUpdates(dt, context.getDeployment(), retval)) {
@@ -313,17 +314,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      */
     private static boolean validateKiplingUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
         CompoundErrors errors = new CompoundErrors();
-
-        //TODO: Temporarily commenting out until we figure out how to hook in validations from pro here.
-        /*
-        PropertiesType newProps = (newDep.getTopicsServer() == null) ? null : newDep.getTopicsServer().getServerProperties();
-        PropertiesType curProps = (curDep.getTopicsServer() == null) ? null : curDep.getTopicsServer().getServerProperties();
-        if (newProps != null && curProps != null) {
-            if (newKt.getPort() != curKt.getPort()) {
-                errors.addErrorMessage("Kipling port number cannot be changed");
-            }
-        }
-        */
         validateTopicUpdates(newDep, curDep, errors);
 
         if (errors.hasErrors()) {
