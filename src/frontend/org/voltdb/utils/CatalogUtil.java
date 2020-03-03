@@ -134,7 +134,6 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -152,7 +151,7 @@ import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
 import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
 import org.voltdb.compiler.deploymentfile.TopicRetentionType;
-import org.voltdb.compiler.deploymentfile.TopicsType;
+import org.voltdb.compiler.deploymentfile.TopicsServerType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
@@ -1327,7 +1326,7 @@ public abstract class CatalogUtil {
         String registryUrl = avro.getRegistry();
         assert registryUrl != null : "deployment syntax must require URL";
         try {
-            URL url = new URL(registryUrl);
+            new URL(registryUrl);
         }
         catch (MalformedURLException ex) {
             throw new RuntimeException(
@@ -1339,9 +1338,9 @@ public abstract class CatalogUtil {
         CompoundErrors errors = new CompoundErrors();
 
         // If topics have a threadpool name, validate it exists
-        TopicsType topicsType = getTopicsType(deployment);
+        TopicsServerType topicsType = deployment.getTopicsServer();
         if (topicsType != null) {
-            String thPoolName = topicsType.getThreadpool();
+            String thPoolName = topicsType.getTopicsThreadPool();
             if (!StringUtils.isEmpty(thPoolName)) {
                 ThreadPoolsType tp = deployment.getThreadpools();
                 if (tp == null) {
@@ -1411,20 +1410,6 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Get the {@link TopicsType} element or null
-     *
-     * @param deployment
-     * @return
-     */
-    public static final TopicsType getTopicsType(DeploymentType deployment) {
-        KiplingType k = deployment.getKipling();
-        if (k == null) {
-            return null;
-        }
-        return k.getTopics();
-    }
-
-    /**
      * Get the topics defined in deployment file: defaults, and map of profiles, keyed CASE INSENSITIVE
      *
      * @param deployment
@@ -1434,7 +1419,7 @@ public abstract class CatalogUtil {
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
-        TopicsType topics = getTopicsType(deployment);
+        TopicsServerType topics = deployment.getTopicsServer();
         if (topics == null) {
             return Pair.of(null, null);
         }
@@ -1442,7 +1427,7 @@ public abstract class CatalogUtil {
     }
 
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
-            TopicsType topics, CompoundErrors errors) {
+            TopicsServerType topics, CompoundErrors errors) {
 
         if (topics == null) {
             return Pair.of(null, null);

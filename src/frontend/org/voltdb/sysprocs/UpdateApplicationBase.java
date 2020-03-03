@@ -52,7 +52,6 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
 import org.voltdb.exceptions.PlanningErrorException;
@@ -315,13 +314,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     private static boolean validateKiplingUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
         CompoundErrors errors = new CompoundErrors();
 
-        KiplingType newKt = newDep.getKipling();
-        KiplingType curKt = curDep.getKipling();
-        if (newKt != null && curKt != null) {
+        //TODO: Temporarily commenting out until we figure out how to hook in validations from pro here.
+        /*
+        PropertiesType newProps = (newDep.getTopicsServer() == null) ? null : newDep.getTopicsServer().getServerProperties();
+        PropertiesType curProps = (curDep.getTopicsServer() == null) ? null : curDep.getTopicsServer().getServerProperties();
+        if (newProps != null && curProps != null) {
             if (newKt.getPort() != curKt.getPort()) {
                 errors.addErrorMessage("Kipling port number cannot be changed");
             }
         }
+        */
         validateTopicUpdates(newDep, curDep, errors);
 
         if (errors.hasErrors()) {
