@@ -53,7 +53,7 @@
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
-      <xs:element name="topics_server" minOccurs="0" maxOccurs="1" type="topicsServerType" />
+      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType" />
       <xs:element name="avro" minOccurs="0" maxOccurs="1" type="avroType" />
     </xs:all>
   </xs:complexType>
@@ -579,19 +579,25 @@
   </xs:complexType>
 
   <!-- <topics> -->
-  <xs:complexType name="topicsServerType">
+  <xs:complexType name="topicsType">
     <xs:sequence>
-      <xs:element name="server_properties" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
-      <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
-      <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="properties" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
+      <xs:element name="profiles" type="topicProfilesType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="false" />
-    <xs:attribute name="topics_thread_pool" type="xs:string" default="" />
+    <xs:attribute name="threadpool" type="xs:string" default="" />
   </xs:complexType>
 
   <xs:complexType name="PropertiesType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="topicProfilesType">
+    <xs:sequence>
+      <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
+      <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 

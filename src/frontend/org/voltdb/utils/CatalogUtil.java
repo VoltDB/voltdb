@@ -151,7 +151,7 @@ import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
 import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
 import org.voltdb.compiler.deploymentfile.TopicRetentionType;
-import org.voltdb.compiler.deploymentfile.TopicsServerType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
@@ -1338,9 +1338,9 @@ public abstract class CatalogUtil {
         CompoundErrors errors = new CompoundErrors();
 
         // If topics have a threadpool name, validate it exists
-        TopicsServerType topicsType = deployment.getTopicsServer();
+        TopicsType topicsType = deployment.getTopics();
         if (topicsType != null) {
-            String thPoolName = topicsType.getTopicsThreadPool();
+            String thPoolName = topicsType.getThreadpool();
             if (!StringUtils.isEmpty(thPoolName)) {
                 ThreadPoolsType tp = deployment.getThreadpools();
                 if (tp == null) {
@@ -1419,7 +1419,7 @@ public abstract class CatalogUtil {
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
-        TopicsServerType topics = deployment.getTopicsServer();
+        TopicsType topics = deployment.getTopics();
         if (topics == null) {
             return Pair.of(null, null);
         }
@@ -1427,14 +1427,14 @@ public abstract class CatalogUtil {
     }
 
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
-            TopicsServerType topics, CompoundErrors errors) {
+            TopicsType topics, CompoundErrors errors) {
 
-        if (topics == null) {
+        if (topics == null || topics.getProfiles() == null) {
             return Pair.of(null, null);
         }
 
-        TopicDefaultsType defaults = topics.getDefaults();
-        List<TopicProfileType> profiles = topics.getProfile();
+        TopicDefaultsType defaults = topics.getProfiles().getDefaults();
+        List<TopicProfileType> profiles = topics.getProfiles().getProfile();
         if (profiles == null) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("No topic profiles in deployment");

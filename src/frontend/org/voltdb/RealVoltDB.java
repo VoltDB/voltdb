@@ -2911,7 +2911,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.error("Command logging is not supported in the community edition of VoltDB.");
                 shutdownDeployment = true;
             }
-            if (deployment.getTopicsServer() != null && deployment.getTopicsServer().isEnabled()) {
+            if (deployment.getTopics() != null && deployment.getTopics().isEnabled()) {
                 consoleLog.error("Kipling is not supported in the community edition of VoltDB.");
                 shutdownDeployment = true;
             }

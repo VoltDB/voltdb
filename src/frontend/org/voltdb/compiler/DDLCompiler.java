@@ -1661,12 +1661,12 @@ public class DDLCompiler {
                 if (definedColumns.contains(col)) {
                     // Do not tolerate any ambiguous key topic definition
                     throw compiler.new VoltCompilerException(
-                            String.format("Column %s is defined more than once in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Column %s is defined more than once in the KEYS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 if (!columnMap.keySet().contains(col)) {
                     throw compiler.new VoltCompilerException(
-                            String.format("Unknown column %s defined in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Unknown column %s defined in the KEYS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 definedColumns.add(col);

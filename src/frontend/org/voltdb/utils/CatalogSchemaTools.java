@@ -138,7 +138,7 @@ public abstract class CatalogSchemaTools {
                     }
                     String topicKeyColumnNames = catalog_tbl.getTopickeycolumnnames();
                     if (!StringUtils.isEmpty(topicKeyColumnNames)) {
-                        table_sb.append(" KEY-COLUMNS ").append(topicKeyColumnNames);
+                        table_sb.append(" KEYS ").append(topicKeyColumnNames);
                     }
                     String topicAllowedRoleNames = catalog_tbl.getTopicallowedrolenames();
                     if (!StringUtils.isEmpty(topicAllowedRoleNames)) {
