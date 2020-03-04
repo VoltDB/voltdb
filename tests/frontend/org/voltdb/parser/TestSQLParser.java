@@ -979,7 +979,7 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
      * <p>
      * Note 1: the 3 top-level clauses "EXPORT TO TARGET", "PARTITION ON COLUMN" and "AS TOPIC" can be
      * in any order, but the sub-clauses of "AS TOPIC" must be in the correct order:
-     * "PROFILE", "FORMAT", "KEY-COLUMNS", "ALLOW".
+     * "PROFILE", "FORMAT", "KEYS", "ALLOW".
      * <p>
      * Note 2: the parsing accepts syntax that may be rejected in subsequent validation, e.g. "EXPORT" clause
      * coexisting with an "AS TOPIC" clause.
@@ -1006,35 +1006,35 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "zoo"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 (",
+                "  AS TOPIC PROFILE foo FORMAT zoo KEYS col1 (",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "zoo" ,
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2(",
+                "  AS TOPIC PROFILE foo FORMAT zoo KEYS col1 , col2(",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "zoo" ,
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2 ALLOW role1(",
+                "  AS TOPIC PROFILE foo FORMAT zoo KEYS col1 , col2 ALLOW role1(",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "zoo" ,
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2",
                         SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, "role1"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo FORMAT zoo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                "  AS TOPIC PROFILE foo FORMAT zoo KEYS col1 , col2,col3 ALLOW role1 , role2 (",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "zoo" ,
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2,col3",
                         SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, "role1 , role2"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC FORMAT zoo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                "  AS TOPIC FORMAT zoo KEYS col1 , col2,col3 ALLOW role1 , role2 (",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_FORMAT, "zoo" ,
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2,col3",
                         SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, "role1 , role2"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo KEY-COLUMNS col1 , col2,col3 ALLOW role1 , role2 (",
+                "  AS TOPIC PROFILE foo KEYS col1 , col2,col3 ALLOW role1 , role2 (",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo",
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2,col3",
                         SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, "role1 , role2"));
@@ -1045,7 +1045,7 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
                         SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, "role1 , role2"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE foo KEY-COLUMNS col1 , col2,col3 (",
+                "  AS TOPIC PROFILE foo KEYS col1 , col2,col3 (",
                 ImmutableMap.of(SQLParser.CAPTURE_TOPIC_PROFILE, "foo",
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2,col3"));
 
@@ -1073,7 +1073,7 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
                 ImmutableMap.of(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN, "foo", SQLParser.CAPTURE_TOPIC_FORMAT, "bar"));
 
         validateStreamModifierClauses(
-                "  AS TOPIC PROFILE bar KEY-COLUMNS col1 , col2,col3 PARTITION ON COLUMN foo (",
+                "  AS TOPIC PROFILE bar KEYS col1 , col2,col3 PARTITION ON COLUMN foo (",
                 ImmutableMap.of(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN, "foo", SQLParser.CAPTURE_TOPIC_PROFILE, "bar",
                         SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, "col1 , col2,col3"));
 
