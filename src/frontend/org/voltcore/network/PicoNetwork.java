@@ -213,10 +213,12 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
                     e instanceof ClosedByInterruptException) {
-                m_logger.debug( "VoltPort died, probably of natural causes", e);
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug( "PicoNetwork died, probably of natural causes", e);
+                }
             } else {
                 e.printStackTrace();
-                networkLog.error( "VoltPort died due to an unexpected exception", e);
+                networkLog.error( "PicoNetwork died due to an unexpected exception", e);
             }
         } catch (Throwable ex) {
             ex.printStackTrace();

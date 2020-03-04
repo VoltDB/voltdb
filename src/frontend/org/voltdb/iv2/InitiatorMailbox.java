@@ -591,6 +591,11 @@ public class InitiatorMailbox implements Mailbox
                 if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
                     hostLog.warn("Repair Request for dead host " + deadHostId +
                             " has not been processed yet because connection has not closed");
+                    if (req.getRepairRetryCount() == 60 * 100) {
+                        hostLog.warn("Connection to dead host " + deadHostId +
+                                " has not been closed for 60 seconds, stop blocking repair request.");
+                        m_messenger.markPicoZombieHost(deadHostId);
+                    }
                 }
                 Runnable retryRepair = new Runnable() {
                     @Override
