@@ -328,7 +328,6 @@ public class UpdateCore extends VoltSystemProcedure {
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalog, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
-            log.info("Executing PF_updateCatalogAggregate");
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateCatalog));
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogAggregate, result);
         }

@@ -89,7 +89,6 @@ public class JiggleExportGeoSinglePartition extends VoltProcedure {
                     , record.type_null_geography_point
                     , record.type_not_null_geography_point
                     );
-        /**/
 
         voltQueueSQL(
                      export_jdbc

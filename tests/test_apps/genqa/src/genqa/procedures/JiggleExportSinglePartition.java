@@ -46,11 +46,6 @@ public class JiggleExportSinglePartition extends VoltProcedure {
 
         // Insert a new record
         SampleRecord record = new SampleRecord(rowid, rand);
-        /*
-          Uncomment this to duplicate the export data in memory.
-          Useful for debugging export data correctness, but not useful
-          for not running out of memory....
-         */
 
         SQLStmt[] statements = {insert, export_kafka, export_rabbit, export_file, export_jdbc};
         for (SQLStmt stmt: statements) {
