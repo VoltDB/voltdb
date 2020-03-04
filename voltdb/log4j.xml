@@ -70,9 +70,13 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="EXPORT">
-        <level value="DEBUG"/>
-    </logger -->
+    <logger name="EXPORT">
+        <level value="TRACE"/>
+    </logger>
+
+    <logger name="KIPLING">
+        <level value="TRACE"/>
+    </logger>
 
     <!-- logger name="IMPORT">
         <level value="INFO"/>
