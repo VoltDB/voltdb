@@ -114,7 +114,10 @@ public class ExportAvroSerializer {
      *
      * @param topicName
      */
-    public void dropTopic(String topicName) {
+    public synchronized void dropTopic(String topicName) {
+        if (m_avro == null) {
+            return;
+        }
         m_decoderMap.remove(getAvroSubjectName(topicName));
         m_decoderMap.remove(getAvroSubjectName(topicName + ExportRow.KEY_SUFFIX));
     }
