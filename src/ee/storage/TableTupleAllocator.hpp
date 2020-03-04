@@ -739,7 +739,7 @@ namespace voltdb {
             void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
-            void add(CompactingChunks const&, ChangeType, void const*);
+            void add(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
@@ -958,6 +958,20 @@ namespace voltdb {
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;
+
+            /**
+             * Weak observer for the snapshot RW iterator
+             */
+            class IteratorObserver : private weak_ptr<hooked_iterator> {
+                using super = weak_ptr<hooked_iterator>;
+            public:
+                using is_iterator_observer = true_type;
+                IteratorObserver() noexcept = default;
+                IteratorObserver(shared_ptr<hooked_iterator> const&) noexcept;
+                IteratorObserver(IteratorObserver const&) noexcept = default;
+                IteratorObserver(IteratorObserver&&) noexcept = default;
+                bool visited(void const*) const;
+            };
         };
 
         struct truth {                                             // simplest Tag that always returns true

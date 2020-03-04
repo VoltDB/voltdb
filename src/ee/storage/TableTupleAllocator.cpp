@@ -1555,6 +1555,25 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() 
              less<position_type>()(super::storage().frozenBoundaries().right(), *this)));
 }
 
+template<typename Chunks, typename Tag, typename E> inline
+IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::IteratorObserver(
+        shared_ptr<typename IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator> const& o) noexcept :
+super(o) {}
+
+template<typename Chunks, typename Tag, typename E> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::visited(void const* p) const {
+    auto o = super::lock();
+    if (o == nullptr) {
+        return false;
+    } else if (o->drained()) {
+        return true;
+    } else {
+        hooked_iterator const* iter = super::get();
+        return less<position_type>()({iter->storage(), p}, *iter);
+    }
+}
+
+
 template<unsigned char NthBit, typename E>
 inline bool NthBitChecker<NthBit, E>::operator()(void* p) const noexcept {
     return *reinterpret_cast<unsigned char*>(p) & MASK;
@@ -1638,8 +1657,8 @@ inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essent
 }
 
 template<typename Alloc, typename Trait, typename E>
-inline void TxnPreHook<Alloc, Trait, E>::add(CompactingChunks const& t,
-        typename TxnPreHook<Alloc, Trait, E>::ChangeType type, void const* dst) {
+inline void TxnPreHook<Alloc, Trait, E>::add(typename TxnPreHook<Alloc, Trait, E>::ChangeType type,
+        void const* dst) {
     if (m_recording) {     // ignore changes beyond boundary
         switch (type) {
             case ChangeType::Update:
@@ -1750,7 +1769,7 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::update(void* dst) {
-    Hook::add(*this, Hook::ChangeType::Update, dst);
+    Hook::add(Hook::ChangeType::Update, dst);
 }
 
 template<typename Hook, typename E> inline void const*
@@ -1759,7 +1778,7 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
         Hook::copy(dst);
     }
     void const* src = CompactingChunks::free(dst);
-    Hook::add(*this, Hook::ChangeType::Deletion, dst);
+    Hook::add(Hook::ChangeType::Deletion, dst);
     return src;
 }
 
@@ -1786,9 +1805,9 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     // hook registration
     std::for_each(CompactingChunks::m_batched.removed().cbegin(),
             CompactingChunks::m_batched.removed().cend(),
-            [this](void* s) noexcept {
+            [this] (void* s) noexcept {
                 Hook::copy(s);
-                Hook::add(*this, Hook::ChangeType::Deletion, s);
+                Hook::add(Hook::ChangeType::Deletion, s);
             });
     std::for_each(CompactingChunks::m_batched.movements().cbegin(),
             CompactingChunks::m_batched.movements().cend(),
