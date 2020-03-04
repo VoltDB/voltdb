@@ -29,6 +29,7 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <boost/dynamic_bitset.hpp>
 #include <stx/btree_map>
 #include <stx/btree_set>
 #include "common/ThreadLocalPool.h"
@@ -87,16 +88,19 @@ namespace voltdb {
             collections_type = collections_enum_type::std_collections;
 
         struct StdCollections {
-            template<typename K> using set = std::set<K>;
-            template<typename K, typename V> using map = std::map<K, V>;
+            template<typename K, typename Cmp = less<K>>
+            using set = std::set<K, Cmp>;
+            template<typename K, typename V, typename Cmp = less<K>>
+            using map = std::map<K, V, Cmp>;
         };
 
         /**
          * B+ tree map/set
          */
         struct StxCollections {
-            template<typename K> class set : private stx::btree_set<K> {
-                using super = stx::btree_set<K>;
+            template<typename K, typename Cmp = less<K>>
+            class set : private stx::btree_set<K, Cmp> {
+                using super = stx::btree_set<K, Cmp>;
             public:
                 using value_type = typename super::value_type;
                 using iterator = typename super::iterator;
@@ -108,13 +112,14 @@ namespace voltdb {
                 set() = default;
                 set(initializer_list<value_type>);
                 template<typename InputIt> set(InputIt, InputIt);
-                set<K>& operator=(set<K> const&) = default;
+                set<K, Cmp>& operator=(set<K, Cmp> const&) = default;
                 const_iterator cbegin() const;
                 const_iterator cend() const;
                 template<typename...Args> pair<iterator, bool> emplace(Args&&...);
             };
-            template<typename K, typename V> class map : private stx::btree_map<K, V> {
-                using super = stx::btree_map<K, V>;
+            template<typename K, typename V, typename Cmp = less<K>>
+            class map : private stx::btree_map<K, V, Cmp> {
+                using super = stx::btree_map<K, V, Cmp>;
             public:
                 using key_type = typename super::key_type;
                 using mapped_type = typename super::data_type;
@@ -128,7 +133,7 @@ namespace voltdb {
                 map() = default;;
                 map(initializer_list<value_type>);
                 template<typename InputIt> map(InputIt, InputIt);
-                map<K, V>& operator=(map<K, V> const&) = default;
+                map<K, V, Cmp>& operator=(map<K, V, Cmp> const&) = default;
                 const_iterator cbegin() const;
                 const_iterator cend() const;
                 template<typename...Args> pair<iterator, bool> emplace(Args&&...);
@@ -274,6 +279,21 @@ namespace voltdb {
         };
 
         /**
+         * Comparison (less<Number>) of rolling unsigned numbers.
+         */
+        template<typename T,
+            typename = typename enable_if<is_integral<T>::value && ! is_signed<T>::value>::type>
+        inline constexpr bool less_rolling(T const& l, T const& r) noexcept {
+            return static_cast<typename make_signed<T>::type>(l - r) < 0;
+        }
+
+        template<typename T> struct less_rolling_type {
+            inline constexpr bool operator()(T const& l, T const& r) const noexcept {
+                return less_rolling(l, r);
+            }
+        };
+
+        /**
          * Homogeneous-sized singly-linked list of memory holders
          * (i.e. ChunkHolder).
          *
@@ -290,8 +310,10 @@ namespace voltdb {
             size_t m_size = 0;
             id_type m_lastChunkId = 0;
             typename super::iterator m_back = super::end();
-            typename Collections<collections_type>::template map<void const*, typename super::iterator> m_byAddr{};
-            typename Collections<collections_type>::template map<id_type, typename super::iterator> m_byId{};
+            typename Collections<collections_type>::template
+                map<void const*, typename super::iterator> m_byAddr{};
+            typename Collections<collections_type>::template
+                map<id_type, typename super::iterator, less_rolling_type<id_type>> m_byId{};
             void add(typename super::iterator const&);
             void remove(typename super::iterator const&);
         protected:
@@ -423,15 +445,6 @@ namespace voltdb {
              */
             void release(typename list_type::iterator, void const*);
         };
-
-        /**
-         * Comparison (less<Number>) of rolling unsigned numbers.
-         */
-        template<typename T,
-            typename = typename enable_if<is_integral<T>::value && ! is_signed<T>::value>::type>
-        inline constexpr bool less_rolling(T const& l, T const& r) noexcept {
-            return static_cast<typename make_signed<T>::type>(l - r) < 0;
-        }
     }
 }
 
@@ -556,43 +569,40 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
-            class BatchRemoveAccumulator :
-                private list_type::collections::template map<list_type::iterator, vector<void*>> {
-                using map_type = list_type::collections::template map<list_type::iterator, vector<void*>>;
-                CompactingChunks* m_self;
-            protected:
-                CompactingChunks& chunks() noexcept;
-                // force "removing" the chunk to be compacted from, either by deleting (when not frozen), or
-                // adjusting m_txnFirstChunk.
-                list_type::iterator pop();
-                vector<void*> collect() const;
-                using map_type::clear;
-            public:
-                explicit BatchRemoveAccumulator(CompactingChunks*);
-                void insert(list_type::iterator, void*);
-                vector<void*> sorted();                         // in compacting order
-            };
         protected:
-            size_t m_allocs = 0;
-            class DelayedRemover : protected BatchRemoveAccumulator {
-                using super = BatchRemoveAccumulator;
-                template<typename K, typename V> using map_type = list_type::collections::template map<K, V>;
-                template<typename K> using set_type = list_type::collections::template set<K>;
+            class DelayedRemover {
+                CompactingChunks& m_chunks;
+                class RemovableRegion {
+                    using bitset_t = boost::dynamic_bitset<>;
+                    char const* m_beg;
+                    bitset_t m_mask;
+                public:
+                    RemovableRegion(char const*, size_t, size_t) noexcept;
+                    vector<void*> holes(size_t) const noexcept;
+                    char const* begin() const noexcept;
+                    bitset_t& mask() noexcept;
+                    bitset_t const& mask() const noexcept;
+                };
+                using map_type = map<id_type, RemovableRegion, less_rolling_type<id_type>>;
+                map_type m_removedRegions{};
+                vector<void*> m_moved{}, m_removed{};
+                vector<pair<void*, void*>> m_movements;
                 size_t m_size = 0;
-                bool m_prepared = false;
-                set_type<void*> m_remove{};
-                map_type<void*, void*> m_move{};
+                void mapping();                        // set up m_movements
+                void shift();                          // adjust txn begin boundary
+                void validate() const;
+                size_t clear() noexcept;
             public:
                 explicit DelayedRemover(CompactingChunks&);
+                void reserve(size_t);
                 // Register a single allocation to be removed later
-                size_t add(void*);
-                // Memory movements (src to be removed => dst to be copied over) due to batch remove
-                DelayedRemover& prepare(bool);
-                map_type<void*, void*> const& movements() const;
-                set_type<void*> const& removed() const;
+                void add(void*);
+                vector<pair<void*, void*>> const& movements() const;
+                vector<void*> const& removed() const;
                 // Actuate batch remove
-                size_t force(bool);
+                size_t force();
             } m_batched;
+            size_t m_allocs = 0;
             using list_type::last;
         public:
             using Compact = true_type;
@@ -716,12 +726,14 @@ namespace voltdb {
         public:
             enum class ChangeType : char {Update, Insertion, Deletion};
             using is_hook = true_type;
+
             TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
             ~TxnPreHook() = default;
-            void freeze(); void thaw();
+            void freeze();
+            void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             void add(CompactingChunks const&, ChangeType, void const*);
@@ -768,21 +780,11 @@ namespace voltdb {
              */
             void remove(remove_direction, void const*);
             /**
-             * Batch removal using a single call
-             * \arg #1: a set of allocation addresses to be
-             * removed
-             * \arg #2: a call back that client specifies what
-             * should happen when a move (from compaction)
-             * occurs. Map for removed addr => addr that fills in
-             * the removed address
-             */
-            size_t remove(set<void*> const&,
-                    function<void(typename CompactingChunks::DelayedRemover_movments_type)> const&);
-            /**
              * Batch removal using separate calls
              */
-            size_t remove_add(void*);
-            typename CompactingChunks::DelayedRemover_movments_type remove_moves();
+            void remove_reserve(size_t);
+            void remove_add(void*);
+            vector<pair<void*, void*>> const& remove_moves();
             size_t remove_force();
         };
 
