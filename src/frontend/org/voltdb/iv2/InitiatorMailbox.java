@@ -582,6 +582,15 @@ public class InitiatorMailbox implements Mailbox
         // even though the PicoNetwork thread could still be alive so we will skeptically
         int deadHostId = req.getDeadHostId();
         if (deadHostId != Integer.MAX_VALUE) {
+            // In busy and (often) resource-limited environment, we've observed extremely long delay to
+            // close the connection to dead host. This may leads to MP deadlock because the SP leader
+            // promotion is blocked, in progress MP transaction couldn't proceed on partitions without
+            // leader. We introduce a timeout as a last resort to break the loop.
+            if (req.getRepairRetryCount() == 60 * 100) {
+                hostLog.warn("Connection to dead host " + deadHostId +
+                        " has not been closed for 60 seconds, stop blocking repair request.");
+                m_messenger.markPicoZombieHost(deadHostId);
+            }
             if (m_messenger.canCompleteRepair(deadHostId)) {
                 // Make sure we are the last in the task queue when we know the ForeignHost is gone
                 req.disableDeadHostCheck();
@@ -591,11 +600,7 @@ public class InitiatorMailbox implements Mailbox
                 if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
                     hostLog.warn("Repair Request for dead host " + deadHostId +
                             " has not been processed yet because connection has not closed");
-                    if (req.getRepairRetryCount() == 60 * 100) {
-                        hostLog.warn("Connection to dead host " + deadHostId +
-                                " has not been closed for 60 seconds, stop blocking repair request.");
-                        m_messenger.markPicoZombieHost(deadHostId);
-                    }
+
                 }
                 Runnable retryRepair = new Runnable() {
                     @Override

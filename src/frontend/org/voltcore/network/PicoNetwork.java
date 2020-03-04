@@ -217,11 +217,9 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                     m_logger.debug( "PicoNetwork died, probably of natural causes", e);
                 }
             } else {
-                e.printStackTrace();
                 networkLog.error( "PicoNetwork died due to an unexpected exception", e);
             }
         } catch (Throwable ex) {
-            ex.printStackTrace();
             m_logger.error(null, ex);
             m_shouldStop = true;
         } finally {
@@ -230,7 +228,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                 p_shutdown();
             } catch (Throwable t) {
                 m_logger.error("Error shutting down Volt Network", t);
-                t.printStackTrace();
             }
         }
     }
