@@ -74,7 +74,7 @@ function srccompile() {
     if [ $? != 0 ]; then exit; fi
 }
 
-# generate sql fils from templates
+# generate sql files from templates
 function generateddl() {
     set -x
     ../ddlgen-tool.py ddl1.tmplt > ddl1.sql
