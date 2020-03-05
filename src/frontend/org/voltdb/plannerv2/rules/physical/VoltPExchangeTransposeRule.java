@@ -17,7 +17,9 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
+import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -26,7 +28,11 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalMergeExchange;
@@ -97,6 +103,21 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                                     operand(VoltPhysicalMergeExchange.class,
                                             operand(RelNode.class, any())))),
                     ExchangeType.LIMIT_SORT_EXCHANGE);
+
+    /**
+     * Predicate to stop AGGREGATE_EXCHANGE to match on Aggregate / EXCHANGE / Aggregate
+    */
+    private static final Predicate<VoltPhysicalAggregate> AGGREGATE_STOP_PREDICATE = rel -> !rel.isPushedDown();
+    /*
+     * Rule to transform Sort(pusheddown = false) / Exchange / SingleRel to
+     *                   Sort(pusheddown = true) / MergeExchange / Sort(pusheddown = false) / SingleRel
+     */
+    public static final VoltPExchangeTransposeRule INSTANCE_AGGREGATE_EXCHANGE =
+            new VoltPExchangeTransposeRule(
+                    operandJ(VoltPhysicalAggregate.class, null, AGGREGATE_STOP_PREDICATE,
+                            operand(VoltPhysicalExchange.class,
+                                    operand(RelNode.class, any()))),
+                    ExchangeType.AGGREGATE_EXCHANGE);
 
 
     private final ExchangeType mExchangeType;
@@ -205,5 +226,62 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         // for aggr without HAVING or GROUP BY)
         // Moving just Aggr without the Calc may be OK but  sub-optimal and should have a higher
         // cost than the plan with both Calc / Aggr pushed down
+        VoltPhysicalAggregate aggregate = (VoltPhysicalAggregate) call.rels[0];
+        Exchange exchange = (Exchange) call.rels[1];
+        RelNode child = call.rels[2];
+
+        // Fragment Aggregate is a copy of the current aggregate
+        VoltPhysicalAggregate fragmentAggregate = aggregate.copy(
+                aggregate.getCluster(),
+                aggregate.getTraitSet().replace(exchange.getDistribution()),
+                child,
+                aggregate.indicator,
+                aggregate.getGroupSet(),
+                aggregate.getGroupSets(),
+                aggregate.getAggCallList(),
+                aggregate.getPostPredicate(),
+                aggregate.isPushedDown());
+
+        // New exchange.
+        Exchange newExchange = new VoltPhysicalExchange(exchange.getCluster(),
+                exchange.getTraitSet(),
+                fragmentAggregate,
+                exchange.getDistribution());
+
+        // Coordinator fragment. Replace all occurrences of COUNT with SUM
+        List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()
+                .map(oldCall -> {
+                    if (oldCall.getAggregation().kind == SqlKind.COUNT) {
+//                        SqlAggFunction aggFunction = new SqlSumEmptyIsZeroAggFunction();
+//                        AggCallBinding callBinding = oldCall.createBinding(aggregate);
+//                        RelDataType type = aggFunction.inferReturnType(callBinding);
+                        final AggregateCall sumCall =
+                                AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
+                                    oldCall.isDistinct(),
+                                    oldCall.isApproximate(),
+                                    oldCall.getArgList(),
+                                    oldCall.filterArg,
+                                    aggregate.getGroupCount(),
+                                    aggregate,
+                                    oldCall.getType(),
+                                    null);
+                        return sumCall;
+                    } else {
+                        return oldCall;
+                    }
+                })
+                .collect(Collectors.toList());
+
+        VoltPhysicalAggregate coordinatorAggregate = aggregate.copy(
+                aggregate.getCluster(),
+                aggregate.getTraitSet(),
+                newExchange,
+                aggregate.indicator,
+                aggregate.getGroupSet(),
+                aggregate.getGroupSets(),
+                aggCalls,
+                aggregate.getPostPredicate(),
+                true);
+        call.transformTo(coordinatorAggregate);
     }
 }

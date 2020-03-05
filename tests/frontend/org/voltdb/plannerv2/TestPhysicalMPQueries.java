@@ -142,50 +142,6 @@ public class TestPhysicalMPQueries extends Plannerv2TestCase {
                 .pass();
     }
 
-//    public void testPartitionedWithAggregate() {
-//        m_tester.sql("select max(R1.I) from R1")
-//        .transform("\n")
-//        .pass();
-//    }
-//
-//    public void testPartitionedWithAggregate4() {
-//        m_tester.sql("select count(*) from P1")
-//        .transform("\n")
-//        .pass();
-//    }
-//
-//    public void testPartitionedWithAggregate5() {
-//        m_tester.sql("select count(P1.I) from P1")
-//        .transform("\n")
-//        .pass();
-//    }
-//
-//    public void testPartitionedWithAggregate6() {
-//        m_tester.sql("select avg(P1.I) from P1")
-//        .transform("\n")
-//        .pass();
-//    }
-//
-//    public void testPartitionedWithAggregate7() {
-//        m_tester.sql("select distinct(P1.I) from P1") // no coord aggr because P1.I is part column
-//        .transform("\n")
-//        .pass();
-//    }
-//
-//    public void testPartitionedWithAggregate8() {
-//        m_tester.sql("select distinct(P1.SI) from P1") // coord aggr because P1.SI is not a part column
-//        .transform("\n")
-//        .pass();
-//    }
-
-    public void testPartitionedWithAggregate9() {
-        m_tester.sql("select max(P1.I) from P1 where I = 8")
-        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], pusheddown=[false], type=[serial])\n" +
-                    "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[8], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
-                    "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-        .pass();
-    }
-
     public void testPartitionedSetOp1() {
         m_tester.sql("select I from p1 union select I from r1")
         .transform("VoltPhysicalUnion(all=[false])\n" +

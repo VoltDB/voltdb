@@ -129,7 +129,7 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
+     * @param isPushedDown If this aggregate was already pushed down through an Exchange node.
      * @return A cloned {@link VoltPhysicalAggregate}.
      */
     public abstract VoltPhysicalAggregate copy(
@@ -141,7 +141,7 @@ public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhy
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode havingExpression,
-            boolean isCoordinatorAggr);
+            boolean isPushedDown);
 
     public RexNode getPostPredicate() {
         return m_postPredicate;

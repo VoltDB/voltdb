@@ -126,17 +126,42 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
     }
 
     public void testDistributedAvgAggregate1() {
-        m_tester.sql("SELECT avg(P1.si) FROM P1")
-        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):SMALLINT], EXPR$0=[$t7])\n" +
-                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
-                "    VoltPhysicalExchange(distribution=[hash])\n" +
-                "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+        m_tester.sql("SELECT avg(P1.i) FROM P1")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):INTEGER], EXPR$0=[$t7])\n" +
+                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0FROMCOUNTY()], pusheddown=[true], type=[serial])\n" +
+                "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "      VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()], pusheddown=[false], type=[serial])\n" +
+                "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
                 )
         .pass();
     }
 
     public void testDistributedAvgAggregate2() {
+        m_tester.sql("SELECT avg(P1.si) FROM P1")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):SMALLINT], EXPR$0=[$t7])\n" +
+                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0FROMCOUNTY($0)], pusheddown=[true], type=[serial])\n" +
+                "    VoltPhysicalExchange(distribution=[hash])\n" +
+                "      VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
+                "        VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregate3() {
+        m_tester.sql("SELECT avg(P1.bi) FROM P1")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):BIGINT], EXPR$0=[$t7])\n" +
+                "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[$SUM0FROMCOUNTY($0)], pusheddown=[true], type=[serial])\n" +
+                "    VoltPhysicalExchange(distribution=[hash])\n" +
+                "      VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
+                "        VoltPhysicalCalc(expr#0..5=[{inputs}], BI=[$t3])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregate4() {
         m_tester.sql("SELECT avg(P1.si) FROM P1 WHERE P1.I = 9")
         .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[=($t1, $t2)], expr#4=[null], expr#5=[CASE($t3, $t4, $t0)], expr#6=[/($t5, $t1)], expr#7=[CAST($t6):SMALLINT], EXPR$0=[$t7])\n" +
                 "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
@@ -151,6 +176,83 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
         .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[AVG($0)], pusheddown=[false], type=[serial])\n" +
                 "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                 "    VoltPhysicalTableSequentialScan(table=[[public, R1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedCountAggregate1() {
+        m_tester.sql("SELECT count(P1.v) FROM P1")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0FROMCOUNTY($0)], pusheddown=[true], type=[serial])\n" +
+                "  VoltPhysicalExchange(distribution=[hash])\n" +
+                "    VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], V=[$t5])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedCountAggregate2() {
+        m_tester.sql("SELECT count(P1.v) FROM P1 where I = 9")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
+                "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[9], expr#7=[=($t0, $t6)], V=[$t5], $condition=[$t7])\n" +
+                "    VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedCountAggregate3() {
+        m_tester.sql("select count(*) from P1")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0FROMCOUNTY()], pusheddown=[true], type=[serial])\n" +
+                "  VoltPhysicalExchange(distribution=[hash])\n" +
+                "    VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], $f0=[$t6])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedCountAggregate4() {
+        m_tester.sql("select count(P1.I) from P1")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], agg#0=[$SUM0FROMCOUNTY()], pusheddown=[true], type=[serial])\n" +
+                "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "    VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], pusheddown=[false], type=[serial])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testPartitionedWithMaxAggregate() {
+        m_tester.sql("select max(P1.I) from P1")
+        .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], pusheddown=[true], type=[serial])\n" +
+                "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "    VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[MAX($0)], pusheddown=[false], type=[serial])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    // Volt omits a coordinator aggregate in this case because P1.I is a partition column
+    public void testPartitionedWithDistinctAggregate1() {
+        m_tester.sql("select distinct(P1.I) from P1")
+        .transform("VoltPhysicalHashAggregate(group=[{0}], pusheddown=[true], type=[hash])\n" +
+                "  VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "    VoltPhysicalHashAggregate(group=[{0}], pusheddown=[false], type=[hash])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    // Here, the coordinator aggregate is required - DISTINCT over a non-partition column
+    public void testPartitionedWithDistinctAggregate2() {
+        m_tester.sql("select distinct(P1.SI) from P1")
+        .transform("VoltPhysicalHashAggregate(group=[{0}], pusheddown=[true], type=[hash])\n" +
+                "  VoltPhysicalExchange(distribution=[hash])\n" +
+                "    VoltPhysicalHashAggregate(group=[{0}], pusheddown=[false], type=[hash])\n" +
+                "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                "        VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
                 )
         .pass();
     }
