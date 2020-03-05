@@ -792,6 +792,31 @@ public class TestGroupBySuite extends RegressionSuite {
         }
     }
 
+    // ENG-18549
+    // GROUP BY doesn't allow ? in aggregate functions, doesn't treat ? as constant
+    public void testGroupByWithParameterizeInAggregateExpression() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        String sql1 = "SELECT A, CAST(1 as integer) + count(B) from R2 group by A;";
+        VoltTable vt1 = client.callProcedure("@Explain", sql1).getResults()[0];
+        String sql2 = "SELECT A, CAST(? as integer) + count(B) from R2 group by A;";
+        VoltTable vt2 = client.callProcedure("@Explain", sql2).getResults()[0];
+        // check the plan is same
+        assertTablesAreEqual("Plans for two sqls should be same", vt1, vt2);
+
+        // Populate some data
+        String insert = "insert into R2 values (?,?,?,?)";
+        client.callProcedure("@AdHoc", insert, 1, 3, 1, 2);
+        client.callProcedure("@AdHoc", insert, 2, 3, 4, 2);
+        client.callProcedure("@AdHoc", insert, 3, 2, 4, 1);
+        client.callProcedure("@AdHoc", insert, 4, 2, 5, 1);
+        client.callProcedure("@AdHoc", insert, 5, 5, 1, 3);
+        client.callProcedure("@AdHoc", insert, 6, 5, 2, 3);
+        vt1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
+        vt2 = client.callProcedure("@AdHoc",sql2, "1").getResults()[0];
+        // check the result table is same
+        assertTablesAreEqual("Result for two sqls should be same", vt1, vt2);
+    }
+
     //
     // Suite builder boilerplate
     //

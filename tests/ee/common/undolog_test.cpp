@@ -52,7 +52,7 @@ public:
         m_history->m_undoneIndex = staticUndoneIndex++;
     }
 
-    void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
+    void release() {
         m_history->m_released = true;
         m_history->m_releasedIndex = staticReleaseIndex++;
     }

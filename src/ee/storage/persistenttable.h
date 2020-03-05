@@ -767,6 +767,7 @@ private:
 
     // This is a testability feature not intended for use in product logic.
     int m_invisibleTuplesPendingDeleteCount;
+    size_t m_batchDeleteTupleCount;
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
@@ -823,7 +824,6 @@ private:
     typedef std::set<void*> MigratingBatch;
     typedef std::map<int64_t, MigratingBatch> MigratingRows;
     MigratingRows m_migratingRows;
-    MigratingBatch m_releaseBatch;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

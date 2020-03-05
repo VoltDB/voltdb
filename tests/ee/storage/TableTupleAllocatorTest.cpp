@@ -91,11 +91,7 @@ public:
     }
     inline static bool same(void const* dst, size_t state) {
         static unsigned char buf[len+1];
-        bool const eq = ! memcmp(dst, query(state, buf), len);
-        if (! eq) {
-            printf("Expect %s, got %s", hex(state).c_str(), hex(dst).c_str());
-        }
-        return eq;
+        return ! memcmp(dst, query(state, buf), len);
     }
     static string hex(unsigned char const* src) {
         static char n[7];
@@ -176,9 +172,9 @@ TEST_F(TableTupleAllocatorTest, TestChunkListFind) {
         addresses[i] = alloc.allocate();
     }
     for(auto i = 0; i < addresses.size(); ++i) {
-        auto const* iter = alloc.find(addresses[i]);
-        ASSERT_NE(iter, nullptr);
-        ASSERT_TRUE((*iter)->contains(addresses[i]));
+        auto const iter = alloc.find(addresses[i]);
+        ASSERT_TRUE(iter.first);
+        ASSERT_TRUE(iter.second->contains(addresses[i]));
     }
 }
 
@@ -773,12 +769,12 @@ void testHookedCompactingChunks() {
     }
     verify_snapshot_const();
 
-    // Step 3: batch deletion, using single API
-    set<void*> ss;
+    // Step 3: batch deletion
+    alloc.remove_reserve(90);
     for (i = 909; i < 999; ++i) {
-        ss.emplace(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove(ss, [](map<void*, void*> const& m) {});
+    alloc.remove_force();
     verify_snapshot_const();
 
     // Step 4: insertion
@@ -813,6 +809,7 @@ void testHookedCompactingChunks() {
     void const* p1 = nullptr;
     for (i = 0; i < 8000;) {
         size_t ii;
+        vector<void*> tb_removed;
         switch(changeTypes(rgen)) {
             case 0:                                            // insertion
                 p1 = memcpy(alloc.allocate(), gen.get(), TupleSize);
@@ -843,15 +840,18 @@ void testHookedCompactingChunks() {
                 }
                 break;
             case 3:                                            // batch remove, using separate APIs
-                ii = 0;
-                for_each<typename IterableTableTupleChunks<Alloc, truth>::iterator>(
-                        alloc, [&alloc, &ii, &rgen, &whole](void* p) {
+                tb_removed.clear();
+                fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                        static_cast<Alloc const&>(alloc), [&tb_removed, &rgen, &whole](void const* p) {
                             if (static_cast<double>(whole(rgen)) / NumTuples < 0.01) {     // 1% chance getting picked for batch deletion
-                                ++ii;
-                                alloc.remove_add(p);
+                                tb_removed.emplace_back(const_cast<void*>(p));
                             }
                         });
-                assert(alloc.remove_force() == ii);
+                alloc.remove_reserve(tb_removed.size());
+                ii = 0;
+                for_each(tb_removed.cbegin(), tb_removed.cend(),
+                        [&ii, &alloc](void* p) { ++ii; alloc.remove_add(p); });
+                assert(alloc.remove_force() == tb_removed.size());
             default:;
         }
         ++i;
@@ -895,11 +895,11 @@ void testHookedCompactingChunksBatchRemove_single1() {
             });
         assert(i == AllocsPerChunk);
     };
-    set<void*> s;
+    alloc.remove_reserve(10);
     for (i = AllocsPerChunk - 10; i < AllocsPerChunk; ++i) {       // batch remove last 10 entries
-        s.emplace(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove(s, [](map<void*, void*> const&) {});
+    alloc.remove_force();
     verify_snapshot_const();
     alloc.thaw();
 }
@@ -937,14 +937,14 @@ void testHookedCompactingChunksBatchRemove_single2() {
             });
         assert(i == AllocsPerChunk);
     };
-    set<void*> s;
+    alloc.remove_reserve(10);
     for (i = 0; i < 10; ++i) {       // batch remove last 10 entries
-        s.emplace(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
         memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
-    alloc.remove(s, [](map<void*, void*> const&) {});
+    alloc.remove_force();
     verify_snapshot_const();
     alloc.thaw();
 }
@@ -967,8 +967,9 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
         memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
-    alloc.remove(set<void*>{const_cast<void*>(addresses[4])},      // 9 => 4
-            [](map<void*, void*> const&){});
+    alloc.remove_reserve(1);
+    alloc.remove_add(const_cast<void*>(addresses[4]));      // 9 => 4
+    alloc.remove_force();
     i = 0;
     fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
             alloc_cref,
@@ -986,7 +987,10 @@ void testHookedCompactingChunksBatchRemove_single4() {         // correctness on
     using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
     using Alloc = HookedCompactingChunks<Hook>;
     Alloc alloc(TupleSize);
-    alloc.remove(set<void*>{alloc.allocate()}, [](map<void*, void*> const&){});
+    void* p = alloc.allocate();
+    alloc.remove_reserve(1);
+    alloc.remove_add(p);
+    alloc.remove_force();
     assert(alloc.empty());
 }
 
@@ -1024,16 +1028,15 @@ void testHookedCompactingChunksBatchRemove_multi1() {
     };
     alloc.template freeze<truth>();
 
-    set<void*> batch;
     auto iter = addresses.begin();
+    alloc.remove_reserve(60);
     for (i = 0; i < 3; ++i) {
-        for_each(iter, next(iter, 10), [&batch](void const* p) { batch.emplace(const_cast<void*>(p)); });
+        for_each(iter, next(iter, 10), [&alloc](void const* p) { alloc.remove_add(const_cast<void*>(p)); });
         advance(iter, AllocsPerChunk - 10);
-        for_each(iter, next(iter, 10), [&batch](void const* p) { batch.emplace(const_cast<void*>(p)); });
+        for_each(iter, next(iter, 10), [&alloc](void const* p) { alloc.remove_add(const_cast<void*>(p)); });
         advance(iter, 10);
     }
-    assert(batch.size() == 60);
-    alloc.remove(batch, [](map<void*, void*> const&){});
+    alloc.remove_force();
     verify_snapshot_const();
     alloc.thaw();
 }
@@ -1067,18 +1070,17 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     };
     alloc.template freeze<truth>();
 
-    set<void*> batch;
+    alloc.remove_reserve(NumTuples / 2);
     for(auto iter = addresses.cbegin();                             // remove every other
             iter != addresses.cend();) {
-        batch.emplace(const_cast<void*>(*iter));
+        alloc.remove_add(const_cast<void*>(*iter));
         if (++iter == addresses.cend()) {
             break;
         } else {
             ++iter;
         }
     }
-    assert(batch.size() == NumTuples / 2);
-    alloc.remove(batch, [](map<void*, void*> const&){});
+    alloc.remove_force();
     verify_snapshot_const();
     alloc.thaw();
 }
@@ -1098,11 +1100,11 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2c
         addresses[i] = alloc.allocate();
         memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
     }
-    set<void*> batch;
+    alloc.remove_reserve(AllocsPerChunk + 2);
     for(i = 0; i < AllocsPerChunk + 2; ++i) {                  // batch remove 1st chunk plus 2
-        batch.emplace(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove(batch, [](map<void*, void*> const&){});
+    alloc.remove_force();
     ASSERT_EQ(AllocsPerChunk - 4, alloc.size());
 }
 
@@ -1127,11 +1129,11 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksStatistics) {
     ASSERT_EQ(4, alloc.chunks());
     ASSERT_EQ(N - 2, alloc.size());
     // batch remove last 30 entries, compacts/removes head chunk
-    set<void*> s;
+    alloc.remove_reserve(AllocsPerChunk - 2);
     for(i = 2; i < AllocsPerChunk; ++i) {
-        s.emplace(const_cast<void*>(addresses[N - i + 1]));
+        alloc.remove_add(const_cast<void*>(addresses[N - i + 1]));
     }
-    alloc.remove(s, [](map<void*, void*> const&){});
+    alloc.remove_force();
     ASSERT_EQ(3, alloc.chunks());
     ASSERT_EQ(N - AllocsPerChunk, alloc.size());
 }

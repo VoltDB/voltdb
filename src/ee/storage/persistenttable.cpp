@@ -85,6 +85,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_stats(this)
     , m_tableStreamer()
     , m_invisibleTuplesPendingDeleteCount(0)
+    , m_batchDeleteTupleCount(0)
     , m_surgeon(*this)
     , m_tableForStreamIndexing(NULL)
     , m_drEnabled(drEnabled && !isMaterialized)
@@ -100,7 +101,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_releaseReplicated(this)
     , m_tableType(tableType)
     , m_shadowStream(nullptr)
-    , m_releaseBatch()
 {
     ::memcpy(&m_signature, signature, 20);
 }
@@ -635,29 +635,16 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
 
 void PersistentTable::finalizeRelease() {
 
-     TableTuple target(m_schema);
-     BOOST_FOREACH (auto toDelete, m_releaseBatch) {
-         target.move(toDelete);
-         if (m_tableStreamer != NULL) {
-              m_tableStreamer->notifyTupleDelete(target);
-         }
-         if (m_schema->getUninlinedObjectColumnCount() != 0) {
-              decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
-              target.freeObjectColumns();
-         }
-     }
-
-     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
-
-     allocator().remove(m_releaseBatch, [this, &target](map<void*, void*> const& tuples) {
-         TableTuple origin(m_schema);
-         for(auto const& p : tuples) {
-             target.move(p.first);
-             origin.move(p.second);
-             swapTuples(origin, target);
-          }
-     });
-     m_releaseBatch.clear();
+    TableTuple target(m_schema);
+    TableTuple origin(m_schema);
+    vector<pair<void*, void*>> moved = allocator().remove_moves();
+    for(auto const& p : moved) {
+       target.move(p.first);
+       origin.move(p.second);
+       swapTuples(origin, target);
+    }
+    allocator().remove_force();
+    m_invisibleTuplesPendingDeleteCount = 0;
 }
 
 /*
@@ -814,6 +801,7 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     target.setPendingDeleteOnUndoReleaseFalse();
     --m_tuplesPinnedByUndo;
     --m_invisibleTuplesPendingDeleteCount;
+    --m_batchDeleteTupleCount;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -1198,6 +1186,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
+        ++m_batchDeleteTupleCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), this);
         SynchronizedThreadLock::addDeleteUndoAction(isReplicatedTable(), uq, undoAction, this);
@@ -1246,17 +1235,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     // No snapshot in progress cares, just whack it.
     deleteTupleStorage(target); // also frees object columns
 
-    MigratingBatch batch{};
-    batch.insert(target.address());
-    allocator().remove(batch,[this](map<void*, void*> const& tuples) {
-        TableTuple target(m_schema);
-        TableTuple origin(m_schema);
-        for(auto const& p : tuples) {
-            target.move(p.first);
-            origin.move(p.second);
-            swapTuples(origin, target);
-        }
-   });
+    allocator().remove_reserve(1);
+    allocator().remove_add(target.address());
+    finalizeRelease();
 }
 
 
@@ -1271,10 +1252,20 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
         // Mark it pending delete and let the snapshot land the finishing blow.
         if (!target.isPendingDelete()) {
             ++m_invisibleTuplesPendingDeleteCount;
+            ++m_batchDeleteTupleCount;
             target.setPendingDeleteTrue();
         }
     }
-    m_releaseBatch.insert(tuple);
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
+        target.freeObjectColumns();
+    }
+    // Reserve batch delete, only once
+    if (m_batchDeleteTupleCount > 0) {
+        allocator().remove_reserve(m_batchDeleteTupleCount);
+        m_batchDeleteTupleCount = 0;
+    }
+    allocator().remove_add(tuple);
 }
 
 /*
