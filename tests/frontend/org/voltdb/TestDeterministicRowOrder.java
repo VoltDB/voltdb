@@ -61,7 +61,16 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
                    "PRIMARY KEY (id));" +
                    "PARTITION TABLE bigfoo ON COLUMN id;" +
                    "CREATE INDEX bigindex ON bigfoo (ts);"+
-            "CREATE TABLE PR(id INTEGER NOT NULL, value VARCHAR(1000), " +
+            "CREATE TABLE PR1(id INTEGER NOT NULL, value VARCHAR(1000), " +
+            "e1 VARCHAR(63)," +
+            "PRIMARY KEY (id)); " +
+            "CREATE TABLE PR2(id INTEGER NOT NULL, value VARCHAR(1000), " +
+            "e1 VARCHAR(63)," +
+            "PRIMARY KEY (id)); " +
+            "CREATE TABLE PR3(id INTEGER NOT NULL, value VARCHAR(1000), " +
+            "e1 VARCHAR(63)," +
+            "PRIMARY KEY (id)); " +
+            "CREATE TABLE PR4(id INTEGER NOT NULL, value VARCHAR(1000), " +
             "e1 VARCHAR(63)," +
             "PRIMARY KEY (id)); ";
 
@@ -75,7 +84,7 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         try {
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(SCHEMA);
-            builder.addStmtProcedure("deletePR", "delete from PR where id = ?");
+            builder.addStmtProcedure("deletePR1", "delete from PR1 where id = ?");
             builder.setUseDDLSchema(true);
             server = new LocalCluster("TestDeterministicRowOrder.jar", sitesPerHost, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
             server.overrideAnyRequestForValgrind();
@@ -267,18 +276,54 @@ public class TestDeterministicRowOrder extends JUnit4LocalClusterTest {
         try {
             final int MAX_ROWS = 10;
             for (int i = 0; i < MAX_ROWS; i++) {
-                client.callProcedure("PR.insert", i, String.valueOf(i),"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+                client.callProcedure("PR1.insert", i, String.valueOf(i),"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             }
             client.drain();
-            VoltTable t = client.callProcedure("@AdHoc", "select Count(*) from PR").getResults()[0];
+            VoltTable t = client.callProcedure("@AdHoc", "select Count(*) from PR1").getResults()[0];
             assert(t.asScalarLong() == MAX_ROWS);
             System.out.printf("Deleting rows\n");
             for (int i = 0; i < MAX_ROWS/2; i++) {
-                client.callProcedure("deletePR", i);
+                client.callProcedure("deletePR1", i);
             }
             client.drain();
-            t = client.callProcedure("@AdHoc", "select Count(*) from PR").getResults()[0];
+            t = client.callProcedure("@AdHoc", "select Count(*) from PR1").getResults()[0];
             assert(t.asScalarLong() == (MAX_ROWS/2));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        } finally {
+            shutDown(server);
+        }
+    }
+
+   @Test
+   public void testDeleteMultileReplicatedTables() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster server = createCluster();
+        try {
+            final int MAX_ROWS = 100;
+            final String data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            for (int i = 0; i < MAX_ROWS; i++) {
+                client.callProcedure("PR1.insert", i, data, data);
+                client.callProcedure("PR2.insert", i, data, data);
+                client.callProcedure("PR3.insert", i, data, data);
+                client.callProcedure("PR4.insert", i, data, data);
+            }
+            client.drain();
+            StringBuilder statement = new StringBuilder();
+            statement.append("DELETE FROM PR1 WHERE ID < 10;");
+            statement.append("DELETE FROM PR2 WHERE ID < 20;");
+            statement.append("DELETE FROM PR3 WHERE ID < 30;");
+            statement.append("DELETE FROM PR4 WHERE ID < 40;");
+            ClientResponse resp = client.callProcedure("@AdHoc", statement.toString());
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = client.callProcedure("@AdHoc", "select Count(*) from PR1").getResults()[0];
+            assert(t.asScalarLong() == 90);
+            t = client.callProcedure("@AdHoc", "select Count(*) from PR2").getResults()[0];
+            assert(t.asScalarLong() == 80);
+            t = client.callProcedure("@AdHoc", "select Count(*) from PR3").getResults()[0];
+            assert(t.asScalarLong() == 70);
+            t = client.callProcedure("@AdHoc", "select Count(*) from PR4").getResults()[0];
+            assert(t.asScalarLong() == 60);
         } catch (Exception e) {
             fail(e.getMessage());
         } finally {
