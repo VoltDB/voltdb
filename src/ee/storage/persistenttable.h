@@ -86,7 +86,7 @@ public:
     void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
-    void deleteTupleStorage(TableTuple& tuple);
+    void deleteTailTupleStorage(TableTuple& tuple);
 
     size_t getSnapshotPendingBlockCount() const;
     size_t getSnapshotPendingLoadBlockCount() const;
@@ -866,8 +866,8 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
     m_table.deleteTupleRelease(tuple);
 }
 
-inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple& tuple) {
-    m_table.deleteTupleStorage(tuple);
+inline void PersistentTableSurgeon::deleteTailTupleStorage(TableTuple& tuple) {
+    m_table.deleteTailTupleStorage(tuple);
 }
 inline bool PersistentTableSurgeon::blockCountConsistent() const {
     return m_table.blockCountConsistent();

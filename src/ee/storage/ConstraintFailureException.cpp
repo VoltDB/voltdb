@@ -74,7 +74,7 @@ ConstraintFailureException::~ConstraintFailureException() throw () {
     // do cleanup here
     VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));
     if (m_surgeon && !m_tuple.isNullTuple()) {
-        m_surgeon->deleteTupleStorage(m_tuple);
+        m_surgeon->deleteTailTupleStorage(m_tuple);
     }
 }
 
