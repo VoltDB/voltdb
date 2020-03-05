@@ -1628,6 +1628,7 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
     } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
+            // The exception will clean up the tableTuple that was being inserted into the storage
             throw;
         } else if (serializedTupleCount == 0) {
             serializeColumnHeaderTo(*uniqueViolationOutput);
