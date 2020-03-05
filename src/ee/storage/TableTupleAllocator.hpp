@@ -787,8 +787,7 @@ namespace voltdb {
              */
             void remove_reserve(size_t);
             void remove_add(void*);
-            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const& =
-                    [](vector<pair<void*, void*>> const&){});
+            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             void clear();
         };
 
