@@ -226,20 +226,25 @@ public class Inits {
         The Inits functions are run via reflection in an order
         that satisfies all dependencies.
 
-        Per John, these all run after the socket joiner complete.
+        Per John, these all run after the socket joiner completes.
 
-        The dependency DAG (a depends on <- b) is:
+        The dependency DAG (a depends on <- b) is as follows;
+        classes are listed in order of appearance in this file.
 
-        SetupAdminMode
-        StartHTTPServer
-        InitHashinator
-        SetupReplicationRole
-        CreateRestoreAgentAndPlan
+        CollectPlatformInfo
         DistributeCatalog <- CreateRestoreAgentAndPlan
-        EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         LoadCatalog <- DistributeCatalog
+        EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         SetupCommandLogging <- LoadCatalog
-        InitExport <- LoadCatalog
+        SetupSNMP
+        StartHTTPServer
+        SetupAdminMode
+        SetupReplicationRole <- LoadCatalog
+        InitModuleManager
+        InitExport <- LoadCatalog, InitModuleManager
+        InitImport <- LoadCatalog, InitModuleManager, SetupAdminMode
+        InitHashinator
+        CreateRestoreAgentAndPlan
         InitLargeBlockManager
 
      */
