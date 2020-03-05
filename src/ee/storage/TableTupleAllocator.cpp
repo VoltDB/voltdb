@@ -345,12 +345,9 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_front(
     if (super::empty()) {
         throw underflow_error("pop_front() called on empty chunk list");
     } else {
-        vassert(m_byAddr.count(super::cbegin()->begin()));
-        vassert(m_byId.count(super::cbegin()->id()));
-        m_byAddr.erase(super::cbegin()->begin());
-        m_byId.erase(super::cbegin()->id());
-        --m_size;
+        remove(super::begin());
         super::pop_front();
+        --m_size;
     }
 }
 
@@ -373,10 +370,7 @@ template<typename Chunk, typename E>
 template<typename Pred> inline void ChunkList<Chunk, E>::remove_if(Pred pred) {
     for(auto iter = begin(); iter != end(); ++iter) {
         if (pred(*iter)) {
-            vassert(m_byAddr.count(iter->begin()));
-            vassert(m_byId.count(iter->id()));
-            m_byAddr.erase(iter->begin());
-            m_byId.erase(iter->id());
+            remove(iter);
             --m_size;
         } else {                           // since the last node could be invalidated, recalculate it
             m_back = iter;
