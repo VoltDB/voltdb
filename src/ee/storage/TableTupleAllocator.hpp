@@ -601,9 +601,11 @@ namespace voltdb {
                 vector<void*> const& removed() const;
                 // Actuate batch remove
                 size_t force();
+                bool empty() const noexcept;
             } m_batched;
             size_t m_allocs = 0;
             using list_type::last;
+            template<typename Remove_cb> void clear(Remove_cb const&);
         public:
             using Compact = true_type;
             // for use in HookedCompactingChunks::remove() [batch mode]:
@@ -614,10 +616,11 @@ namespace voltdb {
              */
             size_t chunks() const noexcept;            // number of chunks
             size_t size() const noexcept;              // number of allocation requested
+            bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
             size_t chunkSize() const noexcept;
             using list_type::tupleSize; using list_type::chunkSize;
-            using list_type::empty; using list_type::begin; using list_type::end;
+            using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
 
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
@@ -785,8 +788,8 @@ namespace voltdb {
              */
             void remove_reserve(size_t);
             void remove_add(void*);
-            vector<pair<void*, void*>> const& remove_moves();
-            size_t remove_force();
+            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            void clear();
         };
 
         /**
