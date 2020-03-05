@@ -252,9 +252,6 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()
                 .map(oldCall -> {
                     if (oldCall.getAggregation().kind == SqlKind.COUNT) {
-//                        SqlAggFunction aggFunction = new SqlSumEmptyIsZeroAggFunction();
-//                        AggCallBinding callBinding = oldCall.createBinding(aggregate);
-//                        RelDataType type = aggFunction.inferReturnType(callBinding);
                         final AggregateCall sumCall =
                                 AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
                                     oldCall.isDistinct(),
