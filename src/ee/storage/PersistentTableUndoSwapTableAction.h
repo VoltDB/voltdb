@@ -53,7 +53,7 @@ private:
     /*
      * Release any resources held by the undo action. It will not need to be undone.
      */
-    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
+    virtual void release() {
         ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
         int64_t uniqueId = executorContext->currentUniqueId();
         AbstractDRTupleStream* drStream = executorContext->drStream();

@@ -18,12 +18,13 @@
 #ifndef UNDOQUANTUM_RELEASE_INTEREST_H_
 #define UNDOQUANTUM_RELEASE_INTEREST_H_
 
+#include <atomic>
+
 namespace voltdb {
 class UndoQuantumReleaseInterest {
 public:
-    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1) {}
-    virtual void notifyQuantumRelease() = 0;
-    virtual void finalizeDelete() = 0;
+    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1), m_interestId(s_uniqueTableId++) {}
+    virtual void finalizeRelease() = 0;
     virtual ~UndoQuantumReleaseInterest() {}
 
     inline bool isNewReleaseInterest(int64_t currentUndoToken) {
@@ -36,8 +37,12 @@ public:
         }
     }
     inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
+    inline int32_t getUniqueInterestId() const { return m_interestId; }
+    inline bool operator <(const UndoQuantumReleaseInterest& rhs) { return m_interestId < rhs.m_interestId; }
 private:
+    static std::atomic<int32_t> s_uniqueTableId;
     int64_t m_lastSeenUndoToken;
+    const int32_t m_interestId;
 };
 }
 

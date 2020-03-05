@@ -127,37 +127,7 @@ namespace voltdb
          * including the quantum with the specified token. It will be
          * impossible to undo these actions in the future.
          */
-        inline void release(const int64_t undoToken) {
-            //std::cout << "Releasing token " << undoToken
-            //          << " lastUndo: " << m_lastUndoToken
-            //          << " lastRelease: " << m_lastReleaseToken << std::endl;
-            vassert(m_lastReleaseToken < undoToken);
-            m_lastReleaseToken = undoToken;
-            std::set<UndoQuantumReleaseInterest*> deleteInterests{};
-            while (!m_undoQuantums.empty()) {
-                UndoQuantum *undoQuantum = m_undoQuantums.front();
-                const int64_t undoQuantumToken = undoQuantum->getUndoToken();
-                if (undoQuantumToken > undoToken) {
-                    break;
-                }
-
-                m_undoQuantums.pop_front();
-                // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = UndoQuantum::release(std::move(*undoQuantum), deleteInterests);
-                pool->purge();
-                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
-                    m_undoDataPools.push_back(pool);
-                } else {
-                    delete pool;
-                }
-                if(undoQuantumToken == undoToken) {
-                    break;
-                }
-            }
-            BOOST_FOREACH (auto interest, deleteInterests) {
-                interest->finalizeDelete();
-            }
-        }
+        void release(const int64_t undoToken);
 
         int64_t getSize() const
         {
