@@ -622,11 +622,16 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
                 static_cast<CompactingChunks const&>(*this),
                 [&cb] (void const* p) noexcept {cb(p);});
+        // since the last chunk may not be full, we need to restore its pointer later.
+        // This is a hack to get the correct behavior for
+        // snapshot -> clear -> finish snapshot
+        void* last_next = last()->next();
         // then, release all chunks from txn view
         while (! beginTxn().empty()) {
             beginTxn().next() = beginTxn().iterator()->m_next = beginTxn().iterator()->begin();
             releasable();
         }
+        last()->m_next = last_next;
         m_allocs = 0;
     } else {                               // fast clear path
         list_type::clear();
@@ -1207,7 +1212,12 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                  txnBeginChunkId = beginTxn.empty() ? 0 : beginTxn.iterator()->id(),
                  iterId = iter->id();
             if (beginTxn.empty()) {                // txn view is empty
-                return iter->end();                // TODO: before txn goes empty, the last chunk may not be full
+                // Under this circumstances, since the last chunk
+                // in txn view may not be full when it is
+                // frozen and clear()-ed, only the last chunk
+                // needs to use the next() position.
+                vassert((iter->begin() == iter->next()) == (next(iter) != l.end()));
+                return iter->begin() == iter->next() ? iter->end() : iter->next();
             } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
                 if (less_rolling(iterId, rightId)) {
                     return iter->end();

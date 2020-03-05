@@ -1689,19 +1689,21 @@ TEST_F(TableTupleAllocatorTest, TestSnapshotIteratorOnNonFull1stChunk) {
                         end != find_if(beg, end, [p](void const* pp) { return ! memcmp(p, pp, TupleSize); }));
                 ++i;
             });
-    ASSERT_EQ(i, NumTuples - 10);
+    ASSERT_EQ(NumTuples - 10, i);
     alloc.thaw();
 }
 
-TEST_F(TableTupleAllocatorTest, TestClearCompactingChunks) {
+/**
+ * Test clear() on hooked compacting chunks in presence of frozen state
+ */
+TEST_F(TableTupleAllocatorTest, TestClearFrozenCompactingChunks) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     using Gen = StringGen<TupleSize>;
     Alloc alloc(TupleSize);
     Gen gen;
-    array<void const*, NumTuples> addresses;
     size_t i;
-    for (i = 0; i < NumTuples; ++i) {
-        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    for (i = 0; i < NumTuples - 6; ++i) {                                              // last chunk not full
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
     alloc.template freeze<truth>();
     alloc.clear();
@@ -1712,9 +1714,44 @@ TEST_F(TableTupleAllocatorTest, TestClearCompactingChunks) {
     fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(      // snapshot should see everything
             static_cast<Alloc const&>(alloc),
             [&i, this](void const* p) { ASSERT_TRUE(Gen::same(p, i++)); });
-    ASSERT_EQ(i, NumTuples);
+    ASSERT_EQ(NumTuples - 6, i);
     alloc.thaw();
     ASSERT_TRUE(alloc.empty());
+    for (i = 0; i < 6; ++i) {                                                          // next, after wipe out, insert 6 tuples
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    i = NumTuples - 6;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(             // check re-inserted content
+            static_cast<Alloc const&>(alloc),
+            [&i, this] (void const* p) { ASSERT_TRUE(Gen::same(p, i++)); });
+    ASSERT_EQ(NumTuples, i);
+}
+
+/**
+ * Test clear() on hooked compacting chunks, in absence of frozen state
+ */
+TEST_F(TableTupleAllocatorTest, TestClearFreeCompactingChunks) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    Gen gen;
+    size_t i;
+    for (i = 0; i < NumTuples - 6; ++i) {
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    alloc.clear();
+    ASSERT_TRUE(alloc.empty());
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc),
+            [this] (void const*) { ASSERT_FALSE(true); });
+    for (i = 0; i < 6; ++i) {
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    i = NumTuples - 6;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc),
+            [&i, this] (void const* p) { ASSERT_TRUE(Gen::same(p, i++)); });
+    ASSERT_EQ(NumTuples, i);
 }
 
 #endif
