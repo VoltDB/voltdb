@@ -347,13 +347,13 @@ class TestDDLGenerator(unittest.TestCase):
         tg = DDLGenerator()
         with self.assertRaises(AttributeError) as cm:
             tg.gen_table("butch", ttl_target="meltdown")
-        self.assertEqual(str(cm.exception), "partition column 'noexist' not present in ALL_COLUMNS")
+        self.assertEqual(str(cm.exception), "when ttl_target is specified, ttl_value must be also be set")
 
     def test_table_neg_ttl_value_no_target(self):
         tg = DDLGenerator()
         with self.assertRaises(AttributeError) as cm:
             tg.gen_table("sundance", ttl_value="freezeup")
-        self.assertEqual(str(cm.exception), "partition column 'noexist' not present in ALL_COLUMNS")
+        self.assertEqual(str(cm.exception), "when ttl_value is specified, ttl_target must be also be set")
 
 
     # ========================================================================
