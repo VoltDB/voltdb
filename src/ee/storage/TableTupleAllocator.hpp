@@ -739,7 +739,23 @@ namespace voltdb {
             void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
-            void add(ChangeType, void const*);
+            template<typename IteratorObserver,
+                typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
+            inline void add(ChangeType type, void const* dst, IteratorObserver = {}) {
+                if (m_recording) {     // ignore changes beyond boundary
+                    switch (type) {
+                        case ChangeType::Update:
+                            update(dst);
+                            break;
+                        case ChangeType::Insertion:
+                            insert(dst);
+                            break;
+                        case ChangeType::Deletion:
+                        default:
+                            remove(dst);
+                    }
+                }
+            }
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,

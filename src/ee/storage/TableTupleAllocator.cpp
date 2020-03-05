@@ -1656,23 +1656,23 @@ inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essent
     }
 }
 
-template<typename Alloc, typename Trait, typename E>
-inline void TxnPreHook<Alloc, Trait, E>::add(typename TxnPreHook<Alloc, Trait, E>::ChangeType type,
-        void const* dst) {
-    if (m_recording) {     // ignore changes beyond boundary
-        switch (type) {
-            case ChangeType::Update:
-                update(dst);
-                break;
-            case ChangeType::Insertion:
-                insert(dst);
-                break;
-            case ChangeType::Deletion:
-            default:
-                remove(dst);
-        }
-    }
-}
+//template<typename Alloc, typename Trait, typename E>
+//inline void TxnPreHook<Alloc, Trait, E>::add(typename TxnPreHook<Alloc, Trait, E>::ChangeType type,
+//        void const* dst) {
+//    if (m_recording) {     // ignore changes beyond boundary
+//        switch (type) {
+//            case ChangeType::Update:
+//                update(dst);
+//                break;
+//            case ChangeType::Insertion:
+//                insert(dst);
+//                break;
+//            case ChangeType::Deletion:
+//            default:
+//                remove(dst);
+//        }
+//    }
+//}
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
     if (m_recording) {
