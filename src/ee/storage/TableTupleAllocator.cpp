@@ -1771,12 +1771,8 @@ HookedCompactingChunks<Hook, E>::remove_reserve(size_t n) {
     CompactingChunks::m_batched.reserve(n);
 }
 
-template<typename Hook, typename E> inline vector<pair<void*, void*>> const&
-HookedCompactingChunks<Hook, E>::remove_moves() {
-    return CompactingChunks::m_batched.movements();
-}
-
-template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force() {
+template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force(
+        function<void(vector<pair<void*, void*>> const&)> const& cb) {
     // hook registration
     std::for_each(CompactingChunks::m_batched.removed().cbegin(),
             CompactingChunks::m_batched.removed().cend(),
@@ -1784,12 +1780,14 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 Hook::copy(s);
                 Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
-    std::for_each(remove_moves().cbegin(), remove_moves().cend(),
+    std::for_each(CompactingChunks::m_batched.movements().cbegin(),
+            CompactingChunks::m_batched.movements().cend(),
             [this](pair<void*, void*> const& entry) noexcept {
                 Hook::copy(entry.first);
                 Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
-                memcpy(entry.first, entry.second, tupleSize());    // memcpy after remove_moves() call
+                memcpy(entry.first, entry.second, tupleSize());
             });
+    cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }
 
