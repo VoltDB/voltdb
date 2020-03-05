@@ -175,7 +175,8 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public void startListeners(ClientInterface cif) {
+    public void startListeners(ClientInterface cif, int myHostId) {
+        assert m_hostId == myHostId : " starting listeners with inconsistent hostId";
         m_ci = cif;
 
         // Initialize adapter for partition leadership and start a listener
