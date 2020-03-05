@@ -230,6 +230,14 @@ public class SerializationHelper {
     }
 
     /**
+     * @param bytes that are going to be serialized
+     * @return The length of {@code bytes} when serialized
+     */
+    public static int calculateSerializedSize(byte[] bytes) {
+        return Integer.BYTES + (bytes == null ? 0 : bytes.length);
+    }
+
+    /**
      * Write a set of bytes in the standard VoltDB way
      */
     public static void writeVarbinary(byte[] bytes, ByteBuffer buf) {
