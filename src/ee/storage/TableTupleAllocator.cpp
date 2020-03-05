@@ -483,8 +483,10 @@ inline void CompactingStorageTrait::freeze() {
 inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
         if (! m_storage->empty()) {
-            auto const stop = reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn().iterator()->id();
-            while (! m_storage->empty() && less_rolling(m_storage->front().id(), stop)) {
+            auto const& beginTxn = reinterpret_cast<CompactingChunks const*>(m_storage)->beginTxn();
+            bool const empty = beginTxn.empty();
+            auto const stop = empty ? 0 : beginTxn.iterator()->id();
+            while (! m_storage->empty() && (empty || less_rolling(m_storage->front().id(), stop))) {
                 m_storage->pop_front();
             }
         }
@@ -523,8 +525,7 @@ inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTra
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
-    list_type(tupleSize), CompactingStorageTrait(this),
-    m_txnFirstChunk(*this), m_batched(*this) {}
+    list_type(tupleSize), CompactingStorageTrait(this), m_txnFirstChunk(*this), m_batched(*this) {}
 
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk>& chunks) noexcept :
     m_chunks(chunks), m_iter(chunks.end()), m_next(nullptr) {
@@ -610,12 +611,41 @@ inline void CompactingChunks::thaw() {
     CompactingStorageTrait::thaw();
 }
 
+template<typename Remove_cb>
+inline void CompactingChunks::clear(Remove_cb const& cb) {
+    if (m_lastFreeFromHead != nullptr) {
+        throw logic_error("Unfinished free(remove_direction::from_head, ?)");
+    } else if (! m_batched.empty()) {
+        throw logic_error("Unfinished free_add(?)");
+    } else if (frozen()) {                        // slow clear path
+        // first, apply call back on all txn tuples (in order)
+        fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
+                static_cast<CompactingChunks const&>(*this),
+                [&cb] (void const* p) noexcept {cb(p);});
+        // then, release all chunks from txn view
+        while (! beginTxn().empty()) {
+            beginTxn().next() = beginTxn().iterator()->m_next = beginTxn().iterator()->begin();
+            releasable();
+        }
+        m_allocs = 0;
+    } else {                               // fast clear path
+        list_type::clear();
+        m_allocs = 0;
+        m_txnFirstChunk.iterator(list_type::begin());
+    }
+}
+
 inline void* CompactingChunks::allocate() {
     void* r;
     if (empty() || last()->full()) {
-        r = emplace_back(lastChunkId()++, list_type::tupleSize(), list_type::chunkSize())->allocate();
-        if (beginTxn().empty()) {
-            beginTxn().iterator(begin());
+        // Under some circumstances (e.g. truncation when frozen, followed by
+        // allocation (still frozen)), the inserted chunk is not
+        // the only chunk.
+        auto const& beg = emplace_back(lastChunkId()++,
+                list_type::tupleSize(), list_type::chunkSize());
+        r = beg->allocate();
+        if (empty()) {
+            beginTxn().iterator(beg);
         }
     } else {
         r = last()->allocate();
@@ -625,6 +655,10 @@ inline void* CompactingChunks::allocate() {
     }
     ++m_allocs;
     return r;
+}
+
+inline bool CompactingChunks::empty() const noexcept {
+    return beginTxn().empty();
 }
 
 void* CompactingChunks::free(void* dst) {
@@ -1033,10 +1067,14 @@ inline size_t CompactingChunks::DelayedRemover::clear() noexcept {
     return r;
 }
 
-size_t CompactingChunks::DelayedRemover::force() {
+inline size_t CompactingChunks::DelayedRemover::force() {
     validate();
     shift();
     return clear();
+}
+
+inline bool CompactingChunks::DelayedRemover::empty() const noexcept {
+    return m_size == 0;
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
@@ -1163,11 +1201,14 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
         if (frozenBoundaries.left().empty()) {        // not frozen
             return iter->next();
         } else {
+            auto const& beginTxn = reinterpret_cast<CompactingChunks const&>(l).beginTxn();
             auto const leftId = frozenBoundaries.left().chunkId(),
                  rightId = frozenBoundaries.right().chunkId(),
-                 txnBeginChunkId = reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator()->id(),
+                 txnBeginChunkId = beginTxn.empty() ? 0 : beginTxn.iterator()->id(),
                  iterId = iter->id();
-            if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
+            if (beginTxn.empty()) {                // txn view is empty
+                return iter->end();                // TODO: before txn goes empty, the last chunk may not be full
+            } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
                 if (less_rolling(iterId, rightId)) {
                     return iter->end();
                 } else {
@@ -1750,6 +1791,13 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
                 memcpy(entry.first, entry.second, tupleSize());    // memcpy after remove_moves() call
             });
     return CompactingChunks::m_batched.force();
+}
+
+template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::clear() {
+    CompactingChunks::clear([this] (void const* s) noexcept {
+                Hook::copy(s);
+                Hook::add(*this, Hook::ChangeType::Deletion, s);
+            });
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #
