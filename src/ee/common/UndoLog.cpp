@@ -16,9 +16,11 @@
  */
 
 #include <common/UndoLog.h>
+#include "common/ExecuteWithMpMemory.h"
 
 namespace voltdb {
 
+std::atomic<int32_t> UndoQuantumReleaseInterest::s_uniqueTableId(0);
 UndoLog::UndoLog()
   : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN)
 {
@@ -39,6 +41,52 @@ void UndoLog::clear()
 UndoLog::~UndoLog()
 {
     clear();
+}
+
+void UndoLog::release(const int64_t undoToken) {
+    //std::cout << "Releasing token " << undoToken
+    //          << " lastUndo: " << m_lastUndoToken
+    //          << " lastRelease: " << m_lastReleaseToken << std::endl;
+    vassert(m_lastReleaseToken < undoToken);
+    m_lastReleaseToken = undoToken;
+    std::set<UndoQuantumReleaseInterest*, ptr_less<UndoQuantumReleaseInterest>> releaseInterests{};
+    while (!m_undoQuantums.empty()) {
+        UndoQuantum *undoQuantum = m_undoQuantums.front();
+        const int64_t undoQuantumToken = undoQuantum->getUndoToken();
+        std::list<UndoQuantumReleaseInterest*>& canceledInterests = undoQuantum->getUndoQuantumCanceledInterests();
+        std::list<UndoQuantumReleaseInterest*>& releasedInterests = undoQuantum->getUndoQuantumReleasedInterests();
+        BOOST_FOREACH (auto interest, canceledInterests) {
+            releaseInterests.erase(interest);
+        }
+        BOOST_FOREACH (auto interest, releasedInterests) {
+            releaseInterests.insert(interest);
+        }
+        if (undoQuantumToken > undoToken) {
+            break;
+        }
+
+        m_undoQuantums.pop_front();
+        // Destroy the quantum, but possibly retain its pool for reuse.
+        Pool *pool = UndoQuantum::release(std::move(*undoQuantum));
+        pool->purge();
+        if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+            m_undoDataPools.push_back(pool);
+        } else {
+            delete pool;
+        }
+        if(undoQuantumToken == undoToken) {
+            break;
+        }
+    }
+    BOOST_FOREACH (auto interest, releaseInterests) {
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+                (false, //interest->isReplicatedTable(),
+                        ExecutorContext::getEngine()->isLowestSite(), []() {});
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+
+        interest->finalizeRelease();
+        }
+    }
 }
 
 }

@@ -224,9 +224,6 @@ public:
         return m_signature;
     }
 
-    void notifyQuantumRelease() {
-    }
-
     TableIterator iterator() {
         vassert(m_dataStorage != nullptr);
         return TableIterator(this, std::make_shared<txn_const_iterator>(*m_dataStorage));
@@ -325,7 +322,7 @@ public:
     }
 
     TableTuple createTuple(TableTuple const &source);
-    void finalizeDelete();
+    void finalizeRelease();
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
@@ -661,6 +658,10 @@ private:
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
+    // Delta Table row manipulation never requires undo actions or dr/stream handling
+    void deleteDeltaTableTuple(TableTuple& target);
+    void insertDeltaTableTuple(TableTuple& target);
+
     /**
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
@@ -708,7 +709,7 @@ private:
 
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple const& source, bool fallible);
+    void insertTupleIntoDeltaTable(TableTuple const& source);
 
     //
     // SWAP TABLE helpers
@@ -1015,11 +1016,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple) {
 
     tuple.setActiveFalse();
 
-    // add to the free list
-    if (tuple.isPendingDelete()) {
-        tuple.setPendingDeleteFalse();
-        --m_invisibleTuplesPendingDeleteCount;
-    }
+    vassert(!tuple.isPendingDelete());
  }
 
 

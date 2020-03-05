@@ -103,7 +103,7 @@ StreamedTable::~StreamedTable() {
 }
 
 // Stream writes were done so commit all the writes
-void StreamedTable::notifyQuantumRelease() {
+void StreamedTable::finalizeRelease() {
     if (m_wrapper) {
         if (m_migrateTxnSizeGuard.undoToken == getLastSeenUndoToken()) {
             m_migrateTxnSizeGuard.reset();
@@ -152,7 +152,7 @@ void StreamedTable::streamTuple(TableTuple const& source,
             // With no active UndoLog, there is no undo support.
             return;
         }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
+        uq->registerInterestAndUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
         if (drStream != NULL) {
             if (m_migrateTxnSizeGuard.undoToken == 0L) {
                 // The buffer size includes the row length and null array, as DR buffer also has those.

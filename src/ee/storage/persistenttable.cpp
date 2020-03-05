@@ -602,7 +602,7 @@ void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     }
 }
 
-void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool fallible) {
+void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source) {
     // If the current table does not have a delta table, return.
     // If the current table has a delta table, but it is used by
     // a single table view during snapshot restore process, return.
@@ -612,30 +612,17 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source, bool f
 
     // If the delta table has data in it, delete the data first.
     if (!m_deltaTable->isPersistentTableEmpty()) {
-       storage::for_each<PersistentTable::txn_iterator>(dynamic_cast<PersistentTable*>(m_deltaTable)->allocator(),
-                      [this, fallible](void* p) {
-             void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
-             TableTuple inputTuple(this->schema());
-             inputTuple.move(tupleAddress);
-             m_deltaTable->deleteTuple(inputTuple, fallible);
-        });
+        vassert(m_deltaTable->activeTupleCount() == 1);
+
+        txn_const_iterator iter = m_deltaTable->allocator();
+        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(*iter));
+        TableTuple inputTuple(this->schema());
+        inputTuple.move(tupleAddress);
+        m_deltaTable->deleteDeltaTableTuple(inputTuple);
     }
 
     TableTuple targetForDelta = m_deltaTable->createTuple(source);
-    try {
-        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
-    } catch (ConstraintFailureException const& e) {
-        m_deltaTable->deleteTailTupleStorage(targetForDelta);
-        throw;
-    } catch (TupleStreamException const& e) {
-        m_deltaTable->deleteTailTupleStorage(targetForDelta);
-        throw;
-
-    }
-    // TODO: we do not catch other types of exceptions, such as
-    // SQLException, etc. The assumption we held that no other
-    // exceptions should be thrown in the try-block is pretty
-    // daring and likely not correct.
+    m_deltaTable->insertDeltaTableTuple(targetForDelta);
 }
 
 TableTuple PersistentTable::createTuple(TableTuple const &source){
@@ -646,7 +633,7 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
     return target;
 }
 
-void PersistentTable::finalizeDelete() {
+void PersistentTable::finalizeRelease() {
 
      TableTuple target(m_schema);
      BOOST_FOREACH (auto toDelete, m_releaseBatch) {
@@ -660,17 +647,17 @@ void PersistentTable::finalizeDelete() {
          }
      }
 
-    m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
+     m_invisibleTuplesPendingDeleteCount -= m_releaseBatch.size();
 
-    allocator().remove(m_releaseBatch, [this, &target](map<void*, void*> const& tuples) {
-        TableTuple origin(m_schema);
-        for(auto const& p : tuples) {
-            target.move(p.first);
-            origin.move(p.second);
-            swapTuples(origin, target);
-         }
-    });
-    m_releaseBatch.clear();
+     allocator().remove(m_releaseBatch, [this, &target](map<void*, void*> const& tuples) {
+         TableTuple origin(m_schema);
+         for(auto const& p : tuples) {
+             target.move(p.first);
+             origin.move(p.second);
+             swapTuples(origin, target);
+          }
+     });
+     m_releaseBatch.clear();
 }
 
 /*
@@ -800,7 +787,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
     // (Note: we may hit a NOT NULL constraint violation, or any
     // types of constraint violation. In which case, we want to
     // clean up by calling deleteTailTupleStorage, below)
-    insertTupleIntoDeltaTable(source, fallible);
+    insertTupleIntoDeltaTable(source);
 }
 
 void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& target,
@@ -970,7 +957,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
         for (auto viewHandler: m_viewHandlers) {
@@ -1059,7 +1046,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     // Note that inserting into the delta table is guaranteed to
     // succeed, since we checked constraints above.
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     for (auto viewHandler: m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -1136,6 +1123,43 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     allocator().update(targetTupleToUpdate.address());
 }
 
+
+void PersistentTable::deleteDeltaTableTuple(TableTuple& target) {
+    // May not delete an already deleted tuple.
+    vassert(target.isActive());
+
+    // The tempTuple is forever!
+    vassert(&target != &m_tempTuple);
+
+    // Just like insert, we want to remove this tuple from all of our indexes
+    deleteFromAllIndexes(&target);
+
+    deleteTailTupleStorage(target);
+}
+
+void PersistentTable::insertDeltaTableTuple(TableTuple& target) {
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        increaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
+    }
+
+    target.setActiveTrue();
+    target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
+
+    TableTuple conflict(m_schema);
+    try {
+        tryInsertOnAllIndexes(&target, &conflict);    // Also evaluates if the index update might throw
+    } catch (std::exception const& e) {
+        // Since the deltatable is always empty and the real persistent table insert was successful,
+        // there should never be a constraint violation
+        vassert(false);
+        deleteTailTupleStorage(target); // also frees object columns
+    }
+    vassert(conflict.isNullTuple());
+}
+
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool removeMigratingIndex) {
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
     bool createUndoAction = fallible && (uq != NULL);
@@ -1176,7 +1200,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), this);
-        SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
+        SynchronizedThreadLock::addDeleteUndoAction(isReplicatedTable(), uq, undoAction, this);
         if (isTableWithExportDeletes(m_tableType)) {
             vassert(m_shadowStream != nullptr);
             if (!isReplicatedTable() || ec->getPartitionId() == 0) {
@@ -1190,7 +1214,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    insertTupleIntoDeltaTable(target, fallible);
+    insertTupleIntoDeltaTable(target);
     {
         SetAndRestorePendingDeleteFlag setPending(target);
         // for multi-table views

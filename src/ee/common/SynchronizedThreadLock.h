@@ -37,8 +37,7 @@ public:
     SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) :
         m_realInterest(realInterest) {}
     virtual ~SynchronizedUndoQuantumReleaseInterest() {}
-    void notifyQuantumRelease();
-    void finalizeDelete();
+    void finalizeRelease();
 private:
     UndoQuantumReleaseInterest *m_realInterest;
 };
@@ -47,8 +46,7 @@ class SynchronizedDummyUndoQuantumReleaseInterest : public UndoQuantumReleaseInt
 public:
     SynchronizedDummyUndoQuantumReleaseInterest() { }
     virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
-    void notifyQuantumRelease();
-    void finalizeDelete();
+    void finalizeRelease();
 };
 
 class PersistentTable;
@@ -103,8 +101,9 @@ public:
      *
      * Wrapper around calling UndoQuantum::registerUndoAction
      */
-    static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-            PersistentTable *interest = nullptr);
+    static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action);
+    static void addDeleteUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+            PersistentTable *interest);
     static void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *deletedTable);
 

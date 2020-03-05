@@ -36,6 +36,9 @@ class TableAndIndexTest;
 namespace voltdb {
 class UndoLog;
 
+template<class T> struct ptr_less {
+    bool operator()(T* lhs, T* rhs) {
+        return *lhs < *rhs; }};
 
 class UndoQuantum {
     // UndoQuantum has a very limited public API that allows UndoAction registration
@@ -58,30 +61,39 @@ public:
      * will be added to the list of interested parties and invoked upon release of the undo quantum after all
      * undoActions have been performed.
      */
-    inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    inline void registerUndoAction(UndoReleaseAction *undoAction) {
         vassert(undoAction);
         m_undoActions.push_back(undoAction);
-
-        if (interest != NULL && interest->isNewReleaseInterest(m_undoToken)) {
-           m_interests.push_back(interest);
-        }
     }
 
-    inline void registerSynchronizedUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    inline void registerSynchronizedUndoAction(UndoReleaseAction *undoAction) {
+        vassert(undoAction);
+        m_undoActions.push_back(undoAction);
+    }
+
+    inline void registerInterestAndUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest) {
         vassert(undoAction);
         m_undoActions.push_back(undoAction);
 
-        if (interest != NULL) {
-           m_interests.push_back(interest);
-        }
+        vassert(interest != NULL);
+        m_releasedInterests.push_back(interest);
+    }
+
+    inline void registerSynchronizedInterestAndUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+        vassert(undoAction);
+        m_undoActions.push_back(undoAction);
+
+        vassert(interest != NULL);
+        m_releasedInterests.push_back(interest);
     }
 
     /**
      * removeInterest is an UndoQuantumReleaseInterest which will be removed
      * from the list of interested parties if it had been previously added.
      */
-    inline void unregisterReleaseInterest(UndoQuantumReleaseInterest *removeInterest) {
-        m_interests.remove(removeInterest);
+    inline void registerTruncateInterest(UndoQuantumReleaseInterest *truncateInterest) {
+        m_releasedInterests.remove(truncateInterest);
+        m_canceledInterests.push_back(truncateInterest);
     }
 
     /*
@@ -113,14 +125,11 @@ public:
      * tuples in a table, then does a truncate. You do not want to delete that
      * table before all the inserts and deletes are released.
      */
-    static Pool* release(UndoQuantum&& quantum, std::set<UndoQuantumReleaseInterest*>& deleteInterests) {
+    static Pool* release(UndoQuantum&& quantum) {
         for (auto i = quantum.m_undoActions.begin();
              i != quantum.m_undoActions.end(); ++i) {
-            (*i)->release(deleteInterests);
+            (*i)->release();
             delete *i;
-        }
-        for(auto cur = quantum.m_interests.begin(); cur != quantum.m_interests.end(); ++cur) {
-           (*cur)->notifyQuantumRelease();
         }
         Pool* result = quantum.m_dataPool;
         quantum.~UndoQuantum();
@@ -143,10 +152,14 @@ public:
     inline const UndoReleaseAction* getLastUndoActionForTest() { return m_undoActions.back(); }
 
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
+    inline std::list<UndoQuantumReleaseInterest*>& getUndoQuantumReleasedInterests() { return m_releasedInterests;}
+    inline std::list<UndoQuantumReleaseInterest*>& getUndoQuantumCanceledInterests() { return m_canceledInterests;}
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*> m_undoActions;
-    std::list<UndoQuantumReleaseInterest*> m_interests;
+    std::list<UndoQuantumReleaseInterest*> m_releasedInterests;
+    std::list<UndoQuantumReleaseInterest*> m_canceledInterests;
+    static bool s_truncation;
 protected:
     Pool *m_dataPool;
 };

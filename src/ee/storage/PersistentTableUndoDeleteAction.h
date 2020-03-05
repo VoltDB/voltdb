@@ -41,9 +41,8 @@ class PersistentTableUndoDeleteAction: public UndoReleaseAction {
      * Release any resources held by the undo action. It will not need to be undone in the future.
      * In this case free the strings associated with the tuple.
      */
-    virtual void release(std::set<UndoQuantumReleaseInterest*>& deleteInterests){
+    virtual void release(){
         m_table->deleteTupleRelease(m_tuple);
-        deleteInterests.insert(dynamic_cast<UndoQuantumReleaseInterest*>(m_table));
     }
 public:
     inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTable *table)

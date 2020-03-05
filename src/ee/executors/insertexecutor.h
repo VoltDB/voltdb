@@ -155,7 +155,7 @@ class InsertExecutor : public AbstractExecutor {
      */
     Table* m_targetTable = nullptr;
     int64_t m_modifiedTuples = 0;
-    static int64_t s_modifiedTuples;                // TODO: need to be atomic
+    static int64_t s_modifiedTuples;
     static std::string s_errorMessage;
     static std::mutex s_errorMessageUpdateLocker;   // needed to lock writes to s_errorMessage
     TableTuple m_count_tuple{};
