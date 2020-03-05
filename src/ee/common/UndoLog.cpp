@@ -53,7 +53,7 @@ void UndoLog::release(const int64_t undoToken) {
     while (!m_undoQuantums.empty()) {
         UndoQuantum *undoQuantum = m_undoQuantums.front();
         const int64_t undoQuantumToken = undoQuantum->getUndoToken();
-        std::list<UndoQuantumReleaseInterest*>& canceledInterests = undoQuantum->getUndoQuantumCanceledInterests();
+        std::deque<UndoQuantumReleaseInterest*>& canceledInterests = undoQuantum->getUndoQuantumCanceledInterests();
         std::list<UndoQuantumReleaseInterest*>& releasedInterests = undoQuantum->getUndoQuantumReleasedInterests();
         BOOST_FOREACH (auto interest, canceledInterests) {
             releaseInterests.erase(interest);
@@ -83,8 +83,7 @@ void UndoLog::release(const int64_t undoToken) {
                 (false, //interest->isReplicatedTable(),
                         ExecutorContext::getEngine()->isLowestSite(), []() {});
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-
-        interest->finalizeRelease();
+            interest->finalizeRelease();
         }
     }
 }

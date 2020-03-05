@@ -267,35 +267,34 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
     }
 }
 
-void SynchronizedThreadLock::addDeleteUndoAction(bool synchronized, UndoQuantum *lowestSiteUQ,
+void SynchronizedThreadLock::addDeleteUndoAction(bool synchronized, UndoQuantum *uq,
         UndoReleaseAction* action, PersistentTable *table) {
     vassert(table != NULL);
     if (synchronized) {
         vassert(isInSingleThreadMode());
+        vassert(table->isReplicatedTable());
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder. Note that since we only touch quantum memory
         // we don't need to switch to the lowest site context when registering the undo action.
-        UndoReleaseAction* realUndoAction = action->getSynchronizedUndoAction(lowestSiteUQ);
-        if (table->isNewReleaseInterest(lowestSiteUQ->getUndoToken())) {
-            vassert(table->isReplicatedTable());
+        UndoReleaseAction* realUndoAction = action->getSynchronizedUndoAction(uq);
+        if (table->isNewReleaseInterest(uq->getUndoToken())) {
             UndoQuantumReleaseInterest* dummyReleaseInterest = table->getDummyReplicatedInterest();
-            lowestSiteUQ->registerSynchronizedInterestAndUndoAction(realUndoAction, table->getReplicatedInterest());
+            uq->registerSynchronizedInterestAndUndoAction(realUndoAction, table->getReplicatedInterest());
             for (const SharedEngineLocalsType::value_type& enginePair : s_activeEnginesByPartitionId) {
                 UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
                 VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
-                if (lowestSiteUQ != currUQ) {
+                if (uq != currUQ) {
                     UndoReleaseAction* dummyUndoAction = action->getDummySynchronizedUndoAction(currUQ);
                     currUQ->registerSynchronizedInterestAndUndoAction(dummyUndoAction, dummyReleaseInterest);
                 }
             }
         } else {
-            vassert(table->isReplicatedTable());
-            lowestSiteUQ->registerSynchronizedUndoAction(realUndoAction);
+            uq->registerSynchronizedUndoAction(realUndoAction);
             for (const SharedEngineLocalsType::value_type& enginePair : s_activeEnginesByPartitionId) {
                 UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
                 VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
-                if (lowestSiteUQ != currUQ) {
+                if (uq != currUQ) {
                     UndoReleaseAction* dummyUndoAction = action->getDummySynchronizedUndoAction(currUQ);
                     currUQ->registerSynchronizedUndoAction(dummyUndoAction);
                 }
@@ -303,7 +302,12 @@ void SynchronizedThreadLock::addDeleteUndoAction(bool synchronized, UndoQuantum 
         }
     } else {
         vassert(!table->isReplicatedTable());
-        lowestSiteUQ->registerInterestAndUndoAction(action, table);
+        if (table->isNewReleaseInterest(uq->getUndoToken())) {
+            uq->registerInterestAndUndoAction(action, table);
+        }
+        else {
+            uq->registerUndoAction(action);
+        }
     }
 }
 
