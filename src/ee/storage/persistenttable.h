@@ -477,7 +477,7 @@ public:
         // if ALL tuples had been deleted earlier in the current transaction.
         // This should never be the case while updating the catalog.
         vassert(m_dataStorage != nullptr);
-        return m_dataStorage->empty();
+        return (m_dataStorage->size() == 0);
     }
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);

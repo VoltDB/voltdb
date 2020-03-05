@@ -39,7 +39,7 @@
 #include "common/ValuePeeker.hpp"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <map>
+#include <vector>
 namespace voltdb {
 
 #define TABLE_BLOCKSIZE 2097152
@@ -637,13 +637,13 @@ void PersistentTable::finalizeRelease() {
 
     TableTuple target(m_schema);
     TableTuple origin(m_schema);
-    vector<pair<void*, void*>> moved = allocator().remove_moves();
-    for(auto const& p : moved) {
-       target.move(p.first);
-       origin.move(p.second);
-       swapTuples(origin, target);
-    }
-    allocator().remove_force();
+    allocator().remove_force([this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
+        for(auto const& p : tuples) {
+           target.move(p.first);
+           origin.move(p.second);
+           swapTuples(origin, target);
+        }
+    });
     m_invisibleTuplesPendingDeleteCount = 0;
 }
 
