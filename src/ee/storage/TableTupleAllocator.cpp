@@ -363,6 +363,7 @@ template<typename Chunk, typename E> inline void ChunkList<Chunk, E>::pop_back()
             remove(m_back);
             super::erase_after(m_back = iter.second);
             --lastChunkId();
+            --m_size;
         } else {
             clear();
         }
@@ -392,6 +393,7 @@ ChunkList<Chunk, E>::clear() noexcept {
     super::clear();
     m_back = end();
     lastChunkId() = 0;
+    m_size = 0;
 }
 
 template<typename C, typename E> inline
@@ -820,6 +822,9 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->next());
                 if (last()->begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
                     pop_back();
+                    if (m_allocs ==  1) {
+                        beginTxn().iterator(list_type::end());
+                    }
                 }
                 vassert(! frozen() || empty() ||
                         less_equal<position_type>()(m_frozenTxnBoundaries.right(), *last()));
