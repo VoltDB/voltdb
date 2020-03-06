@@ -1728,11 +1728,10 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor& outputStreams,
  */
 size_t PersistentTable::hashCode() {
     boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::cloneEmptyTreeIndex(*m_pkeyIndex));
-
+    TableTuple inputTuple(schema());
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                        [this, &pkeyIndex](void* p) {
+                        [&inputTuple, &pkeyIndex](void* p) {
          void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
-         TableTuple inputTuple(this->schema());
          inputTuple.move(tupleAddress);
          pkeyIndex->addEntry(&inputTuple, NULL);
     });
@@ -1772,10 +1771,10 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
 
 int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
     int64_t mispartitionedRows = 0;
+    TableTuple tuple(schema());
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                           [this, &hashinator, &mispartitionedRows, partitionId](void* p) {
+                           [this, &tuple, &hashinator, &mispartitionedRows, partitionId](void* p) {
        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
-       TableTuple tuple(this->schema());
        tuple.move(tupleAddress);
        int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
        if (newPartitionId != partitionId) {
@@ -1784,7 +1783,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
                    << m_surgeon.generateTupleHash(tuple)
                    << " should in "<< partitionId
                    << ", but in " << newPartitionId << "):\n"
-                   << tuple.debug(name())
+                   << tuple.debug(this->name())
                    << std::endl;
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buffer.str().c_str());
             mispartitionedRows++;
@@ -1917,11 +1916,10 @@ TableIndex* PersistentTable::index(std::string const& name) const {
 
 void PersistentTable::addIndex(TableIndex* index) {
     vassert(!isExistingTableIndex(m_indexes, index));
-
+    TableTuple inputTuple(schema());
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                         [this, &index](void* p) {
+                         [&inputTuple, &index](void* p) {
           void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
-          TableTuple inputTuple(this->schema());
           inputTuple.move(tupleAddress);
           index->addEntry(&inputTuple, NULL);
      });
@@ -2141,7 +2139,7 @@ void PersistentTable::serializeTo(SerializeOutput &serialOutput) {
     int64_t written_count = 0;
     TableTuple tuple(m_schema);
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                    [this, &serialOutput, &written_count, &tuple](void* p) {
+                    [&serialOutput, &written_count, &tuple](void* p) {
           void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
           tuple.move(tupleAddress);
           tuple.serializeTo(serialOutput);
@@ -2163,7 +2161,7 @@ void PersistentTable::serializeToWithoutTotalSize(SerializeOutput &serialOutput)
     int64_t written_count = 0;
     TableTuple tuple(m_schema);
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                        [this, &serialOutput, &written_count, &tuple](void* p) {
+                        [&serialOutput, &written_count, &tuple](void* p) {
          void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
          tuple.move(tupleAddress);
          tuple.serializeTo(serialOutput);
@@ -2181,7 +2179,7 @@ size_t PersistentTable::getAccurateSizeToSerialize() {
     int64_t written_count = 0;
     TableTuple tuple(m_schema);
     storage::for_each<PersistentTable::txn_iterator>(allocator(),
-                            [this, &written_count, &tuple, &bytes](void* p) {
+                            [&written_count, &tuple, &bytes](void* p) {
        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
        tuple.move(tupleAddress);
        bytes += tuple.serializationSize();  // tuple size
