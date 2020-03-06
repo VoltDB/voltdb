@@ -312,7 +312,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledFuture<?> resMonitorWork;
     private HealthMonitor m_healthMonitor;
 
-    private FailedLoginCounter m_flc = new FailedLoginCounter();
+    private final FailedLoginCounter m_flc = new FailedLoginCounter();
 
     private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
@@ -394,7 +394,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * Also, use the intrinsic lock to safeguard access from multiple
      * execution site threads */
     private Long m_lastLogUpdateTxnId = 0L;
-    private CopyOnWriteArrayList<CatalogValidator> m_catalogValidators = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<CatalogValidator> m_catalogValidators = new CopyOnWriteArrayList<>();
 
     /**
      * Startup snapshot nonce taken on shutdown --save
@@ -412,7 +412,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
-     };
+     }
 
     @Override
     public boolean isPreparingShuttingdown() {
@@ -865,7 +865,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // by clearing static variables/properties which ModuleManager,
         // and Settings depend on
         ConfigFactory.clearProperty(Settings.CONFIG_DIR);
-        int returnStatus = -1;;
+        int returnStatus = -1;
         switch (config.m_getOption) {
             case DEPLOYMENT:
                 returnStatus = outputDeployment(config);
@@ -3942,7 +3942,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         throw new RuntimeException("Trying to update main catalog context with diff " +
                                 "commands generated for an out-of date catalog. Expected catalog version: " +
                                 expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
-                    };
+                    }
                     assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
                     return m_catalogContext;
                 }
