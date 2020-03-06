@@ -214,19 +214,6 @@ public class TestPersistentBinaryDeque {
                 // When PBD is closed, penultimate entry SHOULD be final
                 assertTrue(PBDSegment.isFinal(penultimate));
             }
-            else {
-                // When PBD is open, penultimateEntry entry MAY be final or not, depending on recovery scenario
-                // FIXME: we could test this
-                if (!PBDSegment.isFinal(penultimate)) {
-                    System.out.println("Penultimate segment not final: " + penultimate.getName());
-                }
-            }
-        }
-        for (File other : sorted) {
-            if (!PBDSegment.isFinal(other)) {
-                System.out.println("Every segment except last and optionally penultimate should be final: "
-                        + other.getName());
-            }
         }
 
         if (penultimate != null) {
