@@ -129,7 +129,7 @@ public class ExportManager implements ExportManagerInterface
 
     // Track the data sources being closed, and a lock allowing {@code canUpdateCatalog()}
     // to wait for all closed sources.
-    private HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
+    private final HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
     private final Semaphore m_allowCatalogUpdate = new Semaphore(1);
     private final long UPDATE_CORE_TIMEOUT_SECONDS = 30;
 
