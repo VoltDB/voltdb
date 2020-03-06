@@ -33,6 +33,8 @@ package org.hsqldb_voltpatches.store;
 
 import java.util.NoSuchElementException;
 
+import org.hsqldb_voltpatches.Expression;
+import org.hsqldb_voltpatches.ExpressionAggregate;
 import org.hsqldb_voltpatches.lib.ArrayCounter;
 import org.hsqldb_voltpatches.lib.Iterator;
 
@@ -211,6 +213,28 @@ public class BaseHashMap {
         return lookup;
     }
 
+    // extended version for getLookup(Object key, int hash), except same Expression with different
+    // queryTableColumnIndex are considered as different keys
+    protected int getLookupSameIndex(Object key, int hash) {
+        if (!(key instanceof Expression)) {
+            return getLookup(key, hash);
+        }
+        Expression expression = (Expression) key;
+
+        int    lookup = hashIndex.getLookup(hash);
+        Expression tempKey;
+
+        for (; lookup >= 0; lookup = hashIndex.getNextLookup(lookup)) {
+            tempKey = (Expression) objectKeyTable[lookup];
+
+            if (expression.equals(tempKey) && expression.queryTableColumnIndexEquals(tempKey)) {
+                return lookup;
+            }
+        }
+
+        return lookup;
+    }
+
     protected int getLookup(int key) {
 
         int lookup = hashIndex.getLookup(key);
@@ -367,6 +391,157 @@ public class BaseHashMap {
             if (reset()) {
                 return addOrRemove(longKey, longValue, objectKey, objectValue,
                                    remove);
+            } else {
+                return null;
+            }
+        }
+
+        lookup = hashIndex.linkNode(index, lastLookup);
+
+        // type dependent block
+        if (isObjectKey) {
+            objectKeyTable[lookup] = objectKey;
+        } else if (isIntKey) {
+            intKeyTable[lookup] = (int) longKey;
+
+            if (longKey == 0) {
+                hasZeroKey   = true;
+                zeroKeyIndex = lookup;
+            }
+        } else if (isLongKey) {
+            longKeyTable[lookup] = longKey;
+
+            if (longKey == 0) {
+                hasZeroKey   = true;
+                zeroKeyIndex = lookup;
+            }
+        }
+
+        if (isObjectValue) {
+            objectValueTable[lookup] = objectValue;
+        } else if (isIntValue) {
+            intValueTable[lookup] = (int) longValue;
+        } else if (isLongValue) {
+            longValueTable[lookup] = longValue;
+        }
+
+        //
+        if (accessTable != null) {
+            accessTable[lookup] = accessCount++;
+        }
+
+        return returnValue;
+    }
+
+    // if the object added is an Aggregate expression, always add it to the set even it's already in the set
+    // see ENG-18917
+    protected Object addOrRemoveAlwaysIfAggregate(long longKey, long longValue,
+                                                  Object objectKey, Object objectValue,
+                                                  boolean remove) {
+
+        int hash = (int) longKey;
+
+        if (isObjectKey) {
+            if (objectKey == null) {
+                return null;
+            }
+
+            hash = objectKey.hashCode();
+        }
+
+        int    index       = hashIndex.getHashIndex(hash);
+        int    lookup      = hashIndex.hashTable[index];
+        int    lastLookup  = -1;
+        Object returnValue = null;
+
+        for (; lookup >= 0;
+             lastLookup = lookup,
+                     lookup = hashIndex.getNextLookup(lookup)) {
+            if (isObjectKey) {
+                // A VoltDB extension to prevent an intermittent NPE on catalogUpdate?
+                if (objectKey.equals(objectKeyTable[lookup])) {
+                    if (!(objectKey instanceof ExpressionAggregate)) {
+                        break;
+                    }
+                    // End of VoltDB extension
+                }
+            } else if (isIntKey) {
+                if (longKey == intKeyTable[lookup]) {
+                    break;
+                }
+            } else if (isLongKey) {
+                if (longKey == longKeyTable[lookup]) {
+                    break;
+                }
+            }
+        }
+
+        if (lookup >= 0) {
+            if (remove) {
+                if (isObjectKey) {
+                    objectKeyTable[lookup] = null;
+                } else {
+                    if (longKey == 0) {
+                        hasZeroKey   = false;
+                        zeroKeyIndex = -1;
+                    }
+
+                    if (isIntKey) {
+                        intKeyTable[lookup] = 0;
+                    } else {
+                        longKeyTable[lookup] = 0;
+                    }
+                }
+
+                if (isObjectValue) {
+                    returnValue              = objectValueTable[lookup];
+                    objectValueTable[lookup] = null;
+                } else if (isIntValue) {
+                    intValueTable[lookup] = 0;
+                } else if (isLongValue) {
+                    longValueTable[lookup] = 0;
+                }
+
+                hashIndex.unlinkNode(index, lastLookup, lookup);
+
+                if (accessTable != null) {
+                    accessTable[lookup] = 0;
+                }
+
+                if (minimizeOnEmpty && hashIndex.elementCount == 0) {
+                    rehash(initialCapacity);
+                }
+
+                return returnValue;
+            }
+
+            if (isObjectValue) {
+                returnValue              = objectValueTable[lookup];
+                objectValueTable[lookup] = objectValue;
+            } else if (isIntValue) {
+                intValueTable[lookup] = (int) longValue;
+            } else if (isLongValue) {
+                longValueTable[lookup] = longValue;
+            }
+
+            if (accessTable != null) {
+                accessTable[lookup] = accessCount++;
+            }
+
+            return returnValue;
+        }
+
+        // not found
+        if (remove) {
+            return null;
+        }
+
+        if (hashIndex.elementCount >= threshold) {
+
+            // should throw maybe, if reset returns false?
+            if (reset()) {
+                return addOrRemove(longKey, longValue, objectKey, objectValue,
+                        remove);
             } else {
                 return null;
             }

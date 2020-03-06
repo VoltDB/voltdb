@@ -87,9 +87,16 @@ def test_os_release(output):
         distInfo = platform.dist()
         supported = False
         if distInfo[0] in ("centos", "redhat", "rhel"):
-            releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
-            if releaseNum >= "6.6":
+            minRhel = "6.6"
+            minRhelMaj = int(minRhel.split(".")[0])
+            minRhelMin = int(minRhel.split(".")[1])
+            RhelMaj = int(distInfo[1].split(".")[0])
+            RhelMin = int(distInfo[1].split(".")[1])
+            if RhelMaj > minRhelMaj:
                 supported = True
+            elif RhelMaj == minRhelMaj:
+                if RhelMin >= minRhelMin:
+                    supported = True
         elif "ubuntu" in distInfo[0].lower():
             if distInfo[1] in ("14.04", "16.04", "18.04"):
                 supported = True

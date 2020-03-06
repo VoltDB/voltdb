@@ -17,17 +17,11 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Predicate;
 
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.*;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.JoinType;
 
@@ -77,6 +71,14 @@ public class BranchNode extends JoinNode {
             newNode.m_whereExpr = m_whereExpr.clone();
         }
         return newNode;
+    }
+
+    public boolean hasChild(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) || pred.test(getRightNode());
+    }
+
+    public boolean allChildren(Predicate<JoinNode> pred) {
+        return pred.test(getLeftNode()) && pred.test(getRightNode());
     }
 
     public void setJoinType(JoinType joinType) {

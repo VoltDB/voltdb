@@ -448,8 +448,12 @@ public class Expression {
 
             default :
                 return equals(nodes, other.nodes)
-                       && equals(subQuery, other.subQuery);
+                        && equals(subQuery, other.subQuery);
         }
+    }
+
+    public boolean queryTableColumnIndexEquals(Expression other) {
+        return queryTableColumnIndex == other.queryTableColumnIndex;
     }
 
     @Override
@@ -546,7 +550,16 @@ public class Expression {
         }
 
         switch (opType) {
-
+            // For ENG-18549
+            // treat ? as constant value, allow ? in aggregate functions
+            // TODO: this fix only lift the restriction for cast function
+            // generalize to other functions in the future if needed
+            case OpTypes.CAST:
+                assert(1 == nodes.length);
+                if (nodes[0].opType == OpTypes.DYNAMIC_PARAM) {
+                    return true;
+                }
+                break;
             case OpTypes.LIKE :
             case OpTypes.MATCH_SIMPLE :
             case OpTypes.MATCH_PARTIAL :
@@ -706,7 +719,7 @@ public class Expression {
             return;
         }
 
-        int index = expressions.getIndex(this);
+        int index = expressions.getIndexByQueryTableColumnIndex(this);
 
         if (index != -1) {
             Expression e = (Expression) replacements.get(index);

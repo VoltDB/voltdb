@@ -175,7 +175,6 @@
         <include name='*.jar' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
-        <exclude name='kafka-clients-0.10.2.1.jar' />
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>

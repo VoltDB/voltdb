@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches.lib;
 
+import org.hsqldb_voltpatches.Expression;
+
 /**
  * Implementation of an ordered Set which maintains the inserted order of
  * elements and allows access by index. Iterators return the
@@ -120,6 +122,10 @@ public class OrderedHashSet extends HashSet implements HsqlList {
 
     public int getIndex(Object key) {
         return getLookup(key, key.hashCode());
+    }
+
+    public int getIndexByQueryTableColumnIndex(Object key) {
+        return getLookupSameIndex(key, key.hashCode());
     }
 
     public int getLargestIndex(OrderedHashSet other) {

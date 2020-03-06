@@ -106,7 +106,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
         Map<Long, TransactionTask> currentSet;
-        boolean readonly = true;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             if (tmLog.isDebugEnabled()) {
@@ -123,7 +122,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
-            readonly = false;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {

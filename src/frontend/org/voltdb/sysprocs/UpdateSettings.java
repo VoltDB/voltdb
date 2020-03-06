@@ -102,7 +102,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
             ZooKeeper zk = getHostMessenger().getZK();
             Stat stat = null;
             try {
@@ -121,7 +120,6 @@ public class UpdateSettings extends VoltSystemProcedure {
             Object [] paramarr = params.toArray();
             byte [] settingsBytes = (byte[])paramarr[0];
             int version = ((Integer)paramarr[1]).intValue();
-
             ClusterSettings settings = ClusterSettings.create(settingsBytes);
             CatalogContext catalogContext =
                     getVoltDB().settingsUpdate(settings, version);
@@ -133,10 +131,8 @@ public class UpdateSettings extends VoltSystemProcedure {
             return new DependencyPair.TableDependencyPair(DEP_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
-
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateSettings));
             return new DependencyPair.TableDependencyPair(DEP_updateSettingsAggregate, result);
-
         } else {
             VoltDB.crashLocalVoltDB(
                     "Received unrecognized plan fragment id " + fragmentId + " in UpdateSettings",

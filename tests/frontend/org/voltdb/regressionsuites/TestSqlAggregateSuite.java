@@ -31,6 +31,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
@@ -521,6 +522,32 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         VoltTable[] results = client.callProcedure("@AdHoc",
                 "SELECT SUM(HOURS),AVG(HOURS),MIN(HOURS),MAX(HOURS) FROM ENG3465 WHERE EMPNUM='E1';").getResults();
         assertTrue(results[0].advanceRow());
+    }
+
+    public void testEng18917() throws IOException, ProcCallException {
+        // ignore the hsql backend for this test case, since the decode function is not implemented in hsql
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (1, 9201, 'A')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (2, 9201, 'A')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (3, 9201, 'B')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (4, 9201, 'B')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (5, 9201, 'B')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng18917 VALUES (6, 9201, 'B')");
+
+        final ClientResponse parameterizedQueryResponse = client.callProcedure("@AdHoc",
+                "SELECT\n" +
+                        "Eng18917.A0 AS A00000016,\n" +
+                        "SUM(DECODE(Eng18917.A0, CAST(? AS VARCHAR), CAST(? AS INTEGER), NULL)) AS A00000045,\n" +
+                        "SUM(DECODE(Eng18917.A0, CAST(? AS VARCHAR), CAST(? AS INTEGER), NULL)) AS A00000073\n" +
+                        "FROM Eng18917\n" +
+                        "GROUP BY Eng18917.A0\n" +
+                        "ORDER BY Eng18917.A0 ASC", "A", 1, "B", 1);
+        final VoltTable parameterizedResults = parameterizedQueryResponse.getResults()[0];
+        assertContentOfTable(new Object[][]{{"A", 2, null}, {"B", null, 4}}, parameterizedResults);
     }
 
     //

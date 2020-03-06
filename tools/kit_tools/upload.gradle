@@ -110,8 +110,8 @@ uploadClientArchives {
                }
 
                dependencies {
-                   runtime 'io.netty:netty-all:4.1.32.Final'
-                   runtime 'io.netty:netty-tcnative-boringssl-static:2.0.20.Final'
+                   runtime 'io.netty:netty-all:4.1.43.Final'
+                   runtime 'io.netty:netty-tcnative-boringssl-static:2.0.27.Final'
                }
             }
             // Set all dependencies as optional

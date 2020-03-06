@@ -1,3 +1,4 @@
+
 # This file is part of VoltDB.
 # Copyright (C) 2008-2018 VoltDB Inc.
 #
@@ -285,15 +286,15 @@ SET (VOLTDB_3PTY_BUILD_PREFIX ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj)
 # we do at build time.
 #
 ########################################################################
-SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
+SET (VOLTDB_OPENSSL_VERSION 1.0.2t)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
-# Again, we unpack the tarball in the binary directory.  See pcre2 above.
+# We unpack the tarball in the binary directory. Same with pcre2 below.
 SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
-# VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
-# VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
+# VOLTDB_3PTY_INSTALL_PREFIX:      voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
+# VOLTDB_3PTY_BUILD_PREFIX:        voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_OPENSSL_BUILD_PREFIX:     /openssl
-# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2.d/ ... unpacked source
-# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.2.0.d/ ... generated binaries
+# VOLTDB_OPENSSL_SRC:              /src/openssl-1.0.2.t/ ... unpacked source
+# VOLTDB_OPENSSL_OBJ:              /src/openssl-1.0.2.t/ ... generated binaries
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/openssl)
@@ -338,11 +339,11 @@ SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
 # ${PROJECT_NAME}_BINARY_DIR.
 SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
 #
-# VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
-# VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
+# VOLTDB_3PTY_INSTALL_PREFIX:     voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
+# VOLTDB_3PTY_BUILD_PREFIX:       voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_PCRE2_BUILD_PREFIX:      /pcre2
-# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.10/ ... unpacked source
-# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.10/ ... generated binaries
+# VOLTDB_PCRE2_SRC:               /src/pcre2-10.10/ ... unpacked source
+# VOLTDB_PCRE2_OBJ:               /obj/pcre2-10.10/ ... generated binaries
 SET (VOLTDB_PCRE2_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/pcre2)
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_BUILD_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_BUILD_PREFIX}/obj/${VOLTDB_PCRE2_NAME})

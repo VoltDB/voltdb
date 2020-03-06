@@ -343,6 +343,23 @@ public class VoltLogger {
         submitl7d(level, key, params, t);
     }
 
+    public void log(Level level, Object message, Throwable t) {
+        switch (level) {
+        case WARN:
+        case INFO:
+        case DEBUG:
+        case TRACE:
+            execute(level, message, t);
+            break;
+        case FATAL:
+        case ERROR:
+            submit(level, message, t);
+            break;
+        default:
+            throw new AssertionError("Unrecognized level " + level);
+        }
+    }
+
     public long getLogLevels(VoltLogger loggers[]) {
         return m_logger.getLogLevels(loggers);
     }

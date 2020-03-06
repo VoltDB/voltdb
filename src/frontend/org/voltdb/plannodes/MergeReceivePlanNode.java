@@ -73,7 +73,7 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         resolveColumnIndexes(m_outputSchemaPreInlineAgg);
 
         AbstractPlanNode orderNode = getInlinePlanNode(PlanNodeType.ORDERBY);
-        assert(orderNode != null && orderNode instanceof OrderByPlanNode);
+        assert(orderNode instanceof OrderByPlanNode);
         OrderByPlanNode opn = (OrderByPlanNode) orderNode;
         opn.resolveSortIndexesUsingSchema(m_outputSchemaPreInlineAgg);
 

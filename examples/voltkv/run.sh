@@ -96,9 +96,10 @@ function async-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
-        --usecompression=false
+        --usecompression=false 
+#        --multisingleratio=0.0
 #        --latencyreport=true \
-#        --ratelimit=100000
+#        --ratelimit=100000 \
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -122,6 +123,7 @@ function sync-benchmark() {
         --maxvaluesize=1024 \
         --usecompression=false \
         --threads=40
+#        --multisingleratio=0.0
 }
 
 # JDBC benchmark sample

@@ -70,6 +70,8 @@ public:
     // Timestamp excluding the counter
     static int64_t ts(UniqueId uid) {
         int64_t time = uid >> (COUNTER_BITS + PARTITIONID_BITS);
+        // Ensure microseconds
+        time *= 1000;
         time += VOLT_EPOCH;
         return time;
     }
