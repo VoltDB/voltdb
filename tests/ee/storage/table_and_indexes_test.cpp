@@ -511,7 +511,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     TableTuple nextTuple(districtTableReplica->schema());
     storage::for_each<PersistentTable::txn_iterator>(districtTableReplica->allocator(),
-                                      [this, &nextTuple](void* p) {
+                                      [&nextTuple](void* p) {
        void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
        nextTuple.move(tupleAddress);
     });
@@ -658,7 +658,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
 
     TableTuple nextTuple(districtTableReplica->schema());
     storage::for_each<PersistentTable::txn_iterator>(districtTableReplica->allocator(),
-                                        [this, &nextTuple](void* p) {
+                                        [&nextTuple](void* p) {
          void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
          nextTuple.move(tupleAddress);
       });
@@ -778,7 +778,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
 
     TableTuple nextTuple(customerTableReplica->schema());
     storage::for_each<PersistentTable::txn_iterator>(customerTableReplica->allocator(),
-                                           [this, &nextTuple](void* p) {
+                                           [&nextTuple](void* p) {
         void *tupleAddress = const_cast<void*>(reinterpret_cast<void const *>(p));
         nextTuple.move(tupleAddress);
     });
