@@ -53,6 +53,7 @@ public interface NodeSettings extends Settings {
     public final static String LARGE_QUERY_SWAP_PATH_KEY = "org.voltdb.path.large_query_swap";
     public final static String LOCAL_SITES_COUNT_KEY = "org.voltdb.local_sites_count";
     public final static String LOCAL_ACTIVE_SITES_COUNT_KEY = "org.voltdb.local_active_sites_count";
+    public final static String LICENSE_PATH_KEY = "org.voltdb.path.license";
 
     @Key(VOLTDBROOT_PATH_KEY)
     public VoltFile getVoltDBRoot();
@@ -88,6 +89,9 @@ public interface NodeSettings extends Settings {
     @DefaultValue("8")
     public int getLocalActiveSitesCount();
 
+    @Key(LICENSE_PATH_KEY)
+    public File getLicense();
+
     public static NodeSettings create(Map<?, ?>...imports) {
         return ConfigFactory.create(NodeSettings.class, imports);
     }
@@ -117,6 +121,7 @@ public interface NodeSettings extends Settings {
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
                 .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))
                 .put(EXPORT_CURSOR_PATH_KEY, resolve(getExportCursor()))
+                .put(LICENSE_PATH_KEY, resolve(getLicense()))
                 .build();
     }
 
