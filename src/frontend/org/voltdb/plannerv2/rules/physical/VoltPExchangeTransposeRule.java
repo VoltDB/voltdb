@@ -30,9 +30,11 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalAggregate;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalMergeExchange;
@@ -109,8 +111,19 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     */
     private static final Predicate<VoltPhysicalAggregate> AGGREGATE_STOP_PREDICATE = rel -> !rel.isPushedDown();
     /*
-     * Rule to transform Sort(pusheddown = false) / Exchange / SingleRel to
-     *                   Sort(pusheddown = true) / MergeExchange / Sort(pusheddown = false) / SingleRel
+     * Rule to transform Calc / Aggr(pusheddown = false) / Exchange / SingleRel to
+     *                   Calc / Aggr(pusheddown = true) / Exchange / Calc / Aggr(pusheddown = false) / SingleRel
+     */
+    public static final VoltPExchangeTransposeRule INSTANCE_CALC_AGGREGATE_EXCHANGE =
+            new VoltPExchangeTransposeRule(
+                    operand(VoltPhysicalCalc.class,
+                            operandJ(VoltPhysicalAggregate.class, null, AGGREGATE_STOP_PREDICATE,
+                                    operand(VoltPhysicalExchange.class,
+                                            operand(RelNode.class, any())))),
+                    ExchangeType.CALC_AGGREGATE_EXCHANGE);
+    /*
+     * Rule to transform Aggr(pusheddown = false) / Exchange / SingleRel to
+     *                   Aggr(pusheddown = true) / Exchange / Aggr(pusheddown = false) / SingleRel
      */
     public static final VoltPExchangeTransposeRule INSTANCE_AGGREGATE_EXCHANGE =
             new VoltPExchangeTransposeRule(
@@ -226,9 +239,21 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         // for aggr without HAVING or GROUP BY)
         // Moving just Aggr without the Calc may be OK but  sub-optimal and should have a higher
         // cost than the plan with both Calc / Aggr pushed down
-        VoltPhysicalAggregate aggregate = (VoltPhysicalAggregate) call.rels[0];
-        Exchange exchange = (Exchange) call.rels[1];
-        RelNode child = call.rels[2];
+        final VoltPhysicalCalc aggrCalc;
+        final VoltPhysicalAggregate aggregate;
+        final Exchange exchange;
+        final RelNode child;
+        if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
+            aggrCalc = (VoltPhysicalCalc) call.rels[0];
+            aggregate = (VoltPhysicalAggregate) call.rels[1];
+            exchange = (Exchange) call.rels[2];
+            child = call.rels[3];
+        } else {
+            aggrCalc = null;
+            aggregate = (VoltPhysicalAggregate) call.rels[0];
+            exchange = (Exchange) call.rels[1];
+            child = call.rels[2];
+        }
 
         // Fragment Aggregate is a copy of the current aggregate
         VoltPhysicalAggregate fragmentAggregate = aggregate.copy(
@@ -242,10 +267,28 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 aggregate.getPostPredicate(),
                 aggregate.isPushedDown());
 
+        final RelNode exhangeInput;
+        if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
+            // Can't just copy calc. Only its filter. Project should remain
+            RexProgramBuilder builder = RexProgramBuilder.forProgram(
+                    aggrCalc.getProgram(),
+                    aggrCalc.getCluster().getRexBuilder(),
+                    true);
+            builder.clearProjects();
+            aggregate.getRowType().getFieldList().forEach(field -> {
+                builder.addProject(field.getIndex(), field.getName());
+            });
+            exhangeInput = aggrCalc.copy(
+                    aggrCalc.getTraitSet().replace(exchange.getDistribution()),
+                    fragmentAggregate,
+                    builder.getProgram());
+        } else {
+            exhangeInput = fragmentAggregate;
+        }
         // New exchange.
         Exchange newExchange = new VoltPhysicalExchange(exchange.getCluster(),
                 exchange.getTraitSet(),
-                fragmentAggregate,
+                exhangeInput,
                 exchange.getDistribution());
 
         // Coordinator fragment. Replace all occurrences of COUNT with SUM
@@ -269,6 +312,8 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 })
                 .collect(Collectors.toList());
 
+        // Can be smarter here and remove aggregates related to HAVING conditions if any
+        // since we eliminate Coordinator's HAVING condition altogether.
         VoltPhysicalAggregate coordinatorAggregate = aggregate.copy(
                 aggregate.getCluster(),
                 aggregate.getTraitSet(),
@@ -279,6 +324,21 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 aggCalls,
                 aggregate.getPostPredicate(),
                 true);
-        call.transformTo(coordinatorAggregate);
+        final RelNode finalResult;
+        if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
+            // HAVING condition can be dropped here because fragment's calc already has them
+            RexProgramBuilder builder = RexProgramBuilder.forProgram(
+                    aggrCalc.getProgram(),
+                    aggrCalc.getCluster().getRexBuilder(),
+                    true);
+            builder.clearCondition();
+            finalResult = aggrCalc.copy(
+                    aggrCalc.getTraitSet(),
+                    coordinatorAggregate,
+                    builder.getProgram());
+        } else {
+            finalResult = coordinatorAggregate;
+        }
+        call.transformTo(finalResult);
     }
 }

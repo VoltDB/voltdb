@@ -257,4 +257,54 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testDistributedAvgAggregateWithGroupBy1() {
+        m_tester.sql("SELECT max(P1.si), i  FROM P1 GROUP BY i")
+        .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], I=[$t0])\n" +
+                "  VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], pusheddown=[true], type=[hash])\n" +
+                "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "      VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], pusheddown=[false], type=[hash])\n" +
+                "        VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregateWithGroupBy2() {
+        m_tester.sql("SELECT avg(P1.si), i  FROM P1 GROUP BY i")
+        .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[0], expr#4=[=($t2, $t3)], expr#5=[null], expr#6=[CASE($t4, $t5, $t1)], expr#7=[/($t6, $t2)], expr#8=[CAST($t7):SMALLINT], EXPR$0=[$t8], I=[$t0])\n" +
+                "  VoltPhysicalHashAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[$SUM0FROMCOUNTY($1)], pusheddown=[true], type=[hash])\n" +
+                "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "      VoltPhysicalHashAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($1)], pusheddown=[false], type=[hash])\n" +
+                "        VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                "          VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregateWithHaving1() {
+        m_tester.sql("SELECT max(P1.si), i  FROM P1 GROUP BY i HAVING min(P1.si) > 9")
+        .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t1], I=[$t0])\n" +
+                "  VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[MIN($1)], pusheddown=[true], type=[hash])\n" +
+                "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "      VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[9], expr#4=[>($t2, $t3)], proj#0..2=[{exprs}], $condition=[$t4])\n" +
+                "        VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[MIN($1)], pusheddown=[false], type=[hash])\n" +
+                "          VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                "            VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
+    public void testDistributedAvgAggregateWithHaving2() {
+        m_tester.sql("SELECT max(P1.si), i  FROM P1 GROUP BY i HAVING avg(P1.si) > 9")
+        .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], EXPR$0=[$t1], I=[$t0])\n" +
+                "  VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[$SUM0($1)], agg#2=[$SUM0FROMCOUNTY($1)], pusheddown=[true], type=[hash])\n" +
+                "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
+                "      VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[0], expr#5=[=($t3, $t4)], expr#6=[null], expr#7=[CASE($t5, $t6, $t2)], expr#8=[/($t7, $t3)], expr#9=[CAST($t8):SMALLINT], expr#10=[9], expr#11=[>($t9, $t10)], proj#0..3=[{exprs}], $condition=[$t11])\n" +
+                "        VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[$SUM0($1)], agg#2=[COUNT($1)], pusheddown=[false], type=[hash])\n" +
+                "          VoltPhysicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                "            VoltPhysicalTableSequentialScan(table=[[public, P1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n"
+                )
+        .pass();
+    }
+
 }
