@@ -166,7 +166,7 @@ public interface ExportManagerInterface {
     public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin);
 
-    public void startListeners(ClientInterface cif, int myHostId);
+    public void startListeners(ClientInterface cif);
 
     public void shutdown();
 

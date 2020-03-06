@@ -1542,7 +1542,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            ExportManagerInterface.instance().startListeners(m_clientInterface, m_myHostId);
+            ExportManagerInterface.instance().startListeners(m_clientInterface);
             m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
                     m_config.m_startAction == StartAction.JOIN,
                     // Task manager is read only if db is paused or this is a replica
