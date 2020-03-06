@@ -348,11 +348,11 @@ public class TestStreamView
             // ENG-11832
             selectStmt = "SELECT max_ask, max_bid FROM bidask_minmax;";
             results = m_client.callProcedure("@AdHoc", selectStmt).getResults();
-            RegressionSuite.assertContentOfTable(new Object[][] {{510.0, 500.0}, {11.0, 10.0}}, results[0]);
+            RegressionSuite.assertContentOfTable(new Object[][] {{11.0, 10.0}, {510.0, 500.0}}, results[0]);
             results = m_client.callProcedure("@AdHoc", "UPDATE bidask_minmax SET max_ask = max_bid + 11").getResults();
             assertEquals(2, results[0].asScalarLong());
             results = m_client.callProcedure("@AdHoc", selectStmt).getResults();
-            RegressionSuite.assertContentOfTable(new Object[][] {{511.0, 500.0}, {21.0, 10.0}}, results[0]);
+            RegressionSuite.assertContentOfTable(new Object[][] {{21.0, 10.0}, {511.0, 500.0}}, results[0]);
 
             // Make sure we can update
             String updateStmt = "UPDATE bidask_minmax SET txn_count = 10 WHERE txn_count=2;";

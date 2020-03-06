@@ -152,14 +152,13 @@ public:
     inline const UndoReleaseAction* getLastUndoActionForTest() { return m_undoActions.back(); }
 
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
-    inline std::list<UndoQuantumReleaseInterest*>& getUndoQuantumReleasedInterests() { return m_releasedInterests;}
-    inline std::deque<UndoQuantumReleaseInterest*>& getUndoQuantumCanceledInterests() { return m_canceledInterests;}
+    inline std::list<UndoQuantumReleaseInterest*>& getUndoQuantumReleasedInterests() { return m_releasedInterests; }
+    inline std::list<UndoQuantumReleaseInterest*>& getUndoQuantumCanceledInterests() { return m_canceledInterests; }
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*> m_undoActions;
     std::list<UndoQuantumReleaseInterest*> m_releasedInterests;
-    std::deque<UndoQuantumReleaseInterest*> m_canceledInterests;
-    static bool s_truncation;
+    std::list<UndoQuantumReleaseInterest*> m_canceledInterests;
 protected:
     Pool *m_dataPool;
 };
