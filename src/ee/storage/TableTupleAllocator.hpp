@@ -25,14 +25,11 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <set>
 #include <vector>
-
-// older GCC compilers incurs some efficiency loss
-#if defined(__GNUC__) && (__GNUC__ <= 4)
-#define CENTOS7
-#endif
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
     namespace storage {
@@ -104,13 +101,33 @@ namespace voltdb {
             using super::get;
         };
 
-        using id_type = size_t;                        // chunk id type
+        class ThreadLocalPoolAllocator : private ThreadLocalPool {
+            size_t const m_blkSize;
+            char const* m_base;
+        public:
+            ThreadLocalPoolAllocator(size_t);
+            ~ThreadLocalPoolAllocator();
+            char* get() const noexcept;
+        };
+
         /**
-         * Holder for a chunk, whether it is self-compacting or not.
+         * Heap memory allocator candidates backing ChunkHolder
          */
-        template<typename Alloc = StdAllocator>
-        class ChunkHolder : private Alloc {
-            id_type const m_id;                         // chunk id
+        enum class allocator_enum_type : char {
+            standard_allocator,
+            thread_local_pool
+        };
+
+        template<allocator_enum_type alloc>
+        using allocator_type = typename conditional<
+            alloc == allocator_enum_type::standard_allocator,
+            StdAllocator, ThreadLocalPoolAllocator>::type;
+
+        using id_type = size_t;                        // chunk id type
+
+        template<allocator_enum_type T = allocator_enum_type::standard_allocator>
+        class ChunkHolder : private allocator_type<T> {
+            id_type const m_id;                        // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
             void*const m_end;                          // indication of chunk capacity
         protected:
@@ -131,6 +148,8 @@ namespace voltdb {
             void*const next() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
+            allocator_type<T>& get_allocator() noexcept;
+            allocator_type<T> const& get_allocator() const noexcept;
         };
 
         /**
@@ -213,6 +232,7 @@ namespace voltdb {
             template<typename Pred> void remove_if(Pred p);
             typename super::iterator& last() noexcept;
         public:
+            using collections = Col;
             using iterator = typename super::iterator;
             using const_iterator = typename super::const_iterator;
             using reference = typename super::reference;
@@ -272,13 +292,14 @@ namespace voltdb {
         protected:
             size_t& emptyChunks();
         public:
-            using Compact = integral_constant<bool, false>;
+            using Compact = false_type;
             NonCompactingChunks(size_t) noexcept;
             ~NonCompactingChunks() = default;
             size_t size() const noexcept;              // number of allocation requests, <= sum(allocated memory from system), considering modulo and non-full spaces
             size_t chunks() const noexcept;            // number of chunks in the list
             void* allocate();
             void free(void*);
+            id_type id() const noexcept { return 0; }              // dummy function
             using list_type = ChunkList<Chunk>;
             using typename list_type::iterator; using typename list_type::const_iterator;
             using list_type::empty; using list_type::clear; using list_type::begin;
@@ -387,6 +408,41 @@ namespace voltdb {
         };
 
         /**
+         * Validates that at most one RW snapshot iterator per
+         * allocator can be created at the same time. Singleton.
+         */
+        // First comes the phantom validator that does no-op
+        class ChunksIdNonValidator {
+            static ChunksIdNonValidator s_singleton;
+            ChunksIdNonValidator() = default;
+        public:
+            static ChunksIdNonValidator& instance();
+            inline constexpr bool validate(id_type) const noexcept {return false;}
+            inline constexpr bool remove(id_type) const noexcept {return false;}
+            inline constexpr id_type id() const noexcept {return 0;}
+        };
+        // Then the real validator
+        class ChunksIdValidatorImpl {
+            atomic<id_type> m_id{0};
+            mutex m_mapMutex{};
+            set<id_type> m_inUse{};
+            static ChunksIdValidatorImpl s_singleton;
+            ChunksIdValidatorImpl() = default;
+        public:
+            static ChunksIdValidatorImpl& instance();
+            id_type id();                       // unique id generator
+            bool validate(id_type);
+            bool remove(id_type);
+        };
+        using ChunksIdValidator =
+#ifdef NDEBUG                                          // release build: don't do actual validations
+            ChunksIdNonValidator
+#else
+            ChunksIdValidatorImpl
+#endif
+;
+
+        /**
          * A linked list of self-compacting chunks:
          * All allocation operations are appended to the last chunk
          * (creates new chunk if necessary); all free operations move
@@ -414,16 +470,13 @@ namespace voltdb {
                 FrozenTxnBoundaries(ChunkList<CompactingChunk> const&) noexcept;
                 position_type const& left() const noexcept;
                 position_type const& right() const noexcept;
-                position_type& right() noexcept;
                 void clear();
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
             using list_type = ChunkList<CompactingChunk>;
-            static id_type s_id;
-            static id_type gen_id();
-
-            id_type const m_id;                    // equivalent to "table id", to ensure injection relation to rw iterator
+            // equivalent to "table id", to ensure injection relation to rw iterator
+            id_type const m_id = ChunksIdValidator::instance().id();
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
@@ -435,9 +488,10 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
-            class BatchRemoveAccumulator : private map<list_type::iterator, vector<void*>> {
+            class BatchRemoveAccumulator :
+                private list_type::collections::template map<list_type::iterator, vector<void*>> {
+                using map_type = list_type::collections::template map<list_type::iterator, vector<void*>>;
                 CompactingChunks* m_self;
-                using map_type = map<list_type::iterator, vector<void*>>;
             protected:
                 CompactingChunks& chunks() noexcept;
                 // force "removing" the chunk to be compacted from, either by deleting (when not frozen), or
@@ -454,26 +508,28 @@ namespace voltdb {
             size_t m_allocs = 0;
             class DelayedRemover : protected BatchRemoveAccumulator {
                 using super = BatchRemoveAccumulator;
+                template<typename K, typename V> using map_type = list_type::collections::template map<K, V>;
+                template<typename K> using set_type = list_type::collections::template set<K>;
                 size_t m_size = 0;
                 bool m_prepared = false;
-                set<void*> m_remove{};
-                map<void*, void*> m_move{};
+                set_type<void*> m_remove{};
+                map_type<void*, void*> m_move{};
             public:
                 explicit DelayedRemover(CompactingChunks&);
                 // Register a single allocation to be removed later
                 size_t add(void*);
                 // Memory movements (src to be removed => dst to be copied over) due to batch remove
                 DelayedRemover& prepare(bool);
-                map<void*, void*> const& movements() const;
-                set<void*> const& removed() const;
+                map_type<void*, void*> const& movements() const;
+                set_type<void*> const& removed() const;
                 // Actuate batch remove
                 size_t force(bool);
             } m_batched;
             using list_type::last;
-            using list_type::pop_back;
-            position_type& frozenRight() noexcept;  // txn right boundary when freezing. Need to be adjusted for LW tail removal
         public:
-            using Compact = integral_constant<bool, true>;
+            using Compact = true_type;
+            // for use in HookedCompactingChunks::remove() [batch mode]:
+            using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
             CompactingChunks(size_t tupleSize) noexcept;
             /**
              * Queries
@@ -567,8 +623,8 @@ namespace voltdb {
             set m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
             bool m_hasDeletes = false;      // observer for iterator::advance()
-            Alloc m_storage;
             void* m_last = nullptr;         // last allocation by copy(void const*);
+            Alloc m_storage;
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -591,7 +647,7 @@ namespace voltdb {
             void remove(void const*);
         public:
             enum class ChangeType : char {Update, Insertion, Deletion};
-            using is_hook = integral_constant<bool, true>;
+            using is_hook = true_type;
             TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
@@ -652,12 +708,13 @@ namespace voltdb {
              * occurs. Map for removed addr => addr that fills in
              * the removed address
              */
-            size_t remove(set<void*> const&, function<void(map<void*, void*>const&)> const&);
+            size_t remove(set<void*> const&,
+                    function<void(typename CompactingChunks::DelayedRemover_movments_type)> const&);
             /**
              * Batch removal using separate calls
              */
             size_t remove_add(void*);
-            map<void*, void*>const& remove_moves();
+            typename CompactingChunks::DelayedRemover_movments_type remove_moves();
             size_t remove_force();
         };
 
@@ -690,6 +747,7 @@ namespace voltdb {
             using chunk_type = Chunks;
             static Tag s_tagger;
             IterableTableTupleChunks() = delete;       // only iterator types can be created/used
+
             template<iterator_permission_type perm, iterator_view_type vtype>
             class iterator_type : public std::iterator<forward_iterator_tag,
                 typename conditional<perm == iterator_permission_type::ro, void const*, iterator_value_type>::type> {
@@ -711,12 +769,9 @@ namespace voltdb {
                 using container_type = typename
                     add_lvalue_reference<typename conditional<perm == iterator_permission_type::ro,
                     Chunks const, Chunks>::type>::type;
-                class Constructible {
-                    set<id_type> m_inUse{};
-                public:
-                    void validate(container_type);
-                    void remove(container_type);
-                } static s_constructible;
+                using constructible_type = typename conditional<
+                    Chunks::Compact::value && vtype == iterator_view_type::snapshot && perm == iterator_permission_type::rw,
+                          ChunksIdValidator, ChunksIdNonValidator>::type;
                 value_type m_cursor;
                 void advance();
                 container_type storage() const noexcept;

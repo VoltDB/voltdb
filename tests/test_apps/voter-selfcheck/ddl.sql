@@ -76,6 +76,9 @@ CREATE ROLE dbuser WITH adhoc, defaultproc;
 CREATE ROLE adminuser WITH sysproc,adhoc;
 CREATE ROLE hockey WITH adhoc;
 
+-- make sure to load the Java code for the procedures, before creating them
+LOAD CLASSES voter.jar;
+
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Initialize;
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Results;
 CREATE PROCEDURE ALLOW dbuser PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.procedures.Vote;

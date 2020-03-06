@@ -42,60 +42,68 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $CLIENTNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar $CLIENTNAME.jar voltdbroot log
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
+# compile the source code for procedures and the client into jarfiles
+function jars() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    # compile java source
+    javac -classpath ${CLASSPATH} -d obj \
         src/com/yahoo/ycsb/db/*.java \
         src/com/procedures/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${CLIENTNAME}.jar -C obj com/yahoo/ycsb/db
+    if [ $? != 0 ]; then exit 2; fi
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 3; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ycsb_ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-function makeclient() {
-    srccompile
-    jar cf $CLIENTNAME.jar -C obj com/yahoo/ycsb/db
-    if [ $? != 0 ]; then exit; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar || ! -e ${CLIENTNAME}.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ycsb_ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 # run the client that drives the example
 function workload() {
-    # if a client doesn't exist, build one
-    if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
+    jars-ifneeded
     # run the YCSB workload, which must exist at $YCSB_HOME/workloads
-    java -cp "$CLASSPATH:$CLIENTNAME.jar" com.yahoo.ycsb.Client -t -s -db com.yahoo.ycsb.db.VoltClient4 \
+    java -cp "${CLASSPATH}:${CLIENTNAME}.jar" com.yahoo.ycsb.Client -t -s -db com.yahoo.ycsb.db.VoltClient4 \
         -P $YCSB_HOME/workloads/$WORKLOAD -P workload.properties -P base.properties
 }
 
 function load() {
     # if a client doesn't exist, build one
-    if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
+    if [ ! -f ${CLIENTNAME}.jar ]; then makeclient; fi
     # run the YCSB load phase
-    java -cp "$CLASSPATH:$CLIENTNAME.jar" com.yahoo.ycsb.Client -load -s -db com.yahoo.ycsb.db.VoltClient4 \
+    java -cp "${CLASSPATH}:${CLIENTNAME}.jar" com.yahoo.ycsb.Client -load -s -db com.yahoo.ycsb.db.VoltClient4 \
         -P load.properties -P base.properties
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|makeclient|server [hostname]|load|workload [file]}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server [hostname]|load|workload [file]}"
 }
 
 # check if an explicit target was specified

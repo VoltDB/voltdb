@@ -63,7 +63,6 @@ import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
-import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
@@ -81,6 +80,7 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
+import org.voltdb.compiler.deploymentfile.TopicProfilesType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -339,7 +339,7 @@ public class VoltProjectBuilder {
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
-    private KiplingType m_kiplingConfiguration;
+    private TopicsType m_kiplingConfiguration;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -411,25 +411,28 @@ public class VoltProjectBuilder {
         m_featureOptions.getFeature().add(exportFeature);
     }
 
-    public KiplingType getKiplingConfiguration() {
+    public TopicsType getKiplingConfiguration() {
         if (m_kiplingConfiguration == null) {
-            m_kiplingConfiguration = new KiplingType();
+            m_kiplingConfiguration = new TopicsType();
         }
         return m_kiplingConfiguration;
     }
 
     public TopicDefaultsType getTopicDefaults() {
-        KiplingType k = getKiplingConfiguration();
-        TopicsType t = k.getTopics();
+        TopicsType t = getKiplingConfiguration();
         if (t == null) {
             t = new TopicsType();
-            k.setTopics(t);
         }
-        TopicDefaultsType d = t.getDefaults();
+        TopicProfilesType profiles = t.getProfiles();
+        if (profiles == null) {
+            profiles = new TopicProfilesType();
+            t.setProfiles(profiles);
+        }
+        TopicDefaultsType d = profiles.getDefaults();
         if (d == null) {
             // Note: defaults with no explicit retention policies are ok
             d = new TopicDefaultsType();
-            t.setDefaults(d);
+            profiles.setDefaults(d);
         }
         return d;
     }
@@ -1424,7 +1427,7 @@ public class VoltProjectBuilder {
 
     private void setKiplingConfiguration(DeploymentType deployment) {
         if (m_kiplingConfiguration != null) {
-            deployment.setKipling(m_kiplingConfiguration);
+            deployment.setTopics(m_kiplingConfiguration);
         }
     }
 

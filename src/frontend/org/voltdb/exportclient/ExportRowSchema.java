@@ -21,13 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
@@ -95,9 +93,9 @@ public class ExportRowSchema extends ExportRow {
      */
     public static ExportRowSchema create(Table table, int partitionId, long initialGenerationId, long generationId) {
 
-        List<String> colNames = new LinkedList<>();
-        List<VoltType> colTypes = new LinkedList<>();
-        List<Integer> colSizes = new LinkedList<>();
+        ImmutableList.Builder<String> colNames = ImmutableList.builder();
+        ImmutableList.Builder<VoltType> colTypes = ImmutableList.builder();
+        ImmutableList.Builder<Integer> colSizes = ImmutableList.builder();
 
         // Add the meta-column definitions
         colNames.addAll(META_COL_NAMES);
@@ -111,7 +109,7 @@ public class ExportRowSchema extends ExportRow {
             colSizes.add(c.getSize());
         }
 
-        return new ExportRowSchema(table.getTypeName(), colNames, colTypes, colSizes,
+        return new ExportRowSchema(table.getTypeName(), colNames.build(), colTypes.build(), colSizes.build(),
                 partitionId, initialGenerationId, generationId);
     }
 
@@ -125,41 +123,15 @@ public class ExportRowSchema extends ExportRow {
      *
      * @param other the other schema to compare
      * @return true if same schema regardless of generations and tableName
+     * @throws NullPointerException if {@code other} is {@code null}
      */
     public boolean sameSchema(ExportRowSchema other) {
 
         if (other == this) {
             return true;
         }
-        if (!(other instanceof ExportRowSchema)) {
-            return false;
-        }
-        if (this.names.size() != other.names.size()) {
-            return false;
-        }
 
-        // Note: valid instances assume those different members have same size
-        // Note: schemas are not identical if columns have different order
-        Iterator<String> itNames = this.names.iterator();
-        Iterator<VoltType> itTypes = this.types.iterator();
-        Iterator<Integer> itSizes = this.lengths.iterator();
-
-        Iterator<String> itONames = other.names.iterator();
-        Iterator<VoltType> itOTypes = other.types.iterator();
-        Iterator<Integer> itOSizes = other.lengths.iterator();
-
-        while(itNames.hasNext()) {
-            if (!itNames.next().equals(itONames.next())) {
-                return false;
-            }
-            if (!itTypes.next().equals(itOTypes.next())) {
-                return false;
-            }
-            if (!itSizes.next().equals(itOSizes.next())) {
-                return false;
-            }
-        }
-        return true;
+        return names.equals(other.names) && types.equals(other.types) && lengths.equals(other.lengths);
     }
 
     /**
@@ -230,11 +202,10 @@ public class ExportRowSchema extends ExportRow {
                 8 + // initial generation id
                 8 + // generation id
                 4 + // partition id
-                4 + /* table name length */
-                tableName.getBytes(Constants.UTF8ENCODING).length +
+                SerializationHelper.calculateSerializedSize(tableName) +
                 4; // column count
         for (String colName : this.names) {
-            size += 4 /* colName len */ + colName.getBytes(Constants.UTF8ENCODING).length + 1 /* value type */
+            size += SerializationHelper.calculateSerializedSize(colName) + 1 /* value type */
                     + 4 /* value len */;
         }
         return size;

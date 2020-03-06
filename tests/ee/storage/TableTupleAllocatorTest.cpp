@@ -1308,9 +1308,9 @@ struct TestInterleavedCompactingChunks {
 TestInterleavedCompactingChunks1<EagerNonCompactingChunk> const TestInterleavedCompactingChunks::s1{};
 TestInterleavedCompactingChunks1<LazyNonCompactingChunk> const TestInterleavedCompactingChunks::s2{};
 
-//TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
-//    TestInterleavedCompactingChunks()();
-//}
+TEST_F(TableTupleAllocatorTest, TestInterleavedOperations) {
+    TestInterleavedCompactingChunks()();
+}
 
 template<typename Chunk, gc_policy pol>
 void testSingleChunkSnapshot() {

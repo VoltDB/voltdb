@@ -38,7 +38,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.ConnectionLossException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -2181,19 +2183,25 @@ public class SynchronizedStatesManager {
         @Override
         public Void call() throws KeeperException {
             try {
-                assert(m_registeredStateMachineInstances == ByteBuffer.wrap(m_zk.getData(m_stateMachineRoot, false, null)).getInt());
-                // First become a member of the community
-                new ZKAsyncCreateHandler(m_stateMachineMemberPath, null, CreateMode.PERSISTENT) {
-                    @Override
-                    public void runImpl() {
-                        if (noCommonKeeperExceptions(m_resultCode)) {
-                            addMemberIdIfMissing();
-                        }
-                    }
-                };
-            } catch (InterruptedException e) {
+                assert (m_registeredStateMachineInstances == ByteBuffer
+                        .wrap(m_zk.getData(m_stateMachineRoot, false, null)).getInt());
+            } catch (InterruptedException | SessionExpiredException | ConnectionLossException e) {
+                if (ssmLog.isDebugEnabled()) {
+                    ssmLog.debug(m_stateMachineRoot + ": Failed to double check registered state machine instances", e);
+                }
                 initializationFailed();
+                return null;
             }
+
+            // First become a member of the community
+            new ZKAsyncCreateHandler(m_stateMachineMemberPath, null, CreateMode.PERSISTENT) {
+                @Override
+                public void runImpl() {
+                    if (noCommonKeeperExceptions(m_resultCode)) {
+                        addMemberIdIfMissing();
+                    }
+                }
+            };
             return null;
         }
 

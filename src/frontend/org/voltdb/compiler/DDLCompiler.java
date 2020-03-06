@@ -1638,11 +1638,11 @@ public class DDLCompiler {
             table.setTopicprofile(topicProfileName);
         }
         String topicFormatName = node.attributes.get(SQLParser.CAPTURE_TOPIC_FORMAT);
+        EncodeFormat format = EncodeFormat.CSV;
         if (topicFormatName != null) {
             try {
                 // Parse the format in an unchecked fashion and handle exceptions
-                EncodeFormat format = EncodeFormat.valueOf(EncodeFormat.class, topicFormatName);
-                table.setTopicformat(format.name());
+                format = EncodeFormat.valueOf(topicFormatName);
             }
             catch (Exception ex) {
                 throw compiler.new VoltCompilerException(
@@ -1650,6 +1650,7 @@ public class DDLCompiler {
                                 topicFormatName, table.getTypeName(), EncodeFormat.valueSet()));
             }
         }
+        table.setTopicformat(format.name());
         String topicKeyColumnNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
         if (topicKeyColumnNames != null) {
             List<String> definedColumns = new ArrayList<>();
@@ -1660,12 +1661,12 @@ public class DDLCompiler {
                 if (definedColumns.contains(col)) {
                     // Do not tolerate any ambiguous key topic definition
                     throw compiler.new VoltCompilerException(
-                            String.format("Column %s is defined more than once in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Column %s is defined more than once in the KEYS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 if (!columnMap.keySet().contains(col)) {
                     throw compiler.new VoltCompilerException(
-                            String.format("Unknown column %s defined in the KEY-COLUMNS attribute of STREAM %s",
+                            String.format("Unknown column %s defined in the KEYS attribute of STREAM %s",
                                     col, table.getTypeName()));
                 }
                 definedColumns.add(col);

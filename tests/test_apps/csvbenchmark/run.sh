@@ -37,37 +37,47 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 SERVERS="localhost"
 
-PYTHON=/usr/bin/python2
-
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot log
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    return
+# compile the source code for procedures into jarfiles
+function jars() {
     mkdir -p obj
+    # compile java source
     javac -classpath $CLASSPATH -d obj \
         src/${APPNAME}/procedures/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPNAME}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the jar file, if it doesn't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 function benchmark-help() {
@@ -81,7 +91,7 @@ function benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|benchmark}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|benchmark[-help]}"
 }
 
 # Run the target passed as the first arg on the command line

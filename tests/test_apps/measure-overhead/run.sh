@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
+# these are usually the same, but not in this case
 APPNAME="measure-overhead"
+APPDIR="measureoverhead"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -32,33 +34,46 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot log
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
+# compile the source code for procedures and the client into jarfiles
+function jars() {
     mkdir -p obj
+    # compile java source
     javac -classpath $CLASSPATH -d obj \
-        src/measureoverhead/*.java \
-        src/measureoverhead/procedures/*.java
+        src/${APPDIR}/*.java \
+        src/${APPDIR}/procedures/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
+    # build the jar file
+    jar cf ${APPNAME}.jar -C obj ${APPDIR}
+    if [ $? != 0 ]; then exit 2; fi
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e ${APPNAME}.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
+    # truncate the voltdb log
+    [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 # run the client that drives the example
@@ -67,9 +82,9 @@ function client() {
 }
 
 function benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
-        measureoverhead.MOBenchmark \
+    jars-ifneeded
+    java -classpath ${CLASSPATH}:${APPNAME}.jar -Dlog4j.configuration=file://$CLIENTLOG4J \
+        ${APPDIR}.MOBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=30 \
@@ -85,7 +100,7 @@ function benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client|benchmark}"
+    echo "Usage: ./run.sh {clean|jars[-ifneeded]|server|client|benchmark}"
 }
 
 # Run the target passed as the first arg on the command line

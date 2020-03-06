@@ -53,8 +53,8 @@
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
-      <xs:element name="kipling" minOccurs="0" maxOccurs="1" type="kiplingType" />
-      <xs:element name="schemaregistryurl" minOccurs="0" maxOccurs="1" type="xs:string" />
+      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType" />
+      <xs:element name="avro" minOccurs="0" maxOccurs="1" type="avroType" />
     </xs:all>
   </xs:complexType>
 
@@ -571,31 +571,30 @@
     <xs:attribute name="option" type="xs:string" use="required"/>
   </xs:complexType>
 
-  <xs:complexType name="kiplingType">
-    <xs:sequence>
-      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType"/>
-    </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean" default="false" />
-    <xs:attribute name="port" default="9092">
-      <xs:simpleType>
-        <xs:restriction base="xs:int">
-          <xs:minInclusive value="1"/>
-          <xs:maxExclusive value="65536"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="threadCount" default="20">
-      <xs:simpleType>
-        <xs:restriction base="xs:int">
-          <xs:minInclusive value="0"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="clusterId" type="xs:string"/>
+  <!-- <avro> -->
+  <xs:complexType name="avroType">
+    <xs:attribute name="registry" type="xs:string" use="required"/>
+    <xs:attribute name="namespace" type="xs:string" default="org.voltdb"/>
+    <xs:attribute name="prefix" type="xs:string" default=""/>
   </xs:complexType>
 
   <!-- <topics> -->
   <xs:complexType name="topicsType">
+    <xs:sequence>
+      <xs:element name="properties" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
+      <xs:element name="profiles" type="topicProfilesType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="false" />
+    <xs:attribute name="threadpool" type="xs:string" default="" />
+  </xs:complexType>
+
+  <xs:complexType name="PropertiesType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="topicProfilesType">
     <xs:sequence>
       <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
       <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
@@ -618,13 +617,13 @@
   <!--
   Retention policy specification
 
-  Examples: 
-    <retention policy="size" limit="5 GB"/> 
+  Examples:
+    <retention policy="size" limit="5 GB"/>
     <retention policy="time" limit="6mo"/>
-     
+
   Acceptable limit qualifiers (case insensitive):
     - size: "mb" (megabytes, minimum 64), "gb" (gigabytes)
-    - time: "mn" (minutes), "hr" (hours), "dy" (days), "wk" (weeks), "mo" (months), "yr" (years) 
+    - time: "mn" (minutes), "hr" (hours), "dy" (days), "wk" (weeks), "mo" (months), "yr" (years)
   -->
   <xs:complexType name="topicRetentionType">
     <xs:attribute name="policy" type="topicRetentionPolicyEnum" default="time" />

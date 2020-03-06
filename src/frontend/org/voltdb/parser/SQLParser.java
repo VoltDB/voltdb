@@ -1341,7 +1341,7 @@ public class SQLParser extends SQLPatternFactory
      *  If AS TOPIC:
      *  (3) PROFILE             ("topicProfileName"): topic profile name
      *  (4) FORMAT              ("topicFormatName"): topic format
-     *  (5) KEY-COLUMNS         ("topicKeyColumnNames"): list of column names
+     *  (5) KEYS                ("topicKeyColumnNames"): list of column names
      *  (6) ALLOW               ("topicAllowedRoleNames"): list of role names
      */
     public static final String CAPTURE_EXPORT_TARGET = "targetName";
@@ -1380,7 +1380,7 @@ public class SQLParser extends SQLPatternFactory
                     ),
                     SPF.optional(
                         SPF.clause(
-                            SPF.token("key-columns"),
+                            SPF.token("keys"),
                             SPF.group(captureTokens,
                                     CAPTURE_TOPIC_KEY_COLUMNS,
                                     new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")

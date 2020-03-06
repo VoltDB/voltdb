@@ -119,6 +119,7 @@ import org.voltdb.catalog.ThreadPool;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.deploymentfile.AvroType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
@@ -133,7 +134,6 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.compiler.deploymentfile.KiplingType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -164,6 +164,7 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -872,6 +873,7 @@ public abstract class CatalogUtil {
 
         try {
             validateDeployment(catalog, deployment);
+            validateAvro(deployment);
             validateTopics(catalog, deployment);
             validateThreadPoolsConfiguration(deployment.getThreadpools());
             Cluster catCluster = getCluster(catalog);
@@ -1315,11 +1317,50 @@ public abstract class CatalogUtil {
         }
     }
 
+    private static void validateAvro(DeploymentType deployment) throws MalformedURLException {
+        AvroType avro = deployment.getAvro();
+        if (avro == null) {
+            return;
+        }
+
+        String registryUrl = avro.getRegistry();
+        assert registryUrl != null : "deployment syntax must require URL";
+        try {
+            new URL(registryUrl);
+        }
+        catch (MalformedURLException ex) {
+            throw new RuntimeException(
+                    "Failed to parse schema registry url in <avro>: " + ex.getMessage());
+        }
+    }
+
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         CompoundErrors errors = new CompoundErrors();
 
+        // If topics have a threadpool name, validate it exists
+        TopicsType topicsType = deployment.getTopics();
+        if (topicsType != null) {
+            String thPoolName = topicsType.getThreadpool();
+            if (!StringUtils.isEmpty(thPoolName)) {
+                ThreadPoolsType tp = deployment.getThreadpools();
+                if (tp == null) {
+                    errors.addErrorMessage(String.format(
+                            "Topics use a thread pool %s and no thread pools are configured in deployment.",
+                            thPoolName));
+                }
+                else {
+                    boolean exists = tp.getPool().stream().anyMatch(i -> i.getName().equals(thPoolName));
+                    if (!exists) {
+                        errors.addErrorMessage(String.format(
+                                "Topics use a thread pool %s that is not configured in deployment.",
+                                thPoolName));
+                    }
+                }
+            }
+        }
+
         // Validate topics in deployment file
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(deployment, errors);
+        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(topicsType, errors);
         TopicDefaultsType defaults = topics.getFirst();
         Map<String, TopicProfileType> profileMap = topics.getSecond();
 
@@ -1333,7 +1374,8 @@ public abstract class CatalogUtil {
             }
         }
 
-        // Verify that every topic refers to an existing profile
+        // Verify that every topic refers to an existing profile, and that if a topic
+        // uses avro, the <avro> element is defined
         CatalogMap<Table> tables = CatalogUtil.getDatabase(catalog).getTables();
         for (Table t : tables) {
             if (!t.getIstopic()) {
@@ -1352,6 +1394,15 @@ public abstract class CatalogUtil {
                         "Topic %s refers to profile %s which is not defined in deployment.",
                         t.getTypeName(), profileName));
             }
+
+            EncodeFormat topicFormat = StringUtils.isBlank(t.getTopicformat()) ? null
+                    : EncodeFormat.checkedValueOf(t.getTopicformat());
+
+            if (topicFormat == EncodeFormat.AVRO && deployment.getAvro() == null) {
+                errors.addErrorMessage(String.format(
+                        "Topic %s uses AVRO encoding and requires that <avro> be defined in deployment.",
+                        t.getTypeName(), profileName));
+            }
         }
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
@@ -1368,17 +1419,22 @@ public abstract class CatalogUtil {
     public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
             DeploymentType deployment, CompoundErrors errors) {
 
-        KiplingType k = deployment.getKipling();
-        if (k == null) {
-            return Pair.of(null, null);
-        }
-        TopicsType topics = k.getTopics();
+        TopicsType topics = deployment.getTopics();
         if (topics == null) {
             return Pair.of(null, null);
         }
+        return getDeploymentTopics(topics, errors);
+    }
 
-        TopicDefaultsType defaults = topics.getDefaults();
-        List<TopicProfileType> profiles = topics.getProfile();
+    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+            TopicsType topics, CompoundErrors errors) {
+
+        if (topics == null || topics.getProfiles() == null) {
+            return Pair.of(null, null);
+        }
+
+        TopicDefaultsType defaults = topics.getProfiles().getDefaults();
+        List<TopicProfileType> profiles = topics.getProfiles().getProfile();
         if (profiles == null) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("No topic profiles in deployment");
@@ -1481,7 +1537,6 @@ public abstract class CatalogUtil {
 
         setSystemSettings(deployment, catDeploy);
         setThreadPools(deployment, catDeploy);
-        setSchemaRegistry(deployment, catDeploy);
 
         catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
         catCluster.setGlobalflushinterval(deployment.getSystemsettings().getFlushinterval().getMinimum());
@@ -1531,10 +1586,6 @@ public abstract class CatalogUtil {
             // TODO: thread pool size upper-bound?
             catalogThreadPool.setSize(threadPool.getSize());
         }
-    }
-
-    private static void setSchemaRegistry(DeploymentType deployment, Deployment catDeployment) {
-        catDeployment.setSchemaregistryurl(deployment.getSchemaregistryurl());
     }
 
     public static void validateDirectory(String type, File path) {

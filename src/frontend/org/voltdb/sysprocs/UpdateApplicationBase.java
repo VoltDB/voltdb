@@ -239,9 +239,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            // Topic configuration is not compiled into the catalog and cannot be validated
+            VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval);
+            // Kipling configuration is not compiled into the catalog and cannot be validated
             // by the CatalogDiffEngine, so validate the changes here.
-            if (!validateTopicUpdates(dt, context.getDeployment(), retval)) {
+            if (!validateKiplingUpdates(dt, context.getDeployment(), retval)) {
                 return retval;
             }
 
@@ -303,17 +304,35 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     /**
-     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * Validate that the Kipling changes to the existing configuration are valid; otherwise set
      * an appropriate error message in the passed-in {@link CatalogChangeResult}
      *
      * @param newDep    new deployment
      * @param curDep    current deployment
-     * @param result    catalog change result (may be updated
+     * @param result    catalog change result (may be updated)
+     * @return          {@code true} if Kipling is valid
+     */
+    private static boolean validateKiplingUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
+        CompoundErrors errors = new CompoundErrors();
+        validateTopicUpdates(newDep, curDep, errors);
+
+        if (errors.hasErrors()) {
+            result.errorMsg = errors.getErrorMessage();
+        }
+        return !errors.hasErrors();
+    }
+
+    /**
+     * Validate that the topic changes to the existing configuration are valid; otherwise set
+     * appropriate error message in the passed-in {@link CompoundErrors}
+     *
+     * @param newDep    new deployment
+     * @param curDep    current deployment
+     * @param errors    {@link CompoundErrors}, updated on errors
      * @return          {@code true} if topics are valid
      */
-    private static boolean validateTopicUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
-        CompoundErrors errors = new CompoundErrors();
-
+    private static void validateTopicUpdates(DeploymentType newDep, DeploymentType curDep,
+            CompoundErrors errors ) {
         Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep, errors);
         TopicDefaultsType newDefaults = newTopics.getFirst();
         Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
@@ -338,10 +357,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
             }
         }
-        if (errors.hasErrors()) {
-            result.errorMsg = errors.getErrorMessage();
-        }
-        return !errors.hasErrors();
     }
 
     /**

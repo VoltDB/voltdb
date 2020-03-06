@@ -25,8 +25,12 @@ import org.voltdb.VoltDB;
  * An enum listing the encoding formats
  */
 public enum EncodeFormat {
-    CSV,
-    AVRO;
+    INVALID(-1),
+    CSV(0),
+    AVRO(1);
+
+    /** ID for the encode format used in serialization of the format */
+    private final byte m_id;
 
     /**
      * Parse an {@link EncodeFormat} from a {@link String} whose
@@ -37,18 +41,46 @@ public enum EncodeFormat {
      */
     public static EncodeFormat checkedValueOf(String name) {
         try {
-            return valueOf(EncodeFormat.class, name);
+            return valueOf(name);
         }
         catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Illegal encoding format " + name, true, ex);
+            throw VoltDB.crashLocalVoltDB("Illegal encoding format " + name, true, ex);
         }
-        return null;
     }
 
     /**
      * @return the set of acceptable values
      */
     public static EnumSet<EncodeFormat> valueSet() {
-        return EnumSet.allOf(EncodeFormat.class);
+        EnumSet<EncodeFormat> allowedValues = EnumSet.allOf(EncodeFormat.class);
+        allowedValues.remove(INVALID);
+        return allowedValues;
+    }
+
+    /**
+     * Convert from id returned by {@link #getId()} to {@code EncodeFormat}
+     *
+     * @param id of encode format
+     * @return {@code EncodeFormat} represented by {@code id} or {@link #INVALID}
+     */
+    public static EncodeFormat byId(byte id) {
+        for (EncodeFormat ef : values()) {
+            if (ef.m_id == id) {
+                return ef;
+            }
+        }
+
+        return INVALID;
+    }
+
+    private EncodeFormat(int id) {
+        m_id = (byte) id;
+    }
+
+    /**
+     * @return ID of this EncodeFormat
+     */
+    public byte getId() {
+        return m_id;
     }
 }

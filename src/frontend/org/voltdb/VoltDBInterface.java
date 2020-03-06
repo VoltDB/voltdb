@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
@@ -363,4 +364,26 @@ public interface VoltDBInterface
 
     boolean isMasterOnly();
     void setMasterOnly();
+
+    /**
+     * Register a validator to be used to validate the catalog on every update.
+     * @param validator
+     */
+    public void registerCatalogValidator(CatalogValidator validator);
+
+    /**
+     * Unregister a validator.
+     * @param validator
+     */
+    public void unregisterCatalogValidator(CatalogValidator validator);
+
+    /**
+     * This will be called from the catalog update procedure on every catalog update.
+     * All the registered validators will be called for validation from here.
+     * @param newDep the updated deployment
+     * @param curDep the current deployment
+     * @param ccr the result of the validations will be set on this result object
+     * @return boolean indicating if the validation was successful or not.
+     */
+    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
 }

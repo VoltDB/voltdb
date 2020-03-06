@@ -17,6 +17,35 @@ defaultlicensedays = 70 #default trial license length
 
 
 ################################################
+# Single repo checkout
+################################################
+# Try to checkout shallow
+# If it's a sha, this won't work, so try that
+# Returns checkout Success (boolean)
+
+def repoCheckout(repo, treeish):
+    #Try a shallow clone (only works with branch names)
+    print "Trying a shallow single branch clone"
+    result = run("git clone -q %s --depth=1 --branch %s --single-branch "% (repo, treeish), warn_only=True)
+    if result.failed:
+        #Maybe it was a sha and needs a full clone
+        try:
+            #Check if it is hex
+            int(treeish, 16)
+        except ValueError:
+            return False
+        #Okay, it's hex, so lets try a real clone + checkout
+        print "Trying a full repo clone"
+        run("git clone -q %s" % repo)
+        directory = repo.split("/")[-1].split(".")[0]
+        result = run("cd %s; git checkout %s" % (directory, treeish), warn_only=True)
+        if result.failed:
+            return False
+    return True
+
+
+
+################################################
 # CHECKOUT CODE INTO A TEMP DIR
 ################################################
 
@@ -31,22 +60,23 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit, gitloc):
         # do the checkouts, collect checkout errors on both community &
         # pro repos so user gets status on both checkouts
         message = ""
-        run("git clone -q %s/voltdb.git" % gitloc)
-        result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
-        if result.failed:
-            message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
+        if voltdbGit:
+            repo = gitloc + "/voltdb.git"
+            checkout_succeeded = repoCheckout(repo, voltdbGit)
+            if not checkout_succeeded:
+                message += "\nCheckout of '%s' from %s repository failed." % (voltdbGit, repo)
+        if proGit:
+            repo = gitloc + "/pro.git"
+            checkout_succeeded = repoCheckout(repo, proGit)
+            if not checkout_succeeded:
+                message += "\nCheckout of '%s' from %s repository failed." % (proGit, repo)
 
-        run("git clone -q %s/pro.git" % gitloc)
-        result = run("cd pro; git checkout %s" % proGit, warn_only=True)
-        if result.failed:
-            message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
-
-        #rabbitmq isn't mirrored internally, so don't use gitloc
-        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
-        result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
-        # Probably ok to use master for export-rabbitmq.
-        if result.failed:
-            print "\nExport-rabbitmg branch %s checkout failed. Defaulting to master." % rbmqExportGit
+        if rbmqExportGit:
+            #rabbitmq isn't mirrored internally, so always go out to github
+            repo = "git@github.com:VoltDB/export-rabbitmq.git"
+            checkout_succeeded = repoCheckout(repo, rbmqExportGit)
+            if not checkout_succeeded:
+                message += "\nCheckout of '%s' from %s repository failed." % (rbmqExportGit, repo)
 
         if len(message) > 0:
             abort(message)
@@ -70,7 +100,7 @@ def makeReleaseDir(releaseDir):
 # BUILD THE COMMUNITY VERSION
 ################################################
 
-def buildCommunity():
+def buildCommunity(ee_only=False):
     if build_mac:
         packageMacLib="true"
     else:
@@ -78,8 +108,11 @@ def buildCommunity():
     with cd(builddir + "/voltdb"):
         run("pwd")
         run("git status")
-        run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
+        if ee_only:
+            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (packageMacLib,  build_args))
+        else:
+            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
+
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -94,7 +127,6 @@ def buildEnterprise(version):
     with cd(builddir + "/pro"):
         run("pwd")
         run("git status")
-        run("git describe --dirty")
         run("VOLTCORE=../voltdb ant -f mmt.xml \
         -Djmemcheck=NO_MEMCHECK \
         -DallowDrReplication=true -DallowDrActiveActive=true \
@@ -108,18 +140,6 @@ def buildEnterprise(version):
 ################################################
 
 #
-def packagePro(version):
-    print "Making license"
-    licensee="VoltDB Pro Trial User " + version
-    licensefile = makeTrialLicense(licensee=licensee, days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
-    print "Repacking pro kit"
-    with cd(builddir + "/pro/obj/pro"):
-        run("mkdir pro_kit_staging")
-    with cd(builddir + "/pro/obj/pro/pro_kit_staging"):
-        run("tar xf ../voltdb-ent-%s.tar.gz" % version)
-        run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
-        run("cp %s/pro/%s voltdb-pro-%s/voltdb/license.xml" % (builddir, licensefile, version))
-        run("tar cvfz ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -142,7 +162,6 @@ def buildRabbitMQExport(version, dist_type):
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
-        run("git describe --dirty", warn_only=True)
         run("VOLTDIST=%s/restage/voltdb-%s-%s ant" % (paths[dist_type], dist_type, version))
 
     # Retar
@@ -329,8 +348,8 @@ if __name__ == "__main__":
     if build_mac or build_community:
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-                versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
-                buildCommunity()
+                versionMac = checkoutCode(voltdbTreeish, None, None, args.gitloc)
+                buildCommunity(ee_only=True)
         except Exception as e:
             print traceback.format_exc()
             print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
@@ -360,9 +379,6 @@ if __name__ == "__main__":
             buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
             copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
-            packagePro(versionCentos)
-            makeSHA256SUM(versionCentos,"pro")
-            copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
             licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)
             copyTrialLicenseToReleaseDir(builddir + "/pro/" + licensefile, releaseDir)
 

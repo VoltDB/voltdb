@@ -70,7 +70,7 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
+    jars-ifneeded
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.AsyncBenchmark --help
 }
 

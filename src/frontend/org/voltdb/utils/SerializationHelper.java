@@ -31,31 +31,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 public class SerializationHelper {
-    byte[] memoizedStringBytes;
-    String memoizedString;
-
-    int getSerializedSize(String value) {
-        if (memoizedString == value) {
-            assert(memoizedStringBytes != null);
-        }
-        else {
-            memoizedString = value;
-            memoizedStringBytes = value.getBytes(Constants.UTF8ENCODING);
-        }
-        return memoizedStringBytes.length + 4; // int length prefix
-    }
-
-    void flattenToBuffer(ByteBuffer buf, String value) {
-        if (memoizedString == value) {
-            assert(memoizedStringBytes != null);
-        }
-        else {
-            memoizedString = value;
-            memoizedStringBytes = value.getBytes(Constants.UTF8ENCODING);
-        }
-        buf.putInt(memoizedStringBytes.length);
-        buf.put(memoizedStringBytes);
-    }
+    private SerializationHelper() {}
 
     public static String getString(ByteBuffer buf) throws IOException {
         final int len = buf.getInt();
@@ -230,6 +206,14 @@ public class SerializationHelper {
     }
 
     /**
+     * @param value String that is going to be serialized
+     * @return The length of {@code value} when serialized
+     */
+    public static int calculateSerializedSize(String value) {
+        return Integer.BYTES + (value == null ? 0 : value.getBytes(Constants.UTF8ENCODING).length);
+    }
+
+    /**
      * Write a string in the standard VoltDB way
      */
     public static void writeString(String value, ByteBuffer buf) {
@@ -248,7 +232,7 @@ public class SerializationHelper {
     /**
      * Write a set of bytes in the standard VoltDB way
      */
-    public static void writeVarbinary(byte[] bytes, ByteBuffer buf) throws IOException {
+    public static void writeVarbinary(byte[] bytes, ByteBuffer buf) {
         if (bytes == null) {
             buf.putInt(VoltType.NULL_STRING_LENGTH);
             return;
@@ -258,7 +242,7 @@ public class SerializationHelper {
         buf.put(bytes);
     }
 
-    public static void writeVarbinary(Byte[] bytes, ByteBuffer buf) throws IOException {
+    public static void writeVarbinary(Byte[] bytes, ByteBuffer buf) {
         byte[] unboxedBytes = new byte[bytes.length];
         for(int i = 0; i < bytes.length; i++) {
             unboxedBytes[i] = bytes[i];
@@ -274,7 +258,7 @@ public class SerializationHelper {
         return retval;
     }
 
-    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
+    public static void writeArray(byte[] values, ByteBuffer buf) {
         buf.putInt(values.length);
         buf.put(values);
     }
@@ -330,8 +314,11 @@ public class SerializationHelper {
         }
         buf.putShort((short)values.length);
         for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) buf.putLong(Long.MIN_VALUE);
-            else buf.putLong(values[i].getTime());
+            if (values[i] == null) {
+                buf.putLong(Long.MIN_VALUE);
+            } else {
+                buf.putLong(values[i].getTime());
+            }
         }
     }
 
@@ -358,8 +345,9 @@ public class SerializationHelper {
         }
         buf.putShort((short)values.length);
         for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null)
+            if (values[i] == null) {
                 throw new IOException("Array being fastserialized can't contain null values (position " + i + ")");
+            }
             values[i].flattenToBuffer(buf);
         }
     }

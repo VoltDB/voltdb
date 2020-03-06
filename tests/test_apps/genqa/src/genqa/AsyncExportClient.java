@@ -70,6 +70,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
@@ -78,97 +79,16 @@ import org.voltdb.iv2.TxnEgo;
 public class AsyncExportClient
 {
     static VoltLogger log = new VoltLogger("ExportClient");
-    // Number of txn ids per client log file.
-    public static long CLIENT_TXNID_FILE_SIZE = 250000;
-
-    static class TxnIdWriter
-    {
-        String m_nonce;
-        String m_txnLogPath;
-        AtomicLong m_count = new AtomicLong(0);
-
-        private Map<Integer,File> m_curFiles = new TreeMap<>();
-        private Map<Integer,File> m_baseDirs = new TreeMap<>();
-        private Map<Integer,OutputStreamWriter> m_osws = new TreeMap<>();
-
-        public TxnIdWriter(String nonce, String txnLogPath)
-        {
-            m_nonce = nonce;
-            m_txnLogPath = txnLogPath;
-
-            File logPath = new File(m_txnLogPath);
-            if (!logPath.exists()) {
-                if (!logPath.mkdir()) {
-                    log.warn("Problem creating log directory " + logPath);
-                }
-            }
-        }
-
-        public void createNewFile(int partId) throws IOException {
-            File dh = m_baseDirs.get(partId);
-            if (dh == null) {
-                dh = new File(m_txnLogPath, Integer.toString(partId));
-                if (!dh.mkdir()) {
-                    log.warn("Problem creating log directory " + dh);
-                }
-                m_baseDirs.put(partId, dh);
-            }
-            long count = m_count.get();
-            count = count - count % CLIENT_TXNID_FILE_SIZE;
-            File logFH = new File(dh, "active-" + count + "-" + m_nonce + "-txns");
-            OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(logFH));
-
-            m_curFiles.put(partId,logFH);
-            m_osws.put(partId,osw);
-        }
-
-        public void write(int partId, String rec) throws IOException {
-
-            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0) {
-                close(false);
-            }
-            OutputStreamWriter osw = m_osws.get(partId);
-            if (osw == null) {
-                createNewFile(partId);
-                osw = m_osws.get(partId);
-            }
-            osw.write(rec);
-            m_count.incrementAndGet();
-        }
-
-        public void close(boolean isLast) throws IOException
-        {
-            for (Map.Entry<Integer,OutputStreamWriter> e: m_osws.entrySet()) {
-
-                int partId = e.getKey();
-                OutputStreamWriter osw = e.getValue();
-
-                if (osw != null) {
-                    osw.close();
-                    File logFH = m_curFiles.get(partId);
-                    File renamed = new File(
-                            m_baseDirs.get(partId),
-                            logFH.getName().substring("active-".length()) + (isLast ? "-last" : "")
-                            );
-                    logFH.renameTo(renamed);
-
-                    e.setValue(null);
-                }
-                m_curFiles.put(partId, null);
-            }
-
-        }
-    }
+    // Transactions between catalog swaps.
+    public static long CATALOG_SWAP_INTERVAL = 500000;
 
     static class AsyncCallback implements ProcedureCallback
     {
-        private final TxnIdWriter m_writer;
         private final long m_rowid;
-        public AsyncCallback(TxnIdWriter writer, long rowid)
+        public AsyncCallback(long rowid)
         {
             super();
             m_rowid = rowid;
-            m_writer = writer;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) {
@@ -178,62 +98,42 @@ public class AsyncExportClient
             {
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(INSERT);
-                long txid = clientResponse.getResults()[0].asScalarLong();
-                final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
-                // log.info("Success " + trace);
-                try
-                {
-                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
             }
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
-                // log.info("Fail " + trace);
-                try
-                {
-                    m_writer.write(-1,trace);
-                }
-                catch (IOException e)
-                {
-                    log.error("Exception: " + e);
-                    e.printStackTrace();
-                }
             }
         }
     }
 
     static class TableExportCallback implements ProcedureCallback
     {
-        private final TxnIdWriter m_writer;
-        private final long m_type;
-        public TableExportCallback(TxnIdWriter writer, long type)
+
+        private final long m_row_id;
+        private final long m_op;
+        public TableExportCallback(long row_id, long op)
         {
             super();
-            m_type = type;
-            m_writer = writer;
+            m_op = op;
+            m_row_id = row_id;
         }
+
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
-            long now = System.currentTimeMillis();
-            int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE)
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
-
+                int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE
                 TrackingResults.incrementAndGet(0);
                 TransactionCounts.incrementAndGet(transType);
             }
             else
             {
+                long now = System.currentTimeMillis();
                 TrackingResults.incrementAndGet(1);
                 final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
                 log.info("TableExport failed: " + trace);
+                // log.info("Failed row_id: " + m_row_id + ", Operation: " + m_op); // it's static so whose rowid anyway?
             }
         }
     }
@@ -282,11 +182,16 @@ public class AsyncExportClient
 
     // If testing Table/Export, count inserts, deletes, update fore & aft
 
+    private static int NONE = 0;
     private static int INSERT = 1;
-    private static int DELETE = 2;
-    private static int UPDATE_OLD = 3;
+    private static int UPDATE_OLD = 2;
+    private static int DELETE = 3;
     private static int UPDATE_NEW = 4;
+    // TBD: add MIGRATE (5), though not relevant in this test (yet)
     private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
+    private static final AtomicLongArray QueuedTransactionCounts = new AtomicLongArray(4);
+    private static final AtomicLong NoConnectionsExceptionsCount = new AtomicLong(0);
+    private static final AtomicLong OtherProcCallExceptionCount = new AtomicLong(0);
 
     private static File deployment = new File("deployment.xml");
 
@@ -344,8 +249,6 @@ public class AsyncExportClient
 
             // Retrieve parameters
             final String csv           = apph.stringValue("statsfile");
-
-            TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
 
             // Validate parameters
             apph.validate("duration", (config.duration > 0))
@@ -413,19 +316,29 @@ public class AsyncExportClient
 
                 // Table with Export
                 if (config.usetableexport) {
-                    // call TableExport twice, once will insert, the second will randomly update or delete
-                    for (int i = 0; i < 2; i++) {
-                        try {
-                            clientRef.get().callProcedure(
-                                    new TableExportCallback(writer, r.nextInt(3)+1),
-                                    "TableExport",
-                                    currentRowId,
-                                    0);
-                        }
-                        catch (Exception e) {
-                            log.fatal("Exception: " + e);
-                            e.printStackTrace();
-                            System.exit(-1);
+                    for (long op = 1; op < 4; op++) {
+                        long retries = 4;
+                        while (retries-- > 0) {
+                            try {
+                                clientRef.get().callProcedure(
+                                        new TableExportCallback(rowId.get(), op),
+                                        "TableExport",
+                                        currentRowId,
+                                        op);
+                                QueuedTransactionCounts.incrementAndGet((int) op);
+                                break;
+                            }
+                            catch (NoConnectionsException e) {
+                                log.info("Exception: " + e);
+                                e.printStackTrace();
+                                NoConnectionsExceptionsCount.incrementAndGet();
+                            }
+                            catch (Exception e) {
+                                log.info("Exception: " + e);
+                                e.printStackTrace();
+                                OtherProcCallExceptionCount.incrementAndGet();
+                            }
+                            Thread.sleep(3000);
                         }
                     }
                 }
@@ -433,7 +346,7 @@ public class AsyncExportClient
                 // Post the request, asynchronously
                     try {
                         clientRef.get().callProcedure(
-                                                      new AsyncCallback(writer, currentRowId),
+                                                      new AsyncCallback(currentRowId),
                                                       config.procedure,
                                                       currentRowId,
                                                       0);
@@ -482,8 +395,6 @@ public class AsyncExportClient
             log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             clientRef.get().callProcedure("InsertExportDoneDetails", TrackingResults.get(0));
 
-            writer.close(true);
-
             // Now print application results:
 
             // 1. Tracking statistics
@@ -502,7 +413,7 @@ public class AsyncExportClient
             , TrackingResults.get(1))
             );
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
-                log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+                log.info("WARNING Tracking results total doesn't match final rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
 
             // 2. Print TABLE EXPORT stats if that's configured
@@ -510,37 +421,51 @@ public class AsyncExportClient
                 log.info(
                     String.format(
                         "-------------------------------------------------------------------------------------\n"
-                      + " Table/Export Results\n"
+                      + " Table/Export Committed Counts\n"
                       + "-------------------------------------------------------------------------------------\n\n"
-                      + "A total of %d calls were received...\n"
-                      + " - %,9d INSERT\n"
-                      + " - %,9d DELETE\n"
-                      + " - %,9d UPDATE (OLD)"
+                      + "A total of %d calls were committed...\n"
+                      + " - %,9d Committed-Inserts\n"
+                      + " - %,9d Committed-Deletes\n"
+                      + " - %,9d Committed-Updates/Before\n"
+                      + " - %,9d None return from SP"
                       + "\n\n"
                       + "-------------------------------------------------------------------------------------\n"
                       , TrackingResults.get(0)+TrackingResults.get(1)
                       , TransactionCounts.get(INSERT)
                       , TransactionCounts.get(DELETE)
-                      , TransactionCounts.get(UPDATE_OLD))
+                      , TransactionCounts.get(UPDATE_OLD)
+                      , TransactionCounts.get(NONE))
                       // old & new on each update so either = total updates, not the sum of the 2
                       // +TransactionCounts.get(UPDATE_NEW)
                       );
+                log.info(
+                        String.format(
+                            "-------------------------------------------------------------------------------------\n"
+                          + " Table/Export Queued Operation Results\n"
+                          + "-------------------------------------------------------------------------------------\n\n"
+                          + "A total of %d calls were queued...\n"
+                          + " - %,9d Queued-Inserts\n"
+                          + " - %,9d Queued-Deletes\n"
+                          + " - %,9d Queued-Updates/Before"
+                          + "\n\n"
+                          + "-------------------------------------------------------------------------------------\n"
+                          , QueuedTransactionCounts.get(INSERT) + QueuedTransactionCounts.get(DELETE) + QueuedTransactionCounts.get(UPDATE_OLD)
+                          , QueuedTransactionCounts.get(INSERT)
+                          , QueuedTransactionCounts.get(DELETE)
+                          , QueuedTransactionCounts.get(UPDATE_OLD))
+                          // old & new on each update so either = total updates, not the sum of the 2
+                          // +TransactionCounts.get(UPDATE_NEW)
+                          );
 
-                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_LOOPBACK");
-                log.info("\nEXPORT_PARTITIONED_TABLE_LOOPBACK count: " + export_table_count);
-                long table_with_metadata_count = get_table_count("PARTITIONED_TABLE_WITH_METADATA");
-                log.info("PARTITIONED_TABLE_WITH_METADATA count:" + table_with_metadata_count);
+                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_CDC");
+                log.info("\nEXPORT_PARTITIONED_TABLE_CDC count: " + export_table_count);
 
-                // do some sanity checks on the counts...
-                long meta_data_expected = TransactionCounts.get(INSERT) + TransactionCounts.get(DELETE) + TransactionCounts.get(UPDATE_OLD) * 2;
-                if (table_with_metadata_count != meta_data_expected) {
-                    System.err.println("ERROR: Metadata expected " + meta_data_expected +
-                        " count does not match with table count: " + table_with_metadata_count + "\n");
-                }
                 long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
-                    System.err.println("Insert and delete count " + export_table_expected +
+                    log.info("Insert and delete count " + export_table_expected +
                         " does not match export table count: " + export_table_count + "\n");
+                    // System.err.println("Insert and delete count " + export_table_expected +
+                    //     " does not match export table count: " + export_table_count + "\n");
                 }
 
             }

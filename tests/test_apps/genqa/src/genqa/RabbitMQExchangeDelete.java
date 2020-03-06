@@ -24,13 +24,14 @@
 package genqa;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 public class RabbitMQExchangeDelete {
-    public static void main(String[] args) throws IOException
+    public static void main(String[] args) throws IOException, TimeoutException
     {
         if (args.length < 5) {
             System.err.println("ERROR: usage: RabbitMQExchangeDelete host user password vhost exhangeName [exchangeName ...]");
