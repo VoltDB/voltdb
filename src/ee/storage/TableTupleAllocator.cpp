@@ -667,7 +667,7 @@ inline void* CompactingChunks::allocate() {
 }
 
 inline bool CompactingChunks::empty() const noexcept {
-    return beginTxn().empty();
+    return m_allocs == 0;
 }
 
 void* CompactingChunks::free(void* dst) {
