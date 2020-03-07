@@ -180,8 +180,11 @@ TEST_F(StreamedTableTest, BaseCase) {
     }
     UndoQuantum::release(std::move(*m_quantum));
     std::list<UndoQuantumReleaseInterest*>& releasedInterests = m_quantum->getUndoQuantumReleasedInterests();
-    releasedInterests.front()->finalizeRelease();
-
+    std::cout << "Release interest count:" << releasedInterests.size() << std::endl;
+    if (releasedInterests.size() > 0) {
+        releasedInterests.front()->finalizeRelease();
+    }
+    std::cout << "Interest has been released." << std::endl;
     // a negative flush implies "now". this helps valgrind heap block test
     m_table->flushOldTuples(-1);
 
