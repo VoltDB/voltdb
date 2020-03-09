@@ -47,6 +47,6 @@ public class VoltPCalcRule extends RelOptRule {
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
         call.transformTo(new VoltPhysicalCalc(
                 calc.getCluster(), calc.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                convertedInput, calc.getProgram()));
+                convertedInput, calc.getProgram(), false));
     }
 }

@@ -22,6 +22,7 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexProgram;
@@ -42,15 +43,26 @@ import com.google.common.base.Preconditions;
  */
 public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
 
+    // In a partitioned query Aggregate could be pushed down to fragments
+    // by the Aggregate Exchange Transpose Rule -
+    // Aggregate / Exchange / RelNode => Coordinator Aggregate / Exchange / Fragment Aggregate / RelNode
+    // This indicator prevents this rule to fire indefinitely by setting it to TRUE
+    private final boolean m_isPushedDown;
+
     public VoltPhysicalCalc(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program, boolean isPushedDown) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
+        m_isPushedDown = isPushedDown;
     }
 
     @Override
     public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
-        return new VoltPhysicalCalc(getCluster(), traitSet, child, program);
+        return copy(traitSet, child, program, m_isPushedDown);
+    }
+
+    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program, boolean isPushedDown) {
+        return new VoltPhysicalCalc(getCluster(), traitSet, child, program, isPushedDown);
     }
 
     @Override
@@ -67,6 +79,13 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     }
 
     @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("pusheddown", m_isPushedDown);
+        return pw;
+    }
+
+    @Override
     public AbstractPlanNode toPlanNode() {
         // Calc can be converted to the ProjectionPlanNode only if its program
         // contains Project fields and no condition (Filter)
@@ -80,5 +99,9 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
                 RexConverter.convertToVoltDBNodeSchema(program, 0));
         ppn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         return ppn;
+    }
+
+    public boolean isPushedDown() {
+        return m_isPushedDown;
     }
 }

@@ -78,7 +78,8 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
                 calc.getCluster(),
                 calc.getTraitSet(),
                 newAggregate,
-                newProgram);
+                newProgram,
+                calc.isPushedDown());
 
         call.transformTo(newCalc);
     }

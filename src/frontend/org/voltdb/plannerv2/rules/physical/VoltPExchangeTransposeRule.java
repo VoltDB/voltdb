@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -42,7 +43,17 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
- * Rules that to push Limit, Sort and Aggregation nodes down through an Exchange node
+ * Rules that to push Limit, Sort and (Calc) Aggregation nodes down through an Exchange node
+ *  - Limit     / Exchange / RelNode => Limit    / Exchange / Limit     / RelNode
+ *  - Sort      / Exchange / RelNode => Sort      / Exchange / Sort      / RelNode
+ *  - Aggregate / Exchange / RelNode => Aggregate / Exchange / Aggregate / RelNode
+ *  - Calc / Aggregate / Exchange / RelNode => Calc / Aggregate / Exchange / Calc / Aggregate / RelNode
+ *  - Limit / Sort / Exchange / RelNode => Limit / Sort  / Exchange / Limit / Sort / RelNode
+ *  - Limit / Aggregate / Exchange / RelNode => Limit / Aggregate / Exchange / Limit / Aggregate / RelNode
+ *  - Limit / Calc / Aggregate / Exchange / RelNode => Limit / Calc / Aggregate / Exchange / Limit / Calc / Aggregate / RelNode
+ *
+ * This is a bit inflexible since the rule has to account for every possible combination of coordinate fragment
+ * configuration that can be pushed down through an Exchange node to fragments
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -54,7 +65,9 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         SORT_EXCHANGE,
         AGGREGATE_EXCHANGE,
         CALC_AGGREGATE_EXCHANGE,
-        LIMIT_SORT_EXCHANGE
+        LIMIT_SORT_EXCHANGE,
+        LIMIT_AGGREGATE_EXCHANGE,
+        LIMIT_CALC_AGGREGATE_EXCHANGE
     }
 
     /**
@@ -112,7 +125,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     private static final Predicate<VoltPhysicalAggregate> AGGREGATE_STOP_PREDICATE = rel -> !rel.isPushedDown();
     /*
      * Rule to transform Calc / Aggr(pusheddown = false) / Exchange / SingleRel to
-     *                   Calc / Aggr(pusheddown = true) / Exchange / Calc / Aggr(pusheddown = false) / SingleRel
+     *                   Calc(pusheddown =true) / Aggr(pusheddown = true) / Exchange / Calc(pusheddown = false) / Aggr(pusheddown = false) / SingleRel
      */
     public static final VoltPExchangeTransposeRule INSTANCE_CALC_AGGREGATE_EXCHANGE =
             new VoltPExchangeTransposeRule(
@@ -132,6 +145,33 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                                     operand(RelNode.class, any()))),
                     ExchangeType.AGGREGATE_EXCHANGE);
 
+    /**
+     * Predicate to stop AGGREGATE_EXCHANGE to match on Aggregate / EXCHANGE / Aggregate
+    */
+    private static final Predicate<VoltPhysicalAggregate> AGGREGATE_PUSHED_PREDICATE = rel -> rel.isPushedDown();
+    private static final Predicate<VoltPhysicalCalc> CLACK_AGGREGATE_PUSHED_PREDICATE = rel -> rel.isPushedDown();
+    /*
+     * Rule to transform Limit(pusheddown = false) / (Calc)Aggregate(pusheddown = true) / Exchange / SingleRel to
+     *                   Limit(pusheddown = true) / (Calc)Aggregate(pusheddown = true) / Exchange / Limit(pusheddown = false) / (Calc)Aggregate(pusheddown = false) /SingleRel
+     *
+     * This rule must fire after the SORT_EXCHANGE to preserve the right Limit / Sort order
+     * at the partition's fragment
+     */
+    public static final VoltPExchangeTransposeRule INSTANCE_LIMIT_AGGREGATE_EXCHANGE =
+            new VoltPExchangeTransposeRule(
+                    operandJ(VoltPhysicalLimit.class, null, LIMIT_STOP_PREDICATE,
+                            operandJ(VoltPhysicalAggregate.class, null, AGGREGATE_PUSHED_PREDICATE,
+                                    operand(VoltPhysicalExchange.class,
+                                            operand(RelNode.class, any())))),
+                    ExchangeType.LIMIT_AGGREGATE_EXCHANGE);
+    public static final VoltPExchangeTransposeRule INSTANCE_LIMIT_CALC_AGGREGATE_EXCHANGE =
+            new VoltPExchangeTransposeRule(
+                    operandJ(VoltPhysicalLimit.class, null, LIMIT_STOP_PREDICATE,
+                            operandJ(VoltPhysicalCalc.class, null, CLACK_AGGREGATE_PUSHED_PREDICATE,
+                                    operand(VoltPhysicalAggregate.class,
+                                            operand(VoltPhysicalExchange.class,
+                                                    operand(RelNode.class, any()))))),
+                    ExchangeType.LIMIT_CALC_AGGREGATE_EXCHANGE);
 
     private final ExchangeType mExchangeType;
 
@@ -143,38 +183,20 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         switch (mExchangeType) {
-            case LIMIT_EXCHANGE:
-                transposeLimitExchange(call);
-                break;
             case SORT_EXCHANGE:
                 transposeSortExchange(call);
                 break;
+            case LIMIT_EXCHANGE:
             case LIMIT_SORT_EXCHANGE:
-                transposeLimitSortExchange(call);
+            case LIMIT_AGGREGATE_EXCHANGE:
+            case LIMIT_CALC_AGGREGATE_EXCHANGE:
+                transposeLimitExchange(call);
                 break;
             case AGGREGATE_EXCHANGE:
             case CALC_AGGREGATE_EXCHANGE:
                 transposeAggregateExchange(call);
                 break;
         }
-    }
-
-    private void transposeLimitExchange(RelOptRuleCall call) {
-        VoltPhysicalLimit coordinatorLimit = (VoltPhysicalLimit) call.rels[0];
-        Exchange exchange = (Exchange) call.rels[1];
-        RelNode child = call.rels[2];
-
-        VoltRelUtil.buildFragmentLimit(coordinatorLimit, exchange.getDistribution(), child)
-            .ifPresent(fragmentLimit -> {
-                // Build chain
-                Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-                VoltPhysicalLimit newCoordinatorLimit = coordinatorLimit.copy(
-                        coordinatorLimit.getTraitSet(),
-                        newExchange,
-                        coordinatorLimit.getOffset(),
-                        coordinatorLimit.getLimit(), true);
-                call.transformTo(newCoordinatorLimit);
-            });
     }
 
     private void transposeSortExchange(RelOptRuleCall call) {
@@ -207,25 +229,39 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         call.transformTo(coordinatorSort);
     }
 
-    private void transposeLimitSortExchange(RelOptRuleCall call) {
-        VoltPhysicalLimit coordinatorLimit = (VoltPhysicalLimit) call.rels[0];
-        VoltPhysicalSort coordinatorSort = (VoltPhysicalSort) call.rels[1];
-        Exchange exchange = (Exchange) call.rels[2];
-        RelNode child = call.rels[3];
+    private void transposeLimitExchange(RelOptRuleCall call) {
+        final VoltPhysicalLimit coordinatorLimit = (VoltPhysicalLimit) call.rels[0];
+        final List<RelNode> coordinatoNodes;
+        final Exchange exchange;
+        final RelNode child;
+        if (mExchangeType == ExchangeType.LIMIT_EXCHANGE) {
+            assert(call.rels.length == 3);
+            coordinatoNodes = Arrays.asList(call.rels[1]);
+            exchange = (Exchange) call.rels[1];
+            child = call.rels[2];
+        } else if (mExchangeType == ExchangeType.LIMIT_SORT_EXCHANGE ||
+                mExchangeType == ExchangeType.LIMIT_AGGREGATE_EXCHANGE) {
+            assert(call.rels.length == 4);
+            coordinatoNodes = Arrays.asList(call.rels[2], call.rels[1]);
+            exchange = (Exchange) call.rels[2];
+            child = call.rels[3];
+        } else {
+            // ExchangeType.LIMIT_CALC_AGGREGATE_EXCHANGE
+            assert(call.rels.length == 5);
+            coordinatoNodes = Arrays.asList(call.rels[3], call.rels[2], call.rels[1]);
+            exchange = (Exchange) call.rels[3];
+            child = call.rels[4];
+        }
 
         VoltRelUtil.buildFragmentLimit(coordinatorLimit, exchange.getDistribution(), child)
             .ifPresent(fragmentLimit -> {
                 // Build chain
-                Exchange newExchange = exchange.copy(exchange.getTraitSet(), fragmentLimit, exchange.getDistribution());
-                VoltPhysicalSort newCoordinatorSort = coordinatorSort.copy(
-                    coordinatorSort.getTraitSet(),
-                    newExchange,
-                    coordinatorSort.getCollation(),
-                    coordinatorSort.offset,
-                    coordinatorSort.fetch);
+                RelNode coordinatorLimitInput = coordinatoNodes.stream().reduce(fragmentLimit, (relNodeInput, relNode) -> {
+                    return relNode.copy(relNode.getTraitSet(), Arrays.asList(relNodeInput));
+                });
                 VoltPhysicalLimit newCoordinatorLimit = coordinatorLimit.copy(
                         coordinatorLimit.getTraitSet(),
-                        newCoordinatorSort,
+                        coordinatorLimitInput,
                         coordinatorLimit.getOffset(),
                         coordinatorLimit.getLimit(), true);
                 call.transformTo(newCoordinatorLimit);
@@ -234,11 +270,14 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
 
     private void transposeAggregateExchange(RelOptRuleCall call) {
         // How to deal with Calc / Aggr / Exchange vs Aggr / Exchange
+        // Ideally, AGGREGATE_EXCHANGE and CALC_AGGREGATE_EXCHANGE should be mutual exclusive
+        // but I can't figure how to make it happen
+
         // If we have aggr with HAVING we should move both Calc and Aggr to fragment
-        // but rule Aggr / Exchange may move just the Aggr (this rule is required
-        // for aggr without HAVING or GROUP BY)
-        // Moving just Aggr without the Calc may be OK but  sub-optimal and should have a higher
+        // but rule Aggr / Exchange may move just the Aggr (this rule is required for aggr without HAVING)
+        // Moving just Aggr without the Calc may be OK but is sub-optimal and should have a higher
         // cost than the plan with both Calc / Aggr pushed down
+
         final VoltPhysicalCalc aggrCalc;
         final VoltPhysicalAggregate aggregate;
         final Exchange exchange;
@@ -269,7 +308,9 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
 
         final RelNode exhangeInput;
         if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
-            // Can't just copy calc. Only its filter. Project should remain
+            // Can't just copy calc. Only its filter. Projects must match the aggregate's output itself
+            // to make sure Coordinator Aggr / Exchange / Fragment Calc/ Fragment Aggr chain has consistent
+            // record type
             RexProgramBuilder builder = RexProgramBuilder.forProgram(
                     aggrCalc.getProgram(),
                     aggrCalc.getCluster().getRexBuilder(),
@@ -281,7 +322,8 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             exhangeInput = aggrCalc.copy(
                     aggrCalc.getTraitSet().replace(exchange.getDistribution()),
                     fragmentAggregate,
-                    builder.getProgram());
+                    builder.getProgram(),
+                    false);
         } else {
             exhangeInput = fragmentAggregate;
         }
@@ -326,7 +368,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 true);
         final RelNode finalResult;
         if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
-            // HAVING condition can be dropped here because fragment's calc already has them
+            // HAVING condition can be dropped now because fragment's calc already has them
             RexProgramBuilder builder = RexProgramBuilder.forProgram(
                     aggrCalc.getProgram(),
                     aggrCalc.getCluster().getRexBuilder(),
@@ -335,7 +377,8 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             finalResult = aggrCalc.copy(
                     aggrCalc.getTraitSet(),
                     coordinatorAggregate,
-                    builder.getProgram());
+                    builder.getProgram(),
+                    true);
         } else {
             finalResult = coordinatorAggregate;
         }

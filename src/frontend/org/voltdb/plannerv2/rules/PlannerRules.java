@@ -266,6 +266,8 @@ public class PlannerRules {
             VoltPExchangeTransposeRule.INSTANCE_LIMIT_SORT_EXCHANGE,
             VoltPExchangeTransposeRule.INSTANCE_AGGREGATE_EXCHANGE,
             VoltPExchangeTransposeRule.INSTANCE_CALC_AGGREGATE_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_AGGREGATE_EXCHANGE,
+            VoltPExchangeTransposeRule.INSTANCE_LIMIT_CALC_AGGREGATE_EXCHANGE,
 
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN,

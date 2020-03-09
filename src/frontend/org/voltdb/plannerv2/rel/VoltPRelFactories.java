@@ -82,7 +82,7 @@ class VoltPRelFactories {
                                 outputRowType, input.getCluster().getRexBuilder());
                 return new VoltPhysicalCalc(input.getCluster(),
                         input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                        input, program);
+                        input, program, false);
             };
 
     /**
@@ -101,7 +101,7 @@ class VoltPRelFactories {
         final RexProgram program = programBuilder.getProgram();
         return new VoltPhysicalCalc(input.getCluster(),
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
-                input, program);
+                input, program, false);
     };
 
     /**
