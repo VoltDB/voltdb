@@ -85,6 +85,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -911,55 +912,53 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Check license availability
             // All above - not for init
             String edition = "Community Edition";
-            if (config.m_startAction != StartAction.INITIALIZE) {
-                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-                // load license API
-                if (config.m_pathToLicense == null) {
-                    m_licenseApi = MiscUtils.licenseApiFactory();
-                    if (m_licenseApi == null) {
-                        hostLog.fatal("Unable to open license file in default directories");
-                    }
-                } else {
-                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
-                    if (m_licenseApi == null) {
-                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
-                    }
-                }
-
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            // load license API
+            if (config.m_pathToLicense == null) {
+                m_licenseApi = MiscUtils.licenseApiFactory();
                 if (m_licenseApi == null) {
-                    hostLog.fatal("Please contact sales@voltdb.com to request a license.");
-                    VoltDB.crashLocalVoltDB(
-                            "Failed to initialize license verifier. " + "See previous log message for details.", false,
-                            null);
+                    hostLog.fatal("Unable to open license file in default directories");
                 }
-
-                if (config.m_isEnterprise) {
-                    if (m_licenseApi.isEnterprise()) {
-                        edition = "Enterprise Edition";
-                    }
-                    if (m_licenseApi.isPro()) {
-                        edition = "Pro Edition";
-                    }
-                    if (m_licenseApi.isEnterpriseTrial()) {
-                        edition = "Enterprise Edition";
-                    }
-                    if (m_licenseApi.isProTrial()) {
-                        edition = "Pro Edition";
-                    }
-                    if (m_licenseApi.isAWSMarketplace()) {
-                        edition = "AWS Marketplace Edition";
-                    }
+            } else {
+                m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
                 }
+            }
 
-                // this also prints out the license type on the console
-                readBuildInfo(edition);
+            if (m_licenseApi == null) {
+                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
+                VoltDB.crashLocalVoltDB(
+                        "Failed to initialize license verifier. " + "See previous log message for details.", false,
+                        null);
+            }
 
-                // print out the licensee on the license
-                if (config.m_isEnterprise) {
-                    String licensee = m_licenseApi.licensee();
-                    if ((licensee != null) && (licensee.length() > 0)) {
-                        consoleLog.info(String.format("Licensed to: %s", licensee));
-                    }
+            if (config.m_isEnterprise) {
+                if (m_licenseApi.isEnterprise()) {
+                    edition = "Enterprise Edition";
+                }
+                if (m_licenseApi.isPro()) {
+                    edition = "Pro Edition";
+                }
+                if (m_licenseApi.isEnterpriseTrial()) {
+                    edition = "Enterprise Edition";
+                }
+                if (m_licenseApi.isProTrial()) {
+                    edition = "Pro Edition";
+                }
+                if (m_licenseApi.isAWSMarketplace()) {
+                    edition = "AWS Marketplace Edition";
+                }
+            }
+
+            // this also prints out the license type on the console
+            readBuildInfo(edition);
+
+            // print out the licensee on the license
+            if (config.m_isEnterprise) {
+                String licensee = m_licenseApi.licensee();
+                if ((licensee != null) && (licensee.length() > 0)) {
+                    consoleLog.info(String.format("Licensed to: %s", licensee));
                 }
             }
 
@@ -1013,6 +1012,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
+                if (config.m_pathToLicense != null) {
+                    stageLicenseFile(config.m_voltdbRoot, config.m_pathToLicense);
+                }
                 stageSchemaFiles(config,
                         readDepl.deployment.getDr() != null &&
                                 DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
@@ -2574,6 +2576,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Save cluster settings properties derived from the deployment file
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
+
+    private void stageLicenseFile(File vdbroot, String pathToLicense) {
+        File licenseF = new VoltFile(pathToLicense);
+        String path = null;
+        try {
+            path = vdbroot.getCanonicalPath();
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to get voltdbroot path", false, e);
+        }
+        File destF = new VoltFile(path + File.separator + licenseF.getName());
+        try {
+            FileUtils.copyFile(licenseF, destF);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage license file to " + vdbroot, false, e);
+        }
+    }
+
 
     private void stageSchemaFiles(Configuration config, boolean isXCDR) {
         if (config.m_userSchemas == null && config.m_stagedClassesPaths == null) {

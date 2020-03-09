@@ -43,7 +43,7 @@ def _listOfGlobsToFiles(pathGlobs):
                            'Specifies a list of schema files or paths with wildcards, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringListOption('-j', '--classes', 'classes_jarfiles',
                           'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.'),
-        VOLT.StringListOption('-l', '--license', 'license', 'specify the location of the license file')
+        VOLT.StringOption('-l', '--license', 'license', 'specify the location of the license file')
     ),
     description = 'Initializes a new, empty database.'
 )
