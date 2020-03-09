@@ -308,7 +308,7 @@ namespace voltdb {
             using super = typename Collections<collections_type>::template map<id_type, Iter, less_rolling_type<id_type>>;
         public:
             using iterator = typename super::iterator;
-            ChunkListIdSeeker() noexcept = default;
+            ChunkListIdSeeker() = default;
             Iter& get(iterator const&);
             using super::emplace;
             using super::erase;
