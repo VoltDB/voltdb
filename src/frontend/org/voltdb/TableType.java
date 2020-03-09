@@ -81,7 +81,10 @@ public enum TableType {
         return (e == CONNECTOR_LESS_STREAM.get());
     }
 
-    // return true if the table type is a STREAM explicitly declared in DDL
+    /**
+     * @param e table type
+     * @return {@code true} if this type is {@link #STREAM} or {@link #CONNECTOR_LESS_STREAM}
+     */
     public static boolean isStream(int e) {
         return (e == STREAM.get() || isConnectorLessStream(e));
     }
