@@ -1426,6 +1426,23 @@ void testRemovesFromEnds(size_t batch) {
                     return ++i >= NumTuples - batch;
                 });
         assert(i == NumTuples - batch);
+        // remove everything, add something back
+        if (! alloc.empty()) {
+            for (--i; i > 0; --i) {
+                alloc.remove(dir, addresses[i]);
+            }
+            alloc.remove(dir, addresses[0]);
+            assert(alloc.empty());
+        }
+        for (i = 0; i < NumTuples; ++i) {
+            memcpy(alloc.allocate(), gen.get(), TupleSize);
+        }
+        fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc),
+                [&i](void const* p) {
+                    assert(Gen::same(p, i++));
+                });
+        assert(i == NumTuples * 2);
     }
 }
 
