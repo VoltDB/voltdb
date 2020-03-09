@@ -320,15 +320,15 @@ inline pair<bool, typename ChunkList<Chunk, Compact, E>::iterator> ChunkList<Chu
     // the same, and TxnLeftBoundary, etc. to maintain two sets
     // of iterators.
     auto* mutable_this = const_cast<ChunkList<Chunk, Compact, E>*>(this);
-    auto r = make_pair(! m_byAddr.empty(), mutable_this->end());
-    if (r.first) {
+    auto const not_found = make_pair(false, mutable_this->end());
+    if (! m_byAddr.empty()) {
         // find first entry whose begin() > k
         auto iter = prev(mutable_this->m_byAddr.upper_bound(k));
         if (iter != mutable_this->m_byAddr.end()) {
-            r.second = iter->second;
+            return {true, iter->second};
         }
     }
-    return r;
+    return not_found;
 }
 
 template<typename Chunk, typename Compact, typename E> inline pair<bool, typename ChunkList<Chunk, Compact, E>::iterator>
@@ -872,8 +872,8 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         beginTxn().iterator(list_type::end());
                     }
                 }
-                vassert(! frozen() || empty() ||
-                        less_equal<position_type>()(m_frozenTxnBoundaries.right(), *last()));
+//                vassert(! frozen() || empty() ||
+//                        less_equal<position_type>()(m_frozenTxnBoundaries.right(), *last()));
                 --m_allocs;
             }
             break;
@@ -1861,6 +1861,48 @@ template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>:
                 Hook::copy(s);
                 Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
+}
+
+template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E>::info(void const* p) const {
+#ifdef DEBUG
+    return {};
+#else
+    auto* mutable_this = const_cast<HookedCompactingChunks<Hook, E>*>(this);
+    auto const iterp = mutable_this->find(p);
+    if (! iterp.first) {
+        snprintf(buf, sizeof buf, "Cannot find address %p\n", p);
+        buf[sizeof buf - 1] = 0;
+        return buf;
+    } else {
+        vassert(! beginTxn().empty());
+        auto const& iter = iterp.second;
+        snprintf(buf, sizeof buf,
+                "Address %p found at chunk %lu, offset %lu, txn 1st chunk = %lu [%p - %p], last chunk = %lu [%p - %p]",
+                p, iter->id(),
+                (reinterpret_cast<char const*>(p) - reinterpret_cast<char const*>(iter->begin())) / tupleSize(),
+                beginTxn().iterator()->id(), beginTxn().iterator()->begin(), beginTxn().iterator()->next(),
+                last()->id(), last()->begin(), last()->next());
+        buf[sizeof buf - 1] = 0;
+        string r{buf};
+        if (! frozen()) {
+            return r.append(" not frozen at the call time");
+        } else {
+            auto const& boundaries = frozenBoundaries();
+            vassert(! boundaries.left().empty() && ! boundaries.right().empty());
+            auto const left = mutable_this->find(boundaries.left().chunkId()),
+                 right = mutable_this->find(boundaries.right().chunkId());
+            vassert(left.first && right.first);
+            snprintf(buf, sizeof buf,
+                    " currently frozen at (%lu <%p of %p - %p>, %lu <%p of %p - %p>)\n",
+                    boundaries.left().chunkId(), boundaries.left().address(),
+                    left.second->begin(), left.second->end(),          // chunk full ranges, since begin == next is also valid
+                    boundaries.right().chunkId(), boundaries.right().address(),
+                    right.second->begin(), right.second->end());       // ditto
+            buf[sizeof buf - 1] = 0;
+            return r.append(buf);
+        }
+    }
+#endif
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

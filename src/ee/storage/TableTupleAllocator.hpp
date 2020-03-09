@@ -835,6 +835,8 @@ namespace voltdb {
             void remove_add(void*);
             size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             void clear();
+            // Debugging aid, only prints in debug build
+            string info(void const*) const;
         };
 
         /**

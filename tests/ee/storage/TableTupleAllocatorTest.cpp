@@ -1771,6 +1771,41 @@ TEST_F(TableTupleAllocatorTest, TestClearFreeCompactingChunks) {
     ASSERT_EQ(NumTuples, i);
 }
 
+string address(void const* p) {
+    static ostringstream oss;
+    oss<<p;
+    return oss.str();
+}
+
+// test printing of debug info
+TEST_F(TableTupleAllocatorTest, TestDebugInfo) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    array<void const*, NumTuples> addresses;
+    Gen gen;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    ASSERT_EQ("Cannot find address (nil)\n", alloc.info(nullptr));
+    string expected_prefix("Address "),
+           actual = alloc.info(addresses[0]);
+    expected_prefix
+        .append(address(addresses[0]))
+        .append(" found at chunk 0, offset 0, ");
+    ASSERT_EQ(expected_prefix, actual.substr(0, expected_prefix.length()));
+    // freeze, remove 1 + AllocsPerChunk tuples from head and
+    // tail each
+    alloc.template freeze<truth>();
+    for (i = 0; i <= AllocsPerChunk; ++i) {
+        alloc.remove(const_cast<void*>(addresses[i]));
+        alloc.remove(CompactingChunks::remove_direction::from_tail, addresses[NumTuples - i - 1]);
+    }
+    ASSERT_EQ(NumTuples - 2 * AllocsPerChunk - 2, alloc.size());
+    puts(alloc.info(addresses[0]).c_str());
+}
+
 #endif
 
 int main() {
