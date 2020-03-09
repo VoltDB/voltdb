@@ -242,7 +242,7 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    private void setupForNewPlans(AbstractParsedStmt parsedStmt) {
+    private void setupForNewPlans(AbstractParsedStmt parsedStmt, boolean isForView) {
         m_bestAndOnlyPlanWasGenerated = false;
         m_partitioning.analyzeTablePartitioning(parsedStmt.allScans());
 
@@ -252,7 +252,7 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedSelectStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
+            if (!isForView && tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
                         "Illegal to read a stream.");
             }
@@ -426,6 +426,10 @@ public class PlanAssembler {
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
     CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+        return getBestCostPlan(parsedStmt, false);
+    }
+
+    CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean isForView) {
         // parse any ephemeral table queries that the statement contains
         List<StmtEphemeralTableScan> scanNodes = parsedStmt.getEphemeralTableScans();
         ParsedResultAccumulator fromSubqueryResult = null;
@@ -466,7 +470,7 @@ public class PlanAssembler {
 
 
         // set up the plan assembler for this statement
-        setupForNewPlans(parsedStmt);
+        setupForNewPlans(parsedStmt, isForView);
 
         /*
          * If this is a select statement with a common table expression, then make sure
