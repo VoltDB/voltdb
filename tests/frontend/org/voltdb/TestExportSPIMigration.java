@@ -82,6 +82,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             builder.setUseDDLSchema(true);
             builder.setPartitionDetectionEnabled(true);
             builder.setDeadHostTimeout(4);
+            builder.setFlushIntervals(1000, 1000, 50000);
 
             //use socket exporter
             Map<String, String> additionalEnv = new HashMap<String, String>();
@@ -95,7 +96,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             builder.addExport(true, ServerExportEnum.CUSTOM, props, "utopia");
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-            cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");
             cluster.setNewCli(true);
             cluster.setHasLocalServer(false);
             cluster.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
@@ -262,6 +262,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                             break;
                         }
                         if (line != null) {
+                            System.out.println("Adding export line: " + line);
                             exportMessageSet.add(line);
                         }
                         String parts[] = m_parser.parseLine(line);
