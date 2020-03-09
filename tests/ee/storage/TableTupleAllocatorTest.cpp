@@ -1772,7 +1772,7 @@ TEST_F(TableTupleAllocatorTest, TestClearFreeCompactingChunks) {
 }
 
 string address(void const* p) {
-    static ostringstream oss;
+    ostringstream oss;
     oss<<p;
     return oss.str();
 }
@@ -1803,7 +1803,12 @@ TEST_F(TableTupleAllocatorTest, TestDebugInfo) {
         alloc.remove(CompactingChunks::remove_direction::from_tail, addresses[NumTuples - i - 1]);
     }
     ASSERT_EQ(NumTuples - 2 * AllocsPerChunk - 2, alloc.size());
-    puts(alloc.info(addresses[0]).c_str());
+    expected_prefix = "Address ";
+    expected_prefix.append(address(addresses[0]))
+        .append(" found at chunk 0, offset 0, txn 1st chunk = 1 [")
+        .append(address(addresses[AllocsPerChunk]))
+        .append(" - ");
+    ASSERT_EQ(expected_prefix, alloc.info(addresses[0]).substr(0, expected_prefix.length()));
 }
 
 #endif

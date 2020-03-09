@@ -635,6 +635,16 @@ CompactingChunks::find(id_type id) noexcept {
         make_pair(false, list_type::end()) : iter;
 }
 
+inline pair<bool, typename CompactingChunks::list_type::iterator>
+CompactingChunks::find(id_type id, bool) noexcept {
+    return list_type::find(id);
+}
+
+inline pair<bool, typename CompactingChunks::list_type::iterator>
+CompactingChunks::find(void const* p, bool) noexcept {
+    return list_type::find(p);
+}
+
 inline typename CompactingChunks::list_type::iterator CompactingChunks::releasable() {
     return beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
 }
@@ -1800,11 +1810,14 @@ HookedCompactingChunks<Hook, E>::thaw() {
 }
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
-    return CompactingChunks::allocate();
+    void* r = CompactingChunks::allocate();
+    VOLT_TRACE("allocate() => %p", r);
+    return r;
 }
 
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::update(void* dst) {
+    VOLT_TRACE("update(%p)", dst);
     Hook::add(*this, Hook::ChangeType::Update, dst);
 }
 
@@ -1814,6 +1827,7 @@ HookedCompactingChunks<Hook, E>::remove(void* dst) {
         Hook::copy(dst);
     }
     void const* src = CompactingChunks::free(dst);
+    VOLT_TRACE("remove(%p) <- %p: ", dst, src, frozen() ? "frozen" : "not frozen");
     Hook::add(*this, Hook::ChangeType::Deletion, dst);
     return src;
 }
@@ -1823,6 +1837,7 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
     if (frozen() && dir == remove_direction::from_head) {
         throw logic_error("Cannot remove from head when frozen");
     } else {
+        VOLT_TRACE("remove(%s, %p)", dir == remove_direction::from_head ? "from_head" : "from_tail", p);
         free(dir, p);
     }
 }
@@ -1838,14 +1853,31 @@ HookedCompactingChunks<Hook, E>::remove_reserve(size_t n) {
 
 template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void*>> const&)> const& cb) {
+#ifndef NDEBUG
+    ostringstream oss;
+    oss << "remove_force([removed]: ";
+    for_each(CompactingChunks::m_batched.removed().cbegin(),
+            CompactingChunks::m_batched.removed().cend(),
+            [&oss] (void* s) noexcept { oss << s << ", "; });
+    oss.seekp(-2, ios_base::end);
+    oss << "\n[moved]: ";
+    for_each(CompactingChunks::m_batched.movements().cbegin(),
+            CompactingChunks::m_batched.movements().cend(),
+            [&oss] (pair<void*, void*> const& s) noexcept {
+                oss << s.first << " <- " << s.second << ", ";
+            });
+    oss.seekp(-2, ios_base::end);
+    oss << ")\n";
+    VOLT_TRACE("%s", oss.str().c_str());
+#endif
     // hook registration
-    std::for_each(CompactingChunks::m_batched.removed().cbegin(),
+    for_each(CompactingChunks::m_batched.removed().cbegin(),
             CompactingChunks::m_batched.removed().cend(),
             [this](void* s) noexcept {
                 Hook::copy(s);
                 Hook::add(*this, Hook::ChangeType::Deletion, s);
             });
-    std::for_each(CompactingChunks::m_batched.movements().cbegin(),
+    for_each(CompactingChunks::m_batched.movements().cbegin(),
             CompactingChunks::m_batched.movements().cend(),
             [this](pair<void*, void*> const& entry) noexcept {
                 Hook::copy(entry.first);
@@ -1864,11 +1896,8 @@ template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>:
 }
 
 template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E>::info(void const* p) const {
-#ifdef DEBUG
-    return {};
-#else
     auto* mutable_this = const_cast<HookedCompactingChunks<Hook, E>*>(this);
-    auto const iterp = mutable_this->find(p);
+    auto const iterp = mutable_this->find(p, true);
     if (! iterp.first) {
         snprintf(buf, sizeof buf, "Cannot find address %p\n", p);
         buf[sizeof buf - 1] = 0;
@@ -1876,33 +1905,31 @@ template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E
     } else {
         vassert(! beginTxn().empty());
         auto const& iter = iterp.second;
-        snprintf(buf, sizeof buf,
-                "Address %p found at chunk %lu, offset %lu, txn 1st chunk = %lu [%p - %p], last chunk = %lu [%p - %p]",
-                p, iter->id(),
-                (reinterpret_cast<char const*>(p) - reinterpret_cast<char const*>(iter->begin())) / tupleSize(),
-                beginTxn().iterator()->id(), beginTxn().iterator()->begin(), beginTxn().iterator()->next(),
-                last()->id(), last()->begin(), last()->next());
-        buf[sizeof buf - 1] = 0;
-        string r{buf};
+        ostringstream oss;
+        oss << "Address " << p << " found at chunk " << iter->id() << ", offset "
+            << (reinterpret_cast<char const*>(p) - reinterpret_cast<char const*>(iter->begin())) / tupleSize()
+            << ", txn 1st chunk = " << beginTxn().iterator()->id() << " [" << beginTxn().iterator()->begin()
+            << " - " << beginTxn().iterator()->next() << "], last chunk = " << last()->id() << " ["
+            << last()->begin() << " - " << last()->next() << "], ";
         if (! frozen()) {
-            return r.append(" not frozen at the call time");
+            oss << "not frozen at the call time";
         } else {
             auto const& boundaries = frozenBoundaries();
             vassert(! boundaries.left().empty() && ! boundaries.right().empty());
-            auto const left = mutable_this->find(boundaries.left().chunkId()),
-                 right = mutable_this->find(boundaries.right().chunkId());
-            vassert(left.first && right.first);
-            snprintf(buf, sizeof buf,
-                    " currently frozen at (%lu <%p of %p - %p>, %lu <%p of %p - %p>)\n",
-                    boundaries.left().chunkId(), boundaries.left().address(),
-                    left.second->begin(), left.second->end(),          // chunk full ranges, since begin == next is also valid
-                    boundaries.right().chunkId(), boundaries.right().address(),
-                    right.second->begin(), right.second->end());       // ditto
-            buf[sizeof buf - 1] = 0;
-            return r.append(buf);
+            auto const left = mutable_this->find(boundaries.left().chunkId(), true),
+                 right = mutable_this->find(boundaries.right().chunkId(), true);
+            vassert(left.first);
+
+            auto const* right_begin = right.first ? right.second->begin() : nullptr,
+                 *right_end = right.first ? right.second->end() : nullptr;
+            oss << " currently frozen at (" << boundaries.left().chunkId() << " <"
+                << boundaries.left().address() << " of " << left.second->begin() << " - "
+                << left.second->end() << ">, " << boundaries.right().chunkId() << " <"
+                << boundaries.right().address() << " of " << right_begin << " - "
+                << right_end << ">)";
         }
+        return oss.str();
     }
-#endif
 }
 
 // # # # # # # # # # # # # # # # # # Codegen: begin # # # # # # # # # # # # # # # # # # # # # # #

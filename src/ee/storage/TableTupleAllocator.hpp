@@ -308,7 +308,7 @@ namespace voltdb {
             using super = typename Collections<collections_type>::template map<id_type, Iter, less_rolling_type<id_type>>;
         public:
             using iterator = typename super::iterator;
-            ChunkListIdSeeker() noexcept = default;
+            ChunkListIdSeeker() = default;
             Iter& get(iterator const&);
             using super::emplace;
             using super::erase;
@@ -653,6 +653,8 @@ namespace voltdb {
             size_t m_allocs = 0;
             using list_type::last;
             template<typename Remove_cb> void clear(Remove_cb const&);
+            pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
+            pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
