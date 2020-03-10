@@ -884,8 +884,6 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         beginTxn().iterator(list_type::end());
                     }
                 }
-//                vassert(! frozen() || empty() ||
-//                        less_equal<position_type>()(m_frozenTxnBoundaries.right(), *last()));
                 --m_allocs;
             }
             break;
@@ -1723,23 +1721,24 @@ inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essent
     }
 }
 
-//template<typename Alloc, typename Trait, typename E>
-//inline void TxnPreHook<Alloc, Trait, E>::add(typename TxnPreHook<Alloc, Trait, E>::ChangeType type,
-//        void const* dst) {
-//    if (m_recording) {     // ignore changes beyond boundary
-//        switch (type) {
-//            case ChangeType::Update:
-//                update(dst);
-//                break;
-//            case ChangeType::Insertion:
-//                insert(dst);
-//                break;
-//            case ChangeType::Deletion:
-//            default:
-//                remove(dst);
-//        }
-//    }
-//}
+template<typename Alloc, typename Trait, typename E1>
+template<typename IteratorObserver, typename E2>
+inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
+        void const* dst, IteratorObserver) {
+    if (m_recording) {     // ignore changes beyond boundary
+        switch (type) {
+            case ChangeType::Update:
+                update(dst);
+                break;
+            case ChangeType::Insertion:
+                insert(dst);
+                break;
+            case ChangeType::Deletion:
+            default:
+                remove(dst);
+        }
+    }
+}
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
     if (m_recording) {
@@ -1815,19 +1814,9 @@ template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
 
 template<typename Hook, typename E>
-template<typename Tag> inline shared_ptr<typename
-    IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
-HookedCompactingChunks<Hook, E>::freeze() {
-    CompactingChunks::freeze();
-    Hook::freeze();
-    return make_shared<typename
-        IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
-}
-
-template<typename Hook, typename E> inline void
-HookedCompactingChunks<Hook, E>::thaw() {
-    Hook::thaw();
-    CompactingChunks::thaw();
+template<typename Tag> inline typename HookedCompactingChunks<Hook, E>::template observer_type<Tag>&
+HookedCompactingChunks<Hook, E>::observer() noexcept {
+    return reinterpret_cast<observer_type<Tag>&>(m_observerReady ? m_iterator_observer : m_dummy_observer);
 }
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
@@ -1836,21 +1825,23 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
     return r;
 }
 
-template<typename Hook, typename E> inline void
-HookedCompactingChunks<Hook, E>::update(void* dst) {
-    VOLT_TRACE("update(%p)", dst);
-    Hook::add(*this, Hook::ChangeType::Update, dst);
-}
-
-template<typename Hook, typename E> inline void const*
-HookedCompactingChunks<Hook, E>::remove(void* dst) {
+template<typename Hook, typename E>
+template<typename Tag> inline void const* HookedCompactingChunks<Hook, E>::remove(void* dst) {
     if (frozen()) {
         Hook::copy(dst);
     }
     void const* src = CompactingChunks::free(dst);
     VOLT_TRACE("remove(%p) <- %p: ", dst, src, frozen() ? "frozen" : "not frozen");
-    Hook::add(*this, Hook::ChangeType::Deletion, dst);
+    Hook::add(Hook::ChangeType::Deletion, dst, observer<Tag>());
     return src;
+}
+
+template<typename Hook, typename E>
+template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
+    CompactingChunks::clear([this] (void const* s) noexcept {
+                Hook::copy(s);
+                Hook::add(Hook::ChangeType::Deletion, s, observer<Tag>());
+            });
 }
 
 template<typename Hook, typename E> inline void
@@ -1863,6 +1854,34 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
     }
 }
 
+template<typename Hook, typename E>
+template<typename Tag> inline void HookedCompactingChunks<Hook, E>::update(void* dst) {
+    VOLT_TRACE("update(%p)", dst);
+    Hook::add(Hook::ChangeType::Update, dst, observer<Tag>());
+}
+
+template<typename Hook, typename E>
+template<typename Tag> inline
+shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
+HookedCompactingChunks<Hook, E>::freeze() {
+    CompactingChunks::freeze();
+    Hook::freeze();
+    auto ptr = make_shared<typename
+        IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
+    m_observerReady = true;
+    new (&m_iterator_observer) observer_type<Tag>(ptr);
+    return ptr;
+}
+
+template<typename Hook, typename E>
+template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
+    Hook::thaw();
+    CompactingChunks::thaw();
+    m_observerReady = false;
+    reinterpret_cast<observer_type<Tag>&>(m_iterator_observer)
+        .~observer_type<Tag>();
+}
+
 template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove_add(void* p) {
     CompactingChunks::m_batched.add(p);
 }
@@ -1872,7 +1891,8 @@ HookedCompactingChunks<Hook, E>::remove_reserve(size_t n) {
     CompactingChunks::m_batched.reserve(n);
 }
 
-template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E>::remove_force(
+template<typename Hook, typename E>
+template<typename Tag> inline size_t HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void*>> const&)> const& cb) {
 #ifndef NDEBUG
     ostringstream oss;
@@ -1885,35 +1905,27 @@ template<typename Hook, typename E> inline size_t HookedCompactingChunks<Hook, E
     for_each(CompactingChunks::m_batched.movements().cbegin(),
             CompactingChunks::m_batched.movements().cend(),
             [&oss] (pair<void*, void*> const& s) noexcept {
-                oss << s.first << " <- " << s.second << ", ";
+            oss << s.first << " <- " << s.second << ", ";
             });
     oss.seekp(-2, ios_base::end);
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
-    // hook registration
-    for_each(CompactingChunks::m_batched.removed().cbegin(),
+    for_each(CompactingChunks::m_batched.removed().cbegin(), // hook registration
             CompactingChunks::m_batched.removed().cend(),
             [this] (void* s) noexcept {
-                Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s);
+            Hook::copy(s);
+            Hook::add(Hook::ChangeType::Deletion, s, observer<Tag>());
             });
     for_each(CompactingChunks::m_batched.movements().cbegin(),
             CompactingChunks::m_batched.movements().cend(),
             [this](pair<void*, void*> const& entry) noexcept {
-                Hook::copy(entry.first);
-                Hook::add(*this, Hook::ChangeType::Deletion, entry.first);
-                memcpy(entry.first, entry.second, tupleSize());
+            Hook::copy(entry.first);
+            Hook::add(Hook::ChangeType::Deletion, entry.first, observer<Tag>());
+            memcpy(entry.first, entry.second, tupleSize());
             });
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
-}
-
-template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::clear() {
-    CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::copy(s);
-                Hook::add(*this, Hook::ChangeType::Deletion, s);
-            });
 }
 
 template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E>::info(void const* p) const {
@@ -1966,6 +1978,7 @@ using t4 = mt<LazyNonCompactingChunk, gc_policy::never>;
 using t5 = mt<LazyNonCompactingChunk, gc_policy::always>;
 using t6 = mt<LazyNonCompactingChunk, gc_policy::batched>;
 }
+
 #define range8(ranger)                                                     \
     ranger(0); ranger(1); ranger(2); ranger(3); ranger(4); ranger(5); ranger(6); ranger(7)
 // BitChecker: 8 instantiations
@@ -1987,7 +2000,7 @@ range8(ComposeByteAndBitCodegen);
 // Chunks
 template class voltdb::storage::NonCompactingChunks<EagerNonCompactingChunk>;
 template class voltdb::storage::NonCompactingChunks<LazyNonCompactingChunk>;
-// HookedCompactingChunks : 2 x 2 x 3 = 12 instantiations
+// HookedCompactingChunks
 #define HookedChunksCodegen2(alloc, gc)                                     \
     template class voltdb::storage::HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>>
 #define HookedChunksCodegen1(alloc)                                         \
@@ -2045,7 +2058,7 @@ IteratorTagCodegen(NthBitChecker<6>); IteratorTagCodegen(NthBitChecker<7>);
 #undef IteratorTagCodegen12
 #undef IteratorTagCodegen11
 #undef IteratorTagCodegen10
-// TxnPreHook: 2 x 3 = 6 instantiations
+// TxnPreHook
 #define TxnPreHookCodegen(alloc)                                                 \
 template class voltdb::storage::TxnPreHook<alloc, HistoryRetainTrait<gc_policy::always>>;       \
 template class voltdb::storage::TxnPreHook<alloc, HistoryRetainTrait<gc_policy::batched>>;      \
@@ -2054,7 +2067,7 @@ template class voltdb::storage::TxnPreHook<alloc, HistoryRetainTrait<gc_policy::
 TxnPreHookCodegen(NonCompactingChunks<EagerNonCompactingChunk>);
 TxnPreHookCodegen(NonCompactingChunks<LazyNonCompactingChunk>);
 #undef TxnPreHookCodegen
-// hooked_iterator_type : 8 x 2 x 3 = 48 instantiations
+// hooked_iterator_type
 #define HookedIteratorCodegen3(tag, alloc, gc)                                           \
 template class voltdb::storage::IterableTableTupleChunks<                                \
     HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>>, \
@@ -2077,21 +2090,43 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen
 #undef HookedIteratorCodegen2
 #undef HookedIteratorCodegen3
-// template member function
-#define HookedFreeze2(tag, alloc, gc)                                                    \
-template shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<alloc,  \
+// template member methods
+#define HookedMethods4(tag, alloc, gc, alloc2)                                           \
+template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<IterableTableTupleChunks<   \
+    alloc2, tag, void>::hooked_iterator, void>(typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::ChangeType,    \
+            void const*, IterableTableTupleChunks<alloc2, tag, void>::hooked_iterator)
+#define HookedMethods3(tag, alloc, gc)                                                   \
+    HookedMethods4(tag, alloc, gc, __codegen__::t1);                                     \
+    HookedMethods4(tag, alloc, gc, __codegen__::t2);                                     \
+    HookedMethods4(tag, alloc, gc, __codegen__::t3);                                     \
+    HookedMethods4(tag, alloc, gc, __codegen__::t4);                                     \
+    HookedMethods4(tag, alloc, gc, __codegen__::t5);                                     \
+    HookedMethods4(tag, alloc, gc, __codegen__::t6)
+
+#define HookedMethods2(tag, alloc, gc)                                                   \
+template shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<alloc,                   \
          HistoryRetainTrait<gc>>, void>, tag, void>::hooked_iterator>                    \
-HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>()
-#define HookedFreeze1(tag, alloc)                                                        \
-    HookedFreeze2(tag, alloc, gc_policy::never);                                         \
-    HookedFreeze2(tag, alloc, gc_policy::always);                                        \
-    HookedFreeze2(tag, alloc, gc_policy::batched)
-#define HookedFreeze(tag)                                                                \
-    HookedFreeze1(tag, NonCompactingChunks<EagerNonCompactingChunk>);                    \
-    HookedFreeze1(tag, NonCompactingChunks<LazyNonCompactingChunk>)
-HookedFreeze(truth);
-#undef HookedFreeze
-#undef HookedFreeze1
-#undef HookedFreeze2
+HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>();  \
+template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
+template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
+template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
+template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(void*);\
+template size_t HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove_force<tag>(      \
+        function<void(vector<pair<void*, void*>> const&)> const&);                                               \
+template typename HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::template observer_type<tag>&  \
+HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::observer<tag>() noexcept;               \
+HookedMethods3(tag, alloc, gc)
+
+#define HookedMethods1(tag, alloc)                                                       \
+    HookedMethods2(tag, alloc, gc_policy::never);                                        \
+    HookedMethods2(tag, alloc, gc_policy::always);                                       \
+    HookedMethods2(tag, alloc, gc_policy::batched)
+#define HookedMethods(tag)                                                               \
+    HookedMethods1(tag, NonCompactingChunks<EagerNonCompactingChunk>);                   \
+    HookedMethods1(tag, NonCompactingChunks<LazyNonCompactingChunk>)
+HookedMethods(truth);
+#undef HookedMethods
+#undef HookedMethods1
+#undef HookedMethods2
 // # # # # # # # # # # # # # # # # # Codegen: end # # # # # # # # # # # # # # # # # # # # # # #
 

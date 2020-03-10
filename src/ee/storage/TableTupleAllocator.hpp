@@ -789,21 +789,7 @@ namespace voltdb {
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            inline void add(ChangeType type, void const* dst, IteratorObserver = {}) {
-                if (m_recording) {     // ignore changes beyond boundary
-                    switch (type) {
-                        case ChangeType::Update:
-                            update(dst);
-                            break;
-                        case ChangeType::Insertion:
-                            insert(dst);
-                            break;
-                        case ChangeType::Deletion:
-                        default:
-                            remove(dst);
-                    }
-                }
-            }
+            void add(ChangeType type, void const* dst, IteratorObserver = {});
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
@@ -816,6 +802,11 @@ namespace voltdb {
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
 
+        struct truth {                                             // simplest Tag that always returns true
+            constexpr bool operator()(void*) const noexcept { return true; }
+            constexpr bool operator()(void const*) const noexcept { return true; }
+        };
+
         /**
          * Client API that manipulates in high level.
          */
@@ -824,6 +815,12 @@ namespace voltdb {
             using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
+            template<typename Tag>
+            using observer_type = typename
+                IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
+            observer_type<truth> m_iterator_observer{}, m_dummy_observer{};
+            bool m_observerReady = false;
+            template<typename Tag> observer_type<Tag>& observer() noexcept;
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
@@ -831,10 +828,10 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            void thaw();                               // switch of snapshot process
+            template<typename Tag> void thaw();             // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
-            void update(void*);                        // NOTE: this must be called prior to any memcpy operations happen
-            void const* remove(void*);
+            template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
+            template<typename Tag> void const* remove(void*);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -851,8 +848,8 @@ namespace voltdb {
              */
             void remove_reserve(size_t);
             void remove_add(void*);
-            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
-            void clear();
+            template<typename Tag> size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
             string info(void const*) const;
         };
@@ -1040,10 +1037,6 @@ namespace voltdb {
             };
         };
 
-        struct truth {                                             // simplest Tag that always returns true
-            constexpr bool operator()(void*) const noexcept { return true; }
-            constexpr bool operator()(void const*) const noexcept { return true; }
-        };
         template<unsigned char NthBit, typename = typename enable_if<NthBit < 8>::type>
         struct NthBitChecker {                         // Tag that checks whether the n-th bit of first byte is on
             static constexpr char const MASK = 1 << NthBit;
