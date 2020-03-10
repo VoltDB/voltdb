@@ -1426,6 +1426,23 @@ void testRemovesFromEnds(size_t batch) {
                     return ++i >= NumTuples - batch;
                 });
         assert(i == NumTuples - batch);
+        // remove everything, add something back
+        if (! alloc.empty()) {
+            for (--i; i > 0; --i) {
+                alloc.remove(dir, addresses[i]);
+            }
+            alloc.remove(dir, addresses[0]);
+            assert(alloc.empty());
+        }
+        for (i = 0; i < NumTuples; ++i) {
+            memcpy(alloc.allocate(), gen.get(), TupleSize);
+        }
+        fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+                static_cast<Alloc const&>(alloc),
+                [&i](void const* p) {
+                    assert(Gen::same(p, i++));
+                });
+        assert(i == NumTuples * 2);
     }
 }
 
@@ -1752,6 +1769,46 @@ TEST_F(TableTupleAllocatorTest, TestClearFreeCompactingChunks) {
             static_cast<Alloc const&>(alloc),
             [&i, this] (void const* p) { ASSERT_TRUE(Gen::same(p, i++)); });
     ASSERT_EQ(NumTuples, i);
+}
+
+string address(void const* p) {
+    ostringstream oss;
+    oss<<p;
+    return oss.str();
+}
+
+// test printing of debug info
+TEST_F(TableTupleAllocatorTest, TestDebugInfo) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Alloc alloc(TupleSize);
+    array<void const*, NumTuples> addresses;
+    Gen gen;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    ASSERT_TRUE(alloc.info(nullptr).substr(0, 20) == "Cannot find address ");
+    string expected_prefix("Address "),
+           actual = alloc.info(addresses[0]);
+    expected_prefix
+        .append(address(addresses[0]))
+        .append(" found at chunk 0, offset 0, ");
+    ASSERT_EQ(expected_prefix, actual.substr(0, expected_prefix.length()));
+    // freeze, remove 1 + AllocsPerChunk tuples from head and
+    // tail each
+    alloc.template freeze<truth>();
+    for (i = 0; i <= AllocsPerChunk; ++i) {
+        alloc.remove(const_cast<void*>(addresses[i]));
+        alloc.remove(CompactingChunks::remove_direction::from_tail, addresses[NumTuples - i - 1]);
+    }
+    ASSERT_EQ(NumTuples - 2 * AllocsPerChunk - 2, alloc.size());
+    expected_prefix = "Address ";
+    expected_prefix.append(address(addresses[0]))
+        .append(" found at chunk 0, offset 0, txn 1st chunk = 1 [")
+        .append(address(addresses[AllocsPerChunk]))
+        .append(" - ");
+    ASSERT_EQ(expected_prefix, alloc.info(addresses[0]).substr(0, expected_prefix.length()));
 }
 
 #endif
