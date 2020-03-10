@@ -1788,7 +1788,7 @@ TEST_F(TableTupleAllocatorTest, TestDebugInfo) {
     for (i = 0; i < NumTuples; ++i) {
         addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
-    ASSERT_EQ("Cannot find address (nil)\n", alloc.info(nullptr));
+    ASSERT_TRUE(alloc.info(nullptr).substr(0, 20) == "Cannot find address ");
     string expected_prefix("Address "),
            actual = alloc.info(addresses[0]);
     expected_prefix
