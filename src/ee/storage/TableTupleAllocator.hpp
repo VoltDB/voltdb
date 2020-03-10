@@ -653,6 +653,8 @@ namespace voltdb {
             size_t m_allocs = 0;
             using list_type::last;
             template<typename Remove_cb> void clear(Remove_cb const&);
+            pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
+            pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
@@ -835,6 +837,8 @@ namespace voltdb {
             void remove_add(void*);
             size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             void clear();
+            // Debugging aid, only prints in debug build
+            string info(void const*) const;
         };
 
         /**
