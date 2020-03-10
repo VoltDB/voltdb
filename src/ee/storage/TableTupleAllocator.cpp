@@ -320,15 +320,17 @@ inline pair<bool, typename ChunkList<Chunk, Compact, E>::iterator> ChunkList<Chu
     // the same, and TxnLeftBoundary, etc. to maintain two sets
     // of iterators.
     auto* mutable_this = const_cast<ChunkList<Chunk, Compact, E>*>(this);
-    auto const not_found = make_pair(false, mutable_this->end());
     if (! m_byAddr.empty()) {
         // find first entry whose begin() > k
-        auto iter = prev(mutable_this->m_byAddr.upper_bound(k));
-        if (iter != mutable_this->m_byAddr.end()) {
-            return {true, iter->second};
+        auto iter = mutable_this->m_byAddr.upper_bound(k);
+        if (iter != mutable_this->m_byAddr.begin()) {
+            iter = prev(iter);
+            if (iter != mutable_this->m_byAddr.end()) {
+                return {true, iter->second};
+            }
         }
     }
-    return not_found;
+    return {false, mutable_this->end()};
 }
 
 template<typename Chunk, typename Compact, typename E> inline pair<bool, typename ChunkList<Chunk, Compact, E>::iterator>
