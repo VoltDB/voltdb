@@ -283,7 +283,7 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
 
     public void testDistributedAvgAggregateWithHaving1() {
         m_tester.sql("SELECT max(P1.si), i  FROM P1 GROUP BY i HAVING min(P1.si) > 9")
-        .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t1], I=[$t0], pusheddown=[true])\n" +
+        .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[9], expr#4=[>($t2, $t3)], EXPR$0=[$t1], I=[$t0], $condition=[$t4], pusheddown=[true])\n" +
                 "  VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[MIN($1)], pusheddown=[true], type=[hash])\n" +
                 "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
                 "      VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=[9], expr#4=[>($t2, $t3)], proj#0..2=[{exprs}], $condition=[$t4], pusheddown=[false])\n" +
@@ -296,7 +296,7 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
 
     public void testDistributedAvgAggregateWithHaving2() {
         m_tester.sql("SELECT max(P1.si), i  FROM P1 GROUP BY i HAVING avg(P1.si) > 9")
-        .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], EXPR$0=[$t1], I=[$t0], pusheddown=[true])\n" +
+        .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[0], expr#5=[=($t3, $t4)], expr#6=[null], expr#7=[CASE($t5, $t6, $t2)], expr#8=[/($t7, $t3)], expr#9=[CAST($t8):SMALLINT], expr#10=[9], expr#11=[>($t9, $t10)], EXPR$0=[$t1], I=[$t0], $condition=[$t11], pusheddown=[true])\n" +
                 "  VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], agg#1=[$SUM0($1)], agg#2=[$SUM0FROMCOUNTY($1)], pusheddown=[true], type=[hash])\n" +
                 "    VoltPhysicalExchange(distribution=[hash[0]])\n" +
                 "      VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[0], expr#5=[=($t3, $t4)], expr#6=[null], expr#7=[CASE($t5, $t6, $t2)], expr#8=[/($t7, $t3)], expr#9=[CAST($t8):SMALLINT], expr#10=[9], expr#11=[>($t9, $t10)], proj#0..3=[{exprs}], $condition=[$t11], pusheddown=[false])\n" +
@@ -323,7 +323,7 @@ public class TestPhysicalAggregate extends Plannerv2TestCase {
     public void testDistributedAvgAggregateWithLimit2() {
         m_tester.sql("SELECT max(P1.si), i FROM P1 GROUP BY i HAVING max(si) > 9 limit 4")
         .transform("VoltPhysicalLimit(limit=[4], pusheddown=[true])\n" +
-                "  VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], I=[$t0], pusheddown=[true])\n" +
+                "  VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[9], expr#3=[>($t1, $t2)], EXPR$0=[$t1], I=[$t0], $condition=[$t3], pusheddown=[true])\n" +
                 "    VoltPhysicalHashAggregate(group=[{0}], EXPR$0=[MAX($1)], pusheddown=[true], type=[hash])\n" +
                 "      VoltPhysicalExchange(distribution=[hash[0]])\n" +
                 "        VoltPhysicalLimit(limit=[4], pusheddown=[false])\n" +

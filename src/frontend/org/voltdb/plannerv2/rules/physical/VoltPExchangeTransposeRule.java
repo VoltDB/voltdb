@@ -354,8 +354,6 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 })
                 .collect(Collectors.toList());
 
-        // Can be smarter here and remove aggregates related to HAVING conditions if any
-        // since we eliminate Coordinator's HAVING condition altogether.
         VoltPhysicalAggregate coordinatorAggregate = aggregate.copy(
                 aggregate.getCluster(),
                 aggregate.getTraitSet(),
@@ -368,16 +366,10 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 true);
         final RelNode finalResult;
         if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
-            // HAVING condition can be dropped now because fragment's calc already has them
-            RexProgramBuilder builder = RexProgramBuilder.forProgram(
-                    aggrCalc.getProgram(),
-                    aggrCalc.getCluster().getRexBuilder(),
-                    true);
-            builder.clearCondition();
             finalResult = aggrCalc.copy(
                     aggrCalc.getTraitSet(),
                     coordinatorAggregate,
-                    builder.getProgram(),
+                    aggrCalc.getProgram(),
                     true);
         } else {
             finalResult = coordinatorAggregate;
