@@ -410,7 +410,8 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
     return destEmptyTable;
 }
 
-void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, bool fallible) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable) {
+    const bool fallible = true;
     if (isPersistentTableEmpty()) {
         // Always log the the truncate if dr is enabled, see ENG-14528.
         drLogTruncate(ExecutorContext::getExecutorContext(), fallible);
@@ -425,7 +426,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
                   << activeTupleCount()
                   << " tuples in " << name() << std::endl;
         // */
-        deleteAllTuples(true, fallible);
+        deleteAllTuples(true, true);
         return;
     }
 

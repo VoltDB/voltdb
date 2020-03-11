@@ -499,7 +499,7 @@ inline void truncateTable(boost::unordered_map<int64_t, PersistentTable*> &table
 
     PersistentTable *table = tableIter->second;
 
-    table->truncateTable(engine, replicatedTableOperation, true);
+    table->truncateTable(engine, replicatedTableOperation);
 }
 
 } //end of anonymous namespace
