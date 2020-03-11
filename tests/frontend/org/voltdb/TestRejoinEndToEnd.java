@@ -893,8 +893,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         localServer.start();
         localServer.waitForRejoin();
 
-        Thread.sleep(10000);
-
         // Run a transaction through the HTTP interface to make sure the
         // internal adapter is correctly setup after rejoin
         final TestJSONInterface.Response httpResp =
@@ -999,7 +997,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             Thread.sleep(100);
         }
 
-        Thread.sleep(10000);
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost", cluster.port(0));
 
