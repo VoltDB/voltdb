@@ -131,7 +131,7 @@ function async-benchmark() {
 
 function init() {
     jars-ifneeded
-    sqlcmd < src/txnIdSelfCheck/ddl-nocat.sql
+    sqlcmd < src/txnIdSelfCheck/ddl.sql
 }
 
 function help() {

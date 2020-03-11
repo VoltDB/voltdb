@@ -747,17 +747,23 @@ public class Benchmark {
                 adHocMayhemThread.start();
             }
         }
+
         if (!config.disabledThreads.contains("idpt")) {
             idpt = new InvokeDroppedProcedureThread(client);
             idpt.start();
-        } if (!config.disabledThreads.contains("ddlt")) {
+        }
+
+        if (!config.disabledThreads.contains("ddlt")) {
             ddlt = new DdlThread(client);
             // XXX/PSR ddlt.start();
         }
+
         if (!config.disabledThreads.contains("updateclasses")) {
             updcls = new UpdateClassesThread(client, config.duration);
             updcls.start();
         }
+
+
         log.info("All threads started...");
 
         while (true) {
@@ -783,37 +789,38 @@ public class Benchmark {
                 if (partBiglt != null) {
                     int lpcc = partBiglt.getPercentLoadComplete();
                     if (!partBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                        exitcode += reportDeadThread(partBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
                     } else
                         log.info(partBiglt + " was at " + lpcc + "% of rows loaded");
                 } if (replBiglt != null) {
                     int lpcc = replBiglt.getPercentLoadComplete();
                     if (!replBiglt.isAlive() && lpcc < 100) {
-                        exitcode = reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+                        exitcode += reportDeadThread(replBiglt, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
                     } else
                         log.info(replBiglt + " was at " + lpcc + "% of rows loaded");
                 }
                 // check if all threads still alive
                 if (partTrunclt != null && !partTrunclt.isAlive())
-                    exitcode = reportDeadThread(partTrunclt);
+                    exitcode += reportDeadThread(partTrunclt);
                 if (replTrunclt != null && !replTrunclt.isAlive())
-                    exitcode = reportDeadThread(replTrunclt);
+                    exitcode += reportDeadThread(replTrunclt);
+
                 /* XXX if (! partLoadlt.isAlive())
                     exitcode = reportDeadThread(partLoadlt);
                 if (! replLoadlt.isAlive())
                     exitcode = reportDeadThread(replLoadlt);
                 */
                 if (readThread != null && !readThread.isAlive())
-                    exitcode = reportDeadThread(readThread);
+                    exitcode += reportDeadThread(readThread);
                 if (adHocMayhemThread != null && !config.disableadhoc && !adHocMayhemThread.isAlive())
-                    exitcode = reportDeadThread(adHocMayhemThread);
+                    exitcode += reportDeadThread(adHocMayhemThread);
                 if (idpt != null && !idpt.isAlive())
-                    exitcode = reportDeadThread(idpt);
+                    exitcode += reportDeadThread(idpt);
                 /* XXX if (! ddlt.isAlive())
                     exitcode = reportDeadThread(ddlt);*/
                 for (ClientThread ct : clientThreads) {
                     if (!ct.isAlive()) {
-                        exitcode = reportDeadThread(ct);
+                        exitcode += reportDeadThread(ct);
                     }
                 }
                 /*
@@ -860,7 +867,7 @@ public class Benchmark {
                 long count = txnCount.get();
                 log.info("Client thread transaction count: " + count + "\n");
                 if (exitcode > 0 && txnCount.get() == 0) {
-                    System.err.println("Shutting down, but found that no work was done.");
+                    System.err.println("Shutting down, but found that no work was done. Exit code: " + exitcode);
                     exitcode = 2;
                 }
                 System.exit(exitcode);

@@ -78,7 +78,7 @@ public class TableChangeMonitor {
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (stats.getLong("TUPLE_PENDING") != 0) {
+                if (stats.getLong("TUPLE_PENDING") != 0 && stats.getString("ACTIVE").equalsIgnoreCase("TRUE") ) {
                     passedThisTime = false;
                     log.info(ttable + ": Partition Not Zero.");
                     break;

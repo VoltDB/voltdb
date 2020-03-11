@@ -36,6 +36,7 @@ import com.rabbitmq.client.QueueingConsumer;
 import org.voltcore.logging.VoltLogger;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * A RabbitMQ consumer that verifies the export data.
@@ -59,7 +60,7 @@ public class ExportRabbitMQVerifier {
         m_exchangeName = exchangename;
     }
 
-    public void run() throws IOException, InterruptedException
+    public void run() throws IOException, InterruptedException, TimeoutException
     {
         final Connection connection = m_connFactory.newConnection();
         final Channel channel = connection.createChannel();
@@ -155,7 +156,7 @@ public class ExportRabbitMQVerifier {
         log.info("Command-line arguments: rabbitmq_server username password virtual_host");
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException
+    public static void main(String[] args) throws IOException, InterruptedException, TimeoutException
     {
         VoltLogger log = new VoltLogger("ExportRabbitMQVerifier.main");
 

@@ -337,7 +337,7 @@ public class MatchChecks {
             VoltTable tableStats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (tableStats.advanceRow()) {
                 Long allocatedMemory = tableStats.getLong("TUPLE_PENDING");
-                if ( allocatedMemory > 0 ) {
+                if ( allocatedMemory > 0 && tableStats.getString("ACTIVE").equalsIgnoreCase("TRUE") ) {
                         backlog = backlog + allocatedMemory;
                 }
             }
