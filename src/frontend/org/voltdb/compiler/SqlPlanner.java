@@ -152,7 +152,7 @@ final class SqlPlanner {
         try (QueryPlanner planner = new QueryPlanner(
                 m_sql, "PlannerTool", "PlannerToolProc", m_database,
                 m_partitioning, m_hsql, new DatabaseEstimates(), !VoltCompiler.DEBUG_MODE, new TrivialCostModel(),
-                null, null, DeterminismMode.FASTER, m_isLargeQuery)) {
+                null, null, DeterminismMode.FASTER, m_isLargeQuery, false)) {
             if (m_isSwapTables) {
                 planner.planSwapTables();
             } else {

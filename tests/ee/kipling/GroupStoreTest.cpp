@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "../../../src/ee/kipling/GroupStore.h"
+#include "kipling/GroupStore.h"
 #include "kipling/GroupTestBase.h"
 #include "common/executorcontext.hpp"
 #include "storage/SystemTableFactory.h"

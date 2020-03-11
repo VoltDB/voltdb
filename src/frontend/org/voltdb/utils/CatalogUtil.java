@@ -686,14 +686,23 @@ public abstract class CatalogUtil {
         logger.debug(sb.toString());
     }
 
-    public static NavigableSet<String> getExportTableNames(Database db) {
-        ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
-        for (Connector connector : db.getConnectors()) {
-            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
-                exportTables.add(tinfo.getTable().getTypeName());
+    /**
+     * Test if a table with {@code name} is involved with export. This will also return {@code false} for topics
+     *
+     * @param db   {@link Database} instance
+     * @param name of table
+     * @return {@code true} if a table with {@code name} is involved with export
+     */
+    public static boolean isExportTable(Database db, String name) {
+        Table table = db.getTables().get(name);
+        if (table != null) {
+            int type = table.getTabletype();
+            if (TableType.isInvalidType(type)) {
+                return isStream(db, table);
             }
+            return TableType.PERSISTENT.get() != type && !table.getIstopic();
         }
-        return exportTables.build();
+        return false;
     }
 
     /**

@@ -52,7 +52,7 @@ public interface ExportManagerInterface {
         BASIC("org.voltdb.export.ExportManager"),
         ADVANCED("org.voltdb.e3.E3ExportManager");
 
-        private String m_mgrClassName;
+        private final String m_mgrClassName;
 
         private ExportMode(String mgrClassName) {
             m_mgrClassName = mgrClassName;
