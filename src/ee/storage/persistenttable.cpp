@@ -112,21 +112,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema);
 
-    // TODO: Pass m_tableAllocationSize as template parameter to m_dataStorage and then
-    //       uncomment this block remove the block below
-//#ifdef MEMCHECK
-//    m_tableAllocationSize = m_tupleLength;
-//    m_tuplesPerChunk = 1;
-//#else
-//    m_tuplesPerChunk = m_tableAllocationTargetSize / m_tupleLength;
-//    if (m_tuplesPerChunk < 1) {
-//        m_tuplesPerChunk = 1;
-//        m_tableAllocationSize = m_tupleLength;
-//    } else {
-//        m_tableAllocationSize = m_tableAllocationTargetSize;
-//    }
-//#endif
-
     // NOTE: we embed m_data pointer immediately after the
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
@@ -1581,13 +1566,14 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
     }
 
     for (int i = 0; i < tupleCount; ++i) {
+        TableTuple target(m_schema);
+        void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
+        target.move(address);
         try {
-           m_tempTuple.deserializeFrom(serialInput, stringPool, caller);
-        } catch (SQLException &e) {
+            target.deserializeFrom(serialInput, stringPool, caller);
+         } catch (SQLException &e) {
             throw;
-        }
-
-        TableTuple target = createTuple(m_tempTuple);
+         }
         // TODO: we do not catch other types of exceptions, such as
         // SQLException, etc. The assumption we held that no other
         // exceptions should be thrown in the try-block is pretty
