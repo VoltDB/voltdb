@@ -6,7 +6,48 @@ timeouts and hangs and scheduling problems that delay message passing. A
 common use for this tool is when sites are experiencing dead host timeouts
 without any obvious network event.
 
-Meshmonitor has threads that measure and report on 3 parameters:
+Mesh monitor can be run alongside VoltDB. It has very low overhead on the CPUs
+and network. It can also be helpful to run without VoltDB - as a proof point that
+your environment is going to have adequate baseline stability for running VoltDB.
+
+
+What Meshmonitor Can (and Can't) Tell You
+---------------------
+First - an analogy.  Think of VoltDB as a fast car.  Like all cars, the 
+quality of the streets impacts the top speed at which you can travel.
+If the streets you drive on are poorly paved, have random lane closings, 
+or a lot of traffic lights then your fast car goes no faster then any
+old jalopy.
+
+Environmental blips in scheduling, networking, CPU accesss are like potholes
+to VoltDB.  If a VoltDB site thread can't run for 50ms - then your application 
+can experience long-tale latency problems.  If the heartbeating between cluster
+nodes is delayed for long enough, then some nodes may get ejected from
+the cluster.
+
+The following is an ever-growing list of things that the VoltDB support
+team has seen when looking at customers' Mesh Monitor data:
+1. Batch network copies/backups that are doing a high IO load that linux 
+decides is more important than scheduling VoltDB (a solution is to 
+throttle these jobs)
+2. Other processes on the system taking too much CPU
+3. VMs/Containers that are starved by neighbors
+4. VMs/Containers with incorrect/inadequate thread pinning
+5. VM/Containers that are migrating
+6. Power save modes that slow down "idle" processors
+7. Boot/grub kernel setting of idle=poll
+8. Network congestion between particular nodes
+
+Causes of latency/timeouts that are not visible using mesh monitor (but
+may be visible in volt.log):
+1. GC stalls
+2. VoltDB memory compaction delays
+
+What Meshmonitor does
+---------------
+
+Each meshmonitor process has 2 threads:*send* and *receive* for every node it 
+is connected to. These threads measure and report 3 metrics:
 
 1. **Sending heartbeats.** A *send* thread wakes up every 5 milliseconds and
 sends heartbeats to all the other servers running meshmonitor. This tracks
@@ -62,6 +103,7 @@ can indicate that a sender is not properly scheduling its threads.  Deltas
 in receive times with no correlated deltas in send times can indicate a
 bottleneck in the network.
 
+
 Starting Meshmonitor
 --------------------
 Copy meshmonitor.jar to all the nodes you want to run on.
@@ -79,6 +121,7 @@ Usage: ./meshmonitorhelper.sh NODESFILE <HICCUPSIZE> <LOGINTERVAL> <NETWORKPORT>
    <NETWORKPORT> - optional               - network port used, default value = 12222
 
 ```
+Most customers run with the default HICCUPSIZE and LOGINTERVAL.
 
 Sample output for a nodes.txt that lists 3 nodes:  
 prod1  
