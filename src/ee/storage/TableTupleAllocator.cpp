@@ -488,7 +488,7 @@ template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(voi
     if (! iter.first) {
         snprintf(buf, sizeof buf, "NonCompactingChunks cannot free address %p", src);
         buf[sizeof buf - 1] = 0;
-        throw runtime_error(buf);
+        throw range_error(buf);
     } else {
         iter.second->free(src);
         if (iter.second->empty() && ++m_emptyChunks >= CHUNK_REMOVAL_THRESHOLD) {
@@ -678,9 +678,9 @@ inline void CompactingChunks::thaw() {
 template<typename Remove_cb>
 inline void CompactingChunks::clear(Remove_cb const& cb) {
     if (m_lastFreeFromHead != nullptr) {
-        throw logic_error("Unfinished free(remove_direction::from_head, ?)");
+        throw logic_error("Unfinished remove(remove_direction::from_head, ?)");
     } else if (! m_batched.empty()) {
-        throw logic_error("Unfinished free_add(?)");
+        throw logic_error("Unfinished remove_add(?) or remove_force()");
     } else if (frozen()) {                        // slow clear path
         // first, apply call back on all txn tuples (in order)
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
@@ -795,8 +795,7 @@ inline bool ChunksIdValidatorImpl::validate(id_type id) {
         m_inUse.emplace_hint(iter, id);
         return true;
     } else {
-        snprintf(buf, sizeof buf,
-                "Cannot create RW snapshot iterator on chunk list id %lu",
+        snprintf(buf, sizeof buf, "Cannot create RW snapshot iterator on chunk list id %lu",
                 static_cast<size_t>(id));
         buf[sizeof buf - 1] = 0;
         throw logic_error(buf);
@@ -1552,16 +1551,14 @@ super(c, c) {}
 inline position_type::position_type(ChunkHolder<> const& c) noexcept : m_chunkId(c.id()), m_addr(c.next()) {}
 
 inline position_type::position_type(CompactingChunks const& c, void const* p) : m_addr(p) {
-    auto const iter = const_cast<CompactingChunks&>(c).find(p);
-    if (! iter.first || ! (iter.second->contains(p) || iter.second->end() > p)) {
-        // NOTE: it is possible that the txn view does not
-        // contain the ptr, as the chunk has been removed. In
-        // that case, we simply "empty" it, and note the
-        // semantics of less<position_type>.
-        const_cast<void*&>(m_addr) = nullptr;
-    } else {
-        const_cast<remove_const<decltype(m_chunkId)>::type&>(m_chunkId) = iter.second->id();
+    // search in "global" region, which also includes txn-invisible region if frozen.
+    auto const iter = const_cast<CompactingChunks&>(c).find(p, true);
+    if (! iter.first) {
+        snprintf(buf, sizeof buf, "position_type::position_type(): cannot find address %p\n", p);
+        buf[sizeof buf - 1] = 0;
+        throw range_error(buf);
     }
+    const_cast<remove_const<decltype(m_chunkId)>::type&>(m_chunkId) = iter.second->id();
 }
 
 template<typename iterator>
@@ -1626,16 +1623,9 @@ IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::IteratorObserver(
 super(o) {}
 
 template<typename Chunks, typename Tag, typename E> inline bool
-IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::visited(void const* p) const {
-    auto o = super::lock();
-    if (o == nullptr) {
-        return false;
-    } else if (o->drained()) {
-        return true;
-    } else {
-        hooked_iterator const* iter = super::get();
-        return less<position_type>()({iter->storage(), p}, *iter);
-    }
+IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::operator()(void const* p) const {
+    auto const& o = super::lock();
+    return o != nullptr && (o->drained() || less<position_type>()({o->storage(), p}, *o));
 }
 
 
@@ -1724,8 +1714,8 @@ inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essent
 template<typename Alloc, typename Trait, typename E1>
 template<typename IteratorObserver, typename E2>
 inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
-        void const* dst, IteratorObserver) {
-    if (m_recording) {     // ignore changes beyond boundary
+        void const* dst, IteratorObserver obs) {
+    if (m_recording && ! obs(dst)) {
         switch (type) {
             case ChangeType::Update:
                 update(dst);
@@ -1810,13 +1800,16 @@ inline void TxnPreHook<Alloc, Trait, E>::release(void const* src) {
     Trait::remove(src);
 }
 
+template<typename Hook, typename E> typename
+HookedCompactingChunks<Hook, E>::template observer_type<truth> HookedCompactingChunks<Hook, E>::DUMMY_OBSERVER{};
+
 template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
 
 template<typename Hook, typename E>
 template<typename Tag> inline typename HookedCompactingChunks<Hook, E>::template observer_type<Tag>&
 HookedCompactingChunks<Hook, E>::observer() noexcept {
-    return reinterpret_cast<observer_type<Tag>&>(m_observerReady ? m_iterator_observer : m_dummy_observer);
+    return reinterpret_cast<observer_type<Tag>&>(m_observerable ? m_iterator_observer : DUMMY_OBSERVER);
 }
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
@@ -1868,7 +1861,7 @@ HookedCompactingChunks<Hook, E>::freeze() {
     Hook::freeze();
     auto ptr = make_shared<typename
         IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
-    m_observerReady = true;
+    m_observerable = true;
     new (&m_iterator_observer) observer_type<Tag>(ptr);
     return ptr;
 }
@@ -1877,9 +1870,9 @@ template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
-    m_observerReady = false;
-    reinterpret_cast<observer_type<Tag>&>(m_iterator_observer)
-        .~observer_type<Tag>();
+    m_observerable = false;
+    // explicit destruction needed bc. of type erasure
+    reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).~IteratorObserver();
 }
 
 template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -2092,9 +2085,11 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen3
 // template member methods
 #define HookedMethods4(tag, alloc, gc, alloc2)                                           \
-template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<IterableTableTupleChunks<   \
-    alloc2, tag, void>::hooked_iterator, void>(typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::ChangeType,    \
-            void const*, IterableTableTupleChunks<alloc2, tag, void>::hooked_iterator)
+template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename                    \
+    IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(                \
+            typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::ChangeType,              \
+            void const*,                                                                 \
+            typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver)
 #define HookedMethods3(tag, alloc, gc)                                                   \
     HookedMethods4(tag, alloc, gc, __codegen__::t1);                                     \
     HookedMethods4(tag, alloc, gc, __codegen__::t2);                                     \
