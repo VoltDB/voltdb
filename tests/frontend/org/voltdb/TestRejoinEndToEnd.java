@@ -67,6 +67,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     public void testRejoinWithMultipartLoad() throws Exception {
         System.out.println("testRejoinWithMultipartLoad");
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
         builder.setSecurityEnabled(true, true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
@@ -251,6 +254,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     public void testLocalClusterRecoveringMode() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI,
@@ -288,6 +294,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     public void testRejoinInlineStringBug() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
         cluster.setMaxHeap(768);
@@ -349,6 +358,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
         builder.setHTTPDPort(0);
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
         int sitesPerHost = 4;
         int hostCount = 3;
         int kFactor = 2;
@@ -471,6 +483,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         cluster.overrideAnyRequestForValgrind();
@@ -530,6 +545,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         System.out.println("testRejoinDataTransfer");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -705,6 +723,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -911,6 +932,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         //builder.setTableAsExportOnly("PARTITIONED", false);
         //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
         builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -926,7 +950,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
+        cluster.setHasLocalServer(true);
 
         cluster.startUp();
 
@@ -967,16 +991,15 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
         config.m_leader = ":" + cluster.internalPort(1);
         config.m_coordinators = cluster.coordinators(1);
-
         config.m_isRejoinTest = true;
         cluster.setPortsFromConfig(0, config);
         cluster.recoverOne(0, 1, "");
 
-        Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
             Thread.sleep(100);
         }
 
+        Thread.sleep(10000);
         client = ClientFactory.createClient(m_cconfig);
         client.createConnection("localhost", cluster.port(0));
 
@@ -1002,6 +1025,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
 
         builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
 
@@ -1019,7 +1045,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
+        cluster.setHasLocalServer(true);
 
         cluster.startUp();
 
@@ -1066,7 +1092,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         cluster.recoverOne(0, 1, "");
 
-        Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
             Thread.sleep(100);
         }
@@ -1110,6 +1135,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         lc.overrideAnyRequestForValgrind();
         VoltProjectBuilder vpb = new VoltProjectBuilder();
         vpb.setUseDDLSchema(true);
+        if (MiscUtils.isPro()) {
+            vpb.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
         vpb.addExport(true, ServerExportEnum.CUSTOM, exportClassName, new Properties(),
                 "exporter");
         assertTrue(lc.compile(vpb));
@@ -1149,6 +1177,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     public void testTimeoutWaitingForInitialDataFromSnapshot() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
         LocalCluster lc = new LocalCluster("rejoin.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
         lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("REJOIN_INITIAL_DATA_TIMEOUT_MS", "2");
