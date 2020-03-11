@@ -20,26 +20,27 @@ or a lot of traffic lights then your fast car goes no faster then any
 old jalopy.
 
 Environmental blips in scheduling, networking, CPU accesss are like potholes
-to VoltDB.  If a VoltDB site thread can't run for 50ms - then your latency 
+to VoltDB.  If a VoltDB site thread can't run for 50ms - then your application 
 can experience long-tale latency problems.  If the heartbeating between cluster
 nodes is delayed for long enough, then some nodes may get ejected from
 the cluster.
 
 The following is an ever-growing list of things that the VoltDB support
-team have seen when looking into the customers' Mesh Monitor data:
+team has seen when looking at customers' Mesh Monitor data:
 1. Batch network copies/backups that are doing a high IO load that linux 
 decides is more important than scheduling VoltDB (a solution is to 
 throttle these jobs)
 2. Other processes on the system taking too much CPU
 3. VMs/Containers that are starved by neighbors
-4. VMs/Containers with incorrect thread pinning
-5. Power save modes that slow down "idle" processors
-6. Boot/grub kernel setting of idle=poll
-7. Network congestion between particular nodes
+4. VMs/Containers with incorrect/inadequate thread pinning
+5. VM/Containers that are migrating
+6. Power save modes that slow down "idle" processors
+7. Boot/grub kernel setting of idle=poll
+8. Network congestion between particular nodes
 
-Causes of latency/timeoutes that are not visible using mesh monitor:
-1. GC stalls. VoltDB will log stalls > 200ms, so you may see evidence
-in your logfiles
+Causes of latency/timeouts that are not visible using mesh monitor (but
+may be visible in volt.log):
+1. GC stalls
 2. VoltDB memory compaction delays
 
 What Meshmonitor does
