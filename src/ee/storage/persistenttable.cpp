@@ -426,7 +426,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable) 
                   << activeTupleCount()
                   << " tuples in " << name() << std::endl;
         // */
-        deleteAllTuples(true, true);
+        deleteAllTuples(true, fallible);
         return;
     }
 
