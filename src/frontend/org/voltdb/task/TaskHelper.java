@@ -17,6 +17,8 @@
 
 package org.voltdb.task;
 
+import org.voltdb.utils.CompoundErrors;
+
 /**
  * Helper interface passed to {@link IntervalGenerator}, {@link ActionGenerator} and {@link ActionScheduler} instances for
  * calling in to the volt system to perform logging, validation and other operations
@@ -113,13 +115,13 @@ public interface TaskHelper {
      * <p>
      * Note: parameter validation might not work for system procedures
      *
-     * @param errors                   {@link TaskValidationErrors} instance to collect errors
+     * @param errors                   {@link CompoundErrors} instance to collect errors
      * @param restrictProcedureByScope If true type of procedures will be restricted. See
      *                                 {@link ActionScheduler#restrictProcedureByScope()}
      * @param procedureName            Name of procedure to validate
      * @param parameters               that will be passed to {@code name}
      */
-    void validateProcedure(TaskValidationErrors errors, boolean restrictProcedureByScope, String procedureName,
+    void validateProcedure(CompoundErrors errors, boolean restrictProcedureByScope, String procedureName,
             Object[] parameters);
 
     /**
