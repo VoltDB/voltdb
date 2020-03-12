@@ -790,7 +790,8 @@ namespace voltdb {
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(ChangeType type, void const* dst, IteratorObserver = {});
+            void add(ChangeType, void const*, IteratorObserver&);
+            void _add_for_test_(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
@@ -829,8 +830,10 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            template<typename Tag> void thaw();             // switch of snapshot process
+            void thaw();             // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
+            // NOTE: these methods with Tag template must be
+            // supplied with same type as freeze() method.
             template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
             template<typename Tag> void const* remove(void*);
             /**

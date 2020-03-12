@@ -1714,7 +1714,7 @@ inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essent
 template<typename Alloc, typename Trait, typename E1>
 template<typename IteratorObserver, typename E2>
 inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
-        void const* dst, IteratorObserver obs) {
+        void const* dst, IteratorObserver& obs) {
     if (m_recording && ! obs(dst)) {
         switch (type) {
             case ChangeType::Update:
@@ -1728,6 +1728,14 @@ inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, 
                 remove(dst);
         }
     }
+}
+
+template<typename Alloc, typename Trait, typename E1>
+inline void TxnPreHook<Alloc, Trait, E1>::_add_for_test_(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
+        void const* dst) {
+    static typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<Alloc, Trait>>,
+        truth, void>::IteratorObserver dummy_observer;
+    add(type, dst, dummy_observer);
 }
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
@@ -1862,17 +1870,17 @@ HookedCompactingChunks<Hook, E>::freeze() {
     auto ptr = make_shared<typename
         IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>(*this);
     m_observerable = true;
+    // placement new for type erasure. Note that dtor cannot be
+    // called explicitly in thaw.
     new (&m_iterator_observer) observer_type<Tag>(ptr);
     return ptr;
 }
 
 template<typename Hook, typename E>
-template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
+inline void HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
     m_observerable = false;
-    // explicit destruction needed bc. of type erasure
-    reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).~IteratorObserver();
 }
 
 template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -2089,7 +2097,7 @@ template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename           
     IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(                \
             typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::ChangeType,              \
             void const*,                                                                 \
-            typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver)
+            typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&)
 #define HookedMethods3(tag, alloc, gc)                                                   \
     HookedMethods4(tag, alloc, gc, __codegen__::t1);                                     \
     HookedMethods4(tag, alloc, gc, __codegen__::t2);                                     \
@@ -2102,7 +2110,6 @@ template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename           
 template shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<alloc,                   \
          HistoryRetainTrait<gc>>, void>, tag, void>::hooked_iterator>                    \
 HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>();  \
-template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
 template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(void*);\
