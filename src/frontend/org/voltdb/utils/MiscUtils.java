@@ -304,7 +304,8 @@ public class MiscUtils {
 
     /**
      * Instantiate the license api impl based on enterprise/community editions
-     * For enterprise edition, look in default locations ./, ~/, jar file directory
+     * For enterprise edition, look in default locations voltdbroot, ./, ~/ and
+     * jar file directory.
      * @return a valid API for community and pro editions, or null on error.
      */
     public static LicenseApi licenseApiFactory(File voltdbRoot)

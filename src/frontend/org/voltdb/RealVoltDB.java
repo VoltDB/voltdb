@@ -910,11 +910,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // print the ascii art!.
             // determine the edition
             // Check license availability
-            // All above - not for init
-            if (config.m_startAction != StartAction.INITIALIZE) {
-                String edition = "Community Edition";
-                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-                // load license API
+            String edition = "Community Edition";
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            // load license API
+            if (config.m_startAction == StartAction.INITIALIZE) {
+                // init without a license is not fatal
+                if (config.m_pathToLicense != null) {
+                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                    }
+                }
+            } else {
                 if (config.m_pathToLicense == null) {
                     m_licenseApi = MiscUtils.licenseApiFactory(config.m_voltdbRoot);
                     if (m_licenseApi == null) {
@@ -926,7 +933,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
                     }
                 }
+            }
 
+            if (config.m_startAction != StartAction.INITIALIZE || config.m_pathToLicense != null) {
                 if (m_licenseApi == null) {
                     hostLog.fatal("Please contact sales@voltdb.com to request a license.");
                     VoltDB.crashLocalVoltDB(
@@ -2581,6 +2590,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageLicenseFile(Configuration config) {
+        // No such need in community version
+        if (!MiscUtils.isPro()) {
+            return;
+        }
         String path = null;
         try {
             path = config.m_voltdbRoot.getCanonicalPath();
@@ -2594,12 +2607,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // copy new license to voltdb root
         if (config.m_pathToLicense != null) {
-            File licenseF = new VoltFile(config.m_pathToLicense);
+            File licenseF = new File(config.m_pathToLicense);
             try {
                 Files.copy(licenseF, destF);
-                hostLog.info("Archive license file to VoltDB root directory: " + destF.getAbsolutePath());
+                hostLog.info("License file is copied to VoltDB root directory: " + destF.getAbsolutePath());
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to stage license file to " + path, false, e);
+                VoltDB.crashLocalVoltDB("Unable to copy license file to " + path, false, e);
             }
         }
     }
