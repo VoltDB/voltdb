@@ -831,7 +831,7 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            void thaw();             // switch of snapshot process
+            template<typename Tag> void thaw();             // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             // NOTE: these methods with Tag template must be
             // supplied with same type as freeze() method.
@@ -1040,6 +1040,7 @@ namespace voltdb {
                 IteratorObserver(IteratorObserver const&) noexcept = default;
                 IteratorObserver(IteratorObserver&&) noexcept = default;
                 bool operator()(void const*) const;    // iterator > arg ptr? i.e. visited?
+                using super::reset;                    // equivalent of dtor
             };
         };
 
