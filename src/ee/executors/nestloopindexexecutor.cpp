@@ -280,7 +280,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
             VOLT_TRACE ("<Nested Loop Index exec, WHILE-LOOP...> Number of searchKeys: %d \n", num_of_searchkeys);
             IndexLookupType localLookupType = m_lookupType;
             SortDirectionType localSortDirection = m_sortDirection;
-            VOLT_TRACE("Lookup type: %d\n", m_lookupType);
+            VOLT_TRACE("Lookup type: %d\n", static_cast<int>(m_lookupType));
             VOLT_TRACE("SortDirectionType: %d\n", m_sortDirection);
 
             // did setting the search key fail (usually due to overflow)

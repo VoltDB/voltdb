@@ -1832,7 +1832,7 @@ template<typename Tag> inline void const* HookedCompactingChunks<Hook, E>::remov
         Hook::copy(dst);
     }
     void const* src = CompactingChunks::free(dst);
-    VOLT_TRACE("remove(%p) <- %p: ", dst, src, frozen() ? "frozen" : "not frozen");
+    VOLT_TRACE("remove(%p) <= %p: ", dst, src);
     Hook::add(Hook::ChangeType::Deletion, dst, observer<Tag>());
     return src;
 }
