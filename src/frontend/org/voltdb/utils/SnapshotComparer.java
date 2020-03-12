@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
 import static org.voltdb.utils.SnapshotComparer.CONSOLE_LOG;
 import static org.voltdb.utils.SnapshotComparer.SNAPSHOT_LOG;
+import static org.voltdb.utils.SnapshotComparer.remoteSnapshotFolder;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,6 +36,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
 
+import org.apache.commons.io.FileUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.ElasticHashinator;
@@ -66,6 +68,7 @@ public class SnapshotComparer {
     public static final StringBuilder m_ErrLogStr =
             new StringBuilder("The comparing process can not find a viable snapshot. "
                     + "Restore requires a complete, uncorrupted snapshot.");
+    public static final String remoteSnapshotFolder = "./remoteSnapshot/";
 
     public static void main(String[] args) {
         if (args.length == 0 || args[0].equals("--help")) {
@@ -113,6 +116,7 @@ public class SnapshotComparer {
         String targetNonce;
         String[] targetDirs;
         String[] targetHosts;
+        boolean cleanup = false;
         boolean valid = false;
 
         public Config(String[] args) {
@@ -170,12 +174,26 @@ public class SnapshotComparer {
                         }
                         i++;
                         username = args[i];
+                    } else if (arg.equalsIgnoreCase("--cleanup")) {
+                        cleanup = true;
                     }
+                }
+                if (sourceNonce == null || sourceNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (local == null) {
+                    System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
+                    printHelpAndQuit(1);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
                                 || (sourceDirs.length != sourceHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
+                    printHelpAndQuit(1);
+                }
+                if (!local && username.isEmpty()) {
+                    System.err.println("Error: Does not specify username.");
                     printHelpAndQuit(1);
                 }
             } else {
@@ -268,7 +286,28 @@ public class SnapshotComparer {
                         }
                         i++;
                         targetHosts = args[i].split(",");
+                    } else if (arg.equalsIgnoreCase("--user")) {
+                        if (i + 1 >= args.length) {
+                            System.err.println("Error: Not enough args following --user");
+                            printHelpAndQuit(1);
+                        }
+                        i++;
+                        username = args[i];
+                    } else if (arg.equalsIgnoreCase("--cleanup")) {
+                        cleanup = true;
                     }
+                }
+                if (sourceNonce == null || sourceNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify source snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (targetNonce == null || targetNonce.isEmpty()) {
+                    System.err.println("Error: Does not specify comparing snapshot nonce.");
+                    printHelpAndQuit(1);
+                }
+                if (local == null) {
+                    System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
+                    printHelpAndQuit(1);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
@@ -277,6 +316,17 @@ public class SnapshotComparer {
                                 || (targetDirs.length != targetHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
                     printHelpAndQuit(1);
+                }
+                if (!local && username.isEmpty()) {
+                    System.err.println("Error: Does not specify username.");
+                    printHelpAndQuit(1);
+                }
+            }
+            if (!local && cleanup) {
+                try {
+                    FileUtils.deleteDirectory(new File(remoteSnapshotFolder));
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
             valid = true;
@@ -325,7 +375,7 @@ class SnapshotLoader {
             }
         } else {
             // if from remote, first fetch to local
-            File localRootDir = new File("./remoteSnapshot/" + nonce);
+            File localRootDir = new File(remoteSnapshotFolder + nonce);
             localRootDir.mkdirs();
             for (int i = 0; i < hosts.length; i++) {
                 File localDir = new File(localRootDir.getPath()+ PATHSEPARATOR + hosts[i]);

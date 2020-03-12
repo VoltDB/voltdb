@@ -25,9 +25,9 @@ import org.voltdb.task.Initializable;
 import com.google_voltpatches.common.base.Joiner;
 
 /**
- * Helper that can be used to collect multiple errors that are encountered, e.g. while validating
- * the parameters of any {@link Initializable} class. This enables implementing a validation logic
- * that will not stop at the first error, and return a message compounding multiple error messages.
+ * Helper that can be used to collect multiple errors that are encountered, e.g. while validating the parameters of any
+ * {@link Initializable} class. This enables implementing a validation logic that will not stop at the first error, and
+ * return a message compounding multiple error messages.
  */
 public final class CompoundErrors {
     private List<String> m_errors = null;

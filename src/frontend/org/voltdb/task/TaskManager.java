@@ -68,6 +68,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.compiler.deploymentfile.TaskThreadPoolType;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.utils.CompoundErrors;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.CompoundErrors;
 
