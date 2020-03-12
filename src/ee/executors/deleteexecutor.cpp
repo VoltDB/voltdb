@@ -110,7 +110,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            (int)targetTable->allocatedTupleCount());
 
                 // empty the table either by table swap or iteratively deleting tuple-by-tuple
-                targetTable->truncateTable(m_engine, m_replicatedTableOperation);
+                targetTable->truncateTable(m_engine, targetTable->isReplicatedTable());
             }
             else {
                 assert(m_inputTable);

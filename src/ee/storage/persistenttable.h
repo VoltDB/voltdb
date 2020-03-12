@@ -260,7 +260,7 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool replicatedTable);
 
     void swapTable
            (PersistentTable* otherTable,
