@@ -1877,10 +1877,11 @@ HookedCompactingChunks<Hook, E>::freeze() {
 }
 
 template<typename Hook, typename E>
-inline void HookedCompactingChunks<Hook, E>::thaw() {
+template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
     Hook::thaw();
     CompactingChunks::thaw();
     m_observerable = false;
+    reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).reset();
 }
 
 template<typename Hook, typename E> inline void HookedCompactingChunks<Hook, E>::remove_add(void* p) {
@@ -2107,9 +2108,10 @@ template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename           
     HookedMethods4(tag, alloc, gc, __codegen__::t6)
 
 #define HookedMethods2(tag, alloc, gc)                                                   \
-template shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<alloc,                   \
-         HistoryRetainTrait<gc>>, void>, tag, void>::hooked_iterator>                    \
+template shared_ptr<typename IterableTableTupleChunks<                                   \
+        HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>, tag, void>::hooked_iterator>    \
 HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>();  \
+template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
 template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(void*);\

@@ -867,7 +867,7 @@ void testHookedCompactingChunks() {
         ++*iterp;
     }
     assert(i == NumTuples);
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol>
@@ -902,7 +902,7 @@ void testHookedCompactingChunksBatchRemove_single1() {
     }
     alloc.template remove_force<truth>([](vector<pair<void*, void*>> const&){});
     verify_snapshot_const();
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol>
@@ -947,7 +947,7 @@ void testHookedCompactingChunksBatchRemove_single2() {
     }
     alloc.template remove_force<truth>([](vector<pair<void*, void*>> const&){});
     verify_snapshot_const();
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol>
@@ -979,7 +979,7 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
                 ++i;
             });
     assert(i == 9);
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol>
@@ -1039,7 +1039,7 @@ void testHookedCompactingChunksBatchRemove_multi1() {
     }
     alloc.template remove_force<truth>([](vector<pair<void*, void*>> const&){});
     verify_snapshot_const();
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol>
@@ -1083,7 +1083,7 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     }
     alloc.template remove_force<truth>([](vector<pair<void*, void*>> const&){});
     verify_snapshot_const();
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2chunks) {
@@ -1273,7 +1273,7 @@ void testInterleavedCompactingChunks() {
             break;                                             // verified all snapshot iterators
         }
     }
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol> struct TestInterleavedCompactingChunks2 {
@@ -1342,7 +1342,7 @@ void testSingleChunkSnapshot() {
                 alloc.release(p);
             });
     assert(i == Number);
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 template<typename Chunk, gc_policy pol> struct TestSingleChunkSnapshot2 {
@@ -1412,7 +1412,7 @@ void testRemovesFromEnds(size_t batch) {
             assert(false);                                     // should have failed
         } catch (logic_error const& e) {
             assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
-            alloc.thaw();
+            alloc.template thaw<truth>();
         }
     } else {                                                   // remove from tail
         for (i = NumTuples - 1; i >= NumTuples - batch && i < NumTuples; --i) {
@@ -1708,7 +1708,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapshotIteratorOnNonFull1stChunk) {
                 ++i;
             });
     ASSERT_EQ(NumTuples - 10, i);
-    alloc.thaw();
+    alloc.template thaw<truth>();
 }
 
 /**
@@ -1733,7 +1733,7 @@ TEST_F(TableTupleAllocatorTest, TestClearFrozenCompactingChunks) {
             static_cast<Alloc const&>(alloc),
             [&i, this](void const* p) { ASSERT_TRUE(Gen::same(p, i++)); });
     ASSERT_EQ(NumTuples - 6, i);
-    alloc.thaw();
+    alloc.template thaw<truth>();
     ASSERT_TRUE(alloc.empty());
     for (i = 0; i < 6; ++i) {                                                          // next, after wipe out, insert 6 tuples
         memcpy(alloc.allocate(), gen.get(), TupleSize);
