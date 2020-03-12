@@ -1569,11 +1569,16 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         TableTuple target(m_schema);
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
         try {
             target.deserializeFrom(serialInput, stringPool, caller);
-         } catch (SQLException &e) {
+        } catch (SQLException &e) {
+            deleteTailTupleStorage(target);
             throw;
-         }
+        }
         // TODO: we do not catch other types of exceptions, such as
         // SQLException, etc. The assumption we held that no other
         // exceptions should be thrown in the try-block is pretty
