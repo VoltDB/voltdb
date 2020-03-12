@@ -68,6 +68,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.TaskSettingsType;
 import org.voltdb.compiler.deploymentfile.TaskThreadPoolType;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.utils.CompoundErrors;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.base.MoreObjects;
@@ -442,7 +443,7 @@ public final class TaskManager {
      * @return An error message or {@code null} if no errors were found
      */
     public static String validateTasks(Database database, ClassLoader classLoader) {
-        TaskValidationErrors errors = new TaskValidationErrors();
+        CompoundErrors errors = new CompoundErrors();
         for (Task task : database.getTasks()) {
             errors.addErrorMessage(
                     validateTask(task, TaskScope.fromId(task.getScope()), database, classLoader).getErrorMessage());

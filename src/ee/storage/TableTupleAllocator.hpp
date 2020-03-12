@@ -602,6 +602,7 @@ namespace voltdb {
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
+            friend class position_type;                // need to search hidden region
             using list_type = ChunkList<CompactingChunk, Compact>;
             // equivalent to "table id", to ensure injection relation to rw iterator
             id_type const m_id = ChunksIdValidator::instance().id();
@@ -788,7 +789,9 @@ namespace voltdb {
             void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
-            void add(CompactingChunks const&, ChangeType, void const*);
+            template<typename IteratorObserver,
+                typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
+            void add(ChangeType type, void const* dst, IteratorObserver = {});
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
             // auxillary buffer that client must need for tuple deletion/update operation,
@@ -801,6 +804,11 @@ namespace voltdb {
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
 
+        struct truth {                                             // simplest Tag that always returns true
+            constexpr bool operator()(void*) const noexcept { return true; }
+            constexpr bool operator()(void const*) const noexcept { return true; }
+        };
+
         /**
          * Client API that manipulates in high level.
          */
@@ -809,6 +817,12 @@ namespace voltdb {
             using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
             using Hook::add; using Hook::copy;
+            template<typename Tag> using observer_type = typename
+                IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
+            static observer_type<truth> DUMMY_OBSERVER;
+            observer_type<truth> m_iterator_observer{};
+            bool m_observerable = false;
+            template<typename Tag> observer_type<Tag>& observer() noexcept;
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
@@ -816,10 +830,10 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            void thaw();                               // switch of snapshot process
+            template<typename Tag> void thaw();             // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
-            void update(void*);                        // NOTE: this must be called prior to any memcpy operations happen
-            void const* remove(void*);
+            template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
+            template<typename Tag> void const* remove(void*);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -836,8 +850,8 @@ namespace voltdb {
              */
             void remove_reserve(size_t);
             void remove_add(void*);
-            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
-            void clear();
+            template<typename Tag> size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
             string info(void const*) const;
         };
@@ -898,16 +912,17 @@ namespace voltdb {
                           ChunksIdValidator, ChunksIdNonValidator>::type;
                 value_type m_cursor;
                 void advance();
-                container_type storage() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
                 list_iterator_type& list_iterator() noexcept;
-                operator position_type() const noexcept;
             public:
                 using constness = integral_constant<bool, perm == iterator_permission_type::ro>;
                 iterator_type(container_type);
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 ~iterator_type();
+                container_type storage() const noexcept;
+                // NOTE: we need to expose these 2 APIs bc. of IteratorObserver
+                operator position_type() const noexcept;
                 static iterator_type begin(container_type);
                 bool operator==(iterator_type const&) const noexcept;
                 inline bool operator!=(iterator_type const& o) const noexcept {
@@ -1009,12 +1024,22 @@ namespace voltdb {
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
             using const_hooked_iterator = hooked_iterator_type<iterator_permission_type::ro>;
+
+            /**
+             * Weak observer for the snapshot RW iterator
+             */
+            class IteratorObserver : private weak_ptr<hooked_iterator> {
+                using super = weak_ptr<hooked_iterator>;
+            public:
+                using is_iterator_observer = true_type;
+                IteratorObserver() noexcept = default;
+                IteratorObserver(shared_ptr<hooked_iterator> const&) noexcept;
+                IteratorObserver(IteratorObserver const&) noexcept = default;
+                IteratorObserver(IteratorObserver&&) noexcept = default;
+                bool operator()(void const*) const;    // iterator > arg ptr? i.e. visited?
+            };
         };
 
-        struct truth {                                             // simplest Tag that always returns true
-            constexpr bool operator()(void*) const noexcept { return true; }
-            constexpr bool operator()(void const*) const noexcept { return true; }
-        };
         template<unsigned char NthBit, typename = typename enable_if<NthBit < 8>::type>
         struct NthBitChecker {                         // Tag that checks whether the n-th bit of first byte is on
             static constexpr char const MASK = 1 << NthBit;

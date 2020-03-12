@@ -1,0 +1,128 @@
+load classes sp.jar;
+
+file -inlinebatch END_OF_BATCH
+
+-- Partitioned Data Table
+%%TABLE name=partitioned_table, partition_key=rowid, primary_key=rowid
+
+-- Index over rowid_group on Partitioned Data Table
+CREATE INDEX IX_partitioned_table_rowid_group
+    ON partitioned_table ( rowid_group );
+
+-- Grouping view over Partitioned Data Table
+CREATE VIEW partitioned_table_group
+(
+  rowid_group
+, record_count
+)
+AS
+   SELECT rowid_group
+        , COUNT(*)
+     FROM partitioned_table
+ GROUP BY rowid_group;
+
+-- Export Table for Partitioned Data Table deletions
+%%TABLE name=export_partitioned_table_kafka, migrate_target=kafka_target, partition_key=rowid
+
+%%TABLE name=export_partitioned_table_rabbit, migrate_target=rabbit_target, partition_key=rowid
+
+%%TABLE name=export_partitioned_table_file, migrate_target=file_target, partition_key=rowid
+
+%%TABLE name=export_partitioned_table_jdbc, migrate_target=jdbc_target, partition_key=rowid
+
+%%TABLE name=export_mirror_partitioned_table, partition_key=rowid
+
+%%TABLE name=export_mirror_replicated_table
+
+CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_done_table_rabbit EXPORT TO TARGET rabbit_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_done_table_jdbc EXPORT TO TARGET jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+-- Export Table for Replicated Data Table deletions
+%%TABLE name=export_replicated_table_kafka, migrate_target=kafka_target
+CREATE INDEX export_replicated_table_kafka_idx ON export_replicated_table_kafka(type_not_null_timestamp) where not migrating;
+
+%%TABLE name=export_replicated_table_rabbit, migrate_target=rabbit_target
+CREATE INDEX export_replicated_table_rabbit_idx ON  export_replicated_table_rabbit(type_not_null_timestamp) where not migrating;
+
+%%TABLE name=export_replicated_table_file, migrate_target=file_target
+CREATE INDEX export_replicated_table_file_idx ON  export_replicated_table_file(type_not_null_timestamp) where not migrating;
+
+%%TABLE name=export_replicated_table_jdbc, migrate_target=jdbc_target
+CREATE INDEX export_replicated_table_jdbc_idx ON  export_replicated_table_jdbc(type_not_null_timestamp)  where not migrating;
+
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.MigratePartitionedExport;
+CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateReplicatedExport;
+CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
+
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
+
+CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+-- Export Stream with extra Geo columns
+%%STREAM name=export_geo_partitioned_table_jdbc, partition_key=rowid, export_target=jdbc_target, geocolumns=True
+
+-- should be an exact copy of the stream. Used for verifiing
+-- export stream contents.
+%%TABLE name=export_geo_mirror_partitioned_table, partition_key=rowid, geocolumns=True
+
+CREATE STREAM export_geo_done_table_kafka EXPORT TO TARGET kafka_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+CREATE STREAM export_geo_done_table_jdbc EXPORT TO TARGET jdbc_target
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW_KAFKA
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM EXPORT_PARTITIONED_TABLE_KAFKA
+ GROUP BY rowid;
+
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW_JDBC
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM EXPORT_PARTITIONED_TABLE_JDBC
+ GROUP BY rowid;
+
+-- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
+CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table_jdbc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
+
+-- this is used by the verifier inside JDBCGetData, re-point to the geo tables
+-- DROP PROCEDURE SelectwithLimit IF EXISTS;
+-- CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+
+END_OF_BATCH
