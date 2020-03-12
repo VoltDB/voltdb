@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
     public class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
         final static String m_hostID = "Host id of this node is: ";
+        final static String m_rejoinCompleteToken = "Node rejoin completed";
 
         FileWriter m_writer ;
         BufferedReader m_input;
