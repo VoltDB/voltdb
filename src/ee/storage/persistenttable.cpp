@@ -622,7 +622,7 @@ void PersistentTable::finalizeRelease() {
 
     TableTuple target(m_schema);
     TableTuple origin(m_schema);
-    allocator().remove_force([this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
+    allocator().remove_force<storage::truth>([this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
         for(auto const& p : tuples) {
            target.move(p.first);
            origin.move(p.second);
@@ -970,7 +970,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     std::vector<char*> newObjects;
 
     // this is the actual write of the new values
-    allocator().update(targetTupleToUpdate.address());
+    allocator().template update<storage::truth>(targetTupleToUpdate.address());
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (fromMigrate) {
@@ -1093,7 +1093,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
         }
     }
     //TO DO: undo update
-    allocator().update(targetTupleToUpdate.address());
+    allocator().template update<storage::truth>(targetTupleToUpdate.address());
 }
 
 
@@ -1802,7 +1802,7 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
        if (m_snapIt->drained()) {
-          allocator().thaw();
+          allocator().template thaw<storage::truth>();
           m_snapIt.reset();
           return false;
        }
