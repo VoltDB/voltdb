@@ -1802,7 +1802,7 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
        if (m_snapIt->drained()) {
-          allocator().template thaw<storage::truth>();
+          allocator().thaw();
           m_snapIt.reset();
           return false;
        }
