@@ -2185,11 +2185,21 @@ void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
 
     int32_t serializedTupleCount = 0;
     size_t tupleCountPosition = 0;
-    TableTuple target(m_schema);
     for (int i = 0; i < tupleCount; ++i) {
+        TableTuple target(m_schema);
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
-        target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
+        try {
+            target.deserializeFrom(serialInput, stringPool, LoadTableCaller::get(LoadTableCaller::INTERNAL));
+        } catch (SQLException &e) {
+            deleteTailTupleStorage(target);
+            throw;
+        }
+
         processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
     }
     vassert(tupleCount == activeTupleCount());
