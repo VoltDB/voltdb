@@ -418,7 +418,7 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
 
     // Note: see document on NonCompactingChunks to understand
     // why we cannot use iterator to free memories.
-    Tag const tag;
+    Tag const tag {};
     if (Chunks::Compact::value) {
         bool freed;
         TrackedDeleter<Chunks> deleter(alloc, freed);

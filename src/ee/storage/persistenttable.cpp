@@ -123,12 +123,8 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         m_allowNulls[i] = columnInfo->allowNull;
     }
 
-#ifdef MEMCHECK
-    vassert(false); // see todo above.
-#else
     m_tableAllocationSize = m_dataStorage->chunkSize();
     m_tuplesPerChunk = m_tableAllocationSize / m_tupleLength;
-#endif
 }
 
 PersistentTable::~PersistentTable() {
