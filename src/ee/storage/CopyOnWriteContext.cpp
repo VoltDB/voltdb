@@ -143,6 +143,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                 }
                 bool deleteTuple = false;
                 yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+
+                if (tuple.isPendingDelete()) {
+                    table.deleteTupleStorage(tuple);
+                }
             }
         }
     }
