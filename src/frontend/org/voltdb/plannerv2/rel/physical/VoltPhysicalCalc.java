@@ -81,7 +81,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("pusheddown", m_isPushedDown);
+        pw.itemIf("pusheddown", m_isPushedDown, m_isPushedDown);
         return pw;
     }
 
