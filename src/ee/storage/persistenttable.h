@@ -597,7 +597,7 @@ public:
     bool deleteMigratedRows(int64_t deletableTxnId);
     void insertTupleForUndo(char* tuple);
     void deleteTupleRelease(char* tuple);
-
+    void deleteTupleStorage(TableTuple& tuple);
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
@@ -666,7 +666,6 @@ private:
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple& tuple);
     void deleteTailTupleStorage(TableTuple& tuple);
 
     /**

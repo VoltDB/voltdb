@@ -1229,15 +1229,18 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
+    bool pendingDelete = false;
     if (m_tableStreamer != NULL && ! m_tableStreamer->notifyTupleDelete(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
         if (!target.isPendingDelete()) {
             ++m_invisibleTuplesPendingDeleteCount;
             ++m_batchDeleteTupleCount;
             target.setPendingDeleteTrue();
+        } else {
+            pendingDelete = true;
         }
     }
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+    if (!pendingDelete && m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
         target.freeObjectColumns();
     }
