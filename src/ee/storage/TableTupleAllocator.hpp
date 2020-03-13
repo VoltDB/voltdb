@@ -229,9 +229,9 @@ namespace voltdb {
             bool contains(void const*) const;          // query if a table tuple is stored in current chunk
             bool full() const noexcept;
             bool empty() const noexcept;
-            void*const begin() const noexcept;
-            void*const end() const noexcept;
-            void*const next() const noexcept;
+            void*const range_begin() const noexcept;
+            void*const range_end() const noexcept;
+            void*const range_next() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
             allocator_type<T>& get_allocator() noexcept;
@@ -464,16 +464,10 @@ namespace voltdb {
          */
         class CompactingStorageTrait {
             using list_type = ChunkList<CompactingChunk, true_type>;
-            /**
-             * Linearized access order depending on shrink
-             * direction, to ensure that chunks are accessed in
-             * snapshot view the same order as they appear in txn
-             * view when snapshot started.
-             */
-            list_type* m_storage;
+            list_type& m_storage;
             bool m_frozen = false;
         public:
-            explicit CompactingStorageTrait(list_type*) noexcept;
+            explicit CompactingStorageTrait(list_type&) noexcept;
             bool frozen() const noexcept;
             void freeze(); void thaw();
             /**
@@ -588,7 +582,7 @@ namespace voltdb {
                 typename ChunkList<CompactingChunk, Compact>::iterator& iterator() noexcept;
                 typename ChunkList<CompactingChunk, Compact>::iterator const&
                     iterator(ChunkList<CompactingChunk, Compact>::iterator const&) noexcept;
-                void const*& next() noexcept;
+                void const*& range_next() noexcept;
                 bool empty() const noexcept;
             };
             class FrozenTxnBoundaries final {
@@ -627,7 +621,7 @@ namespace voltdb {
                 public:
                     RemovableRegion(char const*, size_t, size_t) noexcept;
                     vector<void*> holes(size_t) const noexcept;
-                    char const* begin() const noexcept;
+                    char const* range_begin() const noexcept;
                     bitset_t& mask() noexcept;
                     bitset_t const& mask() const noexcept;
                 };
@@ -752,9 +746,8 @@ namespace voltdb {
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
             set_type m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
-            bool m_hasDeletes = false;      // observer for iterator::advance()
             void* m_last = nullptr;         // last allocation by copy(void const*);
-            Alloc m_storage;
+            Alloc m_changeStore;
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -799,7 +792,6 @@ namespace voltdb {
             // Client is responsible to fill the buffer before
             // calling add() API.
             void copy(void const* prev);
-            bool const& hasDeletes() const noexcept;
         };
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
@@ -819,10 +811,7 @@ namespace voltdb {
             using Hook::add; using Hook::copy;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
-            static observer_type<truth> DUMMY_OBSERVER;
             observer_type<truth> m_iterator_observer{};
-            bool m_observerable = false;
-            template<typename Tag> observer_type<Tag>& observer() noexcept;
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
@@ -922,8 +911,8 @@ namespace voltdb {
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 ~iterator_type();
-                container_type storage() const noexcept;
                 // NOTE: we need to expose these 2 APIs bc. of IteratorObserver
+                container_type storage() const noexcept;
                 operator position_type() const noexcept;
                 static iterator_type begin(container_type);
                 bool operator==(iterator_type const&) const noexcept;

@@ -1411,7 +1411,8 @@ void testRemovesFromEnds(size_t batch) {
             alloc.remove(dir, nullptr);
             assert(false);                                     // should have failed
         } catch (logic_error const& e) {
-            assert(! strcmp(e.what(), "Cannot remove from head when frozen"));
+            assert(! strcmp(e.what(),
+                        "HookedCompactingChunks::remove(dir, ptr): Cannot remove from head when frozen"));
             alloc.template thaw<truth>();
         }
     } else {                                                   // remove from tail
