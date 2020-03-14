@@ -54,6 +54,7 @@ public class VoltPExchangeRule extends RelOptRule {
                 exchange.getCluster(),
                 convertedTraits,
                 convertedInput,
-                exchange.getDistribution()));
+                exchange.getDistribution(),
+                exchange.getChildDistribution()));
     }
 }

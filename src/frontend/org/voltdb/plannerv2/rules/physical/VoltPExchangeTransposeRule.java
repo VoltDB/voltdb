@@ -201,19 +201,24 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
 
     private void transposeSortExchange(RelOptRuleCall call) {
         VoltPhysicalSort sort = (VoltPhysicalSort) call.rels[0];
-        Exchange exchange = (Exchange) call.rels[1];
+        VoltPhysicalExchange exchange = (VoltPhysicalExchange) call.rels[1];
         RelNode child = call.rels[2];
 
+        RelDistribution fragmentDistribution = exchange.getChildDistribution();
         // Fragment Sort
         VoltPhysicalSort fragmentSort = new VoltPhysicalSort(
                 sort.getCluster(),
-                sort.getTraitSet().replace(exchange.getDistribution()),
+                sort.getTraitSet().replace(fragmentDistribution),
                 child,
                 sort.getCollation(),
                 false);
         // New exchange. Since fragment's results will be sorted we can use MergeExchange
         // to eliminate redundant coordinator's sort
-        Exchange newExchange = new VoltPhysicalMergeExchange(exchange.getCluster(), exchange.getTraitSet(), fragmentSort, exchange.getDistribution());
+        Exchange newExchange = new VoltPhysicalMergeExchange(exchange.getCluster(),
+                exchange.getTraitSet(),
+                fragmentSort,
+                exchange.getDistribution(),
+                fragmentDistribution);
         // New Coordinator's Sort
         // If the sort node was created by the Calcite (from an existing collation trait)
         // its distribution needs to be reset
@@ -232,6 +237,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
     private void transposeLimitExchange(RelOptRuleCall call) {
         final VoltPhysicalLimit coordinatorLimit = (VoltPhysicalLimit) call.rels[0];
         final List<RelNode> coordinatoNodes;
+        // Can be Exchange or MergeExchange
         final Exchange exchange;
         final RelNode child;
         if (mExchangeType == ExchangeType.LIMIT_EXCHANGE) {
@@ -280,24 +286,25 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
 
         final VoltPhysicalCalc aggrCalc;
         final VoltPhysicalAggregate aggregate;
-        final Exchange exchange;
+        final VoltPhysicalExchange exchange;
         final RelNode child;
         if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
             aggrCalc = (VoltPhysicalCalc) call.rels[0];
             aggregate = (VoltPhysicalAggregate) call.rels[1];
-            exchange = (Exchange) call.rels[2];
+            exchange = (VoltPhysicalExchange) call.rels[2];
             child = call.rels[3];
         } else {
             aggrCalc = null;
             aggregate = (VoltPhysicalAggregate) call.rels[0];
-            exchange = (Exchange) call.rels[1];
+            exchange = (VoltPhysicalExchange) call.rels[1];
             child = call.rels[2];
         }
 
+        RelDistribution fragmentDistribution = exchange.getChildDistribution();
         // Fragment Aggregate is a copy of the current aggregate
         VoltPhysicalAggregate fragmentAggregate = aggregate.copy(
                 aggregate.getCluster(),
-                aggregate.getTraitSet().replace(exchange.getDistribution()),
+                aggregate.getTraitSet().replace(fragmentDistribution),
                 child,
                 aggregate.indicator,
                 aggregate.getGroupSet(),
@@ -320,7 +327,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 builder.addProject(field.getIndex(), field.getName());
             });
             exhangeInput = aggrCalc.copy(
-                    aggrCalc.getTraitSet().replace(exchange.getDistribution()),
+                    aggrCalc.getTraitSet().replace(fragmentDistribution),
                     fragmentAggregate,
                     builder.getProgram(),
                     false);
@@ -331,7 +338,8 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         Exchange newExchange = new VoltPhysicalExchange(exchange.getCluster(),
                 exchange.getTraitSet(),
                 exhangeInput,
-                exchange.getDistribution());
+                exchange.getDistribution(),
+                fragmentDistribution);
 
         // Coordinator fragment. Replace all occurrences of COUNT with SUM
         List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()

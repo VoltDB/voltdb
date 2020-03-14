@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
@@ -85,6 +84,7 @@ public class VoltPhysicalExchangeMergeRule extends RelOptRule {
                 newExchangeTraits,
                 exchange.getInput(),
                 limitDistribution,
+                exchange.getChildDistribution(),
                 exchange.getChildExps(),
                 limit.getOffset(),
                 limit.getLimit());
@@ -104,6 +104,7 @@ public class VoltPhysicalExchangeMergeRule extends RelOptRule {
                 newExchangeTraits,
                 exchange.getInput(),
                 sortDistribution,
+                exchange.getChildDistribution(),
                 sort.getChildExps(),
                 sort.offset,
                 sort.fetch);

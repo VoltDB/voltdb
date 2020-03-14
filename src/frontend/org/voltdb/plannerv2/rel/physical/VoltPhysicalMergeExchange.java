@@ -47,6 +47,9 @@ import com.google_voltpatches.common.base.Preconditions;
 
 public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalRel {
 
+    // Exchange's input Distribution
+    final private RelDistribution m_childDistribution;
+
     // Inline Sort Data
     private final ImmutableList<RexNode> m_sorFieldExps;
     // Inline Limit
@@ -54,16 +57,34 @@ public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalR
     private final RexNode m_limit;
 
     public VoltPhysicalMergeExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution newDistribution) {
-        this(cluster, traitSet, input, newDistribution, null, null, null);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
+            RelDistribution exchangetDistribution, RelDistribution childDistribution) {
+        this(cluster, traitSet, input, exchangetDistribution, childDistribution, null, null, null);
     }
 
+    /**
+     * Create a VoltPhysicalExchange.
+     *
+     * @param cluster Cluster
+     * @param traitSet Traits
+     * @param input Input relation
+     * @param exchangetDistribution Exchange's Distribution.
+     *                              It's always a SINGLETON with isSP = FALSE and a possible partitioning value
+     * @param childDistribution Distribution below this exchange node
+     * @param sorFieldExps sort fields that this MergeExchange enforces
+     * @param offset inline offset
+     * @param limit inline limit
+     */
     private VoltPhysicalMergeExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution newDistribution,
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
+            RelDistribution exchangetDistribution, RelDistribution childDistribution,
             List<RexNode> sorFieldExps, RexNode offset, RexNode limit) {
-        super(cluster, traitSet, input, newDistribution);
+        super(cluster, traitSet, input, exchangetDistribution);
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
                 traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
+        Preconditions.checkArgument(exchangetDistribution.getType() == RelDistribution.Type.SINGLETON);
+        Preconditions.checkArgument(exchangetDistribution.getIsSP() == false);
+        m_childDistribution = childDistribution;
         m_sorFieldExps = (sorFieldExps != null) ? ImmutableList.copyOf(sorFieldExps) : null;
         m_offset = offset;
         m_limit = limit;
@@ -71,17 +92,20 @@ public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalR
 
     @Override
     public VoltPhysicalMergeExchange copy(
-            RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-        return new VoltPhysicalMergeExchange(getCluster(), traitSet, newInput, newDistribution,
+            RelTraitSet traitSet, RelNode newInput, RelDistribution exchangetDistribution) {
+        return copy(traitSet, newInput, exchangetDistribution,m_childDistribution,
                 m_sorFieldExps, m_offset, m_limit);
     }
 
-    public VoltPhysicalMergeExchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution, List<RexNode> sorFieldExps, RexNode offset, RexNode limit) {
+    public VoltPhysicalMergeExchange copy(RelTraitSet traitSet, RelNode newInput,
+            RelDistribution exchangetDistribution, RelDistribution childDistribution,
+            List<RexNode> sorFieldExps, RexNode offset, RexNode limit) {
         return new VoltPhysicalMergeExchange(
                 getCluster(),
                 traitSet,
                 newInput,
-                newDistribution,
+                exchangetDistribution,
+                childDistribution,
                 sorFieldExps,
                 offset,
                 limit
@@ -107,6 +131,7 @@ public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalR
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
+        pw.item("childDistribution", m_childDistribution);
         pw.item("collation", getTraitSet().getTrait(RelCollationTraitDef.INSTANCE));
         pw.itemIf("offset", m_offset, m_offset != null);
         pw.itemIf("limit", m_limit, m_limit != null);
@@ -134,6 +159,10 @@ public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalR
         }
         rpn.addInlinePlanNode(opn);
         return rpn;
+    }
+
+    public RelDistribution getChildDistribution() {
+        return m_childDistribution;
     }
 
     public RexNode getOffset() {
