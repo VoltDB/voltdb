@@ -544,23 +544,14 @@ void testTxnHook() {
 
     using Gen = UnmaskedStringGen<tuple<InsertionTag, DeletionUpdateTag>>;
     Gen gen{};
-    constexpr auto const InsertTuples = 256lu;                   // # tuples to be inserted/appended since snapshot
 
-    array<void*, NumTuples + InsertTuples> addresses;
+    array<void*, NumTuples> addresses;
     size_t i;
     for(i = 0; i < NumTuples; ++i) {                     // the later appended ones will later be marked as inserted after starting snapshot
         addresses[i] = gen.fill(alloc.allocate());
     }
     hook.freeze();                                       // recording started
     alloc.freeze();                                      // don't forget to notify allocator, too
-    // mark last 256 insertions as inserted after snapshot
-    // started
-    for (i = NumTuples; i < NumTuples + InsertTuples; ++i) {
-        auto* p = alloc.allocate();
-        hook._add_for_test_(Hook::ChangeType::Insertion, p);
-        addresses[i] = gen.fill(p);
-        InsertionTag::set(p);                                  // mark as "insertion pending"
-    }
     // test that the two bits we chose do not step over Gen's work, and txn iterator sees latest change
     i = 0;
     fold<const_iterator>(alloc_cref,
@@ -570,7 +561,7 @@ void testTxnHook() {
                 assert(gen.same(p, i));
                 ++i;
             });
-    assert(i == NumTuples + InsertTuples);
+    assert(i == NumTuples);
     using snapshot_iterator = typename
         IterableTableTupleChunks<DataAlloc, truth>::template iterator_cb<TxnPreHook<HookAlloc, RetainTrait>>;
     using const_snapshot_iterator = typename
@@ -587,11 +578,6 @@ void testTxnHook() {
                 }
             }, hook);
     assert(i == NumTuples);                                    // snapshot does not see newly inserted rows
-    for(; i < NumTuples + InsertTuples; ++i) {
-        assert(hook(addresses[i]) == nullptr);
-        assert(insertionTag(addresses[i]));
-        InsertionTag::set(addresses[i]);
-    }
 
     auto const DeletedTuples = 256lu,                          // Deleting 256th, 257th, ..., 511th allocations
          DeletedOffset = 256lu;
@@ -618,7 +604,7 @@ void testTxnHook() {
     assert(i == NumTuples);                                    // opaque to snapshot
     i = 0;
     fold<const_iterator>(alloc_cref, [&i](void const*) { ++i; });
-    assert(i == NumTuples + InsertTuples - DeletedTuples);     // but transparent to txn
+    assert(i == NumTuples - DeletedTuples);     // but transparent to txn
 
     auto const UpdatedTuples = 1024lu, UpdatedOffset = 1024lu;  // Updating 1024 <= 1025, 1025 <= 1026, ..., 2047 <= 2048
     // do the math: after we deleted first 256 entries, the
@@ -645,7 +631,7 @@ void testTxnHook() {
     assert(i == NumTuples);
     i = 0;
     fold<const_iterator>(alloc_cref, [&i](void const*) { ++i; });
-    assert(i == NumTuples + InsertTuples - DeletedTuples);
+    assert(i == NumTuples - DeletedTuples);
     // Hook releasal should be done as we cover tuples in
     // snapshot process. We delay the release here to help
     // checking invariant on snapshot view.

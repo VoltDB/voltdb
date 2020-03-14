@@ -766,11 +766,13 @@ namespace voltdb {
              *   its content.
              */
             void update(void const*);
-            void insert(void const*);
+            void update(void const*, function<void(void*, void*)> const&);
             void remove(void const*);
+            void remove(void const*, function<void(void*, void*)> const&);
         public:
-            enum class ChangeType : char {Update, Insertion, Deletion};
+            enum class ChangeType : char {Update, Deletion};
             using is_hook = true_type;
+            using update_delete_cb_type = function<void(void*, void*)>;    // args: undo action memory, shallow copied tuple
 
             TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
@@ -784,6 +786,9 @@ namespace voltdb {
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
             void add(ChangeType, void const*, IteratorObserver&);
+            template<typename IteratorObserver,
+                typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
+            void add(ChangeType, void const*, IteratorObserver&, update_delete_cb_type const&);
             void _add_for_test_(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
@@ -825,6 +830,10 @@ namespace voltdb {
             // supplied with same type as freeze() method.
             template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
             template<typename Tag> void const* remove(void*);
+            template<typename Tag> void update(void*,              // with a call back
+                    typename Hook::update_delete_cb_type const&);
+            template<typename Tag> void const* remove(void*,
+                    typename Hook::update_delete_cb_type const&);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when

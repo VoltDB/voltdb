@@ -1714,12 +1714,34 @@ inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, 
             case ChangeType::Update:
                 update(dst);
                 break;
-            case ChangeType::Insertion:
-                insert(dst);
-                break;
             case ChangeType::Deletion:
             default:
                 remove(dst);
+        }
+    }
+}
+
+template<typename Alloc, typename Trait, typename E1>
+template<typename IteratorObserver, typename E2>
+inline void TxnPreHook<Alloc, Trait, E1>::add(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
+        void const* dst, IteratorObserver& obs,
+        typename TxnPreHook<Alloc, Trait, E1>::update_delete_cb_type const& cb) {
+    // identical to the version without call-back, except for the call back
+    if (m_recording && ! obs(dst)) {
+        switch (type) {
+            case ChangeType::Update:
+                // TODO: what is the intention of 1st arg? track it (associated) with dst?
+                cb(nullptr/*FIXME*/, const_cast<void*>(dst));
+                if (! obs(dst)) {
+                    update(dst);
+                }
+                break;
+            case ChangeType::Deletion:
+            default:
+                cb(nullptr/*FIXME*/, const_cast<void*>(dst));
+                if (! obs(dst)) {
+                    remove(dst);
+                }
         }
     }
 }
@@ -1742,7 +1764,7 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::thaw() {
     if (m_recording) {
-        m_changes.clear();
+        m_changes.clear();                                             // TODO: what do we nned to add in here?
         m_copied.clear();
         m_changeStore.clear();
         m_last = nullptr;      // since m_storage is cleared
@@ -1770,18 +1792,30 @@ inline void TxnPreHook<Alloc, Trait, E>::update(void const* dst) {
 }
 
 template<typename Alloc, typename Trait, typename E>
-inline void TxnPreHook<Alloc, Trait, E>::insert(void const* dst) {
+inline void TxnPreHook<Alloc, Trait, E>::update(void const* dst,
+        typename TxnPreHook<Alloc, Trait, E>::update_delete_cb_type const& cb) {
+    // TODO: when to call cb?
     if (m_recording && ! m_changes.count(dst)) {
-        // for insertions, since previous memory is unused, there
-        // is nothing to keep track of. Just mark the position as
-        // previously unused.
-        m_changes.emplace(dst, nullptr);
+        m_changes.emplace(dst, _copy(dst, false));
     }
 }
 
 template<typename Alloc, typename Trait, typename E>
 inline void TxnPreHook<Alloc, Trait, E>::remove(void const* src) {
     // src tuple is deleted, and tuple at dst gets moved to src
+    if (m_recording && m_changes.count(src) == 0) {
+        // Need to copy the original value that gets deleted
+        vassert(m_last != nullptr);
+        m_changes.emplace(src, m_last);
+        m_last = nullptr;
+    }
+}
+
+template<typename Alloc, typename Trait, typename E>
+inline void TxnPreHook<Alloc, Trait, E>::remove(void const* src,
+        typename TxnPreHook<Alloc, Trait, E>::update_delete_cb_type const& cb) {
+    // identical to the non-cb implementation, except for calling call-back
+    // TODO: when to call cb?
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
         vassert(m_last != nullptr);
@@ -1823,6 +1857,20 @@ template<typename Tag> inline void const* HookedCompactingChunks<Hook, E>::remov
 }
 
 template<typename Hook, typename E>
+template<typename Tag> inline void const* HookedCompactingChunks<Hook, E>::remove(void* dst,
+        typename Hook::update_delete_cb_type const& cb) {
+    if (frozen()) {
+        Hook::copy(dst);
+    }
+    void const* src = CompactingChunks::free(dst);
+    VOLT_TRACE("remove(%p, cb) <= %p: ", dst, src);
+    Hook::add(Hook::ChangeType::Deletion, dst,
+            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer),
+            cb);
+    return src;
+}
+
+template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
     CompactingChunks::clear([this] (void const* s) noexcept {
                 Hook::copy(s);
@@ -1847,6 +1895,14 @@ template<typename Tag> inline void HookedCompactingChunks<Hook, E>::update(void*
     VOLT_TRACE("update(%p)", dst);
     Hook::add(Hook::ChangeType::Update, dst,
             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+}
+
+template<typename Hook, typename E>
+template<typename Tag> inline void HookedCompactingChunks<Hook, E>::update(void* dst,
+        typename Hook::update_delete_cb_type const& cb) {
+    VOLT_TRACE("update(%p, cb)", dst);
+    Hook::add(Hook::ChangeType::Update, dst,
+            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer), cb);
 }
 
 template<typename Hook, typename E>
@@ -2101,8 +2157,12 @@ template shared_ptr<typename IterableTableTupleChunks<                          
 HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<tag>();  \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
+template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*,        \
+        typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::update_delete_cb_type const&);                       \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
 template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(void*);\
+template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(void*, \
+        typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::update_delete_cb_type const&);                       \
 template size_t HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove_force<tag>(      \
         function<void(vector<pair<void*, void*>> const&)> const&);                                               \
 HookedMethods3(tag, alloc, gc)
