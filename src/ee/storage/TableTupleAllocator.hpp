@@ -652,7 +652,6 @@ namespace voltdb {
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
-            using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
             CompactingChunks(size_t tupleSize) noexcept;
             /**
              * Queries
@@ -765,14 +764,11 @@ namespace voltdb {
              *   the tuple that gets moved to the hole by deletion, and
              *   its content.
              */
-            void update(void const*);
-            void update(void const*, function<void(void*, void*)> const&);
-            void remove(void const*);
-            void remove(void const*, function<void(void*, void*)> const&);
+            void const* update(void const*);
+            void const* remove(void const*);
         public:
             enum class ChangeType : char {Update, Deletion};
             using is_hook = true_type;
-            using update_delete_cb_type = function<void(void*, void*)>;    // args: undo action memory, shallow copied tuple
 
             TxnPreHook(size_t);
             TxnPreHook(TxnPreHook const&) = delete;
@@ -781,14 +777,29 @@ namespace voltdb {
             ~TxnPreHook() = default;
             void freeze();
             void thaw();
+            struct added_entry_t {
+                /**
+                 * Status for the add() method:
+                 * - not_frozen: the status is not frozen when add() gets called;
+                 * - ignored: frozen, but the rw iterator had visited the tuple already,
+                 *   so we don't bother recording. The tuple may or may not have a local copy.
+                 * - fresh: frozen, and is the first time that any changes occurs on given addr;
+                 * - existing: frozen, and there is already one (or more) changes on given addr.
+                 */
+                enum class status : char {not_frozen, fresh, existing, ignored};
+                added_entry_t(status, void const*) noexcept;
+                added_entry_t() noexcept = default;
+                status status_of() const noexcept;
+                void* copy_of() noexcept;
+            private:
+                status const m_status = status::not_frozen;
+                void* m_copy = nullptr;
+            };
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(ChangeType, void const*, IteratorObserver&);
-            template<typename IteratorObserver,
-                typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(ChangeType, void const*, IteratorObserver&, update_delete_cb_type const&);
+            added_entry_t add(ChangeType, void const*, IteratorObserver&);
             void _add_for_test_(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
@@ -824,16 +835,13 @@ namespace voltdb {
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            template<typename Tag> void thaw();             // switch of snapshot process
+            template<typename Tag> void thaw();        // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             // NOTE: these methods with Tag template must be
             // supplied with same type as freeze() method.
-            template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
-            template<typename Tag> void const* remove(void*);
-            template<typename Tag> void update(void*,              // with a call back
-                    typename Hook::update_delete_cb_type const&);
-            template<typename Tag> void const* remove(void*,
-                    typename Hook::update_delete_cb_type const&);
+            template<typename Tag>      // NOTE: this must be called prior to any memcpy operations happen
+            typename Hook::added_entry_t update(void*);
+            template<typename Tag> void const* _remove_for_test_(void*);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -849,8 +857,8 @@ namespace voltdb {
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
-            void remove_add(void*);
-            template<typename Tag> size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            template<typename Tag> typename Hook::added_entry_t remove_add(void*);
+            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
             string info(void const*) const;
