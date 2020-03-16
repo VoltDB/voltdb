@@ -488,6 +488,11 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
+        builder.put("@UpdateLicense",
+                new Config("org.voltdb.sysprocs.UpdateLicense",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.DURABLE,
+                        false, true, Restartability.RESTARTABLE));
         builder.put("@Ping",
                 new Config(null,
                         false, true,  false, 0, VoltType.INVALID,
