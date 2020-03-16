@@ -1287,7 +1287,7 @@ public class VoltDB {
                 try {
                     VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
                                                   TimeUnit.SECONDS.toMillis(10));
-                } catch (IOException ignored) {}
+                } catch (Exception ignored) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
