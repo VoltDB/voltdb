@@ -681,26 +681,28 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
         throw logic_error("Unfinished remove(remove_direction::from_head, ?)");
     } else if (! m_batched.empty()) {
         throw logic_error("Unfinished remove_add(?) or remove_force()");
-    } else if (frozen()) {                        // slow clear path
+    } else  {                        // slow clear path
         // first, apply call back on all txn tuples (in order)
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
                 static_cast<CompactingChunks const&>(*this),
                 [&cb] (void const* p) noexcept {cb(p);});
-        // since the last chunk may not be full, we need to restore its pointer later.
-        // This is a hack to get the correct behavior for
-        // snapshot -> clear -> finish snapshot
-        void* last_next = last()->range_next();
-        // then, release all chunks from txn view
-        while (! beginTxn().empty()) {
-            beginTxn().range_next() = beginTxn().iterator()->m_next = beginTxn().iterator()->range_begin();
-            releasable();
+        if (frozen()) {
+            // since the last chunk may not be full, we need to restore its pointer later.
+            // This is a hack to get the correct behavior for
+            // snapshot -> clear -> finish snapshot
+            void* last_next = last()->range_next();
+            // then, release all chunks from txn view
+            while (! beginTxn().empty()) {
+                beginTxn().range_next() = beginTxn().iterator()->m_next = beginTxn().iterator()->range_begin();
+                releasable();
+            }
+            last()->m_next = last_next;
+            m_allocs = 0;
+        } else {                               // fast clear path
+            list_type::clear();
+            m_allocs = 0;
+            m_txnFirstChunk.iterator(list_type::begin());
         }
-        last()->m_next = last_next;
-        m_allocs = 0;
-    } else {                               // fast clear path
-        list_type::clear();
-        m_allocs = 0;
-        m_txnFirstChunk.iterator(list_type::begin());
     }
 }
 
@@ -1710,8 +1712,21 @@ inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
             }),
     m_changeStore(tupleSize) {}
 
-template<typename Alloc, typename Trait, typename E>
-inline void TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essential
+template<typename Alloc, typename Trait, typename E> inline
+TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void const*)> const& cb) :
+    Trait([this](void const* key) {
+                auto const& iter = m_changes.find(key);
+                if (iter != m_changes.end()) {
+                    (*m_finalize)(iter->second);               // call back on local copy of old value
+                    m_changes.erase(iter);
+                    m_copied.erase(key);
+                    m_changeStore.free(const_cast<void*>(key));
+                }
+            }),
+    m_changeStore(tupleSize), m_finalize(cb) {}
+
+template<typename Alloc, typename Trait, typename E> inline void
+TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essential
     if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
         if (m_last == nullptr) {                                      // overwritten hadn't been logged
             m_last = m_changeStore.allocate();
@@ -1771,7 +1786,11 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::thaw() {
     if (m_recording) {
-        m_changes.clear();                                             // TODO: what do we nned to add in here?
+        if (m_finalize) {
+            for_each(m_changes.begin(), m_changes.end(),
+                    [this](typename map_type::value_type& p) { (*m_finalize)(p.second); });
+        }
+        m_changes.clear();
         m_copied.clear();
         m_changeStore.clear();
         m_last = nullptr;      // since m_storage is cleared
@@ -1828,6 +1847,10 @@ inline void TxnPreHook<Alloc, Trait, E>::release(void const* src) {
 template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
 
+template<typename Hook, typename E> inline
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s,
+        function<void(void const*)> const& cb) noexcept : CompactingChunks(s), Hook(s, cb), m_finalize(cb) {}
+
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
     void* r = CompactingChunks::allocate();
     VOLT_TRACE("allocate() => %p", r);
@@ -1840,6 +1863,11 @@ HookedCompactingChunks<Hook, E>::_remove_for_test_(void* dst) {
     if (frozen()) {
         Hook::copy(dst);
     }
+    // By calling finalizer on the argument alloc, we are
+    // requring that the dst always be found
+    if (m_finalize) {
+        (*m_finalize)(dst);
+    }
     void const* src = CompactingChunks::free(dst);
     VOLT_TRACE("remove(%p) <= %p: ", dst, src);
     Hook::add(Hook::ChangeType::Deletion, dst,
@@ -1849,11 +1877,20 @@ HookedCompactingChunks<Hook, E>::_remove_for_test_(void* dst) {
 
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
-    CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::copy(s);
-                Hook::add(Hook::ChangeType::Deletion, s,
-                        reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
-            });
+    if (m_finalize) {
+        CompactingChunks::clear([this] (void const* s) noexcept {
+                    Hook::copy(s);
+                    Hook::add(Hook::ChangeType::Deletion, s,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                    (*m_finalize)(s);
+                });
+    } else {
+        CompactingChunks::clear([this] (void const* s) noexcept {
+                    Hook::copy(s);
+                    Hook::add(Hook::ChangeType::Deletion, s,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                });
+    }
 }
 
 template<typename Hook, typename E> inline void
@@ -1934,6 +1971,14 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
+    if (m_finalize) {          // First, call finalizer on all tuples to be removed
+        for_each(CompactingChunks::m_batched.removed().cbegin(),
+                CompactingChunks::m_batched.removed().cend(),
+                [this](void* p) noexcept { (*m_finalize)(p); });
+        for_each(CompactingChunks::m_batched.movements().cbegin(),
+                CompactingChunks::m_batched.movements().cend(),
+                [this](pair<void*, void*> const& entry) noexcept { (*m_finalize)(entry.first); });
+    }
     for_each(CompactingChunks::m_batched.movements().cbegin(),
             CompactingChunks::m_batched.movements().cend(),
             [this](pair<void*, void*> const& entry) noexcept {

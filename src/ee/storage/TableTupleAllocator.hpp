@@ -30,6 +30,7 @@
 #include <set>
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/optional.hpp>
 #include <stx/btree_map>
 #include <stx/btree_set>
 #include "common/ThreadLocalPool.h"
@@ -747,6 +748,7 @@ namespace voltdb {
             bool m_recording = false;       // in snapshot process?
             void* m_last = nullptr;         // last allocation by copy(void const*);
             Alloc m_changeStore;
+            boost::optional<function<void(void const*)>> const m_finalize{};
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -771,6 +773,7 @@ namespace voltdb {
             using is_hook = true_type;
 
             TxnPreHook(size_t);
+            TxnPreHook(size_t, function<void(void const*)> const&);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
@@ -828,10 +831,14 @@ namespace voltdb {
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
+            // action before deallocating a tuple from txn (or
+            // hook) memory.
+            boost::optional<function<void(void const*)>> const m_finalize{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
+            HookedCompactingChunks(size_t, function<void(void const*)> const&) noexcept;
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();

@@ -1812,6 +1812,154 @@ TEST_F(TableTupleAllocatorTest, TestDebugInfo) {
     ASSERT_EQ(expected_prefix, alloc.info(addresses[0]).substr(0, expected_prefix.length()));
 }
 
+TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocsOnly) {
+    // test allocation-only case
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    size_t finalize_called = 0;
+    auto const finalize_counter = [&finalize_called] (void const*) noexcept {
+        ++finalize_called;
+    };
+    Alloc alloc(TupleSize, finalize_counter);
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        alloc.allocate();
+    }
+    alloc.template clear<truth>();
+    ASSERT_EQ(NumTuples, finalize_called);
+    finalize_called = 0;
+    for (i = 0; i < NumTuples; ++i) {
+        alloc.allocate();
+    }
+    alloc.template clear<truth>();
+    ASSERT_EQ(NumTuples, finalize_called);
+}
+
+TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
+    // test batch removal without frozen
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    size_t finalize_called = 0;
+    auto const finalize_counter = [&finalize_called] (void const*) noexcept {
+        ++finalize_called;
+    };
+    Alloc alloc(TupleSize, finalize_counter);
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    // batch remove every other tuple
+    alloc.remove_reserve(NumTuples / 2);
+    for (i = 0; i < NumTuples; i += 2) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+    }
+    ASSERT_EQ(NumTuples / 2,
+            alloc.remove_force([](vector<pair<void*, void*>> const&) noexcept {}));
+    ASSERT_EQ(NumTuples / 2, finalize_called);
+}
+
+TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
+    // test batch removal when frozen, then thaw.
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    size_t finalize_called = 0;
+    auto const finalize_counter = [&finalize_called] (void const*) noexcept {
+        ++finalize_called;
+    };
+    Alloc alloc(TupleSize, finalize_counter);
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    alloc.template freeze<truth>();
+    alloc.remove_reserve(NumTuples / 2);
+    for (i = 0; i < NumTuples; i += 2) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+    }
+    ASSERT_EQ(NumTuples / 2,
+            alloc.remove_force([](vector<pair<void*, void*>> const&) noexcept {}));
+    ASSERT_EQ(NumTuples / 2, finalize_called);
+    alloc.template thaw<truth>();
+    // At thaw time, those copies in the batch should be removed
+    // (and finalized before deallocation)
+    ASSERT_EQ(NumTuples, finalize_called);
+}
+
+TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndUpdates) {
+    // test updates when frozen, then thaw
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    size_t finalize_called = 0;
+    auto const finalize_counter = [&finalize_called] (void const*) noexcept {
+        ++finalize_called;
+    };
+    Alloc alloc(TupleSize, finalize_counter);
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    alloc.template freeze<truth>();
+    //
+    for (i = 0; i < NumTuples; i += 2) {
+        alloc.template update<truth>(const_cast<void*>(addresses[i]));
+        // then, the updates to those tuples should happen;
+        // but we pretend that happens
+    }
+    ASSERT_EQ(0, finalize_called);
+    alloc.template thaw<truth>();
+    ASSERT_EQ(NumTuples / 2, finalize_called);
+}
+
+TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
+    // test allocation-only case
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    size_t finalize_called = 0;
+    auto const finalize_counter = [&finalize_called] (void const*) noexcept {
+        ++finalize_called;
+    };
+    Alloc alloc(TupleSize, finalize_counter);
+    array<void const*, NumTuples> addresses;
+    size_t i;
+    for (i = 0; i < NumTuples; ++i) {
+        addresses[i] = alloc.allocate();
+    }
+    auto const& iter = alloc.template freeze<truth>();
+    for (i = 0; i < NumTuples / 2; ++i) {
+        ++*iter;    // advance snapshot iterator to half way
+    }
+    // update every other tuple; but only those in the 2nd hald
+    // are kept track of in the hook, and thus, a quarter of them
+    // finalized.
+    for (i = 0; i < NumTuples; i += 2) {
+        alloc.template update<truth>(const_cast<void*>(addresses[i]));
+    }
+    // delete the second half; but only half of those deleted
+    // batch are "fresh", so only 1/8 of the whole gets to be
+    // finalized
+    alloc.remove_reserve(NumTuples / 2);
+    // but interleaved with advancing snapshot iterator to 3/4 of
+    // the whole course
+    for (i = 0; i < NumTuples / 4; ++i) {
+        ++*iter;
+    }
+    for (i = 0; i < NumTuples / 2; ++i) {
+        alloc.template remove_add<truth>(
+                const_cast<void*>(addresses[NumTuples - i - 1]));
+    }
+    // finalize called on the 2nd half in the txn memory
+    ASSERT_EQ(NumTuples / 2, alloc.remove_force(
+                [](vector<pair<void*, void*>> const&){}));
+    ASSERT_EQ(NumTuples / 2, finalize_called);
+    finalize_called = 0;    // reset counter
+    alloc.template thaw<truth>();
+    ASSERT_EQ(NumTuples / 4 + NumTuples / 8,       // count finalize called by the hook
+            finalize_called);
+}
+
 #endif
 
 int main() {
