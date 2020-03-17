@@ -15,6 +15,15 @@ CREATE TABLE kafkaimporttable1
 
 PARTITION TABLE kafkaimporttable1 ON COLUMN KEY;
 
+CREATE STREAM  T8_KAFKAEXPORTTABLE1 partition on column key as topic
+     (
+                  KEY   BIGINT NOT NULL,
+                  value BIGINT NOT NULL,
+                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                  CONSTRAINT pk_kafka_export_table1 PRIMARY KEY ( KEY )
+     );
+
+
 CREATE TABLE kafkaimporttable2
     (
           key                       BIGINT        NOT NULL
