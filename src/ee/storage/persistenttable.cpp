@@ -116,7 +116,18 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
-    m_dataStorage.reset(new Alloc{tupleSize});
+    if (m_schema->getUninlinedObjectColumnCount() > 0) {
+        TableTuple tuple(m_schema);
+        auto const cleaner = [this, &tuple] (void const* p) noexcept {
+            void *tupleAddress = const_cast<void*>(p);
+            tuple.move(tupleAddress);
+            this->decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
+            tuple.freeObjectColumns();
+        };
+        m_dataStorage.reset(new Alloc (tupleSize, cleaner));
+    } else {
+        m_dataStorage.reset(new Alloc{tupleSize});
+    }
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
@@ -966,7 +977,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     std::vector<char*> newObjects;
 
     // this is the actual write of the new values
-    allocator().template update<storage::truth>(targetTupleToUpdate.address());
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (fromMigrate) {
@@ -1088,10 +1098,27 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
         }
     }
-    //TO DO: undo update
-    allocator().template update<storage::truth>(targetTupleToUpdate.address());
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
+        sourceTupleWithNewValues.freeObjectColumns();
+    }
 }
 
+void PersistentTable::updateTupelRelease(char* oldTuple, char* newTuple) {
+   TableTuple srcTuple(m_schema);
+   srcTuple.move(oldTuple);
+   auto const& entry = allocator().template update<storage::truth>(oldTuple);
+   if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        auto e = const_cast<typename Hook::added_entry_t&>(entry);
+        if (e.copy_of() != nullptr) {
+            TableTuple copied(m_schema);
+            copied.move(const_cast<void*>(e.copy_of()));
+            copied.copyNonInlinedColumnObjects(srcTuple);
+        }
+        decreaseStringMemCount(srcTuple.getNonInlinedMemorySizeForPersistentTable());
+        srcTuple.freeObjectColumns();
+    }
+}
 
 void PersistentTable::deleteDeltaTableTuple(TableTuple& target) {
     // May not delete an already deleted tuple.
@@ -1229,27 +1256,32 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
-    bool pendingDelete = false;
     if (m_tableStreamer != NULL && ! m_tableStreamer->notifyTupleDelete(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
         if (!target.isPendingDelete()) {
             ++m_invisibleTuplesPendingDeleteCount;
             ++m_batchDeleteTupleCount;
             target.setPendingDeleteTrue();
-        } else {
-            pendingDelete = true;
         }
     }
-    if (!pendingDelete && m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
-        target.freeObjectColumns();
-    }
+
     // Reserve batch delete, only once
     if (m_batchDeleteTupleCount > 0) {
         allocator().remove_reserve(m_batchDeleteTupleCount);
         m_batchDeleteTupleCount = 0;
     }
-    allocator().template remove_add<storage::truth>(tuple);
+
+    auto const& entry = allocator().template remove_add<storage::truth>(tuple);
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        auto e = const_cast<typename Hook::added_entry_t&>(entry);
+        if (e.copy_of() != nullptr) {
+            TableTuple src(m_schema);
+            src.move(const_cast<void*>(e.copy_of()));
+            target.copyNonInlinedColumnObjects(src);
+        }
+        decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
+        target.freeObjectColumns();
+    }
 }
 
 /*
