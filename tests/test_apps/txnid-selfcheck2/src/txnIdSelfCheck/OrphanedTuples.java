@@ -41,7 +41,7 @@ import org.voltdb.task.Action;
 import org.voltdb.task.ActionGenerator;
 import org.voltdb.task.ActionResult;
 import org.voltdb.task.TaskHelper;
-import org.voltdb.task.TaskValidationErrors;
+import org.voltdb.utils.CompoundErrors;
 
 /**
  * Task for polling the EXPORT statistics and reporting when disabled export streams have pending tuple counts.

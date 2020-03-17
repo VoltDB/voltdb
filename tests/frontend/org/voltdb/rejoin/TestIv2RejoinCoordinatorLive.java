@@ -25,8 +25,8 @@ package org.voltdb.rejoin;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -187,7 +187,7 @@ public class TestIv2RejoinCoordinatorLive {
         createCoordinator(true);
         m_coordinator.startJoin(m_catalog);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1",
-                                              null, null, true);
+                null, null);
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
         hsids.add(2l);

@@ -127,4 +127,10 @@ public class SnapshotTableInfo {
         }
         return m_partitionColumn;
     }
+
+    @Override
+    public String toString() {
+        return "SnapshotTableInfo [name=" + m_name + ", tableId=" + m_tableId + ", replicated=" + m_replicated
+                + ", systemTable=" + m_systemTable + ", partitionColumn=" + m_partitionColumn + "]";
+    }
 }

@@ -30,28 +30,19 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
+import io.netty.buffer.ByteBuf;
+
 public class SerializationHelper {
     private SerializationHelper() {}
 
     public static String getString(ByteBuffer buf) throws IOException {
-        final int len = buf.getInt();
+        final byte[] strbytes = getVarbinary(buf);
+        return strbytes == null ? null : new String(strbytes, Constants.UTF8ENCODING);
+    }
 
-        // check for null string
-        if (len == VoltType.NULL_STRING_LENGTH) {
-            return null;
-        }
-
-        if (len < VoltType.NULL_STRING_LENGTH) {
-            throw new IOException("String length is negative " + len);
-        }
-        if (len > buf.remaining()) {
-            throw new IOException("String length is bigger than total buffer " + len);
-        }
-
-        // now assume not null
-        final byte[] strbytes = new byte[len];
-        buf.get(strbytes);
-        return new String(strbytes, Constants.UTF8ENCODING);
+    public static String getString(ByteBuf buf) throws IOException {
+        final byte[] strbytes = getVarbinary(buf);
+        return strbytes == null ? null : new String(strbytes, Constants.UTF8ENCODING);
     }
 
     public static byte[] getVarbinary(ByteBuffer buf) throws IOException {
@@ -63,15 +54,36 @@ public class SerializationHelper {
         }
 
         if (len < VoltType.NULL_STRING_LENGTH) {
-            throw new IOException("Varbinary length is negative " + len);
+            throw new IOException("Value length is negative " + len);
         }
         if (len > buf.remaining()) {
-            throw new IOException("Varbinary length is bigger than total buffer " + len);
+            throw new IOException("Value length is bigger than total buffer " + len);
         }
 
         // now assume not null
         final byte[] retval = new byte[len];
         buf.get(retval);
+        return retval;
+    }
+
+    public static byte[] getVarbinary(ByteBuf buf) throws IOException {
+        final int len = buf.readInt();
+
+        // check for null string
+        if (len == VoltType.NULL_STRING_LENGTH) {
+            return null;
+        }
+
+        if (len < VoltType.NULL_STRING_LENGTH) {
+            throw new IOException("Value length is negative " + len);
+        }
+        if (len > buf.readableBytes()) {
+            throw new IOException("Value length is bigger than total buffer " + len);
+        }
+
+        // now assume not null
+        final byte[] retval = new byte[len];
+        buf.readBytes(retval);
         return retval;
     }
 

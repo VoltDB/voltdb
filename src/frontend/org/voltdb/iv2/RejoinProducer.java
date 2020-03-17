@@ -56,9 +56,6 @@ public class RejoinProducer extends JoinProducerBase {
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor = null;
 
-    // True if there are any persistent tables in the schema.
-    boolean m_hasPersistentTables = true;
-
     // Barrier that prevents the finish task for firing until all sites have finished the stream snapshot
     private static AtomicInteger s_streamingSiteCount;
 
@@ -230,16 +227,10 @@ public class RejoinProducer extends JoinProducerBase {
     void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        m_hasPersistentTables = message.schemaHasPersistentTables();
-        if (m_hasPersistentTables) {
-            m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-            m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
-            // Start the watchdog so if we never get data it will notice
-            kickWatchdog(TimerCallback.initialTimer());
-        } else {
-            m_streamSnapshotMb = null;
-            m_rejoinSiteProcessor = null;
-        }
+        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
+        // Start the watchdog so if we never get data it will notice
+        kickWatchdog(TimerCallback.initialTimer());
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -306,41 +297,35 @@ public class RejoinProducer extends JoinProducerBase {
             // Set enabled to false for the views we found.
             siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
         }
-        if (m_hasPersistentTables) {
-            boolean sourcesReady = false;
-            RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
-            if (rejoinWork != null) {
-                restoreBlock(rejoinWork, siteConnection);
-                sourcesReady = true;
-            }
-
-            if (m_rejoinSiteProcessor.isEOF() == false) {
-                returnToTaskQueue(sourcesReady);
-            } else {
-                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
-                m_rejoinSiteProcessor.close();
-
-                boolean allSitesFinishStreaming;
-                if (m_streamSnapshotMb != null) {
-                    VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
-                    m_streamSnapshotMb = null;
-                    allSitesFinishStreaming = s_streamingSiteCount.decrementAndGet() == 0;
-                }
-                else {
-                    int pendingSites = s_streamingSiteCount.get();
-                    assert(pendingSites >= 0);
-                    allSitesFinishStreaming = pendingSites == 0;
-                }
-                if (allSitesFinishStreaming) {
-                    doFinishingTask(siteConnection);
-                }
-                else {
-                    returnToTaskQueue(sourcesReady);
-                }
-            }
+        boolean sourcesReady = false;
+        RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
+        if (rejoinWork != null) {
+            restoreBlock(rejoinWork, siteConnection);
+            sourcesReady = true;
         }
-        else {
-            doFinishingTask(siteConnection);
+
+        if (m_rejoinSiteProcessor.isEOF() == false) {
+            returnToTaskQueue(sourcesReady);
+        } else {
+            REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+            m_rejoinSiteProcessor.close();
+
+            boolean allSitesFinishStreaming;
+            if (m_streamSnapshotMb != null) {
+                VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+                m_streamSnapshotMb = null;
+                allSitesFinishStreaming = s_streamingSiteCount.decrementAndGet() == 0;
+            } else {
+                int pendingSites = s_streamingSiteCount.get();
+                assert (pendingSites >= 0);
+                allSitesFinishStreaming = pendingSites == 0;
+            }
+            if (allSitesFinishStreaming) {
+                doFinishingTask(siteConnection);
+            }
+            else {
+                returnToTaskQueue(sourcesReady);
+            }
         }
     }
 
@@ -414,7 +399,7 @@ public class RejoinProducer extends JoinProducerBase {
                         exportSequenceNumbers,
                         drSequenceNumbers,
                         allConsumerSiteTrackers,
-                        m_hasPersistentTables /* requireExistingSequenceNumbers */,
+                        true /* requireExistingSequenceNumbers */,
                         clusterCreateTime);
             }
         };

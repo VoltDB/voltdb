@@ -66,7 +66,7 @@ public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
             RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount =
                 PlanCostUtil.discountSerialAggregateRowCount(getInput().estimateRowCount(mq), getGroupCount());
-        return planner.getCostFactory().makeCost(rowCount, 0, 0);
+        return planner.getCostFactory().makeCost(rowCount, rowCount, 0);
     }
 
     @Override

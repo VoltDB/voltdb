@@ -2191,6 +2191,9 @@ TEST CASES
     <condition property="config_verbose" value="-r" else="">
         <isset property="sql_coverage_verbose"/>
     </condition>
+    <condition property="config_maxdetailfiles" value="-d ${maxdetailfiles}" else="">
+        <isset property="maxdetailfiles"/>
+    </condition>
     <condition property="config_reproduce" value="-R ${reproduce}" else="">
         <isset property="reproduce"/>
     </condition>
@@ -2255,6 +2258,7 @@ TEST CASES
         <arg line="${config_invalid}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
+        <arg line="${config_maxdetailfiles}" />
         <arg line="${config_reproduce}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
