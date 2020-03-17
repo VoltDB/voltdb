@@ -604,12 +604,15 @@ namespace voltdb {
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
+            // action before deallocating a tuple from txn (or hook) memory.
+            boost::optional<function<void(void const*)>> const m_finalize{};
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
             CompactingChunks(CompactingChunks&&) = delete;
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
+            void pop_finalize(typename list_type::iterator);
             void pop_front();
             void pop_back();
         protected:
@@ -654,6 +657,7 @@ namespace voltdb {
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
+            CompactingChunks(size_t tupleSize, function<void(void const*)> const&) noexcept;
             /**
              * Queries
              */
@@ -682,6 +686,8 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
+            // apply finalizer (if set) to the given addr
+            void finalize(void const*) const;
             /**
              * Light weight free() operations from either end,
              * involving no compaction.
@@ -777,7 +783,7 @@ namespace voltdb {
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
-            ~TxnPreHook() = default;
+            ~TxnPreHook() = default;                   // TODO
             void freeze();
             void thaw();
             struct added_entry_t {
@@ -831,9 +837,6 @@ namespace voltdb {
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
-            // action before deallocating a tuple from txn (or
-            // hook) memory.
-            boost::optional<function<void(void const*)>> const m_finalize{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
