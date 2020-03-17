@@ -190,6 +190,12 @@ public class ServerThread extends Thread {
         }
     }
 
+    // For TestStartActionWithLicenseOption only, that test want to validate given
+    // license file instead of the default file.
+    public void ignoreDefaultLicense() {
+        m_config.m_pathToLicense = null;
+    }
+
     /**
      * For tests only, mostly with ServerThread or LocalCluster:
      *

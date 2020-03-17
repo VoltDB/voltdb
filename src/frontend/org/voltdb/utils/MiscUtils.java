@@ -55,6 +55,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
@@ -72,7 +73,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final String licenseFileName = "license.xml";
+
     private static final boolean assertsEnabled;
 
     static {
@@ -303,33 +304,46 @@ public class MiscUtils {
 
     /**
      * Instantiate the license api impl based on enterprise/community editions
-     * For enterprise edition, look in default locations ./, ~/, jar file directory
+     * For enterprise edition, look in default locations voltdbroot, ./, ~/ and
+     * jar file directory.
      * @return a valid API for community and pro editions, or null on error.
      */
-    public static LicenseApi licenseApiFactory()
+    public static LicenseApi licenseApiFactory(File voltdbRoot)
     {
-        String licensePath = System.getProperty("user.dir") + "/" + licenseFileName;
-        LicenseApi licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        String licensePath = null;
+        LicenseApi licenseApi = null;
+        // search database root directory as first priority
+        File licenseF = new VoltFile(voltdbRoot, Constants.LICENSE_FILE_NAME);
+        licensePath = licenseF.getAbsolutePath();
+        hostLog.info("Searching for license file located " + licensePath);
+        licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        if (licenseApi != null) {
+            return licenseApi;
+        }
+        // then search current directory
+        licensePath = System.getProperty("user.dir") + File.separator + Constants.LICENSE_FILE_NAME;
+        licenseApi = MiscUtils.licenseApiFactory(licensePath);
         if (licenseApi == null) {
             try {
                 // Get location of jar file
                 String jarLoc = VoltDB.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
                 // Strip of file name
-                int lastSlashOff = jarLoc.lastIndexOf("/");
+                int lastSlashOff = jarLoc.lastIndexOf(File.separator);
                 if (lastSlashOff == -1) {
                     // Jar is at root directory
-                    licensePath = "/" + licenseFileName;
+                    licensePath = File.separator + Constants.LICENSE_FILE_NAME;
                 }
                 else {
-                    licensePath = jarLoc.substring(0, lastSlashOff+1) + licenseFileName;
+                    licensePath = jarLoc.substring(0, lastSlashOff+1) + Constants.LICENSE_FILE_NAME;
                 }
                 licenseApi = MiscUtils.licenseApiFactory(licensePath);
             }
             catch (URISyntaxException e) {
             }
         }
+        // then search user home directory
         if (licenseApi == null) {
-            licensePath = System.getProperty("user.home") + "/" + licenseFileName;
+            licensePath = System.getProperty("user.home") + File.separator + Constants.LICENSE_FILE_NAME;
             licenseApi = MiscUtils.licenseApiFactory(licensePath);
         }
         if (licenseApi != null) {

@@ -230,6 +230,7 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
+import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -921,13 +922,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // print the ascii art!.
             // determine the edition
             // Check license availability
-            // All above - not for init
             String edition = "Community Edition";
-            if (config.m_startAction != StartAction.INITIALIZE) {
-                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-                // load license API
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            // load license API
+            if (config.m_startAction == StartAction.INITIALIZE) {
+                // init without a license is not fatal
+                if (config.m_pathToLicense != null) {
+                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                    }
+                }
+            } else {
                 if (config.m_pathToLicense == null) {
-                    m_licenseApi = MiscUtils.licenseApiFactory();
+                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_voltdbRoot);
                     if (m_licenseApi == null) {
                         hostLog.fatal("Unable to open license file in default directories");
                     }
@@ -937,7 +945,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
                     }
                 }
+            }
 
+            if (config.m_startAction != StartAction.INITIALIZE || config.m_pathToLicense != null) {
                 if (m_licenseApi == null) {
                     hostLog.fatal("Please contact sales@voltdb.com to request a license.");
                     VoltDB.crashLocalVoltDB(
@@ -1030,6 +1040,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
+                stageLicenseFile(config);
                 stageSchemaFiles(config,
                         readDepl.deployment.getDr() != null &&
                                 DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
@@ -1037,6 +1048,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
+            } else {
+                //[Deprecated] allow other start actions stage license file to voltdb root directory
+                stageLicenseFile(config);
             }
             if (config.m_startAction.isLegacy()) {
                 consoleLog.warn("The \"" + config.m_startAction.m_verb +
@@ -2585,6 +2599,34 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Save cluster settings properties derived from the deployment file
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
+    }
+
+    private void stageLicenseFile(Configuration config) {
+        // No such need in community version
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        String path = null;
+        try {
+            path = config.m_voltdbRoot.getCanonicalPath();
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to get voltdbroot path", false, e);
+        }
+        // delete the prior license if exists
+        File destF = new VoltFile(path, Constants.LICENSE_FILE_NAME);
+        if (config.m_forceVoltdbCreate && destF.exists()) {
+            destF.delete();
+        }
+        // copy new license to voltdb root
+        if (config.m_pathToLicense != null) {
+            File licenseF = new File(config.m_pathToLicense);
+            try {
+                Files.copy(licenseF, destF);
+                hostLog.info("License file is copied to VoltDB root directory: " + destF.getAbsolutePath());
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unable to copy license file to " + path, false, e);
+            }
+        }
     }
 
     private void stageSchemaFiles(Configuration config, boolean isXCDR) {

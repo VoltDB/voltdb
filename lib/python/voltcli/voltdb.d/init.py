@@ -42,7 +42,8 @@ def _listOfGlobsToFiles(pathGlobs):
         VOLT.StringListOption('-s', '--schema', 'schemas',
                            'Specifies a list of schema files or paths with wildcards, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringListOption('-j', '--classes', 'classes_jarfiles',
-                          'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.')
+                          'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.'),
+        VOLT.StringOption('-l', '--license', 'license', 'specify the location of the license file')
     ),
     description = 'Initializes a new, empty database.'
 )
@@ -61,6 +62,8 @@ def init(runner):
     if runner.opts.classes_jarfiles:
         runner.args.append('classes')
         runner.args.append(_listOfGlobsToFiles(runner.opts.classes_jarfiles))
+    if runner.opts.license:
+        runner.args.extend(['license', runner.opts.license])
 
     args = runner.args
     runner.java_execute(VoltDB, None, *args)

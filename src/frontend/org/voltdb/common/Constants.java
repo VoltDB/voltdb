@@ -85,4 +85,5 @@ public class Constants
 
     public static final String DBROOT = "voltdbroot";
     public static final String CONFIG_DIR = "config";
+    public static final String LICENSE_FILE_NAME = "license.xml";
 }
