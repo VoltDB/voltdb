@@ -143,13 +143,14 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        VoltDB.initialize(m_config);
+        VoltDB.resetSingletonsForTest();
+        VoltDB.initialize(m_config, true);
         VoltDB.instance().run();
     }
 
     //Call this if you are doing init only or action GET
     public void initialize() {
-        VoltDB.initialize(m_config);
+        VoltDB.initialize(m_config, true);
     }
 
     //Call this if you are doing init only or action GET

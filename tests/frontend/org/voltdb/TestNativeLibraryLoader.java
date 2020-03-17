@@ -52,7 +52,7 @@ public class TestNativeLibraryLoader {
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
         VoltDB.wasCrashCalled = false;
-        VoltDB.initialize(configuration);
+        VoltDB.initialize(configuration, true);
         assertFalse(NativeLibraryLoader.loadVoltDB(true));
         assertFalse(VoltDB.wasCrashCalled);
 
@@ -70,7 +70,7 @@ public class TestNativeLibraryLoader {
             .thenReturn(catContext);
 
         VoltDB.replaceVoltDBInstanceForTest(mockitovolt);
-        VoltDB.initialize(configuration);
+        VoltDB.initialize(configuration, true);
         assertTrue(NativeLibraryLoader.loadVoltDB(true));
     }
 }

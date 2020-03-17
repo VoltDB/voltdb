@@ -47,6 +47,7 @@ import java.util.regex.Pattern;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.NativeLibraryLoader;
+import org.voltdb.RealVoltDB;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -1676,6 +1677,7 @@ public class LocalCluster extends VoltServerConfig {
             log.error("Failure to shutdown LocalCluster's in-process VoltDB server.", e);
         } finally {
             m_running = false;
+            VoltDB.replaceVoltDBInstanceForTest(new RealVoltDB());
         }
         shutDownExternal();
         VoltServerConfig.removeInstance(this);

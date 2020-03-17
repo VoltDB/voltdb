@@ -111,6 +111,9 @@ public class UpdateLogging extends VoltSystemProcedure
                 }
             }
             barrier.reset();
+            // UpdateLogging is not compatible with JUnit LocalServerThread because the static barrier is
+            // only configured once with the first use case's site count
+            assert(!VoltDB.instanceOnServerThread());
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

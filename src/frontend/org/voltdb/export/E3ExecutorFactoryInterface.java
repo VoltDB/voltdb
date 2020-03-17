@@ -1,0 +1,62 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2020 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.export;
+
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+
+public interface E3ExecutorFactoryInterface {
+    /**
+     * @return the min thread count this factory is currently operating upon
+     */
+    int getMinThreads();
+
+    /**
+     * @return max threads configured, package private for JUnit tests
+     */
+    Integer getConfigMaxThreads();
+
+    /**
+     * @return local sites count, or 0 if undefined, package private for JUnit tests
+     */
+    int getLocalSitesCount();
+
+    /**
+     * @return the max thread count this factory is currently operating upon, or 0 if uninitialized
+     */
+    public int getMaxThreadCount();
+
+    /**
+     * @return current thread count
+     */
+    public int getCurrentThreadCount();
+
+    /**
+     * Get an executor for an {@link E3ExportDataSource} identified by partitionId and tableName
+     *
+     * @param partitionId
+     * @return {@link ListeningExecutorService} allocated
+     */
+    public ListeningExecutorService getExecutor(int partitionId);
+
+    /**
+     * Free an executor used by an export data source identified by partitionId and tableName
+     *
+     * @param partitionId
+     */
+    public void freeExecutor(int partitionId);
+}

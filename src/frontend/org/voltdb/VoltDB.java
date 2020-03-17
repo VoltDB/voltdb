@@ -39,18 +39,25 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
+import org.voltdb.export.E3ExecutorFactoryInterface;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExporterVersion;
+import org.voltdb.importer.ImportManager;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
@@ -1109,17 +1116,17 @@ public class VoltDB {
         }
 
         public int getQueryTimeout() {
-           return m_config.m_queryTimeout;
+           return singleton.s_config.m_queryTimeout;
         }
     }
 
     /* helper functions to access current configuration values */
     public static boolean getLoadLibVOLTDB() {
-        return ! m_config.m_noLoadLibVOLTDB;
+        return ! singleton.s_config.m_noLoadLibVOLTDB;
     }
 
     public static BackendTarget getEEBackendType() {
-        return m_config.m_backend;
+        return singleton.s_config.m_backend;
     }
 
     /*
@@ -1245,7 +1252,7 @@ public class VoltDB {
             boolean logFatal) {
 
         if (singleton != null) {
-            singleton.notifyOfShutdown();
+            singleton.s_voltdb.notifyOfShutdown();
         }
         if (exitAfterMessage) {
             System.err.println(errMsg);
@@ -1442,7 +1449,7 @@ public class VoltDB {
             } else if (config.m_startAction == StartAction.GET) {
                 cli(config);
             } else {
-                initialize(config);
+                initialize(config, false);
                 instance().run();
             }
         } catch (OutOfMemoryError e) {
@@ -1455,8 +1462,9 @@ public class VoltDB {
      * Initialize the VoltDB server.
      * @param config  The VoltDB.Configuration to use to initialize the server.
      */
-    public static void initialize(VoltDB.Configuration config) {
-        m_config = config;
+    public static void initialize(VoltDB.Configuration config, boolean fromServerThread) {
+        singleton.s_config = config;
+        singleton.s_fromServerThread = fromServerThread;
         instance().initialize(config);
     }
 
@@ -1465,7 +1473,7 @@ public class VoltDB {
      * @param config  The VoltDB.Configuration to use for getting configuration via CLI
      */
     public static void cli(VoltDB.Configuration config) {
-        m_config = config;
+        singleton.s_config = config;
         instance().cli(config);
     }
 
@@ -1477,9 +1485,12 @@ public class VoltDB {
      * @return A reference to the underlying VoltDBInterface object.
      */
     public static VoltDBInterface instance() {
-        return singleton;
+        return singleton.s_voltdb;
     }
 
+    public static boolean instanceOnServerThread() {
+        return singleton.s_fromServerThread;
+    }
     /**
      * Useful only for unit testing.
      *
@@ -1488,16 +1499,16 @@ public class VoltDB {
      *
      */
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
-        singleton = testInstance;
+        singleton.s_voltdb = testInstance;
     }
 
     public static String getPublicReplicationInterface() {
-        return m_config.m_drPublicHost == null || m_config.m_drPublicHost.isEmpty() ?
-                "" : m_config.m_drPublicHost;
+        return singleton.s_config.m_drPublicHost == null || singleton.s_config.m_drPublicHost.isEmpty() ?
+                "" : singleton.s_config.m_drPublicHost;
     }
 
     public static int getPublicReplicationPort() {
-        return m_config.m_drPublicPort;
+        return singleton.s_config.m_drPublicPort;
     }
 
     /**
@@ -1505,20 +1516,20 @@ public class VoltDB {
      * @return an empty string when neither are specified
      */
     public static String getDefaultReplicationInterface() {
-        if (m_config.m_drInterface == null || m_config.m_drInterface.isEmpty()) {
-            if (m_config.m_externalInterface == null) {
+        if (singleton.s_config.m_drInterface == null || singleton.s_config.m_drInterface.isEmpty()) {
+            if (singleton.s_config.m_externalInterface == null) {
                 return "";
             } else {
-                return m_config.m_externalInterface;
+                return singleton.s_config.m_externalInterface;
             }
         } else {
-            return m_config.m_drInterface;
+            return singleton.s_config.m_drInterface;
         }
     }
 
     public static int getReplicationPort(int deploymentFilePort) {
-        if (m_config.m_drAgentPortStart != -1) {
-            return m_config.m_drAgentPortStart;
+        if (singleton.s_config.m_drAgentPortStart != -1) {
+            return singleton.s_config.m_drAgentPortStart;
         } else {
             return deploymentFilePort;
         }
@@ -1580,6 +1591,74 @@ public class VoltDB {
         return true;
     }
 
-    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
-    private static VoltDBInterface singleton = new RealVoltDB();
+    private static class VoltDBInstance {
+        // NOTE: an explicit exception to the pattern is the Hashinator (which is a static map)
+        //       because the initialize method explicitly resets the map.
+        boolean s_fromServerThread = false;
+        VoltDBInterface s_voltdb = new RealVoltDB();
+        VoltDB.Configuration s_config = new VoltDB.Configuration();
+        ImportManager s_importManager = null;
+        volatile ExportManagerInterface s_exportManager = null;
+        E3ExecutorFactoryInterface s_e3ExecutorFactory = null;
+        ShutdownHooks s_shutdownHooks = new ShutdownHooks();
+        volatile TTLManager s_ttlManager = null;
+    }
+
+    public static void setImportManagerInstance(ImportManager mgr) {
+        singleton.s_importManager = mgr;
+    }
+
+    /**
+     * Get the global instance of the ImportManager.
+     * @return The global single instance of the ImportManager.
+     */
+    public static ImportManager getImportManager() {
+        return singleton.s_importManager;
+    }
+
+    public static ExportManagerInterface getExportManager() {
+        return singleton.s_exportManager;
+    }
+
+    public static void setExportManagerInstance(ExportManagerInterface self) {
+        singleton.s_exportManager = self;
+    }
+
+    public static E3ExecutorFactoryInterface getE3ExecutorFactory() {
+        return singleton.s_e3ExecutorFactory;
+    }
+
+    public static void setE3ExecutorFactoryInstance(E3ExecutorFactoryInterface self) {
+        singleton.s_e3ExecutorFactory = self;
+    }
+
+    public static ShutdownHooks getShutdownHooks() {
+        return singleton.s_shutdownHooks;
+    }
+
+
+    public static void setTTLManagerInstance(TTLManager self) {
+        singleton.s_ttlManager = self;
+    }
+
+    public static TTLManager getTTLManager() {
+        if (singleton.s_ttlManager == null) {
+            synchronized (TTLManager.class) {
+                if (singleton.s_ttlManager == null) {
+                    singleton.s_ttlManager = new TTLManager();
+                }
+            }
+        }
+        return singleton.s_ttlManager;
+    }
+
+    public static void resetSingletonsForTest() {
+        singleton = new VoltDBInstance();
+        EstTimeUpdater.s_pause = false;
+        DBBPool.clear();
+    }
+
+//    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
+//    private static VoltDBInterface singleton = new RealVoltDB();
+    private static VoltDBInstance singleton = new VoltDBInstance();
 }
