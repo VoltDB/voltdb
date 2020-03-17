@@ -62,7 +62,7 @@ public:
      * of the old tuple must be released.
      */
     virtual void release() {
-        m_tableSurgeon->updateTupelRelease(m_oldTuple, m_newTuple);
+        m_tableSurgeon->updateTupleRelease(m_oldTuple, m_newTuple);
     }
     virtual ~PersistentTableUndoUpdateAction() { }
 };

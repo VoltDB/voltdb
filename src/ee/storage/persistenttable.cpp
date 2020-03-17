@@ -1104,7 +1104,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 }
 
-void PersistentTable::updateTupelRelease(char* oldTuple, char* newTuple) {
+void PersistentTable::updateTupleRelease(char* oldTuple, char* newTuple) {
    TableTuple srcTuple(m_schema);
    srcTuple.move(oldTuple);
    auto const& entry = allocator().template update<storage::truth>(oldTuple);
