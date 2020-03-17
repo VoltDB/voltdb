@@ -1240,11 +1240,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
          m_tableStreamer->notifyTupleDelete(target);
     }
 
-    // No snapshot in progress cares, just whack it.
-    deleteTupleStorage(target); // also frees object columns
-
     allocator().remove_reserve(1);
     allocator().template remove_add<storage::truth>(target.address());
+    target.setActiveFalse();
     finalizeRelease();
 }
 
