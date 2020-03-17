@@ -30,6 +30,7 @@
 #include <set>
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/optional.hpp>
 #include <stx/btree_map>
 #include <stx/btree_set>
 #include "common/ThreadLocalPool.h"
@@ -229,9 +230,9 @@ namespace voltdb {
             bool contains(void const*) const;          // query if a table tuple is stored in current chunk
             bool full() const noexcept;
             bool empty() const noexcept;
-            void*const begin() const noexcept;
-            void*const end() const noexcept;
-            void*const next() const noexcept;
+            void*const range_begin() const noexcept;
+            void*const range_end() const noexcept;
+            void*const range_next() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
             allocator_type<T>& get_allocator() noexcept;
@@ -464,16 +465,10 @@ namespace voltdb {
          */
         class CompactingStorageTrait {
             using list_type = ChunkList<CompactingChunk, true_type>;
-            /**
-             * Linearized access order depending on shrink
-             * direction, to ensure that chunks are accessed in
-             * snapshot view the same order as they appear in txn
-             * view when snapshot started.
-             */
-            list_type* m_storage;
+            list_type& m_storage;
             bool m_frozen = false;
         public:
-            explicit CompactingStorageTrait(list_type*) noexcept;
+            explicit CompactingStorageTrait(list_type&) noexcept;
             bool frozen() const noexcept;
             void freeze(); void thaw();
             /**
@@ -588,7 +583,7 @@ namespace voltdb {
                 typename ChunkList<CompactingChunk, Compact>::iterator& iterator() noexcept;
                 typename ChunkList<CompactingChunk, Compact>::iterator const&
                     iterator(ChunkList<CompactingChunk, Compact>::iterator const&) noexcept;
-                void const*& next() noexcept;
+                void const*& range_next() noexcept;
                 bool empty() const noexcept;
             };
             class FrozenTxnBoundaries final {
@@ -627,7 +622,7 @@ namespace voltdb {
                 public:
                     RemovableRegion(char const*, size_t, size_t) noexcept;
                     vector<void*> holes(size_t) const noexcept;
-                    char const* begin() const noexcept;
+                    char const* range_begin() const noexcept;
                     bitset_t& mask() noexcept;
                     bitset_t const& mask() const noexcept;
                 };
@@ -658,7 +653,6 @@ namespace voltdb {
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
-            using DelayedRemover_movments_type = typename list_type::collections::map<void*, void*> const&;
             CompactingChunks(size_t tupleSize) noexcept;
             /**
              * Queries
@@ -753,9 +747,9 @@ namespace voltdb {
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
             set_type m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
-            bool m_hasDeletes = false;      // observer for iterator::advance()
             void* m_last = nullptr;         // last allocation by copy(void const*);
-            Alloc m_storage;
+            Alloc m_changeStore;
+            boost::optional<function<void(void const*)>> const m_finalize{};
             /**
              * Creates a deep copy of the tuple stored in local
              * storage, and keep track of it.
@@ -773,25 +767,43 @@ namespace voltdb {
              *   the tuple that gets moved to the hole by deletion, and
              *   its content.
              */
-            void update(void const*);
-            void insert(void const*);
-            void remove(void const*);
+            void const* update(void const*);
+            void const* remove(void const*);
         public:
-            enum class ChangeType : char {Update, Insertion, Deletion};
+            enum class ChangeType : char {Update, Deletion};
             using is_hook = true_type;
 
             TxnPreHook(size_t);
+            TxnPreHook(size_t, function<void(void const*)> const&);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
             ~TxnPreHook() = default;
             void freeze();
             void thaw();
+            struct added_entry_t {
+                /**
+                 * Status for the add() method:
+                 * - not_frozen: the status is not frozen when add() gets called;
+                 * - ignored: frozen, but the rw iterator had visited the tuple already,
+                 *   so we don't bother recording. The tuple may or may not have a local copy.
+                 * - fresh: frozen, and is the first time that any changes occurs on given addr;
+                 * - existing: frozen, and there is already one (or more) changes on given addr.
+                 */
+                enum class status : char {not_frozen, fresh, existing, ignored};
+                added_entry_t(status, void const*) noexcept;
+                added_entry_t() noexcept = default;
+                status status_of() const noexcept;
+                void* copy_of() noexcept;
+            private:
+                status const m_status = status::not_frozen;
+                void* m_copy = nullptr;
+            };
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(ChangeType, void const*, IteratorObserver&);
+            added_entry_t add(ChangeType, void const*, IteratorObserver&);
             void _add_for_test_(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
@@ -800,7 +812,6 @@ namespace voltdb {
             // Client is responsible to fill the buffer before
             // calling add() API.
             void copy(void const* prev);
-            bool const& hasDeletes() const noexcept;
         };
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
@@ -820,23 +831,25 @@ namespace voltdb {
             using Hook::add; using Hook::copy;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
-            static observer_type<truth> DUMMY_OBSERVER;
             observer_type<truth> m_iterator_observer{};
-            bool m_observerable = false;
-            template<typename Tag> observer_type<Tag>& observer() noexcept;
+            // action before deallocating a tuple from txn (or
+            // hook) memory.
+            boost::optional<function<void(void const*)>> const m_finalize{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
+            HookedCompactingChunks(size_t, function<void(void const*)> const&) noexcept;
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            template<typename Tag> void thaw();             // switch of snapshot process
+            template<typename Tag> void thaw();        // switch of snapshot process
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             // NOTE: these methods with Tag template must be
             // supplied with same type as freeze() method.
-            template<typename Tag> void update(void*);      // NOTE: this must be called prior to any memcpy operations happen
-            template<typename Tag> void const* remove(void*);
+            template<typename Tag>      // NOTE: this must be called prior to any memcpy operations happen
+            typename Hook::added_entry_t update(void*);
+            template<typename Tag> void const* _remove_for_test_(void*);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -852,8 +865,8 @@ namespace voltdb {
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
-            void remove_add(void*);
-            template<typename Tag> size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            template<typename Tag> typename Hook::added_entry_t remove_add(void*);
+            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
             string info(void const*) const;
@@ -923,8 +936,8 @@ namespace voltdb {
                 iterator_type(iterator_type const&) = default;
                 iterator_type(iterator_type&&) = default;
                 ~iterator_type();
-                container_type storage() const noexcept;
                 // NOTE: we need to expose these 2 APIs bc. of IteratorObserver
+                container_type storage() const noexcept;
                 operator position_type() const noexcept;
                 static iterator_type begin(container_type);
                 bool operator==(iterator_type const&) const noexcept;
