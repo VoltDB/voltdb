@@ -1822,10 +1822,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
-        return getListenerAddresses(false);
+        return getListenerAddresses(ListenerPort.SQL);
     }
 
-    public List<String> getListenerAddresses(boolean useAdmin) {
+    public List<String> getListenerAddresses(ListenerPort port) {
         if (!m_running) {
             return null;
         }
@@ -1835,7 +1835,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
+                listeners.add("localhost:" + port.getPort(cl));
             }
         }
         return listeners;
@@ -2346,7 +2346,7 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        for (String address : getListenerAddresses(true)) {
+        for (String address : getListenerAddresses(ListenerPort.ADMIN)) {
             client.createConnection(address);
         }
         return client;
@@ -2425,5 +2425,28 @@ public class LocalCluster extends VoltServerConfig {
     private void resetLogMessageMatchResults(int hostId) {
         assertTrue(m_logMessageMatchResults.containsKey(hostId));
         m_logMessageMatchResults.get(hostId).clear();
+    }
+
+    public enum ListenerPort {
+        SQL {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_port;
+            }
+        },
+        ADMIN {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_adminPort;
+            }
+        },
+        KIPLING {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_kiplingHostPort.getPort();
+            }
+        };
+
+        abstract int getPort(CommandLine cl);
     }
 }

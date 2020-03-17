@@ -287,6 +287,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     protected ClientConfig createClientConfig(String username, String password) {
         ClientConfig cc = new ClientConfig(username, password);
         cc.setProcedureCallTimeout(10 * 60 * 1000); // 10 min
+        cc.setTopologyChangeAware(true);
         return cc;
     }
 
@@ -339,7 +340,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
         for (Pair<LocalCluster, Client> clusterAndClient : CLUSTERS_AND_CLIENTS) {
             Client client = clusterAndClient.getSecond();
-            assertEquals(ClientResponse.SUCCESS, callDMLProcedure(client, "@AdHoc", schemaDDL).getStatus());;
+            assertEquals(ClientResponse.SUCCESS, callDMLProcedure(client, "@AdHoc", schemaDDL).getStatus());
         }
     }
 
