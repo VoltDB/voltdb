@@ -1279,8 +1279,6 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
             src.move(const_cast<void*>(e.copy_of()));
             target.copyNonInlinedColumnObjects(src);
         }
-        decreaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
-        target.freeObjectColumns();
     }
 }
 
