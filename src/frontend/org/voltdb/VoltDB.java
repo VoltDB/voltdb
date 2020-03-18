@@ -1594,14 +1594,25 @@ public class VoltDB {
     private static class VoltDBInstance {
         // NOTE: an explicit exception to the pattern is the Hashinator (which is a static map)
         //       because the initialize method explicitly resets the map.
-        boolean s_fromServerThread = false;
-        VoltDBInterface s_voltdb = new RealVoltDB();
-        VoltDB.Configuration s_config = new VoltDB.Configuration();
-        ImportManager s_importManager = null;
-        volatile ExportManagerInterface s_exportManager = null;
-        E3ExecutorFactoryInterface s_e3ExecutorFactory = null;
-        ShutdownHooks s_shutdownHooks = new ShutdownHooks();
-        volatile TTLManager s_ttlManager = null;
+        boolean s_fromServerThread;
+        VoltDB.Configuration s_config;
+        VoltDBInterface s_voltdb;
+        ImportManager s_importManager;
+        volatile ExportManagerInterface s_exportManager;
+        E3ExecutorFactoryInterface s_e3ExecutorFactory;
+        ShutdownHooks s_shutdownHooks;
+        volatile TTLManager s_ttlManager;
+
+        VoltDBInstance(VoltDB.Configuration emptyConfig) {
+            s_fromServerThread = false;
+            s_config = emptyConfig;
+            s_voltdb = new RealVoltDB();
+            s_importManager = null;
+            s_exportManager = null;
+            s_e3ExecutorFactory = null;
+            s_shutdownHooks = new ShutdownHooks();
+            s_ttlManager = null;
+        }
     }
 
     public static void setImportManagerInstance(ImportManager mgr) {
@@ -1653,12 +1664,12 @@ public class VoltDB {
     }
 
     public static void resetSingletonsForTest() {
-        singleton = new VoltDBInstance();
+        singleton = new VoltDBInstance(s_emptyConfig);
         EstTimeUpdater.s_pause = false;
         DBBPool.clear();
     }
 
-//    private static VoltDB.Configuration m_config = new VoltDB.Configuration();
-//    private static VoltDBInterface singleton = new RealVoltDB();
-    private static VoltDBInstance singleton = new VoltDBInstance();
+    // The Configuration class initializer also initializes the Logger ... so yeah.
+    private static VoltDB.Configuration s_emptyConfig = new VoltDB.Configuration();
+    private static VoltDBInstance singleton = new VoltDBInstance(s_emptyConfig);
 }
