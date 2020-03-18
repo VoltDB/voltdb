@@ -69,8 +69,9 @@ public enum StatsSelector {
     IMPORT(IMPORTER),
     EXPORT,
     TASK(false),
-    TASK_SCHEDULER(TASK),
-    TASK_PROCEDURE(TASK);
+    TASK_SCHEDULER(false, TASK),
+    TASK_PROCEDURE(false, TASK),
+    SYSTEM_TASK(false);
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;
