@@ -906,7 +906,6 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                             reinterpret_cast<char*&>(beginTxn().iterator()->m_next) =
                             dst + offset;
                     } else {                                   // right on the boundary
-                        pop_finalize(begin());
                         pop_front();
                     }
                     m_lastFreeFromHead = nullptr;
@@ -920,7 +919,6 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         (beginTxn().iterator()->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||      // same chunk,
                         next(beginTxn().iterator())->range_begin() == p);                                     // or next chunk
                 if (! beginTxn().iterator()->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
-                    pop_finalize(begin());
                     pop_front();
                 }
                 --m_allocs;
