@@ -117,10 +117,9 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // that stores non-inlined tuple data.
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
-        TableTuple tuple(m_schema);
-        auto const cleaner = [this, &tuple] (void const* p) noexcept {
-            void *tupleAddress = const_cast<void*>(p);
-            tuple.move(tupleAddress);
+        auto const cleaner = [this] (void const* p) noexcept {
+            TableTuple tuple(this->m_schema);
+            tuple.move(const_cast<void*>(p));
             this->decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
