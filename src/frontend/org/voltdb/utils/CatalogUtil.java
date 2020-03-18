@@ -147,9 +147,8 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
-import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
-import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
+import org.voltdb.compiler.deploymentfile.TopicProfilesType;
 import org.voltdb.compiler.deploymentfile.TopicRetentionType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -212,7 +211,6 @@ public abstract class CatalogUtil {
     public static final String MATCHED_STATEMENTS = "matching statements and parameters";
     public static final String MISMATCHED_STATEMENTS = "mismatched statements";
     public static final String MISMATCHED_PARAMETERS = "mismatched parameters";
-
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -1227,6 +1225,8 @@ public abstract class CatalogUtil {
         if (fi.getDr() == null) {
             fi.setDr(new FlushIntervalType.Dr());
         }
+        // Kipling topics
+        setTopicDefaults(deployment);
     }
 
     /**
@@ -1345,6 +1345,7 @@ public abstract class CatalogUtil {
 
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         CompoundErrors errors = new CompoundErrors();
+        setTopicDefaults(deployment);
 
         // If topics have a threadpool name, validate it exists
         TopicsType topicsType = deployment.getTopics();
@@ -1369,22 +1370,20 @@ public abstract class CatalogUtil {
         }
 
         // Validate topics in deployment file
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> topics = getDeploymentTopics(topicsType, errors);
-        TopicDefaultsType defaults = topics.getFirst();
-        Map<String, TopicProfileType> profileMap = topics.getSecond();
-
-        if (defaults != null) {
-            validateRetention("topic defaults", defaults.getRetention(), errors);
-        }
+        Map<String, TopicProfileType> profileMap = getDeploymentTopics(topicsType, errors);
         if (profileMap != null) {
             for(TopicProfileType profile : profileMap.values()) {
+                String profName = profile.getName();
+                if (StringUtils.isBlank(profName)) {
+                    errors.addErrorMessage("A topic profile cannot have a blank name");
+                }
                 String what = "topic profile " + profile.getName();
                 validateRetention(what, profile.getRetention(), errors);
             }
         }
 
-        // Verify that every topic refers to an existing profile, and that if a topic
-        // uses avro, the <avro> element is defined
+        // Verify that every topic that refers to a profile refers to an existing profile,
+        // and that if a topic uses avro, the <avro> element is defined
         CatalogMap<Table> tables = CatalogUtil.getDatabase(catalog).getTables();
         for (Table t : tables) {
             if (!t.getIstopic()) {
@@ -1392,11 +1391,7 @@ public abstract class CatalogUtil {
             }
             String profileName = t.getTopicprofile();
             if (StringUtils.isEmpty(profileName)) {
-                if (defaults == null) {
-                    errors.addErrorMessage(String.format(
-                            "Topic %s has no explicit profile and requires topic defaults to be defined in deployment.",
-                            t.getTypeName()));
-                }
+                continue;
             }
             else if (profileMap.get(profileName) == null) {
                 errors.addErrorMessage(String.format(
@@ -1418,37 +1413,52 @@ public abstract class CatalogUtil {
         }
     }
 
+    // Set the profile default values
+    private static void setTopicDefaults(DeploymentType deployment) {
+        // Ensure deployment has a default profile with default values
+        TopicsType topics = deployment.getTopics();
+        if (topics == null) {
+            topics = new TopicsType();
+            topics.setEnabled(false);
+            deployment.setTopics(topics);
+        }
+        TopicProfilesType profiles = deployment.getTopics().getProfiles();
+        if (profiles == null) {
+            profiles = new TopicProfilesType();
+            deployment.getTopics().setProfiles(profiles);
+        }
+    }
+
     /**
      * Get the topics defined in deployment file: defaults, and map of profiles, keyed CASE INSENSITIVE
      *
-     * @param deployment
-     * @param errors
-     * @return Pair of {@link TopicDefaultsType}, case insensitive map of profile name to {@link TopicProfileType}
+     * @param   deployment
+     * @param   errors
+     * @return case insensitive map of profile name to {@link TopicProfileType}
      */
-    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+    public final static Map<String, TopicProfileType> getDeployedTopicProfiles(
             DeploymentType deployment, CompoundErrors errors) {
 
         TopicsType topics = deployment.getTopics();
         if (topics == null) {
-            return Pair.of(null, null);
+            return null;
         }
         return getDeploymentTopics(topics, errors);
     }
 
-    public final static Pair<TopicDefaultsType, Map<String, TopicProfileType>> getDeploymentTopics(
+    public final static Map<String, TopicProfileType> getDeploymentTopics(
             TopicsType topics, CompoundErrors errors) {
 
         if (topics == null || topics.getProfiles() == null) {
-            return Pair.of(null, null);
+            return null;
         }
 
-        TopicDefaultsType defaults = topics.getProfiles().getDefaults();
         List<TopicProfileType> profiles = topics.getProfiles().getProfile();
         if (profiles == null) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("No topic profiles in deployment");
             }
-            return Pair.of(defaults, null);
+            return null;
         }
 
         Map<String, TopicProfileType> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -1457,7 +1467,7 @@ public abstract class CatalogUtil {
                 errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
             }
         }
-        return Pair.of(defaults, profileMap);
+        return profileMap;
     }
 
     private final static void validateRetention(String what, TopicRetentionType retention,
@@ -1479,17 +1489,6 @@ public abstract class CatalogUtil {
         }
         catch (Exception ex) {
             errors.addErrorMessage("Failed to validate retention policy in " + what + ": " + ex.getMessage());
-        }
-    }
-
-    // Assumes the topics have been validated beforehand
-    public final static void validateRetentionUpdate(String what, TopicRetentionType newRetention,
-            TopicRetentionType curRetention, CompoundErrors errors) {
-        // The limit can be changed, but not the policy.
-        TopicRetentionPolicyEnum newPol = newRetention != null ? newRetention.getPolicy() : null;
-        TopicRetentionPolicyEnum curPol = curRetention != null ? curRetention.getPolicy() : null;
-        if (newPol != curPol) {
-            errors.addErrorMessage("The retention policy in " + what + " cannot be changed");
         }
     }
 

@@ -79,8 +79,6 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
-import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
-import org.voltdb.compiler.deploymentfile.TopicProfilesType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -416,25 +414,6 @@ public class VoltProjectBuilder {
             m_kiplingConfiguration = new TopicsType();
         }
         return m_kiplingConfiguration;
-    }
-
-    public TopicDefaultsType getTopicDefaults() {
-        TopicsType t = getKiplingConfiguration();
-        if (t == null) {
-            t = new TopicsType();
-        }
-        TopicProfilesType profiles = t.getProfiles();
-        if (profiles == null) {
-            profiles = new TopicProfilesType();
-            t.setProfiles(profiles);
-        }
-        TopicDefaultsType d = profiles.getDefaults();
-        if (d == null) {
-            // Note: defaults with no explicit retention policies are ok
-            d = new TopicDefaultsType();
-            profiles.setDefaults(d);
-        }
-        return d;
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {

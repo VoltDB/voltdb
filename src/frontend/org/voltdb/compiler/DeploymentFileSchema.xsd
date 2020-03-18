@@ -596,20 +596,13 @@
   
   <xs:complexType name="topicProfilesType">
     <xs:sequence>
-      <xs:element name="defaults" type="topicDefaultsType" minOccurs="0" maxOccurs="1"/>
       <xs:element name="profile" type="topicProfileType" minOccurs="0" maxOccurs="unbounded"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <xs:complexType name="topicDefaultsType">
-    <xs:sequence>
-      <xs:element name="retention" type="topicRetentionType" minOccurs="0" maxOccurs="1" />
     </xs:sequence>
   </xs:complexType>
 
   <xs:complexType name="topicProfileType">
     <xs:sequence>
-      <xs:element name="retention" type="topicRetentionType" minOccurs="0" maxOccurs="1" />
+      <xs:element name="retention" type="topicRetentionType" minOccurs="1" maxOccurs="1" />
     </xs:sequence>
     <xs:attribute name="name" type="xs:string" use="required" />
   </xs:complexType>
