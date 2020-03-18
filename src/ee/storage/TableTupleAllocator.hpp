@@ -597,6 +597,7 @@ namespace voltdb {
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
+            friend class CompactingStorageTrait;       // need pop_front
             friend class position_type;                // need to search hidden region
             using list_type = ChunkList<CompactingChunk, Compact>;
             // equivalent to "table id", to ensure injection relation to rw iterator
@@ -604,6 +605,8 @@ namespace voltdb {
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
+            // action before deallocating a tuple from txn (or hook) memory.
+            boost::optional<function<void(void const*)>> const m_finalize{};
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
@@ -612,6 +615,7 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
+            void pop_finalize(typename list_type::iterator) const;
         protected:
             class DelayedRemover {
                 CompactingChunks& m_chunks;
@@ -654,6 +658,8 @@ namespace voltdb {
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
+            CompactingChunks(size_t tupleSize, function<void(void const*)> const&) noexcept;
+            ~CompactingChunks();
             /**
              * Queries
              */
@@ -683,6 +689,8 @@ namespace voltdb {
             // CompactingChunksIgnorableFree struct in .cpp for
             // details.
             void* free(void*);
+            // apply finalizer (if set) to the given addr
+            void finalize(void const*) const;
             /**
              * Light weight free() operations from either end,
              * involving no compaction.
@@ -742,10 +750,8 @@ namespace voltdb {
         template<typename Alloc, typename Trait,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
-            using set_type = typename Collections<collections_type>::template set<void const*>;
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            set_type m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
             void* m_last = nullptr;         // last allocation by copy(void const*);
             Alloc m_changeStore;
@@ -778,7 +784,7 @@ namespace voltdb {
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
-            ~TxnPreHook() = default;
+            ~TxnPreHook();
             void freeze();
             void thaw();
             struct added_entry_t {
@@ -832,9 +838,6 @@ namespace voltdb {
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
-            // action before deallocating a tuple from txn (or
-            // hook) memory.
-            boost::optional<function<void(void const*)>> const m_finalize{};
         public:
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())

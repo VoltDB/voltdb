@@ -31,11 +31,35 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     long m_timestamp = INITIAL_TIMESTAMP;
     int m_hash;
     int m_flags = 0;
+
+    // Note: flags below are not mutual exclusive, a CompleteTransactionMessage
+    // may have one or more flags, e.g. rollback and restart.
+    /**
+     * Indicate the current MP transaction needs to be rollback.
+     */
     static final int ISROLLBACK = 0;
+    /**
+     *  Not in use.
+     */
     static final int REQUIRESACK = 1;
+    /**
+     *  MPI sends it when in progress MP transaction is interrupted by
+     *  leader changes, don't apply to non-restartable sysproc.
+     */
     static final int ISRESTART = 2;
+    /**
+     * Indicate whether the message deliver needs to be coordinated by the scoreboard.
+     */
     static final int ISNPARTTXN = 3;
+    /**
+     *  A special type of completion that sends from MpPromoteAlgo to clean up
+     *  transaction task queue, transaction state and the scoreboard of SP site.
+     *  Only non-restartable sysproc fragment in the repair set can trigger it.
+     */
     static final int ISABORTDURINGREPAIR = 4;
+    /**
+     * Indicate whether this is for an empty DR transaction.
+     */
     static final int ISEMPTYDRTXN = 5;
 
     private void setBit(int position, boolean value)
