@@ -597,6 +597,7 @@ namespace voltdb {
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
+            friend class CompactingStorageTrait;       // need pop_front
             friend class position_type;                // need to search hidden region
             using list_type = ChunkList<CompactingChunk, Compact>;
             // equivalent to "table id", to ensure injection relation to rw iterator
@@ -612,9 +613,9 @@ namespace voltdb {
             CompactingChunks(CompactingChunks&&) = delete;
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
-            void pop_finalize(typename list_type::iterator);
             void pop_front();
             void pop_back();
+            void pop_finalize(typename list_type::iterator) const;
         protected:
             class DelayedRemover {
                 CompactingChunks& m_chunks;
@@ -658,6 +659,7 @@ namespace voltdb {
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
             CompactingChunks(size_t tupleSize, function<void(void const*)> const&) noexcept;
+            ~CompactingChunks();
             /**
              * Queries
              */
@@ -747,10 +749,8 @@ namespace voltdb {
         template<typename Alloc, typename Trait,
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
-            using set_type = typename Collections<collections_type>::template set<void const*>;
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            set_type m_copied{};                 // addr in persistent storage that we keep a local copy
             bool m_recording = false;       // in snapshot process?
             void* m_last = nullptr;         // last allocation by copy(void const*);
             Alloc m_changeStore;
@@ -783,7 +783,7 @@ namespace voltdb {
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
-            ~TxnPreHook() = default;                   // TODO
+            ~TxnPreHook();
             void freeze();
             void thaw();
             struct added_entry_t {

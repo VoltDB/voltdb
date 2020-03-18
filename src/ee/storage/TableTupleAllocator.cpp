@@ -536,11 +536,12 @@ inline void CompactingStorageTrait::freeze() {
 inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
         if (! m_storage.empty()) {
-            auto const& beginTxn = reinterpret_cast<CompactingChunks const&>(m_storage).beginTxn();
+            auto& storage = reinterpret_cast<CompactingChunks&>(m_storage);
+            auto const& beginTxn = storage.beginTxn();
             bool const empty = beginTxn.empty();
             auto const stop = empty ? 0 : beginTxn.iterator()->id();
             while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
-                m_storage.pop_front();
+                storage.pop_front();       // need to call correct version (with finalize)
             }
         }
         m_frozen = false;
@@ -577,13 +578,44 @@ inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTra
     }
 }
 
-CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cb) noexcept :
+namespace std {                                    // Need to declare these before using (for Mac clang++)
+    using namespace voltdb::storage;
+    template<> struct less<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            bool const e1 = lhs.empty(), e2 = rhs.empty();
+            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
+                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
+            } else {
+                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
+                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
+            }
+        }
+    };
+    template<> struct less_equal<position_type> {
+        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+            return ! less<position_type>()(rhs, lhs);
+        }
+    };
+    template<> struct less<ChunkHolder<>> {
+        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
+            return less_rolling(lhs.id(), rhs.id());
+        }
+    };
+}
+
+inline CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cb) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
     m_txnFirstChunk(*this), m_finalize(cb), m_batched(*this) {}
 
-CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
+inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
     m_txnFirstChunk(*this), m_batched(*this) {}
+
+CompactingChunks::~CompactingChunks() {
+    for (auto iter = begin(); iter != end(); ++iter) {
+        pop_finalize(iter);
+    }
+}
 
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
     m_chunks(chunks), m_iter(chunks.end()), m_next(nullptr) {
@@ -655,7 +687,7 @@ inline typename CompactingChunks::list_type::iterator CompactingChunks::releasab
     return beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
 }
 
-inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type::iterator iter) {
+inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type::iterator iter) const {
     if (m_finalize && iter->range_begin() < iter->range_next()) {
         for (char const* ptr = reinterpret_cast<char const*>(iter->range_begin());
                 ptr < iter->range_next(); ptr += tupleSize()) {
@@ -706,10 +738,26 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
             // This is a hack to get the correct behavior for
             // snapshot -> clear -> finish snapshot
             void* last_next = last()->range_next();
+            if (m_finalize) {              // finalize the region between frozen right, and txn end
+                auto const& frozenRight = frozenBoundaries().right();
+                if (less<position_type>()(frozenRight, *last())) {
+                    for (auto id = frozenRight.chunkId();
+                            less_rolling(id, last()->id());
+                            ++id) {
+                        auto const iterp = list_type::find(id);
+                        vassert(iterp.first);
+                        for (auto const* ptr = reinterpret_cast<char const*>(
+                                    id == frozenRight.chunkId() ? frozenRight.address() :
+                                    iterp.second->range_begin());
+                                ptr < iterp.second->range_next();
+                                ptr += tupleSize()) {
+                            (*m_finalize)(ptr);
+                        }
+                    }
+                }
+            }
             // then, release all chunks from txn view
             while (! beginTxn().empty()) {
-                // TODO: check txn right boundary with frozen
-                // right boundary, and finalize beyond latter
                 beginTxn().range_next() = beginTxn().iterator()->m_next =
                     beginTxn().iterator()->range_begin();
                 releasable();
@@ -785,31 +833,6 @@ void* CompactingChunks::free(void* dst) {
     }
 }
 
-namespace std {                                    // Need to declare these before using (for Mac clang++)
-    using namespace voltdb::storage;
-    template<> struct less<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            bool const e1 = lhs.empty(), e2 = rhs.empty();
-            if (e1 || e2) { // NOTE: anything but empty < empty, and empty < anything but empty.
-                return ! (e1 && e2);               // That is, empty !< empty (since empty == empty)
-            } else {
-                auto const id1 = lhs.chunkId(), id2 = rhs.chunkId();
-                return (id1 == id2 && lhs.address() < rhs.address()) || less_rolling(id1, id2);
-            }
-        }
-    };
-    template<> struct less_equal<position_type> {
-        inline bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-            return ! less<position_type>()(rhs, lhs);
-        }
-    };
-    template<> struct less<ChunkHolder<>> {
-        inline bool operator()(ChunkHolder<> const& lhs, ChunkHolder<> const& rhs) const noexcept {
-            return less_rolling(lhs.id(), rhs.id());
-        }
-    };
-}
-
 ChunksIdValidatorImpl ChunksIdValidatorImpl::s_singleton{};
 /**
  * The implementation just forward IteratorPermissible
@@ -873,11 +896,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                     if (offset) {                              // some memory ops are unavoidable
                         char* dst = reinterpret_cast<char*>(beginTxn().iterator()->range_begin());
                         char const* src = reinterpret_cast<char const*>(beginTxn().range_next()) - offset;
-                        if (m_finalize) {               // finalize the head portion up to m_lastFreeFromHead position
-                            for(auto const* ptr = dst; ptr < m_lastFreeFromHead; ptr += tupleSize()) {
-                                (*m_finalize)(ptr);
-                            }
-                        }
+                        // NOTE: finalize do not need to be called in this case
                         if (dst + offset < src) {
                             memcpy(dst, src, offset);
                         } else {
@@ -1092,7 +1111,11 @@ inline void CompactingChunks::DelayedRemover::add(void* p) {
             if (--m_size == 0) {
                 mapping();
             }
-            m_chunks.finalize(p);
+            if (! m_chunks.frozen() || // frozen: only finalize if it lies outside frozen boundary
+                    less<position_type>()(m_chunks.frozenBoundaries().right(),
+                        {p, iter.second})) {
+                m_chunks.finalize(p);
+            }
         }
     }
 }
@@ -1362,8 +1385,15 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
     inline void operator()(ChunkList& l, Iter& iter) const noexcept {
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
-            vassert(l.front().id() == iter->id());
+            vassert(l.front().id() == iter->id() && iter->range_begin() == iter->range_next());
+            // chunk was fully used. Need to take care of finalizer
             ++iter;
+            // NOTE: snapshot RW iterator **CAN NOT** take any
+            // finalize actions, since in txn view, these
+            // snapshot-visible-only chunks are moved (compacted)
+            // into other regions of txn chunks (i.e. hidden away)
+            // from snapshot view. The whence of finalize action
+            // needs to be determined by txn, not snapshot.
             l.pop_front();
         } else {
             ++iter;
@@ -1747,11 +1777,20 @@ inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
                 auto const& iter = m_changes.find(key);
                 if (iter != m_changes.end()) {
                     m_changes.erase(iter);
-                    m_copied.erase(key);
                     m_changeStore.free(const_cast<void*>(key));
                 }
             }),
     m_changeStore(tupleSize) {}
+
+template<typename Alloc, typename Trait, typename E>
+inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
+    if (m_finalize) {
+        for_each(m_changes.cbegin(), m_changes.cend(),
+                [this] (typename map_type::value_type const& entry) {
+                    (*m_finalize)(entry.second);
+                });
+    }
+}
 
 template<typename Alloc, typename Trait, typename E> inline
 TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void const*)> const& cb) :
@@ -1760,7 +1799,6 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void con
                 if (iter != m_changes.end()) {
                     (*m_finalize)(iter->second);               // call back on local copy of old value
                     m_changes.erase(iter);
-                    m_copied.erase(key);
                     m_changeStore.free(const_cast<void*>(key));
                 }
             }),
@@ -1819,7 +1857,7 @@ inline void TxnPreHook<Alloc, Trait, E1>::_add_for_test_(typename TxnPreHook<All
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
     if (m_recording) {
-        throw logic_error("TxnPreHook::freez(): double freeze detected");
+        throw logic_error("TxnPreHook::freeze(): double freeze detected");
     } else {
         m_recording = true;
     }
@@ -1832,12 +1870,11 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
                     [this](typename map_type::value_type& p) { (*m_finalize)(p.second); });
         }
         m_changes.clear();
-        m_copied.clear();
         m_changeStore.clear();
         m_last = nullptr;      // since m_storage is cleared
         m_recording = false;
     } else {
-        throw logic_error("TxnPreHook::freez(): double thaw detected");
+        throw logic_error("TxnPreHook::thaw(): double thaw detected");
     }
 }
 
@@ -1846,7 +1883,6 @@ inline void* TxnPreHook<Alloc, Trait, E>::_copy(void const* src, bool) {
     void* dst = m_changeStore.allocate();
     vassert(dst != nullptr);
     memcpy(dst, src, m_changeStore.tupleSize());
-    m_copied.emplace(src);
     return dst;
 }
 
