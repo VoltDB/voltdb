@@ -852,12 +852,17 @@ void testHookedCompactingChunks() {
                 ii = 0;
                 for_each(tb_removed.cbegin(), tb_removed.cend(),
                         [&ii, &alloc](void* p) {
-                        ++ii;
-                        auto const& entry = alloc.template remove_add<truth>(p);
-                        assert(entry.status_of() == Hook::added_entry_t::status::existing ||
-                                (entry.status_of() == Hook::added_entry_t::status::fresh &&
-                                 ! memcmp(const_cast<typename Hook::added_entry_t&>(entry).copy_of(),
-                                     p, TupleSize)));
+                            ++ii;
+                            auto const& entry = alloc.template remove_add<truth>(p);
+                            switch (entry.status_of()) {
+                                case Hook::added_entry_t::status::existing:
+                                case Hook::added_entry_t::status::ignored:
+                                    break;
+                                case Hook::added_entry_t::status::fresh:
+                                default:
+                                    assert(! memcmp(const_cast<typename Hook::added_entry_t&>(entry).copy_of(),
+                                        p, TupleSize));
+                            }
                         });
                 assert(alloc.remove_force([](vector<pair<void*, void*>> const&){}) == tb_removed.size());
             default:;
@@ -1842,9 +1847,7 @@ public:
         m_states.reserve(n);
     }
     void operator()(void const* p) {
-        auto const s = Gen::of(reinterpret_cast<unsigned char const*>(p));
-        m_states.emplace(s);
-        //vassert(m_states.emplace(s).second);
+        assert(m_states.emplace(Gen::of(reinterpret_cast<unsigned char const*>(p))).second);
     }
     unordered_set<size_t> const& seen() const {
         return m_states;

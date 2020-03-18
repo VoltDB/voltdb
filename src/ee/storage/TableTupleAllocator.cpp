@@ -1696,7 +1696,16 @@ super(o) {}
 template<typename Chunks, typename Tag, typename E> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::operator()(void const* p) const {
     auto const& o = super::lock();
-    return o != nullptr && (o->drained() || less<position_type>()({o->storage(), p}, *o));
+    if (o == nullptr) {
+        return false;
+    } else if (o->drained()) {
+        return true;
+    } else {
+        position_type const pos_p{o->storage(), p};
+        return less<position_type>()(pos_p, *o) ||                     // p < iterator,
+            less<position_type>()(o->storage().frozenBoundaries().right(),     // or p > frozen right boundary
+                    pos_p);
+    }
 }
 
 template<unsigned char NthBit, typename E>
