@@ -54,6 +54,7 @@ public:
      */
     virtual void undo() {
         m_tableSurgeon->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes, m_updateMigrate);
+        NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
     }
 
     /*
@@ -62,7 +63,8 @@ public:
      * of the old tuple must be released.
      */
     virtual void release() {
-        m_tableSurgeon->updateTupleRelease(m_oldTuple, m_newTuple);
+        m_tableSurgeon->updateTupleRelease(m_newTuple);
+        NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns);
     }
     virtual ~PersistentTableUndoUpdateAction() { }
 };

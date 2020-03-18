@@ -1097,16 +1097,12 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
         }
     }
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
-        sourceTupleWithNewValues.freeObjectColumns();
-    }
 }
 
-void PersistentTable::updateTupleRelease(char* oldTuple, char* newTuple) {
+void PersistentTable::updateTupleRelease(char* targetTuple) {
    TableTuple srcTuple(m_schema);
-   srcTuple.move(oldTuple);
-   auto const& entry = allocator().template update<storage::truth>(oldTuple);
+   srcTuple.move(targetTuple);
+   auto const& entry = allocator().template update<storage::truth>(targetTuple);
    if (m_schema->getUninlinedObjectColumnCount() != 0) {
         auto e = const_cast<typename Hook::added_entry_t&>(entry);
         if (e.copy_of() != nullptr) {
@@ -1114,8 +1110,6 @@ void PersistentTable::updateTupleRelease(char* oldTuple, char* newTuple) {
             copied.move(const_cast<void*>(e.copy_of()));
             copied.copyNonInlinedColumnObjects(srcTuple);
         }
-        decreaseStringMemCount(srcTuple.getNonInlinedMemorySizeForPersistentTable());
-        srcTuple.freeObjectColumns();
     }
 }
 
