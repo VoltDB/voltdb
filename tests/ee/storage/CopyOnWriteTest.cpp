@@ -1165,7 +1165,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
     const time_t seed = time(NULL);
-    std::cout << "Seed " << seed << std::endl;
+    std::cout << "(Seed " << seed << ") ";
     srand(static_cast<unsigned int>(seed));
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
@@ -1221,7 +1221,10 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     initTable(1, 0);
-    int tupleCount = TUPLE_COUNT;
+    const time_t seed = time(NULL);
+    std::cout << "(Seed " << seed << ") ";
+    srand(static_cast<unsigned int>(seed));
+    int tupleCount = 2200;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
@@ -1290,6 +1293,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     initTable(1, 0);
+    const time_t seed = time(NULL);
+    std::cout << "(Seed " << seed << ") ";
+    srand(static_cast<unsigned int>(seed));
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);

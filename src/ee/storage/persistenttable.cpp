@@ -857,6 +857,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(
                }
            }
         }
+        else {
+            updateTupleRelease(targetTupleToUpdate.address());
+        }
+    }
+    else{
+        updateTupleRelease(targetTupleToUpdate.address());
     }
 
     // Write to the DR stream before doing anything else to ensure we don't
@@ -1226,7 +1232,15 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     }
 
     allocator().remove_reserve(1);
-    allocator().template remove_add<storage::truth>(target.address());
+    auto const& entry = allocator().template remove_add<storage::truth>(target.address());
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        auto e = const_cast<typename Hook::added_entry_t&>(entry);
+        if (e.copy_of() != nullptr) {
+            TableTuple src(m_schema);
+            src.move(const_cast<void*>(e.copy_of()));
+            target.copyNonInlinedColumnObjects(src);
+        }
+    }
     target.setActiveFalse();
     finalizeRelease();
 }
