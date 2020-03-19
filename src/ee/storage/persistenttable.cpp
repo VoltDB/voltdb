@@ -1827,8 +1827,15 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
        if (m_snapIt->drained()) {
-          allocator().template thaw<storage::truth>();
-          m_snapIt.reset();
+           if (isReplicatedTable()) {
+              ScopedReplicatedResourceLock scopedLock;
+              ExecuteWithMpMemory useMpMemory;
+              allocator().template thaw<storage::truth>();
+              m_snapIt.reset();
+          } else {
+              allocator().template thaw<storage::truth>();
+              m_snapIt.reset();
+          }
           return false;
        }
        auto *p = **m_snapIt;
