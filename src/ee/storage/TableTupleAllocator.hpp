@@ -613,8 +613,8 @@ namespace voltdb {
             CompactingChunks(CompactingChunks&&) = delete;
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
-            void pop_front();
-            void pop_back();
+            void pop_front(bool call_finalizer);
+            void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
             class DelayedRemover {
@@ -696,6 +696,11 @@ namespace voltdb {
              * involving no compaction.
              */
             enum class remove_direction : char {from_head, from_tail};
+            /**
+             * Special form of free from either ends, that
+             * triggers no compaction, and does *not* call
+             * finalize method.
+             */
             void free(remove_direction, void const*);
             /**
              * State changes
