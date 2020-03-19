@@ -275,7 +275,6 @@ public class SysProcFragmentId
     public static final int PF_collectDrTrackers = 400;
     public static final int PF_collectDrTrackersAgg = 401;
 
-
     // @StopReplicas
     public static final int PF_stopReplicas = 402;
     public static final int PF_stopReplicasAggregate = 403;
@@ -283,6 +282,12 @@ public class SysProcFragmentId
     // @TopicControl
     public static final int PF_topicControl = 410;
     public static final int PF_topicControlAggregate = 411;
+
+    // @UpdateLicense
+    public static final int PF_updateLicenseBarrier = 415;
+    public static final int PF_updateLicenseBarrierAggregate = 416;
+    public static final int PF_updateLicense = 417;
+    public static final int PF_updateLicenseAggregate = 418;
 
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);

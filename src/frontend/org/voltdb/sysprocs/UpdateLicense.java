@@ -20,12 +20,8 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -34,9 +30,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.VoltZK;
-import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.VoltTableUtil;
 
 public class UpdateLicense extends VoltSystemProcedure {
@@ -46,69 +39,50 @@ public class UpdateLicense extends VoltSystemProcedure {
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{
-            SysProcFragmentId.PF_updateSettingsBarrier,
-            SysProcFragmentId.PF_updateSettingsBarrierAggregate,
-            SysProcFragmentId.PF_updateSettings,
-            SysProcFragmentId.PF_updateSettingsAggregate
+            SysProcFragmentId.PF_updateLicenseBarrier,
+            SysProcFragmentId.PF_updateLicenseBarrierAggregate,
+            SysProcFragmentId.PF_updateLicense,
+            SysProcFragmentId.PF_updateLicenseAggregate
         };
-    }
-
-    private VoltTable getVersionResponse(int version) {
-        VoltTable table = new VoltTable(new ColumnInfo[] { new ColumnInfo("VERSION", VoltType.INTEGER) });
-        table.addRow(version);
-        return table;
     }
 
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-
-        if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
-            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrier,
+        // The purpose of first fragment is to sync all sites across database to the same position.
+        // So far we only update expiration date and/or max host count allowed, but in the future if
+        // feature enable/disable is included, the first fragment can also do
+        if (fragmentId == SysProcFragmentId.PF_updateLicenseBarrier) {
+            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicenseBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                        " reached settings update barrier.");
-            }
+            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                    " reached license update barrier.");
             return success;
 
-        } else if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrierAggregate) {
+        } else if (fragmentId == SysProcFragmentId.PF_updateLicenseBarrierAggregate) {
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicenseBarrierAggregate,
+                    VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateLicenseBarrier)));
 
+        } else if (fragmentId == SysProcFragmentId.PF_updateLicense) {
             Object [] paramarr = params.toArray();
-            byte [] settingsBytes = (byte[])paramarr[0];
-            int version = ((Integer)paramarr[1]).intValue();
-            ZooKeeper zk = getHostMessenger().getZK();
-            Stat stat = null;
-            try {
-                stat = zk.setData(VoltZK.cluster_settings, settingsBytes, version);
-            } catch (KeeperException | InterruptedException e) {
-                String msg = "Failed to update cluster settings";
-                log.error(msg,e);
-                throw new SettingsException(msg, e);
-            }
-            log.info("Saved new cluster settings state");
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrierAggregate,
-                    getVersionResponse(stat.getVersion()));
+            byte [] licenseBytes = (byte[])paramarr[0];
 
-        } else if (fragmentId == SysProcFragmentId.PF_updateSettings) {
-
-            Object [] paramarr = params.toArray();
-            byte [] settingsBytes = (byte[])paramarr[0];
-            int version = ((Integer)paramarr[1]).intValue();
-            ClusterSettings settings = ClusterSettings.create(settingsBytes);
-            CatalogContext catalogContext =
-                    getVoltDB().settingsUpdate(settings, version);
-
-            context.updateSettings(catalogContext);
+            // write file to disk (some temp directory)
+            // use licenseAPI to verify the license validity.
+            // check if we support the license change (max host count/expiration date), reject other changes.
+            // once verified copy it to voltdb root directory (replace the old one)
+            // replace the RealVoltDB.m_licenseAPI on each node.
+            // return failure response if any of above step fails.
+            // unit tests.
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
 
-        } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateSettings));
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsAggregate, result);
+        } else if (fragmentId == SysProcFragmentId.PF_updateLicenseAggregate) {
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateLicense));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicenseAggregate, result);
 
         } else {
             VoltDB.crashLocalVoltDB(
@@ -119,33 +93,23 @@ public class UpdateLicense extends VoltSystemProcedure {
         throw new RuntimeException("Should not reach this code");
     }
 
-    private SynthesizedPlanFragment[] createBarrierFragment(byte[] settingsBytes, int version) {
+    private SynthesizedPlanFragment[] createBarrierFragment(byte[] licenseBytes) {
 
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
-        pfs[0] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateSettingsBarrier, true,
+        pfs[0] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateLicenseBarrier, true,
                 ParameterSet.emptyParameterSet());
 
-        pfs[1] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateSettingsBarrierAggregate, false,
-                ParameterSet.fromArrayNoCopy(settingsBytes, version));
+        pfs[1] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateLicenseBarrierAggregate, false,
+                ParameterSet.fromArrayNoCopy(licenseBytes));
 
         return pfs;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] settingsBytes) {
-        ZooKeeper zk = getHostMessenger().getZK();
-        Stat stat = null;
-        try {
-            stat = zk.exists(VoltZK.cluster_settings, false);
-        } catch (KeeperException | InterruptedException e) {
-            String msg = "Failed to stat cluster settings zookeeper node";
-            log.error(msg, e);
-            throw new VoltAbortException(msg);
-        }
-        final int version = stat.getVersion();
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] licenseBytes) {
 
         executeSysProcPlanFragments(
-                createBarrierFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsBarrierAggregate);
-        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateSettings,  SysProcFragmentId.PF_updateSettingsAggregate, settingsBytes, version);
+                createBarrierFragment(licenseBytes), SysProcFragmentId.PF_updateLicenseBarrierAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateLicense,  SysProcFragmentId.PF_updateLicenseAggregate, licenseBytes);
     }
 }
