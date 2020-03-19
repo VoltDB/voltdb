@@ -541,7 +541,7 @@ inline void CompactingStorageTrait::thaw() {
             bool const empty = beginTxn.empty();
             auto const stop = empty ? 0 : beginTxn.iterator()->id();
             while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
-                storage.pop_front();       // need to call correct version (with finalize)
+                storage.pop_front(true);   // need to call correct version (with finalize)
             }
         }
         m_frozen = false;
@@ -696,8 +696,10 @@ inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type:
     }
 }
 
-inline void CompactingChunks::pop_front() {
-    pop_finalize(begin());
+inline void CompactingChunks::pop_front(bool call_finalizer) {
+    if (call_finalizer) {
+        pop_finalize(begin());
+    }
     list_type::pop_front();
     beginTxn().iterator(begin());
 }
@@ -908,7 +910,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                             reinterpret_cast<char*&>(beginTxn().iterator()->m_next) =
                             dst + offset;
                     } else {                                   // right on the boundary
-                        pop_front();
+                        pop_front(false);
                     }
                     m_lastFreeFromHead = nullptr;
                 }
@@ -921,7 +923,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         (beginTxn().iterator()->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||      // same chunk,
                         next(beginTxn().iterator())->range_begin() == p);                                     // or next chunk
                 if (! beginTxn().iterator()->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
-                    pop_front();
+                    pop_front(false);
                 }
                 --m_allocs;
             }
