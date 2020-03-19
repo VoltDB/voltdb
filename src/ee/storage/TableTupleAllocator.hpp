@@ -614,7 +614,7 @@ namespace voltdb {
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
             void pop_front();
-            void pop_back();
+            void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
             class DelayedRemover {

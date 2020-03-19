@@ -702,8 +702,10 @@ inline void CompactingChunks::pop_front() {
     beginTxn().iterator(begin());
 }
 
-inline void CompactingChunks::pop_back() {
-    pop_finalize(last());
+inline void CompactingChunks::pop_back(bool call_finalizer) {
+    if (call_finalizer) {
+        pop_finalize(last());
+    }
     list_type::pop_back();
     if (empty()) {
         beginTxn().iterator(end());
@@ -933,11 +935,8 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 throw underflow_error(buf);
             } else {
                 vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->range_next());
-                if (m_finalize) {
-                    (*m_finalize)(p);
-                }
                 if (last()->range_begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
-                    pop_back();
+                    pop_back(false);
                     if (m_allocs ==  1) {
                         beginTxn().iterator(list_type::end());
                     }
