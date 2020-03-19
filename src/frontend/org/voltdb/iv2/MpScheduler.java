@@ -26,8 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.errorprone.annotations.Immutable;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -58,6 +56,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.ProClass;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -145,11 +144,11 @@ public class MpScheduler extends Scheduler
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
             TransactionState snapshotTransactionState)
     {
-        return updateReplicas(replicas, partitionMasters, false);
+        return updateReplicas(replicas, partitionMasters, false, false);
     }
 
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
-            boolean balanceSPI)
+            boolean balanceSPI, boolean skipRepair)
     {
         applyLeaderMigration(replicas, balanceSPI);
 
@@ -201,8 +200,9 @@ public class MpScheduler extends Scheduler
         partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
 
         // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI, partitionLeaderHosts.isEmpty());
-        m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI,
+                partitionLeaderHosts.isEmpty(), skipRepair);
+        m_pendingTasks.repair(repairTask, replicas, partitionMasters, skipRepair);
         return new long[0];
     }
 
