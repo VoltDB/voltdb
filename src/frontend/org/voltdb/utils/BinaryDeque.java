@@ -184,6 +184,15 @@ public interface BinaryDeque<M> {
 
     public Pair<Integer, Long> getBufferCountAndSize() throws IOException;
 
+    /**
+     * Returns the offset of the first entry available in this binary deque.
+     * If there are none available yet (the binary deque is empty), this will return -1.
+     *
+     * @return the offset of the first available entry or -1 if no entries are available
+     * @throws IOException if any error occurs trying to read the entry
+     */
+    public long getFirstId() throws IOException;
+
     public void closeAndDelete() throws IOException;
 
     /**

@@ -68,6 +68,7 @@ public enum StatsSelector {
     IMPORTER,       // synonym as IMPORT for backward compatibility
     IMPORT(IMPORTER),
     EXPORT,
+    TOPIC,
     TASK(false),
     TASK_SCHEDULER(TASK),
     TASK_PROCEDURE(TASK);

@@ -1606,6 +1606,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
+    public synchronized long getFirstId() throws IOException {
+        PBDSegment<M> first = m_segments.firstEntry().getValue();
+        assert(first != null);
+        return first.getStartId();
+    }
+
+    @Override
     public void closeAndDelete() throws IOException {
         close(true);
     }
