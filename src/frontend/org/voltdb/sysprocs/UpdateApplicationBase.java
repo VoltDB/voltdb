@@ -22,11 +22,13 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.calcite.sql.SqlNode;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -43,6 +45,8 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogException;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -52,8 +56,9 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.TopicDefaultsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
+import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
+import org.voltdb.compiler.deploymentfile.TopicRetentionType;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -240,15 +245,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
 
             VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval);
-            // Kipling configuration is not compiled into the catalog and cannot be validated
-            // by the CatalogDiffEngine, so validate the changes here.
-            if (!validateKiplingUpdates(dt, context.getDeployment(), retval)) {
-                return retval;
-            }
-
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
+                return retval;
+            }
+
+            // Kipling configuration is not compiled into the catalog and cannot be validated
+            // by the CatalogDiffEngine, so validate the changes here. This must be done after
+            // the new deployment has been validated in {@code CatalogUtil.compileDeployment}
+            CatalogMap<Table> newTables = CatalogUtil.getDatabase(newCatalog).getTables();
+            if (!validateKiplingUpdates(newTables, dt, context.getDeployment(), retval)) {
                 return retval;
             }
 
@@ -307,14 +314,31 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * Validate that the Kipling changes to the existing configuration are valid; otherwise set
      * an appropriate error message in the passed-in {@link CatalogChangeResult}
      *
+     * @param newTables new catalog tables
      * @param newDep    new deployment
      * @param curDep    current deployment
      * @param result    catalog change result (may be updated)
      * @return          {@code true} if Kipling is valid
      */
-    private static boolean validateKiplingUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult result) {
+    private static boolean validateKiplingUpdates(CatalogMap<Table> newTables, DeploymentType newDep, DeploymentType curDep,
+            CatalogChangeResult result) {
         CompoundErrors errors = new CompoundErrors();
-        validateTopicUpdates(newDep, curDep, errors);
+
+        // Build a usage map of profiles
+        Map<String, Integer> usedProfiles = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Table t : newTables) {
+            if (!t.getIstopic()) {
+                continue;
+            }
+            String profileName = t.getTopicprofile();
+            if (StringUtils.isEmpty(profileName)) {
+                continue;
+            }
+            usedProfiles.compute(profileName, (k, v) -> (v == null) ? 1 : v.intValue() + 1);
+        }
+
+         // Now validate the topic updates with the usage map
+        validateTopicUpdates(usedProfiles, newDep, curDep, errors);
 
         if (errors.hasErrors()) {
             result.errorMsg = errors.getErrorMessage();
@@ -324,38 +348,50 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     /**
      * Validate that the topic changes to the existing configuration are valid; otherwise set
-     * appropriate error message in the passed-in {@link CompoundErrors}
+     * appropriate error message in the passed-in {@link CompoundErrors}.
+     * <p>
+     * Note that retention updates are only validated if the profile is in use. Otherwise, if
+     * no tables use the profile, all changes are allowed.
      *
+     * @param usedProfiles usage map of profiles (profile name -> number of tables using it)*
      * @param newDep    new deployment
      * @param curDep    current deployment
      * @param errors    {@link CompoundErrors}, updated on errors
      * @return          {@code true} if topics are valid
      */
-    private static void validateTopicUpdates(DeploymentType newDep, DeploymentType curDep,
+    private static void validateTopicUpdates(Map<String, Integer> usedProfiles, DeploymentType newDep, DeploymentType curDep,
             CompoundErrors errors ) {
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> newTopics = CatalogUtil.getDeploymentTopics(newDep, errors);
-        TopicDefaultsType newDefaults = newTopics.getFirst();
-        Map<String, TopicProfileType> newProfiles = newTopics.getSecond();
+        Map<String, TopicProfileType> newProfiles  = CatalogUtil.getDeployedTopicProfiles(newDep, errors);
+        Map<String, TopicProfileType> curProfiles = CatalogUtil.getDeployedTopicProfiles(curDep, errors);
 
-        Pair<TopicDefaultsType, Map<String, TopicProfileType>> curTopics = CatalogUtil.getDeploymentTopics(curDep, errors);
-        TopicDefaultsType curDefaults = curTopics.getFirst();
-        Map<String, TopicProfileType> curProfiles = curTopics.getSecond();
-
-        if (newDefaults != null && curDefaults != null) {
-            CatalogUtil.validateRetentionUpdate("topic defaults", newDefaults.getRetention(),
-                    curDefaults.getRetention(), errors);
-        }
         if (curProfiles != null) {
             for(TopicProfileType newProfile : newProfiles.values()) {
-                TopicProfileType curProfile = curProfiles.get(newProfile.getName());
+                String profileName = newProfile.getName();
+                TopicProfileType curProfile = curProfiles.get(profileName);
                 if (curProfile == null) {
                     continue;
                 }
-                String what = "topic profile " + newProfile.getName();
-                CatalogUtil.validateRetentionUpdate(what, newProfile.getRetention(),
+                String what = "topic profile " + profileName;
+                validateRetentionUpdate(what, usedProfiles.get(profileName), newProfile.getRetention(),
                         curProfile.getRetention(), errors);
 
             }
+        }
+    }
+
+    // Assumes the topics have been validated beforehand
+    private static void validateRetentionUpdate(String what, Integer useCount, TopicRetentionType newRetention,
+            TopicRetentionType curRetention, CompoundErrors errors) {
+        // All changes are allowed if profile is not in use
+        if (useCount == null || useCount.intValue() == 0) {
+            return;
+        }
+        // If profile in use, the limit can be changed, but not the policy.
+        TopicRetentionPolicyEnum newPol = newRetention != null ? newRetention.getPolicy() : null;
+        TopicRetentionPolicyEnum curPol = curRetention != null ? curRetention.getPolicy() : null;
+        if (newPol != curPol) {
+            errors.addErrorMessage(String.format("The retention policy in %s cannot be changed with %d using tables",
+                    what, useCount));
         }
     }
 
