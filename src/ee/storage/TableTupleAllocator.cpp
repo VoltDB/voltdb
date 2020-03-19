@@ -1706,8 +1706,8 @@ IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::operator()(void cons
         return true;
     } else {
         position_type const pos_p{o->storage(), p};
-        return less<position_type>()(pos_p, *o) ||                     // p < iterator,
-            less<position_type>()(o->storage().frozenBoundaries().right(),     // or p > frozen right boundary
+        return ! less<position_type>()(*o, pos_p) ||                           // p <= iterator,
+            less<position_type>()(o->storage().frozenBoundaries().right(),     // or p > frozen right boundary (right boundary is exclusive)
                     pos_p);
     }
 }
