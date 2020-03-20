@@ -100,6 +100,11 @@ void GroupStore::commitOffsets(int64_t timestamp, int16_t requestVersion, const 
     OffsetCommitResponse response;
     CheckedSerializeInput checkedIn(offsets);
 
+    Group group(*this, groupId);
+    vassert(group.isInTable());
+    group.setCommitTimestamp(timestamp);
+    group.commit();
+
     int topicCount = checkedIn.readInt();
     for (int i = 0; i < topicCount; ++i) {
         NValue topic = checkedIn.readString();

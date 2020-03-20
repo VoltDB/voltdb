@@ -55,6 +55,10 @@ public:
         return ValuePeeker::peekTimestamp(getNValue(GroupTable::Column::COMMIT_TIMESTAMP));
     }
 
+    void setCommitTimestamp(int64_t timestamp) {
+        setNValue(GroupTable::Column::COMMIT_TIMESTAMP, ValueFactory::getTimestampValue(timestamp));
+    }
+
     /**
      * Returns the current group generation
      */
