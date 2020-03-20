@@ -47,6 +47,9 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.logging.Level;
+
+import org.voltcore.utils.RateLimitedLogger;
 
 import com.deletes.Insert;
 
@@ -86,7 +89,9 @@ public class DeletesClient
     static long m_expectedCounts = 0;
     static ArrayList<Integer> m_snapshotSizes = new ArrayList<Integer>();
     static boolean m_snapshotInProgress = false;
+
     static VoltLogger log = new VoltLogger("DeletesClient");
+    //static RateLimitedLogger rlog = new RateLimitedLogger(1000, log, Level.WARN);
 
     static String randomString(int maxStringSize)
     {
@@ -309,7 +314,7 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            log.error("failed delete batch");
+                            log.warn("failed delete batch");
                             System.out.println(response.getStatusString());
                         }
                         else
@@ -373,8 +378,8 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            log.error("failed delete deceased");
-                            log.error(response.getStatusString());
+                            log.warn("failed delete deceased");
+                            log.warn(response.getStatusString());
                         }
                         else
                         {
@@ -434,8 +439,8 @@ public class DeletesClient
                     @Override
                     public void clientCallback(ClientResponse response) {
                         if (response.getStatus() != ClientResponse.SUCCESS){
-                            log.error("failed count batch");
-                            log.error(response.getStatusString());
+                            log.warn("failed count batch");
+                            log.warn(response.getStatusString());
                         }
                         else
                         {
@@ -501,6 +506,7 @@ public class DeletesClient
           finally {
             System.setOut(original);
         }
+        log.info("Snapshot verified");
     }
 
     public static void checkSnapshotComplete(Client client)
@@ -671,16 +677,30 @@ public class DeletesClient
         config.setClientAffinity(true);
         config.setTopologyChangeAware(true);
         client = ClientFactory.createClient(config);
+        // with topo awareness, we only need to connect to one server and it
+        // will figure out the rest
+        boolean success = false;
+        Exception lastException = null;
         for (String server : servers) {
             try {
                 client.createConnection(server);
             } catch (UnknownHostException e) {
-                e.printStackTrace();
-                System.exit(-1);
+                lastException = e;
+                log.warn("can't connect to server:"+ server+" :"+e.getMessage());
+                continue;
             } catch (IOException e) {
-                log.error("Could not connect to database, terminating: (" + server + ")");
-                System.exit(-1);
+                lastException = e;
+                log.warn("can't connect to server:"+ server+" :"+e.getMessage());
+                continue;
             }
+            log.info("connected to server "+server);
+            success = true;
+            break;
+        }
+        if ( ! success ) {
+            log.error("Could not connect to database servers " + servers + "");
+            lastException.printStackTrace();
+            System.exit(-1);
         }
 
         final long endTime = System.currentTimeMillis() + (1000l * duration);
@@ -690,6 +710,7 @@ public class DeletesClient
         for (int i = 0; i < m_batchesToKeep; i++)
         {
             insertBatch(client, true);
+            log.info("batch "+i+"/"+m_batchesToKeep+" inserted");
         }
 
         // now add a batch and remove a batch
