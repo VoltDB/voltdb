@@ -71,7 +71,7 @@ class PersistentTableSurgeon;
          * Tuple update hook.
          * Return true if it was handled by the COW context.
          */
-        virtual bool notifyTupleUpdate(TableTuple &tuple) = 0;
+        virtual void notifyTupleUpdate(TableTuple &tuple) = 0;
 
         /**
          * Tuple delete hook.

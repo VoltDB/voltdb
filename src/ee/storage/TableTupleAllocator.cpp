@@ -2049,11 +2049,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
-    for_each(CompactingChunks::m_batched.movements().cbegin(),
-            CompactingChunks::m_batched.movements().cend(),
-            [this](pair<void*, void*> const& entry) noexcept {
-                memcpy(entry.first, entry.second, tupleSize());
-            });
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }

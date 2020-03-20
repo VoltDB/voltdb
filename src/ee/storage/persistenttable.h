@@ -656,8 +656,6 @@ private:
                             bool revertIndexes,
                             bool fromMigrate);
 
-    void updateTupleRelease(char* targetTuple);
-
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
     // Delta Table row manipulation never requires undo actions or dr/stream handling
@@ -710,7 +708,7 @@ private:
 
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple const& source);
+    bool insertTupleIntoDeltaTable(TableTuple const& source);
 
     //
     // SWAP TABLE helpers

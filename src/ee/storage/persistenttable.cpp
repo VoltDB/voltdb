@@ -584,12 +584,12 @@ void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     }
 }
 
-void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source) {
+bool PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source) {
     // If the current table does not have a delta table, return.
     // If the current table has a delta table, but it is used by
     // a single table view during snapshot restore process, return.
     if (! m_deltaTable || m_mvTrigger) {
-        return;
+        return false;
     }
 
     // If the delta table has data in it, delete the data first.
@@ -605,6 +605,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple const& source) {
 
     TableTuple targetForDelta = m_deltaTable->createTuple(source);
     m_deltaTable->insertDeltaTableTuple(targetForDelta);
+    return true;
 }
 
 TableTuple PersistentTable::createTuple(TableTuple const &source){
@@ -709,15 +710,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
                 delayTupleDelete ? &m_surgeon : NULL);
     }
 
-    /**
-     * Inserts never "dirty" a tuple since the tuple is new, but...  The
-     * COWIterator may still be scanning and if the tuple came from the free
-     * list then it may need to be marked as dirty so it will be skipped. If COW
-     * is on have it decide. COW should always set the dirty to false unless the
-     * tuple is in a to be scanned area.
-     */
-    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
-        target.setDirtyFalse();
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleInsert(target);
     }
 
     // add it to migrating index when loading tuple from a recover or rejoin snapshot (only)
@@ -857,12 +851,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(
                }
            }
         }
-        else {
-            updateTupleRelease(targetTupleToUpdate.address());
-        }
-    }
-    else{
-        updateTupleRelease(targetTupleToUpdate.address());
     }
 
     // Write to the DR stream before doing anything else to ensure we don't
@@ -957,21 +945,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // and that allows us to ignore them (rather than, say, set them) afterwards on the actual
     // target tuple that matters. What could be simpler?
     sourceTupleWithNewValues.setActiveTrue();
-    // The isDirty flag is especially interesting because the COWcontext found it more convenient
-    // to mark it on the target tuple. So, no problem, just copy it from the target tuple to the
-    // source tuple so it can get copied back to the target tuple in copyForPersistentUpdate. Brilliant!
-    //Copy the dirty status that was set by markTupleDirty.
-    if (targetTupleToUpdate.isDirty()) {
-        sourceTupleWithNewValues.setDirtyTrue();
-    } else {
-        sourceTupleWithNewValues.setDirtyFalse();
-    }
 
     // Either the "before" or "after" object reference values that change will come in handy later,
     // so collect them up.
     std::vector<char*> oldObjects;
     std::vector<char*> newObjects;
-    updateTupleRelease(targetTupleToUpdate.address());
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
@@ -1063,14 +1041,8 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
         increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
     }
 
-    bool dirty = targetTupleToUpdate.isDirty();
     // this is the actual in-place revert to the old version
     targetTupleToUpdate.copy(sourceTupleWithNewValues);
-    if (dirty) {
-        targetTupleToUpdate.setDirtyTrue();
-    } else {
-        targetTupleToUpdate.setDirtyFalse();
-    }
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
@@ -1093,20 +1065,6 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
         NValue const txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
-        }
-    }
-}
-
-void PersistentTable::updateTupleRelease(char* targetTuple) {
-   TableTuple srcTuple(m_schema);
-   srcTuple.move(targetTuple);
-   auto const& entry = allocator().template update<storage::truth>(targetTuple);
-   if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        auto e = const_cast<typename Hook::added_entry_t&>(entry);
-        if (e.copy_of() != nullptr) {
-            TableTuple copied(m_schema);
-            copied.move(const_cast<void*>(e.copy_of()));
-            copied.copyNonInlinedColumnObjects(srcTuple);
         }
     }
 }
@@ -1202,8 +1160,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    insertTupleIntoDeltaTable(target);
-    {
+    if (insertTupleIntoDeltaTable(target)) {
         SetAndRestorePendingDeleteFlag setPending(target);
         // for multi-table views
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
@@ -1596,7 +1553,6 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
         target.setActiveTrue();
-        target.setDirtyFalse();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
         try {
@@ -1769,6 +1725,7 @@ size_t PersistentTable::hashCode() {
 
 void PersistentTable::swapTuples(TableTuple& originalTuple,
                                  TableTuple& destinationTuple) {
+    ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
     vassert(!originalTuple.isPendingDeleteOnUndoRelease());
 
     BOOST_FOREACH (auto index, m_indexes) {
@@ -2227,7 +2184,6 @@ void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
         target.setActiveTrue();
-        target.setDirtyFalse();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
         try {

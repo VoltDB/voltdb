@@ -58,6 +58,11 @@ public:
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                      std::vector<int> &retPositions);
 
+    /**
+     * Optional tuple update handler.
+     */
+    virtual void notifyTupleUpdate(TableTuple &tuple);
+
 private:
 
     /**
@@ -78,6 +83,7 @@ private:
      */
     Pool m_pool;
 
+    PersistentTable::Alloc& m_allocator;
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
     int64_t m_serializationBatches;

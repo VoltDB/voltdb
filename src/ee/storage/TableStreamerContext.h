@@ -96,7 +96,7 @@ public:
     /**
      * Optional tuple update handler.
      */
-    virtual bool notifyTupleUpdate(TableTuple &tuple) {return false;}
+    virtual void notifyTupleUpdate(TableTuple &tuple) {}
 
     /**
      * Optional tuple delete handler.

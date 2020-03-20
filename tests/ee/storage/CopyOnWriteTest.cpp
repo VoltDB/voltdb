@@ -1531,7 +1531,7 @@ public:
 
     virtual bool notifyTupleInsert(TableTuple &tuple) { return false; }
 
-    virtual bool notifyTupleUpdate(TableTuple &tuple) { return false; }
+    virtual void notifyTupleUpdate(TableTuple &tuple) { }
 
     virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
 
@@ -1646,8 +1646,8 @@ public:
         return m_context->notifyTupleInsert(tuple);
     }
 
-    virtual bool notifyTupleUpdate(TableTuple &tuple) {
-        return m_context->notifyTupleUpdate(tuple);
+    virtual void notifyTupleUpdate(TableTuple &tuple) {
+        m_context->notifyTupleUpdate(tuple);
     }
 
     virtual bool notifyTupleDelete(TableTuple &tuple) {

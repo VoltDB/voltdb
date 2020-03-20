@@ -41,6 +41,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
              m_pool(2097152, 320),
+             m_allocator(table.allocator()),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples),
              m_serializationBatches(0),
@@ -169,6 +170,18 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
     // Done when the table scan is finished and iteration is complete.
     return retValue;
+}
+
+void CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
+    auto const& entry = m_allocator.template update<storage::truth>(tuple.address());
+    if (tuple.m_schema->getUninlinedObjectColumnCount() != 0) {
+        auto e = const_cast<typename PersistentTable::Hook::added_entry_t&>(entry);
+        if (e.copy_of() != nullptr) {
+            TableTuple copied(tuple.m_schema);
+            copied.move(const_cast<void*>(e.copy_of()));
+            copied.copyNonInlinedColumnObjects(tuple);
+        }
+    }
 }
 
 }
