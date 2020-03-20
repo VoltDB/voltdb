@@ -17,6 +17,9 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +34,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.utils.VoltTableUtil;
+
+import com.google_voltpatches.common.io.Files;
 
 public class UpdateLicense extends VoltSystemProcedure {
 
@@ -67,8 +72,18 @@ public class UpdateLicense extends VoltSystemProcedure {
         } else if (fragmentId == SysProcFragmentId.PF_updateLicense) {
             Object [] paramarr = params.toArray();
             byte [] licenseBytes = (byte[])paramarr[0];
+            VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
 
-            // write file to disk (some temp directory)
+            if (context.isLowestSiteId()) {
+                // write file to disk (some temp directory)
+                File license = new File(VoltDB.instance().getVoltDBRootPath(), ".temp_content");
+                try {
+                    Files.write(licenseBytes, license);
+                } catch (IOException e) {
+                    result.addRow(VoltSystemProcedure.STATUS_FAILURE);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
+                }
+            }
             // use licenseAPI to verify the license validity.
             // check if we support the license change (max host count/expiration date), reject other changes.
             // once verified copy it to voltdb root directory (replace the old one)
@@ -76,9 +91,8 @@ public class UpdateLicense extends VoltSystemProcedure {
             // return failure response if any of above step fails.
             // unit tests.
 
-            VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateLicenseAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateLicense));
@@ -86,30 +100,25 @@ public class UpdateLicense extends VoltSystemProcedure {
 
         } else {
             VoltDB.crashLocalVoltDB(
-                    "Received unrecognized plan fragment id " + fragmentId + " in UpdateSettings",
+                    "Received unrecognized plan fragment id " + fragmentId + " in UpdateLicense",
                     false,
                     null);
         }
         throw new RuntimeException("Should not reach this code");
     }
 
-    private SynthesizedPlanFragment[] createBarrierFragment(byte[] licenseBytes) {
-
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateLicenseBarrier, true,
-                ParameterSet.emptyParameterSet());
-
-        pfs[1] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateLicenseBarrierAggregate, false,
-                ParameterSet.fromArrayNoCopy(licenseBytes));
-
-        return pfs;
-    }
-
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] licenseBytes) {
-
-        executeSysProcPlanFragments(
-                createBarrierFragment(licenseBytes), SysProcFragmentId.PF_updateLicenseBarrierAggregate);
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String license) {
+        byte[] licenseBytes;
+        try {
+            licenseBytes = license.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            String errMsg = "Failed to encode the license: " + e.getMessage();
+            log.error(errMsg);
+            VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+            result.addRow(VoltSystemProcedure.STATUS_FAILURE);
+            return new VoltTable[] {result};
+        }
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateLicenseBarrier, SysProcFragmentId.PF_updateLicenseBarrierAggregate);
         return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateLicense,  SysProcFragmentId.PF_updateLicenseAggregate, licenseBytes);
     }
 }

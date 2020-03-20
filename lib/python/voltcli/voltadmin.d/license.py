@@ -19,21 +19,23 @@ from voltcli import utility
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
-    description='Update the license of a running database.',
-    #description2='A valid VoltDB license file (extension .xml) must be provided.',
+    description='Update the license of a running VoltDB database.',
     arguments=(
         VOLT.StringArgument(
             'license',
-            'VoltDB license file (extension .xml)',
+            'VoltDB_license_file (extension .xml)',
             min_count=1, max_count=1),
     )
 )
 def license(runner):
-    columns = [VOLT.FastSerializer.VOLTTYPE_NULL, VOLT.FastSerializer.VOLTTYPE_NULL]
-    licensePath = runner.opts.license
-    licenseBytes = VOLT.utility.File(licensePath).read()
-    columns[1] = VOLT.FastSerializer.VOLTTYPE_STRING
-    params = [licenseBytes]
-    # call_proc() aborts with an error if the update failed.
-    runner.call_proc('@UpdateLicense', columns, params)
-    runner.info('The configuration update succeeded.')
+    license_file = VOLT.utility.File(runner.opts.license);
+    try:
+        licenseBytes = license_file.read()
+        # call_proc() aborts with an error if the update failed.
+        response = runner.call_proc('@UpdateLicense', [VOLT.FastSerializer.VOLTTYPE_STRING], [licenseBytes])
+        if response.status() != 1:
+            runner.abort('The license update failed with status: %d' % response.response.statusString)
+        else:
+            runner.info('The license is updated successfully.')
+    finally:
+        license_file.close();
