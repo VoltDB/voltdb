@@ -215,6 +215,11 @@ TEST_F(GroupStoreTest, CommitOffsets) {
     NValue groupId = ValueFactory::getTempStringValue("groupId");
     CommitOffsets offsets;
 
+    {
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        upsertGroup(group);
+    }
+
     std::vector<NValue> topics = { ValueFactory::getTempStringValue("topic1"), ValueFactory::getTempStringValue(
             "topic2"), ValueFactory::getTempStringValue("topic3") };
     {
@@ -250,6 +255,11 @@ TEST_F(GroupStoreTest, CommitOffsets) {
 TEST_F(GroupStoreTest, FetchOffsets) {
     NValue groupId = ValueFactory::getTempStringValue("groupId");
     CommitOffsets offsets;
+
+    {
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        upsertGroup(group);
+    }
 
     std::vector<NValue> topics = { ValueFactory::getTempStringValue("topic1"), ValueFactory::getTempStringValue(
             "topic2"), ValueFactory::getTempStringValue("topic3") };
@@ -501,20 +511,30 @@ TEST_F(GroupStoreTest, BadMessages) {
     char outScratch[256];
     ReferenceSerializeOutput out(outScratch, sizeof(outScratch));
 
+    NValue groupId = ValueFactory::getTempStringValue("groupId");
+    {
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        upsertGroup(group);
+    }
+
     // try commit
     try {
         ReferenceSerializeInputBE in(scratch, message.position());
-        m_groupStore.commitOffsets(0, 7, ValueFactory::getTempStringValue("groupId"), in, out);
+        m_groupStore.commitOffsets(0, 7, groupId, in, out);
         FAIL("should have thrown SerializableEEException");
-    } catch (const SerializableEEException &e) {}
+    } catch (const SerializableEEException &e) {
+        ASSERT_EQ(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INVALID_MESSAGE, e.getType());
+    }
     ASSERT_EQ(0, out.position());
 
     // try fetch
     try {
         ReferenceSerializeInputBE in(scratch, message.position());
-        m_groupStore.fetchOffsets(7, ValueFactory::getTempStringValue("groupId"), in, out);
+        m_groupStore.fetchOffsets(7, groupId, in, out);
         FAIL("should have thrown SerializableEEException");
-    } catch (const SerializableEEException &e) {}
+    } catch (const SerializableEEException &e) {
+        ASSERT_EQ(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INVALID_MESSAGE, e.getType());
+    }
     ASSERT_EQ(0, out.position());
 }
 
