@@ -49,8 +49,6 @@ import org.voltdb.utils.SnapshotVerifier;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.logging.Level;
 
-import org.voltcore.utils.RateLimitedLogger;
-
 import com.deletes.Insert;
 
 public class DeletesClient
@@ -91,7 +89,6 @@ public class DeletesClient
     static boolean m_snapshotInProgress = false;
 
     static VoltLogger log = new VoltLogger("DeletesClient");
-    //static RateLimitedLogger rlog = new RateLimitedLogger(1000, log, Level.WARN);
 
     static String randomString(int maxStringSize)
     {
