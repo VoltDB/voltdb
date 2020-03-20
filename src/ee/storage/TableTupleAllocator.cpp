@@ -656,10 +656,6 @@ size_t CompactingChunks::chunks() const noexcept {
     return list_type::size();
 }
 
-size_t CompactingChunks::chunkSize() const noexcept {
-    return list_type::chunkSize();
-}
-
 inline pair<bool, typename CompactingChunks::list_type::iterator>
 CompactingChunks::find(void const* p) noexcept {
     auto const iter = list_type::find(p);
@@ -1707,8 +1703,8 @@ IterableTableTupleChunks<Chunks, Tag, E>::IteratorObserver::operator()(void cons
         return true;
     } else {
         position_type const pos_p{o->storage(), p};
-        return ! less<position_type>()(*o, pos_p) ||                           // p <= iterator,
-            less<position_type>()(o->storage().frozenBoundaries().right(),     // or p > frozen right boundary (right boundary is exclusive)
+        return less<position_type>()(pos_p, *o) ||                     // p < iterator,
+            less<position_type>()(o->storage().frozenBoundaries().right(),     // or p > frozen right boundary
                     pos_p);
     }
 }
