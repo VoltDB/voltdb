@@ -47,7 +47,6 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.logging.Level;
 
 import com.deletes.Insert;
 
