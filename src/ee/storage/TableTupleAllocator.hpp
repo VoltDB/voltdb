@@ -667,7 +667,6 @@ namespace voltdb {
             size_t size() const noexcept;              // number of allocation requested
             bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
-            size_t chunkSize() const noexcept;
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
@@ -1168,3 +1167,4 @@ namespace voltdb {
         }
     };
 }
+
