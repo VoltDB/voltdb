@@ -63,7 +63,6 @@ public:
      * of the old tuple must be released.
      */
     virtual void release() {
-        m_tableSurgeon->updateTupleRelease(m_newTuple);
         NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns);
     }
     virtual ~PersistentTableUndoUpdateAction() { }

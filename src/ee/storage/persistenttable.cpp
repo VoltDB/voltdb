@@ -965,6 +965,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // so collect them up.
     std::vector<char*> oldObjects;
     std::vector<char*> newObjects;
+    updateTupleRelease(targetTupleToUpdate.address());
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);

@@ -87,7 +87,6 @@ public:
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTailTupleStorage(TableTuple& tuple);
-    void updateTupleRelease(char* targetTuple);
 
     size_t getSnapshotPendingBlockCount() const;
     size_t getSnapshotPendingLoadBlockCount() const;
@@ -657,8 +656,9 @@ private:
                             bool revertIndexes,
                             bool fromMigrate);
 
-    void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void updateTupleRelease(char* targetTuple);
+
+    void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
     // Delta Table row manipulation never requires undo actions or dr/stream handling
     void deleteDeltaTableTuple(TableTuple& target);
@@ -866,9 +866,7 @@ inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool ski
 inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
     m_table.deleteTupleRelease(tuple);
 }
-inline void PersistentTableSurgeon::updateTupleRelease(char* targetTuple) {
-    m_table.updateTupleRelease(targetTuple);
-}
+
 inline void PersistentTableSurgeon::deleteTailTupleStorage(TableTuple& tuple) {
     m_table.deleteTailTupleStorage(tuple);
 }
