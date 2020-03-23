@@ -656,8 +656,9 @@ void PersistentTable::insertPersistentTuple(TableTuple const& source, bool falli
     }
 }
 
-void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& target,
+void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& target,
       bool fallible, bool shouldDRStream, bool delayTupleDelete) {
+    // If the target table is a replicated table, only one thread can reach here.
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
@@ -755,15 +756,10 @@ void PersistentTable::doInsertTupleCommon(TableTuple const& source, TableTuple& 
     // (Note: we may hit a NOT NULL constraint violation, or any
     // types of constraint violation. In which case, we want to
     // clean up by calling deleteTailTupleStorage, below)
-    insertTupleIntoDeltaTable(source);
-}
-
-void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& target,
-      bool fallible, bool shouldDRStream, bool delayTupleDelete) {
-    // If the target table is a replicated table, only one thread can reach here.
-    doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->handleTupleInsert(this, fallible);
+    if (insertTupleIntoDeltaTable(source)) {
+        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+            viewHandler->handleTupleInsert(this, fallible);
+        }
     }
 
     // handle any materialized views
@@ -926,16 +922,16 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    insertTupleIntoDeltaTable(targetTupleToUpdate);
-    {
+    if (insertTupleIntoDeltaTable(targetTupleToUpdate)) {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
         for (auto viewHandler: m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
-        // This is for single table view.
-        for (auto view: m_views) {
-            view->processTupleDelete(targetTupleToUpdate, fallible);
-        }
+    }
+
+    // This is for single table view.
+    for (auto view: m_views) {
+        view->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1015,9 +1011,10 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     // Note that inserting into the delta table is guaranteed to
     // succeed, since we checked constraints above.
-    insertTupleIntoDeltaTable(targetTupleToUpdate);
-    for (auto viewHandler: m_viewHandlers) {
-        viewHandler->handleTupleInsert(this, fallible);
+    if (insertTupleIntoDeltaTable(targetTupleToUpdate)) {
+        for (auto viewHandler: m_viewHandlers) {
+            viewHandler->handleTupleInsert(this, fallible);
+        }
     }
 
     // handle any materialized views
@@ -1191,10 +1188,11 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
-        // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
-            view->processTupleDelete(target, fallible);
-        }
+    }
+
+    // This is for single table view.
+    BOOST_FOREACH (auto view, m_views) {
+        view->processTupleDelete(target, fallible);
     }
 
     if (createUndoAction) {
