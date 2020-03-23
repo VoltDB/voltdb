@@ -949,9 +949,9 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
             if (ii == nextUninlineableObjectColumnInfoIndex) {
                 const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
                 char *       *mPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-                //const TupleSchema::ColumnInfo *sourceColumnInfo = source.getSchema()->getColumnInfo(ii);
-                //char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(sourceColumnInfo));
-               // if (*mPtr != *oPtr) {
+                const TupleSchema::ColumnInfo *sourceColumnInfo = source.getSchema()->getColumnInfo(ii);
+                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(sourceColumnInfo));
+                if (*mPtr != *oPtr) {
                     // Make a copy of the input string. Don't want to delete the old string
                     // because it's either from the temp pool or persistently referenced elsewhere.
                     oldObjects.push_back(*mPtr);
@@ -960,7 +960,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                     setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
                     // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
                     newObjects.push_back(*mPtr);
-               // }
+                }
                 uninlineableObjectColumnIndex++;
                 if (uninlineableObjectColumnIndex < uninlineableObjectColumnCount) {
                     nextUninlineableObjectColumnInfoIndex =
