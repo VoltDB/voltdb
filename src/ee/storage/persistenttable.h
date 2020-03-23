@@ -708,7 +708,7 @@ private:
 
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple const& source);
+    bool insertTupleIntoDeltaTable(TableTuple const& source);
 
     //
     // SWAP TABLE helpers
