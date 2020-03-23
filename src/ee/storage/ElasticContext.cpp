@@ -224,11 +224,15 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple) {
 void ElasticContext::notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
     if (m_indexActive) {
         if (m_surgeon.indexHas(sourceTuple)) {
+            // If it was found, it has moved and it should be reindexed
             m_surgeon.indexRemove(sourceTuple);
-            // If the tuple is pending delete, it's held on by COW but
-            // shouldn't be accessible anymore. So don't add it back to
-            // elastic index.
-            if (!targetTuple.isPendingDelete()) {
+            m_surgeon.indexAdd(targetTuple);
+        }
+        else {
+            // It was not found but we don't know if the new location is before or after the
+            // Elastic snapshot iterator so try to add it using the predicate
+            StreamPredicateList &predicates = getPredicates();
+            if (predicates[0].eval(&targetTuple).isTrue()) {
                 m_surgeon.indexAdd(targetTuple);
             }
         }

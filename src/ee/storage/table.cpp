@@ -425,7 +425,6 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
         target.setActiveTrue();
-        target.setDirtyFalse();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 

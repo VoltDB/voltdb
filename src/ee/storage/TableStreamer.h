@@ -88,14 +88,12 @@ public:
      * Tuple update hook.
      * Return true if it was handled by the COW context.
      */
-    virtual bool notifyTupleUpdate(TableTuple &tuple) {
-        bool handled = false;
+    virtual void notifyTupleUpdate(TableTuple &tuple) {
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             vassert(streamPtr != NULL);
-            handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
+            streamPtr->m_context->notifyTupleUpdate(tuple);
         }
-        return handled;
     }
 
     /**
