@@ -603,11 +603,11 @@ namespace std {                                    // Need to declare these befo
     };
 }
 
-inline CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cb) noexcept :
+CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cb) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
     m_txnFirstChunk(*this), m_finalize(cb), m_batched(*this) {}
 
-inline CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
+CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
     m_txnFirstChunk(*this), m_batched(*this) {}
 
