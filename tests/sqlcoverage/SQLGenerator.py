@@ -511,7 +511,7 @@ class BaseGenerator:
     __GEO_COLUMN_NAMES    = ['POINT', 'PT1', 'PT2', 'PT3', 'POLYGON', 'POLY1', 'POLY2', 'POLY3']
     # List of possible prefixes for those column names, i.e., either a table name alias with '.',
     # or nothing at all; the empty one (no table name prefix) must be last
-    __GEO_COLUMN_PREFIXES = ['A.', 'B.', 'LHS.', '']
+    __GEO_COLUMN_PREFIXES = ['A.', 'B.', 'LHS.', 'SUBQ.', '']
     # List of Geo functions, which indicate that the Geo column is already appropriately
     # wrapped, so you don't need to add AsText(...)
     __GEO_FUNCTION_NAMES  = ['AREA', 'ASTEXT', 'CAST', 'CENTROID', 'CONTAINS', 'COUNT',
