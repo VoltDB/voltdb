@@ -646,9 +646,6 @@ private:
     // source tuple's memory should still be retained until the exception is
     // handled.
     void insertTupleCommon(TableTuple const& source, TableTuple& target,
-            bool fallible, bool shouldDRStream = true, bool delayTupleDelete= false);
-
-    void doInsertTupleCommon(TableTuple const& source, TableTuple& target,
             bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
 
     void updateTupleForUndo(char* targetTupleToUpdate,
