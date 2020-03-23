@@ -24,10 +24,39 @@ ps -ef | grep -i postgres
 sudo pkill $IGNORE_CASE postgres
 ps -ef | grep -i postgres
 
+# Function used to return an error code, if an error occurs
+function error-code() {
+    # Use a specified exit code, or a default value
+    EXIT_CODE="${1:-99}"
+
+    #echo -e "DEBUG: In error-code:"
+    #echo -e "DEBUG:     \$1            : $1"
+    #echo -e "DEBUG:     EXIT_CODE     : $EXIT_CODE"
+    #echo -e "DEBUG:     \$0            : $0"
+    #echo -e "DEBUG:     BASH_SOURCE[0]: ${BASH_SOURCE[0]}"
+
+    # If this script was called "normally", then 'exit' with the appropriate
+    # error code; but if it was called using 'source' or '.', then simply
+    # 'return' with that code, in order to avoid also exiting the shell
+    echo -e "\nExiting ${BASH_SOURCE[0]} with error code: $EXIT_CODE"
+    if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+        exit $EXIT_CODE
+    fi
+    return $EXIT_CODE
+}
+
 # Prepare to start the PostgreSQL server, in a new temp dir
 export PG_TMP_DIR=$(mktemp -d $MKTEMP_TEMPLATE)
 echo  "PG_TMP_DIR:" $PG_TMP_DIR
 export PG_PATH=$(locate pg_restore | grep /bin | grep -v /usr/bin | tail -1 | xargs dirname)
+if [[ -z "${PG_PATH}" ]]; then
+    echo -e "\nERROR: Failed to find PG_PATH:"
+    echo "    locate pg_restore         : "`locate pg_restore`
+    echo "    ...grep /bin; -v /usr/bin : "`locate pg_restore | grep /bin | grep -v /usr/bin`
+    echo "    ...tail -1 | xargs dirname: "`locate pg_restore | grep /bin | grep -v /usr/bin | tail -1 | xargs dirname`
+    error-code 11
+    return
+fi
 echo  "PG_PATH:" $PG_PATH
 export PG_PORT=5432
 echo  "PG_PORT:" $PG_PORT
@@ -43,5 +72,24 @@ echo -e "unix_socket_directories='.'\nlisten_addresses='*'\nport=$PG_PORT" >> $P
 $PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log
 
 # Print info about PostgreSQL processes, to make sure they are working OK
+echo -e "\nPostgreSQL processes:"
 ps -ef | grep -i postgres
 eval $SHOW_LISTENING_PORTS
+
+echo -e "\nEnvironment variables that were set:"
+echo "(To echo these in your shell, outside this script, use:"
+echo "echo -e \"PG_TMP_DIR: \$PG_TMP_DIR\nPG_PATH   : \$PG_PATH\nPG_PORT   : \$PG_PORT\nCLASSPATH : \$CLASSPATH\" )"
+echo "PG_TMP_DIR: $PG_TMP_DIR"
+echo "PG_PATH   : $PG_PATH"
+echo "PG_PORT   : $PG_PORT"
+echo -e "CLASSPATH : $CLASSPATH\n"
+
+# If this script was not called using 'source' or '.', then warn the user
+if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+    echo -e "WARNING: ${BASH_SOURCE[0]} was not called using 'source' or '.', so the " \
+            "environment variables were not set the in enclosing shell; to set them, use:" \
+            "\nexport PG_TMP_DIR=$PG_TMP_DIR\nexport PG_PATH=$PG_PATH" \
+            "\nexport PG_PORT=$PG_PORT\nexport CLASSPATH=$CLASSPATH"
+    error-code 12
+    return
+fi

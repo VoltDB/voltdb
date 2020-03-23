@@ -14,13 +14,15 @@
 --{_stringfun |= "LOWER"}
 --{_stringfun |= "UPPER"}
 
--- Aggregate functions that accept a string (or numeric) column and return the same type
+-- Aggregate functions that accept a string (or numeric, or other) column and return the same type
 {_stringagg |= "MIN"}
 {_stringagg |= "MAX"}
 
+-- Aggregate functions that are usable with all types
 {_genericagg |= "_stringagg"}
 {_genericagg |= "COUNT"}
 
+-- Aggregate functions that are usable with numeric types
 {_numagg |= "SUM"}
 {_numagg |= "AVG"}
 {_numagg |= "_genericagg"}
@@ -30,10 +32,8 @@
 --HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
 
 -- Aggregate functions when used as windowed analytic functions
-{_stringwinagg  |= "COUNT"}
-{_stringwinagg  |= "MIN"}
-{_stringwinagg  |= "MAX"}
-{_numwinagg     |= "_stringwinagg"}
+{_stringwinagg  |= "_genericagg"}
+{_numwinagg     |= "_genericagg"}
 {_numwinagg     |= "SUM"}
 
 {_geofun |= ""}
