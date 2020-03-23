@@ -351,7 +351,7 @@ public class VoltDB {
 
         public String m_recoveredPartitions = "";
 
-        public HostAndPort m_kiplingHostPort = null;
+        public HostAndPort m_topicsHostPort = null;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -709,8 +709,8 @@ public class VoltDB {
                     m_exporterVersion = ExporterVersion.E2;
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
-                } else if (arg.equalsIgnoreCase("kiplingHostPort")) {
-                    m_kiplingHostPort = HostAndPort.fromString(args[++i].trim());
+                } else if (arg.equalsIgnoreCase("topicsHostPort")) {
+                    m_topicsHostPort = HostAndPort.fromString(args[++i].trim());
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
