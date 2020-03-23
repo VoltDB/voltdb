@@ -874,6 +874,12 @@ namespace voltdb {
              */
             void remove_reserve(size_t);
             template<typename Tag> typename Hook::added_entry_t remove_add(void*);
+            /**
+             * NOTE: the remove_force method itself **does not**
+             * "compact" tuples, and it is user's responsibility
+             * to call `memcpy' in the call back, to copy the
+             * pair's 2nd content to 1st.
+             */
             size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
