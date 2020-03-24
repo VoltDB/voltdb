@@ -153,3 +153,15 @@ SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype
 SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant@plus10)
 SELECT __[#numone]            Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate
+
+-- Test simple sub-queries, with and without LIMIT (see ENG-18533)
+{_maybelimit |= ""}
+{_maybelimit |= "LIMIT 10"}
+-- Commented out for now, due to ENG-19229; uncomment once that is fixed:
+--SELECT SUBQ.__[#col1] FROM \
+--    (SELECT _variable[#col1 @columntype], @idcol PARTCOL FROM @fromtables ORDER BY __[#col1], PARTCOL _maybelimit) SUBQ, \
+--    @fromtables Q42 \
+--    WHERE Q42.@idcol = SUBQ.PARTCOL ORDER BY PARTCOL
+
+-- Test GROUP BY and aggregate functions, with CAST function (like ENG-18549, but w/o ?)
+SELECT _variable[#GB], CAST('_value[byte]' AS INTEGER) + COUNT(_variable[@columntype]) FROM @fromtables Q43 GROUP BY __[#GB]

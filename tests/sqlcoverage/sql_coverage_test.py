@@ -241,6 +241,9 @@ def get_max_mismatches(comparison_database, suite_name):
         # Failures in joined-matview-int due to ENG-11086
         elif config_name == 'joined-matview-int':
             max_mismatches = 46440
+        # Failures in geo-functions due to ENG-19236
+        elif config_name == 'geo-functions':
+            max_mismatches = 3
 
     return max_mismatches
 
@@ -754,7 +757,7 @@ if __name__ == "__main__":
     parser.add_option("-G", "--postgis", action="store_true",
                       dest="postgis", default=False,
                       help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
-    parser.add_option("-d", "--maxdetailfiles", dest="max_detail_files", default="10",
+    parser.add_option("-d", "--maxdetailfiles", dest="max_detail_files", default="6",
                       help="maximum number of detail files, per test suite, per failure category "
                          + "(e.g. mismatches vs crashes vs various types of exceptions)")
     parser.add_option("-R", "--reproduce", dest="reproduce", default="DML",
@@ -852,15 +855,6 @@ if __name__ == "__main__":
         # for certain rare cases involving known errors in PostgreSQL
         if result["mis"] > get_max_mismatches(comparison_database, config_name):
             success = False
-        # If the number of mismatches is nonzero but less than (or equal to) the
-        # acceptable maximum, then we don't need to save the detailed results,
-        # so delete them
-        elif result["mis"] > 0:
-            print "Deleting unneeded result files, for expected mismatches:\n    " + \
-                report_dir + "/*.html"
-            for file in os.listdir(report_dir):
-                if file.endswith(".html") and not file.endswith("index.html"):
-                    os.remove(os.path.join(report_dir, file))
 
     # Write the summary
     time1 = time.time()

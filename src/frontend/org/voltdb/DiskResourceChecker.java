@@ -205,22 +205,25 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            if (MiscUtils.isPro() && forSnmp && !m_snmpDiskTrapSent) {
-                m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
-                        String.format(
-                                "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
-                                filePath, featureName.value(),
-                                (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
-                m_snmpDiskTrapSent = true;
-            }
-            m_logger.error(String.format(
+            if (forSnmp) {
+                if (MiscUtils.isPro() && !m_snmpDiskTrapSent) {
+                    m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                                              String.format(
+                                                  "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                                  filePath, featureName.value(),
+                                                  (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                                  CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
+                    m_snmpDiskTrapSent = true;
+                }
+            } else {
+                m_logger.error(String.format(
                     "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
                             + "Use \"voltadmin resume\" command once resource constraint is corrected.",
                     filePath, featureName.value(), (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                     CoreUtils.getHostnameOrAddress()));
-            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
                     filePath, featureName.value(), HealthMonitor.getValueWithUnit(usedSpace)));
+            }
             return false;
         } else {
             if (forSnmp && m_snmpDiskTrapSent) {
