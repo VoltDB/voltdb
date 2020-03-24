@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -33,6 +32,8 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.io.Files;
@@ -61,8 +62,6 @@ public class UpdateLicense extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_updateLicenseBarrier) {
             DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicenseBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                    " reached license update barrier.");
             return success;
 
         } else if (fragmentId == SysProcFragmentId.PF_updateLicenseBarrierAggregate) {
@@ -76,21 +75,35 @@ public class UpdateLicense extends VoltSystemProcedure {
 
             if (context.isLowestSiteId()) {
                 // write file to disk (some temp directory)
-                File license = new File(VoltDB.instance().getVoltDBRootPath(), ".temp_content");
+                File tempLicense = new File(VoltDB.instance().getVoltDBRootPath(), ".temp_content");
                 try {
-                    Files.write(licenseBytes, license);
+                    Files.write(licenseBytes, tempLicense);
                 } catch (IOException e) {
+                    log.info("Failed to write the new license to disk: " + e.getMessage());
+                    result.addRow(VoltSystemProcedure.STATUS_FAILURE);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
+                }
+                // validate the license
+                LicenseApi newLicense = MiscUtils.licenseApiFactory(tempLicense.getAbsolutePath());
+                if (newLicense == null) {
+                    log.info("New license is invalid.");
+                    tempLicense.delete();
+                    result.addRow(VoltSystemProcedure.STATUS_FAILURE);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
+                }
+                LicenseApi currentLicense = VoltDB.instance().getLicenseApi();
+                if (MiscUtils.isLicenseChangeAllowed(newLicense, currentLicense)) {
+                    // replace the staged license file in voltdb root
+                    tempLicense.renameTo(new File(VoltDB.instance().getVoltDBRootPath(), "license.xml"));
+                    VoltDB.instance().updateLicenseApi(newLicense);
+                } else {
+                    log.info("Failed to update the license, changes include license type, hard/soft expiration "
+                            + "and/or features enabled are not allowed to live-update.");
+                    tempLicense.delete();
                     result.addRow(VoltSystemProcedure.STATUS_FAILURE);
                     return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
                 }
             }
-            // use licenseAPI to verify the license validity.
-            // check if we support the license change (max host count/expiration date), reject other changes.
-            // once verified copy it to voltdb root directory (replace the old one)
-            // replace the RealVoltDB.m_licenseAPI on each node.
-            // return failure response if any of above step fails.
-            // unit tests.
-
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateLicense, result);
 

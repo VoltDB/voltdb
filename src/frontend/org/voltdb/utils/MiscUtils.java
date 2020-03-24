@@ -460,6 +460,30 @@ public class MiscUtils {
     }
 
     /**
+     * Compare the new and current license, see if the difference is allowed to be updated in live database.
+     * <p>Currently only following types of change is allowed in live cluster:
+     * <li>expiration date, and</li>
+     * <li>max host count</li>
+     * </p>
+     * <p>Ignore differences like license version/scheme, issuer information and licensee name.</p>
+     * @param newLicense
+     * @param currentLicense
+     * @return true if the change is allowed, otherwise false.
+     */
+    public static boolean isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense) {
+        if (!newLicense.getLicenseType().equalsIgnoreCase(currentLicense.getLicenseType()) &&
+            newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed() &&
+            newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed() &&
+            newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() &&
+            newLicense.hardExpiration() != currentLicense.hardExpiration() &&
+            newLicense.isUnrestricted() != currentLicense.isUnrestricted()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
      * Check that RevisionStrings are properly formatted.
      * @param fullBuildString
      * @return build revision # (SVN), build hash (git) or null

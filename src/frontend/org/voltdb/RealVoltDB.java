@@ -520,6 +520,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public void updateLicenseApi(LicenseApi newLicenseApi) {
+        m_licenseApi = newLicenseApi;
+    }
+
+    @Override
     public String getLicenseInformation() {
         return m_licenseInformation;
     }
