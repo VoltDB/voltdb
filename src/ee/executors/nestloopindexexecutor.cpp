@@ -437,7 +437,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params) {
 
                 while (postfilter.isUnderLimit() && IndexScanExecutor::getNextTuple(
                             localLookupType, &inner_tuple, index, &indexCursor, num_of_searchkeys)) {
-                    if (inner_tuple.isPendingDelete()) {
+                    if (inner_tuple.isPendingDeleteOnUndoRelease()) {
                         continue;
                     }
                     VOLT_TRACE("inner_tuple:%s",
