@@ -1533,7 +1533,7 @@ public:
 
     virtual void notifyTupleUpdate(TableTuple &tuple) { }
 
-    virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
+    virtual void notifyTupleDelete(TableTuple &tuple) { }
 
     virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
         m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));
@@ -1650,8 +1650,8 @@ public:
         m_context->notifyTupleUpdate(tuple);
     }
 
-    virtual bool notifyTupleDelete(TableTuple &tuple) {
-        return m_context->notifyTupleDelete(tuple);
+    virtual void notifyTupleDelete(TableTuple &tuple) {
+        m_context->notifyTupleDelete(tuple);
     }
 
     virtual void notifyTupleMovement(TableTuple &sourceTuple, TableTuple &targetTuple) {
