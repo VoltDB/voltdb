@@ -3108,9 +3108,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (null == keyStorePassword) {
             keyStorePassword = Constants.DEFAULT_KEYSTORE_PASSWD;
         }
-        if (keyStorePassword == null) {
-            throw new IllegalArgumentException("An SSL keystore password was not specified.");
-        }
         sslContextFactory.setKeyStorePassword(keyStorePassword);
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
@@ -3126,9 +3123,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
         if (null == trustStorePassword) {
             trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
-        }
-        if (trustStorePassword == null) {
-            throw new IllegalArgumentException("An SSL truststore password was not specified.");
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
