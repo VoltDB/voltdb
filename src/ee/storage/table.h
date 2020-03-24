@@ -326,7 +326,6 @@ protected:
     // schema as array of string names
     std::vector<std::string> m_columnNames{};
 
-    uint64_t m_tuplesPinnedByUndo = 0;
     uint64_t m_columnCount = 0;
     uint32_t m_tupleLength;
     int64_t m_nonInlinedMemorySize = 0;

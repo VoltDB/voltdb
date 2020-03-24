@@ -100,14 +100,12 @@ public:
      * Tuple delete hook.
      * Return true if it was handled by the COW context.
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple) {
-        bool freeable = true;
+    virtual void notifyTupleDelete(TableTuple &tuple) {
         // Any active stream can reject freeing the tuple.
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             vassert(streamPtr != NULL);
-            freeable = streamPtr->m_context->notifyTupleDelete(tuple) && freeable;
+            streamPtr->m_context->notifyTupleDelete(tuple);
         }
-        return freeable;
     }
 
     /**

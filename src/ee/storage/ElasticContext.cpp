@@ -209,13 +209,12 @@ bool ElasticContext::notifyTupleInsert(TableTuple &tuple) {
 /**
  * Tuple delete handler lets us erase tuples from the index.
  */
-bool ElasticContext::notifyTupleDelete(TableTuple &tuple) {
+void ElasticContext::notifyTupleDelete(TableTuple &tuple) {
     if (m_indexActive) {
         if (m_surgeon.indexHas(tuple)) {
             m_surgeon.indexRemove(tuple);
         }
     }
-    return true;
 }
 
 /**

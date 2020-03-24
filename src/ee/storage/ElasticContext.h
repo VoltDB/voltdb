@@ -73,7 +73,7 @@ public:
     /**
      * Optional tuple delete handler.
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple);
+    virtual void notifyTupleDelete(TableTuple &tuple);
 
     /**
      * Optional tuple compaction handler.

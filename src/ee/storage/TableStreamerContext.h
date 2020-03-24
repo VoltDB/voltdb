@@ -96,13 +96,13 @@ public:
     /**
      * Optional tuple update handler.
      */
-    virtual void notifyTupleUpdate(TableTuple &tuple) {}
+    virtual void notifyTupleUpdate(TableTuple &tuple) { }
 
     /**
      * Optional tuple delete handler.
      * returns true meaning that the tuple can be freed
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple) {return true;}
+    virtual void notifyTupleDelete(TableTuple &tuple) { }
 
     /**
      * Optional tuple compaction handler.

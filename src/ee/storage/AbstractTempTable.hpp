@@ -109,7 +109,6 @@ public:
     virtual void swapContents(AbstractTempTable* otherTable) {
         vassert(schema()->isCompatibleForMemcpy(otherTable->schema()));
         std::swap(m_tupleCount, otherTable->m_tupleCount);
-        std::swap(m_tuplesPinnedByUndo, otherTable->m_tuplesPinnedByUndo);
         std::swap(m_nonInlinedMemorySize, otherTable->m_nonInlinedMemorySize);
     }
 
