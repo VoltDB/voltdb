@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -53,19 +52,16 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.BinaryDequeReader;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -91,7 +87,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
-    private final String m_database;
     private final String m_tableName;
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
@@ -111,8 +106,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_overallMaxLatency = 0;
     private long m_queueGap = 0;
     private StreamStatus m_status = StreamStatus.ACTIVE;
-
-    private final ExportFormat m_format;
 
     private long m_firstUnpolledSeqNo = 1L; // sequence number starts from 1
     private long m_lastReleasedSeqNo = 0L;
@@ -156,10 +149,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private ExportSequenceNumberTracker m_gapTracker = new ExportSequenceNumberTracker();
 
-    public final ArrayList<String> m_columnNames = new ArrayList<>();
-    public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
-    public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
-    private String m_partitionColumnName = "";
     private MigrateRowsDeleter m_migrateRowsDeleter;
 
     // Export coordinator manages Export Leadership, Mastership, and gap correction.
@@ -223,7 +212,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public ExportDataSource(
             Generation generation,
             ExportDataProcessor processor,
-            String db,
             String tableName,
             int partitionId,
             int siteId,
@@ -235,8 +223,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     {
         m_generation = generation;
         m_currentGenerationId = genId;
-        m_format = ExportFormat.SEVENDOTX;
-        m_database = db;
         m_tableName = tableName;
         m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
         String nonce = m_tableName + "_" + partitionId;
@@ -259,42 +245,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
         }
 
-        // Add the Export meta-data columns to the schema followed by the
-        // catalog columns for this table.
-        m_columnNames.add("VOLT_TRANSACTION_ID");
-        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
-        m_columnLengths.add(8);
-
-        m_columnNames.add("VOLT_EXPORT_TIMESTAMP");
-        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
-        m_columnLengths.add(8);
-
-        m_columnNames.add("VOLT_EXPORT_SEQUENCE_NUMBER");
-        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
-        m_columnLengths.add(8);
-
-        m_columnNames.add("VOLT_PARTITION_ID");
-        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
-        m_columnLengths.add(8);
-
-        m_columnNames.add("VOLT_SITE_ID");
-        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
-        m_columnLengths.add(8);
-
-        m_columnNames.add("VOLT_EXPORT_OPERATION");
-        m_columnTypes.add(((int)VoltType.TINYINT.getValue()));
-        m_columnLengths.add(1);
-
-        for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
-            m_columnNames.add(c.getName());
-            m_columnTypes.add(c.getType());
-            m_columnLengths.add(c.getSize());
-        }
-
-        if (partitionColumn != null) {
-            m_partitionColumnName = partitionColumn.getName();
-        }
-
         m_adFile = new VoltFile(overflowPath, nonce + ".ad");
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating ad for " + nonce);
@@ -303,7 +253,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.keySymbolValuePair("database", m_database);
             writeAdvertisementTo(stringer);
             stringer.endObject();
             JSONObject jsObj = new JSONObject(stringer.toString());
@@ -346,7 +295,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (version != SEVENX_AD_VERSION) {
                 throw new IOException("Unsupported ad file version " + version);
             }
-            m_database = jsObj.getString("database");
             m_partitionId = jsObj.getInt("partitionId");
             // SiteId is outside the valid range if it is no longer local
             int partitionsLocalSite = MpInitiator.MP_INIT_PID + 1;
@@ -361,26 +309,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_siteId = partitionsLocalSite;
             m_tableName = jsObj.getString("tableName");
             m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
-            JSONArray columns = jsObj.getJSONArray("columns");
-            for (int ii = 0; ii < columns.length(); ii++) {
-                JSONObject column = columns.getJSONObject(ii);
-                m_columnNames.add(column.getString("name"));
-                int columnType = column.getInt("type");
-                m_columnTypes.add(columnType);
-                m_columnLengths.add(column.getInt("length"));
-            }
-
-            if (jsObj.has("format")) {
-                m_format = ExportFormat.valueOf(jsObj.getString("format"));
-            } else {
-                m_format = ExportFormat.SEVENDOTX;
-            }
-
-            try {
-                m_partitionColumnName = jsObj.getString("partitionColumnName");
-            } catch (Exception ex) {
-                //Ignore these if we have a OLD ad file these may not exist.
-            }
         } catch (JSONException e) {
             throw new IOException(e);
         }
@@ -555,20 +483,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return;
     }
 
-    public String getDatabase() {
-        return m_database;
-    }
-
     public String getTableName() {
         return m_tableName;
     }
 
     public int getPartitionId() {
         return m_partitionId;
-    }
-
-    public String getPartitionColumnName() {
-        return m_partitionColumnName;
     }
 
     public long getGeneration() {
@@ -580,17 +500,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("tableName", getTableName());
         stringer.keySymbolValuePair("startTime", ManagementFactory.getRuntimeMXBean().getStartTime());
-        stringer.key("columns").array();
-        for (int ii=0; ii < m_columnNames.size(); ++ii) {
-            stringer.object();
-            stringer.keySymbolValuePair("name", m_columnNames.get(ii));
-            stringer.keySymbolValuePair("type", m_columnTypes.get(ii));
-            stringer.keySymbolValuePair("length", m_columnLengths.get(ii));
-            stringer.endObject();
-        }
-        stringer.endArray();
-        stringer.keySymbolValuePair("format", ExportFormat.SEVENDOTX.toString());
-        stringer.keySymbolValuePair("partitionColumnName", m_partitionColumnName);
     }
 
     /**
@@ -604,11 +513,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result;
 
         result = (m_partitionId - o.m_partitionId);
-        if (result != 0) {
-            return result;
-        }
-
-        result = m_database.compareTo(o.m_database);
         if (result != 0) {
             return result;
         }
@@ -638,7 +542,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public int hashCode() {
         // based on implementation of compareTo
         int result = 0;
-        result += m_database.hashCode();
         result += m_tableName.hashCode();
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
@@ -1542,10 +1445,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //export stream for run-everywhere clients doesn't need ack mailbox
             m_ackMailboxRefs.set(null);
         }
-    }
-
-    public ExportFormat getExportFormat() {
-        return m_format;
     }
 
     public ListeningExecutorService getExecutorService() {

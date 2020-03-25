@@ -31,14 +31,12 @@ import java.util.Map;
 
 import org.voltdb.VoltType;
 import org.voltdb.compiler.DDLCompiler;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Preconditions;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -324,15 +322,6 @@ public class ExportRow {
             return false;
         }
         return true;
-    }
-
-    @Deprecated
-    public static boolean[] extractNullFlags(FastDeserializer fds, int columnCount) throws IOException {
-        Preconditions.checkArgument(
-                fds.buffer().order() == ByteOrder.LITTLE_ENDIAN,
-                "incorret byte order in the deserializer underlying buffer"
-                );
-        return extractNullFlags(fds.buffer(), columnCount);
     }
 
     public static boolean[] extractNullFlags(ByteBuffer bb, int columnCount) {
