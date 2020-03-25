@@ -617,7 +617,7 @@ namespace voltdb {
             void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
-            atomic_bool m_deleting = false;
+            atomic_bool m_deleting{false};
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
