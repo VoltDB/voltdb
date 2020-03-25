@@ -180,7 +180,7 @@ public class TestPBDMultipleReaders {
 
     @Test
     public void testSegmentClosingWriterMultipleReaders() throws Exception {
-        assertEquals(1, m_pbd.numOpenSegments());
+        assertEquals(0, m_pbd.numOpenSegments());
 
         int numSegments = 5;
         for (int i=0; i<numSegments; i++) {
