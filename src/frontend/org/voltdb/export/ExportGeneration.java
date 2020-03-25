@@ -32,7 +32,6 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -145,7 +144,7 @@ public class ExportGeneration implements Generation {
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             File exportOverflowDirectory)
     {
         File files[] = exportOverflowDirectory.listFiles();
@@ -168,7 +167,8 @@ public class ExportGeneration implements Generation {
      */
     private void initializeGenerationFromDisk(final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
-            File[] files, List<Pair<Integer, Integer>> localPartitionsToSites,
+            File[] files,
+            Map<Integer, Integer> localPartitionsToSites,
             long genId) {
 
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
@@ -222,9 +222,7 @@ public class ExportGeneration implements Generation {
         }
 
         // Count unique partitions only
-        Set<Integer> allLocalPartitions = localPartitionsToSites.stream()
-                .map(p -> p.getFirst())
-                .collect(Collectors.toSet());
+        Set<Integer> allLocalPartitions = localPartitionsToSites.keySet();
         Set<Integer> onDIskPartitionsSet = new HashSet<Integer>(onDiskPartitions);
         onDIskPartitionsSet.removeAll(allLocalPartitions);
         // One export mailbox per node, since we only keep one generation
@@ -251,7 +249,7 @@ public class ExportGeneration implements Generation {
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
             int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             boolean isCatalogUpdate)
     {
         // Update catalog version so that datasources use this version when propagating acks
@@ -275,8 +273,7 @@ public class ExportGeneration implements Generation {
         // Now create datasources based on the catalog (if already present will not be re-created).
         // Note that we create sources on disabled connectors.
 
-        Set<Integer> partitionsInUse =
-                localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet());
+        Set<Integer> partitionsInUse = localPartitionsToSites.keySet();
 
         boolean createdSources = false;
         NavigableSet<Table> streams = CatalogUtil.getExportTablesExcludeViewOnly(connectors);
@@ -620,7 +617,7 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             List<Integer> adFilePartitions,
             final ExportDataProcessor processor,
             final long genId) throws IOException {
@@ -662,20 +659,20 @@ public class ExportGeneration implements Generation {
      * @param processor
      */
     private void addDataSources(Table table, int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             Set<Integer> partitionsInUse,
             final ExportDataProcessor processor,
             final long genId,
             boolean isCatalogUpdate)
     {
-        for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
+        for (Map.Entry<Integer, Integer> partitionAndSiteId : localPartitionsToSites.entrySet()) {
 
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
              */
-            int partition = partitionAndSiteId.getFirst();
-            int siteId = partitionAndSiteId.getSecond();
+            int partition = partitionAndSiteId.getKey();
+            int siteId = partitionAndSiteId.getValue();
             synchronized(m_dataSourcesByPartition) {
                 try {
                     Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);

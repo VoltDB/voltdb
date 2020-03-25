@@ -27,7 +27,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -280,7 +280,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ExportDataSource(Generation generation, File adFile,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             final ExportDataProcessor processor,
             final long genId) throws IOException {
         m_generation = generation;
@@ -299,12 +299,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // SiteId is outside the valid range if it is no longer local
             int partitionsLocalSite = MpInitiator.MP_INIT_PID + 1;
             if (localPartitionsToSites != null) {
-                for (Pair<Integer, Integer> partition : localPartitionsToSites) {
-                    if (partition.getFirst() == m_partitionId) {
-                        partitionsLocalSite = partition.getSecond();
-                        break;
-                    }
-                }
+                partitionsLocalSite = localPartitionsToSites.getOrDefault(m_partitionId, partitionsLocalSite);
             }
             m_siteId = partitionsLocalSite;
             m_tableName = jsObj.getString("tableName");
