@@ -51,18 +51,20 @@ namespace voltdb {
 class SetAndRestorePendingDeleteFlag
 {
 public:
-    SetAndRestorePendingDeleteFlag(TableTuple& target) : m_target(target)
+    SetAndRestorePendingDeleteFlag(TableTuple& target) :
+            m_target(target), m_restoreFlag(*target.address())
     {
         vassert(!m_target.isPendingDelete());
-        m_target.setPendingDeleteTrue();
+        m_target.setPendingDeleteOnUndoReleaseTrue();
     }
 
     ~SetAndRestorePendingDeleteFlag() {
-        m_target.setPendingDeleteFalse();
+        *(reinterpret_cast<char*>(m_target.address())) = m_restoreFlag;
     }
 
 private:
     TableTuple& m_target;
+    uint8_t m_restoreFlag;
 };
 
 PersistentTable::PersistentTable(int partitionColumn,
@@ -251,7 +253,6 @@ template<class T> static inline void decrementViewReferences(T views) {
 
 void PersistentTable::truncateTableRelease(PersistentTable* originalTable) {
     VOLT_DEBUG("**** Truncate table release *****\n");
-    m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
 
     if (originalTable->m_tableStreamer != NULL) {
@@ -394,7 +395,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
                                 "active undo quantum, and presumably an active transaction that should be there",
                                 m_name.c_str());
         }
-        emptyTable->m_tuplesPinnedByUndo = emptyTable->activeTupleCount();
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->activeTupleCount();
         // Create and register an undo action.
         UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
@@ -771,7 +771,6 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
-    --m_tuplesPinnedByUndo;
     --m_invisibleTuplesPendingDeleteCount;
     --m_batchDeleteTupleCount;
 
@@ -917,16 +916,15 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    if (insertTupleIntoDeltaTable(targetTupleToUpdate)) {
+    if (insertTupleIntoDeltaTable(targetTupleToUpdate) || !m_views.empty()) {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
         for (auto viewHandler: m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
-    }
-
-    // This is for single table view.
-    for (auto view: m_views) {
-        view->processTupleDelete(targetTupleToUpdate, fallible);
+        // This is for single table view.
+        for (auto view: m_views) {
+            view->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1138,7 +1136,6 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     }
     if (createUndoAction) {
         target.setPendingDeleteOnUndoReleaseTrue();
-        ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
         ++m_batchDeleteTupleCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
@@ -1157,17 +1154,17 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     //
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
-    if (insertTupleIntoDeltaTable(target)) {
+    if (insertTupleIntoDeltaTable(target) || !m_views.empty()) {
         SetAndRestorePendingDeleteFlag setPending(target);
         // for multi-table views
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
             viewHandler->handleTupleDelete(this, fallible);
         }
-    }
 
-    // This is for single table view.
-    BOOST_FOREACH (auto view, m_views) {
-        view->processTupleDelete(target, fallible);
+        // This is for single table view.
+        BOOST_FOREACH (auto view, m_views) {
+            view->processTupleDelete(target, fallible);
+        }
     }
 
     if (createUndoAction) {
@@ -1208,13 +1205,8 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
     TableTuple target(m_schema);
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
-    if (m_tableStreamer != NULL && ! m_tableStreamer->notifyTupleDelete(target)) {
-        // Mark it pending delete and let the snapshot land the finishing blow.
-        if (!target.isPendingDelete()) {
-            ++m_invisibleTuplesPendingDeleteCount;
-            ++m_batchDeleteTupleCount;
-            target.setPendingDeleteTrue();
-        }
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(target);
     }
 
     // Reserve batch delete, only once
