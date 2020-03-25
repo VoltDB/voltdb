@@ -617,6 +617,7 @@ namespace voltdb {
             void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
+            atomic_bool m_deleting{false};
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
@@ -655,6 +656,10 @@ namespace voltdb {
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
+            // in some cases?, we need to set deleting flag before it's too late.
+            // Caution: use it only when you know the flag is
+            // going to be reset very soon.
+            void set_deleting() noexcept;
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
@@ -668,6 +673,7 @@ namespace voltdb {
             bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
             size_t chunkSize() const noexcept;
+            bool deleting() const noexcept;            // grab status
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
