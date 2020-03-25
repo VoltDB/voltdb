@@ -24,7 +24,6 @@
 package org.voltdb.exportclient;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.mockito.Mockito;
 import org.voltdb.VoltTable;
@@ -85,12 +84,9 @@ public class ExportClientTestBase {
             col_names.add(COLUMN_NAMES[i]);
             col_types.add(COLUMN_TYPES[i]);
         }
-        String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, tableName,
-                partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
-                AdvertisedDataSource.ExportFormat.SEVENDOTX);
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, tableName);
         return source;
     }
 

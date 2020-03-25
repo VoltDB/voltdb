@@ -473,7 +473,9 @@ public class ExportGeneration implements Generation {
                     ImmutableList.Builder<Long> mailboxes = ImmutableList.builder();
 
                     for (String child : children) {
-                        if (child.equals(Long.toString(m_mbox.getHSId()))) continue;
+                        if (child.equals(Long.toString(m_mbox.getHSId()))) {
+                            continue;
+                        }
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
@@ -598,8 +600,9 @@ public class ExportGeneration implements Generation {
         for (Map<String, ExportDataSource> dataSources : dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
                 ListenableFuture<ExportStatsRow> syncFuture = source.getImmutableStatsRow(interval);
-                if (syncFuture != null)
+                if (syncFuture != null) {
                     tasks.add(syncFuture);
+                }
             }
         }
 
@@ -685,7 +688,6 @@ public class ExportGeneration implements Generation {
                         // Create a new EDS, discarding any pre-existing data
                         ExportDataSource exportDataSource = new ExportDataSource(this,
                                 processor,
-                                "database",
                                 key,
                                 partition,
                                 siteId,
@@ -957,15 +959,17 @@ public class ExportGeneration implements Generation {
             for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : dataSources.values()) {
                     ListenableFuture<?> syncFuture = source.sync();
-                    if (syncFuture != null)
+                    if (syncFuture != null) {
                         tasks.add(syncFuture);
+                    }
                 }
             }
         }
 
         try {
-            if (!tasks.isEmpty())
+            if (!tasks.isEmpty()) {
                 Futures.allAsList(tasks).get();
+            }
         } catch (Exception e) {
             exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
         }
@@ -982,8 +986,9 @@ public class ExportGeneration implements Generation {
             }
         }
         try {
-            if (!tasks.isEmpty())
+            if (!tasks.isEmpty()) {
                 Futures.allAsList(tasks).get();
+            }
         } catch (Exception e) {
             exportLog.error("Unexpected exception shutting down export data.", e);
         }
