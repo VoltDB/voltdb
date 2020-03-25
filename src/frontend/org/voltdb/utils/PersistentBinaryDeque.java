@@ -109,6 +109,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 assertions();
 
                 moveToValidSegment();
+                if (m_segment == null) {
+                    return null;
+                }
+
                 PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
@@ -212,6 +216,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 assertions();
 
                 moveToValidSegment();
+                if (m_segment == null) {
+                    return 0;
+                }
+
                 long size = 0;
                 boolean inclusive = true;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
@@ -236,6 +244,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 assertions();
 
                 moveToValidSegment();
+                if (m_segment == null) {
+                    return true;
+                }
+
                 boolean inclusive = true;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
                     // Check if there are more to read.
@@ -468,24 +480,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         parseFiles(builder.m_deleteExisting);
-
-        // Find the first and last segment for polling and writing (after); ensure the
-        // writing segment is not final
-
-        long curId = getNextSegmentId();
-        Map.Entry<Long, PBDSegment<M>> lastEntry = m_segments.lastEntry();
-
-        // Note: the "previous" id value may be > "current" id value
-        long prevId = lastEntry == null ? getNextSegmentId() : lastEntry.getValue().segmentId();
-        Long writeSegmentIndex = lastEntry == null ? 1L : lastEntry.getKey() + 1;
-
-        String fname = getSegmentFileName(curId, prevId);
-        PBDSegment<M> writeSegment = initializeNewSegment(writeSegmentIndex, curId, new VoltFile(m_path, fname),
-                "initialization");
-        if (m_segments.put(writeSegmentIndex, writeSegment) != null) {
-            // Sanity check
-            throw new IllegalStateException("Overwriting segment " + writeSegmentIndex);
-        }
 
         m_numObjects = countNumObjects();
         assertions();
@@ -833,17 +827,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          * Return and the parseAndTruncate is a noop, except for the finalization.
          */
         if (lastSegmentIndex == null)  {
-            // Reopen the last segment for write - ensure it is not final
-            PBDSegment<M> lastSegment = peekLastSegment();
-            assert lastSegment.getNumEntries() == 0 : "Segment has entries: " + lastSegment.file();
-            lastSegment.openNewSegment(m_compress);
-
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Segment " + lastSegment.file()
-                    + " (final: " + lastSegment.isFinal() + "), has been opened for writing after truncation");
-            }
             return;
         }
+
         /*
          * Now truncate all the segments after the truncation point.
          */
@@ -862,19 +848,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        /*
-         * Reset the poll and write segments
-         */
-        long curId = getNextSegmentId();
-
-        PBDSegment<M> lastSegment = peekLastSegment();
-        Long newSegmentIndex = lastSegment == null ? 1L : lastSegment.segmentIndex() + 1;
-        long prevId = lastSegment == null ? getNextSegmentId() : lastSegment.segmentId();
-
-        String fname = getSegmentFileName(curId, prevId);
-        PBDSegment<M> newSegment = initializeNewSegment(newSegmentIndex, curId, new VoltFile(m_path, fname),
-                "PBD truncator");
-        m_segments.put(newSegment.segmentIndex(), newSegment);
         assertions();
     }
 
@@ -921,7 +894,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     @Override
     public synchronized void updateExtraHeader(M extraHeader) throws IOException {
         m_extraHeader = extraHeader;
-        addSegment(peekLastSegment());
+        PBDSegment<M> tail = peekLastSegment();
+        if (tail != null) {
+            finishWrite(tail);
+        }
+    }
+
+    private void finishWrite(PBDSegment<M> tail) throws IOException {
+        //Check to see if the tail is completely consumed so we can close it
+        tail.finalize(!tail.isBeingPolled());
+
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug(
+                    "Segment " + tail.file() + " (final: " + tail.isFinal() + "), has been closed by offer to PBD");
+        }
     }
 
     @Override
@@ -932,7 +918,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         PBDSegment<M> tail = peekLastSegment();
+        if (tail == null || !tail.isActive()) {
+            tail = addSegment(tail);
+        }
         if (!tail.offer(object)) {
+            finishWrite(tail);
             tail = addSegment(tail);
             final boolean success = tail.offer(object);
             if (!success) {
@@ -951,31 +941,30 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         PBDSegment<M> tail = peekLastSegment();
+        if (tail == null || !tail.isActive()) {
+            tail = addSegment(tail);
+        }
+
         int written = tail.offer(ds);
         if (written < 0) {
+            finishWrite(tail);
             tail = addSegment(tail);
             written = tail.offer(ds);
             if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
             }
         }
+
         m_numObjects++;
         assertions();
         return written;
     }
 
     private PBDSegment<M> addSegment(PBDSegment<M> tail) throws IOException {
-        //Check to see if the tail is completely consumed so we can close and delete it
-        tail.finalize(!tail.isBeingPolled());
-
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug(
-                    "Segment " + tail.file() + " (final: " + tail.isFinal() + "), has been closed by offer to PBD");
-        }
-        Long nextIndex = tail.segmentIndex() + 1;
-        long lastId = tail.segmentId();
+        Long nextIndex = (tail == null) ? 1 : tail.segmentIndex() + 1;
 
         long curId = getNextSegmentId();
+        long lastId = (tail == null) ? getNextSegmentId() : tail.segmentId();
         String fname = getSegmentFileName(curId, lastId);
         PBDSegment<M> newSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "an offer");
         m_segments.put(newSegment.segmentIndex(), newSegment);
