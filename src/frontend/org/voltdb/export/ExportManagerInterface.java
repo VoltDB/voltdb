@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -116,7 +115,7 @@ public interface ExportManagerInterface {
             boolean isRejoin,
             boolean forceCreate,
             HostMessenger messenger,
-            List<Pair<Integer, Integer>> partitions)
+            Map<Integer, Integer> partitions)
             throws ExportManagerInterface.SetupException, ReflectiveOperationException
     {
         ExportMode mode = getExportFeatureMode(deploymentFeatures);
@@ -163,7 +162,7 @@ public interface ExportManagerInterface {
 
     public List<ExportStatsRow> getStats(final boolean interval);
 
-    public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+    public void initialize(CatalogContext catalogContext, Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin);
 
     public void startListeners(ClientInterface cif);
@@ -173,7 +172,7 @@ public interface ExportManagerInterface {
     public void startPolling(CatalogContext catalogContext, StreamStartAction action);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
+            boolean requiresNewExportGeneration, Map<Integer, Integer> localPartitionsToSites);
 
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
             StreamStartAction action,
