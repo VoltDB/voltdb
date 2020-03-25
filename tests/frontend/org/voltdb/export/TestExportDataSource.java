@@ -657,7 +657,7 @@ public class TestExportDataSource extends TestCase {
             //Ack before push
             s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 1);
+            assertEquals(0, listing.size());
 
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);

@@ -240,16 +240,14 @@ public class TestPBDsWithIds {
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
-        // We create a new segment on recover
-        numSegments++;
-        Pair<Long, Long>[] newSegmentIds = Arrays.copyOf(segmentIds, numSegments);
-        newSegmentIds[numSegments-1] = new Pair<Long, Long>(-1L, -1L);
-        verifySegmentIds(numSegments, newSegmentIds);
+        verifySegmentIds(numSegments, segmentIds);
 
         negativeOffer(-1, -1);
-        long nextId = newSegmentIds[numSegments-2].getSecond() + 1;
+        long nextId = segmentIds[numSegments-2].getSecond() + 1;
         long endId = nextId + 50;
         m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextId, endId);
+        numSegments++;
+        Pair<Long, Long>[] newSegmentIds = Arrays.copyOf(segmentIds, numSegments);
         newSegmentIds[numSegments-1] = new Pair<Long, Long>(nextId, endId);
         verifySegmentIds(numSegments, newSegmentIds);
     }
