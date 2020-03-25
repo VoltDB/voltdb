@@ -623,6 +623,10 @@ inline bool CompactingChunks::deleting() const noexcept {
     return m_deleting;
 }
 
+inline void CompactingChunks::set_deleting() noexcept {
+    m_deleting = true;
+}
+
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
     m_chunks(chunks), m_iter(chunks.end()), m_next(nullptr) {
     assert(m_chunks.empty());
@@ -1186,8 +1190,8 @@ inline void CompactingChunks::DelayedRemover::mapping() {
 }
 
 inline void CompactingChunks::DelayedRemover::shift() {
+    m_chunks.m_deleting = true;
     if (! m_removedRegions.empty()) {
-        m_chunks.m_deleting = true;
         std::for_each(m_removedRegions.cbegin(), prev(m_removedRegions.cend()),
                 [this](typename map_type::value_type const& entry) {
                     auto& iter = m_chunks.beginTxn().iterator();
@@ -1204,8 +1208,8 @@ inline void CompactingChunks::DelayedRemover::shift() {
             m_chunks.tupleSize() * m_removedRegions.rbegin()->second.mask().size();
         m_chunks.releasable();
         m_chunks.m_allocs -= m_removed.size() + m_moved.size();
-        m_chunks.m_deleting = false;
     }
+    m_chunks.m_deleting = false;
 }
 
 inline vector<pair<void*, void*>> const& CompactingChunks::DelayedRemover::movements() const {
@@ -1409,7 +1413,6 @@ struct ChunkDeleter {
 template<typename ChunkList, typename Iter>
 struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, true_type> {
     inline void operator()(ChunkList& l, Iter& iter) const noexcept {
-        using interval_type = chrono::microseconds;
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
             auto const id = iter->id();
@@ -1659,10 +1662,32 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::begin(
     return {c, cb};
 }
 
+/**
+ * Coordinate iterator call back to be made after any txn writes
+ * are complete.
+ */
+template<typename Chunks, typename = typename Chunks::Compact>
+struct TxnWriteBarrier {
+    inline constexpr bool operator()(Chunks const&) const noexcept {
+        return false;
+    }
+};
+template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
+    chrono::microseconds const interval{1};
+    inline bool operator()(Chunks const& s) const noexcept {
+        while (s.deleting()) {
+            this_thread::sleep_for(interval);
+        }
+        return false;
+    }
+};
+
 template<typename Chunks, typename Tag, typename E>
 template<typename Trans, iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::operator*() noexcept {
+    constexpr static TxnWriteBarrier<Chunks> const barrier;
+    barrier(super::storage());
     return const_cast<void*>(m_cb(super::operator*()));
 }
 
@@ -2097,6 +2122,9 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
+    // Mark deletion has begun before call-back time (and thus,
+    // before any memcpy occurs).
+    set_deleting();
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }

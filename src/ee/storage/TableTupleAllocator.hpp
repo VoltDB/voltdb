@@ -656,6 +656,10 @@ namespace voltdb {
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
+            // in some cases?, we need to set deleting flag before it's too late.
+            // Caution: use it only when you know the flag is
+            // going to be reset very soon.
+            void set_deleting() noexcept;
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
