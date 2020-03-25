@@ -2304,7 +2304,7 @@ TEST_F(DRBinaryLogTest, TruncateTable) {
     EXPECT_EQ(total, m_tableReplica->activeTupleCount());
 
     beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
-    m_table->truncateTable(m_engine);
+    m_table->truncateTable(m_engine, true);
     endTxn(m_engine, true);
 
     flushAndApply(spHandle);
