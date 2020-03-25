@@ -192,6 +192,13 @@ public abstract class PBDSegment<M> {
      */
     abstract void finalize(boolean close) throws IOException;
 
+    /**
+     * Is this segment currently active for writing.
+     *
+     * @return returns true if this segment is currently active for writing, false otherwise
+     */
+    abstract boolean isActive();
+
     public static boolean setFinal(File file, boolean isFinal) {
 
         try {

@@ -203,4 +203,9 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         public void closeAndSaveReaderState() {
         }
     };
+
+    @Override
+    boolean isActive() {
+        return false;
+    }
 }

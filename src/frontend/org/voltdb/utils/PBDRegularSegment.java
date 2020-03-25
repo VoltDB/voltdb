@@ -832,6 +832,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         return m_extraHeaderCache;
     }
 
+    @Override
+    boolean isActive() {
+        return m_isActive;
+    }
+
     private class SegmentReader implements PBDSegmentReader<M> {
         private final String m_cursorId;
         private long m_readOffset;
