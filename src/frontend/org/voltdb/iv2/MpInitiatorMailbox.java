@@ -81,14 +81,14 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     "MpInitiator send", 1024 * 128);
 
     @Override
-    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean balanceSPI) {
+    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean skipRepair) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
                     RepairAlgo ra = new MpPromoteAlgo(survivors.get(), deadHost, MpInitiatorMailbox.this,
-                            m_restartSeqGenerator, whoami, balanceSPI);
+                            m_restartSeqGenerator, whoami, skipRepair);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -100,7 +100,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, skipRepair);
             setRepairAlgoInternal(ra);
         }
         return ra;
@@ -248,12 +248,17 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             public void run() {
                 assert(lockingVows());
                 Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
+                // If leader change is caused by leader migration request,
+                // and no pending repair was cancelled previously, the repair
+                // message is not necessarily needed
+                boolean skipRepair = balanceSPI;
                 // If a replica set has been configured and it changed during
                 // promotion, must cancel the term
                 if (m_algo != null) {
                     m_algo.cancel();
+                    skipRepair = false;
                 }
-                ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, balanceSPI);
+                ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, balanceSPI, skipRepair);
             }
         });
     }
