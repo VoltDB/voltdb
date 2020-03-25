@@ -1673,10 +1673,9 @@ struct TxnWriteBarrier {
     }
 };
 template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
-    chrono::microseconds const interval{1};
     inline bool operator()(Chunks const& s) const noexcept {
         while (s.deleting()) {
-            this_thread::sleep_for(interval);
+            this_thread::sleep_for(chrono::microseconds{1});
         }
         return false;
     }
@@ -1686,7 +1685,7 @@ template<typename Chunks, typename Tag, typename E>
 template<typename Trans, iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::operator*() noexcept {
-    constexpr static TxnWriteBarrier<Chunks> const barrier;
+    constexpr static TxnWriteBarrier<Chunks> const barrier{};
     barrier(super::storage());
     return const_cast<void*>(m_cb(super::operator*()));
 }
