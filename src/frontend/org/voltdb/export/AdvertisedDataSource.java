@@ -30,12 +30,19 @@ public class AdvertisedDataSource
     final public int partitionId;
     final public String tableName;
     //Set to other than partition column in case of kafka.
+    @Deprecated
     private String m_partitionColumnName = "";
+    @Deprecated
     final public long m_generation;
+    @Deprecated
     final public long systemStartTimestamp;
+    @Deprecated
     final public ArrayList<String> columnNames = new ArrayList<String>();
+    @Deprecated
     final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+    @Deprecated
     final public List<Integer> columnLengths = new ArrayList<Integer>();
+    @Deprecated
     final public ExportFormat exportFormat;
 
     /*
@@ -44,6 +51,7 @@ public class AdvertisedDataSource
      * representation for decimals so that the format would be more efficient and
      * shareable with other features
      */
+    @Deprecated
     public enum ExportFormat {
         SEVENDOTX;
     }
@@ -106,10 +114,12 @@ public class AdvertisedDataSource
 
     //This is for setting column other than partition column of table.
     //Kafka uses any arbitrary column for using its value for kafka key
+    @Deprecated
     public void setPartitionColumnName(String partitionColumnName) {
         m_partitionColumnName = partitionColumnName;
     }
 
+    @Deprecated
     public String getPartitionColumnName() {
         return m_partitionColumnName;
     }

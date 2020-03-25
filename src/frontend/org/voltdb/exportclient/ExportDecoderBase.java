@@ -119,7 +119,9 @@ public abstract class ExportDecoderBase {
      * @param rowData
      * @return ExportRowData
      * @throws IOException
+     * @deprecated As part of the legacy API
      */
+    @Deprecated
     protected ExportRowData decodeRow(byte[] rowData) throws IOException {
         ExportRow row = ExportRow.decodeRow(m_legacyRow, getPartition(), m_startTS, rowData);
         return new ExportRowData(row.values, row.partitionValue, row.partitionId);
@@ -244,6 +246,15 @@ public abstract class ExportDecoderBase {
         throw new UnsupportedOperationException("processRow must be implemented.");
     }
 
+    /**
+     *
+     * @param rowSize
+     * @param rowData
+     * @return
+     * @throws RestartBlockException
+     * @deprecated As part of the legacy API
+     */
+    @Deprecated
     public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
         throw new UnsupportedOperationException("processRow must be implemented.");
     }
@@ -271,15 +282,21 @@ public abstract class ExportDecoderBase {
     /**
      * Finalize operation upon block completion - provides a means for a
      * specific decoder to flush data to disk - virtual method
+     *
      * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
+     * @deprecated As part of the legacy API
      */
+    @Deprecated
     public void onBlockCompletion() throws RestartBlockException {
     }
 
     /**
      * Notify that a new block of data is going to be processed now
+     *
      * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
+     * @deprecated As part of the legacy API
      */
+    @Deprecated
     public void onBlockStart() throws RestartBlockException {
 
     }
@@ -292,10 +309,12 @@ public abstract class ExportDecoderBase {
         return m_partition;
     }
 
+    @Deprecated
     public void setLegacy(boolean legacy) {
         m_legacy = legacy;
     }
 
+    @Deprecated
     public boolean isLegacy() {
         return m_legacy;
     }
