@@ -2153,64 +2153,56 @@ public:
 //    ASSERT_TRUE(verifier.ok(0));
 //}
 
-TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
+TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt2) {
     // test finalizer on iterator
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     using Gen = StringGen<TupleSize>;
     Gen gen;
     Alloc alloc(TupleSize);
-    constexpr size_t BigNumTuples = NumTuples * 100;
+    constexpr size_t BigNumTuples = NumTuples * 5;
     array<void*, BigNumTuples> addresses;
-    atomic_ulong del_counter{0lu}, snap_counter{0lu};
     for (size_t i = 0; i < BigNumTuples; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
     }
     auto const& iter = alloc.template freeze<truth>();
+    atomic_ulong iterating_counter{0lu};
     // deleting thread that triggers massive chained compaction,
     // by deleting one tuple at a time, in the compacting direction.
     // Synchronized perfectly with the snapshot iterator thread
     // on each deletion
-    auto const deleting_thread = [&alloc, &addresses, &del_counter, &snap_counter, this] () {
+    auto const deleting_thread = [&alloc, &addresses, &iterating_counter, this] () {
         int j = 0;
         do {
             for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
                 alloc.remove_reserve(1);
                 alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
                 ASSERT_EQ(1, alloc.remove_force([this] (vector<pair<void*, void*>> const& entries) {
-                            ASSERT_EQ(1, entries.size());
-                            ASSERT_EQ(AllocsPerChunk - 1,
-                                    Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
-                            memcpy(entries[0].first, entries[0].second, TupleSize);
+                                ASSERT_EQ(1, entries.size());
+                                ASSERT_EQ(AllocsPerChunk - 1,
+                                        Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
+                                memcpy(entries[0].first, entries[0].second, TupleSize);
                             }));
-//                    ++del_counter;
-//                    while (del_counter > snap_counter + 50) {
-//                        this_thread::sleep_for(chrono::nanoseconds{5});
-//                    }
             }
         } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
     };
     // snapshot thread that validates. Synchronized perfectly
     // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, &del_counter, &snap_counter, this] () {
+    auto const snapshot_thread = [&iter, &iterating_counter, this] () {
         while (! iter->drained()) {
-            ASSERT_EQ(snap_counter++, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
+            ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
             ++(*iter);
             if (iter->drained()) {
                 break;
             }
-//                while (snap_counter > del_counter + 50) {
-//                    this_thread::sleep_for(chrono::nanoseconds{5});
-//                }
+            ++iterating_counter;
         }
-        ASSERT_EQ(BigNumTuples, snap_counter);
+        ASSERT_EQ(BigNumTuples, iterating_counter);
     };
     thread t1(deleting_thread);
     snapshot_thread();
     t1.join();
     alloc.template thaw<truth>();
-    ASSERT_EQ(1, alloc.size());
-    alloc.template clear<truth>();
 }
 
 #endif
