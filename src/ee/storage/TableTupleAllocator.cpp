@@ -18,9 +18,7 @@
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
 #include <array>
-#include <chrono>
 #include <numeric>
-#include <thread>
 
 using namespace voltdb;
 using namespace voltdb::storage;
@@ -733,7 +731,8 @@ inline void CompactingChunks::thaw() {
     CompactingStorageTrait::thaw();
     // it is possible that some chunks in snapshot remains to be
     // cleared, despite we try to make it as clean as possible in
-    // the ChunkDeleter. Not cleaning it up creates problems for
+    // the ChunkDeleter; or previous freeze/thaw without draining
+    // the snapshot iterator. Not cleaning it up creates problems for
     // later snapshot processes, and leaks memory.
     while (! list_type::empty() && less<ChunkHolder<>>()(front(), *beginTxn().iterator())) {
         // since we are cleaning up snapshot-only chunk
@@ -1887,14 +1886,12 @@ typename TxnPreHook<Alloc, Trait, E1>::added_entry_t TxnPreHook<Alloc, Trait, E1
             assert(m_changes.find(dst) != m_changes.cend());
             return {added_entry_t::status::existing, m_changes.find(dst)->second};
         } else {               // freshly created copy
-//            m_last = nullptr;
             return {status, r};
         }
     } else if (m_recording) {
         // ignored state: the tuple may, or may not, have a local
         // copy of its original value
         auto const& iter = m_changes.find(dst);
-//        m_last = nullptr;
         return {status, iter == m_changes.cend() ? nullptr : iter->second};
     } else {                   // not frozen
         return {};
@@ -2058,7 +2055,7 @@ template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::remove_add(void* p) {
     CompactingChunks::m_batched.add(p);
     if (frozen()) {            // hook registration
-        Hook::copy(p);         // needs to protect writes to hook map
+        Hook::copy(p);
         return Hook::add(Hook::ChangeType::Deletion, p,
                 reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     } else {
