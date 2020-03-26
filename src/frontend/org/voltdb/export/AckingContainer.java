@@ -83,6 +83,10 @@ public class AckingContainer extends BBContainer {
         return m_lastSeqNo;
     }
 
+    public long getTupleCount() {
+        return m_lastSeqNo - m_startSeqNo + 1;
+    }
+
     private void internalDiscard(boolean checkDoubleFree) {
         if (checkDoubleFree) {
             checkDoubleFree();
@@ -112,6 +116,6 @@ public class AckingContainer extends BBContainer {
 
     @Override
     public String toString() {
-        return new String("Container: ending at " + m_lastSeqNo + " (Committed " + m_commitSeqNo + ")");
+        return new String("Container [" + m_startSeqNo + ", " + m_lastSeqNo + "]");
     }
 }

@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
@@ -49,8 +50,8 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
-import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportLocalClusterBase;
+import org.voltdb.exportclient.SocketExporter;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
@@ -66,7 +67,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
 
-    @Test
+    @Test(timeout = 45_000)
     public void testFlushEEBufferWhenRejoin() throws Exception {
         ExportLocalClusterBase.resetDir();
         m_serverSocket = new ServerListener(5001);
@@ -82,18 +83,14 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             builder.setUseDDLSchema(true);
             builder.setPartitionDetectionEnabled(true);
             builder.setDeadHostTimeout(4);
-            builder.setFlushIntervals(1000, 1000, 50000);
-
-            //use socket exporter
-            Map<String, String> additionalEnv = new HashMap<String, String>();
-            System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-            additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+            // Set flush interval longer than the test timeout so it will never flush naturally
+            builder.setFlushIntervals(1000, 1000, 60_000);
 
             //enable export
             Properties props = new Properties();
             //props.put("replicated", "true");
             props.put("skipinternals", "true");
-            builder.addExport(true, ServerExportEnum.CUSTOM, props, "utopia");
+            builder.addExport(true, ServerExportEnum.CUSTOM, SocketExporter.class.getName(), props, "utopia");
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.setNewCli(true);
@@ -120,7 +117,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO at the start:");
             System.out.println(vt.toFormattedString());
-            assertTrue(!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0]));
+            assertNotEquals(vt.fetchRow(0).getString(2).split(":")[0], vt.fetchRow(1).getString(2).split(":")[0]);
 
             cluster.killSingleHost(1);
             client = ClientFactory.createClient(config);
@@ -128,7 +125,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO after kill:");
             System.out.println(vt.toFormattedString());
-            assertTrue(vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0]));
+            assertEquals(vt.fetchRow(0).getString(2).split(":")[0], vt.fetchRow(1).getString(2).split(":")[0]);
 
             for (int i = 0; i < 5; i++) {
                 //add data to stream table
@@ -150,7 +147,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
 
             // all 5 export messages should be captured
             // because during rejoin a @Quiesce call will be triggered by @Snapshotsave
-            assertEquals(exportMessageSet.size(), 5);
+            waitForExport(5);
 
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO in the end:");
@@ -160,19 +157,21 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                 client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
             }
             client.callProcedure("@Quiesce");
-            while (true) {
-                Thread.sleep(100);
-                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10_000);
-                // make sure see all export message
-                if (exportMessageSet.size() == 10) {
-                    break;
-                }
-            }
+            waitForExport(10);
         } finally {
             m_serverSocket.close();
             cleanup(client, cluster);
             clients.clear();
             System.out.println("Everything shut down.");
+        }
+    }
+
+    private void waitForExport(int count) throws InterruptedException {
+        synchronized (exportMessageSet) {
+            while (exportMessageSet.size() < count) {
+                exportMessageSet.wait();
+            }
+            assertEquals(count, exportMessageSet.size());
         }
     }
 
@@ -262,8 +261,10 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                             break;
                         }
                         if (line != null) {
-                            System.out.println("Adding export line: " + line);
-                            exportMessageSet.add(line);
+                            synchronized (exportMessageSet) {
+                                exportMessageSet.add(line);
+                                exportMessageSet.notifyAll();
+                            }
                         }
                         String parts[] = m_parser.parseLine(line);
                         if (parts == null || parts.length == 0) {
@@ -282,46 +283,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
 
         public void stopClient() {
             m_closed = true;
-        }
-    }
-
-    private static class HostSiteId implements Comparable<HostSiteId> {
-        int m_hostId;
-        int m_siteId;
-
-        public HostSiteId(int hid, int sid) {
-            m_hostId = hid;
-            m_siteId = sid;
-        }
-
-        @Override
-        public int compareTo(HostSiteId other){
-            if (m_hostId == other.m_hostId) {
-                return m_siteId - other.m_siteId;
-            }
-            return m_hostId - other.m_hostId;
-        }
-
-        @Override
-        public int hashCode() {
-            return m_hostId + m_siteId;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj instanceof HostSiteId == false) {
-                return false;
-            }
-            if (obj == this) {
-                return true;
-            }
-            HostSiteId hsid = (HostSiteId)obj;
-            return m_hostId == hsid.m_hostId && m_siteId == hsid.m_siteId;
-        }
-
-        @Override
-        public String toString() {
-            return m_hostId + ":" + m_siteId;
         }
     }
 }

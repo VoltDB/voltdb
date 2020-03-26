@@ -328,7 +328,7 @@ public class MatchChecks {
     }
 
     /**
-    * return the total number of bytes in all tables that have
+    * return the total TUPLE_PENDING count in all tables that have
     * outstanding tuples in their export overflow.
     */
     protected static long getExportBacklog(Client client) {
@@ -336,9 +336,18 @@ public class MatchChecks {
         try {
             VoltTable tableStats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (tableStats.advanceRow()) {
-                Long allocatedMemory = tableStats.getLong("TUPLE_PENDING");
-                if ( allocatedMemory > 0 && tableStats.getString("ACTIVE").equalsIgnoreCase("TRUE") ) {
-                        backlog = backlog + allocatedMemory;
+                Long tpending = tableStats.getLong("TUPLE_PENDING");
+                if ( tpending > 0 && tableStats.getString("ACTIVE").equalsIgnoreCase("TRUE") ) {
+                        backlog = backlog + tpending;
+                }
+
+                String status = tableStats.getString("STATUS");
+                if (status.equalsIgnoreCase("BLOCKED")) {
+                    String source = tableStats.getString("SOURCE");
+                    Long partitionId = tableStats.getLong("PARTITION_ID");
+                    Long tcount = tableStats.getLong("TUPLE_COUNT");
+                    log.warn(String.format("source %s, partition: %d is currently BLOCKED. Count: %d, pending: %d",
+                                           source, partitionId, tcount, tpending));
                 }
             }
         } catch (Exception e) {
@@ -350,41 +359,22 @@ public class MatchChecks {
     }
 
     /**
-    * Export data is pushed to export overflow once every second (1 tick) + queue time when their is less then 2MB of
-    * data in the queue. We need to check that backlog is empty for two consecutive ticks.
-    */
-    protected static boolean isExportDrained(Client client) {
-
-        int done = 0;
-        if ( done < 2 ) {
-            long tableMemory = getExportBacklog(client);
-            if (tableMemory != 0) {
-                log.warn("export table has "+ tableMemory + " bytes to drain");
-                return false;
-            }
-            try { Thread.sleep(1100); } catch (Exception f) { }
-            done++;
-        }
-        return true;
-    }
-
-    /**
     * wait for export to drain. Timeout if their isn't any change
-    * in the backlog for 60 seconds.
+    * in the backlog for 3 minutes.
     */
     protected static boolean waitForExportToDrain(Client client) {
-        long timeout = 60000;
+        long timeout = 180;
         long changeTime = System.currentTimeMillis();
         long backlog = 0;
         long lastBacklog = 1;
         // backlog must be 0 for two ticks.
         int done = 0;
         while (done < 2 ) {
-            if (System.currentTimeMillis() > (changeTime + timeout ) ) {
+            if (System.currentTimeMillis() > (changeTime + timeout*1000 ) ) {
                break;
             }
             backlog = getExportBacklog(client);
-            log.info("waiting on export to drain "+backlog+" bytes");
+            log.info("waiting on export to drain "+backlog+" tuples");
             if ( backlog != lastBacklog) {
                 changeTime = System.currentTimeMillis();
                 lastBacklog = backlog;
@@ -400,7 +390,8 @@ public class MatchChecks {
             return true;
         }
 
-        log.error("Timeout waiting for export to drain, no change in backlog for 30s, backlog is " + backlog);
+        log.error(String.format("Timeout waiting for export to drain, no change in backlog for %d seconds, total tuple_pending: %d",
+                                timeout, backlog));
         return false;
     }
 }
