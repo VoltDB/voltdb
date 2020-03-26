@@ -605,7 +605,6 @@ namespace voltdb {
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
-            atomic_uchar m_deleting{'\0'};             // recursive-lockable (up to 255 times)
             // action before deallocating a tuple from txn (or hook) memory.
             boost::optional<function<void(void const*)>> const m_finalize{};
             // the end of allocations when snapshot started: (block id, end ptr)
@@ -656,15 +655,6 @@ namespace voltdb {
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
-            // In some cases?, we need to set deleting flag before it's too late.
-            class DeleterStatusLock final {
-                decltype(CompactingChunks::m_deleting)& m_status;
-            public:
-                DeleterStatusLock(CompactingChunks&) noexcept;
-                ~DeleterStatusLock();
-                DeleterStatusLock(DeleterStatusLock const&) = delete;
-                DeleterStatusLock(DeleterStatusLock&&) = delete;
-            };
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;

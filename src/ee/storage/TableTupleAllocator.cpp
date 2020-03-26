@@ -619,10 +619,6 @@ CompactingChunks::~CompactingChunks() {
     }
 }
 
-inline bool CompactingChunks::deleting() const noexcept {
-    return m_deleting != '\0';
-}
-
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
     m_chunks(chunks), m_iter(chunks.end()), m_next(nullptr) {
     assert(m_chunks.empty());
@@ -753,7 +749,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
     } else if (! m_batched.empty()) {
         throw logic_error("Unfinished remove_add(?) or remove_force()");
     } else  {                        // slow clear path
-//        DeleterStatusLock lck(*this);
         // first, apply call back on all txn tuples (in order)
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
                 static_cast<CompactingChunks const&>(*this),
@@ -842,7 +837,6 @@ void* CompactingChunks::free(void* dst) {
             throw range_error(buf);
         }
     } else {
-//        DeleterStatusLock lck(*this);
         void* src = beginTxn().iterator()->free();
         if (m_finalize) {
             (*m_finalize)(src);
@@ -1183,7 +1177,6 @@ inline void CompactingChunks::DelayedRemover::mapping() {
 }
 
 inline void CompactingChunks::DelayedRemover::shift() {
-//    CompactingChunks::DeleterStatusLock lck(m_chunks);
     if (! m_removedRegions.empty()) {
         std::for_each(m_removedRegions.cbegin(), prev(m_removedRegions.cend()),
                 [this](typename map_type::value_type const& entry) {
@@ -1232,16 +1225,6 @@ inline size_t CompactingChunks::DelayedRemover::force() {
 
 inline bool CompactingChunks::DelayedRemover::empty() const noexcept {
     return m_size == 0;
-}
-
-inline CompactingChunks::DeleterStatusLock::DeleterStatusLock(CompactingChunks& instance) noexcept :
-m_status(instance.m_deleting) {
-    ++m_status;
-}
-
-inline CompactingChunks::DeleterStatusLock::~DeleterStatusLock() {
-    assert(m_status != '\0');
-    --m_status;
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
@@ -1668,31 +1651,10 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::begin(
     return {c, cb};
 }
 
-/**
- * Coordinate iterator with call back to be despatched after
- * any txn writes are complete.
- */
-template<typename Chunks, typename = typename Chunks::Compact>
-struct TxnWriteBarrier {
-    inline constexpr bool operator()(Chunks const&) const noexcept {
-        return false;
-    }
-};
-template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
-    inline bool operator()(Chunks const& s) const noexcept {
-//        while (s.deleting()) {
-//            this_thread::sleep_for(chrono::nanoseconds{5});
-//        }
-        return false;
-    }
-};
-
 template<typename Chunks, typename Tag, typename E>
 template<typename Trans, iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::operator*() noexcept {
-//    constexpr static TxnWriteBarrier<Chunks> const barrier{};
-//    barrier(super::storage());
     return const_cast<void*>(m_cb(super::operator*()));
 }
 
@@ -2066,7 +2028,6 @@ template<typename Hook, typename E>
 template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::update(void* dst) {
     VOLT_TRACE("update(%p)", dst);
-//    CompactingChunks::DeleterStatusLock lck(*this);
     return Hook::add(Hook::ChangeType::Update, dst,
             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
 }
@@ -2132,7 +2093,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
 #endif
     // Mark deletion has begun before call-back time (and thus,
     // before any memcpy occurs).
-//    CompactingChunks::DeleterStatusLock lck(*this);
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }

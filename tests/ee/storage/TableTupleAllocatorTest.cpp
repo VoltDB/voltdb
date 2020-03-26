@@ -2192,10 +2192,10 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt2) {
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
             ++(*iter);
+            ++iterating_counter;
             if (iter->drained()) {
                 break;
             }
-            ++iterating_counter;
         }
         ASSERT_EQ(BigNumTuples, iterating_counter);
     };
