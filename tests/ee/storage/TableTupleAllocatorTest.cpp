@@ -2165,12 +2165,11 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
         addresses[i] = gen.fill(alloc.allocate());
     }
     auto const& iter = alloc.template freeze<truth>();
-    atomic_ulong iterating_counter{0lu};
     // deleting thread that triggers massive chained compaction,
     // by deleting one tuple at a time, in the compacting direction.
     // Synchronized perfectly with the snapshot iterator thread
     // on each deletion
-    auto const deleting_thread = [&alloc, &addresses, &iterating_counter, this] () {
+    auto const deleting_thread = [&alloc, &addresses, this] () {
         int j = 0;
         do {
             for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
@@ -2188,7 +2187,8 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     };
     // snapshot thread that validates. Synchronized perfectly
     // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, &iterating_counter, this] () {
+    auto const snapshot_thread = [&iter, this] () {
+        auto iterating_counter = 0lu;
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
             ++(*iter);
