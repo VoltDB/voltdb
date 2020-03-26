@@ -2159,9 +2159,10 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     Alloc alloc(TupleSize);
-    array<void*, NumTuples> addresses;
-    using interval_type = chrono::microseconds;
-    for (size_t i = 0; i < NumTuples; ++i) {
+    constexpr size_t BigNumTuples = NumTuples * 50;
+    array<void*, BigNumTuples> addresses;
+    using interval_type = chrono::nanoseconds;
+    for (size_t i = 0; i < BigNumTuples; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
     }
     auto const& iter = alloc.template freeze<truth>();
@@ -2186,10 +2187,10 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                             }));
                 ++deleting_counter;
                 while (deleting_counter > iterating_counter) {
-                    this_thread::sleep_for(interval_type(1));
+                    this_thread::sleep_for(interval_type(10));
                 }
             }
-        } while ((j += AllocsPerChunk) < NumTuples);
+        } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
     };
     // snapshot thread that validates. Synchronized perfectly
@@ -2203,10 +2204,10 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                 break;
             }
             while (iterating_counter > deleting_counter) {                                 // busy loop
-                this_thread::sleep_for(interval_type(1));
+                this_thread::sleep_for(interval_type(10));
             }
         }
-        ASSERT_EQ(NumTuples, iterating_counter);
+        ASSERT_EQ(BigNumTuples, iterating_counter);
     };
     thread t1(deleting_thread);
     snapshot_thread();

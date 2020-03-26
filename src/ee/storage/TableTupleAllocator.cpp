@@ -620,11 +620,7 @@ CompactingChunks::~CompactingChunks() {
 }
 
 inline bool CompactingChunks::deleting() const noexcept {
-    return m_deleting;
-}
-
-inline void CompactingChunks::set_deleting() noexcept {
-    m_deleting = true;
+    return m_deleting != '\0';
 }
 
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
@@ -712,17 +708,14 @@ inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type:
 }
 
 inline void CompactingChunks::pop_front(bool call_finalizer) {
-    m_deleting = true;
     if (call_finalizer) {
         pop_finalize(begin());
     }
     list_type::pop_front();
     beginTxn().iterator(begin());
-    m_deleting = false;
 }
 
 inline void CompactingChunks::pop_back(bool call_finalizer) {
-    m_deleting = true;
     if (call_finalizer) {
         pop_finalize(last());
     }
@@ -730,7 +723,6 @@ inline void CompactingChunks::pop_back(bool call_finalizer) {
     if (empty()) {
         beginTxn().iterator(end());
     }
-    m_deleting = false;
 }
 
 inline void CompactingChunks::freeze() {
@@ -752,7 +744,7 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
     } else if (! m_batched.empty()) {
         throw logic_error("Unfinished remove_add(?) or remove_force()");
     } else  {                        // slow clear path
-        m_deleting = true;
+        DeleterStatusLock lck(*this);
         // first, apply call back on all txn tuples (in order)
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
                 static_cast<CompactingChunks const&>(*this),
@@ -796,7 +788,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
             m_allocs = 0;
             m_txnFirstChunk.iterator(list_type::begin());
         }
-        m_deleting = false;
     }
 }
 
@@ -842,7 +833,7 @@ void* CompactingChunks::free(void* dst) {
             throw range_error(buf);
         }
     } else {
-        m_deleting = true;
+        DeleterStatusLock lck(*this);
         void* src = beginTxn().iterator()->free();
         if (m_finalize) {
             (*m_finalize)(src);
@@ -854,7 +845,6 @@ void* CompactingChunks::free(void* dst) {
             memcpy(dst, src, tupleSize());
         }
         releasable();
-        m_deleting = false;
         --m_allocs;
         return src;
     }
@@ -933,9 +923,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                             reinterpret_cast<char*&>(beginTxn().iterator()->m_next) =
                             dst + offset;
                     } else {                                   // right on the boundary
-                        m_deleting = true;
                         pop_front(false);
-                        m_deleting = false;
                     }
                     m_lastFreeFromHead = nullptr;
                 }
@@ -948,9 +936,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                         (beginTxn().iterator()->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||      // same chunk,
                         next(beginTxn().iterator())->range_begin() == p);                                     // or next chunk
                 if (! beginTxn().iterator()->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
-                    m_deleting = true;
                     pop_front(false);
-                    m_deleting = false;
                 }
                 --m_allocs;
             }
@@ -965,12 +951,10 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
             } else {
                 assert(reinterpret_cast<char const*>(p) + tupleSize() == last()->range_next());
                 if (last()->range_begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
-                    m_deleting = true;
                     pop_back(false);
                     if (m_allocs ==  1) {
                         beginTxn().iterator(list_type::end());
                     }
-                    m_deleting = false;
                 }
                 --m_allocs;
             }
@@ -1190,7 +1174,7 @@ inline void CompactingChunks::DelayedRemover::mapping() {
 }
 
 inline void CompactingChunks::DelayedRemover::shift() {
-    m_chunks.m_deleting = true;
+    CompactingChunks::DeleterStatusLock lck(m_chunks);
     if (! m_removedRegions.empty()) {
         std::for_each(m_removedRegions.cbegin(), prev(m_removedRegions.cend()),
                 [this](typename map_type::value_type const& entry) {
@@ -1209,7 +1193,6 @@ inline void CompactingChunks::DelayedRemover::shift() {
         m_chunks.releasable();
         m_chunks.m_allocs -= m_removed.size() + m_moved.size();
     }
-    m_chunks.m_deleting = false;
 }
 
 inline vector<pair<void*, void*>> const& CompactingChunks::DelayedRemover::movements() const {
@@ -1240,6 +1223,16 @@ inline size_t CompactingChunks::DelayedRemover::force() {
 
 inline bool CompactingChunks::DelayedRemover::empty() const noexcept {
     return m_size == 0;
+}
+
+inline CompactingChunks::DeleterStatusLock::DeleterStatusLock(CompactingChunks& instance) noexcept :
+m_instance(instance) {
+    ++m_instance.m_deleting;
+}
+
+inline CompactingChunks::DeleterStatusLock::~DeleterStatusLock() {
+    assert(m_instance.m_deleting != '\0');
+    --m_instance.m_deleting;
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
@@ -1675,7 +1668,7 @@ struct TxnWriteBarrier {
 template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
     inline bool operator()(Chunks const& s) const noexcept {
         while (s.deleting()) {
-            this_thread::sleep_for(chrono::microseconds{1});
+            this_thread::sleep_for(chrono::nanoseconds{10});
         }
         return false;
     }
@@ -2058,6 +2051,7 @@ template<typename Hook, typename E>
 template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::update(void* dst) {
     VOLT_TRACE("update(%p)", dst);
+    CompactingChunks::DeleterStatusLock lck(*this);
     return Hook::add(Hook::ChangeType::Update, dst,
             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
 }
@@ -2123,7 +2117,7 @@ HookedCompactingChunks<Hook, E>::remove_force(
 #endif
     // Mark deletion has begun before call-back time (and thus,
     // before any memcpy occurs).
-    set_deleting();
+    CompactingChunks::DeleterStatusLock lck(*this);
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }

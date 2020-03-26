@@ -617,7 +617,7 @@ namespace voltdb {
             void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
-            atomic_bool m_deleting{false};
+            atomic_uchar m_deleting{'\0'};              // recursive-lockable (up to 255 times)
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
@@ -656,10 +656,15 @@ namespace voltdb {
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
-            // in some cases?, we need to set deleting flag before it's too late.
-            // Caution: use it only when you know the flag is
-            // going to be reset very soon.
-            void set_deleting() noexcept;
+            // In some cases?, we need to set deleting flag before it's too late.
+            class DeleterStatusLock final {
+                CompactingChunks& m_instance;
+            public:
+                DeleterStatusLock(CompactingChunks&) noexcept;
+                ~DeleterStatusLock();
+                DeleterStatusLock(DeleterStatusLock const&) = delete;
+                DeleterStatusLock(DeleterStatusLock&&) = delete;
+            };
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
