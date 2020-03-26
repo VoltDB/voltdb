@@ -668,7 +668,6 @@ namespace voltdb {
             bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
             size_t chunkSize() const noexcept;
-            bool deleting() const noexcept;            // grab status
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
