@@ -576,8 +576,8 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public String getExportOverflowPath() {
-        return "export_overflow";
+    public File getExportOverflowPath() {
+        return new File("export_overflow");
     }
 
     @Override
@@ -593,6 +593,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getExportCursorPath() {
         return  "export_cursor";
+    }
+
+    @Override
+    public File getTopicsDataPath() {
+        return new File("topic_data");
     }
 
     @Override
