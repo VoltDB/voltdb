@@ -172,6 +172,7 @@ public class DiskResourceChecker
             return licenseApi.isDrReplicationAllowed();
         case SNAPSHOTS:
         case EXPORTOVERFLOW:
+        case TOPICSDATA:
             return true;
         default: return false;
         }
@@ -239,7 +240,7 @@ public class DiskResourceChecker
         }
     }
 
-    private static VoltFile getPathForFeature(FeatureNameType featureName)
+    private static File getPathForFeature(FeatureNameType featureName)
     {
         switch(featureName) {
         case COMMANDLOG :
@@ -249,9 +250,11 @@ public class DiskResourceChecker
         case DROVERFLOW:
             return new VoltFile(VoltDB.instance().getDROverflowPath());
         case EXPORTOVERFLOW:
-            return new VoltFile(VoltDB.instance().getExportOverflowPath());
+            return VoltDB.instance().getExportOverflowPath();
         case SNAPSHOTS:
             return new VoltFile(VoltDB.instance().getSnapshotPath());
+        case TOPICSDATA:
+            return VoltDB.instance().getTopicsDataPath();
         default: // Not a valid feature or one that is supported for disk limit monitoring.
                  // Should not happen unless we forget to add a newly supported feature here.
             return null;
@@ -262,7 +265,7 @@ public class DiskResourceChecker
     private static class FeatureDiskLimitConfig
     {
         final FeatureNameType m_featureName;
-        final VoltFile m_path;
+        final File m_path;
         final double m_diskSizeLimit;
         final int m_diskSizeLimitPerc;
         final double m_diskSizeLimitSnmp;

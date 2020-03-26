@@ -2376,6 +2376,7 @@ public abstract class CatalogUtil {
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
         setupDROverflow(paths.getDroverflow(), voltDbRoot);
         setupLargeQuerySwap(paths.getLargequeryswap(), voltDbRoot);
+        setupTopicData(voltDbRoot);
     }
 
     /**
@@ -2535,6 +2536,21 @@ public abstract class CatalogUtil {
         }
         validateDirectory("large query swap", largeQuerySwap);
         return largeQuerySwap;
+    }
+
+    public static File setupTopicData(File voltDbRoot) {
+        File topicsDataDir = VoltDB.instance().getTopicsDataPath();
+        if (!topicsDataDir.isAbsolute()) {
+            topicsDataDir = new VoltFile(voltDbRoot, topicsDataDir.getPath());
+        }
+        if (!topicsDataDir.exists()) {
+            hostLog.info("Creating topics data directory: " + topicsDataDir.getAbsolutePath());
+            if (!topicsDataDir.mkdirs()) {
+                hostLog.fatal("Failed to create topics data directory \"" + topicsDataDir + "\"");
+            }
+        }
+        validateDirectory("topics data", topicsDataDir);
+        return topicsDataDir;
     }
 
     /**

@@ -71,10 +71,11 @@ public interface VoltDBInterface
     public String getCommandLogSnapshotPath();
     public String getCommandLogPath();
     public String getSnapshotPath();
-    public String getExportOverflowPath();
+    public File getExportOverflowPath();
     public String getDROverflowPath();
     public String getLargeQuerySwapPath();
     public String getExportCursorPath();
+    public File getTopicsDataPath();
 
     public boolean isBare();
     public boolean isClusterComplete();

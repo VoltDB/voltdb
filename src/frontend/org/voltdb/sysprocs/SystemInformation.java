@@ -516,7 +516,7 @@ public class SystemInformation extends VoltSystemProcedure
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath());
+                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath().getPath());
                 break;
             }
         }

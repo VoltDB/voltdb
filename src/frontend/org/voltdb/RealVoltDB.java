@@ -614,8 +614,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public String getExportOverflowPath() {
-        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow()).getPath();
+    public File getExportOverflowPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow());
     }
 
     @Override
@@ -631,6 +631,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public String getExportCursorPath() {
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportCursor()).getPath();
+    }
+
+    @Override
+    public File getTopicsDataPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getTopicsData());
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -691,6 +696,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             nonEmptyPaths.add(path);
         }
         if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null) {
+            nonEmptyPaths.add(path);
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getTopicsDataPath().getPath())) != null) {
             nonEmptyPaths.add(path);
         }
         return nonEmptyPaths.build();
