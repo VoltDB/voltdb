@@ -33,6 +33,7 @@ public abstract class PBDSegment<M> {
 
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
+    static final long INVALID_ID = Long.MIN_VALUE;
 
     // Segment Header layout:
     // - version of segment headers (4 bytes)
@@ -164,8 +165,10 @@ public abstract class PBDSegment<M> {
     /**
      * Writes passed in bytes to this segment as next entry in the PBD.
      * @param cont BBContainer with the bytes to be written
-     * @param startId the starting id of the data that is being offered
-     * @param endId the ending id of the data that is being offered
+     * @param startId the starting id of the data that is being offered. This should be <code>INVALID_ID</code>
+     *        if the PBD does not require ids
+     * @param endId the ending id of the data that is being offered. This should be <code>INVALID_ID</code>
+     *        if the PBD does not require ids
      * @return the number of bytes written. If compression is enables, bytes written will be
      *         different from the number passed in. -1 will be returned if the bytes cannot
      *         fit into this segment.
