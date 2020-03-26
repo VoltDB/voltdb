@@ -2159,7 +2159,7 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     Alloc alloc(TupleSize);
-    constexpr size_t BigNumTuples = NumTuples * 50;
+    constexpr size_t BigNumTuples = NumTuples * 5;
     array<void*, BigNumTuples> addresses;
     using interval_type = chrono::nanoseconds;
     for (size_t i = 0; i < BigNumTuples; ++i) {
@@ -2185,10 +2185,10 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                                         Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
                                 memcpy(entries[0].first, entries[0].second, TupleSize);
                             }));
-                ++deleting_counter;
-                while (deleting_counter > iterating_counter) {
-                    this_thread::sleep_for(interval_type(10));
-                }
+//                ++deleting_counter;
+//                while (deleting_counter > iterating_counter) {
+//                    this_thread::sleep_for(interval_type(10));
+//                }
             }
         } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
@@ -2198,14 +2198,14 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     auto const snapshot_thread = [&iter, &deleting_counter, &iterating_counter, this] () {
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
-            ++iterating_counter;
             ++(*iter);
             if (iter->drained()) {
                 break;
             }
-            while (iterating_counter > deleting_counter) {                                 // busy loop
-                this_thread::sleep_for(interval_type(10));
-            }
+            ++iterating_counter;
+//            while (iterating_counter > deleting_counter) {                                 // busy loop
+//                this_thread::sleep_for(interval_type(10));
+//            }
         }
         ASSERT_EQ(BigNumTuples, iterating_counter);
     };
