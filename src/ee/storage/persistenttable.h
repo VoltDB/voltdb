@@ -398,6 +398,8 @@ public:
      */
     bool nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType);
 
+    void stopSnapshot();
+
     /**
      * Create a tree index on the primary key and then iterate it and hash
      * the tuple data.
@@ -757,6 +759,7 @@ private:
     std::unique_ptr<Alloc> m_dataStorage;
     std::shared_ptr<SnapshotIterator> m_snapIt;
     std::shared_ptr<ElasticIndexIterator> m_elasticIt ;
+    bool m_snapshotStarted;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;

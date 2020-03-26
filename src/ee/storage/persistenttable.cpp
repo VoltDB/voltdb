@@ -85,6 +85,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_purgeExecutorVector()
     , m_views()
     , m_stats(this)
+    , m_snapshotStarted(false)
     , m_tableStreamer()
     , m_invisibleTuplesPendingDeleteCount(0)
     , m_batchDeleteTupleCount(0)
@@ -1772,28 +1773,46 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
    if (streamType == TABLE_STREAM_SNAPSHOT) {
        vassert(m_snapIt.get() == nullptr);
        m_snapIt = allocator().template freeze<storage::truth>();
+       m_snapshotStarted = true;
    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
        m_elasticIt = std::make_shared<ElasticIndexIterator>(allocator());
+   }
+}
+
+void PersistentTable::stopSnapshot() {
+   if (m_snapIt.get() != nullptr && m_snapIt->drained()) {
+      if (isReplicatedTable()) {
+         ScopedReplicatedResourceLock scopedLock;
+         ExecuteWithMpMemory useMpMemory;
+         allocator().template thaw<storage::truth>();
+         m_snapIt.reset();
+      } else {
+         allocator().template thaw<storage::truth>();
+         m_snapIt.reset();
+      }
    }
 }
 
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
        if (m_snapIt->drained()) {
-           if (isReplicatedTable()) {
-              ScopedReplicatedResourceLock scopedLock;
-              ExecuteWithMpMemory useMpMemory;
-              allocator().template thaw<storage::truth>();
-              m_snapIt.reset();
-          } else {
-              allocator().template thaw<storage::truth>();
-              m_snapIt.reset();
-          }
+          stopSnapshot();
+          return false;
+       }
+
+       // Advance the iterator and get the tuple
+       if (m_snapshotStarted) {
+          m_snapshotStarted = false;
+       } else {
+          ++*m_snapIt;
+       }
+       if (m_snapIt->drained()) {
+          stopSnapshot();
           return false;
        }
        auto *p = **m_snapIt;
        tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
-       ++*m_snapIt;
+       return true;
     } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
        if (m_elasticIt->drained()) {
          m_elasticIt.reset();
