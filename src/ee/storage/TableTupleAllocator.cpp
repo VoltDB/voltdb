@@ -735,6 +735,15 @@ inline void CompactingChunks::freeze() {
 inline void CompactingChunks::thaw() {
     m_frozenTxnBoundaries.clear();
     CompactingStorageTrait::thaw();
+    // it is possible that some chunks in snapshot remains to be
+    // cleared, despite we try to make it as clean as possible in
+    // the ChunkDeleter. Not cleaning it up creates problems for
+    // later snapshot processes, and leaks memory.
+    while (! list_type::empty() && less<ChunkHolder<>>()(front(), *beginTxn().iterator())) {
+        // since we are cleaning up snapshot-only chunk
+        // residuals, do NOT finalize.
+        list_type::pop_front();
+    }
 }
 
 template<typename Remove_cb>
@@ -1226,13 +1235,13 @@ inline bool CompactingChunks::DelayedRemover::empty() const noexcept {
 }
 
 inline CompactingChunks::DeleterStatusLock::DeleterStatusLock(CompactingChunks& instance) noexcept :
-m_instance(instance) {
-    ++m_instance.m_deleting;
+m_status(instance.m_deleting) {
+    ++m_status;
 }
 
 inline CompactingChunks::DeleterStatusLock::~DeleterStatusLock() {
-    assert(m_instance.m_deleting != '\0');
-    --m_instance.m_deleting;
+    assert(m_status != '\0');
+    --m_status;
 }
 
 template<typename Chunks, typename Tag, typename E> Tag IterableTableTupleChunks<Chunks, Tag, E>::s_tagger{};
@@ -1656,8 +1665,8 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::begin(
 }
 
 /**
- * Coordinate iterator call back to be made after any txn writes
- * are complete.
+ * Coordinate iterator with call back to be despatched after
+ * any txn writes are complete.
  */
 template<typename Chunks, typename = typename Chunks::Compact>
 struct TxnWriteBarrier {
@@ -1667,9 +1676,9 @@ struct TxnWriteBarrier {
 };
 template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
     inline bool operator()(Chunks const& s) const noexcept {
-        while (s.deleting()) {
-            this_thread::sleep_for(chrono::nanoseconds{10});
-        }
+//        while (s.deleting()) {
+//            this_thread::sleep_for(chrono::nanoseconds{5});
+//        }
         return false;
     }
 };
@@ -2082,7 +2091,7 @@ template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::remove_add(void* p) {
     CompactingChunks::m_batched.add(p);
     if (frozen()) {            // hook registration
-        Hook::copy(p);
+        Hook::copy(p);         // needs to protect writes to hook map
         return Hook::add(Hook::ChangeType::Deletion, p,
                 reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     } else {

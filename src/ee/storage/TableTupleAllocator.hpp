@@ -603,8 +603,9 @@ namespace voltdb {
             // equivalent to "table id", to ensure injection relation to rw iterator
             id_type const m_id = ChunksIdValidator::instance().id();
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
-            TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
+            TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
+            atomic_uchar m_deleting{'\0'};             // recursive-lockable (up to 255 times)
             // action before deallocating a tuple from txn (or hook) memory.
             boost::optional<function<void(void const*)>> const m_finalize{};
             // the end of allocations when snapshot started: (block id, end ptr)
@@ -617,7 +618,6 @@ namespace voltdb {
             void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
-            atomic_uchar m_deleting{'\0'};              // recursive-lockable (up to 255 times)
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
@@ -658,7 +658,7 @@ namespace voltdb {
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
             // In some cases?, we need to set deleting flag before it's too late.
             class DeleterStatusLock final {
-                CompactingChunks& m_instance;
+                decltype(CompactingChunks::m_deleting)& m_status;
             public:
                 DeleterStatusLock(CompactingChunks&) noexcept;
                 ~DeleterStatusLock();
