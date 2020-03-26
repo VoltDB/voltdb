@@ -56,7 +56,9 @@ public class MpPromoteAlgo implements RepairAlgo
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
-    private final boolean m_isMigratePartitionLeader;
+    // If leader change is caused by leader migration request, and no pending repair was cancelled previously,
+    // the repair message is not necessarily needed
+    private final boolean m_skipRepair;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
     private long m_repairTruncationHandle = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
     long getRequestId()
@@ -123,12 +125,12 @@ public class MpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
-            MpRestartSequenceGenerator seqGen, String whoami, boolean migratePartitionLeader)
+            MpRestartSequenceGenerator seqGen, String whoami, boolean skipRepair)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_deadHost = deadHost;
         m_mailbox = mailbox;
-        m_isMigratePartitionLeader = migratePartitionLeader;
+        m_skipRepair = skipRepair;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
     }
@@ -230,7 +232,7 @@ public class MpPromoteAlgo implements RepairAlgo
 
                     //no real transaction repair when triggered with MigratePartitionLeader. Theoretically it should not be here.
                     //MigratePartitionLeader should not trigger MP promotion.
-                    if (m_isMigratePartitionLeader) {
+                    if (m_skipRepair) {
                         m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_repairTruncationHandle));
                     } else {
                         repairSurvivors();
