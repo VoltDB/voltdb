@@ -285,8 +285,10 @@ public class SystemProcedureCatalog {
     // Cache VoltSysemProcedure by name which should be processed
     // when TaskLogs are replayed during rejoining.
     static ImmutableSet<String> s_allowableSysprocsInTaskLog;
-    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
-        // special-case replica acceptability by DR version
+    static {
+        // SinglePar  ReadOnly  EverySite  ParParam  ParamType
+        // Commercial  KillDR  ReplicaOK  Durability
+        // AllowedInShutdown  Transactional  Restartability
         final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
@@ -368,6 +370,16 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
+        builder.put("@GracefulShutdown",
+                new Config("org.voltdb.sysprocs.GracefulShutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        true, false, Restartability.NOT_APPLICABLE));
+        builder.put("@GracefulShutdownWait",
+                new Config("org.voltdb.sysprocs.GracefulShutdownWait",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        true, false, Restartability.NOT_APPLICABLE));
         builder.put("@ProfCtl",
                 new Config("org.voltdb.sysprocs.ProfCtl",
                         false, false, true, 0, VoltType.INVALID,

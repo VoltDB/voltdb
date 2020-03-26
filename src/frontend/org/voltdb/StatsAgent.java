@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.Map;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -491,6 +492,16 @@ public class StatsAgent extends OpsAgent
         if (siteIdToStatsSources != null) {
             siteIdToStatsSources.remove(siteId);
         }
+    }
+
+    public Set<StatsSource> lookupStatsSource(StatsSelector selector, long siteId) {
+        assert selector != null;
+
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
+                m_registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+
+        return siteIdToStatsSources.get(siteId);
     }
 
     /**

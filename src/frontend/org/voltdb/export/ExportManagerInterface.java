@@ -160,6 +160,17 @@ public interface ExportManagerInterface {
 
     public List<ExportStatsRow> getStats(final boolean interval);
 
+    /**
+     * Used by graceful shutdown
+     */
+    default long getTotalPendingCount() {
+        long total = 0;
+        for (ExportStatsRow st : getStats(false)) {
+            total += st.m_tuplesPending;
+        }
+        return total;
+    }
+
     public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin);
 

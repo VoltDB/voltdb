@@ -194,6 +194,13 @@ public abstract class StatsSource {
     }
 
     /**
+     * Gets an index for a named column
+     */
+    public int getStatsColumnIndex(String columnName) {
+        return columnNameToIndex.get(columnName);
+    }
+
+    /**
      * Retrieve an iterator that iterates over the keys identifying all unique
      * stats rows available for retrieval from the stats source
      * @param interval Whether return stats that are recorded from the

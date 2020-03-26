@@ -208,6 +208,18 @@ public class ImporterStatsCollector extends SiteStatsSource
         return value;
     }
 
+    // Used by graceful shutdown
+    public long getTotalPendingCount() {
+        long total = 0;
+        StatsInfoIterator sii = new StatsInfoIterator();
+        while (sii.hasNext()) {
+            long ct = ((StatsInfo)sii.next()).m_pendingCount.get();
+            if (ct > 0) { // negative possible: ignore
+                total += ct;
+            }
+        }
+        return total;
+    }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
