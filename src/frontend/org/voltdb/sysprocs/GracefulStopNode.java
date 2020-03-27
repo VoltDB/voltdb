@@ -166,6 +166,8 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
     /*
      * Counts the number of partitions for which the specified host
      * is the partition leader. Queries TOPO stats to get the data.
+     * Partition numbers are in the range [0,16383], but 16383 has
+     * special meaning, which we ignore.
      */
     private int countLeadership(int hostId) {
         int leaders = 0;
@@ -173,7 +175,7 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
         while (vt != null && vt.advanceRow()) {
             long partition = vt.getLong(0);
             String leader = vt.getString(2);
-            if (partition != 16384 && leader != null && !leader.isEmpty()) {
+            if (partition < 16383 && leader != null && !leader.isEmpty()) {
                 int leaderHost = Integer.parseInt(leader.split(":")[0]);
                 if (leaderHost == hostId) {
                     info("Host %d is still leader for partition %d", leaderHost, partition);
