@@ -204,6 +204,69 @@ public class TestPersistentBinaryDeque {
         return sorted;
     }
 
+    @Test (timeout = 10_000)
+    public void testFileNamesNoIds() throws Exception {
+        testFileNames(false);
+    }
+
+    @Test (timeout = 10_000)
+    public void testFileNamesWithIds() throws Exception {
+        testFileNames(true);
+    }
+
+    private void testFileNames(boolean requiresId) throws Exception {
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .requiresId(requiresId)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        // Make files and verify names
+        int numFiles = 3;
+        long startSeqNo = 1;
+        for (int i=0; i<numFiles; i++) {
+            if (requiresId) {
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i*10, startSeqNo + (i+1)*10 - 1);
+            } else {
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)));
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+
+        List<File> files = getSortedDirectoryListing();
+        assertEquals(numFiles, files.size());
+        for (int i=0; i<files.size(); i++) {
+            PbdSegmentName name = PbdSegmentName.parseFile(logger, files.get(i));
+            if (requiresId) {
+                assertEquals(startSeqNo + i*10, name.m_id);
+            } else {
+                assertEquals(i+1, name.m_id);
+            }
+        }
+
+        // close and open. Add 2 more
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .requiresId(requiresId)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+        for (int i=numFiles; i<numFiles+2; i++) {
+            if (requiresId) {
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i*10, startSeqNo + (i+1)*10 - 1);
+            } else {
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)));
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+        numFiles += 2;
+        files = getSortedDirectoryListing();
+        assertEquals(numFiles, files.size());
+        for (int i=0; i<files.size(); i++) {
+            PbdSegmentName name = PbdSegmentName.parseFile(logger, files.get(i));
+            if (requiresId) {
+                assertEquals(startSeqNo + i*10, name.m_id);
+            } else {
+                assertEquals(i+1, name.m_id);
+            }
+        }
+    }
+
     @Test
     public void testFileSizeDiff() throws Exception {
         List<File> files = getSortedDirectoryListing();
