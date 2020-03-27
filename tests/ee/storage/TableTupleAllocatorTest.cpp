@@ -2159,20 +2159,17 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     Alloc alloc(TupleSize);
-    array<void*, NumTuples> addresses;
-    using interval_type = chrono::microseconds;
-    for (size_t i = 0; i < NumTuples; ++i) {
+    constexpr size_t BigNumTuples = NumTuples * 5;
+    array<void*, BigNumTuples> addresses;
+    for (size_t i = 0; i < BigNumTuples; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
     }
     auto const& iter = alloc.template freeze<truth>();
-    atomic_ulong deleting_counter{0lu},                                  // thread coordinators
-                 iterating_counter{0lu};
     // deleting thread that triggers massive chained compaction,
     // by deleting one tuple at a time, in the compacting direction.
     // Synchronized perfectly with the snapshot iterator thread
     // on each deletion
-    auto const deleting_thread = [&alloc, &addresses, &deleting_counter,
-         &iterating_counter, this] () {
+    auto const deleting_thread = [&alloc, &addresses, this] () {
         int j = 0;
         do {
             for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
@@ -2184,29 +2181,23 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                                         Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
                                 memcpy(entries[0].first, entries[0].second, TupleSize);
                             }));
-                ++deleting_counter;
-                while (deleting_counter > iterating_counter) {
-                    this_thread::sleep_for(interval_type(1));
-                }
             }
-        } while ((j += AllocsPerChunk) < NumTuples);
+        } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
     };
     // snapshot thread that validates. Synchronized perfectly
     // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, &deleting_counter, &iterating_counter, this] () {
+    auto const snapshot_thread = [&iter, this] () {
+        auto iterating_counter = 0lu;
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
-            ++iterating_counter;
             ++(*iter);
+            ++iterating_counter;
             if (iter->drained()) {
                 break;
             }
-            while (iterating_counter > deleting_counter) {                                 // busy loop
-                this_thread::sleep_for(interval_type(1));
-            }
         }
-        ASSERT_EQ(NumTuples, iterating_counter);
+        ASSERT_EQ(BigNumTuples, iterating_counter);
     };
     thread t1(deleting_thread);
     snapshot_thread();

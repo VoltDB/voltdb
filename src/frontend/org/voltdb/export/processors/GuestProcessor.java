@@ -30,6 +30,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -382,6 +383,11 @@ public class GuestProcessor implements ExportDataProcessor {
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 ExportRow row = null;
                                 boolean firstRowOfBlock = true;
+                                long start = 0L;
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Processing " + cont + " on " + source);
+                                    start = System.nanoTime();
+                                }
                                 while (buf.hasRemaining() && !m_shutdown) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
@@ -429,6 +435,15 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 else if (row != null) {
                                     edb.onBlockCompletion(row);
+                                }
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    long elapsedMs = TimeUnit.MILLISECONDS.convert(
+                                            System.nanoTime() - start, TimeUnit.NANOSECONDS);
+                                    long elapsedS = TimeUnit.SECONDS.convert(elapsedMs, TimeUnit.MILLISECONDS);
+                                    long rowsS = cont.getTupleCount() / (elapsedS > 0? elapsedS : 1);
+                                    EXPORTLOG.debug("Processed " + cont + " on " + source + ", "
+                                            + cont.getTupleCount() + " rows in " + elapsedMs + " ms"
+                                            + " (" + rowsS + " rows/s)");
                                 }
                                 // Make sure to discard after onBlockCompletion so that if completion
                                 // wants to retry we don't lose block.
