@@ -1195,8 +1195,6 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
         Procedures.put("@Shutdown",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
-        Procedures.put("@GracefulShutdown",
-                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("int", "int", "int")).build());
         Procedures.put("@StopNode",
                 ImmutableMap.<Integer, List<String>>builder().put(1, Arrays.asList("int")).build());
         Procedures.put("@SnapshotDelete",

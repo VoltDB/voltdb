@@ -548,6 +548,11 @@ public class SystemProcedureCatalog {
                         true,  false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
+        builder.put("@GracefulStopNode",
+                new Config("org.voltdb.sysprocs.GracefulStopNode",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, false, Restartability.NOT_APPLICABLE));
         builder.put("@Explain",
                 new Config("org.voltdb.sysprocs.Explain",
                         false, true, false, 0, VoltType.INVALID,
