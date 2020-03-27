@@ -42,7 +42,7 @@ def hostIdsToNames(hostId, hosts):
                                   disabled_export -- ignore pending export data for targets that are disabled''',
                                   default = ''),
             VOLT.IntegerOption(None, '--delay', 'shutdown_delay', 'Delay the shutdown of the hosts which are being removed. '
-                               + 'This needs to be specified if topics are being used. Unit is seconds.', default=-1),
+                               + 'This needs to be specified if topics are being used. Unit is minutes.', default=-1),
             VOLT.StringOption(None, '--test', 'opt', 'Check the feasibility of current resizing plan.', action='store_const', const=Option.TEST, default=Option.START),
             VOLT.StringOption(None, '--restart', 'opt', 'Restart the previous failed resizing operation.', action='store_const', const=Option.RESTART),
             VOLT.StringOption(None, '--status', 'opt', 'Check the resizing progress.', action='store_const', const=Option.STATUS),
