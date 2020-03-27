@@ -18,7 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -93,6 +92,7 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
      * @return on failure to quiesce: table of (host id, status, activity)
      *         on successful shutdown: does not return
      *
+     * Timeouts are specified in seconds in this external API.
      * Either timeout can be made infinite by setting it to -1.
      */
     public VoltTable[] run(Integer options, Integer progressTmo, Integer waitTmo) {
@@ -103,9 +103,9 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
             throw new VoltAbortException("@GracefulShutdown is already running");
         }
         try {
-            return runShutdown(Optional.ofNullable(options).orElse(0),
-                               Optional.ofNullable(progressTmo).orElse(PROGRESS_TIMEOUT),
-                               Optional.ofNullable(waitTmo).orElse(WAIT_TIMEOUT));
+            return runShutdown(options == null ? 0 : options.intValue(),
+                               toMs(progressTmo, PROGRESS_TIMEOUT),
+                               toMs(waitTmo, WAIT_TIMEOUT));
         }
         finally {
             if (!lock.getAndSet(false)) {
@@ -115,8 +115,21 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
     }
 
     /*
+     * Seconds to milliseconds, handling null, 'infinite', and
+     * avoiding integer overflow.
+     */
+    private int toMs(Integer secs, int deflt) {
+        return secs == null ? deflt
+            : secs < 0 ? -1
+            : secs < Integer.MAX_VALUE/1000 ? secs*1000
+            : Integer.MAX_VALUE;
+    }
+
+    /*
      * Implementation, separate method to avoid clutter from the
      * lock management in the public method.
+     *
+     * Note that from here on, times are always handled in msec.
      */
     private VoltTable[] runShutdown(int options, int progressTmo, int waitTmo) {
         info("Graceful shutdown of database requested");

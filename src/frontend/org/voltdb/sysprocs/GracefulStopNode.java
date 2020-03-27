@@ -62,12 +62,10 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
      * @param waitTmo time limit on waiting for all activity to drain
      * @return an empty VoltTable
      *
+     * Timeouts are specified in seconds in this external API.
      * Either timeout can be made infinite by setting it to -1.
      */
     public VoltTable[] run(Integer hostId, Integer progressTmo, Integer waitTmo) {
-        if (progressTmo == null) progressTmo = Integer.valueOf(PROGRESS_TIMEOUT);
-        if (waitTmo == null) waitTmo = Integer.valueOf(WAIT_TIMEOUT);
-
         if (hostId == null) {
              throw new VoltAbortException("@GracefulStopNode requires a host id");
         }
@@ -79,8 +77,10 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
         callProcGetResult("@PrepareStopNode", hostId);
 
         info("Waiting for host %d to quiesce", hostId);
-        drain("partition leadership", hostId, this::countLeadership, true, progressTmo, waitTmo);
-        drain("export mastership", hostId, this::countExportMastership, false, progressTmo, waitTmo);
+        int progTmoMs = toMs(progressTmo, PROGRESS_TIMEOUT);
+        int waitTmoMs = toMs(waitTmo, WAIT_TIMEOUT);
+        drain("partition leadership", hostId, this::countLeadership, true, progTmoMs, waitTmoMs);
+        drain("export mastership", hostId, this::countExportMastership, false, progTmoMs, waitTmoMs);
 
         info("Stopping host %d", hostId);
         callProcGetResult("@StopNode", hostId);
@@ -90,9 +90,20 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
     }
 
     /*
+     * Seconds to milliseconds, handling null, 'infinite', and
+     * avoiding integer overflow.
+     */
+    private int toMs(Integer secs, int deflt) {
+        return secs == null ? deflt
+            : secs < 0 ? -1 // means infinite timeout
+            : secs < Integer.MAX_VALUE/1000 ? secs*1000
+            : Integer.MAX_VALUE;
+    }
+
+    /*
      * Waits for some countable condition to become zero; the count is
      * reported by countFunc, which we repeatedly evaluate. There are
-     * optional timeouts for the total time we can wait to drain,
+     * optional timeouts (in msec) for the total time we can wait to drain,
      * and on the time that can pass without progress being made.
      */
     private void drain(String what, int hostId, IntUnaryOperator countFunc,

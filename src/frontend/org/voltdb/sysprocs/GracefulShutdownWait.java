@@ -59,7 +59,8 @@ import org.voltdb.export.ExportManagerInterface;
  * - An overall timeout; the entire cluster is required
  *   to become inactive within this limit.
  * Either or both timeouts can be set to infinity, which
- * is represented as -1.
+ * is represented as -1. Otherwise the value is expressed
+ * in msec (unlike @GracefulShutdown's API).
  *
  * We monitor the flag set by @PrepareShutdown and
  * cleared by @CancelShutdown to determine if we should
