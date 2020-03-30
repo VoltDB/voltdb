@@ -1361,6 +1361,8 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                 // needs to use the next() position.
                 vassert((iter->range_begin() == iter->range_next()) == (next(iter) != l.end()));
                 return iter->range_begin() == iter->range_next() ? iter->range_end() : iter->range_next();
+            } else if (leftId == iterId) {      // in the left boundary of frozen state
+                return frozenBoundaries.left().address();
             } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
                 if (less_rolling(iterId, rightId)) {
                     return iter->range_end();
@@ -1368,8 +1370,6 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                     vassert(iterId == rightId);
                     return frozenBoundaries.right().address();
                 }
-            } else if (leftId == iterId) {      // in the left boundary of frozen state
-                return hasTxnInvisibleChunks ? iter->range_end() : frozenBoundaries.left().address();
             } else if (rightId == iterId) {     // in the right boundary
                 return frozenBoundaries.right().address();
             } else if (txnBeginChunkId == iterId) {
