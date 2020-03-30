@@ -929,8 +929,6 @@ namespace voltdb {
                 using list_iterator_type = typename conditional<perm == iterator_permission_type::ro,
                       typename Chunks::list_type::const_iterator, typename Chunks::list_type::iterator>::type;
                 list_iterator_type m_iter;
-                bool const m_hasTxnInvisibleChunks;    // can be true only if in snapshot view, is frozen, and contains chunks
-                // only visible to snapshot
             protected:
                 using value_type = typename super::value_type;
                 // ctor arg type
