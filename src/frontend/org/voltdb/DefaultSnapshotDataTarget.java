@@ -535,6 +535,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     }
                     SNAP_LOG.error("Unexpected error while attempting to write snapshot data to file " + m_file, t);
                     m_writeFailed = true;
+                    throw t;
                 } finally {
                     try {
                         tupleDataCont.discard();
