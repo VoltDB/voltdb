@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.rules.physical;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -41,6 +40,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalMergeExchange;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+
+import com.google.common.collect.Lists;
 
 /**
  * Rules that to push Limit, Sort and (Calc) Aggregation nodes down through an Exchange node
@@ -342,25 +343,50 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
                 fragmentDistribution);
 
         // Coordinator fragment. Replace all occurrences of COUNT with SUM
-        List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()
-                .map(oldCall -> {
-                    if (oldCall.getAggregation().kind == SqlKind.COUNT) {
-                        final AggregateCall sumCall =
-                                AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
-                                    oldCall.isDistinct(),
-                                    oldCall.isApproximate(),
-                                    oldCall.getArgList(),
-                                    oldCall.filterArg,
-                                    aggregate.getGroupCount(),
-                                    aggregate,
-                                    oldCall.getType(),
-                                    null);
-                        return sumCall;
-                    } else {
-                        return oldCall;
-                    }
-                })
-                .collect(Collectors.toList());
+        // The input for a newly created SUM0FZROMCOUNT AggregateCall must be
+        // the output from the fragment's COUNT aggregate
+//        List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()
+//                .map(oldCall -> {
+//                    if (oldCall.getAggregation().kind == SqlKind.COUNT) {
+//                        final AggregateCall sumCall =
+//                                AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
+//                                    oldCall.isDistinct(),
+//                                    oldCall.isApproximate(),
+//                                    oldCall.getArgList(),
+//                                    oldCall.filterArg,
+//                                    aggregate.getGroupCount(),
+//                                    aggregate,
+//                                    oldCall.getType(),
+//                                    null);
+//                        return sumCall;
+//                    } else {
+//                        return oldCall;
+//                    }
+//                })
+//                .collect(Collectors.toList());
+
+        // It seems that aggregate call fields are the last ones in the Aggregate output record.
+        int aggCallIdx = aggregate.getRowType().getFieldCount() - aggregate.getAggCallList().size();
+        assert (aggCallIdx >= 0);
+        List<AggregateCall> aggCalls = Lists.newArrayList();
+        for(AggregateCall oldCall: aggregate.getAggCallList()) {
+            if (oldCall.getAggregation().kind == SqlKind.COUNT) {
+                final AggregateCall sumCall =
+                        AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
+                                oldCall.isDistinct(),
+                                oldCall.isApproximate(),
+                                Lists.newArrayList(aggCallIdx),
+                                oldCall.filterArg,
+                                aggregate.getGroupCount(),
+                                aggregate,
+                                oldCall.getType(),
+                                null);
+                aggCalls.add(sumCall);
+            } else {
+                aggCalls.add(oldCall);
+            }
+            aggCallIdx += 1;
+        }
 
         VoltPhysicalAggregate coordinatorAggregate = aggregate.copy(
                 aggregate.getCluster(),

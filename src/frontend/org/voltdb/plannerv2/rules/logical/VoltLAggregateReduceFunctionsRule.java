@@ -17,7 +17,13 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import java.util.List;
+
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
+import org.apache.calcite.sql.SqlKind;
 import org.voltdb.plannerv2.rel.VoltLRelBuilder;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
 
@@ -35,4 +41,29 @@ public class VoltLAggregateReduceFunctionsRule extends AggregateReduceFunctionsR
         super(operand(VoltLogicalAggregate.class, any()),
                 VoltLRelBuilder.LOGICAL_BUILDER);
     }
+
+    @Override
+    public boolean matches(RelOptRuleCall call) {
+        if (!super.matches(call)) {
+            return false;
+        }
+        Aggregate oldAggRel = (Aggregate) call.rels[0];
+        return containsAvgStddevVarCall(oldAggRel.getAggCallList());
+    }
+
+    /**
+     * Returns whether any of the aggregates are calls to AVG.
+     * All other are ignored
+     *
+     * @param aggCallList List of aggregate calls
+     */
+    private boolean containsAvgStddevVarCall(List<AggregateCall> aggCallList) {
+        for (AggregateCall call : aggCallList) {
+            if (SqlKind.AVG_AGG_FUNCTIONS.contains(call.getAggregation().getKind())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
