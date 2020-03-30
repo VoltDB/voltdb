@@ -1658,7 +1658,7 @@ inline position_type::position_type(CompactingChunks const& c, void const* p) : 
 
 template<typename iterator>
 inline position_type::position_type(void const* p, iterator const& iter) noexcept :
-m_chunkId(iter->id()), m_addr(p) {}
+m_chunkId(p == nullptr ? 0 : iter->id()), m_addr(p) {}
 
 inline id_type position_type::chunkId() const noexcept {
     return m_chunkId;
