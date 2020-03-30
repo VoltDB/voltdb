@@ -1351,7 +1351,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            if (action == StreamStartAction.RECOVER) {
+            if (action == StreamStartAction.RECOVER || t.getIstopic()) {
                 ExportSnapshotTuple sequences =
                         sequenceNumberPerPartition.get(myPartitionId);
                 if (sequences == null) {
