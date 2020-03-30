@@ -1379,7 +1379,7 @@ struct ChunkDeleter {
 
 template<typename ChunkList, typename Iter>
 struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view_type::snapshot, true_type> {
-    inline void operator()(ChunkList& l, Iter& iter) const noexcept {
+    inline void operator()(ChunkList& l, Iter& iter) const {
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
             auto const id = iter->id();
