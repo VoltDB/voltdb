@@ -1326,11 +1326,7 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator position_type() const noexcept {
-    if (m_iter != storage().cend()) {
-        return {m_cursor, m_iter};
-    } else {
-        return {};
-    }
+    return {m_cursor, m_iter};
 }
 
 /**
@@ -1429,7 +1425,8 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
                     vassert(l.front().range_begin() == l.front().range_next());
                     l.pop_front();
                 }
-                vassert(! l.empty() && l.front().id() == id);
+                vassert(! l.empty() && l.front().id() == id &&
+                        l.front().range_begin() == l.front().range_next());
                 l.pop_front();
             } else {                               // snapshot iterator drained
                 vassert(all_of(l.cbegin(), l.cend(),
