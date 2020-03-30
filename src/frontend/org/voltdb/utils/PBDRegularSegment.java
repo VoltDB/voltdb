@@ -913,10 +913,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void markAllReadAndDiscarded() throws IOException {
+        public void markRestReadAndDiscarded() throws IOException {
             //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
+            int outstanding = m_objectReadIndex - m_discardCount;
             m_objectReadIndex = m_numOfEntries;
-            m_discardCount = m_numOfEntries;
+            m_discardCount = m_numOfEntries - outstanding;
             m_readOffset = m_fc.size();
         }
 

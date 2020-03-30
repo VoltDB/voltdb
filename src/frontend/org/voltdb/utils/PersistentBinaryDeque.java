@@ -305,7 +305,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
 
             m_numRead += m_segment.getNumEntries() - segmentReader.readIndex();
-            segmentReader.markAllReadAndDiscarded();
+            segmentReader.markRestReadAndDiscarded();
 
             Map.Entry<Long, PBDSegment<M>> entry = m_segments.higherEntry(m_segment.segmentIndex());
             if (entry == null) { // on the last segment
