@@ -27,12 +27,15 @@ from voltcli import utility
             min_count=1, max_count=1),
     )
 )
+
+# get proper error message from the procedure call
 def license(runner):
     license_file = VOLT.utility.File(runner.opts.license);
     try:
-        licenseBytes = license_file.read()
+        licenseBytes = license_file.read_hex()
         # call_proc() aborts with an error if the update failed.
         response = runner.call_proc('@UpdateLicense', [VOLT.FastSerializer.VOLTTYPE_STRING], [licenseBytes])
+        print response
         if response.status() != 1:
             runner.abort('The license update failed with status: %d' % response.response.statusString)
         else:

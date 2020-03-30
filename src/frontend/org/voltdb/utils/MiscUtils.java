@@ -468,19 +468,32 @@ public class MiscUtils {
      * <p>Ignore differences like license version/scheme, issuer information and licensee name.</p>
      * @param newLicense
      * @param currentLicense
-     * @return true if the change is allowed, otherwise false.
+     * @return error message if change is disallowed, null string if change is allowed.
      */
-    public static boolean isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense) {
-        if (!newLicense.getLicenseType().equalsIgnoreCase(currentLicense.getLicenseType()) &&
-            newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed() &&
-            newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed() &&
-            newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() &&
-            newLicense.hardExpiration() != currentLicense.hardExpiration() &&
-            newLicense.isUnrestricted() != currentLicense.isUnrestricted()) {
-            return false;
-        } else {
-            return true;
+    public static String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense) {
+        if ( !newLicense.getLicenseType().equalsIgnoreCase(currentLicense.getLicenseType()) ) {
+            return "Can not change " + currentLicense.getLicenseType() + " to " + newLicense.getLicenseType();
         }
+        if ( newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed() ||
+             newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed() ||
+             newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() ) {
+            return "Can not change allowed features in license update.";
+        }
+        if ( newLicense.hardExpiration() != currentLicense.hardExpiration() ) {
+            return "Can not change license from " +
+                    (currentLicense.hardExpiration() ? "hard expiration" : "soft expiration") +
+                    " to " + (newLicense.hardExpiration() ? "hard expiration" : "soft expiration");
+        }
+        if ( newLicense.isUnrestricted() != currentLicense.isUnrestricted()) {
+            return "Can not change license from " +
+                    (currentLicense.isUnrestricted() ? "unrestricted" : "restricted") +
+                    " to " + (newLicense.isUnrestricted() ? "unrestricted" : "restricted");
+        }
+        return null;
+    }
+
+    public static boolean isCommunity(LicenseApi api) {
+        return !api.isEnterprise() && !api.isPro() && !api.isAnyKindOfTrial() && !api.isAWSMarketplace();
     }
 
     /**
