@@ -2205,6 +2205,25 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     alloc.template thaw<truth>();
 }
 
+TEST_F(TableTupleAllocatorTest, TestSnapIterBug) {
+    // test finalizer on iterator
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    array<void*, AllocsPerChunk * 2> addresses;
+    for (size_t i = 0; i < AllocsPerChunk * 2 ; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+    }
+    alloc.remove_reserve(2);
+    alloc.template remove_add<truth>(addresses[AllocsPerChunk - 1]);
+    alloc.template remove_add<truth>(addresses[AllocsPerChunk - 2]);
+    // delete last 2 tuples from 1st chunk
+    ASSERT_EQ(2, alloc.template remove_force<truth>());
+    // then, freeze, and remove 2 more tuples
+    auto const& iter = alloc.template freeze<truth>();
+    alloc.template thaw<truth>();
+}
+
 #endif
 
 int main() {
