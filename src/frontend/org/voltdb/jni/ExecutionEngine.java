@@ -830,8 +830,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Export action against the execution engine.
      */
-    public abstract void exportAction( boolean syncAction,
-            ExportSnapshotTuple sequences, int partitionId, String streamName);
+    public abstract void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String streamName);
 
     /**
      * Execute an Delete of migrated rows in the execution engine.
@@ -1292,9 +1291,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param mStreamName Name of the stream being acted against
      * @return
      */
-    protected native long nativeExportAction(
+    protected native void nativeSetExportStreamPositions(
             long pointer,
-            boolean syncAction,
             long mAckOffset,
             long seqNo,
             long generationId,

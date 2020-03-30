@@ -1520,11 +1520,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-                             ExportSnapshotTuple sequences,
-                             Integer partitionId, String streamName)
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, Integer partitionId, String streamName)
     {
-        m_ee.exportAction(syncAction, sequences, partitionId, streamName);
+        m_ee.setExportStreamPositions(sequences, partitionId, streamName);
     }
 
     @Override
@@ -1600,11 +1598,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
 
-            exportAction(
-                    true,
-                    sequenceNumbers,
-                    m_partitionId,
-                    catalogTable.getTypeName());
+            setExportStreamPositions(sequenceNumbers, m_partitionId, catalogTable.getTypeName());
             // assign the stats to the other partition's value
             ExportManagerInterface.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
                     StreamStartAction.REJOIN, tableEntry.getValue());

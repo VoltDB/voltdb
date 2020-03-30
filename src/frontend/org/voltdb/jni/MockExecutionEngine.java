@@ -209,8 +209,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String mStreamName) {
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String mStreamName) {
     }
 
     @Override

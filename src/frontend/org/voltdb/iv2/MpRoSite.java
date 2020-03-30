@@ -589,9 +589,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-                             ExportSnapshotTuple sequences,
-                             Integer partitionId, String tableSignature)
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, Integer partitionId, String tableSignature)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

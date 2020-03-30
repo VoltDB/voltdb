@@ -225,10 +225,9 @@ public interface SiteProcedureConnection {
 
     public void quiesce();
 
-    public void exportAction(boolean syncAction,
-                             ExportSnapshotTuple sequences,
-                             Integer partitionId,
-                             String tableSignature);
+    public void setExportStreamPositions(ExportSnapshotTuple sequences,
+                                         Integer partitionId,
+                                         String tableSignature);
 
     public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId);

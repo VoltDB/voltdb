@@ -240,7 +240,7 @@ private:
 
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
-    void exportAction(struct ipc_command *cmd);
+    void setExportStreamPositions(struct ipc_command *cmd);
     void deleteMigratedRows(struct ipc_command *cmd);
     void getUSOForExportTable(struct ipc_command *cmd);
 
@@ -385,13 +385,12 @@ typedef struct {
  */
 typedef struct {
     struct ipc_command cmd;
-    int32_t isSync;
     int64_t offset;
     int64_t seqNo;
     int64_t genId;
     int32_t tableSignatureLength;
     char tableSignature[0];
-}__attribute__((packed)) export_action;
+}__attribute__((packed)) export_positions;
 
 typedef struct {
     struct ipc_command cmd;
@@ -618,7 +617,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         result = updateCatalog(cmd);
         break;
       case 20:
-        exportAction(cmd);
+        setExportStreamPositions(cmd);
         result = kErrorCode_None;
         break;
       case 22:
@@ -1616,21 +1615,19 @@ void VoltDBIPC::tableHashCode( struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
-void VoltDBIPC::exportAction(struct ipc_command *cmd) {
-    export_action *action = (export_action*)cmd;
+void VoltDBIPC::setExportStreamPositions(struct ipc_command *cmd) {
+    export_positions *action = (export_positions*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
     int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
     std::string tableSignature(action->tableSignature, tableSignatureLength);
-    int64_t result = m_engine->exportAction(action->isSync,
-                                            static_cast<int64_t>(ntohll(action->offset)),
-                                            static_cast<int64_t>(ntohll(action->seqNo)),
-                                            static_cast<int64_t>(ntohll(action->genId)),
-                                            tableSignature);
+    m_engine->setExportStreamPositions(static_cast<int64_t>(ntohll(action->offset)),
+                                       static_cast<int64_t>(ntohll(action->seqNo)),
+                                       static_cast<int64_t>(ntohll(action->genId)),
+                                       tableSignature);
 
-    // write offset across bigendian.
-    result = htonll(result);
-    writeOrDie(m_fd, (unsigned char*)&result, sizeof(result));
+    uint8_t success = 0;
+    writeOrDie(m_fd, (unsigned char*)&success, sizeof(success));
 }
 
 void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
