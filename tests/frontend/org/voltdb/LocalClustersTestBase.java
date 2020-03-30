@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -34,7 +35,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -508,14 +508,16 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     private void insertRandomRows(Client client, String insertPrefix, int tableNumber, TableType tableType,
             int rowCount, LongConsumer consumer) throws NoConnectionsException, IOException, InterruptedException {
         String procedureName = getDbResourceName(insertPrefix, tableNumber, tableType);
-        AtomicInteger errorCount = new AtomicInteger();
+        HashSet<String> errors = new HashSet<>();
         CountDownLatch latch = new CountDownLatch(rowCount);
         for (int i = 0; i < rowCount; ++i) {
             long key = uniqueRandomKey();
             callDMLProcedure(client, cr -> {
                 latch.countDown();
                 if (cr.getStatus() != ClientResponse.SUCCESS) {
-                    errorCount.getAndIncrement();
+                    synchronized (errors) {
+                        errors.add(cr.getStatusString());
+                    }
                 }
             }, procedureName, key, m_random.nextLong());
             if (consumer != null) {
@@ -523,7 +525,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             }
         }
         latch.await();
-        assertEquals(0, errorCount.get());
+        assertTrue(errors.toString(), errors.isEmpty());
     }
 
     protected void insertOneRow(Client client,
