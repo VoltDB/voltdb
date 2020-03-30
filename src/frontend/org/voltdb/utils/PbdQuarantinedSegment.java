@@ -209,7 +209,7 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void markAllReadAndDiscarded() {
+        public void markRestReadAndDiscarded() {
         }
     };
 

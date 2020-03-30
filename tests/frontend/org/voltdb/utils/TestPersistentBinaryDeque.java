@@ -1514,6 +1514,36 @@ public class TestPersistentBinaryDeque {
         assertEquals(1, getSortedDirectoryListing().size());
     }
 
+    @Test(timeout = 10_000)
+    public void testDiscardAfterSkipPast() throws Exception {
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
+                .requiresId(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+
+        long seqNo = 1;
+        int numSegments = 3;
+        for (int i=0; i<numSegments; i++) {
+            if (i>0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            for (int j=0; j<3; j++) {
+                long startSeqNo = seqNo + i*3*10 + j*10;
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), startSeqNo, startSeqNo + 9);
+            }
+        }
+        long lastSeqNo = numSegments*3*10;
+        assertEquals(numSegments, getSortedDirectoryListing().size());
+
+        // read an entry, mark rest read and discarded, then discard the read entry
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        reader.skipPast(lastSeqNo);
+        assertEquals(numSegments, getSortedDirectoryListing().size());
+
+        cont.discard();
+        assertEquals(1, getSortedDirectoryListing().size());
+    }
+
     static <M> BinaryDequeReader.Entry<M> pollOnceWithoutDiscard(BinaryDequeReader<M> reader) throws IOException {
         BinaryDequeReader.Entry<M> entry = reader
                 .pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
