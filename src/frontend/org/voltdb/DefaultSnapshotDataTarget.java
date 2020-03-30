@@ -289,7 +289,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
-                    final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
+                    if (SNAP_LOG.isDebugEnabled()) {
+                        SNAP_LOG.debug("Fsyncing snapshot file" + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
+                                " bytes pending to sync, up to " + m_bytesAllowedBeforeSync.availablePermits() +
+                                " bytes is allowed to write before sync.");
+                    }
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
@@ -299,10 +303,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);
                         } else {
-                            SNAP_LOG.debug("Asynchronous close syncing snasphot data, presumably graceful", e);
+                            SNAP_LOG.info("Asynchronous close syncing snasphot data, presumably graceful", e);
                         }
+                    } catch (Throwable t) {
+                        SNAP_LOG.error("Unexpected error while fsyncing snapshot data to file " + m_file, t);
+                    } finally {
+                        final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
+                        m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                     }
-                    m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
 
                     /*
                      * Don't pollute the page cache with snapshot data, use fadvise
@@ -521,6 +529,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
+                } catch (Throwable t) {
+                    if (permitAcquired > 0) {
+                        m_bytesAllowedBeforeSync.release(permitAcquired);
+                    }
+                    SNAP_LOG.error("Unexpected error while attempting to write snapshot data to file " + m_file, t);
+                    m_writeFailed = true;
                 } finally {
                     try {
                         tupleDataCont.discard();
