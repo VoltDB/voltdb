@@ -1383,8 +1383,11 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 (reinterpret_cast<CompactingChunks const&>(l).beginTxn().empty() ||
                  less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator()))) {
+            assert(iter != l.end());
             auto const id = iter->id();
-            vassert(iter->range_begin() == iter->range_next());
+            // Note the exception is left for frozen right boundary
+            assert(iter->range_begin() == iter->range_next() ||
+                    id == reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries().right().chunkId());
             // chunk was fully used. Need to take care of finalizer
             if (++iter != l.end()) {
                 /**
@@ -1414,8 +1417,6 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
                         l.front().range_begin() == l.front().range_next());
                 l.pop_front();
             } else {                               // snapshot iterator drained
-                vassert(all_of(l.cbegin(), l.cend(),
-                            [](ChunkHolder<> const& c) noexcept { return c.range_begin() == c.range_next(); }));
                 l.clear();
             }
         } else {

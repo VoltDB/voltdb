@@ -2206,7 +2206,6 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
 }
 
 TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
-    // test finalizer on iterator
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     Alloc alloc(TupleSize);
     using Gen = StringGen<TupleSize>;
@@ -2257,7 +2256,6 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
 }
 
 TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
-    // test finalizer on iterator
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
     Alloc alloc(TupleSize);
     using Gen = StringGen<TupleSize>;
@@ -2307,6 +2305,27 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     alloc.template thaw<truth>();
 }
 
+TEST_F(TableTupleAllocatorTest, TestSnapIterEmptyTxnView) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    Alloc alloc(TupleSize);
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    array<void*, AllocsPerChunk * 3> addresses;
+    size_t i;
+    for (i = 0; i < AllocsPerChunk * 3 ; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+    }
+    // after freeze, empty txn view and use snapshot rw iterator
+    auto const& iter = alloc.template freeze<truth>();
+    alloc.template clear<truth>();
+    i = 0;
+    while (! iter->drained()) {
+        ASSERT_EQ(i++, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
+        ++(*iter);
+    }
+    ASSERT_EQ(AllocsPerChunk * 3, i);
+    alloc.template thaw<truth>();
+}
 
 #endif
 
