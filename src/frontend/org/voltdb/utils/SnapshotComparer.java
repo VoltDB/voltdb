@@ -54,9 +54,7 @@ import java.util.TreeSet;
 import java.util.Vector;
 
 import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
-import static org.voltdb.utils.SnapshotComparer.CONSOLE_LOG;
-import static org.voltdb.utils.SnapshotComparer.SNAPSHOT_LOG;
-import static org.voltdb.utils.SnapshotComparer.remoteSnapshotFolder;
+import static org.voltdb.utils.SnapshotComparer.*;
 
 
 /**
@@ -64,6 +62,10 @@ import static org.voltdb.utils.SnapshotComparer.remoteSnapshotFolder;
  */
 
 public class SnapshotComparer {
+    public static int STATUS_OK = 0;
+    public static int STATUS_INVALID_INPUT = -1;
+    public static int STATUS_INCONSISTENCY = -2;
+
     public static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
     public static final VoltLogger SNAPSHOT_LOG = new VoltLogger("SNAPSHOT");
     // A string builder to hold all snapshot validation errors, gets printed when no viable snapshot is found
@@ -79,7 +81,7 @@ public class SnapshotComparer {
 
         Config config = new Config(args);
         if (!config.valid) {
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
 
         SnapshotLoader source = new SnapshotLoader(config.local, config.username, config.sourceNonce, config.sourceDirs, config.sourceHosts);
@@ -89,13 +91,12 @@ public class SnapshotComparer {
             SnapshotLoader target = new SnapshotLoader(config.local, config.username, config.targetNonce, config.targetDirs, config.targetHosts);
             source.compareWith(target);
         }
-        System.exit(0);
     }
 
     private static void printHelpAndQuit(int code) {
         System.out.println("Usage: snapshotComparer --help");
         System.out.println("Self Comparision, verify data consistency among replicas of single snapshot: snapshotComparer --self nonce");
-        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer --self --nonce nonce1 --dir dir1,dir2,dir3");
+        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer --self --nonce nonce1 --dirs dir1,dir2,dir3");
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --self --nonce nonce1 --paths path1,path2 --hosts host1,host2 --user username");
         System.out.println();
         System.out.println("Peer Comparision, verify data consistency among snapshots: snapshotComparer nonce1 nonce2");
@@ -129,50 +130,50 @@ public class SnapshotComparer {
                     if (arg.equalsIgnoreCase("--nonce")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--dirs")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--user")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --user");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         username = args[i];
@@ -182,21 +183,21 @@ public class SnapshotComparer {
                 }
                 if (sourceNonce == null || sourceNonce.isEmpty()) {
                     System.err.println("Error: Does not specify snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (local == null) {
                     System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
                                 || (sourceDirs.length != sourceHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (!local && username.isEmpty()) {
                     System.err.println("Error: Does not specify username.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
             } else {
                 // TODO: better UI for specify target snapshot
@@ -205,93 +206,93 @@ public class SnapshotComparer {
                     if (arg.equalsIgnoreCase("--nonce1")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--nonce2")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         targetNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--dirs1")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--dirs2")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         targetDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths1")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths2")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         targetDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts1")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         sourceHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts2")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         targetHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--user")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --user");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(STATUS_INVALID_INPUT);
                         }
                         i++;
                         username = args[i];
@@ -301,15 +302,15 @@ public class SnapshotComparer {
                 }
                 if (sourceNonce == null || sourceNonce.isEmpty()) {
                     System.err.println("Error: Does not specify source snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (targetNonce == null || targetNonce.isEmpty()) {
                     System.err.println("Error: Does not specify comparing snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (local == null) {
                     System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
@@ -317,11 +318,11 @@ public class SnapshotComparer {
                         || (targetDirs == null) || (targetHosts == null) || (targetDirs.length == 0)
                                 || (targetDirs.length != targetHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
                 if (!local && username.isEmpty()) {
                     System.err.println("Error: Does not specify username.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(STATUS_INVALID_INPUT);
                 }
             }
             if (!local && cleanup) {
@@ -370,7 +371,7 @@ class SnapshotLoader {
                 }
                 directories.add(f);
                 if (invalidDir) {
-                    System.exit(-1);
+                    System.exit(STATUS_INVALID_INPUT);
                 }
                 if (directories.isEmpty()) {
                     directories.add(new File("."));
@@ -413,17 +414,17 @@ class SnapshotLoader {
                 }
                 ii++;
             }
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
 
         if (snapshots.size() < 1) {
             System.err.println("Error: Did not find any snapshots with the specified name");
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
         snapshot = snapshots.values().iterator().next();
         RestoreAgent.SnapshotInfo info = checkSnapshotIsComplete(snapshot.getTxnId(), snapshot, SnapshotComparer.m_ErrLogStr, 0);
         if (info == null) {
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
         partitionCount = info.partitionCount;
 
@@ -464,7 +465,7 @@ class SnapshotLoader {
         for (String tableName : tables.keySet()) {
             if (!snapshot.m_tableFiles.containsKey(tableName)) {
                 System.err.println("Error: Snapshot does not contain table " + tableName);
-                System.exit(-1);
+                System.exit(STATUS_INVALID_INPUT);
             }
             SnapshotUtil.TableFiles tableFiles = snapshot.m_tableFiles.get(tableName);
             if (!tableFiles.m_isReplicated) {
@@ -497,7 +498,7 @@ class SnapshotLoader {
             }
         }
         if (fail) {
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
 
         // based on the plan, retrieve the file and compare
@@ -577,6 +578,9 @@ class SnapshotLoader {
         CONSOLE_LOG.info("Finished comparing all tables.");
         if (!inconsistentTable.isEmpty()) {
             CONSOLE_LOG.info("The inconsistent tables are: " + inconsistentTable);
+            System.exit(STATUS_INCONSISTENCY);
+        } else {
+            System.exit(STATUS_OK);
         }
     }
 
@@ -587,7 +591,7 @@ class SnapshotLoader {
         for (String tableName : tables.keySet()) {
             if (!snapshot.m_tableFiles.containsKey(tableName)) {
                 System.err.println("Error: Snapshot does not contain table " + tableName);
-                System.exit(-1);
+                System.exit(STATUS_INVALID_INPUT);
             }
             SnapshotUtil.TableFiles tableFiles = snapshot.m_tableFiles.get(tableName);
             if (!tableFiles.m_isReplicated) {
@@ -620,7 +624,7 @@ class SnapshotLoader {
             }
         }
         if (fail) {
-            System.exit(-1);
+            System.exit(STATUS_INVALID_INPUT);
         }
         // based on the plan, retrieve the file and compare
         Set<String> inconsistentTable = new HashSet<>();
@@ -628,6 +632,9 @@ class SnapshotLoader {
         CONSOLE_LOG.info("Finished comparing all tables.");
         if (!inconsistentTable.isEmpty()) {
             CONSOLE_LOG.info("The inconsistent tables are: " + inconsistentTable);
+            System.exit(STATUS_INCONSISTENCY);
+        } else {
+            System.exit(STATUS_OK);
         }
     }
 

@@ -1245,28 +1245,12 @@ struct iterator_begin<Cont, perm, iterator_view_type::txn, true_type> {
     }
 };
 
-template<typename Chunks, iterator_view_type view, typename = typename Chunks::Compact>
-struct HasTxnInvisibleChunks {
-    inline constexpr bool operator()(Chunks const&) const noexcept {
-        return false;
-    }
-};
-
-template<typename Chunks>
-struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, true_type> {
-    inline bool operator()(Chunks const& c) const noexcept {
-        return c.frozen() && (c.empty() ||
-                less_rolling(c.frozenBoundaries().left().chunkId(), c.begin()->id()));
-    }
-};
-
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) :
     m_offset(src.tupleSize()), m_storage(src),
     m_iter(iterator_begin<typename remove_reference<container_type>::type, perm, view>()(src)),
-    m_hasTxnInvisibleChunks(HasTxnInvisibleChunks<Chunks, view>()(src)),
     m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->range_begin())) {
     // paranoid type check
     static_assert(is_lvalue_reference<container_type>::value,
@@ -1326,11 +1310,7 @@ inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>:
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view> inline
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator position_type() const noexcept {
-    if (m_iter != storage().cend()) {
-        return {m_cursor, m_iter};
-    } else {
-        return {};
-    }
+    return {m_cursor, m_iter};
 }
 
 /**
@@ -1341,14 +1321,14 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator po
  */
 template<typename ChunkList, typename Iter, iterator_view_type view, typename Comp>
 struct ChunkBoundary {
-    inline void const* operator()(ChunkList const&, Iter const& iter, bool) const noexcept {
+    inline void const* operator()(ChunkList const&, Iter const& iter) const noexcept {
         return iter->range_next();
     }
 };
 
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
-    inline void const* operator()(ChunkList const& l, Iter const& iter, bool hasTxnInvisibleChunks) const noexcept {
+    inline void const* operator()(ChunkList const& l, Iter const& iter) const noexcept {
         auto const& frozenBoundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
         if (frozenBoundaries.left().empty()) {        // not frozen
             return iter->range_next();
@@ -1365,6 +1345,8 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                 // needs to use the next() position.
                 vassert((iter->range_begin() == iter->range_next()) == (next(iter) != l.end()));
                 return iter->range_begin() == iter->range_next() ? iter->range_end() : iter->range_next();
+            } else if (leftId == iterId) {      // in the left boundary of frozen state
+                return frozenBoundaries.left().address();
             } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
                 if (less_rolling(iterId, rightId)) {
                     return iter->range_end();
@@ -1372,8 +1354,6 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                     vassert(iterId == rightId);
                     return frozenBoundaries.right().address();
                 }
-            } else if (leftId == iterId) {      // in the left boundary of frozen state
-                return hasTxnInvisibleChunks ? iter->range_end() : frozenBoundaries.left().address();
             } else if (rightId == iterId) {     // in the right boundary
                 return frozenBoundaries.right().address();
             } else if (txnBeginChunkId == iterId) {
@@ -1429,7 +1409,8 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
                     vassert(l.front().range_begin() == l.front().range_next());
                     l.pop_front();
                 }
-                vassert(! l.empty() && l.front().id() == id);
+                vassert(! l.empty() && l.front().id() == id &&
+                        l.front().range_begin() == l.front().range_next());
                 l.pop_front();
             } else {                               // snapshot iterator drained
                 vassert(all_of(l.cbegin(), l.cend(),
@@ -1456,7 +1437,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         if (! m_storage.empty() && m_iter != m_storage.end()) {
             const_cast<void*&>(m_cursor) =
                 reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-            if (m_cursor < boundary(m_storage, m_iter, m_hasTxnInvisibleChunks)) {
+            if (m_cursor < boundary(m_storage, m_iter)) {
                 finished = false;              // within chunk
             } else {
                 advance_iter(m_storage, m_iter); // cross chunk
@@ -1677,7 +1658,7 @@ inline position_type::position_type(CompactingChunks const& c, void const* p) : 
 
 template<typename iterator>
 inline position_type::position_type(void const* p, iterator const& iter) noexcept :
-m_chunkId(iter->id()), m_addr(p) {}
+m_chunkId(p == nullptr ? 0 : iter->id()), m_addr(p) {}
 
 inline id_type position_type::chunkId() const noexcept {
     return m_chunkId;
