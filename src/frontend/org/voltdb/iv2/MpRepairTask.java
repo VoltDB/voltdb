@@ -61,7 +61,8 @@ public class MpRepairTask extends SiteTasker
 
     // Indicate if the round of leader promotion has been completed
     private final boolean m_partitionLeaderPromotionComplete;
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration, boolean partitionLeaderPromotionComplete)
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration,
+            boolean partitionLeaderPromotionComplete, boolean skipRepair)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
@@ -69,7 +70,7 @@ public class MpRepairTask extends SiteTasker
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
         m_leaderMigration = leaderMigration;
         m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, leaderMigration);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, skipRepair);
     }
 
     @Override

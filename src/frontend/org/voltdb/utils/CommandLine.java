@@ -144,7 +144,7 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
         cl.m_missingHostCount = m_missingHostCount;
-        cl.m_kiplingHostPort = m_kiplingHostPort;
+        cl.m_topicsHostPort = m_topicsHostPort;
 
         return cl;
     }
@@ -535,7 +535,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     public CommandLine setKiplingHostPort(HostAndPort kiplingInterface) {
-        m_kiplingHostPort = kiplingInterface;
+        m_topicsHostPort = kiplingInterface;
         return this;
     }
 
@@ -818,9 +818,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("e3");
         }
 
-        if (m_kiplingHostPort != null) {
-            cmdline.add("kiplingHostPort");
-            cmdline.add(m_kiplingHostPort.toString());
+        if (m_topicsHostPort != null) {
+            cmdline.add("topicsHostPort");
+            cmdline.add(m_topicsHostPort.toString());
         }
 
         return cmdline;

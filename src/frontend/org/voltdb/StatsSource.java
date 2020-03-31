@@ -26,6 +26,8 @@ import org.voltdb.VoltTable.ColumnInfo;
  */
 public abstract class StatsSource {
 
+    protected final int NUM_PREDEFINED_COLS = 3;
+
     private final Integer m_hostId;
     private final String m_hostname;
 
@@ -117,16 +119,20 @@ public abstract class StatsSource {
          * Synchronizing on this allows derived classes to maintain thread safety
          */
         synchronized (this) {
-            Iterator<Object> i = getStatsRowKeyIterator(interval);
-            ArrayList<Object[]> rows = new ArrayList<Object[]>();
-            while (i.hasNext()) {
-                Object rowKey = i.next();
-                Object rowValues[] = new Object[columns.size()];
-                updateStatsRow(rowKey, rowValues);
-                rows.add(rowValues);
-            }
-            return rows.toArray(new Object[0][]);
+            return retrieveStatsRows(interval);
         }
+    }
+
+    protected Object[][] retrieveStatsRows(boolean interval) {
+        Iterator<Object> i = getStatsRowKeyIterator(interval);
+        ArrayList<Object[]> rows = new ArrayList<Object[]>();
+        while (i.hasNext()) {
+            Object rowKey = i.next();
+            Object rowValues[] = new Object[columns.size()];
+            updateStatsRow(rowKey, rowValues);
+            rows.add(rowValues);
+        }
+        return rows.toArray(new Object[rows.size()][]);
     }
 
     /**

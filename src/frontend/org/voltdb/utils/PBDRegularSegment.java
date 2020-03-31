@@ -77,8 +77,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
-    private long m_startId = -1;
-    private long m_endId = -1;
+    private long m_startId = INVALID_ID;
+    private long m_endId = INVALID_ID;
     private boolean m_compress;
     private int m_segmentRandomId;
     private int m_extraHeaderSize = 0;
@@ -361,7 +361,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         int entriesTruncated = 0;
         int sizeInBytes = 0;
 
-        long lastReadId = -1;
+        long lastReadId = INVALID_ID;
         while (true) {
             final long beforePos = reader.readOffset();
 
@@ -370,7 +370,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
             } catch(IOException e) {
                 m_usageSpecificLog.warn("Truncating segment file to the last safe point due to error", e);
-                reader.truncateToCurrentReadIndex(m_startId == -1 ? -1 : lastReadId);
+                reader.truncateToCurrentReadIndex(m_startId == INVALID_ID ? INVALID_ID : lastReadId);
             }
             if (cont == null) {
                 break;
@@ -388,7 +388,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     if (retval != null) {
                         lastReadId = retval.getRowId();
                     }
-                    assert(m_startId == -1 || lastReadId != -1);
+                    assert(m_startId == INVALID_ID || lastReadId != INVALID_ID);
                 } else {
                     // If the returned bytebuffer is empty, remove the object and truncate the file
                     if (retval.m_status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
@@ -415,7 +415,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
                         final int written = writeTruncatedEntry(retval, reader.readIndex());
                         sizeInBytes += written;
-                        assert(m_startId == -1 || retval.getRowId() != -1);
+                        assert(m_startId == INVALID_ID || retval.getRowId() != INVALID_ID);
                         m_endId = retval.getRowId(); // written to header by initNumEntries below
                         initNumEntries(reader.readIndex(), sizeInBytes);
                         m_fc.truncate(partialEntryBeginOffset + written + ENTRY_HEADER_BYTES);
@@ -453,7 +453,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             if (initialEntryCount == 0) {
                 return 0;
             }
-            long lastReadId = -1;
+            long lastReadId = INVALID_ID;
             while (true) {
                 DBBPool.BBContainer cont = null;
                 try {
@@ -467,7 +467,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 }
                 try {
                     lastReadId = scanner.scan(cont);
-                    assert(m_startId == -1 || lastReadId != -1);
+                    assert(m_startId == INVALID_ID || lastReadId != INVALID_ID);
                 } finally {
                     cont.discard();
                 }
@@ -585,7 +585,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     {
         m_numOfEntries++;
         m_size += size;
-        m_startId = (m_startId == -1) ? startId : m_startId;
+        m_startId = (m_startId == INVALID_ID) ? startId : m_startId;
         m_endId = endId;
         writeOutHeader();
     }
@@ -681,7 +681,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     @Override
     int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException
     {
-        assert(m_endId == -1 || startId > m_endId);
+        assert(m_endId == INVALID_ID || startId > m_endId) : "Current endId=" + m_endId + ", input startId=" + startId;
         if (m_closed) {
             throw new IOException("Segment closed");
         }
@@ -764,7 +764,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_fc.write(destBuf.b());
             }
             // Update segment header
-            updateHeaderDataAfterOffer(written, -1, -1);
+            updateHeaderDataAfterOffer(written, INVALID_ID, INVALID_ID);
             return written;
         } finally {
             destBuf.discard();
@@ -913,10 +913,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public void markAllReadAndDiscarded() throws IOException {
+        public void markRestReadAndDiscarded() throws IOException {
             //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
+            int outstanding = m_objectReadIndex - m_discardCount;
             m_objectReadIndex = m_numOfEntries;
-            m_discardCount = m_numOfEntries;
+            m_discardCount = m_numOfEntries - outstanding;
             m_readOffset = m_fc.size();
         }
 

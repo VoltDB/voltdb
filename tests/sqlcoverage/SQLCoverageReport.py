@@ -75,7 +75,10 @@ FatalExceptionTypes = ['NullPointerException',
 NonfatalExceptionTypes = ['ClassCastException',
                           'SAXParseException',
                           'VoltTypeException',
-                          'ERROR: IN: NodeSchema'
+                          'ERROR: IN: NodeSchema',
+                          # this is actually a PostgreSQL error message, not,
+                          # strictly speaking, an exception:
+                          'timeout: procedure call took longer than 5 seconds'
                           ]
 # Rejected idea (happens frequently in advanced-scalar-set-subquery):
 #                        'VOLTDB ERROR: UNEXPECTED FAILURE',
@@ -96,7 +99,7 @@ AllExceptionTypes.extend(NonfatalExceptionTypes)
 def highlight(s, flag):
     if not isinstance(s, basestring):
         s = str(s)
-    return flag and "<span style=\"color: red\">%s</span>" % (s) or s
+    return flag and '<span style="color:red">%s**</span>' % (s) or s
 
 def as_html_unicode_string(s):
     if isinstance(s, list):
@@ -498,7 +501,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             notFound = True
             jni = {'Status': -99, 'Exception': 'None', 'Result': None,
                    'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a VoltDB crash!</p>'}
-        cdb_status = 0
+
         cdb_info = ''
         while True:
             try:
@@ -509,14 +512,17 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                        'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a ' + cmpdb + ' backend crash!</p>'}
 
             if 'timeout: procedure call took longer than 5 seconds' in (cdb.get('Info') or ''):
-                cdb_status = cdb_status | cdb.get('Status', -97)
-                cdb_info += cdb.get('Info', '') + ';\n'
-                next_cdb = cPickle.load(cmpdb_file)
-            else:
-                if cdb_status:
-                    cdb['Status'] = cdb_status | cdb.get('Status', 0)
                 if cdb_info:
-                    cdb['Info'] = cdb_info + cdb.get('Info', '')
+                    cdb_info += ';\n' + cdb.get('Info')
+                else:
+                    cdb_info = cdb.get('Info')
+                print "WARNING: found %s error '%s'; ignoring Status '%s'" % (cmpdb, cdb.get('Info'), cdb.get('Status'))
+            else:
+                if cdb_info:
+                    if cdb.get('Info'):
+                        cdb['Info'] = cdb_info + ';\n' + cdb.get('Info')
+                    else:
+                        cdb['Info'] = cdb_info
                 break
 
         # VoltDB usually produces this error message, for the first couple
@@ -807,7 +813,7 @@ h2 {text-transform: uppercase}
                                                    against VoltDB.</td></tr>
 <tr><td colspan=2>Exceptions/VN: number of 'Non-fatal' Exceptions (those deemed NOT worth failing the test, e.g., VoltTypeException's) while running
                                                    against VoltDB.</td></tr>
-<tr><td colspan=2>Exceptions/%s: number of (any) Exceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
+<tr><td colspan=2>Exceptions/%s: number of (any) Exceptions (or timeouts) while running against %s (likely in VoltDB's %s backend code).</td></tr>
 <tr><td colspan=2>Crashes/V: number of VoltDB crashes.</td></tr>
 <tr><td colspan=2>Crashes/%s: number of %s crashes.</td></tr>
 <tr><td colspan=2>Crashes/C: number of crashes while comparing VoltDB and %s results.</td></tr>

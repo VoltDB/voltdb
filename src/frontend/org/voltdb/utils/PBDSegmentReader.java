@@ -109,5 +109,11 @@ interface PBDSegmentReader<M> {
      */
     public boolean isClosed();
 
-    public void markAllReadAndDiscarded() throws IOException;
+    /**
+     * Mark all entries left to read in this segment as read and discarded.
+     * If there were any entries that were read, but not discarded, they will be left as undiscarded.
+     *
+     * @throws IOException
+     */
+    public void markRestReadAndDiscarded() throws IOException;
 }

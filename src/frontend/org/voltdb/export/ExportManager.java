@@ -233,11 +233,11 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public void clearOverflowData() throws ExportManagerInterface.SetupException {
-        String overflowDir = VoltDB.instance().getExportOverflowPath();
+        File overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
                 String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
-            VoltFile.recursivelyDelete(new File(overflowDir), false);
+            VoltFile.recursivelyDelete(overflowDir, false);
         } catch(IOException e) {
             String msg = String.format("Error cleaning out export overflow directory %s: %s",
                     overflowDir, e.getMessage());
@@ -325,7 +325,8 @@ public class ExportManager implements ExportManagerInterface
 
     /** Creates the initial export processor if export is enabled */
     @Override
-    public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+    public void initialize(CatalogContext catalogContext,
+            Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin) {
         try {
             CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
@@ -343,7 +344,7 @@ public class ExportManager implements ExportManagerInterface
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
-            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            File exportOverflowDirectory = VoltDB.instance().getExportOverflowPath();
             ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, m_messenger);
             generation.initialize(m_hostId, catalogContext,
                     connectors, newProcessor, localPartitionsToSites, exportOverflowDirectory);
@@ -364,7 +365,7 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
+            boolean requiresNewExportGeneration, Map<Integer, Integer> localPartitionsToSites)
     {
         final CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
 
@@ -397,7 +398,7 @@ public class ExportManager implements ExportManagerInterface
             return;
         }
         if (m_generation.get() == null) {
-            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            File exportOverflowDirectory = VoltDB.instance().getExportOverflowPath();
             try {
                 ExportGeneration gen = new ExportGeneration(exportOverflowDirectory, m_messenger);
                 m_generation.set(gen);
@@ -464,7 +465,7 @@ public class ExportManager implements ExportManagerInterface
             final CatalogContext catalogContext,
             ExportGeneration generation,
             CatalogMap<Connector> connectors,
-            List<Pair<Integer, Integer>> partitions,
+            Map<Integer, Integer> partitions,
             Map<String, Pair<Properties, Set<String>>> config)
     {
         ExportDataProcessor oldProcessor = m_processor.get();
@@ -484,8 +485,8 @@ public class ExportManager implements ExportManagerInterface
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
                     m_hostId, partitions, true);
-            for (Pair<Integer, Integer> partition : partitions) {
-                generation.updateAckMailboxes(partition.getFirst(), null);
+            for (int partition : partitions.keySet()) {
+                generation.updateAckMailboxes(partition, null);
             }
             //We create processor even if we dont have any streams.
             newProcessor.setExportGeneration(generation);

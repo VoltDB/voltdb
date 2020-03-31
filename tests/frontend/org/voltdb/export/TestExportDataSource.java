@@ -172,7 +172,8 @@ public class TestExportDataSource extends TestCase {
         public MockExportDataSource(Generation generation, ExportDataProcessor processor, String db, String tableName,
                 int partitionId, int siteId, long genId, CatalogMap<Column> catalogMap, Column partitionColumn,
                 String overflowPath) throws IOException {
-            super(generation, processor, db, tableName, partitionId, siteId, genId, catalogMap, partitionColumn, overflowPath);
+            super(generation, processor, tableName, partitionId, siteId, genId, catalogMap, partitionColumn,
+                    overflowPath);
             setMockCoordination();
         }
 
@@ -258,7 +259,6 @@ public class TestExportDataSource extends TestCase {
                     table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
             try {
-                assertEquals("database", s.getDatabase());
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
             } finally {
@@ -657,7 +657,7 @@ public class TestExportDataSource extends TestCase {
             //Ack before push
             s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 1);
+            assertEquals(0, listing.size());
 
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);

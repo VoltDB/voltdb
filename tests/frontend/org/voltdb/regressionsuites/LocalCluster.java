@@ -654,8 +654,8 @@ public class LocalCluster extends VoltServerConfig {
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
-        if (cmdln.m_kiplingHostPort != null) {
-            cmdln.m_kiplingHostPort = cmdln.m_kiplingHostPort.withDefaultPort(portGenerator.nextKipling());
+        if (cmdln.m_topicsHostPort != null) {
+            cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
         }
 
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
@@ -1171,8 +1171,8 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.enableAdd(true);
             }
 
-            if (cmdln.m_kiplingHostPort != null) {
-                cmdln.m_kiplingHostPort = cmdln.m_kiplingHostPort.withDefaultPort(portGenerator.nextKipling());
+            if (cmdln.m_topicsHostPort != null) {
+                cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
             }
 
             // If local directories are being cleared
@@ -2443,7 +2443,7 @@ public class LocalCluster extends VoltServerConfig {
         KIPLING {
             @Override
             int getPort(CommandLine cl) {
-                return cl.m_kiplingHostPort.getPort();
+                return cl.m_topicsHostPort.getPort();
             }
         };
 

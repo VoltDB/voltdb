@@ -359,7 +359,27 @@ public class RepairLog
             sb.append(indentStr);
             for(int i = 0; i < txnIdsPerLine; i++) {
                 if (itemator.hasNext()) {
-                    sb.append(" ").append(TxnEgo.txnIdSeqToString(itemator.next().getTxnId()));
+                    Item item = itemator.next();
+                    long txnId = item.getTxnId();
+                    String msgType = "U"; // Stands for unknown
+                    VoltMessage msg = item.getMessage();
+                    if (msg instanceof FragmentTaskMessage) {
+                        msgType = "F";
+                    } else if (msg instanceof Iv2InitiateTaskMessage) {
+                        msgType = "I";
+                    } else if (msg instanceof CompleteTransactionMessage) {
+                        CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
+                        if (ctm.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+                            msgType = "C(I)";
+                        } else if (ctm.isRollback()) {
+                            msgType = "C(R)";
+                        } else {
+                            msgType = "C";
+                        }
+                    } else if (msg instanceof DummyTransactionTaskMessage) {
+                        msgType = "D";
+                    }
+                    sb.append(" ").append(TxnEgo.txnIdSeqToString(txnId)).append(msgType);
                 }
             }
         }

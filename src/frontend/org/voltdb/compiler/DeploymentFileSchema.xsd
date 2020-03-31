@@ -175,6 +175,7 @@
       <xs:enumeration value="droverflow"/>
       <xs:enumeration value="commandlog"/>
       <xs:enumeration value="commandlogsnapshot"/>
+      <xs:enumeration value="topicsdata"/>
     </xs:restriction>
   </xs:simpleType>
 

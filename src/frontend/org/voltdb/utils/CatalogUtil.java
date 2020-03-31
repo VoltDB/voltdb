@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Properties;
@@ -175,6 +176,7 @@ import org.xml.sax.SAXException;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 
@@ -613,13 +615,14 @@ public abstract class CatalogUtil {
 
     // Return all the tables that are persistent streams, i.e. all tables creating PBDs,
     // regardless of whether a connector exists
-    public static NavigableSet<Table> getAllStreamsExcludingViews(Database db) {
-        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+    public static NavigableMap<String, Table> getAllStreamsExcludingViews(Database db) {
+        ImmutableSortedMap.Builder<String, Table> exportTables = ImmutableSortedMap
+                .orderedBy(String.CASE_INSENSITIVE_ORDER);
         for (Table t : db.getTables()) {
             if (!TableType.needsExportDataSource(t.getTabletype())) {
                 continue;
             }
-            exportTables.add(t);
+            exportTables.put(t.getTypeName(), t);
         }
         return exportTables.build();
     }
@@ -2373,6 +2376,7 @@ public abstract class CatalogUtil {
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
         setupDROverflow(paths.getDroverflow(), voltDbRoot);
         setupLargeQuerySwap(paths.getLargequeryswap(), voltDbRoot);
+        setupTopicData(voltDbRoot);
     }
 
     /**
@@ -2532,6 +2536,21 @@ public abstract class CatalogUtil {
         }
         validateDirectory("large query swap", largeQuerySwap);
         return largeQuerySwap;
+    }
+
+    public static File setupTopicData(File voltDbRoot) {
+        File topicsDataDir = VoltDB.instance().getTopicsDataPath();
+        if (!topicsDataDir.isAbsolute()) {
+            topicsDataDir = new VoltFile(voltDbRoot, topicsDataDir.getPath());
+        }
+        if (!topicsDataDir.exists()) {
+            hostLog.info("Creating topics data directory: " + topicsDataDir.getAbsolutePath());
+            if (!topicsDataDir.mkdirs()) {
+                hostLog.fatal("Failed to create topics data directory \"" + topicsDataDir + "\"");
+            }
+        }
+        validateDirectory("topics data", topicsDataDir);
+        return topicsDataDir;
     }
 
     /**

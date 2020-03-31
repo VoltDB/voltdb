@@ -17,10 +17,7 @@
 
 package org.voltdb.export;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.voltdb.VoltType;
+import java.util.Objects;
 
 /**
  * The Export data source metadata
@@ -29,95 +26,32 @@ public class AdvertisedDataSource
 {
     final public int partitionId;
     final public String tableName;
-    //Set to other than partition column in case of kafka.
-    private String m_partitionColumnName = "";
-    final public long m_generation;
-    final public long systemStartTimestamp;
-    final public ArrayList<String> columnNames = new ArrayList<String>();
-    final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-    final public List<Integer> columnLengths = new ArrayList<Integer>();
-    final public ExportFormat exportFormat;
-
-    /*
-     * Enumeration defining what format the blocks of export data are in.
-     * Updated for 4.4 to use smaller values for integers and a binary variable size
-     * representation for decimals so that the format would be more efficient and
-     * shareable with other features
-     */
-    public enum ExportFormat {
-        SEVENDOTX;
-    }
 
     @Override
     public int hashCode() {
-        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + tableName.hashCode();
+        return Objects.hash(partitionId, tableName.hashCode());
     }
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof AdvertisedDataSource) {
-            AdvertisedDataSource other = (AdvertisedDataSource)o;
-            if (other.m_generation == m_generation &&
-                    other.tableName.equals(tableName) &&
-                    other.partitionId == partitionId) {
-                return true;
-                    }
+        if (this == o) {
+            return true;
         }
-        return false;
+        if (!(o instanceof AdvertisedDataSource)) {
+            return false;
+        }
+        AdvertisedDataSource other = (AdvertisedDataSource) o;
+        return partitionId == other.partitionId && Objects.equals(tableName, other.tableName);
     }
 
-    public AdvertisedDataSource(int p_id, String t_name,
-            String partitionColumnName,
-            long systemStartTimestamp,
-            long generation,
-            ArrayList<String> names,
-            ArrayList<VoltType> types,
-            List<Integer> lengths,
-            ExportFormat exportFormat)
+    public AdvertisedDataSource(int p_id, String t_name)
     {
         partitionId = p_id;
         tableName = t_name;
-        m_partitionColumnName = partitionColumnName;
-        m_generation = generation;
-        this.systemStartTimestamp = systemStartTimestamp;
-
-        // null checks are for happy-making test time
-        if (names != null)
-            columnNames.addAll(names);
-        if (types != null)
-            columnTypes.addAll(types);
-        if (lengths != null) {
-            columnLengths.addAll(lengths);
-        }
-        this.exportFormat = exportFormat;
-    }
-
-    public VoltType columnType(int index) {
-        return columnTypes.get(index);
-    }
-
-    public String columnName(int index) {
-        return columnNames.get(index);
-    }
-
-    public Integer columnLength(int index) {
-        return columnLengths.get(index);
-    }
-
-    //This is for setting column other than partition column of table.
-    //Kafka uses any arbitrary column for using its value for kafka key
-    public void setPartitionColumnName(String partitionColumnName) {
-        m_partitionColumnName = partitionColumnName;
-    }
-
-    public String getPartitionColumnName() {
-        return m_partitionColumnName;
     }
 
     @Override
     public String toString() {
-        return "Generation: " + m_generation + " Table: " + tableName
-                + " partition " + partitionId
-                + " partitionColumn " + m_partitionColumnName;
+        return "Table: " + tableName + " partition " + partitionId;
     }
 }

@@ -56,7 +56,7 @@ public class TestPBDsWithIds {
 
     @Test
     public void testOfferWithInvalidIds() throws Exception {
-        negativeOffer(-1, 10);
+        negativeOffer(PBDSegment.INVALID_ID, 10);
         negativeOffer(10, -1);
         negativeOffer(10, 8);
 
@@ -68,21 +68,13 @@ public class TestPBDsWithIds {
         } catch(AssertionError e) {
             //expected
         }
-        negativeOffer(-1, -1);
+        negativeOffer(PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
 
         // verify also at new segment boundary
         m_pbd.updateExtraHeader(null);
         negativeOffer(5, 10);
         negativeOffer(-1, -1);
         m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(64)), 11, 20);
-
-        // test offer with no id, then with id
-        tearDown();
-        setUp();
-        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)));
-        negativeOffer(0, 10);
-        m_pbd.updateExtraHeader(null);
-        negativeOffer(0, 10);
     }
 
     @Test
@@ -194,6 +186,7 @@ public class TestPBDsWithIds {
             m_pbd.close();
             m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                     .compression(true)
+                    .requiresId(true)
                     .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
         }
 
@@ -239,17 +232,16 @@ public class TestPBDsWithIds {
         m_pbd.close();
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
+                        .requiresId(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
-        // We create a new segment on recover
-        numSegments++;
-        Pair<Long, Long>[] newSegmentIds = Arrays.copyOf(segmentIds, numSegments);
-        newSegmentIds[numSegments-1] = new Pair<Long, Long>(-1L, -1L);
-        verifySegmentIds(numSegments, newSegmentIds);
+        verifySegmentIds(numSegments, segmentIds);
 
-        negativeOffer(-1, -1);
-        long nextId = newSegmentIds[numSegments-2].getSecond() + 1;
+        negativeOffer(PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
+        long nextId = segmentIds[numSegments-1].getSecond() + 1;
         long endId = nextId + 50;
         m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextId, endId);
+        numSegments++;
+        Pair<Long, Long>[] newSegmentIds = Arrays.copyOf(segmentIds, numSegments);
         newSegmentIds[numSegments-1] = new Pair<Long, Long>(nextId, endId);
         verifySegmentIds(numSegments, newSegmentIds);
     }
@@ -605,10 +597,11 @@ public class TestPBDsWithIds {
     private void negativeOffer(long startId, long endId) throws Exception {
         try {
             m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startId, endId);
-            fail("Expected AssertionError");
         } catch(AssertionError e) {
             //expected
+            return;
         }
+        fail("Expected an AssertionError");
     }
 
     @Before
@@ -616,6 +609,7 @@ public class TestPBDsWithIds {
         TestPersistentBinaryDeque.setupTestDir();
         m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
+                        .requiresId(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
     }
 

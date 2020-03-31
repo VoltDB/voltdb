@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -43,7 +42,6 @@ import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.BinaryDequeReader.NoSuchOffsetException;
 import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
-import org.voltdb.utils.PairSequencer.CyclicSequenceException;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -117,7 +115,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
                 assertions();
 
-                moveToValidSegment();
+                if (moveToValidSegment() == null) {
+                    return null;
+                }
+
                 PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
@@ -196,7 +197,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
             synchronized(PersistentBinaryDeque.this) {
                 PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
-                moveToValidSegment();
+                if (moveToValidSegment() == null) {
+                    return;
+                }
 
                 if (m_segment.segmentIndex() == seekSegment.segmentIndex()) {
                     //Close and open to rewind reader to the beginning and reset everything
@@ -259,6 +262,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     throw new IOException("PBD.ReadCursor.skipToNextSegmentIfOlder(): " + m_cursorId + " - Reader has been closed");
                 }
 
+                if (m_segments.size() == 0) {
+                    return false;
+                }
+
                 long recordTime = getSegmentLastRecordTimestamp();
                 if (recordTime == 0) { // Couldn't get the last record timestamp
                     throw new IOException("Could not get last record time for segment in PBD " + m_nonce);
@@ -281,7 +288,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void skipPast(long id) throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                moveToValidSegment();
+                if (moveToValidSegment() == null) return;
                 while (id >= m_segment.getEndId() && skipToNextSegment(false));
             }
         }
@@ -298,7 +305,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
 
             m_numRead += m_segment.getNumEntries() - segmentReader.readIndex();
-            segmentReader.markAllReadAndDiscarded();
+            segmentReader.markRestReadAndDiscarded();
 
             Map.Entry<Long, PBDSegment<M>> entry = m_segments.higherEntry(m_segment.segmentIndex());
             if (entry == null) { // on the last segment
@@ -331,7 +338,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     throw new IOException("PBD.ReadCursor.skipToNextSegmentIfBigger(): " + m_cursorId + " - Reader has been closed");
                 }
 
-                moveToValidSegment();
+                if (moveToValidSegment() == null) {
+                    return maxBytes;
+                }
+
                 long segmentSize = m_segment.getFileSize();
 
                 long lastSegmentId = peekLastSegment().segmentIndex();
@@ -367,12 +377,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_segment = segment;
         }
 
-        private void moveToValidSegment() {
+        private PBDSegment<M> moveToValidSegment() {
             PBDSegment<M> firstSegment = peekFirstSegment();
             // It is possible that m_segment got closed and removed
             if (m_segment == null || m_segment.segmentIndex() < firstSegment.segmentIndex()) {
                 m_segment = firstSegment;
             }
+            return m_segment;
         }
 
         @Override
@@ -398,7 +409,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
                 assertions();
 
-                moveToValidSegment();
+                if (moveToValidSegment() == null) {
+                    return 0;
+                }
+
                 long size = 0;
                 boolean inclusive = true;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
@@ -422,7 +436,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
                 assertions();
 
-                moveToValidSegment();
+                if (moveToValidSegment() == null) {
+                    return true;
+                }
+
                 boolean inclusive = true;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
                     // Check if there are more to read.
@@ -621,8 +638,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         boolean isCurrentSegmentActive() {
             synchronized(PersistentBinaryDeque.this) {
-                moveToValidSegment();
-                return m_segment.isActive();
+                return (moveToValidSegment() == null) ? false : m_segment.isActive();
             }
         }
 
@@ -633,8 +649,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         public long getSegmentLastRecordTimestamp() {
             synchronized(PersistentBinaryDeque.this) {
-                moveToValidSegment();
-                return m_segment.file().lastModified();
+                return moveToValidSegment() == null ? -1 : m_segment.file().lastModified();
             }
         }
     }
@@ -662,13 +677,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private int m_numObjects;
     private int m_numDeleted;
 
-    // Monotonic segment counter: note that this counter always *increases* even when
-    // used for a *previous* segment (or inserting a segment *before* the others.
-    private long m_segmentCounter = 0L;
     private M m_extraHeader;
     private Executor m_deferredDeleter = Runnable::run;
     private PBDRetentionPolicy m_retentionPolicy;
-    private Boolean m_requiresId;
+    private boolean m_requiresId;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path. This is a
@@ -689,6 +701,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         m_extraHeader = builder.m_initialExtraHeader;
         m_extraHeaderSerializer = builder.m_extraHeaderSerializer;
         m_pbdSegmentFactory = builder.m_pbdSegmentFactory;
+        m_requiresId = builder.m_requiresId;
 
         if (!m_path.exists() || !m_path.canRead() || !m_path.canWrite() || !m_path.canExecute()
                 || !m_path.isDirectory()) {
@@ -698,24 +711,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         parseFiles(builder.m_deleteExisting);
-
-        // Find the first and last segment for polling and writing (after); ensure the
-        // writing segment is not final
-
-        long curId = getNextSegmentId();
-        Map.Entry<Long, PBDSegment<M>> lastEntry = m_segments.lastEntry();
-
-        // Note: the "previous" id value may be > "current" id value
-        long prevId = lastEntry == null ? getNextSegmentId() : lastEntry.getValue().segmentId();
-        Long writeSegmentIndex = lastEntry == null ? 1L : lastEntry.getKey() + 1;
-
-        String fname = getSegmentFileName(curId, prevId);
-        PBDSegment<M> writeSegment = initializeNewSegment(writeSegmentIndex, curId, new VoltFile(m_path, fname),
-                "initialization");
-        if (m_segments.put(writeSegmentIndex, writeSegment) != null) {
-            // Sanity check
-            throw new IllegalStateException("Overwriting segment " + writeSegmentIndex);
-        }
 
         m_numObjects = countNumObjects();
         assertions();
@@ -734,44 +729,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     /**
-     * @return the next segment id
-     */
-    private synchronized long getNextSegmentId() {
-        // reset to 0 when overflow
-        if (m_segmentCounter == Long.MAX_VALUE) {
-            m_segmentCounter = 0L;
-        }
-        long newId = ++m_segmentCounter;
-        return newId;
-    }
-
-    /**
-     * Return a segment file name from m_nonce and current + previous segment ids.
+     * Return a segment file name from m_nonce and current segment id
      *
      * @see parseFiles for file name structure
      * @param currentId   current segment id
-     * @param previousId  previous segment id
      * @return  segment file name
      */
-    private String getSegmentFileName(long currentId, long previousId) {
-        return PbdSegmentName.createName(m_nonce, currentId, previousId, false);
-    }
-
-    /**
-     * Extract the previous segment id from a file name.
-     *
-     * Note that the filename is assumed valid at this point.
-     *
-     * @see parseFiles for file name structure
-     * @param file
-     * @return
-     */
-    private long getPreviousSegmentId(File file) {
-        PbdSegmentName segmentName = PbdSegmentName.parseFile(m_usageSpecificLog, file);
-        if (segmentName.m_result != PbdSegmentName.Result.OK) {
-            throw new IllegalStateException("Invalid file name: " + file.getName());
-        }
-        return segmentName.m_prevId;
+    private String getSegmentFileName(long currentId) {
+        return PbdSegmentName.createName(m_nonce, currentId, false);
     }
 
     /**
@@ -783,8 +748,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
      */
     private void parseFiles(boolean deleteExisting) throws IOException {
 
-        HashMap<Long, PbdSegmentName> filesById = new HashMap<>();
-        PairSequencer<Long> sequencer = new PairSequencer<>();
+        TreeMap<Long, PbdSegmentName> filesById = new TreeMap<>();
         List<String> invalidPbds = new ArrayList<>();
         try {
             for (File file : m_path.listFiles()) {
@@ -815,12 +779,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     continue;
                 }
 
-                long maxCnt = Math.max(segmentName.m_id, segmentName.m_prevId);
-                if (m_segmentCounter < maxCnt) {
-                    m_segmentCounter = maxCnt;
-                }
                 filesById.put(segmentName.m_id, segmentName);
-                sequencer.add(new Pair<Long, Long>(segmentName.m_prevId, segmentName.m_id));
             }
 
             if (!invalidPbds.isEmpty()) {
@@ -841,41 +800,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
 
             m_initializedFromExistingFiles = true;
-            if (filesById.size() == 1) {
-                // Common case, only 1 PBD segment
-                for (Map.Entry<Long, PbdSegmentName> entry : filesById.entrySet()) {
-                    recoverSegment(1, entry.getKey(), entry.getValue());
-                    break;
+            long nextIndex = 1;
+            Long prevIndex = null;
+            for (Map.Entry<Long, PbdSegmentName> entry : filesById.entrySet()) {
+                long currId = entry.getKey();
+                long currIndex = (m_requiresId) ? nextIndex++ : currId;
+                if (!m_requiresId && prevIndex != null && currIndex != prevIndex+1) {
+                    throw new IOException("Found " + entry.getValue().m_file + " with id " + currIndex + " after previous id " + prevIndex);
                 }
-            } else {
-                // Handle the uncommon case of more than 1 PBD file, get the sequence of segments
-                Deque<Deque<Long>> sequences = sequencer.getSequences();
-                if (sequences.size() > 1) {
-                    // FIXME: reject this case for now
-                    // FIXME: we could select the sequence that has the oldest entry and delete
-                    // the other files
-                    StringBuilder sb = new StringBuilder();
-                    for (Deque<Long> seq : sequences) {
-                        sb.append("\nsequence:" + seq);
-                    }
-                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce +
-                            sb.toString() );
-                }
-                Deque<Long> sequence = sequences.getFirst();
-                long index = 1L;
-                for (Long segmentId : sequence) {
-                    PbdSegmentName segmentName = filesById.get(segmentId);
-                    if (segmentName == null) {
-                        // This is an Id in the sequence referring to a previous file that
-                        // was deleted, so move on.
-                        continue;
-                    }
-                    recoverSegment(index++, segmentId, segmentName);
-                }
+                recoverSegment(currId, currId, entry.getValue());
+                prevIndex = currIndex;
             }
-        } catch (CyclicSequenceException e) {
-            m_usageSpecificLog.error("Failed to parse files: " + e);
-            throw new IOException(e);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException) {
                 throw new IOException(e);
@@ -979,8 +914,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     private PBDSegment<M> findSegmentWithEntry(long entryId, SeekErrorRule errorRule) throws NoSuchOffsetException, IOException {
-        long invalidKey = m_segments.firstKey()-1;
-        PBDSegment<M> first = findValidSegmentFrom(peekFirstSegment(), true, invalidKey);
+        long invalidIndex = m_segments.isEmpty() ? 1 : m_segments.firstKey()-1;
+        PBDSegment<M> first = findValidSegmentFrom(peekFirstSegment(), true, invalidIndex);
         if (first == null) {
             throw new NoSuchOffsetException("Offset " + entryId + "not found. Empty PBD");
         }
@@ -989,7 +924,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             throw new IllegalStateException("Seek is not supported in PBDs that don't store id ranges");
         }
 
-        PBDSegment<M> last = findValidSegmentFrom(peekLastSegment(), false, invalidKey);
+        PBDSegment<M> last = findValidSegmentFrom(peekLastSegment(), false, invalidIndex);
 
         if (first.getStartId() > entryId) {
             if (errorRule == SeekErrorRule.SEEK_AFTER) {
@@ -1034,7 +969,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             } else if (entryId < midSegment.getStartId()) {
                 assert(mid > first.segmentIndex()); // because of the checks above
                 // entryId is at a gap or in one of the lower segments
-                PBDSegment<M> prevSegment = findValidSegmentFrom(m_segments.get(mid-1), false, invalidKey);
+                PBDSegment<M> prevSegment = findValidSegmentFrom(m_segments.get(mid-1), false, invalidIndex);
                 if (entryId > prevSegment.getEndId()) { // entryId is at a gap
                     switch(errorRule) {
                     case THROW       : throw new NoSuchOffsetException("Could not find entry with offset " + entryId);
@@ -1081,15 +1016,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return;
                 }
 
-                Boolean requiresId = segment.getNumEntries() == 0 ? null : (segment.getStartId() >= 0);
-                assert (requiresId == null || m_requiresId == null || m_requiresId.equals(requiresId))
-                    : "m_requiresId:" + m_requiresId + ", requiresId: " + requiresId;
-                assert(segment.getEndId() >= segment.getStartId());
-                if (requiresId != null) {
-                    assert !requiresId || peekLastSegment() == null
-                            || peekLastSegment().getEndId() < segment.getStartId();
-                    m_requiresId = requiresId;
-                }
+                assert(!m_requiresId || segment.getNumEntries() == 0 || segment.getEndId() >= segment.getStartId());
+                assert (!m_requiresId || peekLastSegment() == null || segment.getNumEntries() == 0 ||
+                         peekLastSegment().getEndId() < segment.getStartId());
 
                 // Any recovered segment that is not final should be checked
                 // for internal consistency.
@@ -1181,17 +1110,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          * Return and the parseAndTruncate is a noop, except for the finalization.
          */
         if (lastSegmentIndex == null)  {
-            // Reopen the last segment for write - ensure it is not final
-            PBDSegment<M> lastSegment = peekLastSegment();
-            assert lastSegment.getNumEntries() == 0 : "Segment has entries: " + lastSegment.file();
-            lastSegment.openNewSegment(m_compress);
-
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Segment " + lastSegment.file()
-                    + " (final: " + lastSegment.isFinal() + "), has been opened for writing after truncation");
-            }
             return;
         }
+
         /*
          * Now truncate all the segments after the truncation point.
          */
@@ -1210,19 +1131,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        /*
-         * Reset the poll and write segments
-         */
-        long curId = getNextSegmentId();
-
-        PBDSegment<M> lastSegment = peekLastSegment();
-        Long newSegmentIndex = lastSegment == null ? 1L : lastSegment.segmentIndex() + 1;
-        long prevId = lastSegment == null ? getNextSegmentId() : lastSegment.segmentId();
-
-        String fname = getSegmentFileName(curId, prevId);
-        PBDSegment<M> newSegment = initializeNewSegment(newSegmentIndex, curId, new VoltFile(m_path, fname),
-                "PBD truncator");
-        m_segments.put(newSegment.segmentIndex(), newSegment);
         assertions();
     }
 
@@ -1269,60 +1177,55 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     @Override
     public synchronized void updateExtraHeader(M extraHeader) throws IOException {
         m_extraHeader = extraHeader;
-        addSegment(peekLastSegment());
+        PBDSegment<M> tail = peekLastSegment();
+        if (tail != null) {
+            finishWrite(tail);
+        }
     }
 
     @Override
     public synchronized int offer(BBContainer object) throws IOException {
-        return offer(object, -1, -1);
+        return commonOffer(object, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
     }
 
     @Override
     public synchronized int offer(BBContainer object, long startId, long endId) throws IOException {
-        assertions();
-        if (m_closed) {
-            throw new IOException("Closed");
-        }
-
-        assert((startId >= 0 && endId >= startId) || (startId == -1 && endId == -1));
-        boolean requires = startId >= 0;
-        assert(m_requiresId == null || m_requiresId.booleanValue() == requires);
-        m_requiresId = requires;
-
-        PBDSegment<M> tail = peekLastSegment();
-        int written = tail.offer(object, startId, endId);
-        if (written < 0) {
-            tail = addSegment(tail);
-            written = tail.offer(object, startId, endId);
-            if (written < 0) {
-                throw new IOException("Failed to offer object in PBD");
-            }
-        }
-        m_numObjects++;
-        assertions();
-        callBytesAdded(written);
-        return written;
+        return commonOffer(object, startId, endId);
     }
 
     @Override
     public synchronized int offer(DeferredSerialization ds) throws IOException {
+        return commonOffer(ds, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
+    }
+
+    private int commonOffer(Object object, long startId, long endId) throws IOException {
+        boolean isDs = (object instanceof DeferredSerialization);
         assertions();
         if (m_closed) {
             throw new IOException("Cannot offer(): PBD has been Closed");
         }
-
-        assert(m_requiresId == null || m_requiresId.booleanValue() == false);
-        m_requiresId = false;
+        if (isDs) {
+            assert(!m_requiresId && startId == PBDSegment.INVALID_ID && endId == PBDSegment.INVALID_ID);
+        } else {
+            assert(!m_requiresId || (startId != PBDSegment.INVALID_ID && startId != PBDSegment.INVALID_ID && endId >= startId));
+            assert(!m_requiresId || peekLastSegment() == null || peekLastSegment().getEndId() < startId);
+        }
 
         PBDSegment<M> tail = peekLastSegment();
-        int written = tail.offer(ds);
+        if (tail == null || !tail.isActive()) {
+            tail = addSegment(tail, startId);
+        }
+
+        int written = (isDs) ? tail.offer((DeferredSerialization) object) : tail.offer((BBContainer) object, startId, endId);
         if (written < 0) {
-            tail = addSegment(tail);
-            written = tail.offer(ds);
+            finishWrite(tail);
+            tail = addSegment(tail, startId);
+            written = (isDs) ? tail.offer((DeferredSerialization) object) : tail.offer((BBContainer) object, startId, endId);
             if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
             }
         }
+
         m_numObjects++;
         assertions();
         callBytesAdded(written);
@@ -1335,7 +1238,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
-    private PBDSegment<M> addSegment(PBDSegment<M> tail) throws IOException {
+    private void finishWrite(PBDSegment<M> tail) throws IOException {
         //Check to see if the tail is completely consumed so we can close it
         tail.finalize(!tail.isBeingPolled());
         tail.saveFileSize();
@@ -1344,11 +1247,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_usageSpecificLog.debug(
                     "Segment " + tail.file() + " (final: " + tail.isFinal() + "), has been closed by offer to PBD");
         }
-        Long nextIndex = tail.segmentIndex() + 1;
-        long lastId = tail.segmentId();
+    }
 
-        long curId = getNextSegmentId();
-        String fname = getSegmentFileName(curId, lastId);
+    private PBDSegment<M> addSegment(PBDSegment<M> tail, long startId) throws IOException {
+        long nextIndex = (tail == null) ? 1 : tail.segmentIndex() + 1;
+
+        long curId = (startId == PBDSegment.INVALID_ID) ? nextIndex : startId;
+        String fname = getSegmentFileName(curId);
         PBDSegment<M> newSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "an offer");
         m_segments.put(newSegment.segmentIndex(), newSegment);
 
@@ -1428,25 +1333,18 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         PBDSegment<M> first = peekFirstSegment();
         Long nextIndex = first == null ? 1L : first.segmentIndex() - 1;
 
-        // The first segment id is either the "previous" of the current head
-        // (this avoids having to rename the file of the current head), or new id.
-        long curId = first == null ? getNextSegmentId() : getPreviousSegmentId(first.file());
-
         while (segments.peek() != null) {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
 
-            long prevId = getNextSegmentId();
-            String fname = getSegmentFileName(curId, prevId);
-
-            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "a push",
+            String fname = getSegmentFileName(nextIndex);
+            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, nextIndex, new VoltFile(m_path, fname), "a push",
                     extraHeader);
 
             // Prepare for next file
             nextIndex--;
-            curId = prevId;
 
             while (currentSegmentContents.peek() != null) {
-                writeSegment.offer(currentSegmentContents.pollFirst(), -1, -1);
+                writeSegment.offer(currentSegmentContents.pollFirst(), PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
                 m_numObjects++;
             }
 
@@ -1603,6 +1501,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             size += segment.size();
         }
         return Pair.of(count, size);
+    }
+
+    @Override
+    public synchronized long getFirstId() throws IOException {
+        return (m_segments.size() == 0) ? PBDSegment.INVALID_ID : m_segments.firstEntry().getValue().getStartId();
     }
 
     @Override
@@ -1902,6 +1805,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         BinaryDequeSerializer<M> m_extraHeaderSerializer;
         M m_initialExtraHeader;
         PBDSegmentFactory m_pbdSegmentFactory = PBDRegularSegment::new;
+        boolean m_requiresId = false;
 
         private Builder(String nonce, File path, VoltLogger logger) {
             super();
@@ -1916,6 +1820,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             m_initialExtraHeader = extraHeader;
             m_extraHeaderSerializer = serializer;
             m_pbdSegmentFactory = builder.m_pbdSegmentFactory;
+            m_requiresId = builder.m_requiresId;
         }
 
         /**
@@ -1958,6 +1863,19 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         public <T> Builder<T> initialExtraHeader(T extraHeader, BinaryDequeSerializer<T> serializer) {
             return new Builder<>(this, extraHeader, requireNonNull(serializer, "serializer"));
+        }
+
+        /**
+         * Set whether this PBD requires start and end ids for offers.
+         * <p>
+         * Default: {@code false}
+         *
+         * @param requiresId {@code true} if this PBD requires start id and end id to be specified with offers
+         * @return An updated {@link Builder} instance
+         */
+        public Builder<M> requiresId(boolean requiresId) {
+            m_requiresId = requiresId;
+            return this;
         }
 
         /**

@@ -172,6 +172,7 @@ public class DiskResourceChecker
             return licenseApi.isDrReplicationAllowed();
         case SNAPSHOTS:
         case EXPORTOVERFLOW:
+        case TOPICSDATA:
             return true;
         default: return false;
         }
@@ -205,22 +206,25 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            if (MiscUtils.isPro() && forSnmp && !m_snmpDiskTrapSent) {
-                m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
-                        String.format(
-                                "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
-                                filePath, featureName.value(),
-                                (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
-                m_snmpDiskTrapSent = true;
-            }
-            m_logger.error(String.format(
+            if (forSnmp) {
+                if (MiscUtils.isPro() && !m_snmpDiskTrapSent) {
+                    m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                                              String.format(
+                                                  "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                                  filePath, featureName.value(),
+                                                  (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                                  CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
+                    m_snmpDiskTrapSent = true;
+                }
+            } else {
+                m_logger.error(String.format(
                     "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
                             + "Use \"voltadmin resume\" command once resource constraint is corrected.",
                     filePath, featureName.value(), (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                     CoreUtils.getHostnameOrAddress()));
-            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
                     filePath, featureName.value(), HealthMonitor.getValueWithUnit(usedSpace)));
+            }
             return false;
         } else {
             if (forSnmp && m_snmpDiskTrapSent) {
@@ -236,7 +240,7 @@ public class DiskResourceChecker
         }
     }
 
-    private static VoltFile getPathForFeature(FeatureNameType featureName)
+    private static File getPathForFeature(FeatureNameType featureName)
     {
         switch(featureName) {
         case COMMANDLOG :
@@ -246,9 +250,11 @@ public class DiskResourceChecker
         case DROVERFLOW:
             return new VoltFile(VoltDB.instance().getDROverflowPath());
         case EXPORTOVERFLOW:
-            return new VoltFile(VoltDB.instance().getExportOverflowPath());
+            return VoltDB.instance().getExportOverflowPath();
         case SNAPSHOTS:
             return new VoltFile(VoltDB.instance().getSnapshotPath());
+        case TOPICSDATA:
+            return VoltDB.instance().getTopicsDataPath();
         default: // Not a valid feature or one that is supported for disk limit monitoring.
                  // Should not happen unless we forget to add a newly supported feature here.
             return null;
@@ -259,7 +265,7 @@ public class DiskResourceChecker
     private static class FeatureDiskLimitConfig
     {
         final FeatureNameType m_featureName;
-        final VoltFile m_path;
+        final File m_path;
         final double m_diskSizeLimit;
         final int m_diskSizeLimitPerc;
         final double m_diskSizeLimitSnmp;
