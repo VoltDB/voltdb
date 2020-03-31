@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.Random;
 
 import static org.junit.Assert.*;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INVALID_INPUT;
+import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
 
 public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     protected static final String TMPDIR = "/tmp/Backup";
@@ -104,7 +106,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     // wrong parameter yield failure result
     @Test
     public void testSimpleFaiure() {
-        exit.expectSystemExitWithStatus(-1);
+        exit.expectSystemExitWithStatus(STATUS_INVALID_INPUT);
         String[] wrongArg = {"--self", "--unknow"};
         SnapshotComparer.main(wrongArg);
     }
@@ -116,7 +118,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
         if (!MiscUtils.isPro()) {
             return;
         }
-        exit.expectSystemExitWithStatus(0);
+        exit.expectSystemExitWithStatus(STATUS_OK);
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
         for (int i = 0; i < expectedLines; i++) {
