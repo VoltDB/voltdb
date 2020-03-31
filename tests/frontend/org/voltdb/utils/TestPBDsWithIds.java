@@ -417,7 +417,7 @@ public class TestPBDsWithIds {
         int numSegments = 3;
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
-            if (entry.getKey().longValue() == numSegments) {
+            if (entry.getKey().longValue() == m_pbd.getSegments().lastKey()) {
                 m_pbd.quarantineSegment(entry);
             }
         }
@@ -444,7 +444,7 @@ public class TestPBDsWithIds {
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
             long key = entry.getKey().longValue();
-            if (key == 1 || key == numSegments) {
+            if (key == m_pbd.getSegments().firstKey() || key == m_pbd.getSegments().lastKey()) {
                 m_pbd.quarantineSegment(entry);
             }
         }
@@ -469,8 +469,9 @@ public class TestPBDsWithIds {
     public void testSeekOnlyFirstValid() throws Exception {
         int numSegments = 3;
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
+        long firstKey = m_pbd.getSegments().firstKey();
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
-            if (entry.getKey().longValue() != 1) {
+            if (entry.getKey().longValue() != firstKey) {
                 m_pbd.quarantineSegment(entry);
             }
         }
@@ -496,7 +497,7 @@ public class TestPBDsWithIds {
         int numSegments = 3;
         Pair<Long, Long>[] segmentIds = createPopulateSegments(numSegments, 10, 10, -1);
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
-            if (entry.getKey().longValue() != numSegments) {
+            if (entry.getKey().longValue() != m_pbd.getSegments().lastKey()) {
                 m_pbd.quarantineSegment(entry);
             }
         }
@@ -528,10 +529,12 @@ public class TestPBDsWithIds {
             // quarantine segments other than ones at index 1 and numSegments (2 through numSegments-1)
             quarantinedIndexes.add((long) random.nextInt(numSegments-2)+2);
         }
+        long index = 1;
         for (Map.Entry<Long, PBDSegment<ExtraHeaderMetadata>> entry : m_pbd.getSegments().entrySet()) {
-            if (quarantinedIndexes.contains(entry.getKey().longValue())) {
+            if (quarantinedIndexes.contains(index)) {
                 m_pbd.quarantineSegment(entry);
             }
+            index++;
         }
 
         PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
@@ -566,8 +569,8 @@ public class TestPBDsWithIds {
         reader.seekToSegment(seekId, errorRule);
         BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         PBDSegment<ExtraHeaderMetadata> currSegment = reader.getCurrentSegment();
-        assert(currSegment.getStartId() == expectedRange.getFirst());
-        assert(currSegment.getEndId() == expectedRange.getSecond());
+        assertEquals(expectedRange.getFirst().longValue(), currSegment.getStartId());
+        assertEquals(expectedRange.getSecond().longValue(), currSegment.getEndId());
         return container;
     }
 

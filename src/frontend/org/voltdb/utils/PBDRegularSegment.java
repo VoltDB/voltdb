@@ -89,9 +89,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     private DBBPool.BBContainer m_entryHeaderBuf = null;
     Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    PBDRegularSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+    PBDRegularSegment(long id, File file, VoltLogger usageSpecificLog,
             BinaryDequeSerializer<M> extraHeaderSerializer) {
-        super(file, index, id);
+        super(file, id);
         m_crc = new CRC32();
         m_isFinal = PBDSegment.isFinal(m_file);
         m_usageSpecificLog = usageSpecificLog;

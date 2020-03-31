@@ -74,23 +74,17 @@ public abstract class PBDSegment<M> {
     public static final int ENTRY_HEADER_BYTES = ENTRY_HEADER_FLAG_OFFSET + 2;
 
     final File m_file;
-    // Index of this segment in the in-memory segment map
-    final long m_index;
-    // Persistent ID of this segment, based on managing a monotonic counter
+    // Persistent ID of this segment. This is monotonically increasing for PBDs with requiresId=false.
+    // It is the starting id in the segment otherwise, but still increasing value
     final long m_id;
     boolean m_deleteOnAck;
 
     private long m_fileSize = -1;
 
-    PBDSegment(File file, long index, long id) {
+    PBDSegment(File file, long id) {
         super();
         m_file = file;
-        m_index = index;
         m_id = id;
-    }
-
-    long segmentIndex() {
-        return m_index;
     }
 
     long segmentId() {
