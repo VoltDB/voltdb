@@ -179,7 +179,7 @@ void CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
         if (e.copy_of() != nullptr) {
             TableTuple copied(tuple.m_schema);
             copied.move(const_cast<void*>(e.copy_of()));
-            tuple.copyNonInlinedColumnObjects(copied);
+            copied.copyNonInlinedColumnObjects(tuple);
         }
     }
 }

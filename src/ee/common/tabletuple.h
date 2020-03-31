@@ -906,19 +906,19 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     }
 }
 
-inline void TableTuple::copyNonInlinedColumnObjects(TableTuple &target) {
+inline void TableTuple::copyNonInlinedColumnObjects(TableTuple &source) {
     vassert(m_schema);
-    vassert(target.m_schema);
-    vassert(target.m_data);
+    vassert(source.m_schema);
+    vassert(source.m_data);
     vassert(m_data);
 
     const uint16_t count = m_schema->getUninlinedObjectColumnCount();
     if (count > 0) {
         for (uint16_t i = 0; i < count; i++) {
             const uint16_t colIndex = m_schema->getUninlinedObjectColumnInfoIndex(i);
-            target.setNValueAllocateForObjectCopies(colIndex, getNValue(colIndex));
+            setNValueAllocateForObjectCopies(colIndex, source.getNValue(colIndex));
         }
-        target.m_data[0] = m_data[0];
+        m_data[0] = source.m_data[0];
     }
 }
 /*
