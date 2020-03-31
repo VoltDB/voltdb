@@ -39,11 +39,13 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
@@ -70,6 +72,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+    private final RateLimitedLogger m_syncServiceLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toNanos(1), SNAP_LOG, Level.ERROR);
     private Runnable m_onCloseHandler = null;
 
     /*
@@ -301,12 +304,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         syncedBytes = Bits.sync_file_range(SNAP_LOG, m_fos.getFD(), m_channel, syncStart, positionAtSync);
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
-                            SNAP_LOG.error("Error syncing snapshot", e);
+                            m_syncServiceLogger.log(System.nanoTime(), Level.ERROR, e,
+                                    "Error syncing snapshot " + m_file +
+                                    ". This message is rate limited to once every one minute.");
                         } else {
                             SNAP_LOG.info("Asynchronous close syncing snasphot data, presumably graceful", e);
                         }
                     } catch (Throwable t) {
-                        SNAP_LOG.error("Unexpected error while fsyncing snapshot data to file " + m_file, t);
+                        m_syncServiceLogger.log(System.nanoTime(), Level.ERROR, t,
+                                "Unexpected error while fsyncing snapshot data to file " + m_file +
+                                ". This message is rate limited to once every one minute.");
                     } finally {
                         final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
                         m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
@@ -336,7 +343,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             }
                         }
                     } catch (Throwable t) {
-                        SNAP_LOG.error("Error fadvising snapshot data", t);
+                        m_syncServiceLogger.log(System.nanoTime(), Level.ERROR, t,
+                                "Error fadvising snapshot data." +
+                                " This message is rate limited to once every one minute.");
                     }
                 }
             }
@@ -529,13 +538,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
-                } catch (Throwable t) {
-                    if (permitAcquired > 0) {
-                        m_bytesAllowedBeforeSync.release(permitAcquired);
-                    }
-                    SNAP_LOG.error("Unexpected error while attempting to write snapshot data to file " + m_file, t);
-                    m_writeFailed = true;
-                    throw t;
                 } finally {
                     try {
                         tupleDataCont.discard();
