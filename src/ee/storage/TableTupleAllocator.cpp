@@ -752,10 +752,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
                 static_cast<CompactingChunks const&>(*this),
                 [&cb] (void const* p) noexcept {cb(p);});
         if (frozen()) {
-            // since the last chunk may not be full, we need to restore its pointer later.
-            // This is a hack to get the correct behavior for
-            // snapshot -> clear -> finish snapshot
-            void* last_next = last()->range_next();
             if (m_finalize) {              // finalize the region between frozen right, and txn end
                 auto const& frozenRight = frozenBoundaries().right();
                 if (less<position_type>()(frozenRight, *last())) {
@@ -780,7 +776,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
                     beginTxn().iterator()->range_begin();
                 releasable();
             }
-            last()->m_next = last_next;
             m_allocs = 0;
         } else {                               // fast clear path
             for (auto iter = begin(); iter != end(); ++iter) {
@@ -1339,12 +1334,8 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                  txnBeginChunkId = beginTxn.empty() ? 0 : beginTxn.iterator()->id(),
                  iterId = iter->id();
             if (beginTxn.empty()) {                // txn view is empty
-                // Under this circumstances, since the last chunk
-                // in txn view may not be full when it is
-                // frozen and clear()-ed, only the last chunk
-                // needs to use the next() position.
-                vassert((iter->range_begin() == iter->range_next()) == (next(iter) != l.end()));
-                return iter->range_begin() == iter->range_next() ? iter->range_end() : iter->range_next();
+                vassert(iter->range_begin() == iter->range_next());
+                return iterId == rightId ? frozenBoundaries.right().address() : iter->range_end();
             } else if (leftId == iterId) {      // in the left boundary of frozen state
                 return frozenBoundaries.left().address();
             } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
@@ -1383,12 +1374,9 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 (reinterpret_cast<CompactingChunks const&>(l).beginTxn().empty() ||
                  less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator()))) {
-            assert(iter != l.end());
+            vassert(iter != l.end());
+            vassert(iter->range_begin() == iter->range_next());
             auto const id = iter->id();
-            // Note the exception is left for frozen right boundary
-            assert(iter->range_begin() == iter->range_next() ||
-                    id == reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries().right().chunkId());
-            // chunk was fully used. Need to take care of finalizer
             if (++iter != l.end()) {
                 /**
                  * NOTE: snapshot RW iterator **CAN NOT** take any
@@ -1417,6 +1405,8 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
                         l.front().range_begin() == l.front().range_next());
                 l.pop_front();
             } else {                               // snapshot iterator drained
+                vassert(all_of(l.cbegin(), l.cend(),
+                            [](ChunkHolder<> const& c) noexcept { return c.range_begin() == c.range_next(); }));
                 l.clear();
             }
         } else {
