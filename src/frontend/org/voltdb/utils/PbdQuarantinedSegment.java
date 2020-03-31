@@ -32,8 +32,8 @@ import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
  * corruption but is kept around in case any data in the segment is needed to recover data.
  */
 class PbdQuarantinedSegment<M> extends PBDSegment<M> {
-    PbdQuarantinedSegment(File file, long index, long id) {
-        super(file, index, id);
+    PbdQuarantinedSegment(File file, long id) {
+        super(file, id);
     }
 
     @Override

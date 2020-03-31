@@ -269,7 +269,7 @@ public class TestPBDMultipleReaders {
             readBuffer(transientReader);
             // Regular reader reads past one segment, while transient one doesn't.
             // Verify that on next read, transient reader gets the buffer after the segment that got deleted.
-            assertEquals(regularReader.getCurrentSegment().m_index, transientReader.getCurrentSegment().m_index);
+            assertEquals(regularReader.getCurrentSegment().m_id, transientReader.getCurrentSegment().m_id);
         }
 
         // Write more and read all using regular reader.

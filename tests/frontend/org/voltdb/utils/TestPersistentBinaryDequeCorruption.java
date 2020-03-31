@@ -448,9 +448,9 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     private class CorruptingPBDSegment<M> extends PBDRegularSegment<M> {
-        CorruptingPBDSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+        CorruptingPBDSegment(long id, File file, VoltLogger usageSpecificLog,
                 BinaryDequeSerializer<M> extraHeaderSerializer) {
-            super(index, id, file, usageSpecificLog, extraHeaderSerializer);
+            super(id, file, usageSpecificLog, extraHeaderSerializer);
         }
 
         @Override

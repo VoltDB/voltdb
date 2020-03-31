@@ -184,14 +184,14 @@ public class TestPersistentBinaryDeque {
         if (lastEntry != null) {
             if (isPBDClosed) {
                 // When PBD is closed, last entry SHOULD be final
-                //assertTrue(PBDSegment.isFinal(lastEntry));
+                assertTrue(PBDSegment.isFinal(lastEntry));
             }
         }
         File penultimate = sorted.peekLast() != null ? sorted.removeLast() : null;
         if (penultimate != null) {
             if (isPBDClosed) {
                 // When PBD is closed, penultimate entry SHOULD be final
-                //assertTrue(PBDSegment.isFinal(penultimate));
+                assertTrue(PBDSegment.isFinal(penultimate));
             }
         }
 
