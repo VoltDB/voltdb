@@ -95,7 +95,7 @@ public class SnapshotComparer {
     private static void printHelpAndQuit(int code) {
         System.out.println("Usage: snapshotComparer --help");
         System.out.println("Self Comparision, verify data consistency among replicas of single snapshot: snapshotComparer --self nonce");
-        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer --self --nonce nonce1 --dir dir1,dir2,dir3");
+        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer --self --nonce nonce1 --dirs dir1,dir2,dir3");
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --self --nonce nonce1 --paths path1,path2 --hosts host1,host2 --user username");
         System.out.println();
         System.out.println("Peer Comparision, verify data consistency among snapshots: snapshotComparer nonce1 nonce2");
@@ -129,50 +129,50 @@ public class SnapshotComparer {
                     if (arg.equalsIgnoreCase("--nonce")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--dirs")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--user")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --user");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         username = args[i];
@@ -182,21 +182,21 @@ public class SnapshotComparer {
                 }
                 if (sourceNonce == null || sourceNonce.isEmpty()) {
                     System.err.println("Error: Does not specify snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (local == null) {
                     System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
                                 || (sourceDirs.length != sourceHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (!local && username.isEmpty()) {
                     System.err.println("Error: Does not specify username.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
             } else {
                 // TODO: better UI for specify target snapshot
@@ -205,93 +205,93 @@ public class SnapshotComparer {
                     if (arg.equalsIgnoreCase("--nonce1")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--nonce2")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --nonce");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         targetNonce = args[i];
                     } else if (arg.equalsIgnoreCase("--dirs1")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--dirs2")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = true;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --dirs");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         targetDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths1")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--paths2")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --paths");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         targetDirs = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts1")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         sourceHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--hosts2")) {
                         if (local != null && local) {
                             System.err.println("Error: already specify snapshot from local");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         local = false;
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --hosts");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         targetHosts = args[i].split(",");
                     } else if (arg.equalsIgnoreCase("--user")) {
                         if (i + 1 >= args.length) {
                             System.err.println("Error: Not enough args following --user");
-                            printHelpAndQuit(1);
+                            printHelpAndQuit(-1);
                         }
                         i++;
                         username = args[i];
@@ -301,15 +301,15 @@ public class SnapshotComparer {
                 }
                 if (sourceNonce == null || sourceNonce.isEmpty()) {
                     System.err.println("Error: Does not specify source snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (targetNonce == null || targetNonce.isEmpty()) {
                     System.err.println("Error: Does not specify comparing snapshot nonce.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (local == null) {
                     System.err.println("Error: Does not specify location of snapshot, either using --dirs for local or --paths for remote.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
@@ -317,11 +317,11 @@ public class SnapshotComparer {
                         || (targetDirs == null) || (targetHosts == null) || (targetDirs.length == 0)
                                 || (targetDirs.length != targetHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
                 if (!local && username.isEmpty()) {
                     System.err.println("Error: Does not specify username.");
-                    printHelpAndQuit(1);
+                    printHelpAndQuit(-1);
                 }
             }
             if (!local && cleanup) {
