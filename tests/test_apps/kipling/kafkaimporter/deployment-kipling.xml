@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" sitesperhost="4"/>
+    <snapshot frequency="2m" retain="3" />
+    <commandlog synchronous="true" enabled="true" logsize="1024">
+        <frequency time="200" transactions="2147483647"/>
+    </commandlog>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <!-- <commandlog enabled="false" /> -->
+   <topics enabled="true">
+      <properties>
+        <property name="port">9092</property>
+        <property name="thread.count">15</property>
+      </properties>
+      <profiles>
+        <defaults>
+          <retention policy="time" limit="1 yr" />
+        </defaults>
+        <profile name="foo">
+          <retention policy="size" limit="70 gB" />
+        </profile>
+      </profiles>
+    </topics>
+
+    <!-- 
+        <import>
+            <configuration type="kafka" enabled="true">
+                <property name="brokers">pshaw-DH310:9092</property>
+                <property name="topics">T8_KAFKAEXPORTTABLE1</property>
+                <property name="groupid">A8</property>
+                <property name="procedure">KAFKAIMPORTTABLE1.insert</property>
+            </configuration>
+
+            <configuration type="kafka" enabled="true">
+                <property name="brokers">pshaw-DH310:9092</property>
+                <property name="topics">T8_KAFKAEXPORTTABLE2</property>
+                <property name="groupid">B8</property>
+                <property name="procedure">KAFKAIMPORTTABLE2.insert</property>
+            </configuration>
+
+            <configuration type="kafka" enabled="false">
+                <property name="brokers">pshaw-DH310:9092</property>
+                <property name="topics">T8_KAFKAEXPORTTABLE2</property>
+                <property name="groupid">T8</property>
+                <property name="procedure">InsertImport2</property>
+            </configuration>
+        </import>
+
+        <export>
+            <configuration enabled="true" target="default" type="kafka">
+                <property name="metadata.broker.list">volt13i:9092</property>
+                <property name="producer.type">async</property>
+                <property name="acks">1</property>
+                <property name="skipinternals">true</property>
+                <property name="topic.prefix">T8_</property>
+            </configuration>
+        </export>
+    -->
+</deployment>
