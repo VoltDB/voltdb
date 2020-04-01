@@ -1678,12 +1678,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String mStreamName) {
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String mStreamName) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
-            m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(sequences.getAckOffset());
             m_data.putLong(sequences.getSequenceNumber());
             m_data.putLong(sequences.getGenerationId());
@@ -1696,19 +1694,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.flip();
             m_connection.write();
 
-            ByteBuffer results = ByteBuffer.allocate(8);
-            while (results.remaining() > 0) {
-                m_connection.m_socketChannel.read(results);
-            }
-            results.flip();
-            long result_offset = results.getLong();
-            if (result_offset < 0) {
-                System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
-                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
-                    ", generationId: " + sequences.getGenerationId() +
-                    ", partitionId: " + partitionId +
-                    ", streamName: " + mStreamName);
-            }
+            m_connection.readStatusByte();
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }

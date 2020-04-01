@@ -603,7 +603,7 @@ namespace voltdb {
             // equivalent to "table id", to ensure injection relation to rw iterator
             id_type const m_id = ChunksIdValidator::instance().id();
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
-            TxnLeftBoundary m_txnFirstChunk;     // (moving) left boundary for txn
+            TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // action before deallocating a tuple from txn (or hook) memory.
             boost::optional<function<void(void const*)>> const m_finalize{};
@@ -617,7 +617,6 @@ namespace voltdb {
             void pop_back(bool call_finalizer);
             void pop_finalize(typename list_type::iterator) const;
         protected:
-            atomic_bool m_deleting{false};
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
@@ -656,10 +655,6 @@ namespace voltdb {
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
-            // in some cases?, we need to set deleting flag before it's too late.
-            // Caution: use it only when you know the flag is
-            // going to be reset very soon.
-            void set_deleting() noexcept;
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
@@ -673,7 +668,6 @@ namespace voltdb {
             bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
             size_t chunkSize() const noexcept;
-            bool deleting() const noexcept;            // grab status
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
@@ -935,8 +929,6 @@ namespace voltdb {
                 using list_iterator_type = typename conditional<perm == iterator_permission_type::ro,
                       typename Chunks::list_type::const_iterator, typename Chunks::list_type::iterator>::type;
                 list_iterator_type m_iter;
-                bool const m_hasTxnInvisibleChunks;    // can be true only if in snapshot view, is frozen, and contains chunks
-                // only visible to snapshot
             protected:
                 using value_type = typename super::value_type;
                 // ctor arg type

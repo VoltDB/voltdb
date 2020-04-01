@@ -692,28 +692,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String streamName)
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String streamName)
     {
         if (EXPORT_LOG.isDebugEnabled()) {
-            EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
+            EXPORT_LOG.debug("exportAction on partition " + partitionId + ", uso: "
+                    +
                     sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
                     ", generationId:" + sequences.getGenerationId() + ", streamName: " + streamName);
         }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
-        long retval = nativeExportAction(pointer,
-                                         syncAction,
-                                         sequences.getAckOffset(),
-                                         sequences.getSequenceNumber(),
-                                         sequences.getGenerationId(),
-                                         getStringBytes(streamName));
-        if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
-                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
-                    ", generationId:" + sequences.getGenerationId() + ", partitionId: " + partitionId +
-                    ", streamName: " + streamName);
-        }
+        nativeSetExportStreamPositions(pointer,
+                                       sequences.getAckOffset(),
+                                       sequences.getSequenceNumber(),
+                                       sequences.getGenerationId(),
+                                       getStringBytes(streamName));
     }
 
     @Override

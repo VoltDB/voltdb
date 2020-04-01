@@ -1202,7 +1202,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeExportAction
+ * Method:    nativeSetExportStreamPositions
  *
  * @param ackAction  true if this call contains an ack
  * @param pollAction true if this call requests a poll
@@ -1210,16 +1210,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * @param ackOffset  if acking, the universal stream offset being acked/released
  * @param streamName    Name of the stream to which the Export action applies
  *
- * @return the universal stream offset for the last octet in any
- * returned poll results (returned via the query results buffer).  On
- * any error this will be less than 0.  For any call with no
- * pollAction, any value >= 0 may be ignored.
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExportAction
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetExportStreamPositions
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
-   jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
    jlong genId,
@@ -1233,8 +1228,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->exportAction(syncAction,
-                                        static_cast<int64_t>(ackOffset),
+            engine->setExportStreamPositions(static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
                                         static_cast<int64_t>(genId),
                                         streamNameStr);
@@ -1244,7 +1238,6 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
-    return 0;
 }
 
 /**

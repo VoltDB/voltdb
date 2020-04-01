@@ -1351,7 +1351,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            if (action == StreamStartAction.RECOVER) {
+            if (action == StreamStartAction.RECOVER || t.getIstopic()) {
                 ExportSnapshotTuple sequences =
                         sequenceNumberPerPartition.get(myPartitionId);
                 if (sequences == null) {
@@ -1365,11 +1365,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
 
                 //Forward the sequence number to the EE
-                context.getSiteProcedureConnection().exportAction(
-                        true,
-                        sequences,
-                        myPartitionId,
-                        name);
+                context.getSiteProcedureConnection().setExportStreamPositions(sequences, myPartitionId, name);
 
             }
             // Truncate the PBD buffers and assign the stats to the restored value

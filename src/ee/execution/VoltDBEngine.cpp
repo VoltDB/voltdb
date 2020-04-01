@@ -2768,30 +2768,14 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     return remaining;
 }
 
-int64_t VoltDBEngine::exportAction(bool syncAction, int64_t uso,
+void VoltDBEngine::setExportStreamPositions(int64_t uso,
         int64_t seqNo, int64_t generationIdCreated, std::string streamName) {
     std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
-    // return no data and polled offset for unavailable tables.
-    if (pos == m_exportingTables.end()) {
-        // ignore trying to sync a non-exported table
-        if (syncAction) {
-            return 0;
-        }
-
-        m_resultOutput.writeInt(0);
-        if (uso < 0) {
-            return 0;
-        } else {
-            return uso;
-        }
+    // ignore trying to sync a non-exported table
+    if (pos != m_exportingTables.end()) {
+        pos->second->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
     }
-
-    Table *table_for_el = pos->second;
-    if (syncAction) {
-        table_for_el->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
-    }
-    return 0;
 }
 
 bool VoltDBEngine::deleteMigratedRows(
