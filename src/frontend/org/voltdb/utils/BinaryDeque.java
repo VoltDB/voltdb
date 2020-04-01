@@ -131,6 +131,15 @@ public interface BinaryDeque<M> {
     public BinaryDequeReader<M> openForRead(String cursorId, boolean isTransient) throws IOException;
 
     /**
+     * Opens a {@link BinaryDequeGapWriter} for this BinaryDeque.
+     * Only one gap writer is allowed at a time in a BinaryDeque.
+     *
+     * @return new {@link BinaryDequeGapWriter}
+     * @throws IOException if a gap writer is already open for this BinaryDeque
+     */
+    public BinaryDequeGapWriter<M> openGapWriter() throws IOException;
+
+    /**
      * Close a BinaryDequeReader reader, also close the SegmentReader for the segment if it is reading one.
      * @param cursorId a String identifying the cursor.
      * @throws IOException on any errors trying to close the SegmentReader if it is the last one for the segment

@@ -68,6 +68,7 @@ public class TestPBDsWithIds {
         } catch(AssertionError e) {
             //expected
         }
+        negativeOffer(15, 20);
         negativeOffer(PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
 
         // verify also at new segment boundary

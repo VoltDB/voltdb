@@ -681,7 +681,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     @Override
     int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException
     {
-        assert(m_endId == INVALID_ID || startId > m_endId) : "Current endId=" + m_endId + ", input startId=" + startId;
+        assert(m_endId == INVALID_ID || startId == m_endId+1) : "Current endId=" + m_endId + ", input startId=" + startId;
         if (m_closed) {
             throw new IOException("Segment closed");
         }
