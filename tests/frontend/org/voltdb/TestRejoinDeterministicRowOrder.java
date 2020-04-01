@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
@@ -33,7 +32,6 @@ import org.junit.contrib.java.lang.system.internal.CheckExitCalled;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -47,7 +45,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -310,12 +307,14 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
     public void testRejoinWithOrderedRowChecks() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
+        final int numTuples = 500;
         final int numHosts = 2;
         final int kfactor = 1;
+        final int sitesPerHost = 1;
         final LocalCluster cluster =
             new LocalCluster(
                     "rejoin.jar",
-                    4,
+                    sitesPerHost,
                     numHosts,
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
@@ -327,12 +326,11 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             return;
         }
 
-        final int numTuples = 1000;
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
-        final java.util.concurrent.atomic.AtomicBoolean haveFailed = new AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicBoolean rejoinFailed = new AtomicBoolean(false);
 
         Thread recoveryThread = new Thread("Recovery thread") {
             @Override
@@ -340,7 +338,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                 int attempts = 0;
                 while (true) {
                     if (attempts == 6) {
-                        haveFailed.set(true);
+                        rejoinFailed.set(true);
                         break;
                     }
                     if (cluster.recoverOne(1, 0, "")) {
@@ -363,9 +361,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
         try {
             cluster.killSingleHost(1);
 
-            final java.util.concurrent.atomic.AtomicBoolean killerFail =
-                new java.util.concurrent.atomic.AtomicBoolean(false);
-
             //
             // This version doesn't work. It causes concurrent failures during the rejoin sysproc
             // that aren't handled correctly
@@ -375,7 +370,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             loadThread.start();
             recoveryThread.join();
 
-            if (killerFail.get()) {
+            if (rejoinFailed.get()) {
                 fail("Exception in killer thread");
             }
 
@@ -392,19 +387,20 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             cluster.shutDown();
             exit.expectSystemExitWithStatus(STATUS_OK);
         }
-        assertFalse(haveFailed.get());
     }
 
     @Test
     public void testRejoinWithMultipleVarchars() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
+        final int numTuples = 1000;
         final int numHosts = 2;
         final int kfactor = 1;
+        final int sitesPerHost = 1;
         final LocalCluster cluster =
             new LocalCluster(
                     "rejoin.jar",
-                    4,
+                    sitesPerHost,
                     numHosts,
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
@@ -416,12 +412,11 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             return;
         }
 
-        final int numTuples = 1000;
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
-        final java.util.concurrent.atomic.AtomicBoolean haveFailed = new AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicBoolean rejoinFailed = new AtomicBoolean(false);
 
         Thread recoveryThread = new Thread("Recovery thread") {
             @Override
@@ -429,7 +424,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                 int attempts = 0;
                 while (true) {
                     if (attempts == 6) {
-                        haveFailed.set(true);
+                        rejoinFailed.set(true);
                         break;
                     }
                     if (cluster.recoverOne(1, 0, "")) {
@@ -451,9 +446,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
         try {
             cluster.killSingleHost(1);
 
-            final java.util.concurrent.atomic.AtomicBoolean killerFail =
-                new java.util.concurrent.atomic.AtomicBoolean(false);
-
             //
             // This version doesn't work. It causes concurrent failures during the rejoin sysproc
             // that aren't handled correctly
@@ -463,8 +455,8 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             loadThread.start();
             recoveryThread.join();
 
-            if (killerFail.get()) {
-                fail("Exception in killer thread");
+            if (rejoinFailed.get()) {
+                fail("Rejoin failed");
             }
 
             loadThread.stopMutations();
@@ -480,7 +472,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
             cluster.shutDown();
             exit.expectSystemExitWithStatus(STATUS_OK);
         }
-        assertFalse(haveFailed.get());
     }
 
     protected static void deleteTestFiles(final String nonce) {
@@ -495,8 +486,10 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
 
         File tmp_dir = new File(snapshotDir);
         File[] tmp_files = tmp_dir.listFiles(cleaner);
-        for (File tmp_file : tmp_files) {
-            deleteRecursively(tmp_file);
+        if (tmp_files != null) {
+            for (File tmp_file : tmp_files) {
+                deleteRecursively(tmp_file);
+            }
         }
     }
 
