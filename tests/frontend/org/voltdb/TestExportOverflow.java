@@ -110,6 +110,7 @@ public class TestExportOverflow extends RegressionSuite {
             assertEquals(1, result.getLong(0));
         }
         client.drain();
+        client.callProcedure("@Quiesce");
         File overflowDir;
         boolean newCli = ((LocalCluster)m_config).isNewCli();
         if (newCli) {
@@ -118,35 +119,23 @@ public class TestExportOverflow extends RegressionSuite {
             ArrayList<File> subroots = ((LocalCluster) m_config).getSubRoots();
             overflowDir = findExportOverflowDir(subroots.get(0));
         }
-        Map<String, FileTime> fileTimes = getFileTimeAttributesRecursively(overflowDir);
-        String[] oldOverflowFiles = overflowDir.list();
-        assertTrue(oldOverflowFiles.length>0);
+        for (int i=0;true; ++i) {
+            int fileCount = overflowDir.list().length;
+            if (fileCount > 0) {
+                break;
+            }
+            if (i > 100) {
+                fail("Overflow directory is emtpy");
+            }
+            Thread.sleep(20);
+        }
 
         // shutdown and startup with force flag
         // and verify that export overflow directory is cleared
         m_config.shutDown();
-        Map<String, Long> lastModifiedMap = new HashMap<>();
-        for (String f : oldOverflowFiles) {
-            lastModifiedMap.put(f, (new File(f)).lastModified());
-        }
         ((LocalCluster) m_config).setForceVoltdbCreate(true);
         m_config.startUp(false);
-        Map<String, FileTime> newFileTimes = getFileTimeAttributesRecursively(overflowDir);
-        assertTrue(fileTimes.size() == newFileTimes.size());
-
-        assertTrue(oldOverflowFiles.length == newFileTimes.size());
-
-        String fileName;
-        FileTime newer;
-        FileTime older;
-        for (int i = 0; i < oldOverflowFiles.length; i++) {
-            fileName = oldOverflowFiles[i];
-            newer = newFileTimes.get(fileName);
-            older = fileTimes.get(fileName);
-            assertTrue(newer != null);
-            assertTrue(older != null);
-            assertTrue(newer.compareTo(older) > 0);
-        }
+        assertEquals(0, overflowDir.list().length);
     }
 
     static public junit.framework.Test suite() throws Exception
