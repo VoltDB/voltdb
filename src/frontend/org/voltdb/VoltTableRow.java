@@ -30,6 +30,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTypeUtil;
 
+import static org.voltdb.VoltTable.varbinaryToPrintableString;
+
 /**
  * <p>Represents the interface to a row in a VoltTable result set.</p>
  *
@@ -402,7 +404,7 @@ public abstract class VoltTableRow {
      * in a format that can be blindly copied into a VoltDB with sufficient space
      * and the exact same schema.
      */
-    final ByteBuffer getRawRow() {
+    public final ByteBuffer getRawRow() {
         int rowSize = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
         int pos = m_buffer.position();
         m_buffer.position(m_position - ROW_HEADER_SIZE);
@@ -1061,4 +1063,97 @@ public abstract class VoltTableRow {
         return new String(stringData, encoding);
     }
 
+
+    public String getRow() {
+        StringBuilder buffer = new StringBuilder();
+        for (int i = 0; i < getColumnCount(); i++) {
+            switch(getColumnType(i)) {
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                case BIGINT:
+                    long lval = getLong(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                    } else {
+                        buffer.append(lval);
+                    }
+                    break;
+                case FLOAT:
+                    double dval = getDouble(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                    } else {
+                        buffer.append(dval);
+                    }
+                    break;
+                case TIMESTAMP:
+                    TimestampType tstamp = getTimestampAsTimestamp(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                        assert (tstamp == null);
+                    }
+                    else {
+                        buffer.append(tstamp);
+                    }
+                    break;
+                case STRING:
+                    String string = getString(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                        assert (string == null);
+                    }
+                    else {
+                        buffer.append(string);
+                    }
+                    break;
+                case VARBINARY:
+                    byte[] bin = getVarbinary(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                        assert (bin == null);
+                    }
+                    else {
+                        buffer.append(varbinaryToPrintableString(bin));
+                    }
+                    break;
+                case DECIMAL:
+                    BigDecimal bd = getDecimalAsBigDecimal(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                        assert (bd == null);
+                    }
+                    else {
+                        buffer.append(bd.toString());
+                    }
+                    break;
+                case GEOGRAPHY_POINT:
+                    GeographyPointValue pt = getGeographyPointValue(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(pt.toString());
+                    }
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = getGeographyValue(i);
+                    if (wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(gv.toString());
+                    }
+                    break;
+                default:
+                    // should not get here ever
+                    throw new IllegalStateException("Table column had unexpected type.");
+            }
+            if (i < getColumnCount() - 1) {
+                buffer.append(",");
+            }
+        }
+        buffer.append("\n");
+        return buffer.toString();
+    }
 }
