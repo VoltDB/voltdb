@@ -56,6 +56,17 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
+    public static StreamBlock from(BinaryDequeReader.Entry<PersistedMetadata> entry) {
+        ByteBuffer b = entry.getData();
+        b.order(ByteOrder.LITTLE_ENDIAN);
+        long seqNo = b.getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
+        long committedSeqNo = b.getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
+        int tupleCount = b.getInt(StreamBlock.ROW_NUMBER_OFFSET);
+        long uniqueId = b.getLong(StreamBlock.UNIQUE_ID_OFFSET);
+
+        return new StreamBlock(entry, seqNo, committedSeqNo, tupleCount, uniqueId, true);
+    }
+
     public StreamBlock(BinaryDequeReader.Entry<PersistedMetadata> entry, long startSequenceNumber,
             long committedSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
         assert(entry != null);
