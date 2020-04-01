@@ -2159,20 +2159,17 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     Alloc alloc(TupleSize);
-    array<void*, NumTuples> addresses;
-    using interval_type = chrono::microseconds;
-    for (size_t i = 0; i < NumTuples; ++i) {
+    constexpr size_t BigNumTuples = NumTuples * 5;
+    array<void*, BigNumTuples> addresses;
+    for (size_t i = 0; i < BigNumTuples; ++i) {
         addresses[i] = gen.fill(alloc.allocate());
     }
     auto const& iter = alloc.template freeze<truth>();
-    atomic_ulong deleting_counter{0lu},                                  // thread coordinators
-                 iterating_counter{0lu};
     // deleting thread that triggers massive chained compaction,
     // by deleting one tuple at a time, in the compacting direction.
     // Synchronized perfectly with the snapshot iterator thread
     // on each deletion
-    auto const deleting_thread = [&alloc, &addresses, &deleting_counter,
-         &iterating_counter, this] () {
+    auto const deleting_thread = [&alloc, &addresses, this] () {
         int j = 0;
         do {
             for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
@@ -2184,35 +2181,132 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                                         Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
                                 memcpy(entries[0].first, entries[0].second, TupleSize);
                             }));
-                ++deleting_counter;
-                while (deleting_counter > iterating_counter) {
-                    this_thread::sleep_for(interval_type(1));
-                }
             }
-        } while ((j += AllocsPerChunk) < NumTuples);
+        } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
     };
     // snapshot thread that validates. Synchronized perfectly
     // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, &deleting_counter, &iterating_counter, this] () {
+    auto const snapshot_thread = [&iter, this] () {
+        auto iterating_counter = 0lu;
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
-            ++iterating_counter;
             ++(*iter);
+            ++iterating_counter;
             if (iter->drained()) {
                 break;
             }
-            while (iterating_counter > deleting_counter) {                                 // busy loop
-                this_thread::sleep_for(interval_type(1));
-            }
         }
-        ASSERT_EQ(NumTuples, iterating_counter);
+        ASSERT_EQ(BigNumTuples, iterating_counter);
     };
     thread t1(deleting_thread);
     snapshot_thread();
     t1.join();
     alloc.template thaw<truth>();
 }
+
+TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
+    // test finalizer on iterator
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    Alloc alloc(TupleSize);
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    array<void*, AllocsPerChunk * 3> addresses;
+    size_t i;
+    for (i = 0; i < AllocsPerChunk * 3 ; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+    }
+    // delete last 2 tuples from last chunk
+    alloc.remove_reserve(2);
+    alloc.template remove_add<truth>(
+            const_cast<void*>(addresses[AllocsPerChunk * 3 - 1]));
+    alloc.template remove_add<truth>(
+            const_cast<void*>(addresses[AllocsPerChunk * 3 - 2]));
+    ASSERT_EQ(2,
+            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+                for_each(entries.begin(), entries.end(),
+                        [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                }));
+    // then, freeze, and remove 1 full chunk worth of tuples
+    auto const& iter = alloc.template freeze<truth>();
+    alloc.remove_reserve(AllocsPerChunk);
+    for (i = 0; i < AllocsPerChunk - 2; ++i) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+    }
+    for (i = 0; i < 2; ++i) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i + AllocsPerChunk]));
+    }
+    ASSERT_EQ(AllocsPerChunk,
+            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+                for_each(entries.begin(), entries.end(),
+                        [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                }));
+    // verify that snapshot should not see values deleted in the
+    // 1st batch
+    i = 0;
+    while (! iter->drained()) {
+        auto const val = Gen::of(reinterpret_cast<unsigned char*>(**iter));
+        // should not see deleted values before freeze;
+        ASSERT_NE(AllocsPerChunk * 3 - 1, val);
+        ASSERT_NE(AllocsPerChunk * 3 - 2, val);
+        ++(*iter);
+        ++i;
+    }
+    ASSERT_EQ(AllocsPerChunk * 3 - 2, i);
+    alloc.template thaw<truth>();
+}
+
+TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
+    // test finalizer on iterator
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    Alloc alloc(TupleSize);
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    array<void*, AllocsPerChunk * 3> addresses;
+    size_t i;
+    for (i = 0; i < AllocsPerChunk * 3 ; ++i) {
+        addresses[i] = gen.fill(alloc.allocate());
+    }
+    // delete last 2 tuples from 1st chunk
+    alloc.remove_reserve(2);
+    alloc.template remove_add<truth>(
+            const_cast<void*>(addresses[AllocsPerChunk - 1]));
+    alloc.template remove_add<truth>(
+            const_cast<void*>(addresses[AllocsPerChunk - 2]));
+    ASSERT_EQ(2,
+            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+                for_each(entries.begin(), entries.end(),
+                        [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                }));
+    // then, freeze, and remove 1 full chunk worth of tuples
+    auto const& iter = alloc.template freeze<truth>();
+    alloc.remove_reserve(AllocsPerChunk);
+    for (i = 0; i < AllocsPerChunk - 2; ++i) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+    }
+    for (i = 0; i < 2; ++i) {
+        alloc.template remove_add<truth>(const_cast<void*>(addresses[i + AllocsPerChunk]));
+    }
+    ASSERT_EQ(AllocsPerChunk,
+            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+                for_each(entries.begin(), entries.end(),
+                        [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                }));
+    // verify that snapshot should not see values deleted in the
+    // 1st batch
+    i = 0;
+    while (! iter->drained()) {
+        auto const val = Gen::of(reinterpret_cast<unsigned char*>(**iter));
+        // should not see holes created due to deletion before freeze;
+        ASSERT_NE(AllocsPerChunk - 1, val);
+        ASSERT_NE(AllocsPerChunk - 2, val);
+        ++(*iter);
+        ++i;
+    }
+    ASSERT_EQ(AllocsPerChunk * 3 - 2, i);
+    alloc.template thaw<truth>();
+}
+
 
 #endif
 

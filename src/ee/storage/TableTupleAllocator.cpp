@@ -18,9 +18,7 @@
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
 #include <array>
-#include <chrono>
 #include <numeric>
-#include <thread>
 
 using namespace voltdb;
 using namespace voltdb::storage;
@@ -29,7 +27,7 @@ static char buf[128];
 
 inline ThreadLocalPoolAllocator::ThreadLocalPoolAllocator(size_t n) : m_blkSize(n),
     m_base(reinterpret_cast<char*>(allocateExactSizedObject(m_blkSize))) {
-    assert(m_base != nullptr);
+    vassert(m_base != nullptr);
 }
 
 inline ThreadLocalPoolAllocator::~ThreadLocalPoolAllocator() {
@@ -101,8 +99,8 @@ inline static size_t chunkSize(size_t tupleSize) noexcept {
 template<allocator_enum_type T> inline ChunkHolder<T>::ChunkHolder(id_type id, size_t tupleSize, size_t storageSize) :
     allocator_type<T>(storageSize), m_id(id), m_tupleSize(tupleSize),
     m_end(allocator_type<T>::get() + storageSize), m_next(allocator_type<T>::get()) {
-    assert(tupleSize <= 4 * 0x100000);
-    assert(m_next != nullptr);
+    vassert(tupleSize <= 4 * 0x100000);
+    vassert(m_next != nullptr);
 }
 
 template<allocator_enum_type T> inline id_type ChunkHolder<T>::id() const noexcept {
@@ -121,7 +119,7 @@ template<allocator_enum_type T> inline void* ChunkHolder<T>::allocate() noexcept
 
 template<allocator_enum_type T> inline bool ChunkHolder<T>::contains(void const* addr) const {
     // check alignment
-    assert(addr < range_begin() || addr >= range_end() || 0 ==
+    vassert(addr < range_begin() || addr >= range_end() || 0 ==
             (reinterpret_cast<char const*>(addr) - reinterpret_cast<char*const>(range_begin())) % m_tupleSize);
     return addr >= range_begin() && addr < range_next();
 }
@@ -165,7 +163,7 @@ inline void* EagerNonCompactingChunk::allocate() noexcept {
         return super::allocate();
     } else {                               // allocate from free list first, in LIFO order
         auto* r = m_freed.top();
-        assert(r < range_next() && r >= range_begin());
+        vassert(r < range_next() && r >= range_begin());
         m_freed.pop();
         return r;
     }
@@ -195,7 +193,7 @@ inline bool EagerNonCompactingChunk::full() const noexcept {
 inline LazyNonCompactingChunk::LazyNonCompactingChunk(id_type s1, size_t s2, size_t s3) : super(s1, s2, s3) {}
 
 inline void LazyNonCompactingChunk::free(void* src) {
-    assert(src >= range_begin() && src < range_next());
+    vassert(src >= range_begin() && src < range_next());
     if (reinterpret_cast<char*>(src) + tupleSize() == range_next()) {     // last element: decrement boundary ptr
         m_next = src;
     } else {
@@ -260,7 +258,7 @@ pair<typename StxCollections::map<K, V, Cmp>::iterator, bool> StxCollections::ma
 
 template<typename Iter> inline typename ChunkListIdSeeker<Iter, true_type>::iterator
 ChunkListIdSeeker<Iter, true_type>::emplace(id_type id, Iter const& iter) {        // add to rear
-    assert(super::empty() || (iter->id() == super::back()->id() + 1 && id == iter->id()));
+    vassert(super::empty() || (iter->id() == super::back()->id() + 1 && id == iter->id()));
     super::emplace_back(iter);
     return prev(end());
 }
@@ -273,7 +271,7 @@ template<typename Iter> inline bool ChunkListIdSeeker<Iter, true_type>::contains
 template<typename Iter> inline typename ChunkListIdSeeker<Iter, true_type>::iterator
 ChunkListIdSeeker<Iter, true_type>::find(id_type id) {
     if (contains(id)) {
-        assert(super::at(id - super::front()->id())->id() == id);
+        vassert(super::at(id - super::front()->id())->id() == id);
         return next(super::begin(), id - super::front()->id());
     } else {
         return end();
@@ -476,7 +474,7 @@ inline void* NonCompactingChunks<C, E>::allocate() {
         }
         r = iter->allocate();
     }
-    assert(r != nullptr);
+    vassert(r != nullptr);
     ++m_allocs;
     return r;
 }
@@ -504,13 +502,13 @@ template<typename C, typename E> inline void NonCompactingChunks<C, E>::free(voi
 inline CompactingChunk::CompactingChunk(id_type id, size_t s, size_t s2) : super(id, s, s2) {}
 
 inline void CompactingChunk::free(void* dst, void const* src) {     // cross-chunk free(): update only on dst chunk
-    assert(contains(dst));
-    assert(! contains(src));
+    vassert(contains(dst));
+    vassert(! contains(src));
     memcpy(dst, src, tupleSize());
 }
 
 inline void* CompactingChunk::free(void* dst) {                     // within-chunk free()
-    assert(contains(dst));
+    vassert(contains(dst));
     if (reinterpret_cast<char*>(dst) + tupleSize() == range_next()) {     // last allocation on the chunk
         return free();
     } else {                               // free in the middle
@@ -520,7 +518,7 @@ inline void* CompactingChunk::free(void* dst) {                     // within-ch
 }
 
 inline void* CompactingChunk::free() {                               // within-chunk free() of last allocated
-    assert(range_next() > range_begin());
+    vassert(range_next() > range_begin());
     return reinterpret_cast<char*&>(m_next) -= tupleSize();
 }
 
@@ -561,7 +559,7 @@ inline void CompactingStorageTrait::release(
     if (m_frozen && less_rolling(iter->id(),
                 reinterpret_cast<CompactingChunks const&>(m_storage).beginTxn().iterator()->id()) &&
             reinterpret_cast<char const*>(p) + iter->tupleSize() >= iter->range_end()) {
-        assert(iter == m_storage.begin());
+        vassert(iter == m_storage.begin());
         m_storage.pop_front();
     }
 }
@@ -571,7 +569,7 @@ inline typename CompactingStorageTrait::list_type::iterator CompactingStorageTra
     if (iter->empty()) {
         auto iter_next = next(iter);
         if (! m_frozen) {                // safe to erase a Chunk unless frozen
-            assert(iter == m_storage.begin());
+            vassert(iter == m_storage.begin());
             m_storage.pop_front();
         }
         return iter_next;
@@ -619,17 +617,9 @@ CompactingChunks::~CompactingChunks() {
     }
 }
 
-inline bool CompactingChunks::deleting() const noexcept {
-    return m_deleting;
-}
-
-inline void CompactingChunks::set_deleting() noexcept {
-    m_deleting = true;
-}
-
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
     m_chunks(chunks), m_iter(chunks.end()), m_next(nullptr) {
-    assert(m_chunks.empty());
+    vassert(m_chunks.empty());
 }
 
 inline typename ChunkList<CompactingChunk, true_type>::iterator const& CompactingChunks::TxnLeftBoundary::iterator() const noexcept {
@@ -698,8 +688,7 @@ CompactingChunks::find(void const* p, bool) noexcept {
 }
 
 inline typename CompactingChunks::list_type::iterator CompactingChunks::releasable() {
-    auto const& iter = beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
-    return iter;
+    return beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
 }
 
 inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type::iterator iter) const {
@@ -712,17 +701,14 @@ inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type:
 }
 
 inline void CompactingChunks::pop_front(bool call_finalizer) {
-    m_deleting = true;
     if (call_finalizer) {
         pop_finalize(begin());
     }
     list_type::pop_front();
     beginTxn().iterator(begin());
-    m_deleting = false;
 }
 
 inline void CompactingChunks::pop_back(bool call_finalizer) {
-    m_deleting = true;
     if (call_finalizer) {
         pop_finalize(last());
     }
@@ -730,7 +716,6 @@ inline void CompactingChunks::pop_back(bool call_finalizer) {
     if (empty()) {
         beginTxn().iterator(end());
     }
-    m_deleting = false;
 }
 
 inline void CompactingChunks::freeze() {
@@ -743,6 +728,16 @@ inline void CompactingChunks::freeze() {
 inline void CompactingChunks::thaw() {
     m_frozenTxnBoundaries.clear();
     CompactingStorageTrait::thaw();
+    // it is possible that some chunks in snapshot remains to be
+    // cleared, despite we try to make it as clean as possible in
+    // the ChunkDeleter; or previous freeze/thaw without draining
+    // the snapshot iterator. Not cleaning it up creates problems for
+    // later snapshot processes, and leaks memory.
+    while (! list_type::empty() && less<ChunkHolder<>>()(front(), *beginTxn().iterator())) {
+        // since we are cleaning up snapshot-only chunk
+        // residuals, do NOT finalize.
+        list_type::pop_front();
+    }
 }
 
 template<typename Remove_cb>
@@ -752,7 +747,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
     } else if (! m_batched.empty()) {
         throw logic_error("Unfinished remove_add(?) or remove_force()");
     } else  {                        // slow clear path
-        m_deleting = true;
         // first, apply call back on all txn tuples (in order)
         fold<IterableTableTupleChunks<CompactingChunks, truth>::const_iterator>(
                 static_cast<CompactingChunks const&>(*this),
@@ -769,7 +763,7 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
                             less_rolling(id, last()->id());
                             ++id) {
                         auto const iterp = list_type::find(id);
-                        assert(iterp.first);
+                        vassert(iterp.first);
                         for (auto const* ptr = reinterpret_cast<char const*>(
                                     id == frozenRight.chunkId() ? frozenRight.address() :
                                     iterp.second->range_begin());
@@ -796,7 +790,6 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
             m_allocs = 0;
             m_txnFirstChunk.iterator(list_type::begin());
         }
-        m_deleting = false;
     }
 }
 
@@ -842,7 +835,6 @@ void* CompactingChunks::free(void* dst) {
             throw range_error(buf);
         }
     } else {
-        m_deleting = true;
         void* src = beginTxn().iterator()->free();
         if (m_finalize) {
             (*m_finalize)(src);
@@ -854,7 +846,6 @@ void* CompactingChunks::free(void* dst) {
             memcpy(dst, src, tupleSize());
         }
         releasable();
-        m_deleting = false;
         --m_allocs;
         return src;
     }
@@ -918,7 +909,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
             if (p == nullptr) {                         // marks completion
                 if (m_lastFreeFromHead != nullptr && beginTxn().iterator()->contains(m_lastFreeFromHead)) {
                     // effects deletions in 1st chunk
-                    assert(reinterpret_cast<char const*>(beginTxn().range_next()) >= m_lastFreeFromHead + tupleSize());
+                    vassert(reinterpret_cast<char const*>(beginTxn().range_next()) >= m_lastFreeFromHead + tupleSize());
                     auto const offset = reinterpret_cast<char const*>(beginTxn().range_next()) - m_lastFreeFromHead - tupleSize();
                     if (offset) {                              // some memory ops are unavoidable
                         char* dst = reinterpret_cast<char*>(beginTxn().iterator()->range_begin());
@@ -933,9 +924,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                             reinterpret_cast<char*&>(beginTxn().iterator()->m_next) =
                             dst + offset;
                     } else {                                   // right on the boundary
-                        m_deleting = true;
                         pop_front(false);
-                        m_deleting = false;
                     }
                     m_lastFreeFromHead = nullptr;
                 }
@@ -944,13 +933,11 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 buf[sizeof buf - 1] = 0;
                 throw underflow_error(buf);
             } else {
-                assert((m_lastFreeFromHead == nullptr && p == beginTxn().iterator()->range_begin()) ||       // called for the first time?
+                vassert((m_lastFreeFromHead == nullptr && p == beginTxn().iterator()->range_begin()) ||       // called for the first time?
                         (beginTxn().iterator()->contains(p) && m_lastFreeFromHead + tupleSize() == p) ||      // same chunk,
                         next(beginTxn().iterator())->range_begin() == p);                                     // or next chunk
                 if (! beginTxn().iterator()->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
-                    m_deleting = true;
                     pop_front(false);
-                    m_deleting = false;
                 }
                 --m_allocs;
             }
@@ -963,14 +950,12 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 buf[sizeof buf - 1] = 0;
                 throw underflow_error(buf);
             } else {
-                assert(reinterpret_cast<char const*>(p) + tupleSize() == last()->range_next());
+                vassert(reinterpret_cast<char const*>(p) + tupleSize() == last()->range_next());
                 if (last()->range_begin() == (last()->m_next = const_cast<void*>(p))) { // delete last chunk
-                    m_deleting = true;
                     pop_back(false);
                     if (m_allocs ==  1) {
                         beginTxn().iterator(list_type::end());
                     }
-                    m_deleting = false;
                 }
                 --m_allocs;
             }
@@ -1056,7 +1041,7 @@ inline vector<void*> CompactingChunks::DelayedRemover::RemovableRegion::holes(si
     while ((m_index = mask().find_next(m_index)) != bitset_t::npos) {
         r[h_index++] = const_cast<char*>(range_begin()) + tupleSize * m_index;
     }
-    assert(r.size() == mask().count());
+    vassert(r.size() == mask().count());
     return r;
 }
 
@@ -1068,7 +1053,7 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
     } else if (m_size > 0) {
         throw logic_error("CompactingChunks::DelayedRemover::reserve(): double reserve called");
     } else {
-        assert(m_removedRegions.empty() && m_moved.empty() && m_movements.empty() && m_removed.empty());
+        vassert(m_removedRegions.empty() && m_moved.empty() && m_movements.empty() && m_removed.empty());
         m_size = n;
         auto iter = m_chunks.beginTxn().iterator();
         auto const chunkSize = m_chunks.chunkSize(),
@@ -1133,7 +1118,7 @@ inline void CompactingChunks::DelayedRemover::add(void* p) {
                 region = &removed_iter->second;
                 auto const offset =
                     (reinterpret_cast<char*>(p) - region->range_begin()) / tupleSize;
-                assert(region->mask().test(offset));
+                vassert(region->mask().test(offset));
                 region->mask().reset(offset);
             }
             if (--m_size == 0) {
@@ -1159,7 +1144,7 @@ inline void CompactingChunks::DelayedRemover::validate() const {
 }
 
 inline void CompactingChunks::DelayedRemover::mapping() {
-    assert(m_movements.empty());
+    vassert(m_movements.empty());
     auto const len = m_moved.size();
     if (len > 0) {
         m_movements.reserve(len);
@@ -1179,7 +1164,7 @@ inline void CompactingChunks::DelayedRemover::mapping() {
                           return n + h.size();
                       }
                   } else {
-                      assert(n == len);
+                      vassert(n == len);
                       return n;
                   }
                 }) < m_moved.size()) {
@@ -1190,18 +1175,17 @@ inline void CompactingChunks::DelayedRemover::mapping() {
 }
 
 inline void CompactingChunks::DelayedRemover::shift() {
-    m_chunks.m_deleting = true;
     if (! m_removedRegions.empty()) {
         std::for_each(m_removedRegions.cbegin(), prev(m_removedRegions.cend()),
                 [this](typename map_type::value_type const& entry) {
                     auto& iter = m_chunks.beginTxn().iterator();
-                    assert(iter->id() == entry.first);
+                    vassert(iter->id() == entry.first);
                     reinterpret_cast<char*&>(iter->m_next) = reinterpret_cast<char*>(iter->range_begin());
                     m_chunks.releasable();
                 });
         auto last = m_chunks.find(m_removedRegions.rbegin()->first);
-        assert(last.first);
-        assert(reinterpret_cast<char const*>(last.second->range_next()) -
+        vassert(last.first);
+        vassert(reinterpret_cast<char const*>(last.second->range_next()) -
                 reinterpret_cast<char const*>(last.second->range_begin()) >=
                 m_chunks.tupleSize() * m_removedRegions.rbegin()->second.mask().size());
         reinterpret_cast<char*&>(last.second->m_next) -=
@@ -1209,7 +1193,6 @@ inline void CompactingChunks::DelayedRemover::shift() {
         m_chunks.releasable();
         m_chunks.m_allocs -= m_removed.size() + m_moved.size();
     }
-    m_chunks.m_deleting = false;
 }
 
 inline vector<pair<void*, void*>> const& CompactingChunks::DelayedRemover::movements() const {
@@ -1223,7 +1206,7 @@ inline vector<void*> const& CompactingChunks::DelayedRemover::removed() const {
 }
 
 inline size_t CompactingChunks::DelayedRemover::clear() noexcept {
-    assert(m_size == 0);
+    vassert(m_size == 0);
     auto const r = m_removed.size() + m_moved.size();
     m_moved.clear();
     m_removed.clear();
@@ -1262,28 +1245,12 @@ struct iterator_begin<Cont, perm, iterator_view_type::txn, true_type> {
     }
 };
 
-template<typename Chunks, iterator_view_type view, typename = typename Chunks::Compact>
-struct HasTxnInvisibleChunks {
-    inline constexpr bool operator()(Chunks const&) const noexcept {
-        return false;
-    }
-};
-
-template<typename Chunks>
-struct HasTxnInvisibleChunks<Chunks, iterator_view_type::snapshot, true_type> {
-    inline bool operator()(Chunks const& c) const noexcept {
-        return c.frozen() && (c.empty() ||
-                less_rolling(c.frozenBoundaries().left().chunkId(), c.begin()->id()));
-    }
-};
-
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
 inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) :
     m_offset(src.tupleSize()), m_storage(src),
     m_iter(iterator_begin<typename remove_reference<container_type>::type, perm, view>()(src)),
-    m_hasTxnInvisibleChunks(HasTxnInvisibleChunks<Chunks, view>()(src)),
     m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->range_begin())) {
     // paranoid type check
     static_assert(is_lvalue_reference<container_type>::value,
@@ -1354,14 +1321,14 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator po
  */
 template<typename ChunkList, typename Iter, iterator_view_type view, typename Comp>
 struct ChunkBoundary {
-    inline void const* operator()(ChunkList const&, Iter const& iter, bool) const noexcept {
+    inline void const* operator()(ChunkList const&, Iter const& iter) const noexcept {
         return iter->range_next();
     }
 };
 
 template<typename ChunkList, typename Iter>
 struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
-    inline void const* operator()(ChunkList const& l, Iter const& iter, bool hasTxnInvisibleChunks) const noexcept {
+    inline void const* operator()(ChunkList const& l, Iter const& iter) const noexcept {
         auto const& frozenBoundaries = reinterpret_cast<CompactingChunks const&>(l).frozenBoundaries();
         if (frozenBoundaries.left().empty()) {        // not frozen
             return iter->range_next();
@@ -1376,17 +1343,17 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
                 // in txn view may not be full when it is
                 // frozen and clear()-ed, only the last chunk
                 // needs to use the next() position.
-                assert((iter->range_begin() == iter->range_next()) == (next(iter) != l.end()));
+                vassert((iter->range_begin() == iter->range_next()) == (next(iter) != l.end()));
                 return iter->range_begin() == iter->range_next() ? iter->range_end() : iter->range_next();
+            } else if (leftId == iterId) {      // in the left boundary of frozen state
+                return frozenBoundaries.left().address();
             } else if(less_rolling(iterId, txnBeginChunkId)) {  // in chunk visible to frozen iterator only
                 if (less_rolling(iterId, rightId)) {
                     return iter->range_end();
                 } else {
-                    assert(iterId == rightId);
+                    vassert(iterId == rightId);
                     return frozenBoundaries.right().address();
                 }
-            } else if (leftId == iterId) {      // in the left boundary of frozen state
-                return hasTxnInvisibleChunks ? iter->range_end() : frozenBoundaries.left().address();
             } else if (rightId == iterId) {     // in the right boundary
                 return frozenBoundaries.right().address();
             } else if (txnBeginChunkId == iterId) {
@@ -1416,7 +1383,7 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
         if (reinterpret_cast<CompactingChunks const&>(l).frozen() &&
                 less<Iter>()(iter, reinterpret_cast<CompactingChunks const&>(l).beginTxn().iterator())) {
             auto const id = iter->id();
-            assert(iter->range_begin() == iter->range_next());
+            vassert(iter->range_begin() == iter->range_next());
             // chunk was fully used. Need to take care of finalizer
             if (++iter != l.end()) {
                 /**
@@ -1439,13 +1406,14 @@ struct ChunkDeleter<ChunkList, Iter, iterator_permission_type::rw, iterator_view
                 while (! l.empty() && less<id_type>()(l.front().id(), id)) {
                     // Of course, always check that the chunk is
                     // indeed reclaimable.
-                    assert(l.front().range_begin() == l.front().range_next());
+                    vassert(l.front().range_begin() == l.front().range_next());
                     l.pop_front();
                 }
-                assert(! l.empty() && l.front().id() == id);
+                vassert(! l.empty() && l.front().id() == id &&
+                        l.front().range_begin() == l.front().range_next());
                 l.pop_front();
             } else {                               // snapshot iterator drained
-                assert(all_of(l.cbegin(), l.cend(),
+                vassert(all_of(l.cbegin(), l.cend(),
                             [](ChunkHolder<> const& c) noexcept { return c.range_begin() == c.range_next(); }));
                 l.clear();
             }
@@ -1469,7 +1437,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         if (! m_storage.empty() && m_iter != m_storage.end()) {
             const_cast<void*&>(m_cursor) =
                 reinterpret_cast<char*>(const_cast<void*>(m_cursor)) + m_offset;
-            if (m_cursor < boundary(m_storage, m_iter, m_hasTxnInvisibleChunks)) {
+            if (m_cursor < boundary(m_storage, m_iter)) {
                 finished = false;              // within chunk
             } else {
                 advance_iter(m_storage, m_iter); // cross chunk
@@ -1662,31 +1630,10 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::begin(
     return {c, cb};
 }
 
-/**
- * Coordinate iterator call back to be made after any txn writes
- * are complete.
- */
-template<typename Chunks, typename = typename Chunks::Compact>
-struct TxnWriteBarrier {
-    inline constexpr bool operator()(Chunks const&) const noexcept {
-        return false;
-    }
-};
-template<typename Chunks> struct TxnWriteBarrier<Chunks, true_type> {
-    inline bool operator()(Chunks const& s) const noexcept {
-        while (s.deleting()) {
-            this_thread::sleep_for(chrono::microseconds{1});
-        }
-        return false;
-    }
-};
-
 template<typename Chunks, typename Tag, typename E>
 template<typename Trans, iterator_permission_type perm>
 inline typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_cb_type<Trans, perm>::value_type
 IterableTableTupleChunks<Chunks, Tag, E>::iterator_cb_type<Trans, perm>::operator*() noexcept {
-    constexpr static TxnWriteBarrier<Chunks> const barrier{};
-    barrier(super::storage());
     return const_cast<void*>(m_cb(super::operator*()));
 }
 
@@ -1711,7 +1658,7 @@ inline position_type::position_type(CompactingChunks const& c, void const* p) : 
 
 template<typename iterator>
 inline position_type::position_type(void const* p, iterator const& iter) noexcept :
-m_chunkId(iter->id()), m_addr(p) {}
+m_chunkId(p == nullptr ? 0 : iter->id()), m_addr(p) {}
 
 inline id_type position_type::chunkId() const noexcept {
     return m_chunkId;
@@ -1893,7 +1840,7 @@ TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essential
     if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
         if (m_last == nullptr) {                                      // overwritten hadn't been logged
             m_last = m_changeStore.allocate();
-            assert(m_last != nullptr);
+            vassert(m_last != nullptr);
         }
         memcpy(m_last, p, m_changeStore.tupleSize());
     }
@@ -1916,7 +1863,7 @@ typename TxnPreHook<Alloc, Trait, E1>::added_entry_t TxnPreHook<Alloc, Trait, E1
                 r = remove(dst);
         }
         if (r == nullptr) {    // copy already exists
-            assert(m_changes.find(dst) != m_changes.cend());
+            vassert(m_changes.find(dst) != m_changes.cend());
             return {added_entry_t::status::existing, m_changes.find(dst)->second};
         } else {               // freshly created copy
             return {status, r};
@@ -1965,7 +1912,7 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
 template<typename Alloc, typename Trait, typename E>
 inline void* TxnPreHook<Alloc, Trait, E>::_copy(void const* src, bool) {
     void* dst = m_changeStore.allocate();
-    assert(dst != nullptr);
+    vassert(dst != nullptr);
     memcpy(dst, src, m_changeStore.tupleSize());
     return dst;
 }
@@ -1985,7 +1932,7 @@ inline void const* TxnPreHook<Alloc, Trait, E>::remove(void const* src) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
         // Need to copy the original value that gets deleted
-        assert(m_last != nullptr);
+        vassert(m_last != nullptr);
         auto const* val = m_changes.emplace(src, m_last).first->second;
         m_last = nullptr;
         return val;
@@ -2121,9 +2068,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
-    // Mark deletion has begun before call-back time (and thus,
-    // before any memcpy occurs).
-    set_deleting();
     cb(CompactingChunks::m_batched.movements());    // NOTE: memcpy before the call back
     return CompactingChunks::m_batched.force();
 }
@@ -2136,7 +2080,7 @@ template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E
         buf[sizeof buf - 1] = 0;
         return buf;
     } else {
-        assert(! beginTxn().empty());
+        vassert(! beginTxn().empty());
         auto const& iter = iterp.second;
         ostringstream oss;
         oss << "Address " << p << " found at chunk " << iter->id() << ", offset "
@@ -2148,10 +2092,10 @@ template<typename Hook, typename E> inline string HookedCompactingChunks<Hook, E
             oss << "not frozen at the call time";
         } else {
             auto const& boundaries = frozenBoundaries();
-            assert(! boundaries.left().empty() && ! boundaries.right().empty());
+            vassert(! boundaries.left().empty() && ! boundaries.right().empty());
             auto const left = mutable_this->find(boundaries.left().chunkId(), true),
                  right = mutable_this->find(boundaries.right().chunkId(), true);
-            assert(left.first);
+            vassert(left.first);
 
             auto const* right_begin = right.first ? right.second->range_begin() : nullptr,
                  *right_end = right.first ? right.second->range_end() : nullptr;
