@@ -42,16 +42,7 @@ import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.Vector;
+import java.util.*;
 
 import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
 import static org.voltdb.utils.SnapshotComparer.*;
@@ -315,7 +306,7 @@ public class SnapshotComparer {
                 if (!local && (
                         (sourceDirs == null) || (sourceHosts == null) || (sourceDirs.length == 0)
                                 || (sourceDirs.length != sourceHosts.length)
-                        || (targetDirs == null) || (targetHosts == null) || (targetDirs.length == 0)
+                                || (targetDirs == null) || (targetHosts == null) || (targetDirs.length == 0)
                                 || (targetDirs.length != targetHosts.length))) {
                     System.err.println("Error: Directories and Host number does not match.");
                     printHelpAndQuit(STATUS_INVALID_INPUT);
@@ -382,7 +373,7 @@ class SnapshotLoader {
             File localRootDir = new File(remoteSnapshotFolder + nonce);
             localRootDir.mkdirs();
             for (int i = 0; i < hosts.length; i++) {
-                File localDir = new File(localRootDir.getPath()+ PATHSEPARATOR + hosts[i]);
+                File localDir = new File(localRootDir.getPath() + PATHSEPARATOR + hosts[i]);
                 localDir.mkdirs();
                 downloadFiles(username, hosts[i], dirs[i], localDir.getPath());
                 directories.add(localDir);
@@ -509,13 +500,22 @@ class SnapshotLoader {
             for (int p = 0; p < partitionToFiles.size(); p++) {
                 Integer[] relevantPartition = isReplicated ? null : new Integer[]{p};
                 int partitionid = isReplicated ? 16383 : p;
+                TableSaveFile referenceSaveFile = null, compareSaveFile = null;
                 try {
-                    TableSaveFile referenceSaveFile =
+                    referenceSaveFile =
                             new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
                                     1, relevantPartition);
                     for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
                         boolean isConsistent = true;
-                        TableSaveFile compareSaveFile =
+                        // close the previous TableSaveFile if opened
+                        if (compareSaveFile != null) {
+                            try {
+                                compareSaveFile.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        compareSaveFile =
                                 new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(target)),
                                         1, relevantPartition);
                         DBBPool.BBContainer cr = null, cc = null;
@@ -546,6 +546,16 @@ class SnapshotLoader {
                                         SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
                                         SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
                                     }
+
+                                    int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
+                                    int[][] lookup = new int[trSize+1][tcSize + 1];
+                                    // fill lookup table
+                                    LCSLength(tr, tc, trSize, tcSize, lookup);
+                                    // find difference
+                                    StringBuilder output = new StringBuilder();
+                                    output.append("Diffs between file " + partitionToFiles.get(p).get(0) + " and file " + partitionToFiles.get(p).get(target) + " \n");
+                                    diff(tr, tc, trSize, tcSize, lookup, output);
+                                    CONSOLE_LOG.info(output.toString());
                                     isConsistent = false;
                                     break;
                                 }
@@ -571,6 +581,21 @@ class SnapshotLoader {
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
+                } finally {
+                    if (referenceSaveFile != null) {
+                        try {
+                            referenceSaveFile.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    if (compareSaveFile != null) {
+                        try {
+                            compareSaveFile.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
             CONSOLE_LOG.info("Finished comparing table " + tableName + ".\n");
@@ -581,6 +606,67 @@ class SnapshotLoader {
             System.exit(STATUS_INCONSISTENCY);
         } else {
             System.exit(STATUS_OK);
+        }
+    }
+
+    // Function to display the differences between two voltTables
+    public static void diff(VoltTable X, VoltTable Y, int m, int n, int[][] lookup, StringBuilder sb) {
+        // if last character of X and Y matches
+        // TODO: optimize by useing bottom up dp, need traverse volttable backward
+        X.resetRowPosition();
+        X.advanceRow();
+        X.advanceToRow(m-1);
+        Y.resetRowPosition();
+        Y.advanceRow();
+        Y.advanceToRow(n-1);
+        if (m > 0 && n > 0 && X.getRawRow().equals(Y.getRawRow())) {
+            String curRow = "  " + X.getRow();
+            diff(X, Y, m - 1, n - 1, lookup, sb);
+            sb.append(curRow);
+        }
+        // current row of Y is not present in X
+        else if (n > 0 && (m == 0 || lookup[m][n - 1] >= lookup[m - 1][n])) {
+            String curRow = " +" + Y.getRow();
+            diff(X, Y, m, n - 1, lookup, sb);
+            sb.append(curRow);
+        }
+
+        // current row of X is not present in Y
+        else if (m > 0 && (n == 0 || lookup[m][n - 1] < lookup[m - 1][n])) {
+            String curRow = " -" + X.getRow();
+            diff(X, Y, m - 1, n, lookup, sb);
+            sb.append(curRow);
+        }
+    }
+
+    // Function to fill lookup table by finding the length of LCS
+    private static void LCSLength(VoltTable X, VoltTable Y, int m, int n,
+                                 int[][] lookup) {
+        // first column of the lookup table will be all 0
+        for (int i = 0; i <= m; i++) {
+            lookup[i][0] = 0;
+        }
+
+        // first row of the lookup table will be all 0
+        for (int j = 0; j <= n; j++) {
+            lookup[0][j] = 0;
+        }
+
+        // fill the lookup table in bottom-up manner
+        for (int i = 1; i <= m; i++) {
+            X.advanceRow();
+            Y.resetRowPosition();
+            for (int j = 1; j <= n; j++) {
+                Y.advanceRow();
+                // if current row of X and Y matches
+                if (X.getRawRow().equals(Y.getRawRow())) {
+                    lookup[i][j] = lookup[i - 1][j - 1] + 1;
+                } // else if current row of X and Y don't match
+                else {
+                    lookup[i][j] = Integer.max(lookup[i - 1][j],
+                            lookup[i][j - 1]);
+                }
+            }
         }
     }
 
@@ -655,7 +741,7 @@ class SnapshotLoader {
     }
 
     /**
-     *  using publickey for auth
+     * using publickey for auth
      */
     private ChannelSftp setupJsch(String username, String remoteHost) throws JSchException {
         JSch jsch = new JSch();
@@ -675,7 +761,9 @@ class SnapshotLoader {
      * download remote files through ssh
      */
     static String PATHSEPARATOR = "/";
-    private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath) { ;
+
+    private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath) {
+        ;
         ChannelSftp channelSftp = null;
         try {
             channelSftp = setupJsch(username, remoteHost);
@@ -697,7 +785,7 @@ class SnapshotLoader {
                     }
                 }
             }
-        } catch (JSchException | SftpException  ex) {
+        } catch (JSchException | SftpException ex) {
             ex.printStackTrace();
             return false;
         } finally {
@@ -750,32 +838,32 @@ class SnapShotMetaData {
             tableNames.add(table.getTypeName());
         }
     }
-    public String getNonce()
-    {
+
+    public String getNonce() {
         return nonce;
     }
-    public Catalog getCatalog()
-    {
+
+    public Catalog getCatalog() {
         return catalog;
     }
-    public Cluster getCluster()
-    {
+
+    public Cluster getCluster() {
         return cluster;
     }
-    public Database getDatabase()
-    {
+
+    public Database getDatabase() {
         return database;
     }
-    public List<Table> getAllPartitionedTables()
-    {
+
+    public List<Table> getAllPartitionedTables() {
         return partitionedTables;
     }
-    public List<Table> getAllReplicatedTables()
-    {
+
+    public List<Table> getAllReplicatedTables() {
         return replicatedTables;
     }
-    public List<String> getTableNames()
-    {
+
+    public List<String> getTableNames() {
         return tableNames;
     }
 }
