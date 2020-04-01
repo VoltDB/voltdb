@@ -88,7 +88,7 @@ public class TestStreamBlockQueue extends TestCase {
                 cont.discard();
             }
         };
-        return new StreamBlock(entry, g_seqNo, g_seqNo, 1, 0L, false);
+        return new StreamBlock(entry, g_seqNo, g_seqNo, 1, 0L);
     }
 
     @Override

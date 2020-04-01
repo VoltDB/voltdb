@@ -64,11 +64,11 @@ public class StreamBlock {
         int tupleCount = b.getInt(StreamBlock.ROW_NUMBER_OFFSET);
         long uniqueId = b.getLong(StreamBlock.UNIQUE_ID_OFFSET);
 
-        return new StreamBlock(entry, seqNo, committedSeqNo, tupleCount, uniqueId, true);
+        return new StreamBlock(entry, seqNo, committedSeqNo, tupleCount, uniqueId);
     }
 
     public StreamBlock(BinaryDequeReader.Entry<PersistedMetadata> entry, long startSequenceNumber,
-            long committedSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
+            long committedSequenceNumber, int rowCount, long uniqueId) {
         assert(entry != null);
         m_entry  = entry;
         m_startSequenceNumber = startSequenceNumber;
@@ -79,8 +79,6 @@ public class StreamBlock {
         // if we end up persisting
         m_entry.getData().position(HEADER_SIZE);
         m_totalSize = m_entry.getData().remaining();
-        //The first 8 bytes are space for us to store the sequence number if we end up persisting
-        m_isPersisted = isPersisted;
     }
 
     private final AtomicInteger m_refCount = new AtomicInteger(1);
@@ -162,10 +160,6 @@ public class StreamBlock {
                 (m_rowCount - 1) : (int)(releaseSequenceNumber - m_startSequenceNumber);
     }
 
-    boolean isPersisted() {
-        return m_isPersisted;
-    }
-
     private final long m_startSequenceNumber;
     private final long m_committedSequenceNumber;
     private final int m_rowCount;
@@ -174,12 +168,6 @@ public class StreamBlock {
     private final BinaryDequeReader.Entry<PersistedMetadata> m_entry;
     // index of the last row that has been released.
     private int m_releaseOffset = -1;
-
-    /*
-     * True if this block is still backed by a file and false
-     * if the buffer is only stored in memory. No guarantees about fsync though
-     */
-    private final boolean m_isPersisted;
 
     /**
      * Use this when we need a copy BBContainer with refcount incremented.
