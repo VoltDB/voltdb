@@ -235,7 +235,7 @@ public class ExportRow {
      * @return ExportRow row data with metadata
      * @throws IOException
      */
-    public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, ByteBuffer bb) throws IOException {
+    public static ExportRow decodeRow(ExportRow previous, int partition, ByteBuffer bb) throws IOException {
         assert (previous != null);
         if (previous == null) {
             throw new IOException("Export block with no schema found without prior block with schema.");
@@ -281,10 +281,10 @@ public class ExportRow {
      * @return ExportRow
      * @throws IOException
      */
-    public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, byte[] rowData) throws IOException {
+    public static ExportRow decodeRow(ExportRow previous, int partition, byte[] rowData) throws IOException {
         ByteBuffer bb = ByteBuffer.wrap(rowData);
         bb.order(ByteOrder.LITTLE_ENDIAN);
-        return decodeRow(previous, partition, startTS, bb);
+        return decodeRow(previous, partition, bb);
     }
 
     //Based on your skipinternal value return index of first field.

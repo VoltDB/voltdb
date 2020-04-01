@@ -178,7 +178,7 @@ public class TestExportDecoderBase
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -237,7 +237,7 @@ public class TestExportDecoderBase
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -264,7 +264,7 @@ public class TestExportDecoderBase
         assertEquals(rd[15].toString(), GEOG.toString());
 
         bb.getInt(); // row size
-        rowdata = ExportRow.decodeRow(rowdata, 0, 0L, bb);
+        rowdata = ExportRow.decodeRow(rowdata, 0, bb);
         rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -329,7 +329,7 @@ public class TestExportDecoderBase
             int schemaSize = bb.getInt();
             ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
             bb.getInt(); // row size
-            ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+            ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
             Object[] rd = rowdata.values;
 
             assertEquals(rd[0], l);

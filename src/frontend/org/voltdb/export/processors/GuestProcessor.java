@@ -63,7 +63,6 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders = new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
-    private final long m_startTS = System.currentTimeMillis();
     private volatile boolean m_startPolling = false;
 
     // Instantiated at ExportManager
@@ -373,7 +372,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                             edb.setExportRowSchema(newSchema);
                                         }
                                         row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(),
-                                                m_startTS, rowdata);
+                                                rowdata);
                                     } catch (IOException ioe) {
                                         EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId()
                                                 + ". " + ioe.getMessage());
