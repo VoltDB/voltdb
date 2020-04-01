@@ -215,11 +215,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
 
     @Override
     long getStartId() throws IOException {
-        return -1;
+        return PBDSegment.INVALID_ID;
     }
 
     @Override
     long getEndId() throws IOException {
-        return -1;
+        return PBDSegment.INVALID_ID;
     }
 }
