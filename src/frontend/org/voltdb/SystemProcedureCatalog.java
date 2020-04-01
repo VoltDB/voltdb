@@ -689,7 +689,7 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.OpShutdownWait",
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
-                        true, false, Restartability.NOT_APPLICABLE)); 
+                        true, false, Restartability.NOT_APPLICABLE));
         listing = builder.build();
     }
 
