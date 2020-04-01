@@ -527,8 +527,7 @@ inline CompactingStorageTrait::CompactingStorageTrait(
 
 inline void CompactingStorageTrait::freeze() {
     if (m_frozen) {
-        vassert(false);
-//        throw logic_error("CompactingStorageTrait::freeze(): double freeze detected");
+        throw logic_error("CompactingStorageTrait::freeze(): double freeze detected");
     } else {
         m_frozen = true;
     }

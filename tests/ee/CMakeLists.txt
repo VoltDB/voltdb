@@ -138,7 +138,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/tabletuple_export_test
   storage/tabletuplefilter_test
   storage/TempTableLimitsTest
-  # storage/TableTupleAllocatorTest
+  storage/TableTupleAllocatorTest
   structures/CompactingHashTest
   structures/CompactingMapBenchmark
   structures/CompactingMapIndexCountTest
