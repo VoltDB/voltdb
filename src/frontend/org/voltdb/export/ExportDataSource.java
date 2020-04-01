@@ -690,8 +690,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         startSequenceNumber,
                         committedSequenceNumber,
                         tupleCount,
-                        uniqueId,
-                        false);
+                        uniqueId);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
