@@ -15,7 +15,7 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 ######################
-# Temporary command to exercise the new @GracefulStopNode sysproc.
+# Temporary command to exercise the new @OpStopNode sysproc.
 # No intention to ship this as-is.
 ######################
 
@@ -37,7 +37,7 @@ import sys
     ),
 )
 
-def gstop(runner):
+def opstop(runner):
 
     # Exec @SystemInformation to find out about the cluster.
     response = runner.call_proc('@SystemInformation',
@@ -85,7 +85,7 @@ def gstop(runner):
     # Not forcing
     try:
         runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))
-        response = runner.call_proc('@GracefulStopNode',
+        response = runner.call_proc('@OpStopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER, VOLT.FastSerializer.VOLTTYPE_INTEGER, VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id, runner.opts.timeout, runner.opts.waitlimit],
                                     check_status=False)

@@ -22,7 +22,7 @@ from voltcli import utility
 from voltcli.hostinfo import Hosts
 
 ######################
-# Temporary command to exercise the new @GracefulShutdown sysproc.
+# Temporary command to exercise the new @OpShutdown sysproc.
 # No intention to ship this as-is.
 ######################
 
@@ -40,7 +40,7 @@ from voltcli.hostinfo import Hosts
     )
 )
 
-def gshutdown(runner):
+def opshutdown(runner):
     if runner.opts.forcing and runner.opts.save:
        runner.abort_with_help('You cannot specify both --force and --save options.')
     if runner.opts.cancel and runner.opts.save:
@@ -82,7 +82,7 @@ def gshutdown(runner):
             shutdown_options |= 1
         if runner.opts.xforce:
             shutdown_options |= 2
-        response = runner.call_proc('@GracefulShutdown',
+        response = runner.call_proc('@OpShutdown',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER, VOLT.FastSerializer.VOLTTYPE_INTEGER, VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [shutdown_options, runner.opts.timeout, runner.opts.waitlimit],
                                 check_status=False)

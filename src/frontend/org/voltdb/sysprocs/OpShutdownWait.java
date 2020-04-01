@@ -44,13 +44,13 @@ import org.voltdb.export.ExportManagerInterface;
  * to shutting down the cluster. Does not complete until
  * there is no activity (or the waiting times out).
  *
- * This is intended only for use from @GracefulShutdown
- * and therefore the interface may change at no notice.
+ * This is intended only for use from @OpShutdown and
+ * therefore the interface may change at no notice.
  *
  * Response is a table with a single row, two columns:
  * execution status (0 for success) and bitmask of
  * remaining activity, if any. Status and activity
- * values are defined in the GracefulShutdown class.
+ * values are defined in the OpShutdown class.
  *
  * Two timeouts are implemented:
  * - A progress timeout; each source is required to
@@ -60,13 +60,13 @@ import org.voltdb.export.ExportManagerInterface;
  *   to become inactive within this limit.
  * Either or both timeouts can be set to infinity, which
  * is represented as -1. Otherwise the value is expressed
- * in msec (unlike @GracefulShutdown's API).
+ * in msec (unlike @OpShutdown's API).
  *
  * We monitor the flag set by @PrepareShutdown and
  * cleared by @CancelShutdown to determine if we should
  * exit prematurely.
  */
-public class GracefulShutdownWait extends VoltNTSystemProcedure {
+public class OpShutdownWait extends VoltNTSystemProcedure {
 
     private static final VoltLogger log = new VoltLogger("HOST");
 
@@ -121,29 +121,29 @@ public class GracefulShutdownWait extends VoltNTSystemProcedure {
                 elapsed = System.currentTimeMillis() - start;
                 if (waitTmo >= 0 && elapsed >= waitTmo || timedOutSummary != 0) {
                     warn("Wait timed out after %d msec", elapsed);
-                    status = GracefulShutdown.TIMED_OUT;
+                    status = OpShutdown.TIMED_OUT;
                 }
                 else if (shutdownCancelled()) {
                     warn("Wait cancelled by client after %d msec", elapsed);
-                    status = GracefulShutdown.CANCELLED;
+                    status = OpShutdown.CANCELLED;
                 }
                 else {
                     Thread.sleep(checkInterval);
                 }
             }
             if (status < 0) {
-                status = GracefulShutdown.SUCCESS;
+                status = OpShutdown.SUCCESS;
                 elapsed = System.currentTimeMillis() - start;
                 info("All activity on this host drained after %d msec", elapsed);
             }
         }
         catch (InterruptedException ex) {
-            status = GracefulShutdown.CANCELLED;
+            status = OpShutdown.CANCELLED;
             warn("Wait interrupted");
         }
         catch (Exception ex) {
-            status = GracefulShutdown.FAILED;
-            warn("Unexpected exception in GracefulShutdownWait: %s", ex);
+            status = OpShutdown.FAILED;
+            warn("Unexpected exception in OpShutdownWait: %s", ex);
         }
 
         dropTracking();
@@ -158,12 +158,12 @@ public class GracefulShutdownWait extends VoltNTSystemProcedure {
      * Allocate/deallocate progress-tracking mechanism
      */
     private void initTracking(int tmo) {
-        clientProgress = new ProgressTracker(GracefulShutdown.CLIENT);
-        cmdLogProgress = new ProgressTracker(GracefulShutdown.CMDLOG);
-        importProgress = new ProgressTracker(GracefulShutdown.IMPORT);
-        exportProgress = new ProgressTracker(GracefulShutdown.EXPORT);
-        drProdProgress = new ProgressTracker(GracefulShutdown.DRPROD);
-        drConsProgress = new ProgressTracker(GracefulShutdown.DRCONS);
+        clientProgress = new ProgressTracker(OpShutdown.CLIENT);
+        cmdLogProgress = new ProgressTracker(OpShutdown.CMDLOG);
+        importProgress = new ProgressTracker(OpShutdown.IMPORT);
+        exportProgress = new ProgressTracker(OpShutdown.EXPORT);
+        drProdProgress = new ProgressTracker(OpShutdown.DRPROD);
+        drConsProgress = new ProgressTracker(OpShutdown.DRCONS);
         progressTmo = tmo;
         timedOutSummary = 0;
     }
@@ -388,10 +388,10 @@ public class GracefulShutdownWait extends VoltNTSystemProcedure {
      *
      * If there is no progress and we've been without progress
      * for too long, then indicate that in our containing instance
-     * of GracefulShutdownWait; we don't fail yet since we want
-     * to make a complete pass on all activity sources. return
-     * the usual activity flag, but don't reset the time since
-     * we last made progress.
+     * of OpShutdownWait; we don't fail yet since we want to make
+     * a complete pass on all activity sources. Return the usual
+     * activity flag, but don't reset the time since we last made
+     * progress.
      */
     private class ProgressTracker {
         private final int activityFlag;

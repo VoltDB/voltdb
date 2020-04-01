@@ -45,7 +45,7 @@ import org.voltdb.client.ClientResponse;
  * This procedure must be executed on some host which is not
  * the node that is being stopped.
  */
-public class GracefulStopNode extends VoltNTSystemProcedure {
+public class OpStopNode extends VoltNTSystemProcedure {
 
     private final static VoltLogger log = new VoltLogger("HOST");
     private final static int SYSPROC_CALL_TIMEOUT = 10 * 1000; // 10 seconds
@@ -55,7 +55,9 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
 
     /**
      * Shut down a node gracefully. This is to be executed on
-     * a host that is not the one being shut down.
+     * a host that is not the one being shut down. The procedure
+     * is intended for use in operator automation scenarios, and
+     * is not currently exposed to end users.
      *
      * @param hostId the host that is to be stopped
      * @param progressTmo time limit on lack of progress on one source
@@ -67,10 +69,10 @@ public class GracefulStopNode extends VoltNTSystemProcedure {
      */
     public VoltTable[] run(Integer hostId, Integer progressTmo, Integer waitTmo) {
         if (hostId == null) {
-             throw new VoltAbortException("@GracefulStopNode requires a host id");
+             throw new VoltAbortException("@OpStopNode requires a host id");
         }
         if (!isAdminConnection()) {
-            throw new VoltAbortException("@GracefulStopNode requires an admin connection");
+            throw new VoltAbortException("@OpStopNode requires an admin connection");
         }
 
         info("Graceful stopping of host %d requested", hostId);

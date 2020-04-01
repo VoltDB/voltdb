@@ -370,16 +370,6 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
-        builder.put("@GracefulShutdown",
-                new Config("org.voltdb.sysprocs.GracefulShutdown",
-                        false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_APPLICABLE,
-                        true, false, Restartability.NOT_APPLICABLE));
-        builder.put("@GracefulShutdownWait",
-                new Config("org.voltdb.sysprocs.GracefulShutdownWait",
-                        false, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_APPLICABLE,
-                        true, false, Restartability.NOT_APPLICABLE));
         builder.put("@ProfCtl",
                 new Config("org.voltdb.sysprocs.ProfCtl",
                         false, false, true, 0, VoltType.INVALID,
@@ -548,11 +538,6 @@ public class SystemProcedureCatalog {
                         true,  false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
-        builder.put("@GracefulStopNode",
-                new Config("org.voltdb.sysprocs.GracefulStopNode",
-                        true, false, false, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_APPLICABLE,
-                        false, false, Restartability.NOT_APPLICABLE));
         builder.put("@Explain",
                 new Config("org.voltdb.sysprocs.Explain",
                         false, true, false, 0, VoltType.INVALID,
@@ -689,7 +674,22 @@ public class SystemProcedureCatalog {
                         false, false, false,  0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
-
+        // Added for k8s operator support.
+        builder.put("@OpStopNode",
+                new Config("org.voltdb.sysprocs.OpStopNode",
+                        true, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, false, Restartability.NOT_APPLICABLE));
+        builder.put("@OpShutdown",
+                new Config("org.voltdb.sysprocs.OpShutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        true, false, Restartability.NOT_APPLICABLE));
+        builder.put("@OpShutdownWait",
+                new Config("org.voltdb.sysprocs.OpShutdownWait",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        true, false, Restartability.NOT_APPLICABLE)); 
         listing = builder.build();
     }
 

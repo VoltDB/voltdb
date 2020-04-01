@@ -49,7 +49,7 @@ import org.voltdb.client.ClientResponse;
  * without admin-level access. We explicitly check for admin
  * since otherwise the results can be confusing.
  */
-public class GracefulShutdown extends VoltNTSystemProcedure {
+public class OpShutdown extends VoltNTSystemProcedure {
 
     private final static VoltLogger log = new VoltLogger("HOST");
     private final static AtomicBoolean lock = new AtomicBoolean();
@@ -84,7 +84,9 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
     public static final int DRCONS = 32;
 
     /**
-     * Execute a graceful shutdown.
+     * Execute a graceful shutdown. The procedure is intended for
+     * use in operator automation scenarios, and is not currently
+     * exposed to end users.
      *
      * @param options bit-encoded options for this run
      * @param progressTmo time limit on lack of progress on one source
@@ -97,10 +99,10 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
      */
     public VoltTable[] run(Integer options, Integer progressTmo, Integer waitTmo) {
         if (!isAdminConnection()) {
-            throw new VoltAbortException("@GracefulShutdown requires an admin connection");
+            throw new VoltAbortException("@OpShutdown requires an admin connection");
         }
         if (lock.getAndSet(true)) {
-            throw new VoltAbortException("@GracefulShutdown is already running");
+            throw new VoltAbortException("@OpShutdown is already running");
         }
         try {
             return runShutdown(options == null ? 0 : options.intValue(),
@@ -109,7 +111,7 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
         }
         finally {
             if (!lock.getAndSet(false)) {
-                warn("Internal error, lock mishandled in @GracefulShutdown");
+                warn("Internal error, lock mishandled in @OpShutdown");
             }
         }
     }
@@ -161,13 +163,13 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
 
         info("Waiting for in-progress activity to complete on all hosts");
         boolean force = (options & FORCE_SHUT_AFTER_TIMEOUT) != 0;
-        int waitOptions = save ? GracefulShutdownWait.DRAIN_DR : 0;
+        int waitOptions = save ? OpShutdownWait.DRAIN_DR : 0;
         int waitRespTmo = waitTmo >= 0 ? waitTmo+EXTRA_TIMEOUT : -1;
-        Map<Integer,ClientResponse> resp3 = awaitResponse(callNTProcedureOnAllHosts("@GracefulShutdownWait",
+        Map<Integer,ClientResponse> resp3 = awaitResponse(callNTProcedureOnAllHosts("@OpShutdownWait",
                                                                                     waitOptions, progressTmo,
                                                                                     waitTmo, CHECK_INTERVAL),
-                                                          "@GracefulShutdownWait", waitRespTmo);
-        if (resp3 == null) { // @GracefulShutdownWait is wedged
+                                                          "@OpShutdownWait", waitRespTmo);
+        if (resp3 == null) { // @OpShutdownWait is wedged
             warn("Cannot recover from previous error; forcing shutdown");
         }
         else if (allQuiet(resp3)) {
@@ -274,7 +276,7 @@ public class GracefulShutdown extends VoltNTSystemProcedure {
     }
 
     /*
-     * Examine collected responses from execution of @GracefulShutdownWait.
+     * Examine collected responses from execution of @OpShutdownWait.
      * Did everything successfully quiesce? We treat any reported errors
      * or unexpected results as if the host still has activity.
      */
