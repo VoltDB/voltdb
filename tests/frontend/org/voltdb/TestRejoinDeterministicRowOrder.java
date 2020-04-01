@@ -352,19 +352,19 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
         };
 
         cluster.startUp();
+
         Client client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(0));
+
+        final Semaphore rateLimit = new Semaphore(25);
+
+        TableMutator loadThread = new TableMutator(client, "Partitioned", rateLimit, numTuples, 0);
 
         try {
-            client.createConnection("localhost", cluster.port(0));
-
-            final Semaphore rateLimit = new Semaphore(25);
-
             cluster.killSingleHost(1);
 
             final java.util.concurrent.atomic.AtomicBoolean killerFail =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
-
-            TableMutator loadThread = new TableMutator(client, "Partitioned", rateLimit, numTuples, 0);
 
             //
             // This version doesn't work. It causes concurrent failures during the rejoin sysproc
@@ -442,18 +442,17 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
 
         cluster.startUp();
         Client client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(0));
+
+        final Semaphore rateLimit = new Semaphore(25);
+
+        TableMutator loadThread = new TableMutator(client, "PartitionedLarge", rateLimit, numTuples, 200);
 
         try {
-            client.createConnection("localhost", cluster.port(0));
-
-            final Semaphore rateLimit = new Semaphore(25);
-
             cluster.killSingleHost(1);
 
             final java.util.concurrent.atomic.AtomicBoolean killerFail =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
-
-            TableMutator loadThread = new TableMutator(client, "PartitionedLarge", rateLimit, numTuples, 200);
 
             //
             // This version doesn't work. It causes concurrent failures during the rejoin sysproc
