@@ -613,6 +613,7 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
     TableTuple target(m_schema);
     void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
     target.move(address);
+    target.resetHeader();
     target.copyForPersistentInsert(source);
     return target;
 }
@@ -1543,6 +1544,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         TableTuple target(m_schema);
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
+        target.resetHeader();
         target.setActiveTrue();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
@@ -2194,6 +2196,7 @@ void PersistentTable::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         TableTuple target(m_schema);
         void *address = const_cast<void*>(reinterpret_cast<void const *> (allocator().allocate()));
         target.move(address);
+        target.resetHeader();
         target.setActiveTrue();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
