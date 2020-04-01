@@ -398,7 +398,7 @@ public:
      */
     bool nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType);
 
-    void stopSnapshot();
+    void stopSnapshot(bool activated = false);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
