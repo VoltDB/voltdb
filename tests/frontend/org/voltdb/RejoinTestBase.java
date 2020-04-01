@@ -39,6 +39,9 @@ import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 public class RejoinTestBase extends JUnit4LocalClusterTest {
     protected static final ClientConfig m_cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
 
+    //NOTE: if tables or views are added/removed below, this should be incremented/decremented
+    public static final int SNAPSHOT_TABLE_COUNT = 21;
+
     public VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
             "create table blah (" +
@@ -137,12 +140,18 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
             new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);",
                     new ProcedurePartitionData("PARTITIONED", "pkey")),
+            new ProcedureInfo(new String[] { "foo" }, "DeletePartitioned", "delete from PARTITIONED where pkey = ?;",
+                    new ProcedurePartitionData("PARTITIONED", "pkey")),
             new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;",
                     new ProcedurePartitionData("PARTITIONED", "pkey", "1")),
             new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED order by pkey;", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectCountPartitioned", "select count(*) from PARTITIONED;", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);",
                     new ProcedurePartitionData("PARTITIONED_LARGE", "pkey", "0")),
+            new ProcedureInfo(new String[] { "foo" }, "DeletePartitionedLarge", "delete from PARTITIONED_LARGE where pkey = ?;",
+                    new ProcedurePartitionData("PARTITIONED_LARGE", "pkey")),
+            new ProcedureInfo(new String[] { "foo" }, "UpdatePartitionedLarge", "update PARTITIONED_LARGE set data = ? where pkey = ?;",
+                    new ProcedurePartitionData("PARTITIONED_LARGE", "pkey", "1")),
             new ProcedureInfo(new String[] { "foo" }, "InsertMultiPartitionPolygon", "insert into GEO_POLY_MP values (?, ?);", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertMultiPartitionPoint", "insert into GEO_POINT_MP values (?, ?);", null),
             new ProcedureInfo(new String[] { "foo" }, "SelectMultiPartitionPolygon", "select * from GEO_POLY_MP where id = ?;", null),
