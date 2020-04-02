@@ -119,9 +119,10 @@ public class TestExportOverflow extends RegressionSuite {
             ArrayList<File> subroots = ((LocalCluster) m_config).getSubRoots();
             overflowDir = findExportOverflowDir(subroots.get(0));
         }
+        Map<String, FileTime> fileTimes;
         for (int i=0;true; ++i) {
-            int fileCount = overflowDir.list().length;
-            if (fileCount > 0) {
+            fileTimes = getFileTimeAttributesRecursively(overflowDir);
+            if (!fileTimes.isEmpty()) {
                 break;
             }
             if (i > 100) {
@@ -135,7 +136,16 @@ public class TestExportOverflow extends RegressionSuite {
         m_config.shutDown();
         ((LocalCluster) m_config).setForceVoltdbCreate(true);
         m_config.startUp(false);
-        assertEquals(0, overflowDir.list().length);
+        Map<String, FileTime> newFileTimes = getFileTimeAttributesRecursively(overflowDir);
+        if (!newFileTimes.isEmpty()) {
+            for (Map.Entry<String, FileTime> entry : fileTimes.entrySet()) {
+                FileTime newer = newFileTimes.get(entry.getKey());
+                FileTime older = entry.getValue();
+                assertTrue(newer != null);
+                assertTrue(older != null);
+                assertTrue(newer.compareTo(older) > 0);
+            }
+        }
     }
 
     static public junit.framework.Test suite() throws Exception
