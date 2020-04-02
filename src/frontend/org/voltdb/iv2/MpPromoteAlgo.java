@@ -153,6 +153,11 @@ public class MpPromoteAlgo implements RepairAlgo
         return m_promotionResult.cancel(false);
     }
 
+    @Override
+    public boolean isCancelled() {
+        return m_promotionResult.isCancelled();
+    }
+
     /** Start fixing survivors: setup scoreboard and request repair logs. */
     void prepareForFaultRecovery()
     {
