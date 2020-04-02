@@ -128,7 +128,7 @@ public class StreamBlock {
         return m_rowCount;
     }
 
-    long uniqueId() {
+    public long uniqueId() {
         return m_uniqueId;
     }
 
@@ -203,8 +203,18 @@ public class StreamBlock {
         b.putLong(COMMIT_SEQUENCE_NUMBER_OFFSET, committedSequenceNumber());
         b.putInt(ROW_NUMBER_OFFSET, rowCount());
         b.putLong(UNIQUE_ID_OFFSET, uniqueId());
-        b.position(SEQUENCE_NUMBER_OFFSET);
         b.order(ByteOrder.BIG_ENDIAN);
-        return getRefCountingContainer(b.asReadOnlyBuffer());
+
+        ByteBuffer view = b.asReadOnlyBuffer();
+        view.position(SEQUENCE_NUMBER_OFFSET);
+        return getRefCountingContainer(view);
     }
+
+    @Override
+    public String toString() {
+        return "StreamBlock [m_startSequenceNumber=" + m_startSequenceNumber + ", m_committedSequenceNumber="
+                + m_committedSequenceNumber + ", m_rowCount=" + m_rowCount + ", m_uniqueId=" + m_uniqueId
+                + ", m_totalSize=" + m_totalSize + "]";
+    }
+
 }
