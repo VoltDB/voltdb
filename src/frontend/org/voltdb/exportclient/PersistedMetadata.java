@@ -38,7 +38,7 @@ public class PersistedMetadata implements DeferredSerialization {
     private final List<String> m_keyColumns;
     private final ExportRowSchema m_schema;
 
-    static PersistedMetadata deserialize(ByteBuffer buf) throws IOException {
+    public static PersistedMetadata deserialize(ByteBuffer buf) throws IOException {
         short version = buf.getShort();
         if (version != LATEST_VERSION) {
             throw new IOException("Unsupported serialization version: " + version);
@@ -121,4 +121,11 @@ public class PersistedMetadata implements DeferredSerialization {
                 + m_keyColumns.stream().mapToInt(SerializationHelper::calculateSerializedSize).sum()
                 + m_schema.getSerializedSize();
     }
+
+    @Override
+    public String toString() {
+        return "PersistedMetadata [m_format=" + m_format + ", m_keyColumns='" + m_keyColumns + "', m_schema="
+                + m_schema + "]";
+    }
+
 }
