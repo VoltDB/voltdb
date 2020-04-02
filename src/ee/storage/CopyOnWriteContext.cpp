@@ -143,7 +143,14 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                    m_tuplesRemaining = 0;
                 }
                 bool deleteTuple = false;
-                yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+                try {
+                    yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+                } catch (SQLException& e) {
+                    std::ostringstream buf;
+                    buf << "Serialization error on tuple:" << tuple.debug(table.name()).c_str() << std::endl;
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buf.str().c_str());
+                    throw;
+                }
             }
         }
     }
