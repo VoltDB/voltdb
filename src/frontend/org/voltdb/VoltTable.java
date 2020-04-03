@@ -1918,6 +1918,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         return checksum;
     }
 
+    public long updateCheckSum(long preCheckSum) {
+        assert(verifyTableInvariants());
+        preCheckSum += ClientUtils.cheesyBufferCheckSum(m_buffer);
+        assert(verifyTableInvariants());
+        return preCheckSum;
+    }
+
     /**
      *  An unreliable version of {@link java.lang.Object#equals(Object)} that should not be used. Only
      *  present for unit testing.
