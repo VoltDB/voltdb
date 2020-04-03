@@ -50,7 +50,6 @@ public class MpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-    private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
@@ -315,24 +314,18 @@ public class MpPromoteAlgo implements RepairAlgo
         if (msg.getPayload() == null) {
             return;
         }
-        // MP repair log has at most two messages, complete message for prior transaction
-        // and fragment message for current transaction, don't add message before prior completion
-        if (msg.getTxnId() <= m_maxSeenCompleteTxnId) {
-            return;
-        }
+
         Iv2RepairLogResponseMessage prev = m_repairLogUnion.floor(msg);
         if (prev != null && (prev.getTxnId() != msg.getTxnId())) {
             prev = null;
         }
 
-        if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            // prefer complete messages to fragment tasks. Completion message also erases prior staled messages
-            m_repairLogUnion.removeIf((p) -> p.getTxnId() <= msg.getTxnId());
+        if (prev == null) {
             m_repairLogUnion.add(msg);
-            m_maxSeenCompleteTxnId = msg.getTxnId();
-        }
-        else if (prev == null) {
-           m_repairLogUnion.add(msg);
+        } else if (msg.getPayload() instanceof CompleteTransactionMessage) {
+            // prefer complete messages to fragment tasks.
+            m_repairLogUnion.remove(prev);
+            m_repairLogUnion.add(msg);
         }
     }
 
