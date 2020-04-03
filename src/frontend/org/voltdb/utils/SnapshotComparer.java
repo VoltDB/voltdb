@@ -77,7 +77,7 @@ public class SnapshotComparer {
 
         SnapshotLoader source = new SnapshotLoader(config.local, config.username, config.sourceNonce, config.sourceDirs, config.sourceHosts);
         if (config.selfCompare) {
-            source.selfCompare();
+            source.selfCompare(config.orderLevel);
         } else {
             SnapshotLoader target = new SnapshotLoader(config.local, config.username, config.targetNonce, config.targetDirs, config.targetHosts);
             source.compareWith(target);
@@ -93,12 +93,19 @@ public class SnapshotComparer {
         System.out.println("Peer Comparision, verify data consistency among snapshots: snapshotComparer nonce1 nonce2");
         System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer  --nonce1 nonce1 --dir1 dir1-1,dir1-2,dir1-3 nonce2 --dir2 dir2-1,dir2-2,dir2-3");
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --nonce1 nonce1 --paths1 path1,path2 --hosts1 host1,host2 --nonce2 nonce2 --paths2 path1,path2 --hosts2 host1,host2 --user username");
-
+        System.out.println();
+        System.out.println("For integrity check only without row order, use --ignoreOrder");
+        System.out.println("For integrity check only with only chunk level row order, use --ignoreChunkOrder");
         System.exit(code);
     }
 
     static class Config {
         boolean selfCompare;
+        // level of row order consistency
+        // 0 for total order
+        // 1 for chunk level order (there could be out of order within chunk, but not across chunk)
+        // 2 for no order
+        byte orderLevel = 0;
         Boolean local = null;
         String username = "";
         String password = "";
@@ -125,6 +132,10 @@ public class SnapshotComparer {
                         }
                         i++;
                         sourceNonce = args[i];
+                    } else if (arg.equalsIgnoreCase("--ignoreChunkOrder")) {
+                        orderLevel = 1;
+                    } else if (arg.equalsIgnoreCase("--ignoreOrder")) {
+                        orderLevel = 2;
                     } else if (arg.equalsIgnoreCase("--dirs")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
@@ -449,7 +460,7 @@ class SnapshotLoader {
      * Validate the data consistency within the snapshot
      */
     // Todo: now is 1-1 comparing, implement m-way comparing
-    public void selfCompare() {
+    public void selfCompare(byte orderLevel) {
         boolean fail = false;
         // Build a plan for which save file as the baseline for each partition
         Map<String, List<List<File>>> tableToCopies = new HashMap<>();
@@ -502,12 +513,16 @@ class SnapshotLoader {
                 int partitionid = isReplicated ? 16383 : p;
                 TableSaveFile referenceSaveFile = null, compareSaveFile = null;
                 try {
-                    referenceSaveFile =
-                            new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
-                                    1, relevantPartition);
                     for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
                         boolean isConsistent = true;
-                        // close the previous TableSaveFile if opened
+
+                        if (referenceSaveFile != null) {
+                            try {
+                                referenceSaveFile.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
                         if (compareSaveFile != null) {
                             try {
                                 compareSaveFile.close();
@@ -515,10 +530,15 @@ class SnapshotLoader {
                                 e.printStackTrace();
                             }
                         }
+
+                        referenceSaveFile =
+                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
+                                        1, relevantPartition);
                         compareSaveFile =
                                 new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(target)),
                                         1, relevantPartition);
                         DBBPool.BBContainer cr = null, cc = null;
+                        long refCheckSum = 0l, compCheckSum = 0l;
                         while (referenceSaveFile.hasMoreChunks() && compareSaveFile.hasMoreChunks()) {
                             // skip chunk for irrelevant partition
                             cr = referenceSaveFile.getNextChunk();
@@ -529,35 +549,41 @@ class SnapshotLoader {
                             }
                             // TODO: chunk not aligned?
                             if (cr != null && cc == null) {
+                                isConsistent = false;
                                 System.err.println("Reference file still contain chunks while comparing file does not");
                                 break;
                             }
                             if (cr == null && cc != null) {
+                                isConsistent = false;
                                 System.err.println("Comparing file still contain chunks while Reference file does not");
                                 break;
                             }
                             try {
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
-                                // cheesy check sum should already guaranteed row order
-                                if (!tr.hasSameContentsWithOrder(tc)) {
-                                    // seek to find where discrepancy happened
-                                    if (SNAPSHOT_LOG.isDebugEnabled()) {
-                                        SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
-                                        SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
-                                    }
+                                if (orderLevel == 2) {
+                                    refCheckSum = tr.updateCheckSum(refCheckSum);
+                                    compCheckSum = tc.updateCheckSum(compCheckSum);
+                                } else {
+                                    if (!tr.hasSameContents(tc, orderLevel == 1)) {
+                                        // seek to find where discrepancy happened
+                                        if (SNAPSHOT_LOG.isDebugEnabled()) {
+                                            SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
+                                            SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
+                                        }
 
-                                    int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
-                                    int[][] lookup = new int[trSize+1][tcSize + 1];
-                                    // fill lookup table
-                                    LCSLength(tr, tc, trSize, tcSize, lookup);
-                                    // find difference
-                                    StringBuilder output = new StringBuilder();
-                                    output.append("Diffs between file " + partitionToFiles.get(p).get(0) + " and file " + partitionToFiles.get(p).get(target) + " \n");
-                                    diff(tr, tc, trSize, tcSize, lookup, output);
-                                    CONSOLE_LOG.info(output.toString());
-                                    isConsistent = false;
-                                    break;
+                                        int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
+                                        int[][] lookup = new int[trSize + 1][tcSize + 1];
+                                        // fill lookup table
+                                        LCSLength(tr, tc, trSize, tcSize, lookup);
+                                        // find difference
+                                        StringBuilder output = new StringBuilder();
+                                        output.append("Diffs between file " + partitionToFiles.get(p).get(0) + " and file " + partitionToFiles.get(p).get(target) + " \n");
+                                        diff(tr, tc, trSize, tcSize, lookup, output);
+                                        CONSOLE_LOG.info(output.toString());
+                                        isConsistent = false;
+                                        break;
+                                    }
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
@@ -570,6 +596,9 @@ class SnapshotLoader {
                                 }
                             }
                         }
+                        if (orderLevel == 2) {
+                            isConsistent = isConsistent && (refCheckSum == compCheckSum);
+                        }
                         if (isConsistent) {
                             SNAPSHOT_LOG.info((isReplicated ? "Replicated" : "Partitioned") + " Table " + tableName + " is consistent between host0 with host" + target +
                                     " on partition " + partitionid);
@@ -581,21 +610,6 @@ class SnapshotLoader {
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
-                } finally {
-                    if (referenceSaveFile != null) {
-                        try {
-                            referenceSaveFile.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    if (compareSaveFile != null) {
-                        try {
-                            compareSaveFile.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
                 }
             }
             CONSOLE_LOG.info("Finished comparing table " + tableName + ".\n");
