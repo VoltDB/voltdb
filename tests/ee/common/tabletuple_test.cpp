@@ -276,11 +276,8 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
                                              std::make_pair(ValueType::tVARCHAR, 256));
     std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     char signature[20];
-    PersistentTable* table = dynamic_cast<PersistentTable *> (TableFactory::getPersistentTable(0,
-                                                                  "perstbl",
-                                                                  schema,
-                                                                  columnNames,
-                                                                  signature));
+    std::unique_ptr<PersistentTable> table{dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(0, "perstbl", schema, columnNames, signature))};
     TableTuple tuple = table->tempTuple();
     Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
 
@@ -298,9 +295,9 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
 
     table->insertTuple(tuple);
     TableTuple iterTuple{schema};
-    storage::for_each<PersistentTable::txn_iterator>(table->allocator(), [this, &iterTuple](void const* p) {
-         void *tupleData = const_cast<void*>(reinterpret_cast<void const *>(p));
-         iterTuple.move(tupleData);
+    storage::for_each<PersistentTable::txn_iterator>(table->allocator(), [this, &iterTuple](void* p) {
+         iterTuple.move(p);
+
          ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
          ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
 
