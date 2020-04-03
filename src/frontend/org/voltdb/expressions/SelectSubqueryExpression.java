@@ -139,15 +139,6 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public  int overrideSubqueryNodeIds(int newId) {
-        assert(m_subquery != null);
-        CompiledPlan subqueryPlan = m_subquery.getBestCostPlan();
-        newId = subqueryPlan.resetPlanNodeIds(newId);
-        resetSubqueryNodeId();
-        return newId;
-    }
-
-    @Override
     public SelectSubqueryExpression clone() {
         SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {

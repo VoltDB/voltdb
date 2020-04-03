@@ -3457,6 +3457,34 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{4,5}});
     }
 
+    // ENG-16616, duplicated plannode id causing insert to crash
+    @Test
+    public void testSelectSubQueryDuplicatePlanId() throws Exception {
+        final Client client = getClient();
+
+        client.callProcedure("@AdHoc", "insert into R_ENG16616 values (1)");
+
+        validateTableOfLongs(client,
+                "select * from R_ENG16616;",
+                new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "select t0.id from R_ENG16616 t0 order by t0.id limit 1;",
+                new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "select * from R_ENG16616 t0 where (select t0.id from R_ENG16616 t0 order by t0.id limit 1) = t0.id;",
+                new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "insert into R_ENG16616 select * from R_ENG16616 t0 where (select t0.id from R_ENG16616 t0 order by t0.id limit 1) = t0.id;",
+                new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "select * from R_ENG16616;",
+                new long[][] {{1}, {1}});
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSubQueriesSuite.class);
@@ -3527,7 +3555,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "ID integer, NUM integer);" +
 
                 "CREATE TABLE R_ENG8173_1 (" +
-                "ID integer, DESC VARCHAR(300), NUM integer);"
+                "ID integer, DESC VARCHAR(300), NUM integer);" +
+
+                "CREATE TABLE R_ENG16616 (ID integer);"
                 ;
         try {
             project.addLiteralSchema(literalSchema);
