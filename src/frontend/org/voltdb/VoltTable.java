@@ -1891,24 +1891,10 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @return Whether the tables have the same contents.
      */
     public boolean hasSameContents(VoltTable other) {
-        assert(verifyTableInvariants());
-        if (this == other) {
-            return true;
-        }
-
-        int mypos = m_buffer.position();
-        int theirpos = other.m_buffer.position();
-        if (mypos != theirpos) {
-            return false;
-        }
-        long checksum1 = ClientUtils.cheesyBufferCheckSum(m_buffer);
-        long checksum2 = ClientUtils.cheesyBufferCheckSum(other.m_buffer);
-        boolean checksum = (checksum1 == checksum2);
-        assert(verifyTableInvariants());
-        return checksum;
+        return hasSameContents(other, true);
     }
 
-    public boolean hasSameContentsWithOrder(VoltTable other) {
+    public boolean hasSameContents(VoltTable other, boolean ignoreOrder) {
         assert(verifyTableInvariants());
         if (this == other) {
             return true;
@@ -1919,8 +1905,14 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         if (mypos != theirpos) {
             return false;
         }
-        long checksum1 = ClientUtils.cheesyBufferCheckSumWithOrder(m_buffer);
-        long checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
+        long checksum1, checksum2;
+        if (ignoreOrder) {
+            checksum1 = ClientUtils.cheesyBufferCheckSum(m_buffer);
+            checksum2 = ClientUtils.cheesyBufferCheckSum(other.m_buffer);
+        } else {
+            checksum1 = ClientUtils.cheesyBufferCheckSumWithOrder(m_buffer);
+            checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
+        }
         boolean checksum = (checksum1 == checksum2);
         assert(verifyTableInvariants());
         return checksum;

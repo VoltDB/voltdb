@@ -77,7 +77,7 @@ public class SnapshotComparer {
 
         SnapshotLoader source = new SnapshotLoader(config.local, config.username, config.sourceNonce, config.sourceDirs, config.sourceHosts);
         if (config.selfCompare) {
-            source.selfCompare();
+            source.selfCompare(config.ignoreOrder);
         } else {
             SnapshotLoader target = new SnapshotLoader(config.local, config.username, config.targetNonce, config.targetDirs, config.targetHosts);
             source.compareWith(target);
@@ -93,12 +93,14 @@ public class SnapshotComparer {
         System.out.println("Peer Comparision, verify data consistency among snapshots: snapshotComparer nonce1 nonce2");
         System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer  --nonce1 nonce1 --dir1 dir1-1,dir1-2,dir1-3 nonce2 --dir2 dir2-1,dir2-2,dir2-3");
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --nonce1 nonce1 --paths1 path1,path2 --hosts1 host1,host2 --nonce2 nonce2 --paths2 path1,path2 --hosts2 host1,host2 --user username");
-
+        System.out.println();
+        System.out.println("For integrity check only without row only, use --ignoreOrder");
         System.exit(code);
     }
 
     static class Config {
         boolean selfCompare;
+        boolean ignoreOrder = false;
         Boolean local = null;
         String username = "";
         String password = "";
@@ -125,6 +127,8 @@ public class SnapshotComparer {
                         }
                         i++;
                         sourceNonce = args[i];
+                    } else if (arg.equalsIgnoreCase("--ignoreOrder")) {
+                        ignoreOrder = true;
                     } else if (arg.equalsIgnoreCase("--dirs")) {
                         if (local != null && !local) {
                             System.err.println("Error: already specify snapshot from remote");
@@ -449,7 +453,7 @@ class SnapshotLoader {
      * Validate the data consistency within the snapshot
      */
     // Todo: now is 1-1 comparing, implement m-way comparing
-    public void selfCompare() {
+    public void selfCompare(boolean ignoreOrder) {
         boolean fail = false;
         // Build a plan for which save file as the baseline for each partition
         Map<String, List<List<File>>> tableToCopies = new HashMap<>();
@@ -502,12 +506,16 @@ class SnapshotLoader {
                 int partitionid = isReplicated ? 16383 : p;
                 TableSaveFile referenceSaveFile = null, compareSaveFile = null;
                 try {
-                    referenceSaveFile =
-                            new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
-                                    1, relevantPartition);
                     for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
                         boolean isConsistent = true;
-                        // close the previous TableSaveFile if opened
+
+                        if (referenceSaveFile != null) {
+                            try {
+                                referenceSaveFile.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
                         if (compareSaveFile != null) {
                             try {
                                 compareSaveFile.close();
@@ -515,6 +523,10 @@ class SnapshotLoader {
                                 e.printStackTrace();
                             }
                         }
+
+                        referenceSaveFile =
+                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
+                                        1, relevantPartition);
                         compareSaveFile =
                                 new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(target)),
                                         1, relevantPartition);
@@ -540,7 +552,7 @@ class SnapshotLoader {
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 // cheesy check sum should already guaranteed row order
-                                if (!tr.hasSameContentsWithOrder(tc)) {
+                                if (!tr.hasSameContents(tc, ignoreOrder)) {
                                     // seek to find where discrepancy happened
                                     if (SNAPSHOT_LOG.isDebugEnabled()) {
                                         SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
@@ -581,21 +593,6 @@ class SnapshotLoader {
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
-                } finally {
-                    if (referenceSaveFile != null) {
-                        try {
-                            referenceSaveFile.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    if (compareSaveFile != null) {
-                        try {
-                            compareSaveFile.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
                 }
             }
             CONSOLE_LOG.info("Finished comparing table " + tableName + ".\n");
