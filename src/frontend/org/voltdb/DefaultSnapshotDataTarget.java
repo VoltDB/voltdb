@@ -291,12 +291,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                if (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
+                    SNAP_LOG.info("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
+                            " bytes pending to sync, up to " + m_bytesAllowedBeforeSync.availablePermits() +
+                            " bytes is allowed to write before sync.");
+                } else {
+                    SNAP_LOG.info("Wait to gather 4m data to sync, current have " + m_bytesWrittenSinceLastSync.get() + " bytes." +
+                             m_bytesAllowedBeforeSync.availablePermits() + " bytes is allowed to write before sync.");
+                }
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
-                    if (SNAP_LOG.isDebugEnabled()) {
-                        SNAP_LOG.debug("Fsyncing snapshot file" + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
-                                " bytes pending to sync, up to " + m_bytesAllowedBeforeSync.availablePermits() +
-                                " bytes is allowed to write before sync.");
-                    }
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
@@ -383,6 +386,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     // will immediately throw a CancellationException
                 }
             });
+            SNAP_LOG.info("Close data target " + m_tableName + ", file " + m_file +
+                    ". available permit " + m_bytesAllowedBeforeSync.availablePermits() +
+                    ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync.");
             try {
                 task.get();
             } catch (ExecutionException e) {
@@ -494,6 +500,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                             ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
                             permitAcquired = payloadBuffer.remaining();
+                            if (permitAcquired > m_bytesAllowedBeforeSync.availablePermits()) {
+                                SNAP_LOG.info("Failed to acquire enough permits, required " + permitAcquired +
+                                        ", available " + m_bytesAllowedBeforeSync.availablePermits() +
+                                        ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync." +
+                                        " Table " + m_tableName +
+                                        ". File " + m_file +
+                                        ". prependLength " + prependLength +
+                                        ". tuple data size " + tupleData.remaining());
+                            }
                             m_bytesAllowedBeforeSync.acquire(permitAcquired);
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
@@ -523,6 +538,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     } else {
                         permitAcquired = tupleData.remaining();
+                        if (permitAcquired > m_bytesAllowedBeforeSync.availablePermits()) {
+                            SNAP_LOG.info("Failed to acquire enough permits, required " + permitAcquired +
+                                    ", available " + m_bytesAllowedBeforeSync.availablePermits() +
+                                    ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync." +
+                                    " Table " + m_tableName +
+                                    ". File " + m_file +
+                                    ". prependLength " + prependLength);
+                        }
                         m_bytesAllowedBeforeSync.acquire(permitAcquired);
                         while (tupleData.hasRemaining()) {
                             totalWritten += m_channel.write(tupleData);
