@@ -294,12 +294,13 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 if (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
                     SNAP_LOG.info("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
                             " bytes pending to sync, up to " + m_bytesAllowedBeforeSync.availablePermits() +
-                            " bytes is allowed to write before sync.");
+                            " bytes is allowed to write before sync " + m_tableName);
                 } else {
-                    SNAP_LOG.info("Wait to gather 4m data to sync, current have " + m_bytesWrittenSinceLastSync.get() + " bytes." +
+                    SNAP_LOG.info("Wait to gather 4m data to sync " + m_tableName + ", currently have " + m_bytesWrittenSinceLastSync.get() + " bytes. " +
                              m_bytesAllowedBeforeSync.availablePermits() + " bytes is allowed to write before sync.");
                 }
-                while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
+                while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4) ||
+                        m_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength) {
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
