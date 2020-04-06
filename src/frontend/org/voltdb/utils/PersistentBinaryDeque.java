@@ -142,6 +142,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     prev = null;
                 }
 
+                m_filledGap = true;
                 Pair<Integer, PBDSegment<M>> result = offerToSegment(prev, data, startId, endId, m_gapHeader, false);
                 m_activeSegment = result.getSecond();
                 return result.getFirst();
@@ -765,6 +766,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private PBDRetentionPolicy m_retentionPolicy;
     private boolean m_requiresId;
     private GapWriter m_gapWriter;
+    private boolean m_filledGap;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path. This is a
@@ -1605,6 +1607,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
         m_segments.clear();
         m_closed = true;
+        m_filledGap = false;
     }
 
     public static class ByteBufferTruncatorResponse extends TruncatorResponse {
@@ -1693,7 +1696,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     private void assertions() {
-        if (!assertionsOn || m_closed) {
+        if (!assertionsOn || m_closed || m_filledGap) { // assertions don't work with gap filling at points before cursor point
             return;
         }
         for (ReadCursor cursor : m_readCursors.values()) {

@@ -39,6 +39,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
@@ -363,6 +364,66 @@ public class TestPBDGapWriter {
             m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), seqNo, seqNo+99);
         }
         assertEquals(numFiles-3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    @Test(timeout = 15_000)
+    public void testGapFillingWithReading() throws Exception {
+        // gap from 51-80
+        int nextSeqNo = 1;
+        while (nextSeqNo < 100) {
+            if (nextSeqNo < 51 || nextSeqNo > 80) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+            } else {
+                m_pbd.updateExtraHeader(m_metadata);
+            }
+            nextSeqNo += 10;
+        }
+
+        int readCount = 0;
+        PersistentBinaryDeque<ExtraHeaderMetadata>.ReadCursor reader = m_pbd.openForRead("testReader", true);
+        // read past gap
+        for (int i=0; i<6; i++) {
+            BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            container.discard();
+            readCount++;
+        }
+
+        // now fill gap while reading
+        nextSeqNo = 51;
+        while (nextSeqNo < 80) {
+            BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (container != null) {
+                readCount++;
+                container.discard();
+            }
+            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+            nextSeqNo += 10;
+        }
+
+        // do some regular offers
+        nextSeqNo = 101;
+        while (nextSeqNo < 150) {
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+            nextSeqNo += 10;
+        }
+
+        BBContainer container = null;
+        while ((container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            container.discard();
+            readCount++;
+        }
+
+        // We make regular offers of 7 first and 5 later.
+        assertEquals(12, readCount);
+
+        //Another reader starting from the beginning. It should read all 12 + 3 gap entries
+        readCount = 0;
+        reader = m_pbd.openForRead("testReader-new");
+        while ((container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            container.discard();
+            readCount++;
+        }
+        assertEquals(15, readCount);
     }
 
 }
