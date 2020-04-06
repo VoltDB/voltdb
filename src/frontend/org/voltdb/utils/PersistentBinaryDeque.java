@@ -112,7 +112,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 PBDSegment<M> prev = m_activeSegment;
                 if (m_activeSegment == null || startId != m_activeSegment.getEndId()+1) {
                     Map.Entry<Long, PBDSegment<M>> entry = m_segments.floorEntry(startId);
-                    prev = findValidSegmentFrom((entry == null ? null : entry.getValue()), false, PBDSegment.INVALID_ID, true);
+                    prev = findValidSegmentFrom((entry == null ? null : entry.getValue()), false, true);
                     if (m_activeSegment!= null && m_activeSegment.m_id != m_segments.lastKey()) {
                         finishActiveSegmentWrite();
                     }
@@ -120,10 +120,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
                 PBDSegment<M> next = null;
                 if (prev == null) { // inserting at the beginning
-                    next = findValidSegmentFrom(peekFirstSegment(), true, PBDSegment.INVALID_ID, true);
+                    next = findValidSegmentFrom(peekFirstSegment(), true, true);
                 } else {
                     Map.Entry<Long, PBDSegment<M>> nextEntry = m_segments.higherEntry(prev.m_id);
-                    next = findValidSegmentFrom((nextEntry == null ? null : nextEntry.getValue()), true, PBDSegment.INVALID_ID, true);
+                    next = findValidSegmentFrom((nextEntry == null ? null : nextEntry.getValue()), true, true);
                 }
 
                 // verify that these ids don't already exist
@@ -973,21 +973,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
-    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, long indexLimit) throws IOException {
-        return findValidSegmentFrom(segment, higher, indexLimit, false);
+    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher) throws IOException {
+        return findValidSegmentFrom(segment, higher, false);
     }
 
-    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, long indexLimit, boolean deleteInvalid) throws IOException {
+    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, boolean deleteInvalid) throws IOException {
         if (segment == null || segment.getNumEntries() > 0) {
             return segment;
         }
 
         // skip past quarantined segments
         while (segment != null && segment.getNumEntries() == 0) {
-            if (segment.segmentId() == indexLimit) {
-                segment = null;
-                break;
-            }
             Map.Entry<Long, PBDSegment<M>> nextEntry;
             if (higher) {
                 nextEntry = m_segments.higherEntry(segment.segmentId());
@@ -1005,83 +1001,42 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     private PBDSegment<M> findSegmentWithEntry(long entryId, SeekErrorRule errorRule) throws NoSuchOffsetException, IOException {
-        long invalidIndex = m_segments.isEmpty() ? 1 : m_segments.firstKey()-1;
-        PBDSegment<M> first = findValidSegmentFrom(peekFirstSegment(), true, invalidIndex);
-        if (first == null) {
-            throw new NoSuchOffsetException("Offset " + entryId + "not found. Empty PBD");
-        }
-
         if (!m_requiresId) {
             throw new IllegalStateException("Seek is not supported in PBDs that don't store id ranges");
         }
 
-        PBDSegment<M> last = findValidSegmentFrom(peekLastSegment(), false, invalidIndex);
-
-        if (first.getStartId() > entryId) {
-            if (errorRule == SeekErrorRule.SEEK_AFTER) {
-                return first;
-            } else {
-                throw new NoSuchOffsetException("PBD[" + first.getStartId() + "-" +  last.getEndId() +
-                        "] does not contain offset: " + entryId);
-            }
-        }
-        if (last.getEndId() < entryId) {
-            if (errorRule == SeekErrorRule.SEEK_BEFORE) {
-                return last;
-            } else {
-                throw new NoSuchOffsetException("PBD[" + first.getStartId() + "-" +  last.getEndId() +
-                        "] does not contain offset: " + entryId);
-            }
+        PBDSegment<M> first = findValidSegmentFrom(peekFirstSegment(), true);
+        if (first == null) {
+            throw new NoSuchOffsetException("Offset " + entryId + "not found. Empty PBD");
         }
 
-        // Assuming these are the common cases, eliminate these.
-        if (entryId >= first.getStartId() && entryId <= first.getEndId()) {
-            return first;
-        }
-        if (entryId >= last.getStartId() && entryId <= last.getEndId()) {
-            return last;
-        }
-
-        // Map between 0-based monotonically increasing index and ids, so that we can binary search
-        Map<Integer, Long> indexMap = new HashMap<>();
-        int index = 1;
-        for (long key : m_segments.keySet()) {
-            indexMap.put(index++, key);
-        }
-        // At this point, either the entryId is within a segment or it is in a gap between segments.
-        // (As of current use of PBDs, there cannot be gaps in the middle of a segment).
-        int low = 1;
-        int high = index-1;
-        while (low <= high) {
-            int mid = (low + high) / 2;
-            PBDSegment<M> midSegment = m_segments.get(indexMap.get(mid));
-            // search up and down to skip over quarantined segments and find a valid segment.
-            // We must find one because of checks above that verify that the entryId is within the bounds of the PBD
-            PBDSegment<M> valid = findValidSegmentFrom(midSegment, true, high+1);
-            midSegment = (valid == null) ? findValidSegmentFrom(valid, false, low-1) : valid;
-            if (entryId >= midSegment.getStartId() && entryId <= midSegment.getEndId()) {
-                return midSegment;
-            } else if (entryId > midSegment.getEndId()) {
-                low = mid + 1;
-            } else if (entryId < midSegment.getStartId()) {
-                assert(mid > 1); // because of the checks above
-                // entryId is at a gap or in one of the lower segments
-                PBDSegment<M> prevSegment = findValidSegmentFrom(m_segments.get(indexMap.get(mid-1)), false, invalidIndex);
-                if (entryId > prevSegment.getEndId()) { // entryId is at a gap
-                    switch(errorRule) {
-                    case THROW       : throw new NoSuchOffsetException("Could not find entry with offset " + entryId);
-                    case SEEK_AFTER  : return midSegment;
-                    case SEEK_BEFORE : return prevSegment;
-                    default          : throw new IllegalArgumentException("Unsupported SeekErrorRule: " + errorRule);
-                    }
+        Map.Entry<Long, PBDSegment<M>> floorEntry = m_segments.floorEntry(entryId);
+        PBDSegment<M> candidate = findValidSegmentFrom((floorEntry == null ? null : floorEntry.getValue()), false);
+        if (candidate != null) {
+            if (entryId >= candidate.getStartId() && entryId <= candidate.getEndId()) {
+                return candidate;
+            } else { // in a gap or after the last id available in the PBD
+                if (errorRule == SeekErrorRule.THROW) {
+                    throw new NoSuchOffsetException("PBD does not contain offset: " + entryId);
+                } else if (errorRule == SeekErrorRule.SEEK_BEFORE) {
+                    return candidate;
                 } else {
-                    high = mid - 1;
+                    Map.Entry<Long, PBDSegment<M>> nextEntry = m_segments.higherEntry(candidate.getStartId());
+                    PBDSegment<M> next = findValidSegmentFrom((nextEntry == null ? null : nextEntry.getValue()), true);
+                    if (next == null) {
+                        throw new NoSuchOffsetException("PBD does not contain offset: " + entryId);
+                    } else {
+                        return next;
+                    }
                 }
             }
+        } else { // entryId is before the first id available in the PBD
+            if (errorRule == SeekErrorRule.THROW || errorRule == SeekErrorRule.SEEK_BEFORE) {
+                throw new NoSuchOffsetException("PBD does not contain offset: " + entryId);
+            } else {
+                return first;
+            }
         }
-
-        // Should not get here because of the initial checks
-        throw new RuntimeException("Unexpected error. Could not find offset " + entryId);
     }
 
     /**
