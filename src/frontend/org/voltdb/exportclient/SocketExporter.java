@@ -233,8 +233,10 @@ public class SocketExporter extends ExportClientBase {
                     }
                 }
             } catch (IOException ex) {
-                m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to flush to export socket endpoint %s, some servers may be down.", host);
+                m_logger.rateLimitedLog(120, Level.ERROR, null,
+                        "Failed to flush block to socket endpoint %s, some servers may be down. The rows will be retried", host);
                 haplist.clear();
+                throw new RestartBlockException("Error finishing the block", ex, true);
             }
         }
     }
