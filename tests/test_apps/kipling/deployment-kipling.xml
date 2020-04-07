@@ -8,54 +8,25 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <!-- <commandlog enabled="false" /> -->
-   <topics enabled="true">
+   <threadpools>
+      <pool name="foo" size="10"/>
+   </threadpools>
+
+   <topics enabled="true" threadpool="foo">
       <properties>
         <property name="port">9092</property>
         <property name="thread.count">15</property>
       </properties>
       <profiles>
-        <defaults>
-          <retention policy="time" limit="1 yr" />
-        </defaults>
         <profile name="foo">
           <retention policy="size" limit="70 gB" />
         </profile>
+        <profile name="bar">
+          <retention limit="2 mo"/>
+        </profile>
+        <profile name="baz">
+          <retention policy="time" limit="2 wk"/>
+        </profile>
       </profiles>
     </topics>
-
-    <!-- 
-        <import>
-            <configuration type="kafka" enabled="true">
-                <property name="brokers">pshaw-DH310:9092</property>
-                <property name="topics">T8_KAFKAEXPORTTABLE1</property>
-                <property name="groupid">A8</property>
-                <property name="procedure">KAFKAIMPORTTABLE1.insert</property>
-            </configuration>
-
-            <configuration type="kafka" enabled="true">
-                <property name="brokers">pshaw-DH310:9092</property>
-                <property name="topics">T8_KAFKAEXPORTTABLE2</property>
-                <property name="groupid">B8</property>
-                <property name="procedure">KAFKAIMPORTTABLE2.insert</property>
-            </configuration>
-
-            <configuration type="kafka" enabled="false">
-                <property name="brokers">pshaw-DH310:9092</property>
-                <property name="topics">T8_KAFKAEXPORTTABLE2</property>
-                <property name="groupid">T8</property>
-                <property name="procedure">InsertImport2</property>
-            </configuration>
-        </import>
-
-        <export>
-            <configuration enabled="true" target="default" type="kafka">
-                <property name="metadata.broker.list">volt13i:9092</property>
-                <property name="producer.type">async</property>
-                <property name="acks">1</property>
-                <property name="skipinternals">true</property>
-                <property name="topic.prefix">T8_</property>
-            </configuration>
-        </export>
-    -->
 </deployment>
