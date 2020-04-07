@@ -72,4 +72,7 @@ public interface RepairAlgo
 
     /** Process a new repair log response */
     public void deliver(VoltMessage message);
+
+    /** Was the future returned by start() cancelled*/
+    public boolean isCancelled();
 }

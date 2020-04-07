@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
+
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -135,6 +136,11 @@ public class SpPromoteAlgo implements RepairAlgo
     public boolean cancel()
     {
         return m_promotionResult.cancel(false);
+    }
+
+    @Override
+    public boolean isCancelled() {
+        return m_promotionResult.isCancelled();
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
@@ -263,4 +269,5 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId, Long.MIN_VALUE));
     }
+
 }
