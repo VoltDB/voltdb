@@ -103,7 +103,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     public  int overrideSubqueryNodeIds(int newId) {
         assert(m_subqueryNode != null);
-        newId =  m_subqueryNode.overrideId(newId);
+        newId =  m_subqueryNode.resetPlanNodeIds(newId);
         resetSubqueryNodeId();
         return newId;
     }
