@@ -301,7 +301,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4) ||
                         (m_bytesWrittenSinceLastSync.get() > 0 &&
                                 s_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength)) {
-                    SNAP_LOG.debug("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
+                    SNAP_LOG.info("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
                             " bytes pending to sync, up to " + s_bytesAllowedBeforeSync.availablePermits() +
                             " bytes is allowed to write before sync " + m_tableName);
                     long positionAtSync = 0;
