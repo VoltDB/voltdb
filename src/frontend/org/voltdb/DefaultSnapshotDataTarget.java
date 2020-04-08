@@ -89,7 +89,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     private volatile long m_bytesWritten = 0;
 
-    private static final Semaphore m_bytesAllowedBeforeSync = new Semaphore((1024 * 1024) * 256);
+    /**
+     * Ideally this number should be equal or more than
+     * 2MB * (# of persistent tables + # of materialized views),
+     * 2MB is the maximum snapshot buffer size.
+     * If this number is set too low, database will sync frequently, results in longer snapshot generation time.
+     */
+    private static final int s_maxPermit = Integer.getInteger("SNAPSHOT_MEGABYTES_ALLOWED_BEFORE_SYNC", 256);
+    private static final Semaphore s_bytesAllowedBeforeSync = new Semaphore((1024 * 1024) * s_maxPermit);
     private final AtomicInteger m_bytesWrittenSinceLastSync = new AtomicInteger(0);
 
     private final ScheduledFuture<?> m_syncTask;
@@ -291,16 +298,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
-                if (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
-                    SNAP_LOG.info("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
-                            " bytes pending to sync, up to " + m_bytesAllowedBeforeSync.availablePermits() +
-                            " bytes is allowed to write before sync " + m_tableName);
-                } else {
-                    SNAP_LOG.info("Wait to gather 4m data to sync " + m_tableName + ", currently have " + m_bytesWrittenSinceLastSync.get() + " bytes. " +
-                             m_bytesAllowedBeforeSync.availablePermits() + " bytes is allowed to write before sync.");
-                }
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4) ||
-                        m_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength) {
+                        (m_bytesWrittenSinceLastSync.get() > 0 &&
+                                s_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength)) {
+                    SNAP_LOG.debug("Fsyncing snapshot file " + m_file + ", " + m_bytesWrittenSinceLastSync.get() +
+                            " bytes pending to sync, up to " + s_bytesAllowedBeforeSync.availablePermits() +
+                            " bytes is allowed to write before sync " + m_tableName);
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
@@ -320,7 +323,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                                 ". This message is rate limited to once every one minute.");
                     } finally {
                         final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
-                        m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
+                        s_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                     }
 
                     /*
@@ -388,7 +391,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 }
             });
             SNAP_LOG.info("Close data target " + m_tableName + ", file " + m_file +
-                    ". available permit " + m_bytesAllowedBeforeSync.availablePermits() +
+                    ". available permit " + s_bytesAllowedBeforeSync.availablePermits() +
                     ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync.");
             try {
                 task.get();
@@ -397,7 +400,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             }
             m_channel.force(false);
         } finally {
-            m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
+            s_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
         }
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
@@ -501,16 +504,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                             ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
                             permitAcquired = payloadBuffer.remaining();
-                            if (permitAcquired > m_bytesAllowedBeforeSync.availablePermits()) {
+                            if (permitAcquired > s_bytesAllowedBeforeSync.availablePermits()) {
                                 SNAP_LOG.info("Failed to acquire enough permits, required " + permitAcquired +
-                                        ", available " + m_bytesAllowedBeforeSync.availablePermits() +
+                                        ", available " + s_bytesAllowedBeforeSync.availablePermits() +
                                         ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync." +
                                         " Table " + m_tableName +
                                         ". File " + m_file +
                                         ". prependLength " + prependLength +
                                         ". tuple data size " + tupleData.remaining());
                             }
-                            m_bytesAllowedBeforeSync.acquire(permitAcquired);
+                            s_bytesAllowedBeforeSync.acquire(permitAcquired);
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
                             lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
@@ -539,15 +542,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     } else {
                         permitAcquired = tupleData.remaining();
-                        if (permitAcquired > m_bytesAllowedBeforeSync.availablePermits()) {
+                        if (permitAcquired > s_bytesAllowedBeforeSync.availablePermits()) {
                             SNAP_LOG.info("Failed to acquire enough permits, required " + permitAcquired +
-                                    ", available " + m_bytesAllowedBeforeSync.availablePermits() +
+                                    ", available " + s_bytesAllowedBeforeSync.availablePermits() +
                                     ", " + m_bytesWrittenSinceLastSync.get() + " bytes written since last sync." +
                                     " Table " + m_tableName +
                                     ". File " + m_file +
                                     ". prependLength " + prependLength);
                         }
-                        m_bytesAllowedBeforeSync.acquire(permitAcquired);
+                        s_bytesAllowedBeforeSync.acquire(permitAcquired);
                         while (tupleData.hasRemaining()) {
                             totalWritten += m_channel.write(tupleData);
                         }
@@ -556,7 +559,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     if (permitAcquired > 0) {
-                        m_bytesAllowedBeforeSync.release(permitAcquired);
+                        s_bytesAllowedBeforeSync.release(permitAcquired);
                     }
                     m_writeException = e;
                     SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
