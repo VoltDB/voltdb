@@ -299,7 +299,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4) ||
-                        s_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength) {
+                        (m_bytesWrittenSinceLastSync.get() > 0 &&
+                                s_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength)) {
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
