@@ -1220,7 +1220,7 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
     auto const& entry = allocator().template remove_add<storage::truth>(tuple);
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         auto e = const_cast<typename Hook::added_entry_t&>(entry);
-        if (e.copy_of() != nullptr) {
+        if (e.copy_of() != nullptr && e.status_of() == Hook::added_entry_t::status::fresh) {
             TableTuple src(m_schema);
             src.move(const_cast<void*>(e.copy_of()));
             src.copyNonInlinedColumnObjects(target);
