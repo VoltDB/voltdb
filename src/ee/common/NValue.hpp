@@ -316,7 +316,6 @@ class NValue {
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
-    void serializeTo(SerializeOutput &output, bool isInlined, int32_t maxLength, bool isInBytes) const;
 
     /* Serialize this NValue to an Export stream */
     size_t serializeToExport_withoutNull(ExportSerializeOutput&) const;
@@ -3087,14 +3086,10 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
          getTypeName(type).c_str());
 }
 
-inline void NValue::serializeTo(SerializeOutput &output) const {
-    serializeTo(output, true, 0, false);
-}
-
 /**
  * Serialize this NValue to the provided SerializeOutput
  */
-inline void NValue::serializeTo(SerializeOutput &output, bool isInlined, int32_t maxLength, bool isInBytes) const {
+inline void NValue::serializeTo(SerializeOutput &output) const {
     const ValueType type = getValueType();
     switch (type) {
         case ValueType::tVARCHAR:
@@ -3109,9 +3104,6 @@ inline void NValue::serializeTo(SerializeOutput &output, bool isInlined, int32_t
                 const char* buf = getObject_withoutNull(length);
                 if (length <= OBJECTLENGTH_NULL) {
                     throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
-                }
-                if (!isInlined) {
-                    checkTooWideForVariableLengthType(type, buf, length, maxLength, isInBytes);
                 }
                 output.writeInt(length);
 
