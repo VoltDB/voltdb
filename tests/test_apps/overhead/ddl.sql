@@ -4,10 +4,10 @@ CREATE TABLE store
 , value    varbinary(1048576) not null
 , PRIMARY KEY (key)
 );
-
 PARTITION TABLE store ON COLUMN key;
 
--- LOAD CLASSES overhead.jar;
+-- make sure to load the Java code for the procedures, before creating them
+LOAD CLASSES overhead.jar;
 
 CREATE PROCEDURE PARTITION ON TABLE STORE COLUMN KEY FROM CLASS overhead.procedures.NoArgs;
 CREATE PROCEDURE PARTITION ON TABLE STORE COLUMN KEY FROM CLASS overhead.procedures.BinaryPayload;
