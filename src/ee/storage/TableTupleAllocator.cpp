@@ -1830,36 +1830,20 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void con
             }),
     m_changeStore(tupleSize), m_finalize(cb) {}
 
-template<typename Alloc, typename Trait, typename E> inline void const*
-TxnPreHook<Alloc, Trait, E>::copy(void const* p) {
-    if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
-        return memcpy(m_changeStore.allocate(), p, m_changeStore.tupleSize());
-    } else {
-        return nullptr;
-    }
-}
-
 template<typename Alloc, typename Trait, typename E1>
 template<typename IteratorObserver, typename E2> inline
 typename TxnPreHook<Alloc, Trait, E1>::added_entry_t TxnPreHook<Alloc, Trait, E1>::add(
-        typename TxnPreHook<Alloc, Trait, E1>::ChangeType type, void const* dst, IteratorObserver& obs) {
+        void const* dst, IteratorObserver& obs) {
     auto status = added_entry_t::status::not_frozen;
     if (m_recording && added_entry_t::status::fresh ==
             (status = obs(dst) ? added_entry_t::status::ignored : added_entry_t::status::fresh)) {
-        void const* r;
-        switch (type) {
-            case ChangeType::Update:
-                r = update(dst);
-                break;
-            case ChangeType::Deletion:
-            default:
-                r = remove(dst);
-        }
-        if (r == nullptr) {    // copy already exists
-            vassert(m_changes.find(dst) != m_changes.cend());
-            return {added_entry_t::status::existing, m_changes.find(dst)->second};
-        } else {               // freshly created copy
-            return {status, r};
+        auto const iter = m_changes.lower_bound(dst);
+        if (iter != m_changes.cend() && iter->first == dst) {          // copy already exists
+            return {added_entry_t::status::existing, iter->second};
+        } else {               // create a fresh copy
+            return {status,
+                m_changes.emplace_hint(
+                        iter, dst, memcpy(m_changeStore.allocate(), dst, m_changeStore.tupleSize()))->second};
         }
     } else if (m_recording) {
         // ignored state: the tuple may, or may not, have a local
@@ -1894,30 +1878,6 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
 }
 
 template<typename Alloc, typename Trait, typename E>
-inline void const* TxnPreHook<Alloc, Trait, E>::update(void const* src) {
-    // src tuple from temp table written to dst in persistent storage
-    if (m_recording && ! m_changes.count(src)) {
-        auto const* hook = copy(src);
-        assert(hook != nullptr);
-        return m_changes.emplace(src, hook).first->second;
-    } else {
-        return nullptr;
-    }
-}
-
-template<typename Alloc, typename Trait, typename E>
-inline void const* TxnPreHook<Alloc, Trait, E>::remove(void const* src) {
-    // src tuple is deleted, and tuple at dst gets moved to src
-    if (m_recording && m_changes.count(src) == 0) {
-        auto const* hook = copy(src);
-        assert(hook != nullptr);
-        return m_changes.emplace(src, hook).first->second;
-    } else {
-        return nullptr;
-    }
-}
-
-template<typename Alloc, typename Trait, typename E>
 inline void const* TxnPreHook<Alloc, Trait, E>::operator()(void const* src) const {
     auto const& pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
@@ -1944,8 +1904,7 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
     CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::add(Hook::ChangeType::Deletion, s,
-                        reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                Hook::add(s, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
             });
 }
 
@@ -1964,8 +1923,7 @@ template<typename Hook, typename E>
 template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::update(void* dst) {
     VOLT_TRACE("update(%p)", dst);
-    return Hook::add(Hook::ChangeType::Update, dst,
-            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+    return Hook::add(dst, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
 }
 
 template<typename Hook, typename E>
@@ -1994,8 +1952,7 @@ template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::remove_add(void* p) {
     CompactingChunks::m_batched.add(p);
     if (frozen()) {            // hook registration
-        return Hook::add(Hook::ChangeType::Deletion, p,
-                reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+        return Hook::add(p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     } else {
         return {Hook::added_entry_t::status::not_frozen, nullptr};
     }
@@ -2202,7 +2159,6 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 template typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::added_entry_t               \
     TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename                              \
         IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(            \
-            typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::ChangeType,              \
             void const*,                                                                 \
             typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&)
 #define HookedMethods3(tag, alloc, gc)                                                   \

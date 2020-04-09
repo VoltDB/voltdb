@@ -632,7 +632,7 @@ void testTxnHook() {
     typename IterableTableTupleChunks<HookedCompactingChunks<Hook>, truth, void>::IteratorObserver obs{};
     for (i = DeletedOffset; i < DeletedOffset + DeletedTuples; ++i) {
         auto* src = addresses[i];
-        hook.add(Hook::ChangeType::Deletion, src, obs);
+        hook.add(src, obs);
         auto* dst = alloc.free(src);
         assert(dst);
         DeletionUpdateTag::reset(dst);   // NOTE: sequencing this before the hook would cause std::stack<void*> default ctor to crash in GLIBC++7 (~L94 of TableTupleAllocator.h), in /usr/include/c++/7/ext/new_allocator.h
@@ -660,7 +660,7 @@ void testTxnHook() {
         // for update changes, hook does not need to copy
         // tuple getting updated (i.e. dst), since the hook is
         // called pre-update.
-        hook.add(Hook::ChangeType::Update, addresses[i], obs);    // 1280 == first eval
+        hook.add(addresses[i], obs);    // 1280 == first eval
         memcpy(addresses[i], addresses[i + 1], TupleSize);
         DeletionUpdateTag::reset(addresses[i]);
     }

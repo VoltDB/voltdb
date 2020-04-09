@@ -757,26 +757,10 @@ namespace voltdb {
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            bool m_recording = false;       // in snapshot process?
             Alloc m_changeStore;
             boost::optional<function<void(void const*)>> const m_finalize{};
-            void const* copy(void const*);
-            /**
-             * - Update always changes the value of an existing table
-             *   tuple; it tracks the address and the old tuple.
-             * - Insertion always inserts to the tail of allocation
-             *   chunks; it tracks the address and the new tuple.
-             * - Deletion creates a hole at the tuple to be deleted, and
-             *   moves the last table tuple to the hole. Two entries are
-             *   added: the first tracks the address of the hole,
-             *   and tuple to be deleted; the second tracks address of
-             *   the tuple that gets moved to the hole by deletion, and
-             *   its content.
-             */
-            void const* update(void const*);
-            void const* remove(void const*);
+            bool m_recording = false;            // in snapshot process?
         public:
-            enum class ChangeType : char {Update, Deletion};
             using is_hook = true_type;
 
             TxnPreHook(size_t);
@@ -809,7 +793,7 @@ namespace voltdb {
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            added_entry_t add(ChangeType, void const*, IteratorObserver&);
+            added_entry_t add(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
