@@ -67,7 +67,7 @@ CREATE TABLE importNoMatch
 PARTITION TABLE importNoMatch ON COLUMN KEY;
 
 -- Export table
-CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY EXPORT TO TARGET default
+CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY AS TOPIC
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL
