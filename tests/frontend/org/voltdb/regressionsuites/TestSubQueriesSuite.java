@@ -3458,7 +3458,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // ENG-16616, duplicated plannode id causing insert to crash
-    @Test
     public void testSelectSubQueryDuplicatePlanId() throws Exception {
         final Client client = getClient();
 
