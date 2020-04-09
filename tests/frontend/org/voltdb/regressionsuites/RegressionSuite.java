@@ -29,7 +29,6 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
-import java.rmi.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,7 +43,12 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltdb.*;
+import org.voltdb.AdHocQueryTester;
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
@@ -62,7 +66,11 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.*;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -304,12 +312,15 @@ public class RegressionSuite extends TestCase {
         try {
             client.createConnection(listener);
         } catch (ConnectException e) { // retry once
-            if (useAdmin) {
-                listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-            } else {
-                listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
-            }
-            client.createConnection(listener);
+            String newListener;
+            do {
+                if (useAdmin) {
+                    newListener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
+                } else {
+                    newListener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
+                }
+            } while (newListener.equals(listener) && m_config.getListenerCount() > 1);
+            client.createConnection(newListener);
         }
         m_clients.add(client);
         return client;
@@ -1518,8 +1529,9 @@ public class RegressionSuite extends TestCase {
         }
 
         public boolean isValgrind() {
-            if (m_cluster != null)
+            if (m_cluster != null) {
                 return m_cluster.isValgrind();
+            }
             return true;
         }
 

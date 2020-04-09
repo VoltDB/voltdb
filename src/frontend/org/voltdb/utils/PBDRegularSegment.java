@@ -89,9 +89,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     private DBBPool.BBContainer m_entryHeaderBuf = null;
     Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    PBDRegularSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+    PBDRegularSegment(long id, File file, VoltLogger usageSpecificLog,
             BinaryDequeSerializer<M> extraHeaderSerializer) {
-        super(file, index, id);
+        super(file, id);
         m_crc = new CRC32();
         m_isFinal = PBDSegment.isFinal(m_file);
         m_usageSpecificLog = usageSpecificLog;
@@ -681,7 +681,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     @Override
     int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException
     {
-        assert(m_endId == INVALID_ID || startId > m_endId) : "Current endId=" + m_endId + ", input startId=" + startId;
+        assert(m_endId == INVALID_ID || startId == m_endId+1) : "Current endId=" + m_endId + ", input startId=" + startId;
         if (m_closed) {
             throw new IOException("Segment closed");
         }

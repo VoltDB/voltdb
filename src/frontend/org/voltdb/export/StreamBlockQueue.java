@@ -147,19 +147,7 @@ public class StreamBlockQueue {
         try {
             entry = m_reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             if (entry != null) {
-                ByteBuffer b = entry.getData();
-                b.order(ByteOrder.LITTLE_ENDIAN);
-                long seqNo = b.getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
-                long committedSeqNo = b.getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
-                int tupleCount = b.getInt(StreamBlock.ROW_NUMBER_OFFSET);
-                long uniqueId = b.getLong(StreamBlock.UNIQUE_ID_OFFSET);
-
-                block = new StreamBlock(entry,
-                        seqNo,
-                        committedSeqNo,
-                        tupleCount,
-                        uniqueId,
-                        true);
+                block = StreamBlock.from(entry);
 
                 // Optionally store a reference to the block in the in memory deque
                 // Note that any in-memory block must have a schema
@@ -439,22 +427,5 @@ public class StreamBlockQueue {
                 .build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
-    }
-
-    @Override
-    public void finalize() {
-        try {
-            int nonEmptyCnt = 0;
-            nonEmptyCnt = m_memoryDeque.stream().filter((block) -> (!block.isPersisted())).map((_item) -> 1).reduce(nonEmptyCnt, Integer::sum);
-            if (nonEmptyCnt > 0) {
-                exportLog.error("Finalized StreamBlockQueue with " + nonEmptyCnt + " items in the memory deque that are not persisted. Path: " + m_path + " Nonce: " + m_nonce);
-            }
-        } finally {
-            try {
-                super.finalize();
-            } catch (Throwable ex) {
-
-            }
-        }
     }
 }
