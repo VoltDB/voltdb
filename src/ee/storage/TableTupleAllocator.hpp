@@ -638,7 +638,6 @@ namespace voltdb {
                 void mapping();                        // set up m_movements
                 void shift();                          // adjust txn begin boundary
                 void validate() const;
-                size_t clear() noexcept;
             public:
                 explicit DelayedRemover(CompactingChunks&);
                 void reserve(size_t);
@@ -649,6 +648,7 @@ namespace voltdb {
                 // Actuate batch remove
                 size_t force();
                 bool empty() const noexcept;
+                size_t clear(bool) noexcept;
             } m_batched;
             size_t m_allocs = 0;
             using list_type::last;
@@ -758,14 +758,9 @@ namespace voltdb {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
             bool m_recording = false;       // in snapshot process?
-            void* m_last = nullptr;         // last allocation by copy(void const*);
             Alloc m_changeStore;
             boost::optional<function<void(void const*)>> const m_finalize{};
-            /**
-             * Creates a deep copy of the tuple stored in local
-             * storage, and keep track of it.
-             */
-            void* _copy(void const* src, bool);
+            void const* copy(void const*);
             /**
              * - Update always changes the value of an existing table
              *   tuple; it tracks the address and the old tuple.
@@ -815,14 +810,8 @@ namespace voltdb {
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
             added_entry_t add(ChangeType, void const*, IteratorObserver&);
-            void _add_for_test_(ChangeType, void const*);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
-            // auxillary buffer that client must need for tuple deletion/update operation,
-            // to hold value before change.
-            // Client is responsible to fill the buffer before
-            // calling add() API.
-            void copy(void const* prev);
         };
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
@@ -839,7 +828,7 @@ namespace voltdb {
         class HookedCompactingChunks : public CompactingChunks, public Hook {
             using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
-            using Hook::add; using Hook::copy;
+            using Hook::add; //using Hook::copy;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
@@ -857,7 +846,6 @@ namespace voltdb {
             // supplied with same type as freeze() method.
             template<typename Tag>      // NOTE: this must be called prior to any memcpy operations happen
             typename Hook::added_entry_t update(void*);
-            template<typename Tag> void const* _remove_for_test_(void*);
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -881,6 +869,7 @@ namespace voltdb {
              * pair's 2nd content to 1st.
              */
             size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            void remove_reset();
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
             string info(void const*) const;

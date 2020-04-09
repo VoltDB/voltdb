@@ -1200,8 +1200,11 @@ inline vector<void*> const& CompactingChunks::DelayedRemover::removed() const {
     return m_removed;
 }
 
-inline size_t CompactingChunks::DelayedRemover::clear() noexcept {
-    vassert(m_size == 0);
+inline size_t CompactingChunks::DelayedRemover::clear(bool force) noexcept {
+    assert(force || m_size == 0);
+    if (force) {
+        m_size = 0;
+    }
     auto const r = m_removed.size() + m_moved.size();
     m_moved.clear();
     m_removed.clear();
@@ -1213,7 +1216,7 @@ inline size_t CompactingChunks::DelayedRemover::clear() noexcept {
 inline size_t CompactingChunks::DelayedRemover::force() {
     validate();
     shift();
-    return clear();
+    return clear(false);
 }
 
 inline bool CompactingChunks::DelayedRemover::empty() const noexcept {
@@ -1827,14 +1830,12 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void con
             }),
     m_changeStore(tupleSize), m_finalize(cb) {}
 
-template<typename Alloc, typename Trait, typename E> inline void
-TxnPreHook<Alloc, Trait, E>::copy(void const* p) {     // API essential
+template<typename Alloc, typename Trait, typename E> inline void const*
+TxnPreHook<Alloc, Trait, E>::copy(void const* p) {
     if (m_recording && ! m_changes.count(p)) {                        // make a copy only if the addr to be
-        if (m_last == nullptr) {                                      // overwritten hadn't been logged
-            m_last = m_changeStore.allocate();
-            vassert(m_last != nullptr);
-        }
-        memcpy(m_last, p, m_changeStore.tupleSize());
+        return memcpy(m_changeStore.allocate(), p, m_changeStore.tupleSize());
+    } else {
+        return nullptr;
     }
 }
 
@@ -1870,14 +1871,6 @@ typename TxnPreHook<Alloc, Trait, E1>::added_entry_t TxnPreHook<Alloc, Trait, E1
     }
 }
 
-template<typename Alloc, typename Trait, typename E1>
-inline void TxnPreHook<Alloc, Trait, E1>::_add_for_test_(typename TxnPreHook<Alloc, Trait, E1>::ChangeType type,
-        void const* dst) {
-    static typename IterableTableTupleChunks<HookedCompactingChunks<TxnPreHook<Alloc, Trait>>,
-        truth, void>::IteratorObserver dummy_observer{};
-    add(type, dst, dummy_observer);
-}
-
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
     if (m_recording) {
         throw logic_error("TxnPreHook::freeze(): double freeze detected");
@@ -1894,7 +1887,6 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
         }
         m_changes.clear();
         m_changeStore.clear();
-        m_last = nullptr;      // since m_storage is cleared
         m_recording = false;
     } else {
         throw logic_error("TxnPreHook::thaw(): double thaw detected");
@@ -1902,18 +1894,12 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
 }
 
 template<typename Alloc, typename Trait, typename E>
-inline void* TxnPreHook<Alloc, Trait, E>::_copy(void const* src, bool) {
-    void* dst = m_changeStore.allocate();
-    vassert(dst != nullptr);
-    memcpy(dst, src, m_changeStore.tupleSize());
-    return dst;
-}
-
-template<typename Alloc, typename Trait, typename E>
-inline void const* TxnPreHook<Alloc, Trait, E>::update(void const* dst) {
+inline void const* TxnPreHook<Alloc, Trait, E>::update(void const* src) {
     // src tuple from temp table written to dst in persistent storage
-    if (m_recording && ! m_changes.count(dst)) {
-        return m_changes.emplace(dst, _copy(dst, false)).first->second;
+    if (m_recording && ! m_changes.count(src)) {
+        auto const* hook = copy(src);
+        assert(hook != nullptr);
+        return m_changes.emplace(src, hook).first->second;
     } else {
         return nullptr;
     }
@@ -1923,11 +1909,9 @@ template<typename Alloc, typename Trait, typename E>
 inline void const* TxnPreHook<Alloc, Trait, E>::remove(void const* src) {
     // src tuple is deleted, and tuple at dst gets moved to src
     if (m_recording && m_changes.count(src) == 0) {
-        // Need to copy the original value that gets deleted
-        vassert(m_last != nullptr);
-        auto const* val = m_changes.emplace(src, m_last).first->second;
-        m_last = nullptr;
-        return val;
+        auto const* hook = copy(src);
+        assert(hook != nullptr);
+        return m_changes.emplace(src, hook).first->second;
     } else {
         return nullptr;
     }
@@ -1958,25 +1942,8 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
 }
 
 template<typename Hook, typename E>
-template<typename Tag> inline void const*
-HookedCompactingChunks<Hook, E>::_remove_for_test_(void* dst) {
-    if (frozen()) {
-        Hook::copy(dst);
-    }
-    // By calling finalizer on the argument alloc, we are
-    // requring that the dst always be found
-    finalize(dst);
-    void const* src = CompactingChunks::free(dst);
-    VOLT_TRACE("remove(%p) <= %p: ", dst, src);
-    Hook::add(Hook::ChangeType::Deletion, dst,
-            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
-    return src;
-}
-
-template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
     CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::copy(s);
                 Hook::add(Hook::ChangeType::Deletion, s,
                         reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
             });
@@ -2027,7 +1994,6 @@ template<typename Tag> inline typename Hook::added_entry_t
 HookedCompactingChunks<Hook, E>::remove_add(void* p) {
     CompactingChunks::m_batched.add(p);
     if (frozen()) {            // hook registration
-        Hook::copy(p);
         return Hook::add(Hook::ChangeType::Deletion, p,
                 reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     } else {
@@ -2038,6 +2004,11 @@ HookedCompactingChunks<Hook, E>::remove_add(void* p) {
 template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::remove_reserve(size_t n) {
     CompactingChunks::m_batched.reserve(n);
+}
+
+template<typename Hook, typename E> inline void
+HookedCompactingChunks<Hook, E>::remove_reset() {
+    CompactingChunks::m_batched.clear(true);
 }
 
 template<typename Hook, typename E> inline size_t
@@ -2250,8 +2221,6 @@ template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, 
 template typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::added_entry_t               \
     HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);                 \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
-template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>,   \
-    void>::_remove_for_test_<tag>(void*);\
 template typename TxnPreHook<alloc, HistoryRetainTrait<gc>>::added_entry_t               \
 HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove_add<tag>(void*);                 \
 HookedMethods3(tag, alloc, gc)
