@@ -252,11 +252,13 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 // and no pending repair was cancelled previously, the repair
                 // message is not necessarily needed
                 boolean skipRepair = balanceSPI;
+                if (m_algo != null && m_algo.isCancelled()) {
+                    skipRepair = false;
+                }
                 // If a replica set has been configured and it changed during
                 // promotion, must cancel the term
                 if (m_algo != null) {
                     m_algo.cancel();
-                    skipRepair = false;
                 }
                 ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, balanceSPI, skipRepair);
             }

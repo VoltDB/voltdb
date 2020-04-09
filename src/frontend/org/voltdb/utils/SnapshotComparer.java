@@ -386,7 +386,9 @@ class SnapshotLoader {
             for (int i = 0; i < hosts.length; i++) {
                 File localDir = new File(localRootDir.getPath() + PATHSEPARATOR + hosts[i]);
                 localDir.mkdirs();
-                downloadFiles(username, hosts[i], dirs[i], localDir.getPath());
+                if (!downloadFiles(username, hosts[i], dirs[i], localDir.getPath())) {
+                    System.exit(STATUS_INVALID_INPUT);
+                }
                 directories.add(localDir);
             }
         }
@@ -435,6 +437,7 @@ class SnapshotLoader {
             jar = getInMemoryJarFileBySnapShotName(directories.get(0).getPath(), nonce);
         } catch (IOException e) {
             e.printStackTrace();
+            System.exit(STATUS_INVALID_INPUT);
         }
         // Construct SnapShotMetaData object to hold database and table information
         metaData = new SnapShotMetaData(nonce, jar);
