@@ -175,8 +175,8 @@ public class TruncateTableLoader extends BenchmarkThread {
         // if we can't tell if the txn committed or not
         if (!result && TxnId2Utils.isTransactionStateIndeterminate(clientResponse)) {
             // the best we can do is check that neither table has been mutated is some unexpected way
-            if ( ! (afterRowCounts[0] == b4RowCounts[0] || afterRowCounts[0] == b4RowCounts[1])
-                    || ! (afterRowCounts[1] == b4RowCounts[0] || afterRowCounts[1] == b4RowCounts[1])) {
+            if ( ! (afterRowCounts[0] == b4RowCounts[0] && afterRowCounts[1] == b4RowCounts[1])
+                    && ! (afterRowCounts[1] == b4RowCounts[0] && afterRowCounts[0] == b4RowCounts[1])) {
                 String message = swapProcName + " on " + tableName + ", " + swapTableName
                         + " count(s) are not as expected after an indeterminate result: before: " + b4RowCounts[0] + ", " + b4RowCounts[1]
                         + " after: " + afterRowCounts[0] + ", " + afterRowCounts[1] + ", rollback: " + shouldRollback;
@@ -187,7 +187,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             // if shouldRollback is set the operation will fail (ie. result will be false)
             // z==0 compares the counts in the swapped (success) configuration
             int z = result ? 0 : 1;
-            if (afterRowCounts[(z + 0) & 1] != b4RowCounts[1] || afterRowCounts[(z + 1) & 1] != b4RowCounts[0]) {
+            if (afterRowCounts[z] != b4RowCounts[1] || afterRowCounts[(z + 1) & 1] != b4RowCounts[0]) {
                 String message = swapProcName + " on " + tableName + ", " + swapTableName
                         + " failed to swap row counts correctly: went from " + b4RowCounts[0] + ", " + b4RowCounts[1]
                         + " to " + afterRowCounts[0] + ", " + afterRowCounts[1] + ", rollback: " + shouldRollback;

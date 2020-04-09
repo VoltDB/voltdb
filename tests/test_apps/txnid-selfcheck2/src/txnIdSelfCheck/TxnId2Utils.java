@@ -66,7 +66,8 @@ public enum TxnId2Utils {;
     static boolean isTransactionStateIndeterminate(ClientResponse cr) {
         String statusString = cr.getStatusString();
         return (statusString.matches("(?s).*No response received in the allotted time.*") ||
-                statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*"));
+                statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
+                statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*"));
     }
 
 
