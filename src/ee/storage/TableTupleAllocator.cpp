@@ -1122,10 +1122,10 @@ inline void CompactingChunks::DelayedRemover::add(void* p) {
             if (--m_size == 0) {
                 mapping();
             }
-            assert(! m_chunks.frozen() || m_chunks.frozenBoundaries());
             if (! m_chunks.frozen() || // frozen: only finalize if it lies outside frozen boundary
-                    less<position_type>()(m_chunks.frozenBoundaries()->right(),
-                        {p, iter.second})) {
+                    (m_chunks.frozenBoundaries() && // ignoring the case that table was empty at frozen time
+                     less<position_type>()(m_chunks.frozenBoundaries()->right(),
+                         {p, iter.second}))) {
                 m_chunks.finalize(p);
             }
         }
