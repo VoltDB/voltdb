@@ -516,16 +516,17 @@ namespace voltdb {
             id_type const m_chunkId = 0;
             void const* m_addr = nullptr;
         public:
-            position_type() noexcept = default;        // empty initiator
+            position_type() noexcept = default;
             position_type(CompactingChunks const&, void const*);
-            template<typename iterator> position_type(void const*, iterator const&) noexcept;
+            // NOTE: iterator arg is dereferenced, therefore it
+            // *can not* be end().
+            template<typename iterator> position_type(void const*, iterator const&);
             position_type(ChunkHolder<> const&) noexcept;
             position_type(position_type const&) noexcept = default;
             position_type(position_type&&) noexcept = default;
             position_type& operator=(position_type const&) noexcept;
             id_type chunkId() const noexcept;
             void const* address() const noexcept;
-            bool empty() const noexcept;               // makes it behave like std::optional<position_type>
             bool operator==(position_type const&) const noexcept;
         };
 
@@ -587,13 +588,13 @@ namespace voltdb {
                 bool empty() const noexcept;
             };
             class FrozenTxnBoundaries final {
-                position_type m_left{}, m_right{};
+                position_type const m_left{};          // NOTE: need to be empty-constructed, since we need to
+                position_type const m_right{};         // validate ChunkList state before assignment.
             public:
-                FrozenTxnBoundaries() noexcept = default;
                 FrozenTxnBoundaries(ChunkList<CompactingChunk, Compact> const&) noexcept;
+                FrozenTxnBoundaries& operator=(FrozenTxnBoundaries const&) noexcept;
                 position_type const& left() const noexcept;
                 position_type const& right() const noexcept;
-                void clear();
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
@@ -604,7 +605,7 @@ namespace voltdb {
             id_type const m_id = ChunksIdValidator::instance().id();
             char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
             TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
-            FrozenTxnBoundaries m_frozenTxnBoundaries{};  // frozen boundaries for txn
+            boost::optional<FrozenTxnBoundaries> m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // action before deallocating a tuple from txn (or hook) memory.
             boost::optional<function<void(void const*)>> const m_finalize{};
             // the end of allocations when snapshot started: (block id, end ptr)
@@ -677,7 +678,7 @@ namespace voltdb {
             pair<bool, list_type::iterator> find(id_type) noexcept;
             TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
             TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
-            FrozenTxnBoundaries const& frozenBoundaries() const noexcept;  // txn boundaries when freezing
+            boost::optional<FrozenTxnBoundaries> const& frozenBoundaries() const noexcept;  // txn boundaries when freezing
             /**
              * Memory operations
              */
@@ -923,7 +924,7 @@ namespace voltdb {
                 ~iterator_type();
                 // NOTE: we need to expose these 2 APIs bc. of IteratorObserver
                 container_type storage() const noexcept;
-                operator position_type() const noexcept;
+                boost::optional<position_type> to_position() const noexcept;
                 static iterator_type begin(container_type);
                 bool operator==(iterator_type const&) const noexcept;
                 inline bool operator!=(iterator_type const& o) const noexcept {
@@ -953,7 +954,7 @@ namespace voltdb {
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 bool m_empty;                          // is allocator empty at instance construction time?
-                position_type const m_txnBoundary;
+                boost::optional<position_type> const m_txnBoundary;
                 id_type m_chunkId;
                 void refresh();
             public:
@@ -964,8 +965,8 @@ namespace voltdb {
                 elastic_iterator& operator++();
                 elastic_iterator operator++(int);
                 value_type operator*();
-                position_type const& txnBoundary() const noexcept;
-                using super::operator position_type;
+                boost::optional<position_type> const& txnBoundary() const noexcept;
+                using super::to_position;
             };
 
             /**
