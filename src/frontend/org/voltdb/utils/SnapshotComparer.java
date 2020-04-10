@@ -519,21 +519,6 @@ class SnapshotLoader {
                     for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
                         boolean isConsistent = true;
 
-                        if (referenceSaveFile != null) {
-                            try {
-                                referenceSaveFile.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        if (compareSaveFile != null) {
-                            try {
-                                compareSaveFile.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-
                         referenceSaveFile =
                                 new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
                                         1, relevantPartition);
@@ -613,6 +598,23 @@ class SnapshotLoader {
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
+                } finally {
+                    if (referenceSaveFile != null) {
+                        try {
+                            referenceSaveFile.close();
+                        } catch (IOException e) {
+                            System.err.println("Exception for closing reference file " + referenceSaveFile);
+                            e.printStackTrace();
+                        }
+                    }
+                    if (compareSaveFile != null) {
+                        try {
+                            compareSaveFile.close();
+                        } catch (IOException e) {
+                            System.err.println("Exception for closing compare file " + referenceSaveFile);
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
             CONSOLE_LOG.info("Finished comparing table " + tableName + ".\n");
