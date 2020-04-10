@@ -588,8 +588,8 @@ namespace voltdb {
                 bool empty() const noexcept;
             };
             class FrozenTxnBoundaries final {
-                position_type const m_left;
-                position_type const m_right;
+                position_type const m_left{};          // NOTE: need to be empty-constructed, since we need to
+                position_type const m_right{};         // validate ChunkList state before assignment.
             public:
                 FrozenTxnBoundaries(ChunkList<CompactingChunk, Compact> const&) noexcept;
                 FrozenTxnBoundaries& operator=(FrozenTxnBoundaries const&) noexcept;
