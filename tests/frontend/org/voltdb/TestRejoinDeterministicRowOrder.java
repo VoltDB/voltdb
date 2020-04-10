@@ -268,7 +268,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                     e.printStackTrace();
                 }
                 try {
-                    String[] localSnapshots = {"--self", "--nonce", snapshotNonce, "--dirs", snapshotDir};
+                    String[] localSnapshots = {"--self", "--nonce", snapshotNonce, "--dirs", snapshotDir, "--ignoreOrder"};
                     SnapshotComparer.main(localSnapshots);
                     fail();
                 }
