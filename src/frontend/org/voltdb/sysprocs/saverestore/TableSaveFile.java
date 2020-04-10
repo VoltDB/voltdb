@@ -753,7 +753,6 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks.set(false);
                         m_chunkReaderException = e;
