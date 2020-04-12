@@ -175,6 +175,9 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
         retValue = std::numeric_limits<int64_t>::max();
     }
 
+    if (retValue == 0) {
+        table.stopSnapshot(true);
+    }
     // Done when the table scan is finished and iteration is complete.
     return retValue;
 }

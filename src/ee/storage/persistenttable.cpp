@@ -1773,9 +1773,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 
 void PersistentTable::activateSnapshot(TableStreamType streamType) {
    if (streamType == TABLE_STREAM_SNAPSHOT) {
-       if (m_snapIt.get() != nullptr) {
-           stopSnapshot(true);
-       }
+       stopSnapshot(true);
        m_snapIt = allocator().template freeze<storage::truth>();
        m_snapshotStarted = true;
    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
@@ -1784,7 +1782,7 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
 }
 
 void PersistentTable::stopSnapshot(bool activated) {
-   if (activated || (m_snapIt.get() != nullptr && m_snapIt->drained())) {
+   if (m_snapIt.get() != nullptr && (activated || m_snapIt->drained())) {
       if (isReplicatedTable()) {
          ScopedReplicatedResourceLock scopedLock;
          ExecuteWithMpMemory useMpMemory;
