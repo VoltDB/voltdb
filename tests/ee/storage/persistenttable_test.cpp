@@ -365,7 +365,12 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 TEST_F(PersistentTableTest, TruncateTableTest) {
     bool added;
     VoltDBEngine* engine = getEngine();
-    engine->loadCatalog(0, catalogPayload());
+    {
+        std::ostringstream catalog;
+        // Make the table a migrate table to have a shadow stream
+        catalog << catalogPayload() << "set /clusters#cluster/databases#database/tables#T tableType 4\n";
+        engine->loadCatalog(0, catalog.str());
+    }
     PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
 
@@ -377,6 +382,8 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
 
     table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
+    ASSERT_NE(nullptr, table->getStreamedTable());
+    ASSERT_NE(nullptr, table->getStreamedTable()->getWrapper());
 
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
@@ -384,10 +391,27 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     table->truncateTable(engine, false);
     commit();
 
+    // Old table wrapper should be null
+    ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
+
     // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
     table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
+    ASSERT_NE(nullptr, table->getStreamedTable());
+    ASSERT_NE(nullptr, table->getStreamedTable()->getWrapper());
+
+    // Test rollback of truncate table
+    beginWork();
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    ASSERT_TRUE(added);
+    table->truncateTable(engine, true);
+    // Old table wrapper should be null
+    ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
+    rollback();
+
+    // wrapper should now be back on original table
+    ASSERT_NE(nullptr, table->getStreamedTable()->getWrapper());
 }
 
 TEST_F(PersistentTableTest, SwapTablesTest) {
