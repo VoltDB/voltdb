@@ -571,6 +571,9 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
         existingTable->allocator().remove(PersistentTable::remove_direction::from_head, scannedTuple.address());
         ++tuplesMigrated;
     });
+    if (tuplesMigrated) {                          // mark completion of removing from head
+        existingTable->allocator().remove(PersistentTable::remove_direction::from_head, nullptr);
+    }
 
     // release any memory held by the default values --
     // normally you'd want this in a finally block, but since this code failing
