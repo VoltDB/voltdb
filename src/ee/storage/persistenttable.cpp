@@ -335,11 +335,12 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
         unsetTableForStreamIndexing();
     }
 
+    VoltDBEngine* engine = ExecutorContext::getEngine();
     if (m_shadowStream != nullptr) {
         m_shadowStream->moveWrapperTo(originalTable->m_shadowStream);
+        engine->setStreamTableByName(m_name, originalTable->m_shadowStream);
     }
 
-    VoltDBEngine* engine = ExecutorContext::getEngine();
     auto views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH (auto originalView, views) {
@@ -535,6 +536,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
 
     if (m_shadowStream != nullptr) {
         m_shadowStream->moveWrapperTo(emptyTable->m_shadowStream);
+        engine->setStreamTableByName(m_name, emptyTable->m_shadowStream);
     }
 
     engine->rebuildTableCollections(replicatedTable, false);
