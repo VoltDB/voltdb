@@ -335,6 +335,10 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
         unsetTableForStreamIndexing();
     }
 
+    if (m_shadowStream != nullptr) {
+        m_shadowStream->moveWrapperTo(originalTable->m_shadowStream);
+    }
+
     VoltDBEngine* engine = ExecutorContext::getEngine();
     auto views = originalTable->views();
     // reset all view table pointers
@@ -527,6 +531,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         vassert(! emptyTable->hasPurgeFragment());
         boost::shared_ptr<ExecutorVector> evPtr = getPurgeExecutorVector();
         emptyTable->swapPurgeExecutorVector(evPtr);
+    }
+
+    if (m_shadowStream != nullptr) {
+        m_shadowStream->moveWrapperTo(emptyTable->m_shadowStream);
     }
 
     engine->rebuildTableCollections(replicatedTable, false);
