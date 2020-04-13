@@ -354,6 +354,15 @@ Table* VoltDBEngine::getTableByName(const std::string& name) const {
     return findInMapOrNull(name, m_tablesByName);
 }
 
+StreamedTable* VoltDBEngine::getStreamTableByName(const std::string& name) const {
+    return findInMapOrNull(name, m_exportingTables);
+}
+
+void VoltDBEngine::setStreamTableByName(std::string const& name, StreamedTable* newStreamTable) {
+    vassert(findInMapOrNull(name, m_exportingTables) != NULL);
+    m_exportingTables[name] = newStreamTable;
+}
+
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(const std::string& name) const {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_delegatesByName);
