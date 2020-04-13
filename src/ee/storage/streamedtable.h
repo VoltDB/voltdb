@@ -146,6 +146,14 @@ public:
         }
     }
 
+    /**
+     * Move the ExportTupleStream wrapper from this streamed table to other. Setting this wrapper to null
+     */
+    void moveWrapperTo(StreamedTable *other) {
+        other->setWrapper(m_wrapper);
+        m_wrapper = nullptr;
+    }
+
     ExportTupleStream* getWrapper() {
         return m_wrapper;
     }
