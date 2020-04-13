@@ -399,6 +399,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_NE(nullptr, table->getStreamedTable());
+    ASSERT_EQ(table->getStreamedTable(), engine->getStreamTableByName("T"));
     ASSERT_NE(nullptr, table->getStreamedTable()->getWrapper());
 
     // Test rollback of truncate table
@@ -410,6 +411,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
     rollback();
 
+    ASSERT_EQ(table->getStreamedTable(), engine->getStreamTableByName("T"));
     // wrapper should now be back on original table
     ASSERT_NE(nullptr, table->getStreamedTable()->getWrapper());
 }
