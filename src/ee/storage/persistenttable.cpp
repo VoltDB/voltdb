@@ -143,6 +143,17 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
 
+    stopSnapshot(true);
+
+    // delete all tuples to free strings
+    TableIterator ti = iterator();
+    TableTuple tuple(m_schema);
+    while (ti.next(tuple)) {
+        tuple.freeObjectColumns();
+        tuple.setActiveFalse();
+    }
+    m_dataStorage.reset(NULL);
+
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
     BOOST_FOREACH (auto view, m_views) {
