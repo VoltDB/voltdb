@@ -896,12 +896,26 @@ inline void CompactingChunks::finalize(void const* p) const {
 inline void CompactingChunks::free(typename CompactingChunks::remove_direction dir, void const* p) {
     switch (dir) {
         case remove_direction::from_head:
-            // Schema change: it is called in the same
-            // order as txn iterator.
-            //
-            // NOTE: since we only do chunk-wise drop, any reads
-            // from the allocator when these dispersed calls are
-            // occurring *will* get spurious data.
+            /**
+             * Schema change: it is called in the same
+             * order as txn iterator.
+             *
+             * NOTE: since we only do chunk-wise drop, any reads
+             * from the allocator when these dispersed calls are
+             * occurring *will* get spurious data.
+             *
+             * NOTE: finalizer is not called when deleting from
+             * head, considering 3 possible schema changes on
+             * VARCHAR columns:
+             * 1. inlined column => non-inlined column: the
+             * column is registered as a exploded column, and new
+             * object is allocated in the string pool.
+             * 2. inlined column => inlined column: finalizer
+             * does not apply on the old schema column.
+             * 3. non-inlined column => inlined column:
+             * the schema change is prohibited when altering
+             * a non-empty table.
+             */
             if (p == nullptr) {                         // marks completion
                 if (m_lastFreeFromHead != nullptr && beginTxn().iterator()->contains(m_lastFreeFromHead)) {
                     // effects deletions in 1st chunk
@@ -939,8 +953,11 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
             }
             break;
         case remove_direction::from_tail:
-            // Undo insert: it is called in the exactly
-            // opposite order of txn iterator.
+            /**
+             * Undo insert: it is called in the exactly
+             * opposite order of txn iterator. No need to call
+             * finalizer.
+             */
             if (empty()) {
                 snprintf(buf, sizeof buf, "CompactingChunks::remove(from_tail, %p): empty allocator", p);
                 buf[sizeof buf - 1] = 0;
