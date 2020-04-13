@@ -45,9 +45,7 @@ package client.kafkaimporter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -169,7 +167,7 @@ public class KafkaImportBenchmark {
         String password = "";
 
         @Option(desc = "Enable topology awareness")
-        boolean topologyaware = false;
+        boolean topologyaware = true;
 
         @Override
         public void validate() {
@@ -589,7 +587,7 @@ public class KafkaImportBenchmark {
             log.info("The number of rows to export stream: " + finalInsertCount);
             log.info("The number of rows exported: " + exportRowCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorStreamCounts);
-            log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
+            // log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
             if (mirrorStreamCounts != 0) {
                 if (config.alltypes) {
                     log.error(mirrorStreamCounts + " Rows are missing from the import stream, failing test");
