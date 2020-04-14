@@ -143,6 +143,13 @@ public class RetentionPolicyMgr {
                         " using " + this.getClass().getName());
             }
 
+            if (m_reader != null && m_reader.isOpen()) { // retention is already active
+                if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
+                    m_pbd.getUsageSpecificLog().debug("Retention policy for " + m_pbd.getNonce() + " is already active");
+                }
+                return;
+            }
+
             m_reader = m_pbd.openForRead(getCursorId());
             scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, 0);
         }
