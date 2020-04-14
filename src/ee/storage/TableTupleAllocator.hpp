@@ -564,6 +564,26 @@ namespace voltdb {
             ChunksIdValidatorImpl
 #endif
 ;
+        /**
+         * Finalizer, and deep copier.
+         * The finalizer is called when an allocation is to be destroyed (deep-destroyer);
+         * The deep copier has the same signature as
+         * `memcpy', that does both shallow copy (memcpy) and
+         * deep copy.
+         */
+        class FinalizerAndCopier {
+            bool const m_complicated = false;
+            function<void(void const*)> const m_finalize{};
+            function<void*(void*, void const*)> const m_copy{};
+        public:
+            FinalizerAndCopier() noexcept = default;
+            FinalizerAndCopier(FinalizerAndCopier const&) = default;
+            FinalizerAndCopier(function<void(void const*)> const&,
+                    function<void*(void*, void const*)> const&) noexcept;
+            operator bool() const noexcept;
+            void finalize(void const*) const;
+            void* copy(void*, void const*) const;
+        };
 
         /**
          * A linked list of self-compacting chunks:
@@ -574,16 +594,6 @@ namespace voltdb {
         class CompactingChunks : private ChunkList<CompactingChunk, true_type>, private CompactingStorageTrait {
         public:
             using Compact = true_type;
-            /**
-             * Finalizer, and deep copier.
-             * The finalizer is called when a tuple is to be destroyed (deep-destroyer);
-             * The deep copier is called when a tuple is backed
-             * up in hook memory, with same signature as
-             * `memcpy', that does both shallow copy (memcpy) and
-             * deep copy.
-             */
-            using finalizer_and_copier_type =
-                pair<function<void(void const*)>, function<void*(void*, void const*)>>;
             class TxnLeftBoundary final {
                 ChunkList<CompactingChunk, Compact> const& m_chunks;
                 typename ChunkList<CompactingChunk, Compact>::iterator m_iter;
@@ -617,7 +627,7 @@ namespace voltdb {
             TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             boost::optional<FrozenTxnBoundaries> m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // action before deallocating a tuple from txn (or hook) memory.
-            boost::optional<finalizer_and_copier_type> const m_finalizerAndCopier{};
+            FinalizerAndCopier const m_finalizerAndCopier;
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
@@ -669,7 +679,7 @@ namespace voltdb {
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
-            CompactingChunks(size_t tupleSize, finalizer_and_copier_type const&) noexcept;
+            CompactingChunks(size_t tupleSize, FinalizerAndCopier const&) noexcept;
             ~CompactingChunks();
             /**
              * Queries
@@ -679,6 +689,7 @@ namespace voltdb {
             bool empty() const noexcept;               // txn view emptiness
             id_type id() const noexcept;
             size_t chunkSize() const noexcept;
+            FinalizerAndCopier const& finalizerAndCopier() const noexcept;
             using list_type::tupleSize; using list_type::chunkSize;
             using list_type::begin; using list_type::end;
             using CompactingStorageTrait::frozen;
@@ -757,7 +768,7 @@ namespace voltdb {
             void remove(void const*);
         };
 
-        template<typename T>                           // concept check
+        template<typename T>                     // concept check
         using is_chunks = integral_constant<bool,
             is_same<typename remove_const<T>::type, NonCompactingChunks<EagerNonCompactingChunk>>::value ||
             is_same<typename remove_const<T>::type, NonCompactingChunks<LazyNonCompactingChunk>>::value ||
@@ -767,15 +778,16 @@ namespace voltdb {
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
+            static FinalizerAndCopier const EMPTY_FINALIZER;
+            bool m_recording = false;            // in snapshot process?
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
             Alloc m_changeStore;
-            boost::optional<typename CompactingChunks::finalizer_and_copier_type> const m_finalizerAndCopier{};
-            bool m_recording = false;            // in snapshot process?
+            FinalizerAndCopier const& m_finalizerAndCopier;
         public:
             using is_hook = true_type;
 
-            TxnPreHook(size_t);
-            TxnPreHook(size_t, typename CompactingChunks::finalizer_and_copier_type const&);
+            TxnPreHook(size_t);                  // only used by eecheck test, as explicit unit-test of this class
+            TxnPreHook(size_t, FinalizerAndCopier const&);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
@@ -793,7 +805,7 @@ namespace voltdb {
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
 
-        struct truth {                                             // simplest Tag that always returns true
+        struct truth {                             // simplest Tag that always returns true
             constexpr bool operator()(void*) const noexcept { return true; }
             constexpr bool operator()(void const*) const noexcept { return true; }
         };
@@ -810,15 +822,15 @@ namespace voltdb {
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
         public:
-            using hook_type = Hook;                    // for hooked_iterator_type
-            using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
+            using hook_type = Hook;                // for hooked_iterator_type
+            using Hook::release;                   // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            HookedCompactingChunks(size_t, typename CompactingChunks::finalizer_and_copier_type const&) noexcept;
+            HookedCompactingChunks(size_t, FinalizerAndCopier const&) noexcept;
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
-            template<typename Tag> void thaw();        // switch of snapshot process
-            void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
+            template<typename Tag> void thaw();    // switch of snapshot process
+            void* allocate();                      // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             // NOTE: these methods with Tag template must be
             // supplied with same type as freeze() method.
             template<typename Tag> void update(void*); // NOTE: this must be called prior to any memcpy operations happen

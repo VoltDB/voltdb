@@ -137,7 +137,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
             freshCopy.copyNonInlinedColumnObjects(original);
             return fresh;
         };
-        m_dataStorage.reset(new Alloc{tupleSize, make_pair(cleaner, copier)});
+        m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
     } else {
         m_dataStorage.reset(new Alloc{tupleSize});
     }

@@ -603,19 +603,40 @@ namespace std {                                    // Need to declare these befo
     };
 }
 
-CompactingChunks::CompactingChunks(size_t tupleSize,
-        typename CompactingChunks::finalizer_and_copier_type const& cb) noexcept :
+FinalizerAndCopier::FinalizerAndCopier(function<void(void const*)> const& finalize,
+        function<void*(void*, void const*)> const& copy) noexcept : m_complicated(true),
+       m_finalize(finalize), m_copy(copy) {}
+
+inline FinalizerAndCopier::operator bool() const noexcept {
+    return m_complicated;
+}
+
+inline void FinalizerAndCopier::finalize(void const* p) const {
+    assert(m_complicated);
+    m_finalize(p);
+}
+
+inline void* FinalizerAndCopier::copy(void* dst, void const* src) const {
+    assert(m_complicated);
+    return m_copy(dst, src);
+}
+
+CompactingChunks::CompactingChunks(size_t tupleSize, FinalizerAndCopier const& cb) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
     m_txnFirstChunk(*this), m_finalizerAndCopier(cb), m_batched(*this) {}
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
-    m_txnFirstChunk(*this), m_batched(*this) {}
+    m_txnFirstChunk(*this), m_finalizerAndCopier{}, m_batched(*this) {}
 
 CompactingChunks::~CompactingChunks() {
     for (auto iter = begin(); iter != end(); ++iter) {
         pop_finalize(iter);
     }
+}
+
+inline FinalizerAndCopier const& CompactingChunks::finalizerAndCopier() const noexcept {
+    return m_finalizerAndCopier;
 }
 
 inline CompactingChunks::TxnLeftBoundary::TxnLeftBoundary(ChunkList<CompactingChunk, true_type>& chunks) noexcept :
@@ -696,7 +717,7 @@ inline void CompactingChunks::pop_finalize(typename CompactingChunks::list_type:
     if (m_finalizerAndCopier && iter->range_begin() < iter->range_next()) {
         for (char const* ptr = reinterpret_cast<char const*>(iter->range_begin());
                 ptr < iter->range_next(); ptr += tupleSize()) {
-            m_finalizerAndCopier->first(ptr);
+            m_finalizerAndCopier.finalize(ptr);
         }
     }
 }
@@ -767,7 +788,7 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
                                     iterp.second->range_begin());
                                 ptr < iterp.second->range_next();
                                 ptr += tupleSize()) {
-                            m_finalizerAndCopier->first(ptr);
+                            m_finalizerAndCopier.finalize(ptr);
                         }
                     }
                 }
@@ -834,7 +855,7 @@ void* CompactingChunks::free(void* dst) {
     } else {
         void* src = beginTxn().iterator()->free();
         if (m_finalizerAndCopier) {
-            m_finalizerAndCopier->first(src);
+            m_finalizerAndCopier.finalize(src);
         }
         auto& dst_iter = pos.second;
         if (dst_iter != beginTxn().iterator()) {    // cross-chunk movement needed
@@ -890,7 +911,7 @@ inline ChunksIdNonValidator& ChunksIdNonValidator::instance() {
 
 inline void CompactingChunks::finalize(void const* p) const {
     if (m_finalizerAndCopier) {
-        m_finalizerAndCopier->first(p);
+        m_finalizerAndCopier.finalize(p);
     }
 }
 
@@ -1825,7 +1846,20 @@ inline void HistoryRetainTrait<gc_policy::batched>::remove(void const* addr) {
 }
 
 template<typename Alloc, typename Trait, typename E>
-inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
+FinalizerAndCopier const TxnPreHook<Alloc, Trait, E>::EMPTY_FINALIZER{};
+
+template<typename Alloc, typename Trait, typename E>
+inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
+    if (m_finalizerAndCopier) {
+        for_each(m_changes.cbegin(), m_changes.cend(),
+                [this] (typename map_type::value_type const& entry) {
+                    m_finalizerAndCopier.finalize(entry.second);
+                });
+    }
+}
+
+template<typename Alloc, typename Trait, typename E> inline
+TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
     Trait([this](void const* key) {
                 auto const& iter = m_changes.find(key);
                 if (iter != m_changes.end()) {
@@ -1833,25 +1867,14 @@ inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
                     m_changeStore.free(const_cast<void*>(key));
                 }
             }),
-    m_changeStore(tupleSize) {}
-
-template<typename Alloc, typename Trait, typename E>
-inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
-    if (m_finalizerAndCopier) {
-        for_each(m_changes.cbegin(), m_changes.cend(),
-                [this] (typename map_type::value_type const& entry) {
-                    m_finalizerAndCopier->first(entry.second);
-                });
-    }
-}
+    m_changeStore(tupleSize), m_finalizerAndCopier(EMPTY_FINALIZER) {}
 
 template<typename Alloc, typename Trait, typename E> inline
-TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize,
-        typename CompactingChunks::finalizer_and_copier_type const& cb) :
+TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, FinalizerAndCopier const& cb) :
     Trait([this](void const* key) {
                 auto const& iter = m_changes.find(key);
                 if (iter != m_changes.end()) {
-                    m_finalizerAndCopier->first(iter->second);               // call back on local copy of old value
+                    m_finalizerAndCopier.finalize(iter->second);
                     m_changes.erase(iter);
                     m_changeStore.free(const_cast<void*>(key));
                 }
@@ -1866,7 +1889,7 @@ template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, T
         if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
             void *fresh = m_changeStore.allocate();
             if (m_finalizerAndCopier) {                         // invoke deep copier
-                m_finalizerAndCopier->second(fresh, dst);
+                m_finalizerAndCopier.copy(fresh, dst);
             } else {
                 memcpy(fresh, dst, m_changeStore.tupleSize());
             }
@@ -1887,7 +1910,7 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
     if (m_recording) {
         if (m_finalizerAndCopier) {
             for_each(m_changes.begin(), m_changes.end(),
-                    [this](typename map_type::value_type& p) { m_finalizerAndCopier->first(p.second); });
+                    [this](typename map_type::value_type& p) { m_finalizerAndCopier.finalize(p.second); });
         }
         m_changes.clear();
         m_changeStore.clear();
@@ -1909,12 +1932,12 @@ inline void TxnPreHook<Alloc, Trait, E>::release(void const* src) {
 }
 
 template<typename Hook, typename E> inline
-HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s),
+    Hook(s, CompactingChunks::finalizerAndCopier()) {}
 
 template<typename Hook, typename E> inline
-HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s,
-        typename CompactingChunks::finalizer_and_copier_type const& cb) noexcept :
-CompactingChunks(s, cb), Hook(s, cb) {}
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s, FinalizerAndCopier const& cb) noexcept :
+CompactingChunks(s, cb), Hook(s, CompactingChunks::finalizerAndCopier()) {}
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
     void* r = CompactingChunks::allocate();
