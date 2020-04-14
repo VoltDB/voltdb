@@ -888,16 +888,7 @@ void testHookedCompactingChunks() {
                 for_each(tb_removed.cbegin(), tb_removed.cend(),
                         [&ii, &alloc](void* p) {
                             ++ii;
-                            auto const& entry = alloc.template remove_add<truth>(p);
-                            switch (entry.status_of()) {
-                                case Hook::added_entry_t::status::existing:
-                                case Hook::added_entry_t::status::ignored:
-                                    break;
-                                case Hook::added_entry_t::status::fresh:
-                                default:
-                                    assert(! memcmp(const_cast<typename Hook::added_entry_t&>(entry).copy_of(),
-                                        p, TupleSize));
-                            }
+                            alloc.template remove_add<truth>(p);
                         });
                 assert(alloc.remove_force([](vector<pair<void*, void*>> const& entries){
                             for_each(entries.begin(), entries.end(),
@@ -1933,7 +1924,11 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocsOnly) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples};
-    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
+
+    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
     size_t i;
     for (i = 0; i < NumTuples; ++i) {
         gen.fill(alloc.allocate());
@@ -1954,7 +1949,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples};
-    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
+    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
     array<void const*, NumTuples> addresses;
     size_t i;
     for (i = 0; i < NumTuples; ++i) {
@@ -1982,7 +1980,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples};
-    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
+    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
     array<void const*, NumTuples> addresses;
     size_t i;
     for (i = 0; i < NumTuples; ++i) {
@@ -2014,7 +2015,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndUpdates) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples + NumTuples / 2};
-    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
+    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
     array<void const*, NumTuples> addresses;
     size_t i;
     for (i = 0; i < NumTuples; ++i) {
@@ -2040,7 +2044,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples + NumTuples / 2};
-    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
+    Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
     array<void const*, NumTuples> addresses;
     size_t i;
     for (i = 0; i < NumTuples; ++i) {
@@ -2088,8 +2095,11 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples};
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
     {
-        Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+        Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
         size_t i;
         for (i = 0; i < NumTuples; ++i) {
             gen.fill(alloc.allocate());
@@ -2104,8 +2114,11 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
     using Gen = StringGen<TupleSize>;
     Gen gen;
     finalize_verifier verifier{NumTuples + AllocsPerChunk * 3};            // 2 additional chunks inserted, one chunk updated
+    auto const copier = [this] (void* fresh, void const* dest) {
+        memcpy(fresh, dest, TupleSize);
+    };
     {
-        Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); });
+        Alloc alloc(TupleSize, [&verifier](void const* p) { verifier(p); }, copier);
         array<void const*, NumTuples + AllocsPerChunk * 2> addresses;
         size_t i;
         for (i = 0; i < NumTuples; ++i) {

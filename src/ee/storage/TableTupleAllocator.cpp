@@ -604,9 +604,9 @@ namespace std {                                    // Need to declare these befo
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cleaner,
-      function<void*(void*, void const*)> const& copier) noexcept :
+      function<void(void*, void const*)> const& copier) noexcept :
     list_type(tupleSize),CompactingStorageTrait(static_cast<list_type&>(*this)),
-    m_txnFirstChunk(*this),m_finalizerAndCopier(std::make_pair(cleaner, copier)), m_batched(*this) {
+    m_txnFirstChunk(*this), m_finalizerAndCopier(std::make_pair(cleaner, copier)), m_batched(*this) {
 }
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
@@ -1837,18 +1837,8 @@ inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize) :
     m_changeStore(tupleSize) {}
 
 template<typename Alloc, typename Trait, typename E>
-inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
-    if (m_finalizerAndCopier) {
-        for_each(m_changes.cbegin(), m_changes.cend(),
-                [this] (typename map_type::value_type const& entry) {
-                    m_finalizerAndCopier->first(entry.second);
-                });
-    }
-}
-
-template<typename Alloc, typename Trait, typename E> inline
-TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize,
-        typename CompactingChunks::finalizer_and_copier_type const& cb) :
+inline TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, function<void(void const*)> const& cleaner,
+        function<void(void*, void const*)> const& copier) :
     Trait([this](void const* key) {
                 auto const& iter = m_changes.find(key);
                 if (iter != m_changes.end()) {
@@ -1857,7 +1847,17 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize,
                     m_changeStore.free(const_cast<void*>(key));
                 }
             }),
-    m_changeStore(tupleSize), m_finalizerAndCopier(cb) {}
+    m_changeStore(tupleSize), m_finalizerAndCopier(std::make_pair(cleaner, copier)) {}
+
+template<typename Alloc, typename Trait, typename E>
+inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
+    if (m_finalizerAndCopier) {
+        for_each(m_changes.cbegin(), m_changes.cend(),
+                [this] (typename map_type::value_type const& entry) {
+                    m_finalizerAndCopier->first(entry.second);
+                });
+    }
+}
 
 template<typename Alloc, typename Trait, typename E1>
 template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, Trait, E1>::add(
@@ -1914,8 +1914,8 @@ HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : Com
 
 template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s, function<void(void const*)> const& cleaner,
-        function<void*(void*, void const*)> const& copier) noexcept :
-CompactingChunks(s, cleaner, copier), Hook(s, cleaner) {}
+        function<void(void*, void const*)> const& copier) noexcept :
+CompactingChunks(s, cleaner, copier), Hook(s, cleaner, copier) {}
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
     void* r = CompactingChunks::allocate();

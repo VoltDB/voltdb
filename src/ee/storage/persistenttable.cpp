@@ -127,8 +127,8 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
             this->decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
-        auto const copier = [this, &tupleSize] (void* fresh, void const* dest) {
-            memcpy(fresh, dest, tupleSize);
+        auto const copier = [this] (void* fresh, void const* dest) {
+            memcpy(fresh, dest, this->m_tupleLength);
             TableTuple freshCopy(this->m_schema);
             freshCopy.move(fresh);
 

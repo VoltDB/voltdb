@@ -583,7 +583,7 @@ namespace voltdb {
              * deep copy.
              */
             using finalizer_and_copier_type =
-                pair<function<void(void const*)>, function<void*(void*, void const*)>>;
+                pair<function<void(void const*)>, function<void(void*, void const*)>>;
             class TxnLeftBoundary final {
                 ChunkList<CompactingChunk, Compact> const& m_chunks;
                 typename ChunkList<CompactingChunk, Compact>::iterator m_iter;
@@ -669,7 +669,8 @@ namespace voltdb {
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
-            CompactingChunks(size_t tupleSize, function<void(void const*)> const&, function<void*(void*, void const*)> const&) noexcept;
+            CompactingChunks(size_t tupleSize, function<void(void const*)> const&,
+                    function<void(void*, void const*)> const&) noexcept;
             ~CompactingChunks();
             /**
              * Queries
@@ -775,7 +776,8 @@ namespace voltdb {
             using is_hook = true_type;
 
             TxnPreHook(size_t);
-            TxnPreHook(size_t, function<void(void const*)> const&);
+            TxnPreHook(size_t, function<void(void const*)> const&,
+                    function<void(void*, void const*)> const&);
             TxnPreHook(TxnPreHook const&) = delete;
             TxnPreHook(TxnPreHook&&) = delete;
             TxnPreHook& operator=(TxnPreHook const&) = delete;
@@ -813,7 +815,8 @@ namespace voltdb {
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            HookedCompactingChunks(size_t, function<void(void const*)> const&, function<void*(void*, void const*)> const&) noexcept;
+            HookedCompactingChunks(size_t, function<void(void const*)> const&,
+                    function<void(void*, void const*)> const&) noexcept;
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
