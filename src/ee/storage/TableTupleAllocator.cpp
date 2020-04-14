@@ -949,9 +949,7 @@ inline void CompactingChunks::free(typename CompactingChunks::remove_direction d
                 if (! beginTxn().iterator()->contains(m_lastFreeFromHead = reinterpret_cast<char const*>(p))) {
                     pop_front(false);
                 }
-                if (! --m_allocs) {            // clear dirty state, get ready for catalog addition
-                    m_lastFreeFromHead = nullptr;
-                }
+                --m_allocs;
             }
             break;
         case remove_direction::from_tail:
