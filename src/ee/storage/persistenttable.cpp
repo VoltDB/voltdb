@@ -143,6 +143,11 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
 
+    if (tableTypeIsStream(m_tableType) == false) {
+       stopSnapshot(true);
+       allocator().template clear<storage::truth>();
+    }
+
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
     BOOST_FOREACH (auto view, m_views) {
