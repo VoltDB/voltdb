@@ -328,17 +328,23 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * Get total number of sequence from the tracker.
      * @return
      */
-    public int sizeInSequence() {
-        int sequence = 0;
-        if (m_map.isEmpty()) {
-            return sequence;
-        }
-        final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-        while (iter.hasNext()) {
-            Range<Long> range = iter.next();
-            sequence += end(range) - start(range) + 1;
-        }
-        return sequence;
+    public long sizeInSequence() {
+        return sizeInSequence(m_map);
+    }
+
+    /**
+     * Calculate the size of the ranges of the intersection of this tracker and {@code other}
+     *
+     * @param other tracker to calculate overlap size with
+     * @return size of intersection
+     *
+     * @see ExportSequenceNumberTracker#sizeInSequence()
+     */
+    public long intersectionSizeInSequences(ExportSequenceNumberTracker other) {
+        // This isn't the most efficient way to do this but it is easy
+        TreeRangeSet<Long> intersection = TreeRangeSet.create(m_map);
+        intersection.removeAll(other.m_map.complement());
+        return sizeInSequence(intersection);
     }
 
     public String toShortString() {
@@ -421,5 +427,18 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             tracker.append(start(entry), end(entry));
         }
         return tracker;
+    }
+
+    private static long sizeInSequence(RangeSet<Long> ranges) {
+        long sequence = 0;
+        if (ranges.isEmpty()) {
+            return sequence;
+        }
+        final Iterator<Range<Long>> iter = ranges.asRanges().iterator();
+        while (iter.hasNext()) {
+            Range<Long> range = iter.next();
+            sequence += end(range) - start(range) + 1;
+        }
+        return sequence;
     }
 }
