@@ -26,6 +26,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Enum representing state of the node
+ * WAITINGFORLEADER, SHUTTINGDOWN, STOPPED appear to be unused [dp]
  */
 public enum NodeState {
 
