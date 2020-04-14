@@ -603,11 +603,10 @@ namespace std {                                    // Need to declare these befo
     };
 }
 
-CompactingChunks::CompactingChunks(size_t tupleSize, function<void(void const*)> const& cleaner,
-      function<void*(void*, void const*)> const& copier) noexcept :
-    list_type(tupleSize),CompactingStorageTrait(static_cast<list_type&>(*this)),
-    m_txnFirstChunk(*this),m_finalizerAndCopier(std::make_pair(cleaner, copier)), m_batched(*this) {
-}
+CompactingChunks::CompactingChunks(size_t tupleSize,
+        typename CompactingChunks::finalizer_and_copier_type const& cb) noexcept :
+    list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
+    m_txnFirstChunk(*this), m_finalizerAndCopier(cb), m_batched(*this) {}
 
 CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
     list_type(tupleSize), CompactingStorageTrait(static_cast<list_type&>(*this)),
@@ -1913,9 +1912,9 @@ template<typename Hook, typename E> inline
 HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s) noexcept : CompactingChunks(s), Hook(s) {}
 
 template<typename Hook, typename E> inline
-HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s, function<void(void const*)> const& cleaner,
-        function<void*(void*, void const*)> const& copier) noexcept :
-CompactingChunks(s, cleaner, copier), Hook(s, cleaner) {}
+HookedCompactingChunks<Hook, E>::HookedCompactingChunks(size_t s,
+        typename CompactingChunks::finalizer_and_copier_type const& cb) noexcept :
+CompactingChunks(s, cb), Hook(s, cb) {}
 
 template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>::allocate() {
     void* r = CompactingChunks::allocate();

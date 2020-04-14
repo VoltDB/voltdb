@@ -122,21 +122,22 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         auto const cleaner = [this] (void const* p) {
-            TableTuple tuple(this->m_schema);
+            TableTuple tuple(m_schema);
             tuple.move(const_cast<void*>(p));
-            this->decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
+            decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
         auto const copier = [this, &tupleSize] (void* fresh, void const* dest) {
             memcpy(fresh, dest, tupleSize);
-            TableTuple freshCopy(this->m_schema);
+            TableTuple freshCopy(m_schema);
             freshCopy.move(fresh);
 
-            TableTuple original (this->m_schema);
+            TableTuple original(m_schema);
             original.move(const_cast<void*>(dest));
             freshCopy.copyNonInlinedColumnObjects(original);
+            return fresh;
         };
-        m_dataStorage.reset(new Alloc (tupleSize, cleaner, copier));
+        m_dataStorage.reset(new Alloc{tupleSize, make_pair(cleaner, copier)});
     } else {
         m_dataStorage.reset(new Alloc{tupleSize});
     }
