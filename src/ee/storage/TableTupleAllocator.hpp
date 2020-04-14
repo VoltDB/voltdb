@@ -574,6 +574,16 @@ namespace voltdb {
         class CompactingChunks : private ChunkList<CompactingChunk, true_type>, private CompactingStorageTrait {
         public:
             using Compact = true_type;
+            /**
+             * Finalizer, and deep copier.
+             * The finalizer is called when a tuple is to be destroyed (deep-destroyer);
+             * The deep copier is called when a tuple is backed
+             * up in hook memory, with same signature as
+             * `memcpy', that does both shallow copy (memcpy) and
+             * deep copy.
+             */
+            using finalizer_and_copier_type =
+                pair<function<void(void const*)>, function<void*(void*, void const*)>>;
             class TxnLeftBoundary final {
                 ChunkList<CompactingChunk, Compact> const& m_chunks;
                 typename ChunkList<CompactingChunk, Compact>::iterator m_iter;
@@ -607,7 +617,7 @@ namespace voltdb {
             TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             boost::optional<FrozenTxnBoundaries> m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // action before deallocating a tuple from txn (or hook) memory.
-            boost::optional<function<void(void const*)>> const m_finalize{};
+            boost::optional<finalizer_and_copier_type> const m_finalizerAndCopier{};
             // the end of allocations when snapshot started: (block id, end ptr)
             CompactingChunks(CompactingChunks const&) = delete;
             CompactingChunks& operator=(CompactingChunks const&) = delete;
@@ -659,7 +669,7 @@ namespace voltdb {
         public:
             // for use in HookedCompactingChunks::remove() [batch mode]:
             CompactingChunks(size_t tupleSize) noexcept;
-            CompactingChunks(size_t tupleSize, function<void(void const*)> const&) noexcept;
+            CompactingChunks(size_t tupleSize, finalizer_and_copier_type const&) noexcept;
             ~CompactingChunks();
             /**
              * Queries
@@ -759,7 +769,7 @@ namespace voltdb {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
             Alloc m_changeStore;
-            boost::optional<function<void(void const*)>> const m_finalize{};
+            boost::optional<typename CompactingChunks::finalizer_and_copier_type> const m_finalizerAndCopier{};
             bool m_recording = false;            // in snapshot process?
         public:
             using is_hook = true_type;
@@ -772,29 +782,11 @@ namespace voltdb {
             ~TxnPreHook();
             void freeze();
             void thaw();
-            struct added_entry_t {
-                /**
-                 * Status for the add() method:
-                 * - not_frozen: the status is not frozen when add() gets called;
-                 * - ignored: frozen, but the rw iterator had visited the tuple already,
-                 *   so we don't bother recording. The tuple may or may not have a local copy.
-                 * - fresh: frozen, and is the first time that any changes occurs on given addr;
-                 * - existing: frozen, and there is already one (or more) changes on given addr.
-                 */
-                enum class status : char {not_frozen, fresh, existing, ignored};
-                added_entry_t(status, void const*) noexcept;
-                added_entry_t() noexcept = default;
-                status status_of() const noexcept;
-                void* copy_of() noexcept;
-            private:
-                status const m_status = status::not_frozen;
-                void* m_copy = nullptr;
-            };
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            added_entry_t add(void const*, IteratorObserver&);
+            void add(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
@@ -821,7 +813,8 @@ namespace voltdb {
             using hook_type = Hook;                    // for hooked_iterator_type
             using Hook::release;                       // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
             HookedCompactingChunks(size_t) noexcept;
-            HookedCompactingChunks(size_t, function<void(void const*)> const&) noexcept;
+            HookedCompactingChunks(size_t,
+                    typename CompactingChunks::finalizer_and_copier_type const&) noexcept;
             template<typename Tag>
             shared_ptr<typename IterableTableTupleChunks<HookedCompactingChunks<Hook, E>, Tag, void>::hooked_iterator>
             freeze();
@@ -829,8 +822,7 @@ namespace voltdb {
             void* allocate();                          // NOTE: now that client in control of when to fill in, be cautious not to overflow!!
             // NOTE: these methods with Tag template must be
             // supplied with same type as freeze() method.
-            template<typename Tag>      // NOTE: this must be called prior to any memcpy operations happen
-            typename Hook::added_entry_t update(void*);
+            template<typename Tag> void update(void*); // NOTE: this must be called prior to any memcpy operations happen
             /**
              * Light weight free() operations from either end,
              * involving no compaction. Removing from head when
@@ -846,7 +838,7 @@ namespace voltdb {
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
-            template<typename Tag> typename Hook::added_entry_t remove_add(void*);
+            template<typename Tag> void remove_add(void*);
             /**
              * NOTE: the remove_force method itself **does not**
              * "compact" tuples, and it is user's responsibility
