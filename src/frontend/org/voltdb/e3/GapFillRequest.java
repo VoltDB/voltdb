@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 
+import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.messaging.VoltDbMessageFactory;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -38,8 +39,8 @@ public class GapFillRequest extends GapFillMessage {
     }
 
     /**
-     * @param streamName
-     * @param partitionId
+     * @param streamName  Name of stream
+     * @param partitionId partition id ranges should be retrieved from
      * @param start       inclusive start sequence number
      * @param end         inclusive end sequence number
      */
@@ -48,10 +49,9 @@ public class GapFillRequest extends GapFillMessage {
     }
 
     /**
-     * @param streamName
-     * @param partitionId
-     * @param ranges      {@link Collection} of {@link Range}s being requested. All ranges must be
-     *                    {@link Range#closed(Comparable, Comparable)}
+     * @param streamName  Name of stream
+     * @param partitionId partition id ranges should be retrieved from
+     * @param ranges      {@link Collection} of {@link Range}s being requested
      */
     GapFillRequest(String streamName, int partitionId, Collection<Range<Long>> ranges) {
         super(VoltDbMessageFactory.E3_GAP_FILL_REQUEST, streamName, partitionId);
@@ -84,8 +84,8 @@ public class GapFillRequest extends GapFillMessage {
         super.flattenToBuffer(buf);
         buf.putInt(m_ranges.size());
         for (Range<Long> range : m_ranges) {
-            buf.putLong(range.lowerEndpoint());
-            buf.putLong(range.upperEndpoint());
+            buf.putLong(ExportSequenceNumberTracker.start(range));
+            buf.putLong(ExportSequenceNumberTracker.end(range));
         }
     }
 }
