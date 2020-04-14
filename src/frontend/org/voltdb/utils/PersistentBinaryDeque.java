@@ -382,7 +382,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         // while with regular skip forward, you want to delete the older segments only.
         // In regular skip, current segment is ready to be deleted only after at least
         // one entry from the next segment is read and discarded.
-        private boolean skipToNextSegment(boolean deleteCurrent) throws IOException {
+        private boolean skipToNextSegment(boolean retention) throws IOException {
             PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
             if (segmentReader == null) {
                 segmentReader = m_segment.openForRead(m_cursorId);
@@ -394,14 +394,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             Map.Entry<Long, PBDSegment<M>> entry = m_segments.higherEntry(m_segment.segmentId());
             if (entry == null) { // on the last segment
                 // We are marking this one as read. So OK to delete segments before this
-                callDeleteSegmentsBefore(m_segment, 1);
+                callDeleteSegmentsBefore(m_segment, 1, retention);
                 return false;
             }
 
             PBDSegment<M> oldSegment = m_segment;
             m_segment = entry.getValue();
-            PBDSegment<M> segmentToDeleteBefore = deleteCurrent ? m_segment : oldSegment;
-            callDeleteSegmentsBefore(segmentToDeleteBefore, 1);
+            PBDSegment<M> segmentToDeleteBefore = retention ? m_segment : oldSegment;
+            callDeleteSegmentsBefore(segmentToDeleteBefore, 1, retention);
             return true;
         }
 
@@ -594,7 +594,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 return;
             }
 
-            callDeleteSegmentsBefore(segment, entryNumber);
+            callDeleteSegmentsBefore(segment, entryNumber, false);
         }
 
         private void deleteMarkedSegments() {
@@ -621,12 +621,24 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private void callDeleteSegmentsBefore(PBDSegment<M> segment, int entryNumber) {
+        private void callDeleteSegmentsBefore(PBDSegment<M> segment, int entryNumber, boolean retention) {
             // If this is the first entry of a segment, see if previous segments can be deleted or marked ready to
             // delete
             if (m_cursorClosed || m_segments.size() == 1 || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
                     || !PersistentBinaryDeque.this.canDeleteSegmentsBefore(segment)) {
                 return;
+            }
+            if (retention) {
+                try {
+                    Map.Entry<Long, PBDSegment<M>> lower = m_segments.lowerEntry(segment.segmentId());
+                    m_retentionDeletePoint = (lower == null) ? m_retentionDeletePoint : lower.getValue().getEndId();
+                } catch(IOException e) { // cannot happen because header is read at open time of retention reader.
+                    // If it does happen, don't delete without being able to save the deletion point.
+                    // Next retention will hopefully be successful and delete everything.
+                    m_usageSpecificLog.error("Unexpected error getting endId of segment. " + segment.m_file +
+                            ". PBD files may not be deleted.", e);
+                    return;
+                }
             }
             m_deferredDeleter.execute(() -> deleteSegmentsBefore(segment));
         }
@@ -766,6 +778,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private M m_extraHeader;
     private Executor m_deferredDeleter = Runnable::run;
     private PBDRetentionPolicy m_retentionPolicy;
+    private long m_retentionDeletePoint = PBDSegment.INVALID_ID;
     private boolean m_requiresId;
     private GapWriter m_gapWriter;
     private boolean m_filledGap;
@@ -1859,6 +1872,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     @Override
     public boolean isRetentionPolicyEnforced() {
         return m_retentionPolicy != null && m_retentionPolicy.isPolicyEnforced();
+    }
+
+    @Override
+    public synchronized long getRetentionDeletionPoint() {
+        return m_retentionDeletePoint;
     }
 
     /**

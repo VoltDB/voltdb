@@ -238,6 +238,15 @@ public interface BinaryDeque<M> {
      */
     public boolean isRetentionPolicyEnforced();
 
+    /**
+     * Returns the id of the last entry that was deleted by retention policy on this BinaryDeque.
+     * This will return {@link PBDSegment.INALID_ID} if this BinaryDeque does not have a retention policy
+     * or if this retention policy has not deleted anything since it was started up.
+     *
+     * @return id of the last entry that was deleted by retention policy
+     */
+    public long getRetentionDeletionPoint();
+
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
