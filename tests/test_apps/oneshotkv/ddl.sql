@@ -4,8 +4,10 @@ CREATE TABLE store
 , value    varbinary(1048576) not null
 , PRIMARY KEY (key)
 );
-
 PARTITION TABLE store ON COLUMN key;
+
+-- make sure to load the Java code for the procedures, before creating them
+LOAD CLASSES oneshotkv.jar;
 
 CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Initialize;
 CREATE PROCEDURE PARTITION ON TABLE STORE COLUMN KEY FROM CLASS oneshotkv.procedures.Get;
