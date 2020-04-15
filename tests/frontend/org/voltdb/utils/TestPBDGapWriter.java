@@ -100,49 +100,6 @@ public class TestPBDGapWriter {
     }
 
     @Test(timeout = 10_000)
-    public void testEmptyPbdOffer() throws Exception {
-        assertEquals(0, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 11, 15);
-        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-
-        // Mix regular offers with gap offers
-        int startSeqNo = 16;
-        for (int i=0; i<3; i++) {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-            startSeqNo += 5;
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-            startSeqNo += 5;
-        }
-        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-        assertEquals(startSeqNo-1, m_pbd.getSegments().lastEntry().getValue().getEndId());
-
-        // with header updates
-        for (int i=0; i<2; i++) {
-            m_gapWriter.updateGapHeader(m_gapHeader);
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-            assertEquals(startSeqNo, m_pbd.getSegments().lastKey().longValue());
-            assertEquals(startSeqNo, m_pbd.getSegments().lastEntry().getValue().getStartId());
-            startSeqNo += 5;
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-            startSeqNo += 5;
-        }
-        assertEquals(3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-        assertEquals(startSeqNo-1, m_pbd.getSegments().lastEntry().getValue().getEndId());
-
-        // close gap writer. gap offers should fail, regular offers should work
-        m_gapWriter.close();
-        try {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-            fail();
-        } catch(IOException e) {
-            // expected
-        }
-        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startSeqNo, startSeqNo+4);
-        m_gapWriter.close(); // second close does nothing
-    }
-
-    @Test(timeout = 10_000)
     public void testNegativeOffers() throws Exception {
         int startSeqNo = 1, nextSeqNo = 1;
         for (int i=0; i<3; i++) {
@@ -219,33 +176,47 @@ public class TestPBDGapWriter {
 
     @Test(timeout = 10_000)
     public void testFillAtTail() throws Exception {
-        int nextSeqNo = 1;
+        long nextSeqNo = 1;
         for (int i=0; i<3; i++) {
             m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+4);
             nextSeqNo += 5;
         }
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
 
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque
+                .builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
+                .compression(true).requiresId(true).initialExtraHeader(m_metadata, TestPersistentBinaryDeque.SERIALIZER)
+                .build();
+        m_gapWriter = m_pbd.openGapWriter();
+
+        long afterGapSeqNo = nextSeqNo + 4 * 5;
         for (int i=0; i<4; i++) {
             m_gapWriter.updateGapHeader(m_gapHeader);
             m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+2);
             m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo+3, nextSeqNo+4);
             nextSeqNo += 5;
+
+            // Offer beyond the end of the gap being filled
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), afterGapSeqNo,
+                    afterGapSeqNo + 4);
+            afterGapSeqNo += 5;
         }
-        assertEquals(4, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-        assertEquals(1, getNumActiveSegments());
+        assertEquals(6, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        assertEquals(2, getNumActiveSegments());
         nextSeqNo = 1;
         int i = 0;
         for (PBDSegment<ExtraHeaderMetadata> segment : m_pbd.getSegments().values()) {
             assertEquals(nextSeqNo, segment.m_id);
             assertEquals(nextSeqNo, segment.getStartId());
             if (i++ == 0) {
-                assertEquals(20, segment.getEndId());
-                nextSeqNo = 21;
+                assertEquals(15, segment.getEndId());
+            } else if (i == 6) {
+                assertEquals(55, segment.getEndId());
             } else {
                 assertEquals(nextSeqNo+4, segment.getEndId());
-                nextSeqNo += 5;
             }
+            nextSeqNo = segment.getEndId() + 1;
         }
         m_gapWriter.close();
         assertEquals(1, getNumActiveSegments());
@@ -425,5 +396,4 @@ public class TestPBDGapWriter {
         }
         assertEquals(15, readCount);
     }
-
 }
