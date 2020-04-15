@@ -287,6 +287,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
     private GcStats m_gcStats = null;
+    private ActivityStats m_activityStats = null;
     private CommandLogStats m_commandLogStats = null;
     private DRRoleStats m_drRoleStats = null;
     private StatsManager m_statsManager = null;
@@ -1501,6 +1502,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
+
+            m_activityStats = new ActivityStats();
+            getStatsAgent().registerStatsSource(StatsSelector.ACTIVITY_SUMMARY, 0, m_activityStats);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2

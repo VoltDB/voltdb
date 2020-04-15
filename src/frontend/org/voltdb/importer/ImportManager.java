@@ -351,4 +351,7 @@ public class ImportManager implements ChannelChangeCallback {
         }
     }
 
+    public ImporterStatsCollector statsCollector() {
+        return m_statsCollector;
+    }
 }
