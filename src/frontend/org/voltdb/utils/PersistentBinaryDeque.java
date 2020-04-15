@@ -207,7 +207,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }
-                long lastSegmentId = peekLastSegment().segmentId();
+                long lastSegmentId = m_segments.lastEntry().getValue().segmentId();
                 while (!segmentReader.hasMoreEntries()) {
                     if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
                         return null;
@@ -359,7 +359,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return false;
                 }
 
-                long lastSegmentId = peekLastSegment().segmentId();
+                long lastSegmentId = m_activeSegment.segmentId();
                 if (m_segment.segmentId() == lastSegmentId) {
                     return false;
                 }
@@ -428,7 +428,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
                 long segmentSize = m_segment.getFileSize();
 
-                long lastSegmentId = peekLastSegment().segmentId();
+                long lastSegmentId = m_activeSegment.segmentId();
                 if (m_segment.segmentId() == lastSegmentId) { // last segment, cannot skip
                     long needed = maxBytes - segmentSize;
                     return (needed == 0) ? 1 : needed; // To fix: 0 is a special value indicating we skipped.
@@ -756,6 +756,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
     private final TreeMap<Long, PBDSegment<M>> m_segments = new TreeMap<>();
+    // Current active segment being written to or the most recent segment if m_requiresId is false
+    private PBDSegment<M> m_activeSegment;
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
     private int m_numObjects;
@@ -894,6 +896,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
                 recoverSegment(currId, entry.getValue());
                 prevId = currId;
+            }
+
+            if (!m_requiresId && prevId != null) {
+                m_activeSegment = m_segments.get(prevId);
             }
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException) {
@@ -1071,8 +1077,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
 
                 assert(!m_requiresId || segment.getNumEntries() == 0 || segment.getEndId() >= segment.getStartId());
-                assert (!m_requiresId || peekLastSegment() == null || segment.getNumEntries() == 0 ||
-                         peekLastSegment().getEndId() < segment.getStartId());
+                assert (!m_requiresId || m_activeSegment == null || segment.getNumEntries() == 0
+                        || m_activeSegment.getEndId() < segment.getStartId());
 
                 // Any recovered segment that is not final should be checked
                 // for internal consistency.
@@ -1119,7 +1125,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         // Close the last write segment for now, will reopen after truncation
-        peekLastSegment().close();
+        if (m_activeSegment != null) {
+            m_activeSegment.close();
+        }
 
         /*
          * Iterator all the objects in all the segments and pass them to the truncator
@@ -1185,6 +1193,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
+        if (!m_requiresId) {
+            m_activeSegment = m_segments.isEmpty() ? null : m_segments.lastEntry().getValue();
+        }
+
         assertions();
     }
 
@@ -1217,18 +1229,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         return (entry==null) ? null : entry.getValue();
     }
 
-    private PBDSegment<M> peekLastSegment() {
-        Map.Entry<Long, PBDSegment<M>> entry = m_segments.lastEntry();
-        // entry may be null in ctor and while we are manipulating m_segments in addSegment, for example
-        return (entry==null) ? null : entry.getValue();
-    }
-
     @Override
     public synchronized void updateExtraHeader(M extraHeader) throws IOException {
         m_extraHeader = extraHeader;
-        PBDSegment<M> tail = peekLastSegment();
-        if (tail != null) {
-            finishWrite(tail);
+        if (m_activeSegment != null) {
+            finishWrite(m_activeSegment);
         }
     }
 
@@ -1257,10 +1262,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             assert(!m_requiresId && startId == PBDSegment.INVALID_ID && endId == PBDSegment.INVALID_ID);
         } else {
             assert(!m_requiresId || (startId != PBDSegment.INVALID_ID && endId != PBDSegment.INVALID_ID && endId >= startId));
-            assert(!m_requiresId || peekLastSegment() == null || peekLastSegment().getEndId() < startId);
+            assert (!m_requiresId || m_activeSegment == null || m_activeSegment.getEndId() < startId);
         }
 
-        return offerToSegment(peekLastSegment(), object, startId, endId, m_extraHeader, isDs).getFirst();
+        Pair<Integer, PBDSegment<M>> result;
+        result = offerToSegment(m_activeSegment, object, startId, endId, m_extraHeader, isDs);
+        m_activeSegment = result.getSecond();
+        return result.getFirst();
     }
 
     private Pair<Integer, PBDSegment<M>> offerToSegment(PBDSegment<M> segment, Object object, long startId, long endId, M extraHeader, boolean isDs) throws IOException {
@@ -1605,6 +1613,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
             }
         }
+        m_activeSegment = null;
         m_segments.clear();
         m_closed = true;
         m_filledGap = false;
