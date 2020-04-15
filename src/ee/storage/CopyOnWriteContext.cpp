@@ -183,15 +183,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 }
 
 void CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
-    auto const& entry = m_allocator.template update<storage::truth>(tuple.address());
-    if (tuple.m_schema->getUninlinedObjectColumnCount() != 0) {
-        auto e = const_cast<typename PersistentTable::Hook::added_entry_t&>(entry);
-        if (e.copy_of() != nullptr && e.status_of() == PersistentTable::Hook::added_entry_t::status::fresh) {
-            TableTuple copied(tuple.m_schema);
-            copied.move(const_cast<void*>(e.copy_of()));
-            copied.copyNonInlinedColumnObjects(tuple);
-        }
-    }
+    m_allocator.template update<storage::truth>(tuple.address());
 }
 
 }

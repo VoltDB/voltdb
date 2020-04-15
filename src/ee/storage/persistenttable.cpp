@@ -40,6 +40,7 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <vector>
+#include <functional>
 namespace voltdb {
 
 #define TABLE_BLOCKSIZE 2097152
@@ -120,13 +121,23 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // that stores non-inlined tuple data.
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
-        auto const cleaner = [this] (void const* p) noexcept {
-            TableTuple tuple(this->m_schema);
+        auto const cleaner = [this] (void const* p) {
+            TableTuple tuple(m_schema);
             tuple.move(const_cast<void*>(p));
-            this->decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
+            decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
-        m_dataStorage.reset(new Alloc (tupleSize, cleaner));
+        auto const copier = [this, &tupleSize] (void* fresh, void const* dest) {
+            memcpy(fresh, dest, tupleSize);
+            TableTuple freshCopy(m_schema);
+            freshCopy.move(fresh);
+
+            TableTuple original(m_schema);
+            original.move(const_cast<void*>(dest));
+            freshCopy.copyNonInlinedColumnObjects(original);
+            return fresh;
+        };
+        m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
     } else {
         m_dataStorage.reset(new Alloc{tupleSize});
     }
@@ -1201,15 +1212,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     }
 
     allocator().remove_reserve(1);
-    auto const& entry = allocator().template remove_add<storage::truth>(target.address());
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        auto e = const_cast<typename Hook::added_entry_t&>(entry);
-        if (e.copy_of() != nullptr && e.status_of() == Hook::added_entry_t::status::fresh) {
-            TableTuple src(m_schema);
-            src.move(const_cast<void*>(e.copy_of()));
-            target.copyNonInlinedColumnObjects(src);
-        }
-    }
+    allocator().template remove_add<storage::truth>(target.address());
     target.setActiveFalse();
     finalizeRelease();
 }
@@ -1232,15 +1235,7 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
         m_batchDeleteTupleCount = 0;
     }
 
-    auto const& entry = allocator().template remove_add<storage::truth>(tuple);
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        auto e = const_cast<typename Hook::added_entry_t&>(entry);
-        if (e.copy_of() != nullptr && e.status_of() == Hook::added_entry_t::status::fresh) {
-            TableTuple src(m_schema);
-            src.move(const_cast<void*>(e.copy_of()));
-            src.copyNonInlinedColumnObjects(target);
-        }
-    }
+    allocator().template remove_add<storage::truth>(tuple);
 }
 
 /*
