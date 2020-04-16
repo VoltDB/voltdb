@@ -85,6 +85,7 @@ public class PauseActivityStats extends StatsSource
         boolean active = false;
         try {
             ActivityHelper helper = new ActivityHelper();
+            active = helper.collect(statsList);
             setValue(row, ColumnName.EXPORTS_PENDING, helper.export_pend);
             setValue(row, ColumnName.DRPROD_SEGS, helper.drprod_segsPend);
             setValue(row, ColumnName.DRPROD_BYTES, helper.drprod_bytesPend);
