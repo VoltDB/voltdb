@@ -101,7 +101,7 @@ public final class Bits {
     public static long sync_file_range(VoltLogger logger, FileDescriptor fd, FileChannel fc, long syncStart, long positionAtSync) throws IOException {
         //Don't start writeback on the currently appending page to avoid
         //issues with stables pages, hence we move the end back one page
-        long syncedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
+        long syncedBytes = (positionAtSync / Bits.pageSize()) * Bits.pageSize();
         if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
             final long retval = PosixAdvise.sync_file_range(fd,
                                                             syncStart,
