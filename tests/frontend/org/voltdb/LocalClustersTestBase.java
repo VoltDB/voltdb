@@ -328,6 +328,23 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         return pair;
     }
 
+    /**
+     * Close the current client for {@code clusterId} and open a new one
+     *
+     * @param clusterId of client
+     * @return The new {@link Client}
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    protected Client recreateClient(int clusterId) throws IOException, InterruptedException {
+        Pair<LocalCluster, Client> pair = CLUSTERS_AND_CLIENTS.get(clusterId);
+        pair.getSecond().close();
+        LocalCluster cluster = pair.getFirst();
+        pair = Pair.of(cluster, cluster.createAdminClient(createClientConfig()));
+        CLUSTERS_AND_CLIENTS.set(clusterId, pair);
+        return pair.getSecond();
+    }
+
     protected void addSchema(int partitionedTableCount, int replicatedTableCount, String[] streamTargets)
             throws Exception {
         addSchema(partitionedTableCount, replicatedTableCount, 0, streamTargets);
