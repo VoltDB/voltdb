@@ -51,6 +51,7 @@ public class RetentionPolicyMgr {
     private static final Map<String, Long> s_timeLimitConverter;
     static {
         ImmutableMap.Builder<String, Long>bldr = ImmutableMap.builder();
+        bldr.put("ss", 1000L);
         bldr.put("mn", 60_000L);
         bldr.put("hr", 60L * 60_000L);
         bldr.put("dy", 24L * 60L * 60_000L);
@@ -193,7 +194,7 @@ public class RetentionPolicyMgr {
         // This is called from synchronized PBD method, so calls to this should be serialized as well.
         @Override
         public void newSegmentAdded() {
-            if (!m_reader.isOpen()) { // not started yet
+            if (m_reader == null || !m_reader.isOpen()) { // not started yet
                 return;
             }
 
@@ -297,7 +298,7 @@ public class RetentionPolicyMgr {
 
         @Override
         public void bytesAdded(long numBytes) {
-            if (!m_reader.isOpen()) {
+            if (m_reader == null || !m_reader.isOpen()) {
                 return;
             }
 

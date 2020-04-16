@@ -608,6 +608,46 @@ public class TestPBDsWithIds {
         fail("Expected an AssertionError");
     }
 
+    @Test
+    public void testDeleteToEntryId() throws Exception {
+        int[][] entryIds = { {101, 500}, {701, 1500}, {1501, 2300} };
+        //Arrays of {entry-to-delete, numFiles-after-deletion}
+        int[][] testCases = {
+                {0,3}, {100,3}, {101,3}, {150,3}, {499,3},
+                {500,2}, {501,2}, {600,2}, {700,2}, {701,2}, {1000, 2}, {1499,2},
+                {500,2}, {501,2}, {600,2}, {700,2}, {701,2}, {1000, 2}, {1499,2},
+                {1500,1}, {1501,1}, {2000,1}, {2300,1}, {2500,1},
+        };
+
+        // We need to run these on PBDs with all 3 segments. Otherwise it is always delete at the beginning.
+        // Which is why this is broken into multiple runs
+        for (int[] test : testCases) {
+            runDeleteToEntryId(entryIds, test[0], test[1]);
+            tearDown();
+            setUp();
+        }
+    }
+
+    private void runDeleteToEntryId(int[][] entryIds, long deleteId, int expectedNumFiles) throws IOException {
+        for (int[] ids : entryIds) {
+            int startId = ids[0];
+            int endId = ids[1];
+            while (startId < endId) {
+                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(64)), startId, startId+99);
+                startId += 100;
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+        assertEquals(entryIds.length, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        if (deleteId == 501) {
+            System.out.println();
+        }
+        m_pbd.deleteSegmentsToEntryId(deleteId);
+        assertEquals("Assertion failed on deleting " + deleteId,
+                     expectedNumFiles, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
     @Before
     public void setUp() throws Exception {
         TestPersistentBinaryDeque.setupTestDir();
