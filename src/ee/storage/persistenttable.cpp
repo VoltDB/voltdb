@@ -127,13 +127,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") <<'\n';
             string msg = message.str();
             LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
-//
-//            VOLT_DEBUG("Clean TABLE %s", name().c_str());
-//            if (isReplicatedTable()) {
-//                vassert(SynchronizedThreadLock::usingMpMemory());
-//            } else {
-//                vassert(!SynchronizedThreadLock::usingMpMemory());
-//            }
             TableTuple tuple(m_schema);
             tuple.move(const_cast<void*>(p));
             decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
@@ -145,11 +138,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                   (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
             string msg = message.str();
             LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
-//            if (isReplicatedTable()) {
-//                vassert(SynchronizedThreadLock::usingMpMemory());
-//            } else {
-//                vassert(!SynchronizedThreadLock::usingMpMemory());
-//            }
             TableTuple freshCopy(m_schema);
             freshCopy.move(fresh);
             TableTuple original(m_schema);
@@ -178,14 +166,9 @@ PersistentTable::~PersistentTable() {
     message << "Delete table " << name().c_str()  << " with context:" <<
                  (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
     string msg = message.str();
-   LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
 
     if (tableTypeIsStream(m_tableType) == false) {
-//        if (isReplicatedTable()) {
-//            vassert(SynchronizedThreadLock::usingMpMemory());
-//        } else {
-//            vassert(!SynchronizedThreadLock::usingMpMemory());
-//        }
        stopSnapshot(true);
        allocator().template clear<storage::truth>();
     }

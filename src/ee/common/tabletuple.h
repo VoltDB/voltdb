@@ -469,7 +469,6 @@ public:
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
                                  std::vector<char*> &oldObjects, std::vector<char*> &newObjects);
-    void copyNonInlinedColumnObjects(TableTuple &target);
 
     void copy(const TableTuple &source);
 
@@ -906,21 +905,6 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     }
 }
 
-inline void TableTuple::copyNonInlinedColumnObjects(TableTuple &source) {
-    vassert(m_schema);
-    vassert(source.m_schema);
-    vassert(source.m_data);
-    vassert(m_data);
-
-    const uint16_t count = m_schema->getUninlinedObjectColumnCount();
-    if (count > 0) {
-        for (uint16_t i = 0; i < count; i++) {
-            const uint16_t colIndex = m_schema->getUninlinedObjectColumnInfoIndex(i);
-            setNValueAllocateForObjectCopies(colIndex, source.getNValue(colIndex));
-        }
-        m_data[0] = source.m_data[0];
-    }
-}
 /*
  * With a persistent update the copy should only do an allocation for
  * a string if the source and destination pointers are different.
