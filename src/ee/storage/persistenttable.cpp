@@ -122,19 +122,20 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         auto const cleaner = [this] (void const* p) {
+            checkContext("Cleaning");
             TableTuple tuple(m_schema);
             tuple.move(const_cast<void*>(p));
             decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
-        auto const copier = [this, &tupleSize] (void* fresh, void const* dest) {
-            memcpy(fresh, dest, tupleSize);
+        auto const copier = [this] (void* fresh, void const* dest) {
+            checkContext("Copying");
             TableTuple freshCopy(m_schema);
             freshCopy.move(fresh);
-
-            TableTuple original(m_schema);
-            original.move(const_cast<void*>(dest));
-            freshCopy.copyNonInlinedColumnObjects(original);
+            TableTuple source(m_schema);
+            source.move(const_cast<void*>(dest));
+            freshCopy.resetHeader();
+            freshCopy.copyForPersistentInsert(source);
             return fresh;
         };
         m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
@@ -154,6 +155,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
 
+    checkContext("Deleting");
     if (tableTypeIsStream(m_tableType) == false) {
        stopSnapshot(true);
        allocator().template clear<storage::truth>();
@@ -189,6 +191,16 @@ PersistentTable::~PersistentTable() {
     }
 }
 
+void PersistentTable::checkContext(const char* operation) {
+   if (isReplicatedTable() != SynchronizedThreadLock::usingMpMemory()) {
+       std::stringstream message;
+       message << operation << (isReplicatedTable()?" REPLICATED ":" PARTITIONED ") << name().c_str() << " with context " <<
+                 (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
+       string msg = message.str();
+       LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
+       //throwFatalException("%s", message.str().c_str());
+   }
+}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
