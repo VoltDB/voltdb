@@ -668,7 +668,8 @@ namespace voltdb {
                 vector<void*> const& removed() const;
                 // finalize on removed addresses, and some dst of moved address.
                 // Note that it has to be called prior to any movements.
-                size_t finalize(boost::optional<position_type> const&) const;
+                size_t finalize(boost::optional<position_type> const&,
+                        function<bool(void const*)> const&) const;
                 // Actuate batch remove
                 size_t force();
                 bool empty() const noexcept;
@@ -804,6 +805,7 @@ namespace voltdb {
             void add(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
+            bool contains(void const*) const noexcept;
         };
 
         template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl

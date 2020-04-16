@@ -1178,13 +1178,14 @@ inline void CompactingChunks::DelayedRemover::validate() const {
     }
 }
 
-inline size_t CompactingChunks::DelayedRemover::finalize(boost::optional<position_type> const& iterp) const {
+inline size_t CompactingChunks::DelayedRemover::finalize(boost::optional<position_type> const& iterp,
+        function<bool(void const*)> const& pred) const {
     size_t finalized = 0;
     if (m_chunks.finalizerAndCopier()) {
         if (! m_removed.empty()) {         // removed addresses need to be finalized right away
             for_each(m_removed.cbegin(), m_removed.cend(),
                     [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
-            finalized += m_removed.size();
+            finalized = m_removed.size();
         }
         if (! m_movements.empty()) {
             if (! m_chunks.frozen() || ! m_chunks.frozenBoundaries()) {
@@ -1194,21 +1195,21 @@ inline size_t CompactingChunks::DelayedRemover::finalize(boost::optional<positio
                         [this](pair<void*, void*> const& entry) {
                             m_chunks.finalizerAndCopier().finalize(entry.first);
                         });
-                finalized += m_movements.size();
+                return finalized + m_movements.size();
             } else {                       // when frozen, finalize before iterator
                 auto const& frozenRight = m_chunks.frozenBoundaries()->right();
                 // Finalizable when the dst of movement is either
                 // before iterator position, or after frozen
                 // right boundary
-                auto const finalizable = [this, &frozenRight, &iterp] (void const* p) {
+                auto const finalizable = [this, &frozenRight, &iterp, &pred] (void const* p) {
                     auto const iter = m_chunks.find(p);
                     assert(iter.first);
                     position_type const pos_p{p, iter.second};
                     return less<position_type>()(frozenRight, pos_p) ||
-                        (iterp && less<position_type>()(pos_p, *iterp));
+                        (iterp && less<position_type>()(pos_p, *iterp) && pred(p));
                 };
-                finalized += accumulate(
-                        m_movements.cbegin(), m_movements.cend(), 0lu,
+                return accumulate(
+                        m_movements.cbegin(), m_movements.cend(), finalized,
                         [this, &finalizable](size_t acc, pair<void*, void*> const& entry) {
                             void const* p = entry.first;
                             if (finalizable(p)) {
@@ -1979,6 +1980,11 @@ inline void const* TxnPreHook<Alloc, Trait, E>::operator()(void const* src) cons
 }
 
 template<typename Alloc, typename Trait, typename E>
+inline bool TxnPreHook<Alloc, Trait, E>::contains(void const* src) const noexcept {
+    return m_changes.find(src) == m_changes.cend();
+}
+
+template<typename Alloc, typename Trait, typename E>
 inline void TxnPreHook<Alloc, Trait, E>::release(void const* src) {
     Trait::remove(src);
 }
@@ -2078,6 +2084,12 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss << ")\n";
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
+    // finalize before memcpy
+    CompactingChunks::m_batched.finalize(
+            m_iterator_observer.to_position(),
+            [this](void const* p) {      // dst is finalizable if hook already captured changes
+                return Hook::contains(p);
+            });
     if (frozen()) {            // hook registration on movements only
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
@@ -2086,8 +2098,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
     }
-    // finalize before memcpy
-    CompactingChunks::m_batched.finalize(m_iterator_observer.to_position());
     cb(CompactingChunks::m_batched.movements());    // memcpy by call back
     return CompactingChunks::m_batched.force();
 }

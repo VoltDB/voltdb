@@ -2067,9 +2067,9 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
-    ASSERT_EQ(NumTuples / 4, verifier.seen().size());
+    ASSERT_EQ(NumTuples / 8, verifier.seen().size());
     alloc.template thaw<truth>();
-    ASSERT_EQ(NumTuples / 2 + NumTuples / 8, verifier.seen().size());
+    ASSERT_EQ(NumTuples / 2, verifier.seen().size());
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
