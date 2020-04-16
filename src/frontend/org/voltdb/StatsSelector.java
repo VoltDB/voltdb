@@ -72,7 +72,9 @@ public enum StatsSelector {
     TASK_SCHEDULER(TASK),
     TASK_PROCEDURE(TASK),
 
-    ACTIVITY_SUMMARY; // activity summary for convenience of shutdown
+    // Activity summary for use by 'operator' functions
+    SHUTDOWN_CHECK,
+    PAUSE_CHECK;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

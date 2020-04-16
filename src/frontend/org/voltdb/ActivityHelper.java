@@ -17,141 +17,92 @@
 
 package org.voltdb;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 /**
- * The ActivityStats statistics provide a summary of current
- * cluster activity that can be used to determine when cluster
- * shutdown can safely proceed.
+ * Activity stats helper class. This holds methods that collect
+ * specific statistics for the purpose of determining whether
+ * cluster activity has quiesced, for example preparatory to
+ * cluster shutdown.
  *
- * The intended use is that an admin client executes the
- * two pre-shutdown procedures @PrepareShutdown and @Quiesce,
- * and then monitors '@Statistics activity-summary' until all
- * work is drained.
- *
- * The result of the statistics request is a table with one
- * row per host, and a summary of activity in various categories.
- * Activity is summarized in the 'ACTIVE' column; if desired,
- * then other columns can be used to determine what the activity
- * relates to, and perhaps whether forward progress is being made.
+ * The stats class provides a list of the stats it is interested
+ * in; we fetch those stats, and leave them in member data for
+ * the stats class to pick up by name. This is not a particularly
+ * clean interface, but that's ok. This class is just for use by
+ * two or three stats classes under our control. We have this
+ * class just to avoid a lot of cut and paste, and inheritance
+ * hierarchies would be going too far.
  */
-public class ActivityStats extends StatsSource
-{
+class ActivityHelper {
+
     private static final VoltLogger logger = new VoltLogger("HOST");
 
-    private enum ColumnName {
-        ACTIVE, // 0 if all other gauges 0, else 1
-        CLIENT_TXNS, CLIENT_REQ_BYTES, CLIENT_RESP_MSGS,
-        CMDLOG_TXNS, CMDLOG_BYTES,
-        IMPORTS_PENDING, EXPORTS_PENDING,
-        DRPROD_SEGS, DRPROD_BYTES, DRCONS_PARTS,
-    };
-
-    public ActivityStats() {
-        super(false);
-    }
-
     /*
-     * Constructs a description of the columns we'll return
-     * in our stats table.
+     * The types of stats for which we offer help.
      */
-    @Override
-    protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        for (ColumnName col : ColumnName.values()) {
-            VoltType type = (col == ColumnName.ACTIVE ? VoltType.TINYINT : VoltType.BIGINT);
-            columns.add(new ColumnInfo(col.name(), type));
-        }
+    enum Type {
+        CLIENT,
+        CMDLOG,
+        IMPORT,
+        EXPORT,
+        DRCONS,
+        DRPROD,
     }
 
     /*
-     * Iterator through the rows of stats we make available. In fact
-     * we have a single row, so we fake out the iterator.
+     * Output values. Package access intentionally; there is
+     * little point in adding a dozen or so simple-minded
+     * getters for internal-only use. Obviously these are
+     * named with prefixes similar to the Type names above.
      */
-    @Override
-    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
-    {
-        return new DummyIterator();
-    }
-
-    private class DummyIterator implements Iterator<Object> {
-        private boolean hasNext = true;
-        @Override
-        public boolean hasNext() {
-            return hasNext;
-        }
-        @Override
-        public Object next() {
-            Object obj = null;
-            if (hasNext) {
-                hasNext = false;
-                obj = "THE_ROW";
-            }
-            return obj;
-        }
-    }
+    long client_reqBytes, client_respMsgs, client_txns;
+    long cmdlog_bytes, cmdlog_txns;
+    long import_pend;
+    long export_pend;
+    long drcons_pend;
+    long drprod_bytesPend, drprod_segsPend;
 
     /*
-     * Main stats collection. We return a single row, and
-     * the key is irrelevant.
+     * Main stats collection method. Stats values
+     * are saved as member variables.
      *
-     * We have two distinct cases depending on whether
-     * command-logging is in use. In particular, DR is
-     * only of interest if we do not have command-logging.
-     * The assumption here is that the client is going
-     * to make a shutdown snapshot, thus needs DR copies
-     * to be stable.
-     *
-     * Ordering reflects that used by 'voltadmin shutdown',
-     * on which this is based, and is loosely characterized
-     * as 'inputs before outputs'. Probably this no longer
-     * matters, since from the client point of view we are
-     * now checking in parallel rather than sequentially.
+     * @param types  ordered list of stats types
+     * @return active/inactive summary flag
      */
-    @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    boolean collect(Type[] types) {
         boolean active = false;
-        try {
-            if (usingCommandLog()) {
-                active |= checkClients(rowValues);
-                active |= checkImporter(rowValues);
-                active |= checkCommandLog(rowValues);
-                active |= checkExporter(rowValues);
-            }
-            else {
-                active |= checkClients(rowValues);
-                active |= checkImporter(rowValues);
-                active |= checkDrConsumer(rowValues);
-                active |= checkExporter(rowValues);
-                active |= checkDrProducer(rowValues);
-            }
-            if (!active) { // if active, we already logged details
-                logger.info("ActivityStats, no activity");
+        for (Type type : types) {
+            switch (type) {
+            case CLIENT:
+                active |= checkClients();
+                break;
+            case CMDLOG:
+                active |= checkCommandLog();
+                break;
+            case IMPORT:
+                active |= checkImporter();
+                break;
+            case EXPORT:
+                active |= checkExporter();
+                break;
+            case DRCONS:
+                active |= checkDrConsumer();
+                break;
+            case DRPROD:
+                active |= checkDrProducer();
+                break;
             }
         }
-        catch (Exception ex) {
-            logger.error("Unhandled exception in ActivityStats: " + ex);
+        if (!active) { // if active, we already logged details
+            logger.info("Activity check: no activity");
         }
-        setValue(rowValues, ColumnName.ACTIVE, active);
-        super.updateStatsRow(rowKey, rowValues);
-    }
-
-    /*
-     * Are we running with command logging enabled?
-     */
-    private boolean usingCommandLog() {
-        CommandLog cl = VoltDB.instance().getCommandLog();
-        return cl != null && cl.isEnabled();
+        return active;
     }
 
     /*
@@ -159,7 +110,7 @@ public class ActivityStats extends StatsSource
      * Check for outstanding requests, responses, transactions.
      * Counters are all zero if nothing outstanding.
      */
-    private boolean checkClients(Object[] out) {
+    private boolean checkClients() {
         long reqBytes = 0, respMsgs = 0, txns = 0;
         try {
             ClientInterface ci = VoltDB.instance().getClientInterface();
@@ -175,9 +126,9 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkClients", ex);
         }
-        setValue(out, ColumnName.CLIENT_TXNS, txns);
-        setValue(out, ColumnName.CLIENT_REQ_BYTES, reqBytes);
-        setValue(out, ColumnName.CLIENT_RESP_MSGS, respMsgs);
+        client_reqBytes = reqBytes;
+        client_respMsgs = respMsgs;
+        client_txns = txns;
         return isActive("client interface: outstanding txns %d, request bytes %d, responses %d",
                         txns, reqBytes, respMsgs);
     }
@@ -187,7 +138,7 @@ public class ActivityStats extends StatsSource
      * Check for outstanding logging: bytes and transactions.
      * Counters are zero if nothing outstanding.
      */
-    private boolean checkCommandLog(Object[] out) {
+    private boolean checkCommandLog() {
         long bytes = 0, txns = 0;
         try {
             CommandLog cl = VoltDB.instance().getCommandLog();
@@ -202,8 +153,8 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkCommandLog", ex);
         }
-        setValue(out, ColumnName.CMDLOG_TXNS, txns);
-        setValue(out, ColumnName.CMDLOG_BYTES, bytes);
+        cmdlog_bytes = bytes;
+        cmdlog_txns = txns;
         return isActive("command log: outstanding txns %d, bytes %d", txns, bytes);
     }
 
@@ -213,7 +164,7 @@ public class ActivityStats extends StatsSource
      * Count is of outstanding requests across all importers,
      * and is zero if there's nothing outstanding.
      */
-    private boolean checkImporter(Object[] out) {
+    private boolean checkImporter() {
         long pend = 0;
         try {
             ImportManager im = ImportManager.instance();
@@ -224,7 +175,7 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkImporter", ex);
         }
-        setValue(out, ColumnName.IMPORTS_PENDING, pend);
+        import_pend = pend;
         return isActive("importer: %d pending", pend);
     }
 
@@ -234,7 +185,7 @@ public class ActivityStats extends StatsSource
      * Count is of outstanding tuples across all exporters,
      * and is zero if there's nothing outstanding.
      */
-    private boolean checkExporter(Object[] out) {
+    private boolean checkExporter() {
         long pend = 0;
         try {
             ExportManagerInterface em = ExportManagerInterface.instance();
@@ -245,7 +196,7 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkExporter", ex);
         }
-        setValue(out, ColumnName.EXPORTS_PENDING, pend);
+        export_pend = pend;
         return isActive("exporter: %d pending", pend);
     }
 
@@ -254,7 +205,7 @@ public class ActivityStats extends StatsSource
      * Returns details of outstanding data, expressed in bytes and message
      * segments, summed across all partitions. Zero when none outstanding.
      */
-    private boolean checkDrProducer(Object[] out) {
+    private boolean checkDrProducer() {
         long bytesPend = 0, segsPend = 0;
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
@@ -276,8 +227,8 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkDrProducer", ex);
         }
-        setValue(out, ColumnName.DRPROD_SEGS, segsPend);
-        setValue(out, ColumnName.DRPROD_BYTES, bytesPend);
+        drprod_bytesPend = bytesPend;
+        drprod_segsPend = segsPend;
         return isActive("DR producer: outstanding segments %d, bytes %d", segsPend, bytesPend);
     }
 
@@ -286,7 +237,7 @@ public class ActivityStats extends StatsSource
      * Returns count of partitions for which there is data not
      * yet successfully applied. Zero when nothing outstanding.
      */
-    private boolean checkDrConsumer(Object[] out) {
+    private boolean checkDrConsumer() {
         long pend = 0;
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
@@ -305,19 +256,8 @@ public class ActivityStats extends StatsSource
         catch (Exception ex) {
             warn("checkDrConsumer", ex);
         }
-        setValue(out, ColumnName.DRCONS_PARTS, pend);
+        drcons_pend = pend;
         return isActive("DR consumer: %d partitions with pending data", pend);
-    }
-
-    /*
-     * Utilities to set a value in a row.
-     */
-    private void setValue(Object[] row, ColumnName col, long val) {
-        row[columnNameToIndex.get(col.name())] = val;
-    }
-
-    private void setValue(Object[] row, ColumnName col, boolean val) {
-        row[columnNameToIndex.get(col.name())] = (val ? 1 : 0);
     }
 
     /*
@@ -330,7 +270,7 @@ public class ActivityStats extends StatsSource
     /*
      * Find source for someone else's stats (used for DR activity check)
      */
-    private StatsSource getStatsSource(StatsSelector selector) {
+    private static StatsSource getStatsSource(StatsSelector selector) {
         StatsSource ss = null;
         StatsAgent sa = VoltDB.instance().getStatsAgent();
         if (sa != null) {
@@ -365,7 +305,7 @@ public class ActivityStats extends StatsSource
             for (int i=0; i<counts.length; i++) {
                 args[i] = counts[i]; // boxing
             }
-            logger.info("ActivityStats, " + String.format(fmt, args));
+            logger.info("Activity check: " + String.format(fmt, (Object[])args));
         }
         return actv;
     }
@@ -375,6 +315,27 @@ public class ActivityStats extends StatsSource
      * is otherwise ignored.
      */
     private static void warn(String func, Exception ex) {
-        logger.warn(String.format("Unexpected exception in ActivityStats.%s: %s", func, ex));
+        logger.warn(String.format("Unexpected exception in ActivityHelper.%s: %s", func, ex));
+    }
+
+    /*
+     * Iterator through the rows of stats we make available. In fact
+     * we have a single row, so we fake out the iterator.
+     */
+    static class OneShotIterator implements Iterator<Object> {
+        private boolean hasNext = true;
+        @Override
+        public boolean hasNext() {
+            return hasNext;
+        }
+        @Override
+        public Object next() {
+            Object obj = null;
+            if (hasNext) {
+                hasNext = false;
+                obj = "THE_ROW";
+            }
+            return obj;
+        }
     }
 }
