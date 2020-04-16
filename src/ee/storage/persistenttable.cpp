@@ -122,27 +122,20 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         auto const cleaner = [this] (void const* p) {
-            std::stringstream message;
-            message << "Clean table " << name().c_str()  << " with context:" <<
-               (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") <<'\n';
-            string msg = message.str();
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
+            checkContext("Cleaning ");
             TableTuple tuple(m_schema);
             tuple.move(const_cast<void*>(p));
             decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
             tuple.freeObjectColumns();
         };
         auto const copier = [this, &tupleSize] (void* fresh, void const* dest) {
-            std::stringstream message;
-            message << "Copy table " << name().c_str()  << " with context:" <<
-                  (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
-            string msg = message.str();
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
+            checkContext("Copying ");
             TableTuple freshCopy(m_schema);
             freshCopy.move(fresh);
-            TableTuple original(m_schema);
-            original.move(const_cast<void*>(dest));
-            freshCopy.copyForPersistentInsert(original);
+            TableTuple source(m_schema);
+            source.move(const_cast<void*>(dest));
+            freshCopy.resetHeader();
+            freshCopy.copyForPersistentInsert(source);
             return fresh;
         };
         m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
@@ -162,12 +155,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 PersistentTable::~PersistentTable() {
     VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
 
-    std::stringstream message;
-    message << "Delete table " << name().c_str()  << " with context:" <<
-                 (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
-    string msg = message.str();
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &msg);
-
+    checkContext("Deleting ");
     if (tableTypeIsStream(m_tableType) == false) {
        stopSnapshot(true);
        allocator().template clear<storage::truth>();
@@ -203,6 +191,16 @@ PersistentTable::~PersistentTable() {
     }
 }
 
+void PersistentTable::checkContext(const std::string& operation) {
+   if ((isReplicatedTable() && !SynchronizedThreadLock::usingMpMemory()) ||
+      (!isReplicatedTable() && SynchronizedThreadLock::usingMpMemory())) {
+       std::stringstream message;
+       message << operation << name().c_str()  << " with context:" <<
+                 (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
+       string msg = message.str();
+       LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
+   }
+}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------

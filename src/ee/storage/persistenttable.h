@@ -323,6 +323,7 @@ public:
 
     TableTuple createTuple(TableTuple const &source);
     void finalizeRelease();
+    void checkContext(const std::string& operation);
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
