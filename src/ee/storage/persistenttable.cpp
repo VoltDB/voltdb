@@ -191,14 +191,14 @@ PersistentTable::~PersistentTable() {
     }
 }
 
-void PersistentTable::checkContext(const std::string& operation) {
-   if ((isReplicatedTable() && !SynchronizedThreadLock::usingMpMemory()) ||
-      (!isReplicatedTable() && SynchronizedThreadLock::usingMpMemory())) {
+void PersistentTable::checkContext(const char* operation) {
+   if (isReplicatedTable() != SynchronizedThreadLock::usingMpMemory()) {
        std::stringstream message;
-       message << operation << (isReplicatedTable()?" REPLICATED ":" PARTITIONED ") << name().c_str()  << " with context " <<
+       message << operation << (isReplicatedTable()?" REPLICATED ":" PARTITIONED ") << name().c_str() << " with context " <<
                  (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
        string msg = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
+       throwFatalException("%s", message.str().c_str());
    }
 }
 // ------------------------------------------------------------------
