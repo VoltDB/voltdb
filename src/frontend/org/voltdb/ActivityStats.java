@@ -104,17 +104,37 @@ public class ActivityStats extends StatsSource
     /*
      * Main stats collection. We return a single row, and
      * the key is irrelevant.
+     *
+     * We have two distinct cases depending on whether
+     * command-logging is in use. In particular, DR is
+     * only of interest if we do not have command-logging.
+     * The assumption here is that the client is going
+     * to make a shutdown snapshot, thus needs DR copies
+     * to be stable.
+     *
+     * Ordering reflects that used by 'voltadmin shutdown',
+     * on which this is based, and is loosely characterized
+     * as 'inputs before outputs'. Probably this no longer
+     * matters, since from the client point of view we are
+     * now checking in parallel rather than sequentially.
      */
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
         boolean active = false;
         try {
-            active |= checkClients(rowValues);
-            active |= checkCommandLog(rowValues);
-            active |= checkImporter(rowValues);
-            active |= checkExporter(rowValues);
-            active |= checkDrProducer(rowValues);
-            active |= checkDrConsumer(rowValues);
+            if (usingCommandLog()) {
+                active |= checkClients(rowValues);
+                active |= checkImporter(rowValues);
+                active |= checkCommandLog(rowValues);
+                active |= checkExporter(rowValues);
+            }
+            else {
+                active |= checkClients(rowValues);
+                active |= checkImporter(rowValues);
+                active |= checkDrConsumer(rowValues);
+                active |= checkExporter(rowValues);
+                active |= checkDrProducer(rowValues);
+            }
             if (!active) { // if active, we already logged details
                 logger.info("ActivityStats, no activity");
             }
@@ -124,6 +144,14 @@ public class ActivityStats extends StatsSource
         }
         setValue(rowValues, ColumnName.ACTIVE, active);
         super.updateStatsRow(rowKey, rowValues);
+    }
+
+    /*
+     * Are we running with command logging enabled?
+     */
+    private boolean usingCommandLog() {
+        CommandLog cl = VoltDB.instance().getCommandLog();
+        return cl != null && cl.isEnabled();
     }
 
     /*
@@ -229,23 +257,18 @@ public class ActivityStats extends StatsSource
     private boolean checkDrProducer(Object[] out) {
         long bytesPend = 0, segsPend = 0;
         try {
-            StatsAgent sa = VoltDB.instance().getStatsAgent();
-            if (sa != null) {
-                Set<StatsSource> sss = sa.lookupStatsSource(StatsSelector.DRPRODUCERPARTITION, 0);
-                if (sss != null && !sss.isEmpty()) {
-                    assert sss.size() == 1;
-                    StatsSource ss = sss.iterator().next();
-                    int ix_totalBytes = getIndex(ss, DRProducerStatsBase.Columns.TOTAL_BYTES);
-                    int ix_lastQueued = getIndex(ss, DRProducerStatsBase.Columns.LAST_QUEUED_DRID);
-                    int ix_lastAcked = getIndex(ss, DRProducerStatsBase.Columns.LAST_ACK_DRID);
-                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
-                        long totalBytes = asLong(row[ix_totalBytes]);
-                        long lastQueuedDrId = asLong(row[ix_lastQueued]);
-                        long lastAckedDrId = asLong(row[ix_lastAcked]);
-                        bytesPend += totalBytes;
-                        if (lastQueuedDrId > lastAckedDrId) {
-                            segsPend += lastQueuedDrId - lastAckedDrId;
-                        }
+            StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
+            if (ss != null) {
+                int ix_totalBytes = getIndex(ss, DRProducerStatsBase.Columns.TOTAL_BYTES);
+                int ix_lastQueued = getIndex(ss, DRProducerStatsBase.Columns.LAST_QUEUED_DRID);
+                int ix_lastAcked = getIndex(ss, DRProducerStatsBase.Columns.LAST_ACK_DRID);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    long totalBytes = asLong(row[ix_totalBytes]);
+                    long lastQueuedDrId = asLong(row[ix_lastQueued]);
+                    long lastAckedDrId = asLong(row[ix_lastAcked]);
+                    bytesPend += totalBytes;
+                    if (lastQueuedDrId > lastAckedDrId) {
+                        segsPend += lastQueuedDrId - lastAckedDrId;
                     }
                 }
             }
@@ -266,20 +289,15 @@ public class ActivityStats extends StatsSource
     private boolean checkDrConsumer(Object[] out) {
         long pend = 0;
         try {
-            StatsAgent sa = VoltDB.instance().getStatsAgent();
-            if (sa != null) {
-                Set<StatsSource> sss = sa.lookupStatsSource(StatsSelector.DRCONSUMERPARTITION, 0);
-                if (sss != null && !sss.isEmpty()) {
-                    assert sss.size() == 1;
-                    StatsSource ss = sss.iterator().next();
-                    int ix_timeRcvd = getIndex(ss, DRConsumerStatsBase.Columns.LAST_RECEIVED_TIMESTAMP);
-                    int ix_timeAppl = getIndex(ss, DRConsumerStatsBase.Columns.LAST_APPLIED_TIMESTAMP);
-                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
-                        long timeLastRcvd = asLong(row[ix_timeRcvd]);
-                        long timeLastApplied = asLong(row[ix_timeAppl]);
-                        if (timeLastRcvd != timeLastApplied) {
-                            pend++;
-                        }
+            StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
+            if (ss != null) {
+                int ix_timeRcvd = getIndex(ss, DRConsumerStatsBase.Columns.LAST_RECEIVED_TIMESTAMP);
+                int ix_timeAppl = getIndex(ss, DRConsumerStatsBase.Columns.LAST_APPLIED_TIMESTAMP);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    long timeLastRcvd = asLong(row[ix_timeRcvd]);
+                    long timeLastApplied = asLong(row[ix_timeAppl]);
+                    if (timeLastRcvd != timeLastApplied) {
+                        pend++;
                     }
                 }
             }
@@ -307,6 +325,22 @@ public class ActivityStats extends StatsSource
      */
     private static long asLong(Object obj) {
         return ((Long)obj).longValue();
+    }
+
+    /*
+     * Find source for someone else's stats (used for DR activity check)
+     */
+    private StatsSource getStatsSource(StatsSelector selector) {
+        StatsSource ss = null;
+        StatsAgent sa = VoltDB.instance().getStatsAgent();
+        if (sa != null) {
+            Set<StatsSource> sss = sa.lookupStatsSource(selector, 0);
+            if (sss != null && !sss.isEmpty()) {
+                assert sss.size() == 1;
+                ss = sss.iterator().next();
+            }
+        }
+        return ss;
     }
 
     /*
