@@ -150,13 +150,11 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 //            } else {
 //                vassert(!SynchronizedThreadLock::usingMpMemory());
 //            }
-            memcpy(fresh, dest, tupleSize);
             TableTuple freshCopy(m_schema);
             freshCopy.move(fresh);
-
             TableTuple original(m_schema);
             original.move(const_cast<void*>(dest));
-            freshCopy.copyNonInlinedColumnObjects(original);
+            freshCopy.copyForPersistentInsert(original);
             return fresh;
         };
         m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
