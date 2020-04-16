@@ -663,7 +663,8 @@ void PersistentTable::finalizeRelease() {
 
     TableTuple target(m_schema);
     TableTuple origin(m_schema);
-    allocator().remove_force([this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
+    allocator().template remove_force<storage::truth>(
+            [this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
         for(auto const& p : tuples) {
            target.move(p.first);
            origin.move(p.second);
@@ -1227,7 +1228,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     }
 
     allocator().remove_reserve(1);
-    allocator().template remove_add<storage::truth>(target.address());
+    allocator().remove_add(target.address());
     target.setActiveFalse();
     finalizeRelease();
 }
@@ -1250,7 +1251,7 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
         m_batchDeleteTupleCount = 0;
     }
 
-    allocator().template remove_add<storage::truth>(tuple);
+    allocator().remove_add(tuple);
 }
 
 /*

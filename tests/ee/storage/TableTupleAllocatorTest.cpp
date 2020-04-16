@@ -146,10 +146,10 @@ constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in
 
 template<typename Alloc> void* remove_single(Alloc& alloc, void const* p) {
     alloc.remove_reserve(1);
-    alloc.template remove_add<truth>(const_cast<void*>(p));
+    alloc.remove_add(const_cast<void*>(p));
     void* r = nullptr;
     assert(1 ==
-            alloc.remove_force([&r](vector<pair<void*, void*>> const& entries) noexcept {
+            alloc.template remove_force<truth>([&r](vector<pair<void*, void*>> const& entries) noexcept {
                 if (! entries.empty()) {
                     assert(entries.size() == 1);
                     r = memcpy(entries[0].first, entries[0].second, TupleSize);
@@ -163,10 +163,10 @@ template<typename Alloc> void remove_multiple(Alloc& alloc, size_t n, ...) {
     va_list args;
     va_start(args, n);
     for (size_t i = 0; i < n; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(va_arg(args, void const*)));
+        alloc.remove_add(const_cast<void*>(va_arg(args, void const*)));
     }
     assert(n ==
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept {
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
@@ -804,9 +804,9 @@ void testHookedCompactingChunks() {
     // Step 3: batch deletion
     alloc.remove_reserve(90);
     for (i = 909; i < 999; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
             for_each(entries.begin(), entries.end(),
                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -885,8 +885,8 @@ void testHookedCompactingChunks() {
                         });
                 alloc.remove_reserve(tb_removed.size());
                 for_each(tb_removed.cbegin(), tb_removed.cend(),
-                        [&alloc](void* p) { alloc.template remove_add<truth>(p); });
-                assert(alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+                        [&alloc](void* p) { alloc.remove_add(p); });
+                assert(alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                             for_each(entries.begin(), entries.end(),
                                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                             }) == tb_removed.size());
@@ -935,9 +935,9 @@ void testHookedCompactingChunksBatchRemove_single1() {
     };
     alloc.remove_reserve(10);
     for (i = AllocsPerChunk - 10; i < AllocsPerChunk; ++i) {       // batch remove last 10 entries
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
             for_each(entries.begin(), entries.end(),
                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -980,12 +980,12 @@ void testHookedCompactingChunksBatchRemove_single2() {
     };
     alloc.remove_reserve(10);
     for (i = 0; i < 10; ++i) {       // batch remove last 10 entries
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
         memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
             for_each(entries.begin(), entries.end(),
                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1012,8 +1012,8 @@ void testHookedCompactingChunksBatchRemove_single3() {         // correctness on
     }
     alloc.template freeze<truth>();
     alloc.remove_reserve(1);
-    alloc.template remove_add<truth>(const_cast<void*>(addresses[4]));      // 9 => 4
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.remove_add(const_cast<void*>(addresses[4]));      // 9 => 4
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1036,8 +1036,8 @@ void testHookedCompactingChunksBatchRemove_single4() {         // correctness on
     Alloc alloc(TupleSize);
     void* p = alloc.allocate();
     alloc.remove_reserve(1);
-    alloc.template remove_add<truth>(p);
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.remove_add(p);
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1082,15 +1082,15 @@ void testHookedCompactingChunksBatchRemove_multi1() {
     alloc.remove_reserve(60);
     for (i = 0; i < 3; ++i) {
         for_each(iter, next(iter, 10), [&alloc](void const* p) {
-                alloc.template remove_add<truth>(const_cast<void*>(p));
+                alloc.remove_add(const_cast<void*>(p));
             });
         advance(iter, AllocsPerChunk - 10);
         for_each(iter, next(iter, 10), [&alloc](void const* p) {
-                alloc.template remove_add<truth>(const_cast<void*>(p));
+                alloc.remove_add(const_cast<void*>(p));
             });
         advance(iter, 10);
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1130,14 +1130,14 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     alloc.remove_reserve(NumTuples / 2);
     for(auto iter = addresses.cbegin();                             // remove every other
             iter != addresses.cend();) {
-        alloc.template remove_add<truth>(const_cast<void*>(*iter));
+        alloc.remove_add(const_cast<void*>(*iter));
         if (++iter == addresses.cend()) {
             break;
         } else {
             ++iter;
         }
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1162,9 +1162,9 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksBatchRemove_nonfull_2c
     }
     alloc.remove_reserve(AllocsPerChunk + 2);
     for(i = 0; i < AllocsPerChunk + 2; ++i) {                  // batch remove 1st chunk plus 2
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries){
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1193,9 +1193,9 @@ TEST_F(TableTupleAllocatorTest, testHookedCompactingChunksStatistics) {
     // batch remove last 30 entries, compacts/removes head chunk
     alloc.remove_reserve(AllocsPerChunk - 2);
     for(i = 2; i < AllocsPerChunk; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[N - i + 1]));
+        alloc.remove_add(const_cast<void*>(addresses[N - i + 1]));
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept {
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1762,9 +1762,9 @@ TEST_F(TableTupleAllocatorTest, TestSnapshotIteratorOnNonFull1stChunk) {
     // Remove last 10, making 1st chunk non-full
     alloc.remove_reserve(10);
     for (i = 0; i < 10; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[NumTuples - i - 1]));
+        alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
     }
-    alloc.remove_force([](vector<pair<void*, void*>> const& entries)noexcept{
+    alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries)noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
@@ -1954,10 +1954,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
     // batch remove every other tuple
     alloc.remove_reserve(NumTuples / 2);
     for (i = 0; i < NumTuples; i += 2) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     ASSERT_EQ(NumTuples / 2,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept {
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
@@ -1982,14 +1982,14 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
     alloc.template freeze<truth>();
     alloc.remove_reserve(NumTuples / 2);
     for (i = 0; i < NumTuples; i += 2) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     ASSERT_EQ(NumTuples / 2,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept {
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
-    ASSERT_TRUE(verifier.seen().empty());
+    ASSERT_EQ(NumTuples / 4, verifier.seen().size());
     alloc.template thaw<truth>();
     // At thaw time, those copies in the batch should be removed
     // (and finalized before being deallocated), since snapshot iterator needs them
@@ -2059,18 +2059,17 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
         ++*iter;
     }
     for (i = 0; i < NumTuples / 2; ++i) {
-        alloc.template remove_add<truth>(
-                const_cast<void*>(addresses[NumTuples - i - 1]));
+        alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
     }
     // finalize called on the 2nd half in the txn memory
-    ASSERT_EQ(NumTuples / 2, alloc.remove_force(
+    ASSERT_EQ(NumTuples / 2, alloc.template remove_force<truth>(
                 [](vector<pair<void*, void*>> const& entries){
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
-    ASSERT_TRUE(verifier.seen().empty());
+    ASSERT_EQ(NumTuples / 4, verifier.seen().size());
     alloc.template thaw<truth>();
-    ASSERT_EQ(NumTuples / 2 - NumTuples / 8, verifier.seen().size());
+    ASSERT_EQ(NumTuples / 2 + NumTuples / 8, verifier.seen().size());
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
@@ -2118,27 +2117,27 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
         }
         alloc.remove_reserve(AllocsPerChunk * 4);
         for (i = 0; i < AllocsPerChunk * 3; ++i) {                         // does not account for any chunks
-            alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+            alloc.remove_add(const_cast<void*>(addresses[i]));
         }
         ASSERT_TRUE(verifier.seen().empty());
         for (i = 0; i < AllocsPerChunk; ++i) {
             // Deleting beyond frozen region should trigger
             // finalize right away (same as unfrozen state):
-            alloc.template remove_add<truth>(const_cast<void*>(addresses[NumTuples + i]));
+            alloc.remove_add(const_cast<void*>(addresses[NumTuples + i]));
         }
 
-        ASSERT_EQ(AllocsPerChunk, verifier.seen().size());
+        ASSERT_EQ(AllocsPerChunk * 4,
+                alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
+                    for_each(entries.begin(), entries.end(),
+                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                    }));
+        ASSERT_EQ(AllocsPerChunk * 4, verifier.seen().size());
         // verify that this 2nd to last chunk is finalized on
         // each call to `remove_add'
         for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
             ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
         }
 
-        ASSERT_EQ(AllocsPerChunk * 4,
-                alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
-                    for_each(entries.begin(), entries.end(),
-                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                    }));
         // check 1st value of txn iterator
         ASSERT_EQ(AllocsPerChunk * 4, Gen::of(reinterpret_cast<unsigned char const*>(
                         *IterableTableTupleChunks<Alloc, truth>::const_iterator(alloc))));
@@ -2149,7 +2148,6 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
             // trigger any finalization.
             ++*iter;
         }
-        ASSERT_EQ(AllocsPerChunk, verifier.seen().size());
         alloc.template thaw<truth>();
         /**
          * verify what hook had finalized
@@ -2206,8 +2204,8 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
         do {
             for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
                 alloc.remove_reserve(1);
-                alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
-                ASSERT_EQ(1, alloc.remove_force([this] (vector<pair<void*, void*>> const& entries) {
+                alloc.remove_add(const_cast<void*>(addresses[i]));
+                ASSERT_EQ(1, alloc.template remove_force<truth>([this] (vector<pair<void*, void*>> const& entries) {
                                 ASSERT_EQ(1, entries.size());
                                 ASSERT_EQ(AllocsPerChunk - 1,
                                         Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
@@ -2250,12 +2248,10 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     }
     // delete last 2 tuples from last chunk
     alloc.remove_reserve(2);
-    alloc.template remove_add<truth>(
-            const_cast<void*>(addresses[AllocsPerChunk * 3 - 1]));
-    alloc.template remove_add<truth>(
-            const_cast<void*>(addresses[AllocsPerChunk * 3 - 2]));
+    alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk * 3 - 1]));
+    alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk * 3 - 2]));
     ASSERT_EQ(2,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
@@ -2263,13 +2259,13 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     auto const& iter = alloc.template freeze<truth>();
     alloc.remove_reserve(AllocsPerChunk);
     for (i = 0; i < AllocsPerChunk - 2; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     for (i = 0; i < 2; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i + AllocsPerChunk]));
+        alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
     ASSERT_EQ(AllocsPerChunk,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
@@ -2300,12 +2296,10 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     }
     // delete last 2 tuples from 1st chunk
     alloc.remove_reserve(2);
-    alloc.template remove_add<truth>(
-            const_cast<void*>(addresses[AllocsPerChunk - 1]));
-    alloc.template remove_add<truth>(
-            const_cast<void*>(addresses[AllocsPerChunk - 2]));
+    alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk - 1]));
+    alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk - 2]));
     ASSERT_EQ(2,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
@@ -2313,13 +2307,13 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     auto const& iter = alloc.template freeze<truth>();
     alloc.remove_reserve(AllocsPerChunk);
     for (i = 0; i < AllocsPerChunk - 2; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
+        alloc.remove_add(const_cast<void*>(addresses[i]));
     }
     for (i = 0; i < 2; ++i) {
-        alloc.template remove_add<truth>(const_cast<void*>(addresses[i + AllocsPerChunk]));
+        alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
     ASSERT_EQ(AllocsPerChunk,
-            alloc.remove_force([](vector<pair<void*, void*>> const& entries) noexcept{
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));

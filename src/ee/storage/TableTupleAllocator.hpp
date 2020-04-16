@@ -634,8 +634,8 @@ namespace voltdb {
             CompactingChunks(CompactingChunks&&) = delete;
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
-            void pop_front(bool call_finalizer);
-            void pop_back(bool call_finalizer);
+            void pop_front();
+            void pop_back();
             void pop_finalize(typename list_type::iterator) const;
         protected:
             class DelayedRemover {
@@ -664,8 +664,11 @@ namespace voltdb {
                 void reserve(size_t);
                 // Register a single allocation to be removed later
                 void add(void*);
-                vector<pair<void*, void*>> const& movements() const;
+                vector<pair<void*, void*>> const& movements() const;       // #2 copied over to #1
                 vector<void*> const& removed() const;
+                // finalize on removed addresses, and some dst of moved address.
+                // Note that it has to be called prior to any movements.
+                size_t finalize(boost::optional<position_type> const&) const;
                 // Actuate batch remove
                 size_t force();
                 bool empty() const noexcept;
@@ -849,13 +852,14 @@ namespace voltdb {
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
-            template<typename Tag> void remove_add(void*);
+            void remove_add(void*);
             /**
              * NOTE: the remove_force method itself **does not**
              * "compact" tuples, and it is user's responsibility
              * to call `memcpy' in the call back, to copy the
              * pair's 2nd content to 1st.
              */
+            template<typename Tag>
             size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             void remove_reset();
             template<typename Tag> void clear();
@@ -1043,6 +1047,7 @@ namespace voltdb {
                 IteratorObserver(IteratorObserver&&) noexcept = default;
                 bool operator()(void const*) const;    // iterator > arg ptr? i.e. visited?
                 using super::reset;                    // equivalent of dtor
+                boost::optional<position_type> to_position() const noexcept;
             };
         };
 
