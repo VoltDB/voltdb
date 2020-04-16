@@ -97,7 +97,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                     + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} values (?, ?);");
 
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
-            "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic (key bigint not null, value bigint not null);"
+            "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic {2} (key bigint not null, value bigint not null);"
                     + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change
@@ -447,7 +447,11 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     protected void generateTopicDDL(int topicNum, StringBuffer sb) {
-        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum);
+        generateTopicDDL(topicNum, "", sb);
+    }
+
+    protected void generateTopicDDL(int topicNum, String profileClause, StringBuffer sb) {
+        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum, profileClause);
     }
 
     /**

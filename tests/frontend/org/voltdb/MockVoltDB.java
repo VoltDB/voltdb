@@ -64,6 +64,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -213,6 +214,12 @@ public class MockVoltDB implements VoltDBInterface
         getDatabase().getTables().add(tableName);
         getTable(tableName).setIsreplicated(isReplicated);
         getTable(tableName).setSignature(tableName);
+    }
+
+    public void addTopic(String topicName) {
+        addTable(topicName, false);
+        getTable(topicName).setIstopic(true);
+        getTable(topicName).setTopicformat(EncodeFormat.CSV.name());
     }
 
     public void setDRProducerEnabled()
