@@ -271,9 +271,7 @@ public class UniqueIdGenerator {
      * id was created.
      */
     public static Date getDateFromUniqueId(long uniqueId) {
-        long time = uniqueId >> (COUNTER_BITS + PARTITIONID_BITS);
-        time += VOLT_EPOCH;
-        return new Date(time);
+        return new Date(getTimestampFromUniqueId(uniqueId));
     }
 
     /**

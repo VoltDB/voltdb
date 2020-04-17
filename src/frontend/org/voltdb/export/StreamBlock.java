@@ -132,8 +132,12 @@ public class StreamBlock {
         return m_uniqueId;
     }
 
+    public long getTimestampMs() {
+        return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId);
+    }
+
     public long getTimestamp() {
-        return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId) * 1000;
+        return getTimestampMs() * 1000;
     }
 
     /**

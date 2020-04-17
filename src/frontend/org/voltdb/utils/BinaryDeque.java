@@ -75,12 +75,13 @@ public interface BinaryDeque<M> {
      * @param BBContainer with the bytes to store
      * @param startId the id of the first row in the buffer
      * @param endId the id of the last row in the buffer
+     * @param timestamp of this object
      * @return the number of bytes written. If compression is enabled, the number of compressed bytes
      *         written is returned, which will be different from the number of bytes passed in.
      * @throws IOException if the object is larger then the implementation defined max,
      *         64 megabytes in the case of PersistentBinaryDeque.
      */
-    int offer(BBContainer object, long startId, long endId) throws IOException;
+    int offer(BBContainer object, long startId, long endId, long timestamp) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 

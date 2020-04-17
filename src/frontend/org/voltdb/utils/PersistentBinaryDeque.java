@@ -89,7 +89,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void updateGapHeader(M gapHeader) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                if (m_closed) throw new IOException("updateGapHeader call on closed PBD " + m_nonce);
+                if (m_closed) {
+                    throw new IOException("updateGapHeader call on closed PBD " + m_nonce);
+                }
                 m_gapHeader = gapHeader;
                 if (m_activeSegment!= null) {
                     finishActiveSegmentWrite();
@@ -103,9 +105,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         @Override
-        public int offer(BBContainer data, long startId, long endId) throws IOException {
+        public int offer(BBContainer data, long startId, long endId, long timestamp) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                if (m_closed) throw new IOException("updateGapHeader call on closed PBD " + m_nonce);
+                if (m_closed) {
+                    throw new IOException("updateGapHeader call on closed PBD " + m_nonce);
+                }
                 assert(m_gapHeader != null);
                 assert(startId != PBDSegment.INVALID_ID && endId >= startId);
 
@@ -143,7 +147,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 }
 
                 m_filledGap = true;
-                Pair<Integer, PBDSegment<M>> result = offerToSegment(prev, data, startId, endId, m_gapHeader, false);
+                Pair<Integer, PBDSegment<M>> result = offerToSegment(prev, data, startId, endId, timestamp, m_gapHeader,
+                        false);
                 m_activeSegment = result.getSecond();
                 return result.getFirst();
             }
@@ -372,7 +377,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void skipPast(long id) throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                if (moveToValidSegment() == null) return;
+                if (moveToValidSegment() == null) {
+                    return;
+                }
                 while (id >= m_segment.getEndId() && skipToNextSegment(false));
             }
         }
@@ -1207,20 +1214,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized int offer(BBContainer object) throws IOException {
-        return commonOffer(object, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
+        return commonOffer(object, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID, PBDSegment.INVALID_TIMESTAMP);
     }
 
     @Override
-    public synchronized int offer(BBContainer object, long startId, long endId) throws IOException {
-        return commonOffer(object, startId, endId);
+    public synchronized int offer(BBContainer object, long startId, long endId, long timestamp) throws IOException {
+        return commonOffer(object, startId, endId, timestamp);
     }
 
     @Override
     public synchronized int offer(DeferredSerialization ds) throws IOException {
-        return commonOffer(ds, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
+        return commonOffer(ds, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID, PBDSegment.INVALID_TIMESTAMP);
     }
 
-    private int commonOffer(Object object, long startId, long endId) throws IOException {
+    private int commonOffer(Object object, long startId, long endId, long timestamp) throws IOException {
         boolean isDs = (object instanceof DeferredSerialization);
         assertions();
         if (m_closed) {
@@ -1234,21 +1241,24 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         Pair<Integer, PBDSegment<M>> result;
-        result = offerToSegment(m_activeSegment, object, startId, endId, m_extraHeader, isDs);
+        result = offerToSegment(m_activeSegment, object, startId, endId, timestamp, m_extraHeader, isDs);
         m_activeSegment = result.getSecond();
         return result.getFirst();
     }
 
-    private Pair<Integer, PBDSegment<M>> offerToSegment(PBDSegment<M> segment, Object object, long startId, long endId, M extraHeader, boolean isDs) throws IOException {
+    private Pair<Integer, PBDSegment<M>> offerToSegment(PBDSegment<M> segment, Object object, long startId, long endId,
+            long timestamp, M extraHeader, boolean isDs) throws IOException {
         if (segment == null || !segment.isActive()) {
             segment = addSegment(segment, startId, extraHeader);
         }
 
-        int written = (isDs) ? segment.offer((DeferredSerialization) object) : segment.offer((BBContainer) object, startId, endId);
+        int written = (isDs) ? segment.offer((DeferredSerialization) object)
+                : segment.offer((BBContainer) object, startId, endId, timestamp);
         if (written < 0) {
             finishWrite(segment);
             segment = addSegment(segment, startId, extraHeader);
-            written = (isDs) ? segment.offer((DeferredSerialization) object) : segment.offer((BBContainer) object, startId, endId);
+            written = (isDs) ? segment.offer((DeferredSerialization) object)
+                    : segment.offer((BBContainer) object, startId, endId, timestamp);
             if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
             }
@@ -1372,7 +1382,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             nextIndex--;
 
             while (currentSegmentContents.peek() != null) {
-                writeSegment.offer(currentSegmentContents.pollFirst(), PBDSegment.INVALID_ID, PBDSegment.INVALID_ID);
+                writeSegment.offer(currentSegmentContents.pollFirst(), PBDSegment.INVALID_ID, PBDSegment.INVALID_ID,
+                        PBDSegment.INVALID_TIMESTAMP);
                 m_numObjects++;
             }
 

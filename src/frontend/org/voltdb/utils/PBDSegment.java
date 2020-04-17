@@ -34,6 +34,7 @@ public abstract class PBDSegment<M> {
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
     static final long INVALID_ID = Long.MIN_VALUE;
+    static final long INVALID_TIMESTAMP = -1;
 
     // Segment Header layout:
     // - version of segment headers (4 bytes)
@@ -42,6 +43,7 @@ public abstract class PBDSegment<M> {
     //  - total bytes of data (4 bytes, uncompressed size),
     //  - id of the first data entry (8 bytes)
     //  - id of the last data entry (8 bytes)
+    // - timestamp last entry was added (8 bytes)
     //  - random id assigned to segment ( 4 bytes )
     //  - size in bytes of extra header ( 4 bytes )
     //  - crc for the extra header ( 4 bytes )
@@ -52,7 +54,8 @@ public abstract class PBDSegment<M> {
     public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
     public static final int HEADER_START_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 8;
     public static final int HEADER_END_ID_OFFSET = HEADER_START_ID_OFFSET + 8;
-    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_END_ID_OFFSET + 4;
+    public static final int HEADER_LAST_TIMESTAMP = HEADER_END_ID_OFFSET + 8;
+    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_LAST_TIMESTAMP + 4;
     public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_RANDOM_ID_OFFSET + 4;
     public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
     static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
@@ -117,6 +120,12 @@ public abstract class PBDSegment<M> {
      */
     abstract long getEndId() throws IOException ;
 
+    /**
+     * @return the timestamp of the last entry or {@code -1} if there is no timestamp
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getTimestamp() throws IOException;
+
     abstract int getNumEntries() throws IOException;
 
     abstract boolean isBeingPolled();
@@ -168,7 +177,7 @@ public abstract class PBDSegment<M> {
      *         fit into this segment.
      * @throws IOException if any IO error occurs trying to write to the pbd segment file.
      */
-    abstract int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException;
+    abstract int offer(DBBPool.BBContainer cont, long startId, long endId, long timestamp) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
