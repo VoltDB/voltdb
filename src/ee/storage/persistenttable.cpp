@@ -39,6 +39,8 @@
 #include "common/ValuePeeker.hpp"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+#include <boost/stacktrace.hpp>
 #include <vector>
 #include <functional>
 namespace voltdb {
@@ -192,14 +194,14 @@ PersistentTable::~PersistentTable() {
 }
 
 void PersistentTable::checkContext(const char* operation) {
-   if (isReplicatedTable() != SynchronizedThreadLock::usingMpMemory()) {
+    if (isReplicatedTable() != SynchronizedThreadLock::usingMpMemory()) {
        std::stringstream message;
-       message << operation << (isReplicatedTable()?" REPLICATED ":" PARTITIONED ") << name().c_str() << " with context " <<
+       message << operation << " tuples from table " << name().c_str() << (isReplicatedTable()?"(REPLICATED)":"(PARTITIONED)") << " with incorrect context: " <<
                  (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
+       message << boost::stacktrace::stacktrace() << '\n';
        string msg = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
-       //throwFatalException("%s", message.str().c_str());
-   }
+    }
 }
 // ------------------------------------------------------------------
 // OPERATIONS
