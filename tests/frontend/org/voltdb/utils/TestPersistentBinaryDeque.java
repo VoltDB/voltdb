@@ -227,7 +227,8 @@ public class TestPersistentBinaryDeque {
         long startSeqNo = 1;
         for (int i=0; i<numFiles; i++) {
             if (requiresId) {
-                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i*10, startSeqNo + (i+1)*10 - 1);
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i * 10, startSeqNo + (i + 1) * 10 - 1,
+                        System.currentTimeMillis());
             } else {
                 m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)));
             }
@@ -252,7 +253,8 @@ public class TestPersistentBinaryDeque {
                 .initialExtraHeader(m_metadata, SERIALIZER).build();
         for (int i=numFiles; i<numFiles+2; i++) {
             if (requiresId) {
-                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i*10, startSeqNo + (i+1)*10 - 1);
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)), startSeqNo + i * 10, startSeqNo + (i + 1) * 10 - 1,
+                        System.currentTimeMillis());
             } else {
                 m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(i)));
             }
@@ -1532,7 +1534,8 @@ public class TestPersistentBinaryDeque {
             }
             for (int j=0; j<3; j++) {
                 long startSeqNo = seqNo + i*3*10 + j*10;
-                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), startSeqNo, startSeqNo + 9);
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), startSeqNo, startSeqNo + 9,
+                        System.currentTimeMillis());
             }
         }
         long lastSeqNo = numSegments*3*10;

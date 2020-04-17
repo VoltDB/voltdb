@@ -28,6 +28,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +93,7 @@ public class TestPBDGapWriter {
         // close the pbd. Now gapWriter calls should fail
         m_pbd.close();
         try {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 1, 10);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), 1, 10);
             fail();
         } catch(IOException e) {
             //expected
@@ -103,7 +104,7 @@ public class TestPBDGapWriter {
     public void testNegativeOffers() throws Exception {
         int startSeqNo = 1, nextSeqNo = 1;
         for (int i=0; i<3; i++) {
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+4);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 4);
             nextSeqNo += 5;
             m_pbd.updateExtraHeader(m_metadata);
         }
@@ -123,7 +124,7 @@ public class TestPBDGapWriter {
 
     private void negativeGapOffer(long firstSeqNo, long lastSeqNo) throws IOException {
         try {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), firstSeqNo, lastSeqNo);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), firstSeqNo, lastSeqNo);
             fail();
         } catch(IllegalArgumentException e) {
             // expected
@@ -134,7 +135,7 @@ public class TestPBDGapWriter {
     public void testFillAtHead() throws Exception {
         int nextSeqNo = 21;
         for (int i=0; i<3; i++) {
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+4);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 4);
             nextSeqNo += 5;
         }
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
@@ -142,8 +143,8 @@ public class TestPBDGapWriter {
         nextSeqNo = 1;
         for (int i=0; i<4; i++) {
             m_gapWriter.updateGapHeader(m_metadata);
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+2);
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo+3, nextSeqNo+4);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 2);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo + 3, nextSeqNo + 4);
             nextSeqNo += 5;
         }
         assertEquals(5, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
@@ -178,7 +179,7 @@ public class TestPBDGapWriter {
     public void testFillAtTail() throws Exception {
         long nextSeqNo = 1;
         for (int i=0; i<3; i++) {
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+4);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 4);
             nextSeqNo += 5;
         }
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
@@ -193,13 +194,12 @@ public class TestPBDGapWriter {
         long afterGapSeqNo = nextSeqNo + 4 * 5;
         for (int i=0; i<4; i++) {
             m_gapWriter.updateGapHeader(m_gapHeader);
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+2);
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo+3, nextSeqNo+4);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 2);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo + 3, nextSeqNo + 4);
             nextSeqNo += 5;
 
             // Offer beyond the end of the gap being filled
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), afterGapSeqNo,
-                    afterGapSeqNo + 4);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), afterGapSeqNo, afterGapSeqNo + 4);
             afterGapSeqNo += 5;
         }
         assertEquals(6, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
@@ -232,14 +232,14 @@ public class TestPBDGapWriter {
                 m_pbd.updateExtraHeader(m_metadata);
                 nextSeqNo += 20;
             } else {
-                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+                offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 9);
                 nextSeqNo += 10;
             }
         }
         int numFiles = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
 
         for (long seqNo : gapStarts) {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), seqNo, seqNo+19);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), seqNo, seqNo + 19);
         }
 
         assertEquals(numFiles + gapStarts.size()-1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
@@ -261,7 +261,7 @@ public class TestPBDGapWriter {
         int nextSeqNo = 1;
         while (nextSeqNo < 100) {
             if (nextSeqNo < 51 || nextSeqNo > 80) {
-                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+                offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 9);
             } else {
                 m_pbd.updateExtraHeader(m_metadata);
             }
@@ -269,9 +269,9 @@ public class TestPBDGapWriter {
         }
 
         int numFiles = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 51, 60);
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 71, 80);
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 61, 70);
+        gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), 51, 60);
+        gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), 71, 80);
+        gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), 61, 70);
         assertEquals(numFiles+3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
@@ -297,7 +297,7 @@ public class TestPBDGapWriter {
             if (nextSeqNo == gapStart) {
                 m_pbd.updateExtraHeader(m_metadata);
             } else {
-                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+99);
+                offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 99);
             }
             nextSeqNo += 100;
         }
@@ -307,8 +307,8 @@ public class TestPBDGapWriter {
 
         int numFiles = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
         long otherKey = gapStart+50;
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), otherKey, gapStart+99);
-        m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), gapStart, gapStart+49);
+        gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), otherKey, gapStart + 99);
+        gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), gapStart, gapStart + 49);
         assertEquals(numFiles + 2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         assertTrue(m_pbd.getSegments().containsKey(otherKey));
         assertTrue(m_pbd.getSegments().containsKey(gapStart));
@@ -319,7 +319,7 @@ public class TestPBDGapWriter {
         List<Long> quarantined = Arrays.asList(1L, 101L, 501L, 601L, 1001L, 1101L);
         int nextSeqNo = 1;
         while (nextSeqNo < 1200) {
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+99);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 99);
             nextSeqNo += 100;
             m_pbd.updateExtraHeader(m_metadata);
         }
@@ -332,7 +332,7 @@ public class TestPBDGapWriter {
         int numFiles = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
 
         for (Long seqNo : quarantined) {
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), seqNo, seqNo+99);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), seqNo, seqNo + 99);
         }
         assertEquals(numFiles-3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
@@ -343,7 +343,7 @@ public class TestPBDGapWriter {
         int nextSeqNo = 1;
         while (nextSeqNo < 100) {
             if (nextSeqNo < 51 || nextSeqNo > 80) {
-                m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+                offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 9);
             } else {
                 m_pbd.updateExtraHeader(m_metadata);
             }
@@ -367,14 +367,14 @@ public class TestPBDGapWriter {
                 readCount++;
                 container.discard();
             }
-            m_gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+            gapOffer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 9);
             nextSeqNo += 10;
         }
 
         // do some regular offers
         nextSeqNo = 101;
         while (nextSeqNo < 150) {
-            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), nextSeqNo, nextSeqNo+9);
+            offer(TestPersistentBinaryDeque.getFilledSmallBuffer(0), nextSeqNo, nextSeqNo + 9);
             nextSeqNo += 10;
         }
 
@@ -395,5 +395,13 @@ public class TestPBDGapWriter {
             readCount++;
         }
         assertEquals(15, readCount);
+    }
+
+    private void offer(ByteBuffer buffer, long startId, long endId) throws IOException {
+        m_pbd.offer(DBBPool.wrapBB(buffer), startId, endId, System.currentTimeMillis());
+    }
+
+    private void gapOffer(ByteBuffer buffer, long startId, long endId) throws IOException {
+        m_gapWriter.offer(DBBPool.wrapBB(buffer), startId, endId, System.currentTimeMillis());
     }
 }
