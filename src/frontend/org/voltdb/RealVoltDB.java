@@ -975,13 +975,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // Start the listener that responds to "status" requests. This needs
                 // to be started "early" to be available during initialization.
-                StatusListener sl = new StatusListener(config.m_statusInterface,
-                                                       config.m_statusPort,
-                                                       config.m_publicInterface);
-                sl.start();
-                config.m_statusInterface = sl.getListenInterface();
-                config.m_statusPort = sl.getAssignedPort();
-                consoleLog.info(String.format("Listening for status requests on %s:%s", config.m_statusInterface, config.m_statusPort));
+                if (config.m_statusPort != VoltDB.DISABLED_PORT) {
+                    StatusListener sl = new StatusListener(config.m_statusInterface,
+                                                           config.m_statusPort,
+                                                           config.m_publicInterface);
+                    sl.start();
+                    config.m_statusInterface = sl.getListenInterface();
+                    config.m_statusPort = sl.getAssignedPort();
+                    consoleLog.info(String.format("Listening for status requests on %s:%s", config.m_statusInterface, config.m_statusPort));
+                }
             }
 
             // Replay command line args that we can see

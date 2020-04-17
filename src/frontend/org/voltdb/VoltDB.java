@@ -218,7 +218,7 @@ public class VoltDB {
         public String m_publicInterface = "";
 
         /** Status monitoring interface and port */
-        public int m_statusPort = AUTO_STATUS_PORT;
+        public int m_statusPort = DISABLED_PORT;
         public String m_statusInterface = "";
 
         /** running the enterprise version? */
