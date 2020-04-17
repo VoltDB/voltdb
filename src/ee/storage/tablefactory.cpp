@@ -108,7 +108,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId, const std::string &name, TupleSchema* schema,
             const std::vector<std::string> &columnNames, ExportTupleStream* wrapper,
             bool exportEnabled) {
-    StreamedTable *table = new StreamedTable(wrapper);
+    StreamedTable *table = StreamedTable::createForTest(wrapper);
 
     initCommon(databaseId, table, name, schema, columnNames,true);
 
