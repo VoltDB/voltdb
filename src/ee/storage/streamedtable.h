@@ -62,7 +62,7 @@ class StreamedTable : public Table, public UndoQuantumReleaseInterest {
 public:
     StreamedTable(int partitionColumn = -1);
     //Used for test
-    StreamedTable(ExportTupleStream *wrapper, int partitionColumn = -1);
+    static StreamedTable* createForTest(ExportTupleStream *wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema,
             std::string tableName, std::vector<std::string> & columnNames);
 
@@ -159,6 +159,8 @@ public:
     }
 
 private:
+    StreamedTable(ExportTupleStream *wrapper);
+
     // Just say 0
     size_t allocatedBlockCount() const;
 

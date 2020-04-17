@@ -41,22 +41,27 @@ StreamedTable::StreamedTable(int partitionColumn)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
-    , m_wrapper(NULL)
+    , m_wrapper(nullptr)
     , m_sequenceNo(0)
     , m_partitionColumn(partitionColumn)
 {
 }
 
-StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
+StreamedTable::StreamedTable(ExportTupleStream *wrapper)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
     , m_wrapper(wrapper)
     , m_sequenceNo(0)
-    , m_partitionColumn(partitionColumn)
+    , m_partitionColumn(-1)
 {
 }
 
+StreamedTable *
+StreamedTable::createForTest(ExportTupleStream *wrapper) {
+    StreamedTable * st = new StreamedTable(wrapper);
+    return st;
+}
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::string tableName, std::vector<std::string> & columnNames) {
@@ -97,7 +102,7 @@ StreamedTable::~StreamedTable() {
         delete m_views[i];
     }
     //When stream is dropped its wrapper is kept safe in pending list until tick or push pushes all buffers and deleted there after.
-    if (m_wrapper) {
+    if (m_wrapper != nullptr) {
         delete m_wrapper;
     }
 }

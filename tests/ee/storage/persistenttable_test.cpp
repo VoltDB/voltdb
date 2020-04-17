@@ -164,6 +164,7 @@ protected:
 
             "add /clusters#cluster/databases#database tables X\n"
             "set /clusters#cluster/databases#database/tables#X isreplicated false\n"
+            "set /clusters#cluster/databases#database/tables#X tableType 1\n"
             "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#T/columns#PK\n"
             "set $PREV estimatedtuplecount 0\n"
             "set $PREV materializer null\n"
@@ -389,10 +390,11 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     ASSERT_TRUE(added);
     table->truncateTable(engine, false);
+
+    // Old table wrapper should be null (before the commit which deallocates the old table)
+    ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
     commit();
 
-    // Old table wrapper should be null
-    ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
