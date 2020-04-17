@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.voltdb.importer.ImportManager;
@@ -61,12 +62,12 @@ class ActivityHelper {
      * getters for internal-only use. Obviously these are
      * named with prefixes similar to the Type names above.
      */
-    long client_reqBytes, client_respMsgs, client_txns;
-    long cmdlog_bytes, cmdlog_txns;
-    long import_pend;
-    long export_pend;
-    long drcons_pend;
-    long drprod_bytesPend, drprod_segsPend;
+    long clientReqBytes, clientRespMsgs, clientTxns;
+    long cmdlogBytes, cmdlogTxns;
+    long importPend;
+    long exportPend;
+    long drconsPend;
+    long drprodBytesPend, drprodSegsPend;
 
     /*
      * Main stats collection method. Stats values
@@ -126,9 +127,9 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkClients", ex);
         }
-        client_reqBytes = reqBytes;
-        client_respMsgs = respMsgs;
-        client_txns = txns;
+        clientReqBytes = reqBytes;
+        clientRespMsgs = respMsgs;
+        clientTxns = txns;
         return isActive("client interface: outstanding txns %d, request bytes %d, responses %d",
                         txns, reqBytes, respMsgs);
     }
@@ -153,8 +154,8 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkCommandLog", ex);
         }
-        cmdlog_bytes = bytes;
-        cmdlog_txns = txns;
+        cmdlogBytes = bytes;
+        cmdlogTxns = txns;
         return isActive("command log: outstanding txns %d, bytes %d", txns, bytes);
     }
 
@@ -175,7 +176,7 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkImporter", ex);
         }
-        import_pend = pend;
+        importPend = pend;
         return isActive("importer: %d pending", pend);
     }
 
@@ -196,7 +197,7 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkExporter", ex);
         }
-        export_pend = pend;
+        exportPend = pend;
         return isActive("exporter: %d pending", pend);
     }
 
@@ -210,13 +211,13 @@ class ActivityHelper {
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
             if (ss != null) {
-                int ix_totalBytes = getIndex(ss, DRProducerStatsBase.Columns.TOTAL_BYTES);
-                int ix_lastQueued = getIndex(ss, DRProducerStatsBase.Columns.LAST_QUEUED_DRID);
-                int ix_lastAcked = getIndex(ss, DRProducerStatsBase.Columns.LAST_ACK_DRID);
+                int ixTotalBytes = getIndex(ss, DRProducerStatsBase.Columns.TOTAL_BYTES);
+                int ixLastQueued = getIndex(ss, DRProducerStatsBase.Columns.LAST_QUEUED_DRID);
+                int ixLastAcked = getIndex(ss, DRProducerStatsBase.Columns.LAST_ACK_DRID);
                 for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
-                    long totalBytes = asLong(row[ix_totalBytes]);
-                    long lastQueuedDrId = asLong(row[ix_lastQueued]);
-                    long lastAckedDrId = asLong(row[ix_lastAcked]);
+                    long totalBytes = asLong(row[ixTotalBytes]);
+                    long lastQueuedDrId = asLong(row[ixLastQueued]);
+                    long lastAckedDrId = asLong(row[ixLastAcked]);
                     bytesPend += totalBytes;
                     if (lastQueuedDrId > lastAckedDrId) {
                         segsPend += lastQueuedDrId - lastAckedDrId;
@@ -227,8 +228,8 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkDrProducer", ex);
         }
-        drprod_bytesPend = bytesPend;
-        drprod_segsPend = segsPend;
+        drprodBytesPend = bytesPend;
+        drprodSegsPend = segsPend;
         return isActive("DR producer: outstanding segments %d, bytes %d", segsPend, bytesPend);
     }
 
@@ -242,11 +243,11 @@ class ActivityHelper {
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
             if (ss != null) {
-                int ix_timeRcvd = getIndex(ss, DRConsumerStatsBase.Columns.LAST_RECEIVED_TIMESTAMP);
-                int ix_timeAppl = getIndex(ss, DRConsumerStatsBase.Columns.LAST_APPLIED_TIMESTAMP);
+                int ixTimeRcvd = getIndex(ss, DRConsumerStatsBase.Columns.LAST_RECEIVED_TIMESTAMP);
+                int ixTimeAppl = getIndex(ss, DRConsumerStatsBase.Columns.LAST_APPLIED_TIMESTAMP);
                 for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
-                    long timeLastRcvd = asLong(row[ix_timeRcvd]);
-                    long timeLastApplied = asLong(row[ix_timeAppl]);
+                    long timeLastRcvd = asLong(row[ixTimeRcvd]);
+                    long timeLastApplied = asLong(row[ixTimeAppl]);
                     if (timeLastRcvd != timeLastApplied) {
                         pend++;
                     }
@@ -256,7 +257,7 @@ class ActivityHelper {
         catch (Exception ex) {
             warn("checkDrConsumer", ex);
         }
-        drcons_pend = pend;
+        drconsPend = pend;
         return isActive("DR consumer: %d partitions with pending data", pend);
     }
 
@@ -315,7 +316,7 @@ class ActivityHelper {
      * is otherwise ignored.
      */
     private static void warn(String func, Exception ex) {
-        logger.warn(String.format("Unexpected exception in ActivityHelper.%s: %s", func, ex));
+        logger.warn(String.format("Unexpected exception in ActivityHelper.%s", func), ex);
     }
 
     /*
@@ -330,12 +331,11 @@ class ActivityHelper {
         }
         @Override
         public Object next() {
-            Object obj = null;
-            if (hasNext) {
-                hasNext = false;
-                obj = "THE_ROW";
+            if (!hasNext) {
+                throw new NoSuchElementException("no more rows");
             }
-            return obj;
+            hasNext = false;
+            return "THE_ROW";
         }
     }
 }

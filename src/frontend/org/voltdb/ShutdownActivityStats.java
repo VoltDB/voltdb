@@ -113,24 +113,24 @@ public class ShutdownActivityStats extends StatsSource
             ActivityHelper helper = new ActivityHelper();
             if (usingCommandLog()) {
                 active = helper.collect(statsWithCmdLog);
-                setValue(row, ColumnName.CLIENT_TXNS, helper.client_txns);
-                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.client_reqBytes);
-                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.client_respMsgs);
-                setValue(row, ColumnName.IMPORTS_PENDING, helper.import_pend);
-                setValue(row, ColumnName.CMDLOG_TXNS, helper.cmdlog_txns);
-                setValue(row, ColumnName.CMDLOG_BYTES, helper.cmdlog_bytes);
-                setValue(row, ColumnName.EXPORTS_PENDING, helper.export_pend);
+                setValue(row, ColumnName.CLIENT_TXNS, helper.clientTxns);
+                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.clientReqBytes);
+                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.clientRespMsgs);
+                setValue(row, ColumnName.IMPORTS_PENDING, helper.importPend);
+                setValue(row, ColumnName.CMDLOG_TXNS, helper.cmdlogTxns);
+                setValue(row, ColumnName.CMDLOG_BYTES, helper.cmdlogBytes);
+                setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
             }
             else {
                 active = helper.collect(statsWithoutCmdLog);
-                setValue(row, ColumnName.CLIENT_TXNS, helper.client_txns);
-                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.client_reqBytes);
-                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.client_respMsgs);
-                setValue(row, ColumnName.IMPORTS_PENDING, helper.import_pend);
-                setValue(row, ColumnName.DRCONS_PARTS, helper.drcons_pend);
-                setValue(row, ColumnName.EXPORTS_PENDING, helper.export_pend);
-                setValue(row, ColumnName.DRPROD_SEGS, helper.drprod_segsPend);
-                setValue(row, ColumnName.DRPROD_BYTES, helper.drprod_bytesPend);
+                setValue(row, ColumnName.CLIENT_TXNS, helper.clientTxns);
+                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.clientReqBytes);
+                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.clientRespMsgs);
+                setValue(row, ColumnName.IMPORTS_PENDING, helper.importPend);
+                setValue(row, ColumnName.DRCONS_PARTS, helper.drconsPend);
+                setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
+                setValue(row, ColumnName.DRPROD_SEGS, helper.drprodSegsPend);
+                setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
             }
         }
         catch (Exception ex) {

@@ -73,8 +73,8 @@ public class StatusServlet extends HttpServlet {
         if (!instance.getNodeStartupComplete()) {
             int[] n = instance.getNodeStartupProgress();
             if (n[1] > 0) {
-                if (n[0] < 0) n[0] = 0;
-                if (n[0] > n[1]) n[0] = n[1];
+                if (n[0] < 0) { n[0] = 0; }
+                if (n[0] > n[1]) { n[0] = n[1]; }
                 p = String.format("%d/%d (%d%%)", n[0], n[1], (n[0] * 100) / n[1]);
             }
             else {
