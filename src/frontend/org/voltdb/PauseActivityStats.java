@@ -42,7 +42,7 @@ public class PauseActivityStats extends StatsSource
     private enum ColumnName {
         ACTIVE, // 0 if all other gauges 0, else 1
         EXPORTS_PENDING,
-        DRPROD_SEGS, DRPROD_BYTES,
+        DRPROD_ROWS, DRPROD_BYTES,
     };
 
     public PauseActivityStats() {
@@ -87,7 +87,7 @@ public class PauseActivityStats extends StatsSource
             ActivityHelper helper = new ActivityHelper();
             active = helper.collect(statsList);
             setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
-            setValue(row, ColumnName.DRPROD_SEGS, helper.drprodSegsPend);
+            setValue(row, ColumnName.DRPROD_ROWS, helper.drprodRowsPend);
             setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
         }
         catch (Exception ex) {

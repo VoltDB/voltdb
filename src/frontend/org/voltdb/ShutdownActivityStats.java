@@ -49,7 +49,7 @@ public class ShutdownActivityStats extends StatsSource
         CLIENT_TXNS, CLIENT_REQ_BYTES, CLIENT_RESP_MSGS,
         CMDLOG_TXNS, CMDLOG_BYTES,
         IMPORTS_PENDING, EXPORTS_PENDING,
-        DRPROD_SEGS, DRPROD_BYTES, DRCONS_PARTS,
+        DRPROD_ROWS, DRPROD_BYTES, DRCONS_PARTS,
     };
 
     public ShutdownActivityStats() {
@@ -129,7 +129,7 @@ public class ShutdownActivityStats extends StatsSource
                 setValue(row, ColumnName.IMPORTS_PENDING, helper.importPend);
                 setValue(row, ColumnName.DRCONS_PARTS, helper.drconsPend);
                 setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
-                setValue(row, ColumnName.DRPROD_SEGS, helper.drprodSegsPend);
+                setValue(row, ColumnName.DRPROD_ROWS, helper.drprodRowsPend);
                 setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
             }
         }

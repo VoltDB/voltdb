@@ -67,7 +67,7 @@ class ActivityHelper {
     long importPend;
     long exportPend;
     long drconsPend;
-    long drprodBytesPend, drprodSegsPend;
+    long drprodBytesPend, drprodRowsPend;
 
     /*
      * Main stats collection method. Stats values
@@ -207,7 +207,7 @@ class ActivityHelper {
      * segments, summed across all partitions. Zero when none outstanding.
      */
     private boolean checkDrProducer() {
-        long bytesPend = 0, segsPend = 0;
+        long bytesPend = 0, rowsPend = 0;
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
             if (ss != null) {
@@ -220,7 +220,7 @@ class ActivityHelper {
                     long lastAckedDrId = asLong(row[ixLastAcked]);
                     bytesPend += totalBytes;
                     if (lastQueuedDrId > lastAckedDrId) {
-                        segsPend += lastQueuedDrId - lastAckedDrId;
+                        rowsPend += lastQueuedDrId - lastAckedDrId;
                     }
                 }
             }
@@ -229,8 +229,8 @@ class ActivityHelper {
             warn("checkDrProducer", ex);
         }
         drprodBytesPend = bytesPend;
-        drprodSegsPend = segsPend;
-        return isActive("DR producer: outstanding segments %d, bytes %d", segsPend, bytesPend);
+        drprodRowsPend = rowsPend;
+        return isActive("DR producer: outstanding rows %d, bytes %d", rowsPend, bytesPend);
     }
 
     /*
