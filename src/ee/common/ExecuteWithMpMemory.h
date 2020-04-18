@@ -60,7 +60,7 @@ public:
     , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread) {
         if (needMpMemoryOnLowestThread) {
             if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
-                VOLT_DEBUG("Entering UseMPmemory");
+                VOLT_DEBUG("Entering Conditional Sync UseMPmemory");
                 SynchronizedThreadLock::assumeMpMemoryContext();
                 // This must be done in here to avoid a race with the non-MP path.
                 initiator();
@@ -96,6 +96,16 @@ class ScopedReplicatedResourceLock {
 public:
     ScopedReplicatedResourceLock();
     ~ScopedReplicatedResourceLock();
+};
+
+class ConditionalExecuteWithMpMemoryAndScopedResourceLock {
+public:
+    ConditionalExecuteWithMpMemoryAndScopedResourceLock(bool needMpMemory);
+
+    ~ConditionalExecuteWithMpMemoryAndScopedResourceLock();
+
+private:
+    bool m_usingMpMemory;
 };
 
 } // end namespace voltdb

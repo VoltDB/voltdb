@@ -48,13 +48,6 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_replicated(table.isReplicatedTable()),
              m_hiddenColumnFilter(hiddenColumnFilter)
 {
-    if (m_replicated) {
-        // There is a corner case where a replicated table is streamed from a thread other than the lowest
-        // site thread. The only known case is rejoin snapshot where none of the target partitions are on
-        // the lowest site thread.
-        ScopedReplicatedResourceLock scopedLock;
-        ExecuteWithMpMemory useMpMemory;
-    }
 }
 
 /**
@@ -62,10 +55,6 @@ CopyOnWriteContext::CopyOnWriteContext(
  */
 CopyOnWriteContext::~CopyOnWriteContext()
 {
-    if (m_replicated) {
-        ScopedReplicatedResourceLock scopedLock;
-        ExecuteWithMpMemory useMpMemory;
-    }
 }
 
 
@@ -128,28 +117,32 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     PersistentTable &table = getTable();
     TableTuple tuple(table.schema());
 
-    // Set to true to break out of the loop after the tuples dry up
-    // or the byte count threshold is hit.
-    bool yield = false;
-    while (!yield) {
-        bool hasMore = table.nextSnapshotTuple(tuple, TABLE_STREAM_SNAPSHOT);
-        if (!hasMore) {
-            yield = true;
-        } else {
-            if (!tuple.isNullTuple()) {
-                m_tuplesRemaining--;
-                if (m_tuplesRemaining < 0) {
-                   // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
-                   m_tuplesRemaining = 0;
-                }
-                bool deleteTuple = false;
-                try {
-                    yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
-                } catch (SQLException& e) {
-                    std::ostringstream buf;
-                    buf << "Serialization error on tuple:" << tuple.debug(table.name()).c_str() << std::endl;
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buf.str().c_str());
-                    throw;
+    {
+        ConditionalExecuteWithMpMemoryAndScopedResourceLock lockInMpMemory(m_replicated);
+
+        // Set to true to break out of the loop after the tuples dry up
+        // or the byte count threshold is hit.
+        bool yield = false;
+        while (!yield) {
+            bool hasMore = table.nextSnapshotTuple(tuple, TABLE_STREAM_SNAPSHOT);
+            if (!hasMore) {
+                yield = true;
+            } else {
+                if (!tuple.isNullTuple()) {
+                    m_tuplesRemaining--;
+                    if (m_tuplesRemaining < 0) {
+                       // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
+                       m_tuplesRemaining = 0;
+                    }
+                    bool deleteTuple = false;
+                    try {
+                        yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+                    } catch (SQLException& e) {
+                        std::ostringstream buf;
+                        buf << "Serialization error on tuple:" << tuple.debug(table.name()).c_str() << std::endl;
+                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buf.str().c_str());
+                        throw;
+                    }
                 }
             }
         }

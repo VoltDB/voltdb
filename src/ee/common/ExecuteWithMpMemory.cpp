@@ -33,14 +33,14 @@ ExecuteWithMpMemory::~ExecuteWithMpMemory() {
 
 ConditionalExecuteWithMpMemory::ConditionalExecuteWithMpMemory(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
     if (m_usingMpMemory) {
-        VOLT_DEBUG("Entering UseMPmemory");
+        VOLT_DEBUG("Entering Conditional UseMPmemory");
         SynchronizedThreadLock::assumeMpMemoryContext();
     }
 }
 
 ConditionalExecuteWithMpMemory::~ConditionalExecuteWithMpMemory() {
     if (m_usingMpMemory) {
-        VOLT_DEBUG("Exiting UseMPmemory");
+        VOLT_DEBUG("Exiting Conditional UseMPmemory");
         SynchronizedThreadLock::assumeLocalSiteContext();
     }
 }
@@ -99,6 +99,22 @@ ScopedReplicatedResourceLock::ScopedReplicatedResourceLock() {
 
 ScopedReplicatedResourceLock::~ScopedReplicatedResourceLock() {
     SynchronizedThreadLock::unlockReplicatedResource();
+}
+
+ConditionalExecuteWithMpMemoryAndScopedResourceLock::ConditionalExecuteWithMpMemoryAndScopedResourceLock(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
+    if (m_usingMpMemory) {
+        VOLT_DEBUG("Entering Conditional (locked) UseMPmemory");
+        SynchronizedThreadLock::lockReplicatedResource();
+        SynchronizedThreadLock::assumeMpMemoryContext();
+    }
+}
+
+ConditionalExecuteWithMpMemoryAndScopedResourceLock::~ConditionalExecuteWithMpMemoryAndScopedResourceLock() {
+    if (m_usingMpMemory) {
+        VOLT_DEBUG("Exiting Conditional (locked) UseMPmemory");
+        SynchronizedThreadLock::assumeLocalSiteContext();
+        SynchronizedThreadLock::unlockReplicatedResource();
+    }
 }
 
 } // end namespace voltdb

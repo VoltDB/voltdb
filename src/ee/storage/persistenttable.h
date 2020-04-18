@@ -446,9 +446,11 @@ public:
     int tupleLimit() const { return m_tupleLimit; }
 
     bool isReplicatedTable() const {
+#ifndef NDEBUG
         if (!m_isMaterialized && m_isReplicated != (m_partitionColumn == -1)) {
             VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name:%s\n", m_name.c_str());
         }
+#endif
         return m_isReplicated;
     }
 

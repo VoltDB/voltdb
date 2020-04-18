@@ -35,8 +35,8 @@ typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
     SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) :
-        m_realInterest(realInterest) {}
-    virtual ~SynchronizedUndoQuantumReleaseInterest() {}
+            m_realInterest(realInterest) { }
+    virtual ~SynchronizedUndoQuantumReleaseInterest() { }
     void finalizeRelease();
 private:
     UndoQuantumReleaseInterest *m_realInterest;
@@ -54,6 +54,7 @@ class SynchronizedThreadLock {
     friend class ExecuteWithAllSitesMemory;
     friend class ReplicatedMaterializedViewHandler;
     friend class ScopedReplicatedResourceLock;
+    friend class ConditionalExecuteWithMpMemoryAndScopedResourceLock;
     friend class VoltDBEngine;
     friend class ::DRBinaryLogTest;
 

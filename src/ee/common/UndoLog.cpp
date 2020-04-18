@@ -79,12 +79,7 @@ void UndoLog::release(const int64_t undoToken) {
         }
     }
     BOOST_FOREACH (auto interest, releaseInterests) {
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-                (false, //interest->isReplicatedTable(),
-                        ExecutorContext::getEngine()->isLowestSite(), []() {});
-        if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            interest->finalizeRelease();
-        }
+        interest->finalizeRelease();
     }
 }
 
