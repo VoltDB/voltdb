@@ -62,19 +62,27 @@ public class StatusListener {
     private static StatusListener singleton;
     private static final Object lock = new Object();
 
+    public class InitException extends Exception {
+        private static final long serialVersionUID = 1L;
+        public InitException(String msg, Exception cause) {
+            super(msg, cause);
+        }
+    }
+
     /**
      * Status listener:
      * @param intf  interface on which to listen for connections (null for any)
      * @param port  TCP port number (zero for automatic)
      * @param publicIntf  address to be returned in 'Host' header (if different)
+     * @throws InitException
      */
-    public StatusListener(String intf, int port, String publicIntf) {
+    public StatusListener(String intf, int port, String publicIntf) throws InitException {
         m_resolvedIntf = resolveInterface(intf, "");
         m_publicIntf = resolveInterface(publicIntf, m_resolvedIntf);
         initServer(m_resolvedIntf, port);
    }
 
-    private void initServer(String intf, int portReq) {
+    private void initServer(String intf, int portReq) throws InitException {
         QueuedThreadPool qtp = null;
         Server server = null;
         ServerConnector connector = null;
@@ -98,14 +106,14 @@ public class StatusListener {
             try { connector.close(); } catch (Exception e2) { }
             try { server.destroy(); } catch (Exception e2) { }
             try { qtp.join(); } catch (Exception e2) { }
-            throw new RuntimeException("Failed to initialize status listener", ex);
+            throw new InitException("Failed to initialize status listener", ex);
         }
 
         m_server = server;
         m_connector = connector;
     }
 
-    private static ServerConnector initConnector(Server server, String intf, int portReq) {
+    private static ServerConnector initConnector(Server server, String intf, int portReq) throws IOException {
         int portLo = portReq, portHi = portReq;
         if (portReq == 0) {
             portLo = VoltDB.DEFAULT_STATUS_PORT;
@@ -132,7 +140,7 @@ public class StatusListener {
         else {
             fail = String.format("Unable to open any port in range %s to %s", portLo, portHi);
         }
-        throw new RuntimeException(fail);
+        throw new IOException(fail);
     }
 
     public String getListenInterface() {
@@ -147,7 +155,7 @@ public class StatusListener {
         return singleton;
     }
 
-    public void start() {
+    public void start() throws InitException {
         synchronized (lock) {
             if (m_server != null) {
                 try {
@@ -162,7 +170,7 @@ public class StatusListener {
                     dumpThreadInfo();
                     safeStop();
                     singleton = null;
-                    throw new RuntimeException("Failed to start status listener", ex);
+                    throw new InitException("Failed to start status listener", ex);
                 }
             }
         }
