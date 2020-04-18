@@ -224,11 +224,14 @@ public class RetentionPolicyMgr {
                 }
 
                 if (m_reader.isOpen() && !m_reader.isCurrentSegmentActive()) {
-                    long recordTime = m_reader.getSegmentLastRecordTimestamp();
-                    if (recordTime == 0) { // cannot read last record timestamp
-                        m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
-                                "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
-                                m_pbd.getNonce());
+                    long recordTime = m_reader.getSegmentTimestamp();
+                    if (recordTime == PBDSegment.INVALID_TIMESTAMP) { // cannot read last record timestamp
+                        if (m_reader.getCurrentSegment() != null) {
+                            m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
+                                    "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
+                                    m_pbd.getNonce());
+                        }
+                        scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, m_retainMillis);
                         return;
                     }
 

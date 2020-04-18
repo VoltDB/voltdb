@@ -355,17 +355,29 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return false;
                 }
 
-                long recordTime = getSegmentLastRecordTimestamp();
-                if (recordTime == 0) { // Couldn't get the last record timestamp
-                    throw new IOException("Could not get last record time for segment in PBD " + m_nonce);
+                long recordTime = getSegmentTimestamp();
+
+                // If this one is invalid keep searching forward until there are no more or there is a valid one
+                boolean foundInvalid = recordTime == PBDSegment.INVALID_TIMESTAMP;
+                while (recordTime == PBDSegment.INVALID_TIMESTAMP) {
+                    PBDSegment<M> nextValidSegment = findNextValidSegmentFrom(m_segment, true, false);
+                    if (nextValidSegment == null) {
+                        return false;
+                    } else {
+                        m_segment = nextValidSegment;
+                        recordTime = getSegmentTimestamp();
+                    }
                 }
 
                 if (System.currentTimeMillis() - recordTime < millis) { // can't skip yet
                     return false;
                 }
 
-                long lastSegmentId = m_activeSegment.segmentId();
-                if (m_segment.segmentId() == lastSegmentId) {
+                if (m_segment.isActive() || m_segment.segmentId() == m_segments.lastEntry().getValue().segmentId()) {
+                    if (foundInvalid) {
+                        // Current segment is old enough to be deleted but is active or latest so delete invalid ones
+                        deleteSegmentsBefore(m_segment);
+                    }
                     return false;
                 }
 
@@ -441,7 +453,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return (needed == 0) ? 1 : needed; // To fix: 0 is a special value indicating we skipped.
                 }
 
-                long readerSize = readerFizeSize();
+                long readerSize = readerFileSize();
                 long diff = readerSize - segmentSize;
                 if (diff < maxBytes) {
                     return maxBytes - diff;
@@ -452,7 +464,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private long readerFizeSize() {
+        private long readerFileSize() {
             long size = 0;
             for (PBDSegment<M> segment: m_segments.tailMap(m_segment.segmentId()).values()) {
                 size += segment.getFileSize();
@@ -705,9 +717,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          *
          * @return timestamp in millis of the last record in this segment.
          */
-        public long getSegmentLastRecordTimestamp() {
-            synchronized(PersistentBinaryDeque.this) {
-                return moveToValidSegment() == null ? -1 : m_segment.file().lastModified();
+        public long getSegmentTimestamp() {
+            synchronized (PersistentBinaryDeque.this) {
+                try {
+                    return moveToValidSegment() == null ? PBDSegment.INVALID_TIMESTAMP : m_segment.getTimestamp();
+                } catch (IOException e) {
+                    m_usageSpecificLog.warn("Failed to read timestamp", e);
+                    return PBDSegment.INVALID_TIMESTAMP;
+                }
             }
         }
     }
@@ -960,13 +977,18 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         return findValidSegmentFrom(segment, higher, false);
     }
 
-    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, boolean deleteInvalid) throws IOException {
+    private PBDSegment<M> findValidSegmentFrom(PBDSegment<M> segment, boolean higher, boolean deleteInvalid)
+            throws IOException {
         if (segment == null || segment.getNumEntries() > 0) {
             return segment;
         }
+        return findNextValidSegmentFrom(segment, higher, deleteInvalid);
+    }
 
+    private PBDSegment<M> findNextValidSegmentFrom(PBDSegment<M> segment, boolean higher, boolean deleteInvalid)
+            throws IOException {
         // skip past quarantined segments
-        while (segment != null && segment.getNumEntries() == 0) {
+        do {
             Map.Entry<Long, PBDSegment<M>> nextEntry;
             if (higher) {
                 nextEntry = m_segments.higherEntry(segment.segmentId());
@@ -978,7 +1000,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 segment.m_file.delete();
             }
             segment = (nextEntry == null) ? null : nextEntry.getValue();
-        }
+        } while (segment != null && segment.getNumEntries() == 0);
 
         return segment;
     }

@@ -26,7 +26,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -34,7 +33,9 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -47,7 +48,10 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class TestTimeBasedRetentionPolicy {
     private static final VoltLogger s_logger = new VoltLogger("TestRetention");
-    private static final int s_retainMillis = 2000;
+    private static final int s_retainMillis = 500;
+
+    @Rule
+    public final TestName m_name = new TestName();
 
     PersistentBinaryDeque<ExtraHeaderMetadata> m_pbd;
 
@@ -82,22 +86,19 @@ public class TestTimeBasedRetentionPolicy {
             m_pbd.updateExtraHeader(null);
             writeBuffers(2);
             assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-            long fileTime = Long.MAX_VALUE;
-            for(File file : TestPersistentBinaryDeque.getSortedDirectoryListing()) {
-                long currFileTime = file.lastModified();
-                if (currFileTime < fileTime) {
-                    fileTime = currFileTime;
-                }
+            long fileTime;
+            synchronized (m_pbd) {
+                fileTime = m_pbd.getSegments().firstEntry().getValue().getTimestamp();
             }
 
             long now = 0L;
             long end = fileTime + retainMs;
             while(true) {
                 Thread.sleep(50);
+                now = System.currentTimeMillis();
                 if (TestPersistentBinaryDeque.getSortedDirectoryListing().size() == 1) {
                     break;
                 }
-                now = System.currentTimeMillis();
                 assert (now < (end + 250));
             }
 
@@ -224,7 +225,7 @@ public class TestTimeBasedRetentionPolicy {
     @Before
     public void setUp() throws Exception {
         TestPersistentBinaryDeque.setupTestDir();
-        m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
+        m_pbd = PersistentBinaryDeque.builder(m_name.getMethodName(), TestPersistentBinaryDeque.TEST_DIR, s_logger)
                         .compression(true)
                         .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
         m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(s_retainMillis));
