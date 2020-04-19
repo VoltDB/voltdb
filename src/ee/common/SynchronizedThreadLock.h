@@ -111,6 +111,7 @@ public:
     static bool isInSingleThreadMode();
     static void setIsInSingleThreadMode(bool value);
     static bool isInLocalEngineContext();
+    static bool isInMpEngineContext();
     static bool usingMpMemory();
     static void setUsingMpMemory(bool isUsingMpMemory);
     static bool isHoldingResourceLock();

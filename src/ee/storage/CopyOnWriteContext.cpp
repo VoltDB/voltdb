@@ -169,7 +169,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     }
 
     if (retValue == 0) {
-        table.stopSnapshot(true);
+        table.stopSnapshot(TABLE_STREAM_SNAPSHOT);
     }
     // Done when the table scan is finished and iteration is complete.
     return retValue;

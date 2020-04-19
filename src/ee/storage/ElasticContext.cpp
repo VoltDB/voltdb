@@ -175,7 +175,8 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     // Table changes are tracked through notifications.
     size_t i = 0;
     TableTuple tuple(getTable().schema());
-    while (getTable().nextSnapshotTuple(tuple, TABLE_STREAM_ELASTIC_INDEX)) {
+    bool moreRows = getTable().nextSnapshotTuple(tuple, TABLE_STREAM_ELASTIC_INDEX);
+    while (moreRows) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
@@ -183,6 +184,10 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
         if (++i == m_nTuplesPerCall) {
             break;
         }
+        moreRows = getTable().nextSnapshotTuple(tuple, TABLE_STREAM_ELASTIC_INDEX);
+    }
+    if (!moreRows) {
+        getTable().stopSnapshot(TABLE_STREAM_ELASTIC_INDEX);
     }
 
     bool indexingComplete = getTable().elasticIndexScanComplete();
