@@ -159,7 +159,7 @@ PersistentTable::~PersistentTable() {
 
     checkContext("Deleting");
     if (tableTypeIsStream(m_tableType) == false) {
-       stopSnapshot(true);
+       stopSnapshot(TABLE_STREAM_SNAPSHOT, true);
        allocator().template clear<storage::truth>();
     }
 
@@ -194,10 +194,11 @@ PersistentTable::~PersistentTable() {
 }
 
 void PersistentTable::checkContext(const char* operation) {
-    if (isReplicatedTable() != SynchronizedThreadLock::usingMpMemory()) {
+    if (isReplicatedTable() != SynchronizedThreadLock::isInMpEngineContext()) {
        std::stringstream message;
-       message << operation << " tuples from table " << name().c_str() << (isReplicatedTable()?"(REPLICATED)":"(PARTITIONED)") << " with incorrect context: " <<
-                 (SynchronizedThreadLock::usingMpMemory()?"REPLICATED":"PARTITIONED") << '\n';
+       message << operation << " tuples from table " << name().c_str() <<
+               (isReplicatedTable()?"(REPLICATED)":"(PARTITIONED)") << " with incorrect context: " <<
+               (SynchronizedThreadLock::isInMpEngineContext()?"REPLICATED":"PARTITIONED") << '\n';
        message << boost::stacktrace::stacktrace() << '\n';
        string msg = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
@@ -1797,7 +1798,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 
 void PersistentTable::activateSnapshot(TableStreamType streamType) {
    if (streamType == TABLE_STREAM_SNAPSHOT) {
-       stopSnapshot(true);
+       stopSnapshot(TABLE_STREAM_SNAPSHOT, true);
        m_snapIt = allocator().template freeze<storage::truth>();
        m_snapshotStarted = true;
    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
@@ -1805,48 +1806,50 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
    }
 }
 
-void PersistentTable::stopSnapshot(bool activated) {
-   if (m_snapIt.get() != nullptr && (activated || m_snapIt->drained())) {
-      if (isReplicatedTable()) {
-         ScopedReplicatedResourceLock scopedLock;
-         ExecuteWithMpMemory useMpMemory;
-         allocator().template thaw<storage::truth>();
-         m_snapIt.reset();
-      } else {
-         allocator().template thaw<storage::truth>();
-         m_snapIt.reset();
-      }
-   }
+void PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactivation) {
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
+        if (m_snapIt.get() != nullptr && (m_snapIt->drained() || forceDeactivation)) {
+            if (isReplicatedTable()) {
+                ScopedReplicatedResourceLock scopedLock;
+                ExecuteWithMpMemory useMpMemory;
+                allocator().template thaw<storage::truth>();
+                m_snapIt.reset();
+            } else {
+                allocator().template thaw<storage::truth>();
+                m_snapIt.reset();
+            }
+        }
+    }
+    else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+        if (m_elasticIt.get() != nullptr && m_elasticIt->drained()) {
+            m_elasticIt.reset();
+        }
+    }
 }
 
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
-       if (m_snapIt->drained()) {
-          stopSnapshot();
-          return false;
-       }
-
-       // Advance the iterator and get the tuple
-       if (m_snapshotStarted) {
-          m_snapshotStarted = false;
-       } else {
-          ++*m_snapIt;
-       }
-       if (m_snapIt->drained()) {
-          stopSnapshot();
-          return false;
-       }
-       auto *p = **m_snapIt;
-       tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
-       return true;
+        // Advance the iterator and get the tuple
+        if (m_snapshotStarted) {
+            m_snapshotStarted = false;
+            if (m_snapIt->drained()) {
+                return false;
+            }
+        } else {
+            ++*m_snapIt;
+            if (m_snapIt->drained()) {
+                return false;
+            }
+        }
+        auto *p = **m_snapIt;
+        tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
     } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
-       if (m_elasticIt->drained()) {
-         m_elasticIt.reset();
-         return false;
-       }
-       auto *p = **m_elasticIt;
-       tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
-       ++*m_elasticIt;
+        if (m_elasticIt->drained()) {
+            return false;
+        }
+        auto *p = **m_elasticIt;
+        tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
+        ++*m_elasticIt;
     }
     return true;
 }

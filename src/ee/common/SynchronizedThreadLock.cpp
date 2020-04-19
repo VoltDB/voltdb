@@ -200,7 +200,7 @@ void SynchronizedThreadLock::deactiveEngineLocals(int32_t partitionId) {
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
     VOLT_DEBUG("Entering countdown latch... %d", s_globalTxnStartCountdownLatch);
     vassert(s_globalTxnStartCountdownLatch > 0);
-    vassert(ThreadLocalPool::getEnginePartitionId() != 16383);
+    vassert(!isInMpEngineContext());
     vassert(!isInSingleThreadMode());
     if (lowestSite) {
         {
@@ -405,6 +405,10 @@ bool SynchronizedThreadLock::isHoldingResourceLock() {
 bool SynchronizedThreadLock::isInLocalEngineContext() {
     return ThreadLocalPool::getEnginePartitionId() ==
         ThreadLocalPool::getThreadPartitionId();
+}
+
+bool SynchronizedThreadLock::isInMpEngineContext() {
+    return (ThreadLocalPool::getEnginePartitionId() == 16383);
 }
 
 bool SynchronizedThreadLock::isInSingleThreadMode() {
