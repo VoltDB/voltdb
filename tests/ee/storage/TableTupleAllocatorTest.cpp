@@ -154,7 +154,7 @@ template<typename Alloc> void* remove_single(Alloc& alloc, void const* p) {
                     assert(entries.size() == 1);
                     r = memcpy(entries[0].first, entries[0].second, TupleSize);
                 }
-            }));
+            }).first);
     return r;
 }
 
@@ -169,7 +169,7 @@ template<typename Alloc> void remove_multiple(Alloc& alloc, size_t n, ...) {
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                }));
+                }).first);
 }
 
 TEST_F(TableTupleAllocatorTest, TestStringGen_static) {
@@ -316,78 +316,6 @@ TEST_F(TableTupleAllocatorTest, TestIteratorOfNonCompactingChunks) {
     testIteratorOfNonCompactingChunks<NonCompactingChunks<LazyNonCompactingChunk>>();
 }
 
-void testCompactingChunks() {
-    using Gen = StringGen<TupleSize>;
-    using const_iterator = typename IterableTableTupleChunks<CompactingChunks, truth>::const_iterator;
-    using iterator = typename IterableTableTupleChunks<CompactingChunks, truth>::iterator;
-    Gen gen;
-    CompactingChunks alloc(TupleSize);
-    array<void*, NumTuples> addresses;
-    size_t i;
-    for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-        assert(Gen::same(addresses[i], i));
-    }
-    i = 0;
-    auto const& alloc_cref = alloc;
-    // allocation memory order is consistent with iterator order
-    fold<const_iterator>(alloc_cref,
-            [&i, &addresses](void const* p) { assert(p == addresses[i++]); });
-    assert(i == NumTuples);
-    assert(alloc_cref.size() == NumTuples);
-    // testing compacting behavior
-    // 1. free() call sequence that does not trigger compaction
-    assert(CompactingChunks::Compact::value);
-    // free() from either end: freed values should not be
-    // overwritten.
-    // shrink from head is a little twisted:
-    for(int j = 0; j < NumTuples / AllocsPerChunk; ++j) {      // on each chunk, free from its tail
-        for(int i = AllocsPerChunk - 1; i >= 0; --i) {
-            auto index = j * AllocsPerChunk + i;
-            if (addresses[index] != alloc.free(addresses[index])) {
-                assert(false);
-            }
-            // skip content check on i == 0, since OS has already claimed the chunk upon free() call
-            assert(i == 0 || Gen::same(addresses[index], index));
-        }
-    }
-    assert(alloc.empty());
-    // 2. always trigger compaction, by free()-ing in the opposite order
-    gen.reset();
-    for(i = 0; i < NumTuples; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-        assert(Gen::same(addresses[i], i));
-    }
-    size_t j = 0;
-    // shrink from head: free in LIFO order triggers compaction in "roughly" opposite direction
-    // 1st half: chop from tail, replaced by "head" (the tail of the first chunk, to be exact)
-    for(i = 0; i < NumTuples / 2; ++i, ++j) {
-        auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
-             indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-        if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples - 1 - i])) {
-            assert(false);
-        }
-    }
-    // 2nd half
-    i = 0;
-    fold<const_iterator>(alloc_cref, [&i, &addresses](void const* p)
-            { addresses[i++] = const_cast<void*>(p); });
-    for(i = 0; i < NumTuples / 4; ++i, ++j) {
-        auto const chunkful = i / AllocsPerChunk * AllocsPerChunk,
-             indexInsideChunk = AllocsPerChunk - 1 - (i % AllocsPerChunk);
-        if (addresses[chunkful + indexInsideChunk] != alloc.free(addresses[NumTuples / 2 - 1 - i])) {
-            assert(false);
-        }
-    }
-    // free them all! See note on IterableTableTupleChunks on
-    // why we need a loop of calls to iterate through.
-    while(! alloc.empty()) {
-        for_each<iterator>(alloc, [&alloc, &j](void* p) {      // no-ops on boundary of each compacted chunk
-                if (alloc.free(p) != nullptr) {++j;} });
-    }
-    assert(j == NumTuples);            // number of free() calls
-}
-
 template<typename Alloc, typename Compactible = typename Alloc::Compact> struct TrackedDeleter {
     Alloc& m_alloc;
     bool& m_freed;
@@ -457,48 +385,9 @@ void testCustomizedIterator(size_t skipped) {      // iterator that skips on eve
                 ++i;
             });
     assert(i == NumTuples);
-    // Free all tuples via allocator. Note that allocator needs
-    // to be aware the "emptiness" from the iterator POV, not
-    // allocator's POV.
-
-    // Note: see document on NonCompactingChunks to understand
-    // why we cannot use iterator to free memories.
-    Tag const tag {};
-    if (Chunks::Compact::value) {
-        bool freed;
-        TrackedDeleter<Chunks> deleter(alloc, freed);
-        do {
-            freed = false;
-            try {
-                for_each<iterator>(alloc, [&deleter, &tag](void* p) {
-                        assert(tag(p));
-                        deleter(p);
-                    });
-            } catch (range_error const&) {}
-        } while(freed);
-        // Check using normal iterator (i.e. non-skipping one) that
-        // the remains are what should be.
-        fold<typename IterableTableTupleChunks<Chunks, truth>::const_iterator>(
-                alloc_cref, [&tag](void const* p) { assert(! tag(p)); });
-    } else {       // to free on compacting chunk safely, collect and free separately
-        forward_list<void const*> crematorium;
-        i = 0;
-        fold<const_iterator>(alloc_cref, [&crematorium, &tag, &i](void const* p) {
-                assert(tag(p));
-                crematorium.emplace_front(p);
-                ++i;
-            });
-        for_each(crematorium.begin(), crematorium.end(),
-                [&alloc](void const*p) { alloc.free(const_cast<void*>(p)); });
-        // We should not check/free() the rest using
-        // iterator, for much the same reason that we don't use
-        // same iterator-delete pattern (i.e. for_each) as
-        // compactible allocators.
-    }
 }
 
 TEST_F(TableTupleAllocatorTest, TestCompactingChunks) {
-    testCompactingChunks();
     for (auto skipped = 8lu; skipped < 64; skipped += 8) {
         testCustomizedIterator<CompactingChunks, 3>(skipped);
         testCustomizedIterator<NonCompactingChunks<EagerNonCompactingChunk>, 3>(skipped);
@@ -523,226 +412,6 @@ template<typename Tuple> struct Apply<Tuple, 0> {
         return p;
     }
 };
-
-template<typename TagsAsTuple>
-class UnmaskedStringGen : public StringGen<TupleSize> {
-    using super = StringGen<TupleSize>;
-    static Apply<TagsAsTuple, tuple_size<TagsAsTuple>::value - 1> const applicator;
-    static unsigned char* mask(unsigned char* p) {
-        return applicator(p);
-    }
-    static unsigned char* copy_mask(void const* p) {
-        static unsigned char copy[TupleSize];
-        memcpy(copy, p, TupleSize);
-        return applicator(copy);
-    }
-public:
-    unsigned char* query(size_t state) override {
-        return mask(super::query(state));
-    }
-    inline bool same(void const* dst, size_t state) {
-        static unsigned char buf[TupleSize+1];
-        return ! memcmp(
-                copy_mask(dst),
-                mask(super::of(state, buf)),
-                TupleSize);
-    }
-    inline static string hex(void const* p) {
-        return super::hex(copy_mask(p));
-    }
-    inline string hex(size_t s) {
-        return super::hex(copy_mask(query(s)));
-    }
-};
-template<typename TagsAsTuple> Apply<TagsAsTuple, tuple_size<TagsAsTuple>::value - 1> const UnmaskedStringGen<TagsAsTuple>::applicator{};
-
-/**
- * In this test, the Chunks is ignorant to whether there is
- * a snapshot or not, and we are using TxnHook together with
- * hook-aware iterator, and the abstraction is still quite
- * leaky...
- *
- * Ideally, we should let CompactingChunks know when the snapshot
- * started/stopped, and client does not need to know the hook a
- * lot (i.e. let the Chunks notify the hook when it
- * started/stopped).
- */
-template<typename HookAlloc, typename DataAlloc, typename RetainTrait>
-void testTxnHook() {
-    using const_iterator = typename IterableTableTupleChunks<DataAlloc, truth>::const_iterator;
-    using iterator = typename IterableTableTupleChunks<DataAlloc, truth>::iterator;
-    using Hook = TxnPreHook<HookAlloc, RetainTrait>;
-    DataAlloc alloc(TupleSize);
-    using dummy_observer_type = typename IterableTableTupleChunks<HookedCompactingChunks<Hook>, truth>::IteratorObserver;
-    auto const& alloc_cref = alloc;
-    Hook hook(TupleSize);
-    /**
-     * We reserve 2 bits in the leading char to signify that this
-     * tuple is newly inserted, thus invisible in snapshot view (bit#7),
-     * and is deleted or updated (bit#6), thus snapshot view should retrieve
-     * the actual thing from *the hook*.
-     */
-    using InsertionTag = NthBitChecker<7>;
-    using DeletionUpdateTag = NthBitChecker<0>;
-    InsertionTag const insertionTag{};
-    DeletionUpdateTag const deletionUpdateTag{};
-
-    using Gen = UnmaskedStringGen<tuple<InsertionTag, DeletionUpdateTag>>;
-    Gen gen{};
-
-    array<void*, NumTuples> addresses;
-    size_t i;
-    for(i = 0; i < NumTuples; ++i) {                     // the later appended ones will later be marked as inserted after starting snapshot
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-    hook.freeze();                                       // recording started
-    alloc.freeze();                                      // don't forget to notify allocator, too
-    // test that the two bits we chose do not step over Gen's work, and txn iterator sees latest change
-    i = 0;
-    fold<const_iterator>(alloc_cref,
-            [&insertionTag, &deletionUpdateTag, &i, &gen](void const* p) {
-                assert((i >= NumTuples) == insertionTag(p));
-                assert(! deletionUpdateTag(p));
-                assert(gen.same(p, i));
-                ++i;
-            });
-    assert(i == NumTuples);
-    using snapshot_iterator = typename
-        IterableTableTupleChunks<DataAlloc, truth>::template iterator_cb<TxnPreHook<HookAlloc, RetainTrait>>;
-    using const_snapshot_iterator = typename
-        IterableTableTupleChunks<DataAlloc, truth>::template const_iterator_cb<TxnPreHook<HookAlloc, RetainTrait>>;
-    i = 0;
-    fold<const_snapshot_iterator>(alloc_cref,
-            [&insertionTag, &deletionUpdateTag, &hook, &i, &gen](void const* p) {
-                if (p != nullptr) {                            // see document on iterator_cb_type for why client needs to do the checking
-                    assert(! insertionTag(p));
-                    assert(! deletionUpdateTag(p));
-                    assert(gen.same(p, i));
-                    assert(hook(p) == p);
-                    ++i;
-                }
-            }, hook);
-    assert(i == NumTuples);                                    // snapshot does not see newly inserted rows
-
-    auto const DeletedTuples = 256lu,                          // Deleting 256th, 257th, ..., 511th allocations
-         DeletedOffset = 256lu;
-    // marks first 256 as deleted, and delete them. Notice how we
-    // need to intertwine hook into the deletion process.
-
-    typename IterableTableTupleChunks<HookedCompactingChunks<Hook>, truth, void>::IteratorObserver obs{};
-    for (i = DeletedOffset; i < DeletedOffset + DeletedTuples; ++i) {
-        auto* src = addresses[i];
-        hook.add(src, obs);
-        auto* dst = alloc.free(src);
-        assert(dst);
-        DeletionUpdateTag::reset(dst);   // NOTE: sequencing this before the hook would cause std::stack<void*> default ctor to crash in GLIBC++7 (~L94 of TableTupleAllocator.h), in /usr/include/c++/7/ext/new_allocator.h
-    }
-    i = 0;
-    fold<const_snapshot_iterator>(alloc_cref,
-            [&insertionTag, &i, &gen](void const* p) {
-                if (p != nullptr) {
-                    assert(! insertionTag(p));
-                    assert(gen.same(p, i));                    // snapshot sees no delete changes
-                    ++i;
-                }
-            }, hook);
-    assert(i == NumTuples);                                    // opaque to snapshot
-    i = 0;
-    fold<const_iterator>(alloc_cref, [&i](void const*) { ++i; });
-    assert(i == NumTuples - DeletedTuples);     // but transparent to txn
-
-    auto const UpdatedTuples = 1024lu, UpdatedOffset = 1024lu;  // Updating 1024 <= 1025, 1025 <= 1026, ..., 2047 <= 2048
-    // do the math: after we deleted first 256 entries, the
-    // 2014th is what 2014 + 256 = 2260th entry once were.
-    for (i = UpdatedOffset + DeletedTuples;
-            i < UpdatedOffset + DeletedTuples + UpdatedTuples;
-            ++i) {
-        // for update changes, hook does not need to copy
-        // tuple getting updated (i.e. dst), since the hook is
-        // called pre-update.
-        hook.add(addresses[i], obs);    // 1280 == first eval
-        memcpy(addresses[i], addresses[i + 1], TupleSize);
-        DeletionUpdateTag::reset(addresses[i]);
-    }
-    i = 0;
-    fold<const_snapshot_iterator>(alloc_cref,
-            [&insertionTag, &i, &gen](void const* p) {
-                if (p != nullptr) {
-                    assert(! insertionTag(p));
-                    assert(gen.same(p, i));                    // snapshot sees no update changes
-                    ++i;
-                }
-            }, hook);
-    assert(i == NumTuples);
-    i = 0;
-    fold<const_iterator>(alloc_cref, [&i](void const*) { ++i; });
-    assert(i == NumTuples - DeletedTuples);
-    // Hook releasal should be done as we cover tuples in
-    // snapshot process. We delay the release here to help
-    // checking invariant on snapshot view.
-    for_each<snapshot_iterator>(alloc,
-            [&hook](void const* p) {
-                hook.release(p);
-            }, hook);
-    // Verify that we cannot create two snapshot iterators at the
-    // same time
-    if (DataAlloc::Compact::value) {
-        using snapshot_rw_iterator =
-            typename IterableTableTupleChunks<DataAlloc, truth>::
-            template iterator_type<iterator_permission_type::rw, iterator_view_type::snapshot>;
-        {                                                      // verifiy on base iterator type
-            snapshot_rw_iterator iter1(alloc);
-            try {
-                snapshot_rw_iterator iter2(alloc);             // expected to throw
-                assert(false);
-            } catch (logic_error const& e) {
-                assert(string(e.what()).substr(0, 52) ==
-                        "Cannot create RW snapshot iterator on chunk list id ");
-            }
-        }
-        {                                                      // verifiy on iterator_cb_type
-            auto iter1 = snapshot_iterator::begin(alloc, hook);
-            try {
-                auto iter2 = snapshot_iterator::begin(alloc, hook);
-                assert(false);
-            } catch (logic_error const& e) {
-                assert(string(e.what()).substr(0, 52) ==
-                        "Cannot create RW snapshot iterator on chunk list id ");
-            }
-        }
-        // But it's okay to create multiple snapshot RO iterators
-        auto iter1 = const_snapshot_iterator::begin(alloc, hook),
-             iter2 = const_snapshot_iterator::begin(alloc, hook);
-        // or RW iterators on different allocators
-        DataAlloc alloc2(TupleSize);
-        auto iter10 = snapshot_iterator::begin(alloc, hook),
-             iter20 = snapshot_iterator::begin(alloc2, hook);
-    }
-    hook.thaw();
-    alloc.thaw();
-}
-
-template<typename Alloc1> struct TestTxnHook1 {
-    void operator()() const {
-        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::never>>();
-        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::always>>();
-        testTxnHook<Alloc1, CompactingChunks, HistoryRetainTrait<gc_policy::batched>>();
-    }
-};
-struct TestTxnHook {
-    static TestTxnHook1<NonCompactingChunks<EagerNonCompactingChunk>> const sChain1;
-    static TestTxnHook1<NonCompactingChunks<LazyNonCompactingChunk>> const sChain2;
-    void operator()() const {
-        sChain1();
-        sChain2();
-    }
-};
-TestTxnHook1<NonCompactingChunks<EagerNonCompactingChunk>> const TestTxnHook::sChain1{};
-TestTxnHook1<NonCompactingChunks<LazyNonCompactingChunk>> const TestTxnHook::sChain2{};
-
-TEST_F(TableTupleAllocatorTest, TestTxnHook) {
-    TestTxnHook()();
-}
 
 /**
  * Test of HookedCompactingChunks using its RW iterator that
@@ -889,7 +558,7 @@ void testHookedCompactingChunks() {
                 assert(alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                             for_each(entries.begin(), entries.end(),
                                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                            }) == tb_removed.size());
+                            }).first == tb_removed.size());
             default:;
         }
         ++i;
@@ -1960,7 +1629,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                }));
+                }).first);
     ASSERT_EQ(NumTuples / 2, verifier.seen().size());
     for (i = 0; i < NumTuples; i += 2) {
         ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
@@ -1984,15 +1653,13 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
     for (i = 0; i < NumTuples; i += 2) {
         alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    ASSERT_EQ(NumTuples / 2,
+    ASSERT_EQ(make_pair(NumTuples / 2, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                 }));
-    ASSERT_EQ(NumTuples / 4, verifier.seen().size());
+    ASSERT_TRUE(verifier.seen().empty());                                              // finalizer postponed till thaw time
     alloc.template thaw<truth>();
-    // At thaw time, those copies in the batch should be removed
-    // (and finalized before being deallocated), since snapshot iterator needs them
     ASSERT_EQ(NumTuples / 2, verifier.seen().size());
     for (i = 0; i < NumTuples; i += 2) {
         ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
@@ -2048,7 +1715,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
         alloc.template update<truth>(const_cast<void*>(addresses[i]));
         gen.fill(const_cast<void*>(addresses[i]));
     }
-    ASSERT_TRUE(verifier.seen().empty());                                  // copies for updates finalized at thaw, or release() time, whichever comes first
+    ASSERT_EQ(NumTuples / 4, verifier.seen().size());                      // first half of updates are finalized immediately upon `update' call
     // delete the second half; but only half of those deleted
     // batch are "fresh", so only 1/8 of the whole gets to be
     // finalized
@@ -2058,18 +1725,25 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     for (i = 0; i < NumTuples / 4; ++i) {
         ++*iter;
     }
-    for (i = 0; i < NumTuples / 2; ++i) {
+    for (i = 0; i < NumTuples / 2; ++i) {                                  // remove 2nd half
         alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
     }
+    ASSERT_EQ(NumTuples / 4, verifier.seen().size());                      // unchanged
     // finalize called on the 2nd half in the txn memory
-    ASSERT_EQ(NumTuples / 2, alloc.template remove_force<truth>(
-                [](vector<pair<void*, void*>> const& entries){
-                    for_each(entries.begin(), entries.end(),
-                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                }));
-    ASSERT_EQ(NumTuples / 8, verifier.seen().size());
+    ASSERT_EQ(make_pair(NumTuples / 2, NumTuples * 3 / 8),
+            alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
+                for_each(entries.begin(), entries.end(),
+                        [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+            }));
+    ASSERT_EQ(NumTuples * 3 / 8 + NumTuples / 4, verifier.seen().size());
     alloc.template thaw<truth>();
-    ASSERT_EQ(NumTuples / 2, verifier.seen().size());
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<Alloc const&>(alloc), [&verifier](void const* p) {
+                assert(verifier.seen().cend() == verifier.seen().find(
+                            Gen::of(reinterpret_cast<unsigned char const*>(p))));
+            });
+    alloc.template clear<truth>();
+    ASSERT_TRUE(verifier.ok(0));
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
@@ -2126,12 +1800,12 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
             alloc.remove_add(const_cast<void*>(addresses[NumTuples + i]));
         }
 
-        ASSERT_EQ(AllocsPerChunk * 4,
+        ASSERT_EQ(make_pair(AllocsPerChunk * 4, AllocsPerChunk),           // the 2nd-to-last chunk is finalized right away
                 alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                     }));
-        ASSERT_EQ(AllocsPerChunk * 4, verifier.seen().size());
+        ASSERT_EQ(AllocsPerChunk, verifier.seen().size());
         // verify that this 2nd to last chunk is finalized on
         // each call to `remove_add'
         for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
@@ -2210,7 +1884,7 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
                                 ASSERT_EQ(AllocsPerChunk - 1,
                                         Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
                                 memcpy(entries[0].first, entries[0].second, TupleSize);
-                            }));
+                            }).first);
             }
         } while ((j += AllocsPerChunk) < BigNumTuples);
         ASSERT_EQ(1, alloc.size());
@@ -2250,7 +1924,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     alloc.remove_reserve(2);
     alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk * 3 - 1]));
     alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk * 3 - 2]));
-    ASSERT_EQ(2,
+    ASSERT_EQ(make_pair(2lu, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
@@ -2264,7 +1938,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     for (i = 0; i < 2; ++i) {
         alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
-    ASSERT_EQ(AllocsPerChunk,
+    ASSERT_EQ(make_pair(AllocsPerChunk, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
@@ -2298,7 +1972,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     alloc.remove_reserve(2);
     alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk - 1]));
     alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk - 2]));
-    ASSERT_EQ(2,
+    ASSERT_EQ(make_pair(2lu, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
@@ -2312,7 +1986,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     for (i = 0; i < 2; ++i) {
         alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
-    ASSERT_EQ(AllocsPerChunk,
+    ASSERT_EQ(make_pair(AllocsPerChunk, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});

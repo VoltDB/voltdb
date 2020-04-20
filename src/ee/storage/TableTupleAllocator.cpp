@@ -1860,21 +1860,17 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, FinalizerAndCopier con
 template<typename Alloc, typename Trait, typename E1>
 template<typename IteratorObserver, typename E2> inline bool TxnPreHook<Alloc, Trait, E1>::addOrFinalize(
         void const* dst, IteratorObserver& obs) {
-    bool added = false, hasCopierFinalizer = m_finalizerAndCopier;
     if (m_recording && ! obs(dst)) {
         auto const iter = m_changes.lower_bound(dst);
         if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
-            void *fresh = m_changeStore.allocate();
-            if (hasCopierFinalizer) {                                 // invoke deep copier
-                m_finalizerAndCopier.copy(fresh, dst);
-            } else {
-                memcpy(fresh, dst, m_changeStore.tupleSize());
-            }
-            m_changes.emplace_hint(iter, dst, fresh);           // then, add map entry
-            added = true;
+            void* fresh = m_changeStore.allocate();
+            m_changes.emplace_hint(iter, dst,
+                    m_finalizerAndCopier ? m_finalizerAndCopier.copy(fresh, dst) :
+                    memcpy(fresh, dst, m_changeStore.tupleSize()));
+            return false;      // not finalized
         }
     }
-    if (m_recording && hasCopierFinalizer && ! added) {
+    if (m_recording && m_finalizerAndCopier) {
         // finalize unless hook memory copied the addr to be changed
         m_finalizerAndCopier.finalize(dst);
         return true;
@@ -2041,14 +2037,13 @@ HookedCompactingChunks<Hook, E>::remove_force(
                 CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(), 0lu,
                 [this](size_t acc, pair<void*, void*> const& entry) {
-                    bool const finalized = Hook::addOrFinalize(entry.first,
-                        reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
-                    if (finalized && ! Hook::moved_add(entry.second)) {
+                    if (! Hook::moved_add(entry.second)) {
                         snprintf(buf, sizeof buf, "Failed to add to Hook::m_moved: %p\n",
                                 entry.second);
                         buf[sizeof buf - 1] = 0;
                         throw runtime_error(buf);
-                    } else if (finalized) {
+                    } else if (Hook::addOrFinalize(entry.first,
+                                reinterpret_cast<observer_type<Tag>&>(m_iterator_observer))) {
                         return acc + 1;
                     } else {
                         return acc;

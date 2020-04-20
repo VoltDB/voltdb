@@ -731,7 +731,7 @@ namespace voltdb {
              * State changes
              */
             void freeze();
-            template<typename Pred> void thaw(Pred&&);
+            template<typename Pred> void thaw(Pred&&);          // when to apply finalizer
             /**
              * Auxillary others
              */
