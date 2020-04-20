@@ -43,6 +43,9 @@ import org.voltdb.utils.VoltFile;
 
 public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
+    private static final int SITE_COUNT = 4;
+    private static final int HOST_COUNT = 3;
+
     static LocalCluster m_nonEmptyConfig;
     static LocalCluster m_emptyConfig;
     static LocalCluster m_emptyCatalogConfig;
@@ -308,8 +311,8 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
      * @return the number of rows expected in the restore result which are from system tables
      */
     private static int getSystemTableRowCount() {
-        // One row for each table for each host
-        return SystemTable.values().length * 3;
+        // One row for each table for each partition
+        return SystemTable.values().length * SITE_COUNT * HOST_COUNT;
     }
 
     public TestRestoreEmptyDatabaseSuite(final String name) {
@@ -325,7 +328,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
 
-        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_nonEmptyConfig.setNewCli(false);
         boolean compile = m_nonEmptyConfig.compile(project);
@@ -333,7 +336,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         builder.addServerConfig(m_nonEmptyConfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
-        m_emptyConfig = new LocalCluster("empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyConfig = new LocalCluster("empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_emptyConfig.setNewCli(false);
         project = new VoltProjectBuilder();
@@ -342,7 +345,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         assertTrue(compile);
 
 
-        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_emptyCatalogConfig.setNewCli(false);
         project = new VoltProjectBuilder();

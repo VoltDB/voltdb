@@ -91,7 +91,7 @@ public class TestRestoreSchema extends LocalClustersTestBase {
             fail(response.getStatusString() + '\n' + Arrays.toString(response.getResults()));
         }
 
-        assertEquals(response.getResults()[0].toString(), 2 * tableCount * sitesPerHost + SystemTable.values().length,
+        assertEquals(response.getResults()[0].toString(), 2 * tableCount * sitesPerHost + SystemTable.values().length*sitesPerHost,
                 response.getResults()[0].getRowCount());
 
         for (int i = 0; i < tableCount; ++i) {
