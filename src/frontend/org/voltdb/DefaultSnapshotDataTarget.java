@@ -296,10 +296,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             private long syncedBytes = 0;
             @Override
             public void run() {
-                //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
-                //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                /*
+                 * Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
+                 * on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                 *
+                 * Sync for at least single page size (4K, thus more frequently) if bytes allowed to
+                 * write is running low.
+                 */
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4) ||
-                        (m_bytesWrittenSinceLastSync.get() > 0 &&
+                        (m_bytesWrittenSinceLastSync.get() > Bits.pageSize() &&
                                 s_bytesAllowedBeforeSync.availablePermits() < SnapshotSiteProcessor.m_snapshotBufferLength)) {
                     long positionAtSync = 0;
                     try {
