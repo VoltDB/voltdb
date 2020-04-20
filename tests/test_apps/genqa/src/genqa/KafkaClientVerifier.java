@@ -93,7 +93,7 @@ public class KafkaClientVerifier {
         @Option(desc = "Kafka brokers host:port")
         String brokers = "localhost";
 
-        // Topic prefixes maybe used when two or more instances of a tests share the same kafka cluster
+        // Topic prefixes may be used when two or more instances of a tests share the same kafka cluster
         // as a means to distinquish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
@@ -122,9 +122,10 @@ public class KafkaClientVerifier {
 
         @Override
         public void validate() {
-            if ("".equals(topicprefix)) {
-                exitWithMessageAndUsage("topicprefix must not be empty");
-            }
+            // it's ok to have a empty prefix
+            // if ("".equals(topicprefix)) {
+            //     exitWithMessageAndUsage("topicprefix must not be empty");
+            // }
             if ("".equals(topic)) {
                 exitWithMessageAndUsage("topic must not be empty");
             }
@@ -471,6 +472,7 @@ public class KafkaClientVerifier {
         config.parse(KafkaClientVerifier.class.getName(), args);
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
+        log.info("+++ fulltopic: " + fulltopic);
         try {
             verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield, config.usetableexport);
         } catch (IOException e) {
