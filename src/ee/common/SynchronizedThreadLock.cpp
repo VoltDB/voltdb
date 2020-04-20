@@ -408,7 +408,7 @@ bool SynchronizedThreadLock::isInLocalEngineContext() {
 }
 
 bool SynchronizedThreadLock::isInMpEngineContext() {
-    return (ThreadLocalPool::getEnginePartitionId() == 16383);
+    return (ThreadLocalPool::getEnginePartitionId() == s_mpMemoryPartitionId);
 }
 
 bool SynchronizedThreadLock::isInSingleThreadMode() {
