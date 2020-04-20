@@ -24,12 +24,14 @@
 package org.voltdb.export;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 
 public class TestExportSequenceNumberTracker {
 
@@ -253,5 +255,23 @@ public class TestExportSequenceNumberTracker {
         // Complete intersection
         other.addRange(1, 900);
         assertEquals(220, tracker.intersectionSizeInSequences(other));
+    }
+
+    @Test
+    public void gapOfEmptyTracker() {
+        assertEquals(Pair.of(ExportSequenceNumberTracker.MIN_SEQNO, ExportSequenceNumberTracker.INFINITE_SEQNO),
+                tracker.getFirstGap(Long.MAX_VALUE / 2));
+    }
+
+    /*
+     * Test that that imitating looping over gaps will return null if >= INFINTY is requested
+     */
+    @Test
+    public void getGapsFromNonNormalizedTracker() {
+        tracker.addRange(500, 999);
+
+        assertEquals(Pair.of(ExportSequenceNumberTracker.MIN_SEQNO, 499L), tracker.getFirstGap(1));
+        assertEquals(Pair.of(1000L, ExportSequenceNumberTracker.INFINITE_SEQNO), tracker.getFirstGap(500));
+        assertNull(tracker.getFirstGap(ExportSequenceNumberTracker.INFINITE_SEQNO + 1));
     }
 }
