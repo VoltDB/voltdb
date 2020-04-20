@@ -2098,7 +2098,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         VoltTable[] results = new VoltTable[] { constructResultsTable() };
         results[0].addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, -1,
-                "SUCCESS", "NO DATA TO DISTRIBUTE");
+                "SUCCESS", "");
 
         Map<Long, Integer> sitesToPartitions = null;
         int partitionCount = ctx.getNumberOfPartitions();
@@ -2415,8 +2415,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         else {
             result = constructResultsTable();
-            result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, 0,
-                    "SUCCESS", "NO DATA TO DISTRIBUTE");
+            result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, ctx.getPartitionId(),
+                    "SUCCESS", "");
         }
         return result;
     }
