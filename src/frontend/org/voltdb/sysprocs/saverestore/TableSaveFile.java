@@ -755,7 +755,6 @@ public class TableSaveFile implements Closeable
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks.set(false);
                         m_chunkReaderException = e;

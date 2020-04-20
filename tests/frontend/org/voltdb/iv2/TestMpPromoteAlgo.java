@@ -252,7 +252,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        inOrder.verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
+        inOrder.verify(mailbox, times(3)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
 
         assertEquals(txnEgo(1003L), result.get().m_txnId);
     }
