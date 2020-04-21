@@ -1006,17 +1006,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_objectReadIndex++;
 
                 return new DBBPool.DBBDelegateContainer(retcont) {
-                    private boolean m_discarded = false;
-
                     @Override
                     public void discard() {
-                        checkDoubleFree();
-                        if (m_discarded) {
-                            m_usageSpecificLog.error("PBD Container discarded more than once");
-                            return;
-                        }
-
-                        m_discarded = true;
                         super.discard();
                         m_discardCount++;
                     }
