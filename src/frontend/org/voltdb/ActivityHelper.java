@@ -22,6 +22,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.voltdb.importer.ImportManager;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -50,8 +51,10 @@ class ActivityHelper {
     enum Type {
         CLIENT,
         CMDLOG,
+        LEADER,
         IMPORT,
         EXPORT,
+        EXMAST,
         DRCONS,
         DRPROD,
     }
@@ -64,8 +67,10 @@ class ActivityHelper {
      */
     long clientReqBytes, clientRespMsgs, clientTxns;
     long cmdlogBytes, cmdlogTxns;
+    long leaderCount;
     long importPend;
     long exportPend;
+    long exportMasters;
     long drconsPend;
     long drprodBytesPend, drprodRowsPend;
 
@@ -86,11 +91,17 @@ class ActivityHelper {
             case CMDLOG:
                 active |= checkCommandLog();
                 break;
+            case LEADER:
+                active |= checkPartitionLeadership();
+                break;
             case IMPORT:
                 active |= checkImporter();
                 break;
             case EXPORT:
                 active |= checkExporter();
+                break;
+            case EXMAST:
+                active |= checkExportMastership();
                 break;
             case DRCONS:
                 active |= checkDrConsumer();
@@ -160,10 +171,31 @@ class ActivityHelper {
     }
 
     /*
+     * Partition leaderhip.
+     * Check for partitions for which the local host
+     * is the leader.
+     */
+    private boolean checkPartitionLeadership() {
+        int leaders = 0;
+        try {
+            int hostId = VoltDB.instance().getMyHostId();
+            Cartographer cart = VoltDB.instance().getCartographer();
+            if (cart != null) {
+                leaders = cart.getMasterCount(hostId);
+            }
+        }
+        catch (Exception ex) {
+            warn("checkPartitionLeadership", ex);
+        }
+        leaderCount = leaders;
+        return isActive("partitions: %d led by this host", leaders);
+
+    }
+
+    /*
      * Importer.
-     * Check for unprocessed import request.
-     * Count is of outstanding requests across all importers,
-     * and is zero if there's nothing outstanding.
+     * Check for unprocessed import requests by counting
+     * outstanding requests across all importers.
      */
     private boolean checkImporter() {
         long pend = 0;
@@ -182,9 +214,8 @@ class ActivityHelper {
 
     /*
      * Exporter.
-     * Check for unprocessed exports.
-     * Count is of outstanding tuples across all exporters,
-     * and is zero if there's nothing outstanding.
+     * Check for unprocessed exports by looking at the
+     * count of outstanding tuples across all exporters.
      */
     private boolean checkExporter() {
         long pend = 0;
@@ -202,9 +233,28 @@ class ActivityHelper {
     }
 
     /*
+     * Export mastership for current host.
+     * Counts locally active streams.
+     */
+    private boolean checkExportMastership() {
+        int masters = 0;
+        try {
+            ExportManagerInterface em = ExportManagerInterface.instance();
+            if (em != null) {
+                masters = em.getMastershipCount();
+            }
+        }
+        catch (Exception ex) {
+            warn("checkExportMastership", ex);
+        }
+        exportMasters = masters;
+        return isActive("exports: %d mastered on this host", masters);
+    }
+
+    /*
      * DR producer.
-     * Returns details of outstanding data, expressed in bytes and message
-     * segments, summed across all partitions. Zero when none outstanding.
+     * Counts outstanding data, expressed in bytes and table rows,
+     * summed across all partitions.
      */
     private boolean checkDrProducer() {
         long bytesPend = 0, rowsPend = 0;
@@ -235,8 +285,8 @@ class ActivityHelper {
 
     /*
      * DR consumer.
-     * Returns count of partitions for which there is data not
-     * yet successfully applied. Zero when nothing outstanding.
+     * Counts partitions for which there is data not yet
+     * successfully applied.
      */
     private boolean checkDrConsumer() {
         long pend = 0;

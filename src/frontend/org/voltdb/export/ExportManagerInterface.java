@@ -161,7 +161,7 @@ public interface ExportManagerInterface {
     public List<ExportStatsRow> getStats(final boolean interval);
 
     /**
-     * Used by graceful shutdown
+     * Used for export activity checks by 'operator' code
      */
     default long getTotalPendingCount() {
         long total = 0;
@@ -169,6 +169,16 @@ public interface ExportManagerInterface {
             total += st.m_tuplesPending;
         }
         return total;
+    }
+
+    default int getMastershipCount() {
+        int count = 0;
+        for (ExportStatsRow st : getStats(false)) {
+            if ("TRUE".equalsIgnoreCase(st.m_exportingRole)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
