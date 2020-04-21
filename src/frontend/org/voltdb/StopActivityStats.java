@@ -25,9 +25,9 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltcore.logging.VoltLogger;
 
 /**
- * The PauseActivityStats statistics provide a summary of current
+ * The StopActivityStats statistics provide a summary of current
  * cluster activity that can be used to determine when the cluster
- * activity has subsided after a call to @Pause.
+ * activity has subsided after a call to @PrepareStopNode.
  *
  * The result of the statistics request is a table with one
  * row per host, and a summary of activity in various categories.
@@ -35,16 +35,16 @@ import org.voltcore.logging.VoltLogger;
  * then other columns can be used to determine what the activity
  * relates to, and perhaps whether forward progress is being made.
  */
-public class PauseActivityStats extends StatsSource {
+public class StopActivityStats extends StatsSource {
     private static final VoltLogger logger = new VoltLogger("HOST");
 
     private enum ColumnName {
         ACTIVE, // 0 if all other gauges 0, else 1
-        EXPORTS_PENDING,
-        DRPROD_ROWS, DRPROD_BYTES,
+        PAR_LEADERS,
+        EXP_MASTERS,
     };
 
-    public PauseActivityStats() {
+    public StopActivityStats() {
         super(false);
     }
 
@@ -75,7 +75,7 @@ public class PauseActivityStats extends StatsSource {
      * used by 'voltadmin pause --wait'.
      */
     private static final ActivityHelper.Type[] statsList = {
-        ActivityHelper.Type.EXPORT, ActivityHelper.Type.DRPROD,
+        ActivityHelper.Type.LEADER, ActivityHelper.Type.EXMAST
     };
 
     @Override
@@ -84,12 +84,11 @@ public class PauseActivityStats extends StatsSource {
         try {
             ActivityHelper helper = new ActivityHelper();
             active = helper.collect(statsList);
-            setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
-            setValue(row, ColumnName.DRPROD_ROWS, helper.drprodRowsPend);
-            setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
+            setValue(row, ColumnName.PAR_LEADERS, helper.leaderCount);
+            setValue(row, ColumnName.EXP_MASTERS, helper.exportMasters);
         }
         catch (Exception ex) {
-            logger.error("Unhandled exception in PauseActivityStats: " + ex);
+            logger.error("Unhandled exception in StopActivityStats: " + ex);
         }
         setValue(row, ColumnName.ACTIVE, active);
         super.updateStatsRow(key, row);

@@ -1201,7 +1201,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 } else if (determination.startAction.doesRecover()) {
                     action = "Restarting the database cluster from the command logs";
                 }
-                hostLog.info(String.format("%s [%s]", action, determination.startAction));
+                hostLog.info(action);
                 consoleLog.info(action);
             }
 
@@ -1510,8 +1510,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             replaceDRConsumerStatsWithDummy();
 
             // Operator function helpers
-            getStatsAgent().registerStatsSource(StatsSelector.SHUTDOWN_CHECK, 0, new ShutdownActivityStats());
-            getStatsAgent().registerStatsSource(StatsSelector.PAUSE_CHECK, 0, new PauseActivityStats());
+            StatsAgent sa = getStatsAgent();
+            sa.registerStatsSource(StatsSelector.SHUTDOWN_CHECK, 0, new ShutdownActivityStats());
+            sa.registerStatsSource(StatsSelector.STOP_CHECK, 0, new StopActivityStats());
+            sa.registerStatsSource(StatsSelector.PAUSE_CHECK, 0, new PauseActivityStats());
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2

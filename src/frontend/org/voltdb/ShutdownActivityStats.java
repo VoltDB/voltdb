@@ -40,8 +40,7 @@ import org.voltcore.logging.VoltLogger;
  * then other columns can be used to determine what the activity
  * relates to, and perhaps whether forward progress is being made.
  */
-public class ShutdownActivityStats extends StatsSource
-{
+public class ShutdownActivityStats extends StatsSource {
     private static final VoltLogger logger = new VoltLogger("HOST");
 
     private enum ColumnName {
@@ -73,8 +72,7 @@ public class ShutdownActivityStats extends StatsSource
      * Iterator through the one row of stats we make available.
      */
     @Override
-    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
-    {
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         return new ActivityHelper.OneShotIterator();
     }
 
