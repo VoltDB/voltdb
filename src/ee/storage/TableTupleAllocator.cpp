@@ -1013,7 +1013,9 @@ inline typename CompactingChunks::TxnLeftBoundary& CompactingChunks::beginTxn() 
     return m_txnFirstChunk;
 }
 
-inline CompactingChunks::FrozenTxnBoundaries::FrozenTxnBoundaries(ChunkList<CompactingChunk, true_type> const& l) noexcept {
+inline CompactingChunks::FrozenTxnBoundaries::FrozenTxnBoundaries(
+        ChunkList<CompactingChunk, true_type> const& l) noexcept :
+    m_size(reinterpret_cast<CompactingChunks const&>(l).size()) {
     assert(! l.empty());
     const_cast<position_type&>(m_left) = *l.begin();
     const_cast<position_type&>(m_right) = *l.last();
@@ -1032,6 +1034,10 @@ inline position_type const& CompactingChunks::FrozenTxnBoundaries::left() const 
 
 inline position_type const& CompactingChunks::FrozenTxnBoundaries::right() const noexcept {
     return m_right;
+}
+
+inline size_t CompactingChunks::FrozenTxnBoundaries::size() const noexcept {
+    return m_size;
 }
 
 inline boost::optional<typename CompactingChunks::FrozenTxnBoundaries> const&
@@ -1318,6 +1324,7 @@ inline IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::iter
         typename IterableTableTupleChunks<Chunks, Tag, E>::template iterator_type<perm, view>::container_type src) :
     m_offset(src.tupleSize()), m_storage(src),
     m_iter(iterator_begin<typename remove_reference<container_type>::type, perm, view>()(src)),
+    m_allocs(src.size()),
     m_cursor(const_cast<value_type>(m_iter == m_storage.end() ? nullptr : m_iter->range_begin())) {
     // paranoid type check
     static_assert(is_lvalue_reference<container_type>::value,
@@ -1434,9 +1441,9 @@ struct ChunkBoundary<ChunkList, Iter, iterator_view_type::snapshot, true_type> {
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm, iterator_view_type view>
-void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advance() {
+void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advance(bool checked) {
     static constexpr ChunkBoundary<list_type, decltype(m_iter), view, typename Chunks::Compact> const boundary{};
-    if (! drained()) {
+    if (! (checked ? drained() : unchecked_drained())) {
         // Need to maintain invariant that m_cursor is nullptr iff
         // iterator points to end().
         bool finished = true;
@@ -1459,6 +1466,7 @@ void IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::advanc
         } else {
             const_cast<void*&>(m_cursor) = nullptr;
         }
+        ++m_advanced;
         if (! finished && ! s_tagger(m_cursor)) {
             advance();                         // skip current cursor
         }
@@ -1490,9 +1498,24 @@ IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::operator*()
 }
 
 template<typename Chunks, typename Tag, typename E>
-template<iterator_permission_type perm, iterator_view_type view>
-inline bool IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::drained() const noexcept {
+template<iterator_permission_type perm, iterator_view_type view> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::unchecked_drained() const noexcept {
     return m_cursor == nullptr;
+}
+
+template<typename Chunks, typename Tag, typename E>
+template<iterator_permission_type perm, iterator_view_type view> inline bool
+IterableTableTupleChunks<Chunks, Tag, E>::iterator_type<perm, view>::drained() const {
+    bool const drained = unchecked_drained();
+    if (drained != (m_advanced == m_allocs)) {
+        snprintf(buf, sizeof buf,
+                "iterator_type::drained() -> %s: expect to iterate %lu values, but saw %lu ",
+                (drained ? "drained" : "not drained"), m_allocs, m_advanced);
+        buf[sizeof buf - 1] = 0;
+        throw length_error(buf);
+    } else {
+        return drained;
+    }
 }
 
 template<typename Chunks, typename Tag, typename E> inline
@@ -1593,7 +1616,7 @@ template<typename Chunks, typename Tag, typename E> inline
 typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator&
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::operator++() {
     refresh();
-    super::advance();
+    super::advance(false);
     if (! drained()) {
         m_chunkId = super::list_iterator()->id();
     }
@@ -1605,7 +1628,7 @@ typename IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::operator++(int) {
     typename remove_reference<decltype(*this)>::type const copy(*this);
     refresh();
-    super::advance();
+    super::advance(false);
     if (! drained()) {
         m_chunkId = super::list_iterator()->id();
     }
@@ -1657,7 +1680,10 @@ template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline
 IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::hooked_iterator_type(
         typename IterableTableTupleChunks<Chunks, Tag, E>::template hooked_iterator_type<perm>::container_type c) :
-super(c, c) {}
+super(c, c) {
+    assert(c.frozen());
+    const_cast<size_t&>(super::m_allocs) = c.frozenBoundaries() ? c.frozenBoundaries()->size() : 0;
+}
 
 inline position_type::position_type(ChunkHolder<> const& c) noexcept : m_chunkId(c.id()), m_addr(c.range_next()) {}
 
@@ -1693,7 +1719,7 @@ inline position_type& position_type::operator=(position_type const& o) noexcept 
 
 template<typename Chunks, typename Tag, typename E> inline bool
 IterableTableTupleChunks<Chunks, Tag, E>::elastic_iterator::drained() noexcept {
-    if (super::drained()) {
+    if (super::unchecked_drained()) {
         return true;
     } else {
         auto const& s = super::storage();
@@ -1723,16 +1749,24 @@ IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::begin(
 
 template<typename Chunks, typename Tag, typename E>
 template<iterator_permission_type perm> inline bool
-IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const noexcept {
-    if (super::drained()) {
-        return true;
-    } else if (! super::storage().frozen()) {
-        return false;
+IterableTableTupleChunks<Chunks, Tag, E>::hooked_iterator_type<perm>::drained() const {
+    bool drained;
+    if (super::unchecked_drained() || ! super::storage().frozen()) {
+        drained = true;
     } else {
         assert(super::storage().frozenBoundaries());
         assert(super::to_position());
-        return super::storage().frozenBoundaries()->right().address() == super::m_cursor ||
+        drained = super::storage().frozenBoundaries()->right().address() == super::m_cursor ||
             less<position_type>()(super::storage().frozenBoundaries()->right(), *super::to_position());
+    }
+    if (drained != (super::m_allocs == super::m_advanced)) {
+        snprintf(buf, sizeof buf,
+                "hooked_iterator_type::drained() -> %s: expect to iterate %lu values, but saw %lu",
+                (drained ? "drained" : "not drained"), super::m_allocs, super::m_advanced);
+        buf[sizeof buf - 1] = 0;
+        throw length_error(buf);
+    } else {
+        return drained;
     }
 }
 

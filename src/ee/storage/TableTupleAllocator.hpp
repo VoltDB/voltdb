@@ -611,11 +611,13 @@ namespace voltdb {
             class FrozenTxnBoundaries final {
                 position_type const m_left{};          // NOTE: need to be empty-constructed, since we need to
                 position_type const m_right{};         // validate ChunkList state before assignment.
+                size_t const m_size;
             public:
                 FrozenTxnBoundaries(ChunkList<CompactingChunk, Compact> const&) noexcept;
                 FrozenTxnBoundaries& operator=(FrozenTxnBoundaries const&) noexcept;
                 position_type const& left() const noexcept;
                 position_type const& right() const noexcept;
+                size_t size() const noexcept;
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
@@ -812,7 +814,7 @@ namespace voltdb {
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
 
-        template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;     // fwd decl
+        template<typename Chunks, typename Tag, typename> struct IterableTableTupleChunks;
 
         struct truth {                             // simplest Tag that always returns true
             constexpr bool operator()(void*) const noexcept { return true; }
@@ -926,8 +928,11 @@ namespace voltdb {
                 using constructible_type = typename conditional<
                     Chunks::Compact::value && vtype == iterator_view_type::snapshot && perm == iterator_permission_type::rw,
                           ChunksIdValidator, ChunksIdNonValidator>::type;
+                size_t const m_allocs;
+                size_t m_advanced = 0;
                 value_type m_cursor;
-                void advance();
+                void advance(bool = true);
+                bool unchecked_drained() const noexcept;
                 list_iterator_type const& list_iterator() const noexcept;
                 list_iterator_type& list_iterator() noexcept;
             public:
@@ -944,7 +949,7 @@ namespace voltdb {
                 inline bool operator!=(iterator_type const& o) const noexcept {
                     return ! operator==(o);
                 }
-                bool drained() const noexcept;
+                bool drained() const;
                 iterator_type& operator++();           // prefix
                 iterator_type operator++(int);         // postfix
                 value_type operator*() noexcept;// ideally this should be const method for const iterator; but that would require class specialization...
@@ -1035,7 +1040,7 @@ namespace voltdb {
                 using container_type = typename super::container_type;
                 using value_type = typename super::value_type;
                 hooked_iterator_type(typename super::container_type);
-                bool drained() const noexcept;
+                bool drained() const;
                 static hooked_iterator_type begin(container_type);
             };
             using hooked_iterator = hooked_iterator_type<iterator_permission_type::rw>;
