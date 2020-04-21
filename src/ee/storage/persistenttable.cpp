@@ -1354,9 +1354,12 @@ void PersistentTable::insertIntoAllIndexes(TableTuple* tuple) {
 void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
     BOOST_FOREACH (auto index, m_indexes) {
         if (!index->deleteEntry(tuple)) {
+            std::stringstream message;
+            message << boost::stacktrace::stacktrace() << std::endl;
+            string msg = message.str();
             throwFatalException(
-                    "Failed to delete tuple in Table: %s Index %s",
-                    m_name.c_str(), index->getName().c_str());
+                    "Failed to delete tuple in Table: %s Index %s, \nStack Trace: %s",
+                    m_name.c_str(), index->getName().c_str(), msg);
         }
     }
 }
