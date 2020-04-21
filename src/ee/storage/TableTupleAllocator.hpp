@@ -470,7 +470,8 @@ namespace voltdb {
         public:
             explicit CompactingStorageTrait(list_type&) noexcept;
             bool frozen() const noexcept;
-            void freeze(); void thaw();
+            void freeze();
+            template<typename Pred> void thaw(Pred&& pred);
             /**
              * post-action when free() is called, only useful when shrinking
              * in head direction.
@@ -618,7 +619,7 @@ namespace voltdb {
             };
         private:
             template<typename, typename, typename> friend struct IterableTableTupleChunks;
-            friend class CompactingStorageTrait;       // need pop_front
+            friend class CompactingStorageTrait;       // needs pop_finalize
             friend class position_type;                // need to search hidden region
             using list_type = ChunkList<CompactingChunk, Compact>;
             // equivalent to "table id", to ensure injection relation to rw iterator
@@ -634,9 +635,10 @@ namespace voltdb {
             CompactingChunks(CompactingChunks&&) = delete;
             // helpers to guarantee object invariant
             typename list_type::iterator releasable();
-            void pop_front(bool call_finalizer);
-            void pop_back(bool call_finalizer);
-            void pop_finalize(typename list_type::iterator) const;
+            void pop_front();
+            void pop_back();
+            void pop_finalize();
+            template<typename Pred> void pop_finalize(const void*, Pred&&);
         protected:
             class DelayedRemover {
                 CompactingChunks& m_chunks;
@@ -664,8 +666,15 @@ namespace voltdb {
                 void reserve(size_t);
                 // Register a single allocation to be removed later
                 void add(void*);
-                vector<pair<void*, void*>> const& movements() const;
+                vector<pair<void*, void*>> const& movements() const;       // #2 copied over to #1
                 vector<void*> const& removed() const;
+                /**
+                 * finalize on removed addresses, and some dst of moved address.
+                 * Note that it has to be called prior to any movements.
+                 * \returns conservative count of number of
+                 * finalized calls
+                 */
+                size_t finalize() const;
                 // Actuate batch remove
                 size_t force();
                 bool empty() const noexcept;
@@ -673,6 +682,7 @@ namespace voltdb {
             } m_batched;
             size_t m_allocs = 0;
             using list_type::last;
+            void pop_frozen();
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
@@ -704,13 +714,6 @@ namespace voltdb {
              * Memory operations
              */
             void* allocate();
-            // frees a single tuple, and returns the tuple that gets copied
-            // over the given address, which is at the tail of
-            // first/last chunk; or nullptr when the address is
-            // *reasonably* invalid. See documents of
-            // CompactingChunksIgnorableFree struct in .cpp for
-            // details.
-            void* free(void*);
             // apply finalizer (if set) to the given addr
             void finalize(void const*) const;
             /**
@@ -728,7 +731,7 @@ namespace voltdb {
              * State changes
              */
             void freeze();
-            void thaw();
+            template<typename Pred> void thaw(Pred&&);          // when to apply finalizer
             /**
              * Auxillary others
              */
@@ -778,11 +781,16 @@ namespace voltdb {
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
+            using set_type = typename Collections<collections_type>::template set<void const*>;
             static FinalizerAndCopier const EMPTY_FINALIZER;
             bool m_recording = false;            // in snapshot process?
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
+            set_type m_moved{};     // addr copied to other addresses (in m_changes's key value) due to compaction, used in lieu with finalization
             Alloc m_changeStore;
             FinalizerAndCopier const& m_finalizerAndCopier;
+        protected:
+            bool moved_add(void const*);         // adds an entry to m_moved
+            bool moved_contains(void const*) const noexcept;
         public:
             using is_hook = true_type;
 
@@ -796,9 +804,10 @@ namespace voltdb {
             void thaw();
             // NOTE: the deletion event need to happen before
             // calling add(...), unlike insertion/update.
+            // \return whether finalize is called on the addr
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(void const*, IteratorObserver&);
+            bool addOrFinalize(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
@@ -815,12 +824,12 @@ namespace voltdb {
          */
         template<typename Hook, typename E = typename enable_if<Hook::is_hook::value>::type>
         class HookedCompactingChunks : public CompactingChunks, public Hook {
-            using CompactingChunks::free;// hide details
             using CompactingChunks::freeze; using Hook::freeze;
-            using Hook::add; //using Hook::copy;
+            using Hook::addOrFinalize;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
+            void finalize_range(void const*, void const*) const;
         public:
             using hook_type = Hook;                // for hooked_iterator_type
             using Hook::release;                   // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
@@ -849,14 +858,16 @@ namespace voltdb {
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
-            template<typename Tag> void remove_add(void*);
+            void remove_add(void*);
             /**
              * NOTE: the remove_force method itself **does not**
              * "compact" tuples, and it is user's responsibility
              * to call `memcpy' in the call back, to copy the
              * pair's 2nd content to 1st.
+             * \return (#removals, #finalizations)
              */
-            size_t remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            template<typename Tag> pair<size_t, size_t>
+            remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
             void remove_reset();
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
@@ -1043,6 +1054,7 @@ namespace voltdb {
                 IteratorObserver(IteratorObserver&&) noexcept = default;
                 bool operator()(void const*) const;    // iterator > arg ptr? i.e. visited?
                 using super::reset;                    // equivalent of dtor
+                boost::optional<position_type> to_position() const noexcept;
             };
         };
 
