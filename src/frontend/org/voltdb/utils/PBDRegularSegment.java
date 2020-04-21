@@ -696,11 +696,13 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         if (m_closed) {
             throw new IOException("Segment closed");
         }
+
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
         boolean compress = m_compress && remaining >= 32 && buf.isDirect();
 
-        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + ENTRY_HEADER_BYTES;
+        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining)
+                + ENTRY_HEADER_BYTES;
         if (remaining() < maxCompressedSize) {
             return -1;
         }
@@ -735,9 +737,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             // Update segment header
             updateHeaderDataAfterOffer(remaining, startId, endId, timestamp);
         } finally {
-            destBuf.discard();
             if (compress) {
-                cont.discard();
+                destBuf.discard();
             }
         }
 
@@ -746,8 +747,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     // Used by DR path
     @Override
-    int offer(DeferredSerialization ds) throws IOException
-    {
+    int offer(DeferredSerialization ds) throws IOException {
         if (m_closed) {
             throw new IOException("closed");
         }
@@ -761,22 +761,10 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         try {
             m_entryHeaderBuf.b().clear();
-            final int written = MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
+            MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
             destBuf.b().flip();
             // Write entry header
-            writeEntryHeader(destBuf.b(), PBDSegment.NO_FLAGS);
-            m_entryHeaderBuf.b().flip();
-            while (m_entryHeaderBuf.b().hasRemaining()) {
-                m_fc.write(m_entryHeaderBuf.b());
-            }
-            // Write entry
-            destBuf.b().flip();
-            while (destBuf.b().hasRemaining()) {
-                m_fc.write(destBuf.b());
-            }
-            // Update segment header
-            updateHeaderDataAfterOffer(written, INVALID_ID, INVALID_ID, INVALID_TIMESTAMP);
-            return written;
+            return offer(destBuf, INVALID_ID, INVALID_ID, INVALID_TIMESTAMP);
         } finally {
             destBuf.discard();
         }

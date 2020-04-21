@@ -42,6 +42,8 @@ public interface BinaryDequeGapWriter<M> {
      * The offer implementation should find the exact location where the data should
      * be inserted and insert it there. The id range being offered must not already
      * exist in the BinaryDeque.
+     * <p>
+     * {@code data} will be guaranteed to be discarded before this method returns
      *
      * @param data the bytes to be written
      * @param startId starting id of the data block being offered
