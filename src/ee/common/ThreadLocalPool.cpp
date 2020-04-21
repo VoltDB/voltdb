@@ -201,11 +201,11 @@ int32_t getAllocationSizeForObject(int length) {
         return MAX_ALLOCATION;
     } else {
         std::stringstream message;
-        message << boost::stacktrace::stacktrace() << std::endl;
+        message << "Attempted to allocate an object larger than the 1 MB limit. Requested size was " << length << '\n';
+        message << boost::stacktrace::stacktrace() << '\n';
         string msg = message.str();
-        throwFatalException(
-                "Attempted to allocate an object larger than the 1 MB limit. Requested size was %d.\n Stack trace: %s",
-                length, msg);
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
+        throwFatalException("%s", message.str().c_str());
     }
 }
 

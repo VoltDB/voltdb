@@ -1355,11 +1355,11 @@ void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
     BOOST_FOREACH (auto index, m_indexes) {
         if (!index->deleteEntry(tuple)) {
             std::stringstream message;
-            message << boost::stacktrace::stacktrace() << std::endl;
+            message << "Failed to delete tuple in Table: " << m_name.c_str() << " index:" << index->getName().c_str() << '\n';
+            message << boost::stacktrace::stacktrace() << '\n';
             string msg = message.str();
-            throwFatalException(
-                    "Failed to delete tuple in Table: %s Index %s, \nStack Trace: %s",
-                    m_name.c_str(), index->getName().c_str(), msg);
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_ERROR, &msg);
+            throwFatalException("%s", message.str().c_str());
         }
     }
 }
