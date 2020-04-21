@@ -8,10 +8,8 @@
 
 # Remember the directory where we started, and find the <voltdb>, <voltdb>/bin/,
 # and <voltdb>/tests/ directories; and set variables accordingly
-function test-tools-find-directories() {
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: test-tools-find-directories"
-    fi
+function tt-find-directories() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
     TT_HOME_DIR=$(pwd)
     if [[ -e $TT_HOME_DIR/tests/test-tools.sh ]]; then
         # It looks like we're running from a <voltdb> directory
@@ -53,7 +51,9 @@ function test-tools-find-directories() {
     VOLTDB_COM_BIN=$VOLTDB_COM_DIR/bin
     VOLTDB_TESTS=$VOLTDB_COM_DIR/tests
     # These directories may or may not exist, so ignore any errors
-    VOLTDB_PRO_DIR=$(cd $VOLTDB_COM_DIR/../pro 2> /dev/null; pwd)
+    if [[ -z "$VOLTDB_PRO_DIR" ]]; then
+        VOLTDB_PRO_DIR=$(cd $VOLTDB_COM_DIR/../pro 2> /dev/null; pwd)
+    fi
     VOLTDB_PRO_BIN=$(cd $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*/bin 2> /dev/null; pwd)
     # Use 'community', open-source VoltDB by default (not 'pro')
     if [[ -z "$VOLTDB_BIN_DIR" ]]; then
@@ -62,9 +62,10 @@ function test-tools-find-directories() {
 }
 
 # Find the directories and set variables, only if not set already
-function test-tools-find-directories-if-needed() {
+function tt-find-directories-if-needed() {
+    if [[ "$TT_DEBUG" -ge "4" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
     if [[ -z "$TT_HOME_DIR" || -z "$VOLTDB_COM_DIR" || -z "$VOLTDB_COM_BIN" || -z "$VOLTDB_TESTS" ]]; then
-        test-tools-find-directories
+        tt-find-directories
     fi
 }
 
@@ -90,6 +91,7 @@ function tt-echo-build-args() {
 # Echo environment variables that are commonly used in Jenkins jobs,
 # only if not echoed already
 function tt-echo-build-args-if-needed() {
+    if [[ "$TT_DEBUG" -ge "4" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
     if [[ -z "$BUILD_ARGS_WERE_ECHOED" ]]; then
         tt-echo-build-args
     fi
@@ -99,8 +101,8 @@ function tt-echo-build-args-if-needed() {
 # based on simpler arguments passed to this function, such as 'debug', 'pool',
 # 'memcheck', etc.
 function tt-set-build-args() {
-    tt-echo-build-args-if-needed
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $@"
+    tt-echo-build-args-if-needed
 
     if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
         echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without 'source' or '.':"
@@ -171,8 +173,8 @@ function tt-set-build-args() {
 # JUnit tests, based on simpler arguments passed to this function, such as
 # 'flaky', 'nonflaky', 'flakydebug', etc.
 function tt-set-test-args() {
-    tt-echo-build-args-if-needed
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $@"
+    tt-echo-build-args-if-needed
 
     if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
         echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without 'source' or '.':"
@@ -227,8 +229,8 @@ function tt-set-test-args() {
 # so. Any argument value other than 'master' or 'false' will leave VERIFY_ARG
 # unset, so the default behavior of verifying DDL will occur.
 function tt-set-verify-arg() {
-    tt-echo-build-args-if-needed
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $1"
+    tt-echo-build-args-if-needed
 
     if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
         echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without 'source' or '.':"
@@ -255,8 +257,8 @@ function tt-set-verify-arg() {
 # an argument passed to this function, or on the current value (if any) of
 # the SEED variable
 function tt-set-setseed() {
-    tt-echo-build-args-if-needed
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $1"
+    tt-echo-build-args-if-needed
 
     if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
         echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without 'source' or '.':"
@@ -275,8 +277,8 @@ function tt-set-setseed() {
 
 # Call the 'killstragglers' script, passing it the standard PostgreSQL port number
 function tt-killstragglers() {
-    test-tools-find-directories-if-needed
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME"
+    tt-find-directories-if-needed
 
     cd $VOLTDB_COM_DIR
     ant killstragglers -Dport=5432
@@ -285,8 +287,8 @@ function tt-killstragglers() {
 
 # Call the start_postgresql.sh script
 function tt-start-postgresql() {
-    test-tools-find-directories-if-needed
-    echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME"
+    echo -e "\n${BASH_SOURCE[0]} performing: tt-start-postgres[ql]"
+    tt-find-directories-if-needed
 
     # SqlCoverage will only work well with PostgreSQL, if PostgreSQL is
     # started by user 'test'
@@ -317,8 +319,8 @@ function tt-start-postgres() {
 
 # Call the stop_postgresql.sh script
 function tt-stop-postgresql() {
-    test-tools-find-directories-if-needed
-    echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME"
+    echo -e "\n${BASH_SOURCE[0]} performing: tt-stop-postgres[ql]"
+    tt-find-directories-if-needed
 
     # Stop the PostgreSQL server & delete the temp directory
     $VOLTDB_TESTS/sqlcoverage/stop_postgresql.sh
@@ -332,21 +334,49 @@ function tt-stop-postgres() {
 # TODO: this could be implemented in the future, to run the SqlCoverage test
 # program, with various arguments
 function tt-sqlcoverage() {
-    echo -e "\n${BASH_SOURCE[0]} performing: [test-tools.]run-sqlcoverage $@"
+    echo -e "\n${BASH_SOURCE[0]} performing: tt-run-sqlcoverage $@"
 
     echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME not implemented yet!!!\n"
 }
 
+# Sets the TT_BUILD_ARGS environment variable, based on the args passed to it;
+# translates certain brief arg abbreviations into their full meanings, leaves
+# the rest unchanged
+function tt-set-tt-build-args() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    for arg in $@; do
+        TT_BUILD_ARGS=()
+        if [[ "$arg" == "--debug" ]]; then
+            TT_BUILD_ARGS+=("-Dbuild=debug")
+        elif [[ "$arg" == "--pool" ]]; then
+            TT_BUILD_ARGS+=("-Dbuild=debug" "-DVOLT_POOL_CHECKING=true")
+        elif [[ "$arg" == "--release" ]]; then
+            TT_BUILD_ARGS+=("-Dbuild=release")
+        else
+            if [[ "$arg" == --* ]]; then
+                echo -e "\nWARNING: unrecognized build arg $arg will be passed in, but effect is unknown"
+            fi
+            TT_BUILD_ARGS+=("$arg")
+        fi
+    done
+}
+
 # Build VoltDB: 'community', open-source version
 # Optionally, you may specify one or more build arguments ($@)
-function test-tools-build() {
-    test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build $@"
+function tt-build() {
+    tt-find-directories-if-needed
+    tt-set-tt-build-args "$@"
+    echo -e "\n$0 performing: [tt-]build ${TT_BUILD_ARGS[@]}"
+    if [[ "$code_tt_build" -ne "0" ]]; then
+        echo -e "ERROR: $FUNCNAME skipped because of a previous failure."
+        return $code_tt_build
+    fi
 
     cd $VOLTDB_COM_DIR
-    ant clean dist "$@"
+    ant clean dist "${TT_BUILD_ARGS[@]}"
     code_tt_build=$?
     cd -
+    VOLTDB_BIN_DIR=${VOLTDB_COM_BIN}
 
     if [[ "$code_tt_build" -ne "0" ]]; then
         echo -e "\ncode_tt_build: $code_tt_build"
@@ -355,16 +385,22 @@ function test-tools-build() {
 
 # Build VoltDB: 'pro' version
 # Optionally, you may specify one or more build arguments ($@)
-function test-tools-build-pro() {
-    test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build-pro $@"
+function tt-build-pro() {
+    tt-find-directories-if-needed
+    tt-set-tt-build-args "$@"
+    echo -e "\n$0 performing: [tt-]build-pro ${TT_BUILD_ARGS[@]}"
+    if [[ "$code_tt_build" -ne "0" ]]; then
+        echo -e "ERROR: $FUNCNAME skipped because of a previous failure."
+        return $code_tt_build
+    fi
 
     cd $VOLTDB_PRO_DIR
-    ant -f mmt.xml dist.pro "$@"
+    ant -f mmt.xml clean dist.pro "${TT_BUILD_ARGS[@]}"
     code_tt_build=$?
     cd -
     VOLTDB_PRO_BIN=$(cd $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*/bin; pwd)
     cp $VOLTDB_PRO_BIN/../voltdb/license.xml $VOLTDB_COM_DIR/voltdb/
+    VOLTDB_BIN_DIR=${VOLTDB_PRO_BIN}
 
     if [[ "$code_tt_build" -ne "0" ]]; then
         echo -e "\ncode_tt_build(pro): $code_tt_build"
@@ -373,37 +409,31 @@ function test-tools-build-pro() {
 
 # Build VoltDB ('community'), only if not built already
 # Optionally, you may specify one or more build arguments ($@)
-function test-tools-build-if-needed() {
-    test-tools-find-directories-if-needed
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: [test-tools-]build-if-needed $@"
-    fi
+function tt-build-if-needed() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
     VOLTDB_COM_JAR=$(ls $VOLTDB_COM_DIR/voltdb/voltdb-*.jar)
     if [[ ! -e $VOLTDB_COM_JAR ]]; then
-        test-tools-build "$@"
+        tt-build "$@"
     fi
 }
 
 # Build VoltDB 'pro' version, only if not built already
 # Optionally, you may specify one or more build arguments ($@)
-function test-tools-build-pro-if-needed() {
-    test-tools-find-directories-if-needed
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: [test-tools-]build-pro-if-needed $@"
-    fi
+function tt-build-pro-if-needed() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
     VOLTDB_PRO_TAR=$(ls $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*.tar.gz)
     if [[ ! -e $VOLTDB_PRO_TAR ]]; then
-        test-tools-build-pro "$@"
+        tt-build-pro "$@"
     fi
 }
 
 # Set CLASSPATH, PATH, and python, as needed
-function test-tools-init() {
-    test-tools-find-directories-if-needed
-    test-tools-build-if-needed "$@"
-    if [[ "$TT_DEBUG" -gt "0" ]]; then
-        echo -e "\n$0 performing: test-tools-init $@"
-    fi
+function tt-init() {
+    if [[ "$TT_DEBUG" -ge "1" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
+    tt-build-if-needed "$@"
 
     # Set CLASSPATH to include the VoltDB Jar file
     VOLTDB_COM_JAR=$(ls $VOLTDB_COM_DIR/voltdb/voltdb-*.jar)
@@ -432,20 +462,21 @@ function test-tools-init() {
 }
 
 # Set CLASSPATH, PATH, and python, only if not set already
-function test-tools-init-if-needed() {
+function tt-init-if-needed() {
+    if [[ "$TT_DEBUG" -ge "4" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
     if [[ -z "${code_tt_init}" ]]; then
-        test-tools-init
+        tt-init "$@"
     fi
 }
 
 # Print the values of various variables, mainly those set in the
-# test-tools-find-directories() and test-tools-init() functions
-function test-tools-debug() {
-    test-tools-init-if-needed
-    if [[ "$TT_DEBUG" -gt "0" ]]; then
-        echo -e "\n$0 performing: test-tools-debug"
+# tt-find-directories() and tt-init() functions
+function tt-print-vars() {
+    if [[ "$TT_DEBUG" -ge "1" ]]; then
+        echo -e "\n$0 performing: $FUNCNAME"
         echo "TT_DEBUG       :" $TT_DEBUG
     fi
+    tt-init-if-needed "$@"
 
     echo "TT_HOME_DIR    :" $TT_HOME_DIR
     echo "VOLTDB_COM_DIR :" $VOLTDB_COM_DIR
@@ -463,16 +494,13 @@ function test-tools-debug() {
     echo "which voltdb   :" `which voltdb`
     echo "voltdb version :" `$VOLTDB_BIN_DIR/voltdb --version`
     echo "which python   :" `which python`
-    echo "python version :"
-    python --version
+    echo "python version :" `python --version 2>&1`
 }
 
 # Wait for a VoltDB server to finish initializing; should not be called directly
-function test-tools-wait-for-server-to-start() {
-    test-tools-find-directories-if-needed
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: test-tools-wait-for-server-to-start"
-    fi
+function tt-wait-for-server-to-start() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
 
     SQLCMD_COMMAND="$VOLTDB_COM_BIN/sqlcmd --query='select C1 from NONEXISTENT_TABLE' 2>&1"
     if [[ "$TT_DEBUG" -ge "3" ]]; then
@@ -517,10 +545,12 @@ function test-tools-wait-for-server-to-start() {
 # VOLTDB_BIN_DIR variable; optionally, you may set the DEPLOYMENT_FILE or
 # DEPLOYMENT_ARG variable (the latter should start with '-C ' or '--config=')
 # before calling this function; should not be called directly
-function test-tools-server-community-or-pro() {
-    test-tools-find-directories-if-needed
-    if [[ "$TT_DEBUG" -ge "2" ]]; then
-        echo -e "\n$0 performing: test-tools-server-community-or-pro"
+function tt-server-community-or-pro() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
+    if [[ "$code_tt_server" -ne "0" ]]; then
+        echo -e "ERROR: $FUNCNAME skipped because of a previous failure."
+        return $code_tt_server
     fi
 
     if [[ -z "$DEPLOYMENT_ARG" && -n "$DEPLOYMENT_FILE" ]]; then
@@ -535,7 +565,7 @@ function test-tools-server-community-or-pro() {
     echo -e "Running:\n${START_COMMAND} > volt_console.out 2>&1 &"
     ${START_COMMAND} > volt_console.out 2>&1 &
     code_voltdb_start=$?
-    test-tools-wait-for-server-to-start
+    tt-wait-for-server-to-start
 
     # Prevent exit before stopping the VoltDB server, if your tests fail
     set +e
@@ -549,23 +579,23 @@ function test-tools-server-community-or-pro() {
 }
 
 # Start the VoltDB server: 'community', open-source version
-function test-tools-server() {
-    test-tools-find-directories-if-needed
-    test-tools-build-if-needed
-    echo -e "\n$0 performing: [test-tools-]server"
+function tt-server() {
+    echo -e "\n$0 performing: [tt-]server"
+    tt-find-directories-if-needed
+    tt-build-if-needed
 
     VOLTDB_BIN_DIR=${VOLTDB_COM_BIN}
-    test-tools-server-community-or-pro
+    tt-server-community-or-pro
 }
 
 # Start the VoltDB server: 'pro' version
-function test-tools-server-pro() {
-    test-tools-find-directories-if-needed
-    test-tools-build-pro-if-needed
-    echo -e "\n$0 performing: [test-tools-]server-pro"
+function tt-server-pro() {
+    echo -e "\n$0 performing: [tt-]server-pro"
+    tt-find-directories-if-needed
+    tt-build-pro-if-needed
 
     VOLTDB_BIN_DIR=${VOLTDB_PRO_BIN}
-    test-tools-server-community-or-pro
+    tt-server-community-or-pro
 }
 
 # Counts the number of VoltDB processes, e.g., processes that contain
@@ -573,42 +603,42 @@ function test-tools-server-pro() {
 # (this version should be good through 'voldb/voltdb-99.9.9.9.9.9.jar').
 # Note that 'org.voltdb.VoltDB' cannot be used because it does not work on
 # Ubuntu-14.04 machines; and 'jps' no longer seems to work either.
-function test-tools-server-count() {
+function tt-server-count() {
     COUNT_VOLTDB_PROCESSES=`ps -ef | grep -v grep | grep -vi SQLCommand | grep -cE 'voltdb/voltdb-[1-9]?[0-9](.[0-9])+.jar'`
-    echo -e "\n$0 performing: test-tools-server-count: $COUNT_VOLTDB_PROCESSES"
+    echo -e "\n$0 performing: $FUNCNAME, result: $COUNT_VOLTDB_PROCESSES"
     return $COUNT_VOLTDB_PROCESSES
 }
 
 # Start the VoltDB server ('community'), only if not already running
-function test-tools-server-if-needed() {
-    test-tools-server-count
+function tt-server-if-needed() {
+    if [[ "$TT_DEBUG" -ge "4" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-server-count
     RETURN_CODE=$?
     if [[ "$RETURN_CODE" -gt "0" ]]; then
         echo -e "Not (re-)starting a VoltDB server, because 'ps -ef' now includes a VoltDB process."
     else
         echo -e "A VoltDB server will be started, because 'ps -ef' does not include a VoltDB process."
-        test-tools-server
+        tt-server
     fi
 }
 
 # Start the VoltDB 'pro' server, only if not already running
-function test-tools-server-pro-if-needed() {
-    test-tools-server-count
+function tt-server-pro-if-needed() {
+    if [[ "$TT_DEBUG" -ge "4" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-server-count
     RETURN_CODE=$?
     if [[ "$RETURN_CODE" -gt "0" ]]; then
         echo -e "Not (re-)starting a VoltDB (pro) server, because 'ps -ef' now includes a VoltDB process."
     else
         echo -e "A VoltDB (pro) server will be started, because 'ps -ef' does not include a VoltDB process."
-        test-tools-server-pro
+        tt-server-pro
     fi
 }
 
 # Stop the VoltDB server, and kill any straggler processes
-function test-tools-shutdown() {
-    test-tools-find-directories-if-needed
-    if [[ "$TT_DEBUG" -gt "0" ]]; then
-        echo -e "\n$0 performing: test-tools-shutdown"
-    fi
+function tt-shutdown() {
+    if [[ "$TT_DEBUG" -ge "1" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    tt-find-directories-if-needed
 
     # Stop the VoltDB server (& kill any stragglers)
     $VOLTDB_BIN_DIR/voltadmin shutdown --force
@@ -625,44 +655,42 @@ function test-tools-shutdown() {
 # Builds the latest (local) version of VoltDB (the 'community', open-source
 # version), and starts a ('community') VoltDB server, after setting and echoing
 # various environment variables
-function test-tools-all() {
-    echo -e "\n$0 performing: test-tools-all"
-
-    test-tools-build
-    test-tools-init
-    test-tools-debug
-    test-tools-server
+function tt-all() {
+    echo -e "\n$0 performing: $FUNCNAME"
+    tt-build
+    tt-init
+    tt-print-vars
+    tt-server
 }
 
 # Builds the latest (local) version of VoltDB (the 'pro' version), and starts a
 # ('pro') VoltDB server, after setting and echoing various environment variables
-function test-tools-all-pro() {
-    echo -e "\n$0 performing: test-tools-all-pro"
-
-    test-tools-build-pro
-    test-tools-init
-    test-tools-debug
-    test-tools-server-pro
+function tt-all-pro() {
+    echo -e "\n$0 performing: $FUNCNAME"
+    tt-build-pro
+    tt-init
+    tt-print-vars
+    tt-server-pro
 }
 
 # Print a simple help message, describing the options for this script
 function tt-help() {
-    echo -e "\nUsage: ./test-tools.sh test-tools-{build[-pro]|init|debug|server[-pro]|all[-pro]|shutdown}"
+    echo -e "\nUsage: ./test-tools.sh tt-{build[-pro]|init|print-vars|server[-pro]|all[-pro]|shutdown}"
     echo -e "Or   : ./test-tools.sh tt-{echo-build-args|set-build-args|set-setseed|killstragglers|"
     echo -e "                           start-postgres[ql]|stop-postgres[ql]|help}"
     echo -e "This script is largely intended to provide useful functions that may be called"
     echo -e "    by a variety of other test scripts, e.g., <voltdb>/tests/sqlgrammar/run.sh,"
     echo -e "    but it may also be called directly on the command line."
     echo -e "Options:"
-    echo -e "    test-tools-build      : builds VoltDB ('community', open-source version)"
-    echo -e "    test-tools-build-pro  : builds VoltDB ('pro' version)"
-    echo -e "    test-tools-init       : sets useful variables such as CLASSPATH and PATH"
-    echo -e "    test-tools-debug      : prints the values of variables such as VOLTDB_COM_DIR and PATH"
-    echo -e "    test-tools-server     : starts a VoltDB server ('community', open-source version)"
-    echo -e "    test-tools-server-pro : starts a VoltDB server ('pro' version)"
-    echo -e "    test-tools-all        : runs (almost) all of the above, except the '-pro' options"
-    echo -e "    test-tools-all-pro    : runs (almost) all of the above, using the '-pro' options"
-    echo -e "    test-tools-shutdown   : stops a VoltDB server that is currently running"
+    echo -e "    tt-build              : builds VoltDB ('community', open-source version)"
+    echo -e "    tt-build-pro          : builds VoltDB ('pro' version)"
+    echo -e "    tt-init               : sets useful variables such as CLASSPATH and PATH"
+    echo -e "    tt-print-vars         : prints the values of variables such as VOLTDB_COM_DIR and PATH"
+    echo -e "    tt-server             : starts a VoltDB server ('community', open-source version)"
+    echo -e "    tt-server-pro         : starts a VoltDB server ('pro' version)"
+    echo -e "    tt-all                : runs (almost) all of the above, except the '-pro' options"
+    echo -e "    tt-all-pro            : runs (almost) all of the above, using the '-pro' options"
+    echo -e "    tt-shutdown           : stops a VoltDB server that is currently running"
     echo -e "    tt-echo-build-args    : echoes build (& test) args commonly used in Jenkins"
     echo -e "    tt-set-build-args     : sets the BUILD_ARGS, VOLTBUILD_ARG environment variables"
     echo -e "    tt-set-test-args      : sets the TEST_ARGS environment variable"
@@ -674,17 +702,68 @@ function tt-help() {
     echo -e "    tt-stop-postgres[ql]  : calls the stop_postgresql.sh script"
     #echo -e "    tt-sqlcoverage        : NOT YET IMPLEMENTED!"
     echo -e "    tt-help               : prints this message"
-    echo -e "Some options (test-tools-build[-pro], test-tools-init, test-tools-server[-pro],"
-    echo -e "    tt-echo-build-args) may have '-if-needed' appended, e.g.,"
-    echo -e "    'test-tools-server-if-needed' will start a VoltDB server only if"
-    echo -e "    one is not already running."
+    echo -e "Some options (tt-build[-pro], tt-init, tt-server[-pro], tt-echo-build-args) may have"
+    echo -e "    '-if-needed' appended, e.g.,'tt-server-if-needed' will start a VoltDB server only"
+    echo -e "    if one is not already running."
     echo -e "Some options (tt-set-build-args, tt-set-test-args, tt-set-verify-arg, tt-set-setseed) may be"
     echo -e "    passed argument(s) that determine what the relevant environment variable will be set to."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
     PRINT_ERROR_CODE=0
 }
 
-# Old name for tt-help
+# Old, deprecated name for tt-find-directories
+function test-tools-find-directories() {
+    tt-find-directories "$@"
+}
+# Old, deprecated name for tt-find-directories-if-needed
+function test-tools-find-directories-if-needed() {
+    tt-find-directories-if-needed "$@"
+}
+# Old, deprecated name for tt-build
+function test-tools-build() {
+    tt-build "$@"
+}
+# Old, deprecated name for tt-build-pro
+function test-tools-tt-build-pro() {
+    tt-build-pro "$@"
+}
+# Old, deprecated name for tt-build-if-needed
+function test-tools-build-if-needed() {
+    tt-build-if-needed "$@"
+}
+# Old, deprecated name for tt-build-pro-if-needed
+function test-tools-build-pro-if-needed() {
+    tt-build-pro-if-needed "$@"
+}
+# Old, deprecated name for tt-init
+function test-tools-init() {
+    tt-init "$@"
+}
+# Old, deprecated name for tt-print-vars
+function test-tools-debug() {
+    tt-print-vars "$@"
+}
+# Old, deprecated name for tt-server
+function test-tools-server() {
+    tt-server "$@"
+}
+# Old, deprecated name for tt-server-pro
+function test-tools-server-pro() {
+    tt-server-pro "$@"
+}
+# Old, deprecated name for tt-server-if-needed
+function test-tools-server-if-needed() {
+    tt-server-if-needed "$@"
+}
+# Old, deprecated name for tt-server-pro-if-needed
+function test-tools-server-pro-if-needed() {
+    tt-server-pro-if-needed "$@"
+}
+# Old, deprecated name for tt-shutdown
+function test-tools-shutdown() {
+    tt-shutdown "$@"
+}
+# Old, deprecated name for tt-help
 function test-tools-help() {
     tt-help
 }
@@ -694,9 +773,7 @@ function test-tools-help() {
 # and error messages ($3 and $4); note that all parameters are optional, and
 # will assume default values if unspecified
 function tt-exit-script() {
-    if [[ "$TT_DEBUG" -ge "1" ]]; then
-        echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $@"
-    fi
+    if [[ "$TT_DEBUG" -ge "1" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
 
     # Set variables equal to the first 4 args or, if not specified, default values
     TT_EXIT_CODE="${1:-1}"
