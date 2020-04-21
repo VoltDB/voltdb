@@ -106,6 +106,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         @Override
         public int offer(BBContainer data, long startId, long endId, long timestamp) throws IOException {
+            try {
+                return offer0(data, startId, endId, timestamp);
+            } finally {
+                data.discard();
+            }
+        }
+
+        private int offer0(BBContainer data, long startId, long endId, long timestamp) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
                     throw new IOException("updateGapHeader call on closed PBD " + m_nonce);
@@ -1240,12 +1248,16 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized int offer(BBContainer object) throws IOException {
-        return commonOffer(object, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID, PBDSegment.INVALID_TIMESTAMP);
+        return offer(object, PBDSegment.INVALID_ID, PBDSegment.INVALID_ID, PBDSegment.INVALID_TIMESTAMP);
     }
 
     @Override
     public synchronized int offer(BBContainer object, long startId, long endId, long timestamp) throws IOException {
-        return commonOffer(object, startId, endId, timestamp);
+        try {
+            return commonOffer(object, startId, endId, timestamp);
+        } finally {
+            object.discard();
+        }
     }
 
     @Override
@@ -1353,12 +1365,22 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public synchronized void push(BBContainer[] objects) throws IOException {
+    public void push(BBContainer[] objects) throws IOException {
         push(objects, m_extraHeader);
     }
 
     @Override
-    public synchronized void push(BBContainer objects[], M extraHeader) throws IOException {
+    public void push(BBContainer objects[], M extraHeader) throws IOException {
+        try {
+            push0(objects, extraHeader);
+        } finally {
+            for (BBContainer obj : objects) {
+                obj.discard();
+            }
+        }
+    }
+
+    private synchronized void push0(BBContainer objects[], M extraHeader) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Cannot push(): PBD has been Closed");

@@ -982,8 +982,6 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( cont );
         } catch (IOException e) {
             return;
-        } finally {
-            cont.discard();
         }
         fail();
     }
@@ -997,8 +995,6 @@ public class TestPersistentBinaryDeque {
             m_pbd.push(objs);
         } catch (IOException e) {
             return;
-        } finally {
-            objs[0].discard();
         }
         fail();
     }
@@ -1160,8 +1156,6 @@ public class TestPersistentBinaryDeque {
             m_pbd.push(objs);
         } catch (IOException e) {
             return;
-        } finally {
-            objs[0].discard();
         }
         fail();
     }
@@ -1174,8 +1168,6 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( cont );
         } catch (IOException e) {
             return;
-        } finally {
-            cont.discard();
         }
         fail();
     }
