@@ -22,6 +22,8 @@
 #include "common/SynchronizedThreadLock.h"
 #include "ExecuteWithMpMemory.h"
 #include <numeric>
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+#include <boost/stacktrace.hpp>
 
 namespace voltdb {
 
@@ -198,9 +200,12 @@ int32_t getAllocationSizeForObject(int length) {
     } else if (length_to_fit <= MAX_ALLOCATION) {
         return MAX_ALLOCATION;
     } else {
+        std::stringstream message;
+        message << boost::stacktrace::stacktrace() << std::endl;
+        string msg = message.str();
         throwFatalException(
-                "Attempted to allocate an object larger than the 1 MB limit. Requested size was %d",
-                length);
+                "Attempted to allocate an object larger than the 1 MB limit. Requested size was %d.\n Stack trace: %s",
+                length, msg);
     }
 }
 
