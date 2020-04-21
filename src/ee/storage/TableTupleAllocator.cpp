@@ -1979,7 +1979,7 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::finalize_range(void const* beg, void const* end) const {
     assert(beg <= end);
     for(auto const* ptr = reinterpret_cast<char const*>(beg); ptr < end; ptr += tupleSize()) {
-        if (! Hook::moved_contains(ptr)) {
+        if (! this->moved_contains(ptr)) {
             finalizerAndCopier().finalize(ptr);
         }
     }
@@ -1988,7 +1988,7 @@ HookedCompactingChunks<Hook, E>::finalize_range(void const* beg, void const* end
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
     CompactingChunks::thaw([this](void const* p) noexcept {
-            return ! Hook::moved_contains(p);
+            return ! this->moved_contains(p);
         });
     Hook::thaw();
     reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).reset();
@@ -2037,7 +2037,7 @@ HookedCompactingChunks<Hook, E>::remove_force(
                 CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(), 0lu,
                 [this](size_t acc, pair<void*, void*> const& entry) {
-                    if (! Hook::moved_add(entry.second)) {
+                    if (! this->moved_add(entry.second)) {
                         snprintf(buf, sizeof buf, "Failed to add to Hook::m_moved: %p\n",
                                 entry.second);
                         buf[sizeof buf - 1] = 0;
