@@ -198,7 +198,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                             new DataTargetInfo(stream,
                                                srcHSId,
                                                destHSId,
-                                               new StreamSnapshotDataTarget(destHSId,
+                                               new StreamSnapshotDataTarget(srcHSId, destHSId,
                                                                             (destHSId == stream.lowestSiteSinkHSId),
                                                                             destsByHostId.get(CoreUtils.getHostIdFromHSId(destHSId)),
                                                                             hashinatorConfig, schemas, sender, ackReceiver));

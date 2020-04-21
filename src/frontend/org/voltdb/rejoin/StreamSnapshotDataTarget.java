@@ -78,6 +78,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final Map<Integer, Pair<Boolean, byte[]>> m_schemas = new HashMap<>();
     // HSId of the destination mailbox
     private final long m_destHSId;
+    private long m_sourceHSId = -1;
     private final Set<Long> m_otherDestHostHSIds;
     private boolean m_replicatedTableTarget;
     // input and output threads
@@ -107,6 +108,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+    }
+
+    public StreamSnapshotDataTarget(long sourceHsid, long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
+            byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
+            SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+    {
+        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+        m_sourceHSId = sourceHsid;
     }
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
@@ -325,7 +334,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                rejoinLog.info(String.format("While sending rejoin data%s to site %s, %d bytes have been sent in the past %s seconds.",
+                        m_sourceHSId != -1 ? (" from " + CoreUtils.hsIdToString(m_sourceHSId)) : " ",
                         CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
 
                 checkTimeout(m_writeTimeout);
