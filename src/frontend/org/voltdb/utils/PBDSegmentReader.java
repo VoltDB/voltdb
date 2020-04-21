@@ -45,6 +45,11 @@ interface PBDSegmentReader<M> {
     public boolean allReadAndDiscarded();
 
     /**
+     * @return {@code true} if any entries have been polled but not freed
+     */
+    boolean hasOutstandingEntries();
+
+    /**
      * Read the next entry from the segment for this reader.
      * Returns null if all entries in this segment were already read by this reader.
      *

@@ -924,6 +924,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return m_discardCount != m_objectReadIndex;
+        }
+
+        @Override
         public void markRestReadAndDiscarded() throws IOException {
             //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
             int outstanding = m_objectReadIndex - m_discardCount;
@@ -1006,17 +1011,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_objectReadIndex++;
 
                 return new DBBPool.DBBDelegateContainer(retcont) {
-                    private boolean m_discarded = false;
-
                     @Override
                     public void discard() {
-                        checkDoubleFree();
-                        if (m_discarded) {
-                            m_usageSpecificLog.error("PBD Container discarded more than once");
-                            return;
-                        }
-
-                        m_discarded = true;
                         super.discard();
                         m_discardCount++;
                     }

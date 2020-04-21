@@ -201,6 +201,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return false;
+        }
+
+        @Override
         public void close() {
         }
 

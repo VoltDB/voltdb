@@ -56,6 +56,18 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
+    private final AtomicInteger m_refCount = new AtomicInteger(1);
+    private final long m_startSequenceNumber;
+    private final long m_committedSequenceNumber;
+    private final int m_rowCount;
+    private final long m_uniqueId;
+    private final long m_totalSize;
+    private final BinaryDequeReader.Entry<PersistedMetadata> m_entry;
+    // index of the last row that has been released.
+    private int m_releaseOffset = -1;
+    // If true free entry rather than releasing it
+    private volatile boolean m_freeOnly = false;
+
     public static StreamBlock from(BinaryDequeReader.Entry<PersistedMetadata> entry) {
         ByteBuffer b = entry.getData();
         b.order(ByteOrder.LITTLE_ENDIAN);
@@ -81,18 +93,11 @@ public class StreamBlock {
         m_totalSize = m_entry.getData().remaining();
     }
 
-    private final AtomicInteger m_refCount = new AtomicInteger(1);
-
     /*
      * Call discard on the underlying buffer used for storage
      */
     public void discard() {
-        final int count = m_refCount.decrementAndGet();
-        if (count == 0) {
-            m_entry.release();
-        } else if (count < 0) {
-            VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
-        }
+        decrementReference(false);
     }
 
     public ExportRowSchema getSchema() {
@@ -164,15 +169,6 @@ public class StreamBlock {
                 (m_rowCount - 1) : (int)(releaseSequenceNumber - m_startSequenceNumber);
     }
 
-    private final long m_startSequenceNumber;
-    private final long m_committedSequenceNumber;
-    private final int m_rowCount;
-    private final long m_uniqueId;
-    private final long m_totalSize;
-    private final BinaryDequeReader.Entry<PersistedMetadata> m_entry;
-    // index of the last row that has been released.
-    private int m_releaseOffset = -1;
-
     /**
      * Use this when we need a copy BBContainer with refcount incremented.
      *
@@ -212,6 +208,27 @@ public class StreamBlock {
         ByteBuffer view = b.asReadOnlyBuffer();
         view.position(SEQUENCE_NUMBER_OFFSET);
         return getRefCountingContainer(view);
+    }
+
+    /**
+     * Free the memory backed by this entry but do not release the entries
+     */
+    public void free() {
+        decrementReference(true);
+    }
+
+    private void decrementReference(boolean freeOnly) {
+        m_freeOnly |= freeOnly;
+        final int count = m_refCount.decrementAndGet();
+        if (count == 0) {
+            if (m_freeOnly) {
+                m_entry.free();
+            } else {
+                m_entry.release();
+            }
+        } else if (count < 0) {
+            VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
+        }
     }
 
     @Override

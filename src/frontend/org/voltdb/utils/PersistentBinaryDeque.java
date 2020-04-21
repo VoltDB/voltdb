@@ -197,7 +197,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         @Override
-        public BBContainer poll(OutputContainerFactory ocf) throws IOException {
+        public Wrapper poll(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_cursorClosed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
@@ -246,8 +246,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public BinaryDequeReader.Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                BBContainer retcont = poll(ocf);
-                if (retcont == null) {
+                Wrapper wrapper = poll(ocf);
+                if (wrapper == null) {
                     return null;
                 }
 
@@ -261,12 +261,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
                     @Override
                     public ByteBuffer getData() {
-                        return retcont.b();
+                        return wrapper.b();
                     }
 
                     @Override
                     public void release() {
-                        retcont.discard();
+                        wrapper.discard();
+                    }
+
+                    @Override
+                    public void free() {
+                        wrapper.free();
                     }
                 };
             }
@@ -279,12 +284,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void seekToSegment(long entryId, SeekErrorRule errorRule)
                 throws NoSuchOffsetException, IOException {
-            // Support this only for transient readers for now.
-            // if we support this for non-transient reader, revisit wrapRetCont asserts as well.
-            assert(m_isTransient);
             assert(entryId >= 0);
 
-            synchronized(PersistentBinaryDeque.this) {
+            synchronized (PersistentBinaryDeque.this) {
+                // Support this for transient readers or readers which do not have outstanding entries
+                assert (m_isTransient || m_segments.values().stream().map(s -> s.getReader(m_cursorId))
+                        .allMatch(r -> r == null || !r.hasOutstandingEntries()));
+
                 PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
                 if (moveToValidSegment() == null) {
                     return;
@@ -562,18 +568,16 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private BBContainer wrapRetCont(PBDSegment<M> segment, int entryNumber, final BBContainer retcont) {
-            return new BBContainer(retcont.b()) {
+        private Wrapper wrapRetCont(PBDSegment<M> segment, int entryNumber, final BBContainer retcont) {
+            if (m_isTransient) {
+                return new Wrapper(retcont);
+            }
+
+            return new Wrapper(retcont) {
                 @Override
                 public void discard() {
                     synchronized(PersistentBinaryDeque.this) {
-                        checkDoubleFree();
-                        retcont.discard();
-
-                        // Transient readers do not affect PBD data deletion.
-                        if (m_isTransient) {
-                            return;
-                        }
+                        free();
 
                         assert m_cursorClosed || m_segments.containsKey(segment.segmentId());
                         if (m_cursorClosed) {
@@ -2062,5 +2066,19 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     @Override
     public synchronized int countCursors() {
         return m_readCursors.size();
+    }
+
+    /**
+     * Simple wrapper around a {@link BBContainer} which exposes a {@link #free()} method to directly call the
+     * underlying discard
+     */
+    private class Wrapper extends DBBPool.DBBDelegateContainer {
+        Wrapper(BBContainer delegate) {
+            super(delegate);
+        }
+
+        void free() {
+            super.discard();
+        }
     }
 }

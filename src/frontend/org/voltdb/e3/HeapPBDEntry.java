@@ -41,4 +41,7 @@ class HeapPBDEntry implements BinaryDequeReader.Entry<PersistedMetadata> {
 
     @Override
     public void release() {}
+
+    @Override
+    public void free() {}
 }
