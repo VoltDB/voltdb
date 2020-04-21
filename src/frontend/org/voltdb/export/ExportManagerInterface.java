@@ -174,7 +174,7 @@ public interface ExportManagerInterface {
     default int getMastershipCount() {
         int count = 0;
         for (ExportStatsRow st : getStats(false)) {
-            if ("TRUE".equalsIgnoreCase(st.m_exportingRole)) {
+            if (Boolean.parseBoolean(st.m_exportingRole)) {
                 count++;
             }
         }
