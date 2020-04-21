@@ -924,6 +924,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return m_discardCount != m_objectReadIndex;
+        }
+
+        @Override
         public void markRestReadAndDiscarded() throws IOException {
             //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
             int outstanding = m_objectReadIndex - m_discardCount;

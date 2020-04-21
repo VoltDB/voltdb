@@ -284,12 +284,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Override
         public void seekToSegment(long entryId, SeekErrorRule errorRule)
                 throws NoSuchOffsetException, IOException {
-            // Support this only for transient readers for now.
-            // if we support this for non-transient reader, revisit wrapRetCont asserts as well.
-            assert(m_isTransient);
             assert(entryId >= 0);
 
-            synchronized(PersistentBinaryDeque.this) {
+            synchronized (PersistentBinaryDeque.this) {
+                // Support this for transient readers or readers which do not have outstanding entries
+                assert (m_isTransient || m_segments.values().stream().map(s -> s.getReader(m_cursorId))
+                        .allMatch(r -> r == null || !r.hasOutstandingEntries()));
+
                 PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
                 if (moveToValidSegment() == null) {
                     return;
