@@ -1636,6 +1636,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
     }
 }
 
+/*
 TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
     // test batch removal when frozen, then thaw.
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
@@ -1745,6 +1746,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     alloc.template clear<truth>();
     ASSERT_TRUE(verifier.ok(0));
 }
+*/
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
     // test that dtor should properly finalize
@@ -1762,88 +1764,88 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_SimpleDtor) {
     ASSERT_TRUE(verifier.ok(0));
 }
 
-TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
-    // test finalizer on iterator
-    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
-    using Gen = StringGen<TupleSize>;
-    Gen gen;
-    finalize_verifier verifier{NumTuples + AllocsPerChunk * 3};            // 2 additional chunks inserted, one chunk updated
-    {
-        Alloc alloc(TupleSize, {[&verifier](void const* p) { verifier(p); }, tuple_memcpy});
-        array<void const*, NumTuples + AllocsPerChunk * 2> addresses;
-        size_t i;
-        for (i = 0; i < NumTuples; ++i) {
-            addresses[i] = gen.fill(alloc.allocate());
-        }
-        auto const& iter = alloc.template freeze<truth>();
-        // After frozen, make some new allocations (2 new chunk);
-        // some updates (10th chunk)
-        // and batch remove from head (delete first 3 chunks) and
-        // 2nd to last chunk, totaling 4 chunks
-        for (i = 0; i < AllocsPerChunk * 2; ++i) {     // accounts for 2 additinal chunks to be finalized
-            addresses[i + NumTuples] = gen.fill(alloc.allocate());
-        }
-        for (i = AllocsPerChunk * 10; i < AllocsPerChunk * 11; ++i) {      // accounts for 1 chunk
-            alloc.template update<truth>(const_cast<void*>(addresses[i]));
-            ASSERT_EQ(NumTuples + AllocsPerChunk * 2 + i - AllocsPerChunk * 10,
-                    Gen::of(reinterpret_cast<unsigned char*>(
-                            gen.fill(const_cast<void*>(addresses[i])))));
-        }
-        alloc.remove_reserve(AllocsPerChunk * 4);
-        for (i = 0; i < AllocsPerChunk * 3; ++i) {                         // does not account for any chunks
-            alloc.remove_add(const_cast<void*>(addresses[i]));
-        }
-        ASSERT_TRUE(verifier.seen().empty());
-        for (i = 0; i < AllocsPerChunk; ++i) {
-            // Deleting beyond frozen region should trigger
-            // finalize right away (same as unfrozen state):
-            alloc.remove_add(const_cast<void*>(addresses[NumTuples + i]));
-        }
-
-        ASSERT_EQ(make_pair(AllocsPerChunk * 4, AllocsPerChunk),           // the 2nd-to-last chunk is finalized right away
-                alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
-                    for_each(entries.begin(), entries.end(),
-                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                    }));
-        ASSERT_EQ(AllocsPerChunk, verifier.seen().size());
-        // verify that this 2nd to last chunk is finalized on
-        // each call to `remove_add'
-        for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
-            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
-        }
-
-        // check 1st value of txn iterator
-        ASSERT_EQ(AllocsPerChunk * 4, Gen::of(reinterpret_cast<unsigned char const*>(
-                        *IterableTableTupleChunks<Alloc, truth>::const_iterator(alloc))));
-        // use iterator for first 4 chunks, before thawing
-        for (i = 0; i < AllocsPerChunk * 4; ++i) {
-            // See src document for why using snapshot iterator
-            // on snapshot-visible-only chunks **should not**
-            // trigger any finalization.
-            ++*iter;
-        }
-        alloc.template thaw<truth>();
-        /**
-         * verify what hook had finalized
-         */
-        ASSERT_EQ(AllocsPerChunk * 5, verifier.seen().size());
-        // batch removal on first 3 chunks: no compaction
-        for (i = 0; i < AllocsPerChunk * 3; ++i) {
-            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
-        }
-        // update of 10th chunk
-        for (i = AllocsPerChunk * 10; i < AllocsPerChunk * 11; ++i) {
-            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
-        }
-        // batch removal on 2nd to last chunk: this chunk is
-        // finalized as soon as remove_add is called (as verified
-        // above)
-        for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
-            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
-        }
-    }
-    ASSERT_TRUE(verifier.ok(0));
-}
+//TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
+//    // test finalizer on iterator
+//    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+//    using Gen = StringGen<TupleSize>;
+//    Gen gen;
+//    finalize_verifier verifier{NumTuples + AllocsPerChunk * 3};            // 2 additional chunks inserted, one chunk updated
+//    {
+//        Alloc alloc(TupleSize, {[&verifier](void const* p) { verifier(p); }, tuple_memcpy});
+//        array<void const*, NumTuples + AllocsPerChunk * 2> addresses;
+//        size_t i;
+//        for (i = 0; i < NumTuples; ++i) {
+//            addresses[i] = gen.fill(alloc.allocate());
+//        }
+//        auto const& iter = alloc.template freeze<truth>();
+//        // After frozen, make some new allocations (2 new chunk);
+//        // some updates (10th chunk)
+//        // and batch remove from head (delete first 3 chunks) and
+//        // 2nd to last chunk, totaling 4 chunks
+//        for (i = 0; i < AllocsPerChunk * 2; ++i) {     // accounts for 2 additinal chunks to be finalized
+//            addresses[i + NumTuples] = gen.fill(alloc.allocate());
+//        }
+//        for (i = AllocsPerChunk * 10; i < AllocsPerChunk * 11; ++i) {      // accounts for 1 chunk
+//            alloc.template update<truth>(const_cast<void*>(addresses[i]));
+//            ASSERT_EQ(NumTuples + AllocsPerChunk * 2 + i - AllocsPerChunk * 10,
+//                    Gen::of(reinterpret_cast<unsigned char*>(
+//                            gen.fill(const_cast<void*>(addresses[i])))));
+//        }
+//        alloc.remove_reserve(AllocsPerChunk * 4);
+//        for (i = 0; i < AllocsPerChunk * 3; ++i) {                         // does not account for any chunks
+//            alloc.remove_add(const_cast<void*>(addresses[i]));
+//        }
+//        ASSERT_TRUE(verifier.seen().empty());
+//        for (i = 0; i < AllocsPerChunk; ++i) {
+//            // Deleting beyond frozen region should trigger
+//            // finalize right away (same as unfrozen state):
+//            alloc.remove_add(const_cast<void*>(addresses[NumTuples + i]));
+//        }
+//
+//        ASSERT_EQ(make_pair(AllocsPerChunk * 4, AllocsPerChunk),           // the 2nd-to-last chunk is finalized right away
+//                alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
+//                    for_each(entries.begin(), entries.end(),
+//                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+//                    }));
+//        ASSERT_EQ(AllocsPerChunk, verifier.seen().size());
+//        // verify that this 2nd to last chunk is finalized on
+//        // each call to `remove_add'
+//        for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
+//            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
+//        }
+//
+//        // check 1st value of txn iterator
+//        ASSERT_EQ(AllocsPerChunk * 4, Gen::of(reinterpret_cast<unsigned char const*>(
+//                        *IterableTableTupleChunks<Alloc, truth>::const_iterator(alloc))));
+//        // use iterator for first 4 chunks, before thawing
+//        for (i = 0; i < AllocsPerChunk * 4; ++i) {
+//            // See src document for why using snapshot iterator
+//            // on snapshot-visible-only chunks **should not**
+//            // trigger any finalization.
+//            ++*iter;
+//        }
+//        alloc.template thaw<truth>();
+//        /**
+//         * verify what hook had finalized
+//         */
+//        ASSERT_EQ(AllocsPerChunk * 5, verifier.seen().size());
+//        // batch removal on first 3 chunks: no compaction
+//        for (i = 0; i < AllocsPerChunk * 3; ++i) {
+//            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
+//        }
+//        // update of 10th chunk
+//        for (i = AllocsPerChunk * 10; i < AllocsPerChunk * 11; ++i) {
+//            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
+//        }
+//        // batch removal on 2nd to last chunk: this chunk is
+//        // finalized as soon as remove_add is called (as verified
+//        // above)
+//        for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
+//            ASSERT_NE(verifier.seen().cend(), verifier.seen().find(i));
+//        }
+//    }
+//    ASSERT_TRUE(verifier.ok(0));
+//}
 
 /**
  * This concurrent test is occasionally useful in creating a more
@@ -1908,7 +1910,6 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     t1.join();
     alloc.template thaw<truth>();
 }
-*/
 
 TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
@@ -2005,6 +2006,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     ASSERT_EQ(AllocsPerChunk * 3 - 2, i);
     alloc.template thaw<truth>();
 }
+*/
 
 TEST_F(TableTupleAllocatorTest, TestSnapIterEmptyTxnView) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;

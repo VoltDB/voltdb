@@ -807,7 +807,7 @@ namespace voltdb {
             // \return whether finalize is called on the addr
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            bool addOrFinalize(void const*, IteratorObserver&);
+            void add(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
@@ -824,8 +824,8 @@ namespace voltdb {
          */
         template<typename Hook, typename E = typename enable_if<Hook::is_hook::value>::type>
         class HookedCompactingChunks : public CompactingChunks, public Hook {
-            using CompactingChunks::freeze; using Hook::freeze;
-            using Hook::addOrFinalize;
+            using CompactingChunks::freeze;
+            using Hook::freeze; using Hook::add;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};

@@ -1858,7 +1858,7 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, FinalizerAndCopier con
     m_changeStore(tupleSize), m_finalizerAndCopier(cb) {}
 
 template<typename Alloc, typename Trait, typename E1>
-template<typename IteratorObserver, typename E2> inline bool TxnPreHook<Alloc, Trait, E1>::addOrFinalize(
+template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, Trait, E1>::add(
         void const* dst, IteratorObserver& obs) {
     if (m_recording && ! obs(dst)) {
         auto const iter = m_changes.lower_bound(dst);
@@ -1867,15 +1867,10 @@ template<typename IteratorObserver, typename E2> inline bool TxnPreHook<Alloc, T
             m_changes.emplace_hint(iter, dst,
                     m_finalizerAndCopier ? m_finalizerAndCopier.copy(fresh, dst) :
                     memcpy(fresh, dst, m_changeStore.tupleSize()));
-            return false;      // not finalized
         }
     }
     if (m_recording && m_finalizerAndCopier) {
-        // finalize unless hook memory copied the addr to be changed
         m_finalizerAndCopier.finalize(dst);
-        return true;
-    } else {
-        return false;
     }
 }
 
@@ -1940,7 +1935,7 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
     CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::addOrFinalize(s, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                Hook::add(s, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
             });
 }
 
@@ -1958,7 +1953,7 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::update(void* dst) {
     VOLT_TRACE("update(%p)", dst);
-    Hook::addOrFinalize(dst, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+    Hook::add(dst, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
 }
 
 template<typename Hook, typename E>
@@ -2033,22 +2028,19 @@ HookedCompactingChunks<Hook, E>::remove_force(
     // finalize before memcpy
     auto finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {            // hook registration on movements only
-        finalized += accumulate(
-                CompactingChunks::m_batched.movements().cbegin(),
-                CompactingChunks::m_batched.movements().cend(), 0lu,
-                [this](size_t acc, pair<void*, void*> const& entry) {
+        for_each(CompactingChunks::m_batched.movements().cbegin(),
+                CompactingChunks::m_batched.movements().cend(),
+                [this](pair<void*, void*> const& entry) {
                     if (! this->moved_add(entry.second)) {
                         snprintf(buf, sizeof buf, "Failed to add to Hook::m_moved: %p\n",
                                 entry.second);
                         buf[sizeof buf - 1] = 0;
                         throw runtime_error(buf);
-                    } else if (Hook::addOrFinalize(entry.first,
-                                reinterpret_cast<observer_type<Tag>&>(m_iterator_observer))) {
-                        return acc + 1;
-                    } else {
-                        return acc;
                     }
+                    Hook::add(entry.first,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
+        finalized += CompactingChunks::m_batched.movements().size();
     }
     cb(CompactingChunks::m_batched.movements());    // memcpy by call back
     return make_pair(CompactingChunks::m_batched.force(), finalized);
@@ -2218,7 +2210,7 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen3
 // template member methods
 #define HookedMethods4(tag, alloc, gc, alloc2)                                           \
-template bool TxnPreHook<alloc, HistoryRetainTrait<gc>>::addOrFinalize<typename          \
+template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename                    \
         IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(            \
             void const*,                                                                 \
             typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&)
