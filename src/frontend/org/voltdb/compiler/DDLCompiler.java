@@ -1689,8 +1689,8 @@ public class DDLCompiler {
                 }
                 if (db.getGroups().get(role) == null) {
                     throw compiler.new VoltCompilerException(
-                            String.format("Unknown user group %s defined in the ALLOW attribute of STREAM %s",
-                                    role, table.getTypeName()));
+                            String.format("Unknown role %s listed in the ALLOW attribute of STREAM %s", role,
+                                    table.getTypeName()));
                 }
                 definedRoles.add(role);
             }
