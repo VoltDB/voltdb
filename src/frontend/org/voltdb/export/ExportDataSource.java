@@ -667,23 +667,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 // Create a block to offer: NOTE this block should not
                 // be used for anything else than offering, as it doesn't have metadata.
-                BinaryDequeReader.Entry<PersistedMetadata> entry = new BinaryDequeReader.Entry<PersistedMetadata>() {
-
-                    @Override
-                    public PersistedMetadata getExtraHeader() {
-                        return null;
-                    }
-
-                    @Override
-                    public ByteBuffer getData() {
-                        return cont.b();
-                    }
-
-                    @Override
-                    public void release() {
-                        cont.discard();
-                    }
-                };
+                BinaryDequeReader.Entry<PersistedMetadata> entry = BinaryDequeReader.Entry.wrap(cont);
 
                 StreamBlock sb = new StreamBlock(
                         entry,
