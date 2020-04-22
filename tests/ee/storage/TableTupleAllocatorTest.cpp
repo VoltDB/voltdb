@@ -1961,6 +1961,40 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
     ASSERT_TRUE(verifier.ok(0));
 }
 
+TEST_F(TableTupleAllocatorTest, TestFinalizer_bug1) {
+    // test finalizer on iterator
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    finalize_verifier verifier{NumTuples};
+    {
+        array<void const*, NumTuples> addresses;
+        Alloc alloc(TupleSize, {
+                [&verifier](void const* p) { verifier(p); },
+                [&verifier](void* dst, void const* src) { return verifier(dst, src); }
+            });
+        size_t i;
+        for (i = 0; i < NumTuples; ++i) {
+            addresses[i] = gen.fill(alloc.allocate());
+        }
+        alloc.template freeze<truth>();
+        auto const batch_size = NumTuples / 2 + 4;
+        alloc.remove_reserve(batch_size);
+        for (i = 0; i < batch_size; ++i) {
+            alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
+        }
+        ASSERT_EQ(make_pair(batch_size, batch_size - 8),
+                alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
+                    for_each(entries.begin(), entries.end(),
+                            [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
+                    }));
+        ASSERT_EQ(batch_size - 8, verifier.finalized().size());
+        alloc.template thaw<truth>();
+        ASSERT_EQ(batch_size, verifier.finalized().size());
+    }
+    ASSERT_TRUE(verifier.ok(0));
+}
+
 //TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
 //    // test finalizer on iterator
 //    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;

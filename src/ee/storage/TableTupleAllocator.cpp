@@ -554,17 +554,27 @@ template<typename Pred> inline void CompactingStorageTrait::thaw(Pred&& pred) {
             } else {                       // harder case: has frozen boundary
                 auto const& left = storage.frozenBoundaries()->left(),
                      &right = storage.frozenBoundaries()->right();
+                auto const& left_id = left.chunkId(), &right_id = right.chunkId();
                 while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
                     auto const& id = m_storage.front().id();
-                    storage.pop_finalize(id == left.chunkId() ? left.address() :
-                                (id == right.chunkId() ? right.address() : m_storage.front().range_end()),
+                    storage.pop_finalize(id == left_id ? left.address() :
+                                (id == right_id ? right.address() : m_storage.front().range_end()),
                             pred);
                 }
-                if (! m_storage.empty()) {
-                    auto const& beg_id = m_storage.front().id();
-                    if (beg_id == right.chunkId() || beg_id == left.chunkId()) {
-                        auto const* dst = beg_id == right.chunkId() ? right.address() : left.address();
-                        for (char const* ptr = reinterpret_cast<char const*>(m_storage.front().range_next());
+                if (! m_storage.empty()) {                             // finalize on first txn chunk
+                    auto const& front = m_storage.front();
+                    auto const& beg_id = front.id();
+                    void const* dst = nullptr;
+                    if (beg_id == right_id) {
+                        dst = right.address();
+                    } else if (beg_id == left_id) {
+                        dst = left.address();
+                    } else if (less<id_type>()(left_id, beg_id) &&
+                            less<id_type>()(beg_id, right_id)) {
+                        dst = front.range_end();
+                    }
+                    if (dst != nullptr) {
+                        for (char const* ptr = reinterpret_cast<char const*>(front.range_next());
                                 ptr < dst; ptr += storage.tupleSize()) {
                             if (pred(ptr)) {
                                 storage.finalizerAndCopier().finalize(ptr);
