@@ -74,15 +74,19 @@ function build-pro() {
 # Build VoltDB, only if not built already
 function build-if-needed() {
     if [[ "$TT_DEBUG" -ge "3" ]]; then echo -e "\n$0 performing: $FUNCNAME$BUILD_ARGS"; fi
-    tt-build-if-needed $BUILD_ARGS
-    code[0]=$code_tt_build
+    if [[ -z "${code[0]}" ]]; then
+        tt-build-if-needed $BUILD_ARGS
+        code[0]=$code_tt_build
+    fi
 }
 
 # Build VoltDB 'pro' version, only if not built already
 function build-pro-if-needed() {
     if [[ "$TT_DEBUG" -ge "3" ]]; then echo -e "\n$0 performing: $FUNCNAME$BUILD_ARGS"; fi
-    tt-build-pro-if-needed $BUILD_ARGS
-    code[0]=$code_tt_build
+    if [[ -z "${code[0]}" ]]; then
+        tt-build-pro-if-needed $BUILD_ARGS
+        code[0]=$code_tt_build
+    fi
 }
 
 # Set CLASSPATH, PATH, python, DEFAULT_ARGS, and MINUTES, as needed
@@ -90,6 +94,12 @@ function init() {
     find-directories-if-needed
     build-if-needed
     echo -e "\n$0 performing: $FUNCNAME$BUILD_ARGS"
+
+    if [[ "${code[0]}" -ne "0" || "${code[1]}" -ne "0" ]]; then
+        echo -e "ERROR: $FUNCNAME skipped because of a previous failure of build or init."
+        code[1]=`if [[ "${code[1]}" -ne "0" ]]; then echo "${code[1]}"; else echo "21"; fi`
+        return ${code[1]}
+    fi
     tt-init $BUILD_ARGS
 
     # Set the default values of the args to pass to SQL-grammar-gen
@@ -106,7 +116,7 @@ function init() {
                 "(or set the MINUTES environment value)."
     fi
 
-    code[1]=`if [[ "${code_tt_init}" -ne "0" && "${code[0]}" -ne "0" ]]; then echo "21"; else echo "${code_tt_init}"; fi`
+    code[1]=${code_tt_init}
 }
 
 # Set CLASSPATH, PATH, DEFAULT_ARGS, MINUTES, and python, only if not set already
@@ -144,6 +154,12 @@ function jars() {
     init-if-needed
     echo -e "\n$0 performing: $FUNCNAME$BUILD_ARGS"
 
+    if [[ "${code[0]}" -ne "0" || "${code[1]}" -ne "0" || "${code[2]}" -ne "0" ]]; then
+        echo -e "ERROR: $FUNCNAME skipped because of a previous failure of build, init, or jars."
+        code[2]=`if [[ "${code[2]}" -ne "0" ]]; then echo "${code[2]}"; else echo "22"; fi`
+        return ${code[2]}
+    fi
+
     # Compile the classes and build the main jar file for the SQL-grammar-gen tests
     mkdir -p obj
     javac -cp $CLASSPATH -d ./obj $SQLGRAMMAR_DIR/procedures/sqlgrammartest/*.java
@@ -165,9 +181,6 @@ function jars() {
     cd -
 
     code[2]=$(($code2a|$code2b|$code2c|$code2d))
-    if [[ "${code[2]}" -ne "0" && ("${code[0]}" -ne "0" || "${code[1]}" -ne "0") ]]; then
-        code[2]="22"
-    fi
 }
 
 # Create the Jar files, only if not created already
@@ -180,9 +193,9 @@ function jars-if-needed() {
 
 # Start the VoltDB server: 'community', open-source version
 function server() {
-    echo -e "\n$0 performing: $FUNCNAME"
     find-directories-if-needed
     build-if-needed
+    echo -e "\n$0 performing: $FUNCNAME"
     if [[ "${code[0]}" -ne "0" || "${code[1]}" -ne "0" || "${code[2]}" -ne "0" ]]; then
         echo -e "ERROR: $FUNCNAME skipped because of a previous failure of build, init, and/or jars."
         code_tt_server="23"
@@ -194,9 +207,9 @@ function server() {
 
 # Start the VoltDB server: 'pro' version
 function server-pro() {
-    echo -e "\n$0 performing: $FUNCNAME"
     find-directories-if-needed
     build-pro-if-needed
+    echo -e "\n$0 performing: $FUNCNAME"
     # For now, the same deployment file is used for 'pro' as for 'community'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     if [[ "${code[0]}" -ne "0" || "${code[1]}" -ne "0" || "${code[2]}" -ne "0" ]]; then
@@ -211,23 +224,27 @@ function server-pro() {
 # Start the VoltDB 'community' server, only if not already running
 function server-if-needed() {
     if [[ "$TT_DEBUG" -ge "3" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
-    tt-server-if-needed
-    code[3]=$code_tt_server
+    if [[ -z "${code[3]}" ]]; then
+        tt-server-if-needed
+        code[3]=$code_tt_server
+    fi
 }
 
 # Start the VoltDB 'pro' server, only if not already running
 function server-pro-if-needed() {
     if [[ "$TT_DEBUG" -ge "3" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
-    tt-server-pro-if-needed
-    code[3]=$code_tt_server
+    if [[ -z "${code[3]}" ]]; then
+        tt-server-pro-if-needed
+        code[3]=$code_tt_server
+    fi
 }
 
 # Load the main SQL-grammar-gen schema and procedures, plus the UDF functions
 function ddl() {
-    echo -e "\n$0 performing: $FUNCNAME"
     find-directories-if-needed
     jars-if-needed
     server-if-needed
+    echo -e "\n$0 performing: $FUNCNAME"
 
     if [[ "${code[3]}" -ne "0" ]]; then
         echo -e "ERROR: $FUNCNAME skipped because of a previous failure of server[-pro]."
@@ -357,8 +374,8 @@ function prepare-pro() {
 # Run the SQL-grammar-generator tests, only, on the assumption that 'prepare'
 # (or the equivalent) has already been run
 function tests-only() {
-    echo -e "\n$0 performing: tests[-only]$ARGS"
     init-if-needed
+    echo -e "\n$0 performing: tests[-only]$ARGS"
 
     if [[ "${code[3]}" -ne "0" || "${code[4]}" -ne "0" ]]; then
         echo -e "ERROR: $FUNCNAME skipped because of a previous failure of server[-pro] and/or ddl[-pro]."
@@ -382,17 +399,17 @@ function tests-only() {
 
 # Run the SQL-grammar-generator tests, with the usual prerequisites
 function tests() {
-    echo -e "\n$0 performing: $FUNCNAME$ARGS"
     server-if-needed
     ddl-if-needed
+    echo -e "\n$0 performing: $FUNCNAME$ARGS"
     tests-only
 }
 
 # Run the SQL-grammar-generator tests, with the usual prerequisites
 function tests-pro() {
-    echo -e "\n$0 performing: $FUNCNAME$ARGS"
     server-pro-if-needed
     ddl-pro-if-needed
+    echo -e "\n$0 performing: $FUNCNAME$ARGS"
     tests-only
 }
 
@@ -407,8 +424,8 @@ function shutdown() {
         mv voltdbroot/log/volt.log voltdbroot/log/volt$SUFFIX.log
         SUFFIX_INFO=" --suffix=$SUFFIX"
     fi
-    echo -e "\n$0 performing: shutdown$SUFFIX_INFO"
     find-directories-if-needed
+    echo -e "\n$0 performing: shutdown$SUFFIX_INFO"
 
     # Stop the VoltDB server (& any stragglers)
     tt-shutdown
@@ -513,7 +530,7 @@ function exit-with-code() {
     done
     if [[ "$errcode" -ne "0" ]]; then
         echo -e "\n\nError(s) found; here are some indications of where they occurred" \
-                "(0 for no error; 20+ for failed or skipped due to a previous error):"
+                "(0 for no error; 21-6 for failed or skipped due to a previous error):"
         if [[ "${code[1]}" -ne "0" ]]; then
             echo -e "code1a code1b: $code_voltdb_jar $code_python (classpath, python)"
         fi
@@ -543,8 +560,11 @@ function exit-with-code() {
     exit $errcode
 }
 
-# If no options specified, run help
+# Start by echoing the arguments
+echo -e "$0 called with argument(s): $@"
 SECONDS=0
+
+# If no options specified, run help
 if [[ $# -eq 0 ]]; then
     help
 fi

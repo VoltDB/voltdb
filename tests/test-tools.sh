@@ -354,7 +354,7 @@ function tt-set-tt-build-args() {
             TT_BUILD_ARGS+=("-Dbuild=release")
         else
             if [[ "$arg" == --* ]]; then
-                echo -e "\nWARNING: unrecognized build arg $arg will be passed in, but effect is unknown"
+                echo -e "\nWARNING: in $FUNCNAME, unrecognized build arg $arg will be passed on, but effect is unknown"
             fi
             TT_BUILD_ARGS+=("$arg")
         fi
