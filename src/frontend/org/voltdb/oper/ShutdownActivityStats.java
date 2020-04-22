@@ -15,13 +15,18 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.oper;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.voltdb.CommandLog;
+import org.voltdb.StatsSelector;
+import org.voltdb.StatsSource;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltcore.logging.VoltLogger;
 
 /**

@@ -15,12 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.oper;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.voltdb.ClientInterface;
+import org.voltdb.CommandLog;
+import org.voltdb.DRConsumerStatsBase;
+import org.voltdb.DRProducerStatsBase;
+import org.voltdb.StatsAgent;
+import org.voltdb.StatsSelector;
+import org.voltdb.StatsSource;
+import org.voltdb.VoltDB;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.export.ExportManagerInterface;
@@ -338,7 +346,7 @@ class ActivityHelper {
      * Get index for a column in someone else's stats table.
      */
     private static int getIndex(StatsSource ss, String name) {
-        return ss.columnNameToIndex.get(name);
+        return ss.getStatsColumnIndex(name);
     }
 
     /*
