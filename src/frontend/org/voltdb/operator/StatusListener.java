@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb.operator;
 
 import java.io.IOException;
 import java.net.InetAddress;
