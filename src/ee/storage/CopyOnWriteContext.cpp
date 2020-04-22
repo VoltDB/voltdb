@@ -135,6 +135,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             } else {
                 if (!tuple.isNullTuple()) {
                     m_tuplesRemaining--;
+                    if (m_tuplesRemaining < 0) {
+                       // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
+                       m_tuplesRemaining = 0;
+                    }
                     bool deleteTuple = false;
                     yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
                 } else {
