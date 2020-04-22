@@ -116,7 +116,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
     PersistentTable &table = getTable();
     TableTuple tuple(table.schema());
-
     {
         ConditionalExecuteWithMpMemoryAndScopedResourceLock lockInMpMemory(m_replicated);
 
@@ -127,22 +126,21 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             bool hasMore = table.nextSnapshotTuple(tuple, TABLE_STREAM_SNAPSHOT);
             if (!hasMore) {
                 yield = true;
+                if (m_tuplesRemaining > 0) {
+                   std::ostringstream buf;
+                   buf << "Tuples to be streamed on " << table.name() << ": " << m_tuplesRemaining << std::endl;
+                   LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, buf.str().c_str());
+                }
+                m_tuplesRemaining = 0;
             } else {
                 if (!tuple.isNullTuple()) {
                     m_tuplesRemaining--;
-                    if (m_tuplesRemaining < 0) {
-                       // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
-                       m_tuplesRemaining = 0;
-                    }
                     bool deleteTuple = false;
-                    try {
-                        yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
-                    } catch (SQLException& e) {
-                        std::ostringstream buf;
-                        buf << "Serialization error on tuple:" << tuple.debug(table.name()).c_str() << std::endl;
-                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buf.str().c_str());
-                        throw;
-                    }
+                    yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+                } else {
+                   std::ostringstream buf;
+                   buf << "Found a NULL tuple from snapshot:" << table.name() << std::endl;
+                   LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, buf.str().c_str());
                 }
             }
         }
@@ -169,7 +167,11 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     }
 
     if (retValue == 0) {
-        table.stopSnapshot(TABLE_STREAM_SNAPSHOT);
+        if (!table.stopSnapshot(TABLE_STREAM_SNAPSHOT)) {
+            std::ostringstream buf;
+            buf << "Stream snapshot is not drained on " << table.name() << std::endl;
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, buf.str().c_str());
+        }
     }
     // Done when the table scan is finished and iteration is complete.
     return retValue;

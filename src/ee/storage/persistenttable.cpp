@@ -1802,25 +1802,44 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 
 void PersistentTable::activateSnapshot(TableStreamType streamType) {
    if (streamType == TABLE_STREAM_SNAPSHOT) {
+       std::ostringstream buffer;
+       if (m_snapIt.get() != nullptr) {
+          buffer << "Snapshot activated when previous one is not done on " << name() << std::endl;
+          LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,buffer.str().c_str());
+       } else {
+           buffer << "Snapshot activated on " << name() << std::endl;
+           LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,buffer.str().c_str());
+       }
        stopSnapshot(TABLE_STREAM_SNAPSHOT, true);
        m_snapIt = allocator().template freeze<storage::truth>();
        m_snapshotStarted = true;
+       vassert(m_invisibleTuplesPendingDeleteCount == 0);
    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
        m_elasticIt = std::make_shared<ElasticIndexIterator>(allocator());
    }
 }
 
-void PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactivation) {
+bool PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactivation) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
-        if (m_snapIt.get() != nullptr && (m_snapIt->drained() || forceDeactivation)) {
-            if (isReplicatedTable()) {
-                ScopedReplicatedResourceLock scopedLock;
-                ExecuteWithMpMemory useMpMemory;
-                allocator().template thaw<storage::truth>();
-                m_snapIt.reset();
-            } else {
-                allocator().template thaw<storage::truth>();
-                m_snapIt.reset();
+        if (m_snapIt.get() != nullptr) {
+            // The iterator must go beyond the last entry to be drained.
+            if (!m_snapIt->drained()) {
+                ++*m_snapIt;
+            }
+            if (m_snapIt->drained() || forceDeactivation) {
+                if (isReplicatedTable()) {
+                    ScopedReplicatedResourceLock scopedLock;
+                    ExecuteWithMpMemory useMpMemory;
+                    allocator().template thaw<storage::truth>();
+                    m_snapIt.reset();
+                } else {
+                    allocator().template thaw<storage::truth>();
+                    m_snapIt.reset();
+                }
+                std::ostringstream buffer;
+                buffer << "Snapshot is done on: " << name() << std::endl;
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,buffer.str().c_str());
+                return true;
             }
         }
     }
@@ -1829,21 +1848,18 @@ void PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactiv
             m_elasticIt.reset();
         }
     }
+    return false;
 }
 
 bool PersistentTable::nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType) {
     if (streamType == TABLE_STREAM_SNAPSHOT) {
-        // Advance the iterator and get the tuple
         if (m_snapshotStarted) {
             m_snapshotStarted = false;
-            if (m_snapIt->drained()) {
-                return false;
-            }
         } else {
             ++*m_snapIt;
-            if (m_snapIt->drained()) {
-                return false;
-            }
+        }
+        if (m_snapIt->drained()) {
+           return false;
         }
         auto *p = **m_snapIt;
         tuple.move(const_cast<void*>(reinterpret_cast<const void*>(p)));
