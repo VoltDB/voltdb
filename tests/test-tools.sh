@@ -344,8 +344,8 @@ function tt-sqlcoverage() {
 # the rest unchanged
 function tt-set-tt-build-args() {
     if [[ "$TT_DEBUG" -ge "2" ]]; then echo -e "\n$0 performing: $FUNCNAME"; fi
+    TT_BUILD_ARGS=()
     for arg in $@; do
-        TT_BUILD_ARGS=()
         if [[ "$arg" == "--debug" ]]; then
             TT_BUILD_ARGS+=("-Dbuild=debug")
         elif [[ "$arg" == "--pool" ]]; then
