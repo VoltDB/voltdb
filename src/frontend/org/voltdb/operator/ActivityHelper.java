@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.oper;
+package org.voltdb.operator;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
