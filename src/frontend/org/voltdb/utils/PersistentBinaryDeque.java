@@ -141,12 +141,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 // verify that these ids don't already exist
                 if (prev!=null && startId <= prev.getEndId()) {
                     throw new IllegalArgumentException("PBD segment with range [" + prev.getStartId() + "-" + prev.getEndId() +
-                            "] already contains some entries offered in the range ]" + startId + "-" + endId + "]");
+                            "] already contains some entries offered in the range [" + startId + "-" + endId + "]");
                 }
 
                 if (next!=null && endId >= next.getStartId()) {
                     throw new IllegalArgumentException("PBD segment with range [" + next.getStartId() + "-" + next.getEndId() +
-                            "] already contains some entries offered in the range ]" + startId + "-" + endId + "]");
+                            "] already contains some entries offered in the range [" + startId + "-" + endId + "]");
                 }
 
                 // By now prev.endId < startId. But it may not be the next id, in which case, we need to start a new segment
