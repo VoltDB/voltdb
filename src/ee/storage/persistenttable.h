@@ -399,7 +399,7 @@ public:
      */
     bool nextSnapshotTuple(TableTuple& tuple, TableStreamType streamType);
 
-    void stopSnapshot(TableStreamType streamType, bool forceDeactivation = false);
+    bool stopSnapshot(TableStreamType streamType, bool forceDeactivation = false);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
