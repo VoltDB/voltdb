@@ -517,6 +517,9 @@ function exit-with-code() {
     find-directories-if-needed
     cd $HOME_DIR
 
+    if [[ "$PRINT_ERROR_CODE" -ne "0" ]]; then
+        echo -e "\nTo learn more about how to run this script, use the 'help' (and/or 'tests-help') option:\n    $0 help"
+    fi
     if [[ -n "$MINUTES_WARNING" ]]; then
         echo -e $MINUTES_WARNING
     fi
