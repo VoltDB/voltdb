@@ -265,7 +265,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 
 
     size_t dataSz;
-    if (tuple.isAllCollumnNull()) {
+    if (tuple.isAllCollumnVarAndNull()) {
         // if all columns are null
         dataSz = 0;
     } else {
