@@ -1434,7 +1434,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
-                if (!tableSchemaChanged) {
+                if (!tableSchemaChanged && !persistentTable) {
                     continue;
                 }
             }
