@@ -657,6 +657,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             processCatalogDeletes(timestamp, true, purgedStreams);
         }
 
+        template<class TableType, class MaterializedView>
+        void rebuildViewsOnTable(catalog::Table* catalogTable, TableType* table);
+
         void initMaterializedViewsAndLimitDeletePlans(bool updateReplicated = false);
         void initReplicatedMaterializedViewsAndLimitDeletePlans() {
             initMaterializedViewsAndLimitDeletePlans(true);
