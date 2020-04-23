@@ -1803,10 +1803,7 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
        std::ostringstream buffer;
        if (m_snapIt.get() != nullptr) {
           buffer << "Snapshot activated when previous one is not done on " << name() << std::endl;
-          LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,buffer.str().c_str());
-       } else {
-           buffer << "Snapshot activated on " << name() << std::endl;
-           LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,buffer.str().c_str());
+          LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,buffer.str().c_str());
        }
        stopSnapshot(TABLE_STREAM_SNAPSHOT, true);
        m_snapIt = allocator().template freeze<storage::truth>();
@@ -1834,11 +1831,6 @@ bool PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactiv
                     allocator().template thaw<storage::truth>();
                     m_snapIt.reset();
                 }
-                // these 3 lines of logging fails memcheck on
-                // CopyOnWriteTest
-//                std::ostringstream buffer;
-//                buffer << "Snapshot is done on: " << name() << std::endl;
-//                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,buffer.str().c_str());
                 return true;
             }
         }
