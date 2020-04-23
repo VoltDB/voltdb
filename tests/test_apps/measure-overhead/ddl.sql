@@ -9,6 +9,9 @@ CREATE TABLE empty_p
 );
 PARTITION TABLE empty_p ON COLUMN id;
 
+-- make sure to load the Java code for the procedures, before creating them
+LOAD CLASSES measure-overhead.jar;
+
 -- stored procedures
 CREATE PROCEDURE PARTITION ON TABLE EMPTY_P COLUMN ID FROM CLASS measureoverhead.procedures.MO_ROSP;
 CREATE PROCEDURE PARTITION ON TABLE EMPTY_P COLUMN ID FROM CLASS measureoverhead.procedures.MO_RWSP;
