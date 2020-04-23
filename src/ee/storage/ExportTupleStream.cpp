@@ -263,10 +263,17 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + sizeof (int32_t)           // column count
             + nullMaskLength;           // null array
 
-    // returns 0 if corrupt tuple detected
-    size_t dataSz = tuple.maxExportSerializationSize();
-    if (dataSz == 0) {
-        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
+
+    size_t dataSz;
+    if (tuple.isAllCollumnNull()) {
+        // if all columns are null
+        dataSz = 0;
+    } else {
+        // returns 0 if corrupt tuple detected
+        dataSz = tuple.maxExportSerializationSize();
+        if (dataSz == 0) {
+            throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
+        }
     }
     //Data size for metadata columns.
     dataSz += (5 * sizeof(int64_t)) + 1;

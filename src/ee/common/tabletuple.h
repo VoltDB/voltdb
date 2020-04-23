@@ -164,6 +164,16 @@ public:
         return m_schema->columnCount();
     }
 
+    bool isAllCollumnNull() const {
+        int cols = columnCount();
+        for (int i = 0; i < cols; ++i) {
+            if (!isNull(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
         Determine the maximum number of bytes when serialized for Export.
         Excludes the bytes required by the row header (which includes
