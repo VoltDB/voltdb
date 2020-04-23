@@ -1879,9 +1879,9 @@ template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, T
                     memcpy(fresh, dst, m_changeStore.tupleSize()));
         }
     }
-    if (m_recording && m_finalizerAndCopier) {
-        m_finalizerAndCopier.finalize(dst);
-    }
+//    if (m_recording && m_finalizerAndCopier) {
+//        m_finalizerAndCopier.finalize(dst);
+//    }
 }
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {
