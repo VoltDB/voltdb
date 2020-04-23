@@ -670,7 +670,7 @@ private:
             columnInfo = m_schema->getColumnInfo(colIndex);
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
-        return columnType ==  ValueType::tVARCHAR || columnType ==  ValueType::tVARBINARY || columnType == case ValueType::tGEOGRAPHY;
+        return columnType ==  ValueType::tVARCHAR || columnType ==  ValueType::tVARBINARY || columnType == ValueType::tGEOGRAPHY;
     }
 
     inline size_t maxExportSerializedColumnSizeCommon(int colIndex, bool isHidden) const {

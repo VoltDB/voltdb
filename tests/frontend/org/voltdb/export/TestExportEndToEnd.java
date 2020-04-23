@@ -37,6 +37,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -68,6 +69,15 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
                 + "     a integer not null, "
                 + "     b integer not null"
                 + ");";
+
+    private static final String NULLABLE_SCHEMA =
+            "CREATE STREAM nullable "
+                    + "EXPORT TO TARGET export_target_c ("
+                    + "     a varchar(32), "
+                    + "     b varbinary, "
+                    + "     c geography"
+                    + ");";
+
     private static List<String> streamNames = new ArrayList<>();
 
     @Before
@@ -80,7 +90,8 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(T1_SCHEMA);
         builder.addLiteralSchema(T2_SCHEMA);
-        streamNames = new ArrayList<>(Arrays.asList("t_1", "t_2"));
+        builder.addLiteralSchema(NULLABLE_SCHEMA);
+        streamNames = new ArrayList<>(Arrays.asList("t_1", "t_2", "nullable"));
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
@@ -93,6 +104,10 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
                 ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                 createSocketExportProperties("t_2", false /* is replicated stream? */),
                 "export_target_b");
+        builder.addExport(true /* enabled */,
+                ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
+                createSocketExportProperties("nullable", false /* is replicated stream? */),
+                "export_target_c");
         // Start socket exporter client
         startListener();
 
@@ -121,6 +136,20 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         }
         m_cluster.shutDown();
     }
+
+    @Test
+    public void testInsertAllNulls_ENG_19237() throws Exception {
+        Client client = getClient(m_cluster);
+
+        ClientResponse response = client.callProcedure("@AdHoc",
+                "insert into nullable values(null, null, null)" );
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        // no crash
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
+        assertEquals(3, m_cluster.getLiveNodeCount());
+    }
+
 
     @Test
     public void testExportRejoinThenDropStream_ENG_15740() throws Exception
