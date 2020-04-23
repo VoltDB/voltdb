@@ -76,7 +76,7 @@ public:
         std::vector<MATVIEW*> &obsoleteViewsOut) {
         // iterate through all of the existing views
         BOOST_FOREACH(MATVIEW* currView, viewsIn) {
-            std::string currentViewId = currView->destTable()->name();
+            const std::string& currentViewId = currView->destTable()->name();
 
             // iterate through all of the catalog views, looking for a match.
             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
