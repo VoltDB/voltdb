@@ -2024,6 +2024,27 @@ HookedCompactingChunks<Hook, E>::remove_force(
     // finalize before memcpy
     auto finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {            // hook registration on movements only
+        auto const dup = accumulate(                               // sanity check on batch removal algorithm
+                    CompactingChunks::m_batched.movements().cbegin(),
+                    CompactingChunks::m_batched.movements().cend(),
+                    make_pair(vector<void const*>{}, set<void const*>{}),
+                    [](pair<vector<void const*>, set<void const*>>& acc,
+                        pair<void*, void*> const& entry) {
+                        if (! acc.second.emplace(entry.second).second) {
+                            acc.first.emplace_back(entry.second);
+                        }
+                        return acc;
+                    }).first;
+        if (! dup.empty()) {
+            ostringstream oss;
+            oss << "?Request to remove " << CompactingChunks::m_batched.movements().size()
+                << " tuples, found " << dup.size() << " duplicates: ";
+            for(void const* p : dup) {
+                oss << p << ": {" << info(p) << "}, ";
+            }
+            oss.seekp(-2, ios_base::end); oss << "?";
+            throw runtime_error(oss.str());
+        }
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void*> const& entry) {
