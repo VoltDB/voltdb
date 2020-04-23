@@ -512,7 +512,9 @@ TEST_F(FunctionTest, NaturalLogTest) {
     try {
         testUnary(FUNC_LN, -1, 0);
     } catch(SQLException &sqlExcp) {
-    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
+        const std::string message = sqlExcp.message();
+        sawException = findString(message, "Invalid result value (nan)")
+                || findString(message, "Invalid result value (-nan)");
     }
     ASSERT_EQ(sawException, true);
 
