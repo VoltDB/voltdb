@@ -1693,6 +1693,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             return;
         }
 
+        stopRetentionPolicyEnforcement();
         if (m_gapWriter != null) {
             m_gapWriter.close();
         }
