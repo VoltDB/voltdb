@@ -1200,17 +1200,6 @@ inline size_t CompactingChunks::DelayedRemover::finalize() const {
             for_each(m_removed.cbegin(), m_removed.cend(),
                     [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
         }
-        if (! m_movements.empty()) {
-            /**
-             * The frozen case: finalize need to by called on
-             * destination unless a fresh entry is added to hook
-             * memory. This depends on CompactingChunks::add(...) to handle it
-             */
-            for_each(m_movements.cbegin(), m_movements.cend(),
-                    [this](pair<void*, void*> const& entry) {
-                        m_chunks.finalizerAndCopier().finalize(entry.first);
-                    });
-        }
         return m_removed.size() + m_movements.size();
     } else {
         return 0;
@@ -1879,9 +1868,6 @@ template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, T
                     memcpy(fresh, dst, m_changeStore.tupleSize()));
         }
     }
-//    if (m_recording && m_finalizerAndCopier) {
-//        m_finalizerAndCopier.finalize(dst);
-//    }
 }
 
 template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Alloc, Trait, E>::freeze() {

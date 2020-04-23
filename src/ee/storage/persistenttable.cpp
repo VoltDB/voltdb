@@ -661,14 +661,32 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
 
 void PersistentTable::finalizeRelease() {
 
-    TableTuple target(m_schema);
-    TableTuple origin(m_schema);
+    TableTuple destinationTuple(m_schema);
+    TableTuple originalTuple(m_schema);
     allocator().template remove_force<storage::truth>(
-            [this, &target, &origin](vector<pair<void*, void*>> const& tuples) {
+            [this, &destinationTuple, &originalTuple](vector<pair<void*, void*>> const& tuples) {
         for(auto const& p : tuples) {
-           target.move(p.first);
-           origin.move(p.second);
-           swapTuples(origin, target);
+            destinationTuple.move(p.first);
+            originalTuple.move(p.second);
+
+            decreaseStringMemCount(destinationTuple.getNonInlinedMemorySizeForPersistentTable());
+            destinationTuple.freeObjectColumns();
+            ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
+            vassert(!originalTuple.isPendingDeleteOnUndoRelease());
+
+            BOOST_FOREACH (auto index, m_indexes) {
+                index->replaceEntryNoKeyChange(destinationTuple, originalTuple);
+            }
+            if (isTableWithMigrate(m_tableType)) {
+                uint16_t migrateColumnIndex = getMigrateColumnIndex();
+                NValue txnId = originalTuple.getHiddenNValue(migrateColumnIndex);
+                if (!txnId.isNull()) {
+                    migratingSwap(ValuePeeker::peekBigInt(txnId), originalTuple, destinationTuple);
+                }
+           }
+           if (m_tableStreamer != NULL) {
+               m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
+           }
         }
     });
     m_invisibleTuplesPendingDeleteCount = 0;
@@ -1743,26 +1761,6 @@ size_t PersistentTable::hashCode() {
          tuple.hashCode(hashCode);
     }
     return hashCode;
-}
-
-void PersistentTable::swapTuples(TableTuple& originalTuple,
-                                 TableTuple& destinationTuple) {
-    ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
-    vassert(!originalTuple.isPendingDeleteOnUndoRelease());
-
-    BOOST_FOREACH (auto index, m_indexes) {
-        index->replaceEntryNoKeyChange(destinationTuple, originalTuple);
-    }
-    if (isTableWithMigrate(m_tableType)) {
-        uint16_t migrateColumnIndex = getMigrateColumnIndex();
-        NValue txnId = originalTuple.getHiddenNValue(migrateColumnIndex);
-        if (!txnId.isNull()) {
-            migratingSwap(ValuePeeker::peekBigInt(txnId), originalTuple, destinationTuple);
-       }
-    }
-    if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
-    }
 }
 
 int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
