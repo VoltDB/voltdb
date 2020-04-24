@@ -1183,8 +1183,8 @@ public class VoltDB {
         }
     }
 
-    public static void crashLocalVoltDB(String errMsg) {
-        crashLocalVoltDB(errMsg, false, null);
+    public static RuntimeException crashLocalVoltDB(String errMsg) {
+        return crashLocalVoltDB(errMsg, false, null);
     }
 
     /**
