@@ -1755,19 +1755,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return true;
     }
 
-    //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
-    //to allow the site to be promoted. Remove the sites on the new host from the replica list and
-    //update the duplicated counters after the host failure.
-    public void updateReplicasFromMigrationLeaderFailedHost(int failedHostId) {
-        List<Long> replicas = new ArrayList<>();
-        for (long hsid : m_replicaHSIds) {
-            if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {
-                replicas.add(hsid);
-            }
-        }
-        ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
-    }
-
     // Because now in rejoin we rely on first fragment of stream snapshot to update the replica
     // set of every partition, it creates a window that may cause task log on rejoin node miss sp txns.
     // To fix it, leader forwards to rejoin node any sp txn that are queued in backlog between leader receives the
