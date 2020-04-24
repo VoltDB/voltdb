@@ -18,6 +18,9 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +35,10 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
+
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -82,6 +87,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
     protected LoadedProcedureSet m_procSet;
+
+    // Lock shared by all schedulers to de-conflict the first dump message to log a stacktrace of all site threads
+    private static final Object s_threadDumpLock = new Object();
+    private static long s_txnIdForSiteThreadDump = 0;
 
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
@@ -219,4 +228,27 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     //flush out read only transactions upon host failure
     public void cleanupTransactionBacklogOnRepair() {}
+
+    protected static void generateSiteThreadDump(StringBuilder threadDumps) {
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
+        for (ThreadInfo t : threadInfos) {
+            if (t.getThreadName().startsWith("SP") || t.getThreadName().startsWith("MP Site") || t.getThreadName().startsWith("RO MP Site")) {
+                threadDumps.append(t);
+            }
+        }
+    }
+
+    protected static void dumpStackTraceOnFirstSiteThread(DumpMessage message, StringBuilder threadDumps) {
+        synchronized(s_threadDumpLock) {
+            if (message.getTxnId() > s_txnIdForSiteThreadDump) {
+                s_txnIdForSiteThreadDump = message.getTxnId();
+            } else {
+                return;
+            }
+        }
+        threadDumps.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
+        generateSiteThreadDump(threadDumps);
+        threadDumps.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+    }
 }

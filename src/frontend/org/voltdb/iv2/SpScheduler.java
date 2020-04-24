@@ -469,7 +469,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else if (message instanceof DumpMessage) {
-            handleDumpMessage();
+            handleDumpMessage((DumpMessage)message);
         } else if (message instanceof DumpPlanThenExitMessage) {
             handleDumpPlanMessage((DumpPlanThenExitMessage)message);
         }
@@ -1419,7 +1419,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private void handleDumpMessage()
+    private void handleDumpMessage(DumpMessage message)
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         StringBuilder builder = new StringBuilder();
@@ -1442,6 +1442,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         builder.append("END of STATE DUMP FOR SITE: ").append(who);
+        dumpStackTraceOnFirstSiteThread(message, builder);
         hostLog.warn(builder.toString());
     }
 
