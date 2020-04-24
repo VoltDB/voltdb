@@ -494,7 +494,7 @@ namespace voltdb {
  * Needed for maps keyed on iterator, or chunk.
  * Of course, compared items must belong to the same list.
  */
-namespace std {                                        // TODO: needed?
+namespace std {
     using namespace voltdb::storage;
     template<> struct less<typename ChunkList<CompactingChunk, true_type>::iterator> {
         using value_type = typename ChunkList<CompactingChunk, true_type>::iterator;
@@ -661,6 +661,7 @@ namespace voltdb {
                 };
                 using map_type = map<id_type, RemovableRegion, less_rolling_type<id_type>>;
                 map_type m_removedRegions{};
+                set<void*> m_added{};
                 vector<void*> m_moved{}, m_removed{};
                 vector<pair<void*, void*>> m_movements;// (dst, <= src)
                 size_t m_size = 0;

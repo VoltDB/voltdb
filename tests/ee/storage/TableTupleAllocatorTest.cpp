@@ -1248,6 +1248,60 @@ TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
     ASSERT_EQ(1, i);
 }
 
+TEST_F(TableTupleAllocatorTest, TestBatchRemoveBug) {
+    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
+    using Gen = StringGen<TupleSize>;
+    auto const ordered_pred = [this] (Alloc const& a, size_t i, set<size_t> const& holes) {
+        fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
+                a, [this, &i, &holes] (void const* p) {
+                    if (! holes.count(i)) {
+                        assert(i++ == Gen::of(reinterpret_cast<unsigned char const*>(p)));
+                    }
+                });
+    };
+    Alloc alloc(TupleSize);
+    Gen gen;
+    array<void const*, AllocsPerChunk * 5> addresses;
+    size_t i;
+    for (i = 0; i < AllocsPerChunk * 5; ++i) {
+        addresses[i] = memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    // prep work: batch remove 1st .. (AllocsPerChunk - 1) -th
+    // alloc, making 1st chunk contain only a single tuple
+    alloc.remove_reserve(AllocsPerChunk - 1);
+    for (i = 0; i < AllocsPerChunk - 1; ++i) {
+        alloc.remove_add(const_cast<void*>(addresses[i]));
+    }
+    ordered_pred(alloc, 0, {});
+    ASSERT_EQ(make_pair(AllocsPerChunk - 1, 0lu),
+                alloc.template remove_force<truth>([this, &addresses] (vector<pair<void*, void*>> const& entries) noexcept {
+                        ASSERT_EQ(1, entries.size());
+                        ASSERT_EQ(addresses[0], entries[0].first);
+                        ASSERT_EQ(addresses[AllocsPerChunk - 1], entries[0].second);
+                        memcpy(entries[0].first, entries[0].second, TupleSize);
+                    }));
+    // verify in-order
+    ordered_pred(alloc, AllocsPerChunk - 1, {});
+    ASSERT_EQ(AllocsPerChunk - 1, Gen::of(reinterpret_cast<unsigned char const*>(addresses[0])));
+    // real test: remove the next (AllocsPerChunk + 2) allocs,
+    // affecting first 3 chunks
+    alloc.remove_reserve(AllocsPerChunk + 2);
+    for (i = AllocsPerChunk; i < AllocsPerChunk * 2; ++i) {
+        alloc.remove_add(const_cast<void*>(addresses[i]));
+    }
+    alloc.remove_add(const_cast<void*>(addresses[0]));
+    alloc.remove_add(const_cast<void*>(addresses[AllocsPerChunk * 3 - 1]));
+    ASSERT_EQ(make_pair(AllocsPerChunk + 2, 0lu),
+                alloc.template remove_force<truth>([this](vector<pair<void*, void*>> const& entries) noexcept {
+                        ASSERT_TRUE(entries.empty());
+                    }));
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
+            static_cast<Alloc const&>(alloc), [] (void const* p) {
+                    printf("%lu\n", Gen::of(reinterpret_cast<unsigned char const*>(p)));
+                });
+    ordered_pred(alloc, AllocsPerChunk * 2, {{AllocsPerChunk * 3 - 1}});
+}
+
 // Test that it should work without txn in progress
 TEST_F(TableTupleAllocatorTest, TestElasticIterator_basic0) {
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
@@ -1600,11 +1654,11 @@ public:
         m_finalized.reserve(n);
     }
     void operator()(void const* p) {
-        assert(add(m_finalized, p) <= value_of(m_copied, p) + 1);
+        bool const tst = add(m_finalized, p) <= value_of(m_copied, p) + 1;
+        assert(tst);
     }
     void* operator()(void* dst, void const* src) {
         // copier
-        add(m_copied, src);
         return memcpy(dst, src, TupleSize);
     }
     map_type const& finalized() const noexcept {
@@ -1716,17 +1770,25 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndRemoves) {
         for (i = 0; i < NumTuples; i += 2) {
             alloc.remove_add(const_cast<void*>(addresses[i]));
         }
-        ASSERT_EQ(NumTuples / 2,
+        ASSERT_EQ(make_pair(NumTuples / 2, NumTuples / 4),
                 alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                         for_each(entries.begin(), entries.end(),
-                                [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
-                    }).first);
-//        ASSERT_EQ(NumTuples / 2, verifier.finalized().size());
-//        for (i = 0; i < NumTuples; i += 2) {
-//            ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
-//        }
+                                [](pair<void*, void*> const& entry) {
+                                    memcpy(entry.first, entry.second, TupleSize);
+                                });
+                    }));
+        // only the non-compacting subset of removal batch are finalized
+        ASSERT_EQ(NumTuples / 4, verifier.finalized().size());
+        for (i = 0; i < NumTuples / 2; i += 2) {
+            ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
+        }
+        // Cheat the compacting subset of removal batch
+        unsigned char buf[TupleSize];
+        for (i = NumTuples / 2; i < NumTuples; i += 2) {
+            verifier(Gen::of(i, buf));
+        }
     }
-//    ASSERT_TRUE(verifier.ok(0));
+    ASSERT_TRUE(verifier.ok(0));
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
@@ -1750,20 +1812,20 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
         for (i = 0; i < NumTuples; i += 2) {
             alloc.remove_add(const_cast<void*>(addresses[i]));
         }
-        ASSERT_EQ(make_pair(NumTuples / 2, NumTuples / 4),
+        ASSERT_EQ(make_pair(NumTuples / 2, 0lu),
                 alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept {
                         for_each(entries.begin(), entries.end(),
                                 [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                     }));
-        // finalizer had been called on all compacted addresses
-//        ASSERT_EQ(NumTuples / 4, verifier.finalized().size());
+        // finalizer is never called in frozen state
+        ASSERT_TRUE(verifier.finalized().empty());
         alloc.template thaw<truth>();
         ASSERT_EQ(NumTuples / 2, verifier.finalized().size());
         for (i = 0; i < NumTuples; i += 2) {
             ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
         }
     }
-//    ASSERT_TRUE(verifier.ok(0));
+    ASSERT_TRUE(verifier.ok(0));
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndUpdates) {
@@ -1786,17 +1848,16 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndUpdates) {
         // update with newest states
         for (i = 0; i < NumTuples; i += 2) {
             alloc.template update<truth>(const_cast<void*>(addresses[i]));
-//            // updated values are finalized right away
-//            ASSERT_EQ(i / 2 + 1, verifier.finalized().size());
             gen.fill(const_cast<void*>(addresses[i]));
         }
+        ASSERT_TRUE(verifier.finalized().empty());                         // updates in frozen never finalize anything
         alloc.template thaw<truth>();
         ASSERT_EQ(NumTuples / 2, verifier.finalized().size());
         for (i = 0; i < NumTuples; i += 2) {
             ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
         }
     }
-//    ASSERT_TRUE(verifier.ok(0));
+    ASSERT_TRUE(verifier.ok(0));
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
@@ -1806,7 +1867,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     Gen gen;
     finalize_verifier verifier{NumTuples + NumTuples / 2};
     Alloc alloc(TupleSize, {
-            [&verifier](void const* p) { verifier(p); },
+            [&verifier](void const* p) {
+//                printf("Finalizing %lu\n", Gen::of(reinterpret_cast<unsigned char const*>(p))); fflush(stdout);
+                verifier(p);
+            },
             [&verifier](void* dst, void const* src) { return verifier(dst, src); }
         });
     array<void const*, NumTuples> addresses;
@@ -1823,10 +1887,9 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     // finalized.
     for (i = 0; i < NumTuples; i += 2) {
         alloc.template update<truth>(const_cast<void*>(addresses[i]));
-//        // finalized right away
-//        ASSERT_EQ(1 + i / 2, verifier.finalized().size());
         gen.fill(const_cast<void*>(addresses[i]));
     }
+    ASSERT_TRUE(verifier.finalized().empty());
     // delete the second half; but only half of those deleted
     // batch are "fresh", so only 1/8 of the whole gets to be
     // finalized
@@ -1839,21 +1902,23 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
     for (i = 0; i < NumTuples / 2; ++i) {                                  // remove 2nd half
         alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
     }
-//    ASSERT_EQ(NumTuples / 2, verifier.finalized().size());                      // unchanged
     // finalize called on the 2nd half in the txn memory
-    ASSERT_EQ(make_pair(NumTuples / 2, NumTuples / 2),
+    ASSERT_EQ(make_pair(NumTuples / 2, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             }));
-//    ASSERT_EQ(NumTuples, verifier.finalized().size());
+//    puts("???? 1"); fflush(stdout);
+    ASSERT_TRUE(verifier.finalized().empty());
     alloc.template thaw<truth>();
+//    puts("???? 2"); fflush(stdout);
     fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
             static_cast<Alloc const&>(alloc), [&verifier](void const* p) {
                 assert(verifier.finalized().cend() == verifier.finalized().find(
                             Gen::of(reinterpret_cast<unsigned char const*>(p))));
             });
     alloc.template clear<truth>();
+//    puts("???? 3"); fflush(stdout);
 //    ASSERT_TRUE(verifier.ok(0));
 }
 
@@ -1902,8 +1967,6 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
         }
         for (i = AllocsPerChunk * 10; i < AllocsPerChunk * 11; ++i) {      // accounts for 1 chunk
             alloc.template update<truth>(const_cast<void*>(addresses[i]));
-//            // finalized right away
-//            ASSERT_EQ(i - AllocsPerChunk * 10 + 1, verifier.finalized().size());
             ASSERT_EQ(NumTuples + AllocsPerChunk * 2 + i - AllocsPerChunk * 10,
                     Gen::of(reinterpret_cast<unsigned char*>(
                             gen.fill(const_cast<void*>(addresses[i])))));
@@ -1912,24 +1975,17 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
         for (i = 0; i < AllocsPerChunk * 3; ++i) {                         // does not account for any chunks
             alloc.remove_add(const_cast<void*>(addresses[i]));
         }
-//        ASSERT_EQ(AllocsPerChunk, verifier.finalized().size());
         for (i = 0; i < AllocsPerChunk; ++i) {
             // Deleting beyond frozen region should trigger
             // finalize right away (same as unfrozen state):
             alloc.remove_add(const_cast<void*>(addresses[NumTuples + i]));
         }
 
-        ASSERT_EQ(make_pair(AllocsPerChunk * 4, AllocsPerChunk),           // the 2nd-to-last chunk is finalized right away
+        ASSERT_EQ(make_pair(AllocsPerChunk * 4, 0lu),
                 alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                     }));
-//        ASSERT_EQ(AllocsPerChunk * 2, verifier.finalized().size());
-//        // verify that this 2nd to last chunk is finalized on
-//        // each call to `remove_add'
-//        for (i = NumTuples; i < NumTuples + AllocsPerChunk; ++i) {
-//            ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
-//        }
 
         // check 1st value of txn iterator
         ASSERT_EQ(AllocsPerChunk * 4, Gen::of(reinterpret_cast<unsigned char const*>(
@@ -1941,8 +1997,9 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
             // trigger any finalization.
             ++*iter;
         }
+        ASSERT_TRUE(verifier.finalized().empty());
         alloc.template thaw<truth>();
-//        ASSERT_EQ(AllocsPerChunk * 5, verifier.finalized().size());
+        ASSERT_EQ(AllocsPerChunk * 4, verifier.finalized().size());
         // batch removal on first 3 chunks: no compaction
         for (i = 0; i < AllocsPerChunk * 3; ++i) {
             ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
@@ -1983,12 +2040,11 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_bug1) {
         for (i = 0; i < batch_size; ++i) {
             alloc.remove_add(const_cast<void*>(addresses[NumTuples - i - 1]));
         }
-        ASSERT_EQ(make_pair(batch_size, batch_size - 8),
+        ASSERT_EQ(make_pair(batch_size, 0lu),
                 alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                     for_each(entries.begin(), entries.end(),
                             [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
                     }));
-//        ASSERT_EQ(batch_size - 8, verifier.finalized().size());
         alloc.template thaw<truth>();
         ASSERT_EQ(batch_size, verifier.finalized().size());
     }
@@ -2075,7 +2131,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     for (i = 0; i < 2; ++i) {
         alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
-    ASSERT_EQ(make_pair(AllocsPerChunk, 2lu),
+    ASSERT_EQ(make_pair(AllocsPerChunk, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
@@ -2123,7 +2179,7 @@ TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep2) {
     for (i = 0; i < 2; ++i) {
         alloc.remove_add(const_cast<void*>(addresses[i + AllocsPerChunk]));
     }
-    ASSERT_EQ(make_pair(AllocsPerChunk, 2lu),
+    ASSERT_EQ(make_pair(AllocsPerChunk, 0lu),
             alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries) noexcept{
                 for_each(entries.begin(), entries.end(),
                         [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});

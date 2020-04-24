@@ -23,7 +23,7 @@
 using namespace voltdb;
 using namespace voltdb::storage;
 
-static char buf[128];
+static char buf[256];
 
 inline ThreadLocalPoolAllocator::ThreadLocalPoolAllocator(size_t n) : m_blkSize(n),
     m_base(reinterpret_cast<char*>(allocateExactSizedObject(m_blkSize))) {
@@ -1151,6 +1151,12 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
 inline void CompactingChunks::DelayedRemover::add(void* p) {
     if (m_size == 0) {
         throw underflow_error("CompactingChunks::DelayedRemover::add() called more times than reserved");
+    } else if (m_added.count(p)) {
+        snprintf(buf, sizeof buf - 1,
+                "CompactingChunks::DelayedRemover::add(): requested to add %p multiple times",
+                p);
+        buf[sizeof buf - 1] = 0;
+        throw logic_error(buf);
     } else {
         auto const iter = m_chunks.find(p);
         if (! iter.first) {
@@ -1178,6 +1184,7 @@ inline void CompactingChunks::DelayedRemover::add(void* p) {
                 mapping();
             }
         }
+        m_added.emplace(p);
     }
 }
 
@@ -1193,15 +1200,11 @@ inline void CompactingChunks::DelayedRemover::validate() const {
 
 inline size_t CompactingChunks::DelayedRemover::finalize() const {
     if (m_chunks.finalizerAndCopier() && ! (m_chunks.frozen() && m_chunks.frozenBoundaries())) {
-        // finalizer in frozen state must be postponed
-        if (! m_removed.empty()) {
-            // removed addresses need to be finalized right away,
-            // unless frozen
-            for_each(m_removed.cbegin(), m_removed.cend(),
-                    [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
-        }
-        return m_removed.size() + m_movements.size();
-    } else {
+        // removed addresses need to be finalized right away
+        for_each(m_removed.cbegin(), m_removed.cend(),
+                [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
+        return m_removed.size();
+    } else {        // finalizer in frozen state must be postponed
         return 0;
     }
 }
@@ -1274,6 +1277,7 @@ inline size_t CompactingChunks::DelayedRemover::clear(bool force) noexcept {
         m_size = 0;
     }
     auto const r = m_removed.size() + m_moved.size();
+    m_added.clear();
     m_moved.clear();
     m_removed.clear();
     m_movements.clear();
@@ -2031,7 +2035,7 @@ HookedCompactingChunks<Hook, E>::remove_force(
     VOLT_TRACE("%s", oss.str().c_str());
 #endif
     // finalize before memcpy
-    auto finalized = CompactingChunks::m_batched.finalize();
+    auto const finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {            // hook registration on movements only
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
@@ -2061,7 +2065,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
                         throw runtime_error(buf);
                     }
                 });
-        finalized += CompactingChunks::m_batched.movements().size();
     }
     cb(CompactingChunks::m_batched.movements());    // memcpy by call back
     return make_pair(CompactingChunks::m_batched.force(), finalized);
