@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -38,6 +39,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class TestReplaySequencer {
+
+    static final VoltLogger hostLog = new VoltLogger("HOST");
 
     TransactionInfoBaseMessage makeIv2InitTask(long unused)
     {
@@ -110,9 +113,9 @@ public class TestReplaySequencer {
         TransactionInfoBaseMessage sntl = makeSentinel(1L);
         TransactionInfoBaseMessage frag = makeFragment(1L);
         TransactionInfoBaseMessage frag2 = makeFragment(1L);
-
+        StringBuilder sb = new StringBuilder();
         result = dut.offer(1L, sntl);
-        try { dut.dump(1); } catch (Exception e) { fail(e.getMessage()); } // toString should not throw
+        try { dut.dump(1, sb); hostLog.warn(sb.toString());} catch (Exception e) { fail(e.getMessage()); } // toString should not throw
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(frag, dut.poll());
@@ -137,7 +140,8 @@ public class TestReplaySequencer {
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(null, dut.poll());
-        try { dut.dump(1); } catch (Exception e) { fail(e.getMessage()); } // toString should not throw
+        StringBuilder sb = new StringBuilder();
+        try { dut.dump(1, sb);  hostLog.warn(sb.toString()); } catch (Exception e) { fail(e.getMessage()); } // toString should not throw
 
         result = dut.offer(1L, sntl);
         Assert.assertEquals(true, result);
