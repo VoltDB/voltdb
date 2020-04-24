@@ -105,6 +105,12 @@ public interface VoltDBInterface
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
     /**
+     * Do minimum cleanup (but don't kill database) so the system is ready to
+     * call initialize again. This is called from @OpPesudoShutdow only.
+     */
+    public void pesudoShutdown();
+
+    /**
      * Check if the host is in prepare-shutting down state.
      */
     public boolean isPreparingShuttingdown();
