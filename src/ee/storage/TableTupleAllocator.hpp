@@ -517,8 +517,14 @@ namespace voltdb {
             id_type const m_chunkId = 0;
             void const* m_addr = nullptr;
         public:
+            struct less_address {                      // special comparator on m_addr only
+                bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
+                    return lhs.address() < rhs.address();
+                }
+            };
             position_type() noexcept = default;
             position_type(CompactingChunks const&, void const*);
+            position_type(void const*);                // NOTE: only uses this when you know what you are doing
             // NOTE: iterator arg is dereferenced, therefore it
             // *can not* be end().
             template<typename iterator> position_type(void const*, iterator const&);
@@ -781,16 +787,20 @@ namespace voltdb {
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
-            using set_type = typename Collections<collections_type>::template set<void const*>;
+            using set_type = typename Collections<collections_type>::template    // NOTE: comparator ignores chunk id to help
+                set<position_type, position_type::less_address>;                 // detect duplicates
             static FinalizerAndCopier const EMPTY_FINALIZER;
             bool m_recording = false;            // in snapshot process?
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            set_type m_moved{};     // addr copied to other addresses (in m_changes's key value) due to compaction, used in lieu with finalization
+            set_type m_removed{};                // addr that's removed without getting compacted to other addresses. Used in lieu with finalization, "scopes" till thaw()
             Alloc m_changeStore;
             FinalizerAndCopier const& m_finalizerAndCopier;
         protected:
-            bool moved_add(void const*);         // adds an entry to m_moved
-            bool moved_contains(void const*) const noexcept;
+            bool removed_add(CompactingChunks const&, void const*);
+            // NOTE: exploits the fact that the set of
+            // position_type is compared based on address only
+            bool removed_contains(void const*) const noexcept;
+            position_type const& removed_find(void const*) const;
         public:
             using is_hook = true_type;
 

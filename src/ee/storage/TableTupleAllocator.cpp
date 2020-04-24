@@ -1660,6 +1660,8 @@ super(c, c) {}
 
 inline position_type::position_type(ChunkHolder<> const& c) noexcept : m_chunkId(c.id()), m_addr(c.range_next()) {}
 
+inline position_type::position_type(void const* p) : m_addr(p) {}
+
 inline position_type::position_type(CompactingChunks const& c, void const* p) : m_addr(p) {
     // search in "global" region, which also includes txn-invisible region if frozen.
     auto const iter = const_cast<CompactingChunks&>(c).find(p, true);
@@ -1884,7 +1886,7 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
             for_each(m_changes.begin(), m_changes.end(),
                     [this](typename map_type::value_type& p) { m_finalizerAndCopier.finalize(p.second); });
         }
-        m_moved.clear();
+        m_removed.clear();
         m_changes.clear();
         m_changeStore.clear();
         m_recording = false;
@@ -1900,13 +1902,20 @@ inline void const* TxnPreHook<Alloc, Trait, E>::operator()(void const* src) cons
 }
 
 template<typename Alloc, typename Trait, typename E> inline bool
-TxnPreHook<Alloc, Trait, E>::moved_add(void const* src) {
-    return m_moved.emplace(src).second;
+TxnPreHook<Alloc, Trait, E>::removed_add(CompactingChunks const& c, void const* src) {
+    return m_removed.emplace(c, src).second;
 }
 
 template<typename Alloc, typename Trait, typename E> inline bool
-TxnPreHook<Alloc, Trait, E>::moved_contains(void const* p) const noexcept {
-    return m_moved.count(p);
+TxnPreHook<Alloc, Trait, E>::removed_contains(void const* p) const noexcept {
+    return m_removed.count({p});
+}
+
+template<typename Alloc, typename Trait, typename E> inline position_type const&
+TxnPreHook<Alloc, Trait, E>::removed_find(void const* p) const {
+    auto const& iter = m_removed.find({p});
+    assert(iter != m_removed.cend());
+    return *iter;
 }
 
 template<typename Alloc, typename Trait, typename E>
@@ -1970,7 +1979,7 @@ template<typename Hook, typename E> inline void
 HookedCompactingChunks<Hook, E>::finalize_range(void const* beg, void const* end) const {
     assert(beg <= end);
     for(auto const* ptr = reinterpret_cast<char const*>(beg); ptr < end; ptr += tupleSize()) {
-        if (! this->moved_contains(ptr)) {
+        if (this->removed_contains(ptr)) {
             finalizerAndCopier().finalize(ptr);
         }
     }
@@ -1979,7 +1988,7 @@ HookedCompactingChunks<Hook, E>::finalize_range(void const* beg, void const* end
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
     CompactingChunks::thaw([this](void const* p) noexcept {
-            return ! this->moved_contains(p);
+            return this->removed_contains(p);
         });
     Hook::thaw();
     reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).reset();
@@ -2024,38 +2033,33 @@ HookedCompactingChunks<Hook, E>::remove_force(
     // finalize before memcpy
     auto finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {            // hook registration on movements only
-        auto const dup = accumulate(                               // sanity check on batch removal algorithm
-                    CompactingChunks::m_batched.movements().cbegin(),
-                    CompactingChunks::m_batched.movements().cend(),
-                    make_pair(vector<void const*>{}, set<void const*>{}),
-                    [](pair<vector<void const*>, set<void const*>>& acc,
-                        pair<void*, void*> const& entry) {
-                        if (! acc.second.emplace(entry.second).second) {
-                            acc.first.emplace_back(entry.second);
-                        }
-                        return acc;
-                    }).first;
-        if (! dup.empty()) {
-            ostringstream oss;
-            oss << "?Request to remove " << CompactingChunks::m_batched.movements().size()
-                << " tuples, found " << dup.size() << " duplicates: ";
-            for(void const* p : dup) {
-                oss << p << ": {" << info(p) << "}, ";
-            }
-            oss.seekp(-2, ios_base::end); oss << "?";
-            throw runtime_error(oss.str());
-        }
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void*> const& entry) {
-                    if (! this->moved_add(entry.second)) {
-                        snprintf(buf, sizeof buf, "Failed to add to Hook::m_moved: %p\n",
-                                entry.second);
+                    Hook::add(entry.first,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                });
+        for_each(CompactingChunks::m_batched.removed().cbegin(),
+                CompactingChunks::m_batched.removed().cend(),
+                [this] (void const* pos) {
+                    if (! this->removed_add(*this, pos)) {         // report conflict
+                        auto const cur = position_type{*this, pos};
+                        auto const& existing = this->removed_find(pos);
+                        auto const& cur_chunk = this->find(cur.chunkId(), false),
+                            &existing_chunk = this->find(existing.chunkId(), false);
+                        assert(cur_chunk.first);
+                        assert(existing_chunk.first);
+                        snprintf(buf, sizeof buf,
+                                "Failed to add to Hook::m_removed: %lu: %p [%p - %p / %p] <=> %lu: %p [%p - %p / %p]\n",
+                                cur.chunkId(), cur.address(),
+                                cur_chunk.second->range_begin(), cur_chunk.second->range_next(),
+                                cur_chunk.second->range_end(),
+                                existing.chunkId(), existing.address(),
+                                existing_chunk.second->range_begin(), existing_chunk.second->range_next(),
+                                existing_chunk.second->range_end());
                         buf[sizeof buf - 1] = 0;
                         throw runtime_error(buf);
                     }
-                    Hook::add(entry.first,
-                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
         finalized += CompactingChunks::m_batched.movements().size();
     }
