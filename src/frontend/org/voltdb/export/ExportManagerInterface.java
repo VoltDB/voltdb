@@ -181,7 +181,7 @@ public interface ExportManagerInterface {
     public void updateDanglingExportStates(StreamStartAction action,
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers);
 
-    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
+    public void processExportControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
             VoltTable results);
 
     public void pushBuffer(

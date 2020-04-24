@@ -72,7 +72,7 @@ public class ExportControl extends VoltSystemProcedure {
                 final String operationMode = (String) params.toArray()[2];
                 List<String> exportTargets = Arrays.asList(targets).stream().
                         filter(s -> (!StringUtil.isEmpty(s))).collect(Collectors.toList());
-                ExportManagerInterface.instance().processStreamControl(exportSource, exportTargets,
+                ExportManagerInterface.instance().processExportControl(exportSource, exportTargets,
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
 
