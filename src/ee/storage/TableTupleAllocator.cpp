@@ -2036,7 +2036,7 @@ HookedCompactingChunks<Hook, E>::remove_force(
     oss.seekp(-2, ios_base::end);
     oss << ") ";
     LogManager::getThreadLogger(LOGGERID_HOST)
-        ->log(LOGLEVEL_ERROR, oss.str().c_str());
+        ->log(LOGLEVEL_WARN, oss.str().c_str());
     VOLT_TRACE("%s", oss.str().c_str());
 //#endif
     ++m_batchRemoveId;
@@ -2088,7 +2088,7 @@ HookedCompactingChunks<Hook, E>::remove_force(
                 }
             });
     LogManager::getThreadLogger(LOGGERID_HOST)
-        ->log(LOGLEVEL_ERROR, oss.str().c_str());
+        ->log(LOGLEVEL_WARN, oss.str().c_str());
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 
