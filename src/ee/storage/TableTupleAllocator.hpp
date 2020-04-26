@@ -798,6 +798,9 @@ namespace voltdb {
             FinalizerAndCopier const& m_finalizerAndCopier;
         protected:
             bool removed_add(CompactingChunks const&, void const*);
+            set_type const& removed_all() const noexcept {
+                return m_removed;
+            }
             // NOTE: exploits the fact that the set of
             // position_type is compared based on address only
             bool removed_contains(void const*) const noexcept;
@@ -840,7 +843,7 @@ namespace voltdb {
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
-            void finalize_range(void const*, void const*) const;
+            size_t m_batchRemoveId = 0;
         public:
             using hook_type = Hook;                // for hooked_iterator_type
             using Hook::release;                   // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())
