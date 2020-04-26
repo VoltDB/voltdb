@@ -17,7 +17,6 @@
 
 #include "TableTupleAllocator.hpp"
 #include "common/debuglog.h"
-#include "logging/LogManager.h"
 #include <array>
 #include <numeric>
 
@@ -2008,8 +2007,8 @@ template<typename Hook, typename E>
 template<typename Tag> inline pair<size_t, size_t>
 HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void*>> const&)> const& cb) {
-    ostringstream oss;
-//#ifndef NDEBUG
+#ifndef NDEBUG
+   ostringstream oss;
     oss << "remove_force<" << m_batchRemoveId << ">([removed "
        << CompactingChunks::m_batched.removed().size() << "]: ";
     for_each(CompactingChunks::m_batched.removed().cbegin(),
@@ -2035,10 +2034,8 @@ HookedCompactingChunks<Hook, E>::remove_force(
     auto const prev_removed = Hook::removed_all();                 // create a copy
     oss.seekp(-2, ios_base::end);
     oss << ") ";
-    LogManager::getThreadLogger(LOGGERID_HOST)
-        ->log(LOGLEVEL_WARN, oss.str().c_str());
     VOLT_TRACE("%s", oss.str().c_str());
-//#endif
+#endif
     ++m_batchRemoveId;
     // finalize before memcpy
     auto const finalized = CompactingChunks::m_batched.finalize();
@@ -2073,22 +2070,6 @@ HookedCompactingChunks<Hook, E>::remove_force(
                 });
     }
     cb(CompactingChunks::m_batched.movements());    // memcpy by call back
-    // and diff the copy
-    oss.clear();
-    oss << "Right before force(): acc newly added " <<
-        Hook::removed_all().size() - prev_removed.size() << ": ";
-    for_each(Hook::removed_all().cbegin(), Hook::removed_all().cend(),
-            [this, &oss, &prev_removed] (position_type const& pos) {
-                if (! prev_removed.count(pos)) {
-                    auto const& chunk = this->find(pos.chunkId(), false);
-                    assert(chunk.first);
-                    oss << "{" << pos.chunkId() << ", " << pos.address() << ": "
-                        << chunk.second->range_begin() << "~" << chunk.second->range_end()
-                        << "/" << chunk.second->range_next() << "}, ";
-                }
-            });
-    LogManager::getThreadLogger(LOGGERID_HOST)
-        ->log(LOGLEVEL_WARN, oss.str().c_str());
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 
