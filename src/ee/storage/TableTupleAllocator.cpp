@@ -1990,23 +1990,23 @@ HookedCompactingChunks<Hook, E>::remove_force(
     // finalize before memcpy
     auto const finalized = CompactingChunks::m_batched.finalize();
     bool const isFrozen = frozen();
-    if (isFrozen) {            // hook registration on movements only
+    if (isFrozen) {
+        // hook registration on movements only
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void const*> const& entry) {
                     Hook::add(entry.first,
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
+        if (finalizerAndCopier()) {                   // deep copy on movements
+            for_each(CompactingChunks::m_batched.movements().cbegin(),
+                    CompactingChunks::m_batched.movements().cend(),
+                    [this](pair<void*, void const*> const& entry) {
+                        finalizerAndCopier().copy(entry.first, entry.second);
+                    });
+        }
     }
-    if (isFrozen && finalizerAndCopier()) {                   // deep copy on movements
-        for_each(CompactingChunks::m_batched.movements().cbegin(),
-                CompactingChunks::m_batched.movements().cend(),
-                [this](pair<void*, void const*> const& entry) {
-                    finalizerAndCopier().copy(entry.first, entry.second);
-                });
-    } else {                   // shallow copy using provided arg
-        cb(CompactingChunks::m_batched.movements());
-    }
+    cb(CompactingChunks::m_batched.movements());      // shallow copy (with index update)
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 

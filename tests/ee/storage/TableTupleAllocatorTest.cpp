@@ -1758,7 +1758,10 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
         }
         ASSERT_EQ(make_pair(NumTuples / 2, 0lu),
                 alloc.template remove_force<truth>([](vector<pair<void*, void const*>> const& entries) noexcept {
-                        return;                                            //ignored
+                        for_each(entries.begin(), entries.end(),
+                                [](pair<void*, void const*> const& entry) {
+                                    memcpy(entry.first, entry.second, TupleSize);
+                                });
                     }));
         // finalizer is never called in frozen state
         ASSERT_TRUE(verifier.finalized().empty());
