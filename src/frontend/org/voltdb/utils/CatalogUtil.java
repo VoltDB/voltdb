@@ -707,6 +707,21 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Test if a table with {@code name} is a topic
+     *
+     * @param db    {@link Database} instance
+     * @param       name of table
+     * @return      {@code true} if a table with {@code name} is a topic
+     */
+    public static boolean isTopic(Database db, String name) {
+        Table table = db.getTables().get(name);
+        if (table != null) {
+            return table.getIstopic();
+        }
+        return false;
+    }
+
+    /**
      * Return true if a table was explicitly declared as a STREAM in the DDL
      *
      * @param database

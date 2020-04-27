@@ -286,9 +286,10 @@ public class SystemProcedureCatalog {
     // Cache VoltSysemProcedure by name which should be processed
     // when TaskLogs are replayed during rejoining.
     static ImmutableSet<String> s_allowableSysprocsInTaskLog;
-    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
-        // special-case replica acceptability by DR version
+    static {
+        // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
+        // special-case replica acceptability by DR version
         builder.put("@AdHoc_RW_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
                         false, false, false, 0, VoltType.INVALID,
@@ -309,7 +310,7 @@ public class SystemProcedureCatalog {
                         true, true, false, 0, VoltType.BIGINT,
                         false, true,  false, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
-        builder.put("@AdHoc_RO_SP",
+        builder.put("@AdHoc_ZRO_SP",
                 new Config("org.voltdb.sysprocs.AdHoc_RO_SP",
                         true,  true,  false, 0, VoltType.VARBINARY,
                         false, false, true, Durability.NOT_DURABLE,
@@ -631,6 +632,12 @@ public class SystemProcedureCatalog {
                 new Config("org.voltdb.sysprocs.ExportControl",
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
+                        false, true, Restartability.RESTARTABLE));
+        // @TopicControl is like @ExportControl but for topic streams in PRO
+        builder.put("@TopicControl",
+                new Config("org.voltdb.sysprocs.TopicControl",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsAcked_SP",
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",
