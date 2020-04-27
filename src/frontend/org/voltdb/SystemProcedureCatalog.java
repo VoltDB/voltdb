@@ -285,9 +285,12 @@ public class SystemProcedureCatalog {
     // Cache VoltSysemProcedure by name which should be processed
     // when TaskLogs are replayed during rejoining.
     static ImmutableSet<String> s_allowableSysprocsInTaskLog;
-    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
-        // special-case replica acceptability by DR version
+    static {
         final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
+        //              SP     RO      Every  Param  ParamType
+        //              PRO    killDR  replica-ok    durable
+        //              allowedInShutdown transactional restartable
+        // Special case: replica acceptability by DR version
         builder.put("@AdHoc_RW_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
                         false, false, false, 0, VoltType.INVALID,
