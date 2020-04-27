@@ -68,7 +68,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
 
 
-    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
+    public static final String migrate_partition_leader_suffix = "_migrated";
 
     public static class LeaderCallBackInfo {
         Long m_lastHSId;
@@ -195,6 +195,14 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             cacheCopy.put(e.getKey(), e.getValue().m_HSId);
         }
         return ImmutableMap.copyOf(cacheCopy);
+    }
+
+    public boolean isMigratePartitionLeaderRequested(int partitionId) {
+        LeaderCallBackInfo info = m_publicCache.get(partitionId);
+        if (info != null) {
+            return info.m_isMigratePartitionLeaderRequested;
+        }
+        return false;
     }
 
     /**
