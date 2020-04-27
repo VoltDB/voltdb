@@ -52,8 +52,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.ClientResponseToJsonApiV2;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -316,6 +316,12 @@ public class HTTPClientInterface {
                     request.setHandled(true);
                     return;
                 }
+            }
+
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+                badRequest(jsonp, "database is shutting down.", response);
+                request.setHandled(true);
+                return;
             }
 
             authResult = authenticate(request);
