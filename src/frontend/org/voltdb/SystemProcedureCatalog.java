@@ -672,7 +672,11 @@ public class SystemProcedureCatalog {
                         false, false, false,  0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
-
+        builder.put("@OpPseudoShutdown",
+                new Config("org.voltdb.operator.OpPseudoShutdown",
+                        false, false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_DURABLE,
+                        true, true, Restartability.NOT_RESTARTABLE));
         listing = builder.build();
     }
 

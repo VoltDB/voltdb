@@ -3800,6 +3800,69 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    /**
+     * Do minimum cleanup (but don't kill database) so the system can be safely killed.
+     * Mostly it ensures the disk data part of various subsystems to be synced and closed.
+     * This is called from @OpPseudoShutdown only.
+     */
+    @Override
+    public void pseudoShutdown() {
+        if (m_mode != OperationMode.SHUTTINGDOWN) {
+            m_mode = OperationMode.SHUTTINGDOWN;
+            m_statusTracker.set(NodeState.SHUTTINGDOWN);
+
+            // Send hostDown trap as client interface is no longer available
+            m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
+
+            // Releases any stored blocks and clears the swap directory
+            try {
+                LargeBlockManager.shutdown();
+            }
+            catch (Exception e) {
+                hostLog.warn(e);
+            }
+
+            // Stop monitoring membership change, no leader promotion service is needed
+            if (m_cartographer != null) {
+                try {
+                    m_cartographer.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted shutting down cartographer", e);
+                }
+            }
+
+            // Shut down Export and its connectors.
+            // Sync dirty buffer to disk.
+            ExportManagerInterface.instance().shutdown();
+
+            // At this stage all sites are idle (quiesced and stop accepting new transaction)
+            // it's safe to shutdown DR producer
+            if (m_producerDRGateway != null) {
+                try {
+                    m_producerDRGateway.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted shutting down invocation buffer server", e);
+                }
+                finally {
+                    m_producerDRGateway = null;
+                }
+            }
+            // Shutdown DR consumer
+            shutdownReplicationConsumerRole();
+
+            // Shut down the client interface
+            if (m_clientInterface != null) {
+                try {
+                    m_clientInterface.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted shutting down client interface", e);
+                } finally {
+                    m_clientInterface = null;
+                }
+            }
+        }
+    }
+
     @Override
     synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
