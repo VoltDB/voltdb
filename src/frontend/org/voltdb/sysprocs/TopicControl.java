@@ -93,7 +93,7 @@ public class TopicControl extends VoltSystemProcedure {
                 new ColumnInfo("STATUS", VoltType.STRING),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
-            OperationMode.valueOf(operationMode.toUpperCase());
+            TopicControlOperation.valueOf(operationMode.toUpperCase());
         } catch (IllegalArgumentException e){
             results.addRow("", -1, "FAILURE", e.getMessage());
             return new VoltTable[] {results};
