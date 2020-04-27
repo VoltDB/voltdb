@@ -687,6 +687,7 @@ void PersistentTable::finalizeRelease() {
            if (m_tableStreamer != NULL) {
                m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
            }
+           originalTuple.setActiveFalse();
         }
     });
     m_invisibleTuplesPendingDeleteCount = 0;
@@ -1268,7 +1269,7 @@ void PersistentTable::deleteTupleRelease(char* tuple) {
         allocator().remove_reserve(m_batchDeleteTupleCount);
         m_batchDeleteTupleCount = 0;
     }
-
+    vassert(target.isActive());
     allocator().remove_add(tuple);
 }
 
