@@ -3801,19 +3801,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Do minimum cleanup (but don't kill database) so the system is ready to
-     * call initialize again. This is called from @OpPesudoShutdow only.
+     * Do minimum cleanup (but don't kill database) so the system can be safely killed.
+     * Mostly it ensures the disk data part of various subsystems to be synced and closed.
+     * This is called from @OpPseudoShutdown only.
      */
     @Override
-    public void pesudoShutdown() {
+    public void pseudoShutdown() {
         if (m_mode != OperationMode.SHUTTINGDOWN) {
             m_mode = OperationMode.SHUTTINGDOWN;
             m_statusTracker.set(NodeState.SHUTTINGDOWN);
 
-            // send hostDown trap as client interface is no longer available
+            // Send hostDown trap as client interface is no longer available
             m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
-            // releases any stored blocks and clears the swap directory
+            // Releases any stored blocks and clears the swap directory
             try {
                 LargeBlockManager.shutdown();
             }
@@ -3821,6 +3822,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.warn(e);
             }
 
+            // Stop monitoring membership change, no leader promotion service is needed
             if (m_cartographer != null) {
                 try {
                     m_cartographer.shutdown();
@@ -3829,12 +3831,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            // shut down Export and its connectors.
-            // sync dirty buffer to disk.
+            // Shut down Export and its connectors.
+            // Sync dirty buffer to disk.
             ExportManagerInterface.instance().shutdown();
 
-            // After sites are terminated, shutdown the DRProducer.
-            // The DRProducer is shared by all sites; don't kill it while any site is active.
+            // At this stage all sites are idle (quiesced and stop accepting new transaction)
+            // it's safe to shutdown DR producer
             if (m_producerDRGateway != null) {
                 try {
                     m_producerDRGateway.shutdown();
@@ -3845,9 +3847,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_producerDRGateway = null;
                 }
             }
+            // Shutdown DR consumer
             shutdownReplicationConsumerRole();
 
-            // shut down the client interface
+            // Shut down the client interface
             if (m_clientInterface != null) {
                 try {
                     m_clientInterface.shutdown();

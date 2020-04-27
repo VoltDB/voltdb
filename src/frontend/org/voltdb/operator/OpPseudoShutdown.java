@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,8 +30,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.VoltType;
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -42,54 +42,54 @@ import org.voltdb.utils.VoltTableUtil;
  * stopped via @Shutdown or @StopNode, so a special shutdown procedure is needed to do
  * proper cleanup but doesn't exit the process.
  *
- * The goal of @OpPesudoShutdown is to do the minimum cleanups so that the database can be
+ * The goal of @OpPseudoShutdown is to do the minimum cleanups so that the database can be
  * terminated (un-gracefully) without affecting recoverability after the call.
  */
-public class OpPesudoShutdown extends VoltSystemProcedure {
+public class OpPseudoShutdown extends VoltSystemProcedure {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{
-            SysProcFragmentId.PF_pesudoShutdownSync,
-            SysProcFragmentId.PF_pesudoShutdownSyncDone,
-            SysProcFragmentId.PF_pesudoShutdownCommand,
-            SysProcFragmentId.PF_pesudoProcedureDone
+            SysProcFragmentId.PF_pseudoShutdownSync,
+            SysProcFragmentId.PF_pseudoShutdownSyncDone,
+            SysProcFragmentId.PF_pseudoShutdown,
+            SysProcFragmentId.PF_pseudoShutdownDone
         };
     }
 
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        if (fragmentId == SysProcFragmentId.PF_pesudoShutdownSync) {
+        if (fragmentId == SysProcFragmentId.PF_pseudoShutdownSync) {
             VoltDB.instance().getHostMessenger().prepareForShutdown();
             if (context.isLowestSiteId()) {
-                String msg = "VoltDB shutdown operation requested by kubernetes and in progress. Cluster will terminate shortly.";
+                String msg = "VoltDB shutdown operation requested by external controller in progress. Cluster will terminate shortly.";
                 CoreUtils.printAsciiArtLog(hostLog, msg, Level.INFO);
             }
             VoltTable result = new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pesudoShutdownSync, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pseudoShutdownSync, result);
         }
-        else if (fragmentId == SysProcFragmentId.PF_pesudoShutdownSyncDone) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_pesudoShutdownSync));
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pesudoShutdownSyncDone, result);
+        else if (fragmentId == SysProcFragmentId.PF_pseudoShutdownSyncDone) {
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_pseudoShutdownSync));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pseudoShutdownSyncDone, result);
         }
-        else if (fragmentId == SysProcFragmentId.PF_pesudoShutdownCommand) {
+        else if (fragmentId == SysProcFragmentId.PF_pseudoShutdown) {
             if (context.isLowestSiteId()) {
-                VoltDB.instance().pesudoShutdown();
+                VoltDB.instance().pseudoShutdown();
             }
             VoltTable result = new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pesudoShutdownCommand, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pseudoShutdown, result);
         }
-        else if (fragmentId == SysProcFragmentId.PF_pesudoProcedureDone) {
+        else if (fragmentId == SysProcFragmentId.PF_pseudoShutdownDone) {
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pesudoProcedureDone, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pseudoShutdownDone, result);
         }
         else {
             VoltDB.crashLocalVoltDB(
-                    "Received unrecognized plan fragment id " + fragmentId + " in OpPesudoShutdown",
+                    "Received unrecognized plan fragment id " + fragmentId + " in OpPseudoShutdown",
                     false,
                     null);
         }
@@ -97,7 +97,7 @@ public class OpPesudoShutdown extends VoltSystemProcedure {
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        createAndExecuteSysProcPlan(SysProcFragmentId.PF_pesudoShutdownSync, SysProcFragmentId.PF_pesudoShutdownSyncDone);
-        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_pesudoShutdownCommand, SysProcFragmentId.PF_pesudoProcedureDone);
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_pseudoShutdownSync, SysProcFragmentId.PF_pseudoShutdownSyncDone);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_pseudoShutdown, SysProcFragmentId.PF_pseudoShutdownDone);
     }
 }

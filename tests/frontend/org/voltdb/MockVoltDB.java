@@ -1023,5 +1023,5 @@ public class MockVoltDB implements VoltDBInterface
     public void setMasterOnly() {}
 
     @Override
-    public void pesudoShutdown() {}
+    public void pseudoShutdown() {}
 }

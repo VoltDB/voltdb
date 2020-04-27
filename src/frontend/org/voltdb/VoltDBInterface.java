@@ -106,9 +106,9 @@ public interface VoltDBInterface
 
     /**
      * Do minimum cleanup (but don't kill database) so the system is ready to
-     * call initialize again. This is called from @OpPesudoShutdow only.
+     * call initialize again. This is called from @OpPseudoShutdow only.
      */
-    public void pesudoShutdown();
+    public void pseudoShutdown();
 
     /**
      * Check if the host is in prepare-shutting down state.

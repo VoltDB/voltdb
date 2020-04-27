@@ -510,7 +510,8 @@ public final class InvocationDispatcher {
             if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName)
-                 || "@CancelShutdown".equals(procName))
+                 || "@CancelShutdown".equals(procName)
+                 || "@OpPseudoShutdown".equals(procName))
             {
                 if (handler.isAdmin() == false) {
                     return unexpectedFailureResponse(
