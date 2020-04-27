@@ -842,7 +842,6 @@ namespace voltdb {
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
-            size_t m_batchRemoveId = 0;
         public:
             using hook_type = Hook;                // for hooked_iterator_type
             using Hook::release;                   // reminds to client: this must be called for GC to happen (instead of delaying it to thaw())

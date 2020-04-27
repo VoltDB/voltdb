@@ -2013,36 +2013,6 @@ template<typename Hook, typename E>
 template<typename Tag> inline pair<size_t, size_t>
 HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void*>> const&)> const& cb) {
-#ifndef NDEBUG
-   ostringstream oss;
-    oss << "remove_force<" << m_batchRemoveId << ">([removed "
-       << CompactingChunks::m_batched.removed().size() << "]: ";
-    for_each(CompactingChunks::m_batched.removed().cbegin(),
-            CompactingChunks::m_batched.removed().cend(),
-            [&oss] (void* s) noexcept { oss << s << ", "; });
-    oss.seekp(-2, ios_base::end);
-    oss << " [moved " << CompactingChunks::m_batched.movements().size() << "]: ";
-    for_each(CompactingChunks::m_batched.movements().cbegin(),
-            CompactingChunks::m_batched.movements().cend(),
-            [&oss] (pair<void*, void*> const& s) noexcept {
-                oss << s.first << " <- " << s.second << ", ";
-            });
-    oss.seekp(-2, ios_base::end);
-    oss << " [acc removed " << Hook::removed_all().size() << "]: ";
-    for_each(Hook::removed_all().cbegin(), Hook::removed_all().cend(),
-            [this, &oss] (position_type const& pos) {
-                auto const& chunk = this->find(pos.chunkId(), false);
-                assert(chunk.first);
-                oss << "{" << pos.chunkId() << ", " << pos.address() << ": "
-                    << chunk.second->range_begin() << "~" << chunk.second->range_end()
-                    << "/" << chunk.second->range_next() << "}, ";
-            });
-    auto const prev_removed = Hook::removed_all();                 // create a copy
-    oss.seekp(-2, ios_base::end);
-    oss << ") ";
-    VOLT_TRACE("%s", oss.str().c_str());
-#endif
-    ++m_batchRemoveId;
     // finalize before memcpy
     auto const finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {            // hook registration on movements only
