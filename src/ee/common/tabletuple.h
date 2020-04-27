@@ -164,10 +164,10 @@ public:
         return m_schema->columnCount();
     }
 
-    bool isAllCollumnVarAndNull() const {
+    bool areAllCollumnsVarAndNull() const {
         int cols = columnCount();
         for (int i = 0; i < cols; ++i) {
-            if (!isVarLengthType(i, false) || !isNull(i)) {
+            if (!isVarLengthType(i) || !isNull(i)) {
                 return false;
             }
         }
@@ -662,14 +662,10 @@ private:
         return maxExportSerializedColumnSizeCommon(colIndex, true);
     }
 
-    inline bool isVarLengthType(int colIndex, bool isHidden) const {
-        const TupleSchema::ColumnInfoBase *columnInfo;
-        if (isHidden) {
-            columnInfo = m_schema->getHiddenColumnInfo(colIndex);
-        } else {
-            columnInfo = m_schema->getColumnInfo(colIndex);
-        }
-        voltdb::ValueType columnType = columnInfo->getVoltType();
+    // exclude hidden column since it should nver be var-length type
+    inline bool isVarLengthType(int colIndex) const {
+        const TupleSchema::ColumnInfoBase *columnInfo = m_schema->getColumnInfo(colIndex);
+        ValueType columnType = columnInfo->getVoltType();
         return columnType ==  ValueType::tVARCHAR || columnType ==  ValueType::tVARBINARY || columnType == ValueType::tGEOGRAPHY;
     }
 

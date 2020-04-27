@@ -264,16 +264,11 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + nullMaskLength;           // null array
 
 
-    size_t dataSz;
-    if (tuple.isAllCollumnVarAndNull()) {
-        // if all columns are null
-        dataSz = 0;
-    } else {
-        // returns 0 if corrupt tuple detected
-        dataSz = tuple.maxExportSerializationSize();
-        if (dataSz == 0) {
-            throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
-        }
+    size_t dataSz = 0;
+    if (!tuple.areAllCollumnsVarAndNull() && (dataSz = tuple.maxExportSerializationSize()) == 0) {
+        // if all columns are null value var-length type, serialization size would be 0
+        // otherwise 0 size indicate corrupt tuple detected
+        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
     //Data size for metadata columns.
     dataSz += (5 * sizeof(int64_t)) + 1;
