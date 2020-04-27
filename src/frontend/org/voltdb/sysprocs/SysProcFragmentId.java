@@ -280,7 +280,7 @@ public class SysProcFragmentId
     public static final int PF_stopReplicas = 402;
     public static final int PF_stopReplicasAggregate = 403;
 
-    // @PesudoShutdown
+    // @OpPseudoShutdown
     public static final int PF_pseudoShutdownSync = 410;
     public static final int PF_pseudoShutdownSyncDone = 411;
     public static final int PF_pseudoShutdown = 412;
