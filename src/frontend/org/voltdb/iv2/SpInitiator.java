@@ -81,11 +81,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 LeaderCallBackInfo info = entry.getValue();
                 leaders.add(info.m_HSId);
                 if (info.m_HSId == getInitiatorHSId()){
-
-                    // Test case: Interrupt leader promotion process
-                    if (info.m_lastHSId == LeaderCache.TEST_LAST_HSID) {
-                        break;
-                    }
                     boolean reinstate = reinstateAsLeader(info);
                     if (!m_promoted || reinstate) {
                         acceptPromotionImpl(info.m_lastHSId, (reinstate || info.m_isMigratePartitionLeaderRequested));
