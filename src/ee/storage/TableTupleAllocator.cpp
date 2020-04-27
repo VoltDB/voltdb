@@ -860,8 +860,22 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
 }
 
 inline void* CompactingChunks::allocate() {
+    /**
+     * In 3 situations, we need to allocate in a new chunk:
+     * 1. TXN is empty
+     * 2. last chunk is full
+     * 3. Frozen, TXN has a single chunk, which happens to be
+     *  the right frozen boundary
+     */
+    auto& txn = beginTxn();
+    bool newChunk = empty() || last()->full();
+    if (! newChunk) {
+        auto const& id = last()->id();
+        newChunk = txn.iterator()->id() == id &&
+            frozenBoundaries() && frozenBoundaries()->right().chunkId() == id;
+    }
     void* r;
-    if (empty() || last()->full()) {
+    if (newChunk) {
         // Under some circumstances (e.g. truncation when frozen, followed by
         // allocation (still frozen)), the inserted chunk is not
         // the only chunk.
@@ -869,12 +883,12 @@ inline void* CompactingChunks::allocate() {
                 list_type::tupleSize(), list_type::chunkSize());
         r = beg->allocate();
         if (empty()) {
-            beginTxn().iterator(beg);
+            txn.iterator(beg);
         }
     } else {
         r = last()->allocate();
-        if (last()->id() == beginTxn().iterator()->id()) {
-            beginTxn().range_next() = last()->range_next();
+        if (last()->id() == txn.iterator()->id()) {
+            txn.range_next() = last()->range_next();
         }
     }
     ++m_allocs;
@@ -1094,7 +1108,7 @@ inline vector<void*> CompactingChunks::DelayedRemover::RemovableRegion::holes(si
     while ((m_index = mask().find_next(m_index)) != bitset_t::npos) {
         r[h_index++] = const_cast<char*>(range_begin()) + tupleSize * m_index;
     }
-    vassert(r.size() == mask().count());
+    vassert(r.size() == mask().count() && h_index == r.size());
     return r;
 }
 
@@ -1151,12 +1165,6 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
 inline void CompactingChunks::DelayedRemover::add(void* p) {
     if (m_size == 0) {
         throw underflow_error("CompactingChunks::DelayedRemover::add() called more times than reserved");
-    } else if (m_added.count(p)) {
-        snprintf(buf, sizeof buf - 1,
-                "CompactingChunks::DelayedRemover::add(): requested to add %p multiple times",
-                p);
-        buf[sizeof buf - 1] = 0;
-        throw logic_error(buf);
     } else {
         auto const iter = m_chunks.find(p);
         if (! iter.first) {
@@ -1184,7 +1192,6 @@ inline void CompactingChunks::DelayedRemover::add(void* p) {
                 mapping();
             }
         }
-        m_added.emplace(p);
     }
 }
 
@@ -1277,7 +1284,6 @@ inline size_t CompactingChunks::DelayedRemover::clear(bool force) noexcept {
         m_size = 0;
     }
     auto const r = m_removed.size() + m_moved.size();
-    m_added.clear();
     m_moved.clear();
     m_removed.clear();
     m_movements.clear();

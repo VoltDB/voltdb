@@ -638,12 +638,12 @@ void testHookedCompactingChunksBatchRemove_single2() {
         using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
         size_t i = 0;
         fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
-                assert(p == nullptr || Gen::same(p, i++));
+                assert(Gen::same(p, i++));
             });
         assert(i == AllocsPerChunk);
         i = 0;
         for_each<snapshot_iterator>(alloc, [&i](void const* p) {
-                assert(p == nullptr || Gen::same(p, i++));
+                assert(Gen::same(p, i++));
             });
         assert(i == AllocsPerChunk);
     };
@@ -651,13 +651,13 @@ void testHookedCompactingChunksBatchRemove_single2() {
     for (i = 0; i < 10; ++i) {       // batch remove last 10 entries
         alloc.remove_add(const_cast<void*>(addresses[i]));
     }
-    for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
-        memcpy(alloc.allocate(), gen.get(), TupleSize);
-    }
     alloc.template remove_force<truth>([](vector<pair<void*, void*>> const& entries){
             for_each(entries.begin(), entries.end(),
                     [](pair<void*, void*> const& entry) {memcpy(entry.first, entry.second, TupleSize);});
             });
+    for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
     verify_snapshot_const();
     alloc.template thaw<truth>();
 }
