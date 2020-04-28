@@ -4013,10 +4013,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requiresNewExportGeneration,
             boolean hasSecurityUserChange)
     {
-       try {
+        try {
             m_catalogUpdateBarrier.await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
+        }
 
-            synchronized (m_catalogUpdateBarrier) {
+        synchronized (m_catalogUpdateBarrier) {
+            NodeState prevNodeState = m_statusTracker.set(NodeState.UPDATING);
+            try {
+                m_statusTracker.set(prevNodeState);
                 final ReplicationRole oldRole = getReplicationRole();
 
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
@@ -4190,14 +4196,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 checkThreadsSanity();
 
                 return m_catalogContext;
-            } // end sync
-        } catch (InterruptedException | BrokenBarrierException e) {
-            throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
-        } finally {
-           // Set node state to what it was on entry
-           //  (still under synchronization)
-           m_statusTracker.set(prevNodeState);
-        }
+            } finally {
+                // Set node state to what it was on entry
+                //  (still under synchronization)
+                m_statusTracker.set(prevNodeState);
+            }
+        } // end of sync on m_catalogUpdateBarrier
     }
 
     @Override
