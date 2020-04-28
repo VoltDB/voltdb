@@ -680,6 +680,11 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
+        builder.put("@OpPseudoStop",
+                new Config(null,
+                        true,  false, false, 0, VoltType.INVALID,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
         listing = builder.build();
     }
 

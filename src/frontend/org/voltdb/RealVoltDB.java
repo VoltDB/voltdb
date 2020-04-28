@@ -4317,12 +4317,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void halt() {
+    public void halt(boolean pseudoKill) {
         SnmpTrapSender snmp = getSnmpTrapSender();
         if (snmp != null) {
-            snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down because of @StopNode");
+            snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(),
+                    "Host is shutting down because of " + (pseudoKill? "@OpPseudoStop" : "@StopNode"));
             snmp.shutdown();
         }
+        if (pseudoKill) {
+            hostLog.warn("VoltDB node shutting down as requested by @OpPseudoStop command.");
+            return;
+        }
+
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {

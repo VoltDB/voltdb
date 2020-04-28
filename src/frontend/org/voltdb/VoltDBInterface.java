@@ -211,9 +211,11 @@ public interface VoltDBInterface
     public boolean isRunning();
 
     /**
-     * Halt a node used by @StopNode
+     * Halt a node used by @StopNode or @OpPseudoStop, the latter one is called
+     * by orchestration platform such as Kubernetes.
+     *
      */
-    public void halt();
+    public void halt(boolean pseudoKill);
 
     /**
      * @return The number of milliseconds the cluster has been up
