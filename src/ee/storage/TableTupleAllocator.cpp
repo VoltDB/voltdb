@@ -868,14 +868,9 @@ inline void* CompactingChunks::allocate() {
      *  the right frozen boundary
      */
     auto& txn = beginTxn();
-    bool newChunk = empty() || last()->full();
-    if (! newChunk) {
-        auto const& id = last()->id();
-        newChunk = txn.iterator()->id() == id &&
-            frozenBoundaries() && frozenBoundaries()->right().chunkId() == id;
-    }
     void* r;
-    if (newChunk) {
+    if (empty() || last()->full() ||
+            (frozenBoundaries() && frozenBoundaries()->right().chunkId() == last()->id())) {
         // Under some circumstances (e.g. truncation when frozen, followed by
         // allocation (still frozen)), the inserted chunk is not
         // the only chunk.
