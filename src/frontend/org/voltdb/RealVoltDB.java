@@ -4022,7 +4022,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         synchronized (m_catalogUpdateBarrier) {
             NodeState prevNodeState = m_statusTracker.set(NodeState.UPDATING);
             try {
-                m_statusTracker.set(prevNodeState);
                 final ReplicationRole oldRole = getReplicationRole();
 
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
