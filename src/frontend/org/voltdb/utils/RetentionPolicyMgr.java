@@ -51,6 +51,7 @@ public class RetentionPolicyMgr {
     private static final Map<String, Long> s_timeLimitConverter;
     static {
         ImmutableMap.Builder<String, Long>bldr = ImmutableMap.builder();
+        bldr.put("ss", 1000L);
         bldr.put("mn", 60_000L);
         bldr.put("hr", 60L * 60_000L);
         bldr.put("dy", 24L * 60L * 60_000L);
@@ -143,6 +144,13 @@ public class RetentionPolicyMgr {
                         " using " + this.getClass().getName());
             }
 
+            if (m_reader != null && m_reader.isOpen()) { // retention is already active
+                if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
+                    m_pbd.getUsageSpecificLog().debug("Retention policy for " + m_pbd.getNonce() + " is already active");
+                }
+                return;
+            }
+
             m_reader = m_pbd.openForRead(getCursorId());
             scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, 0);
         }
@@ -186,7 +194,7 @@ public class RetentionPolicyMgr {
         // This is called from synchronized PBD method, so calls to this should be serialized as well.
         @Override
         public void newSegmentAdded() {
-            if (!m_reader.isOpen()) { // not started yet
+            if (m_reader == null || !m_reader.isOpen()) { // not started yet
                 return;
             }
 
@@ -216,11 +224,14 @@ public class RetentionPolicyMgr {
                 }
 
                 if (m_reader.isOpen() && !m_reader.isCurrentSegmentActive()) {
-                    long recordTime = m_reader.getSegmentLastRecordTimestamp();
-                    if (recordTime == 0) { // cannot read last record timestamp
-                        m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
-                                "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
-                                m_pbd.getNonce());
+                    long recordTime = m_reader.getSegmentTimestamp();
+                    if (recordTime == PBDSegment.INVALID_TIMESTAMP) { // cannot read last record timestamp
+                        if (m_reader.getCurrentSegment() != null) {
+                            m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
+                                    "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
+                                    m_pbd.getNonce());
+                        }
+                        scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, m_retainMillis);
                         return;
                     }
 
@@ -290,7 +301,7 @@ public class RetentionPolicyMgr {
 
         @Override
         public void bytesAdded(long numBytes) {
-            if (!m_reader.isOpen()) {
+            if (m_reader == null || !m_reader.isOpen()) {
                 return;
             }
 

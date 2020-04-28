@@ -272,6 +272,7 @@ public final class DBBPool {
 
         @Override
         public void discard() {
+            checkDoubleFree();
             m_delegate.discard();
         }
     }

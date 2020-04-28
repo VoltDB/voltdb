@@ -132,6 +132,40 @@ public interface BinaryDequeReader<M> {
      */
     public interface Entry<M> {
         /**
+         * Wrap a basic {@link BBContainer} in the {@link Entry} interface. When using this wrapper {@link #free()} is
+         * equivalent to {@link #release()}
+         * <p>
+         * This wrapper should only be used to wrap {@link BBContainers} whose discard only free the memory and have no
+         * BinaryDeque related side effects.
+         *
+         * @param <M>       Type of metadata
+         * @param container to wrap
+         * @return {@link Entry} instance which wraps {@code container}
+         */
+        static <M> Entry<M> wrap(BBContainer container) {
+            return new Entry<M>() {
+                @Override
+                public M getExtraHeader() {
+                    return null;
+                }
+
+                @Override
+                public ByteBuffer getData() {
+                    return container.b();
+                }
+
+                @Override
+                public void release() {
+                    free();
+                }
+
+                @Override
+                public void free() {
+                    container.discard();
+                }
+            };
+        }
+        /**
          * @return any associated extra header metadata. May return {@code null} if there was none
          */
         M getExtraHeader();
@@ -146,5 +180,10 @@ public interface BinaryDequeReader<M> {
          * {@link BinaryDequeReader} which returned this entry.
          */
         void release();
+
+        /**
+         * Free the memory being held by this entry but it is not eligible for deletion
+         */
+        void free();
     }
 }

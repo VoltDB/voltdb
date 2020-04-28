@@ -97,7 +97,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                     + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} values (?, ?);");
 
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
-            "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic (key bigint not null, value bigint not null);"
+            "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic {2} (key bigint not null, value bigint not null);"
                     + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change
@@ -328,6 +328,23 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         return pair;
     }
 
+    /**
+     * Close the current client for {@code clusterId} and open a new one
+     *
+     * @param clusterId of client
+     * @return The new {@link Client}
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    protected Client recreateClient(int clusterId) throws IOException, InterruptedException {
+        Pair<LocalCluster, Client> pair = CLUSTERS_AND_CLIENTS.get(clusterId);
+        pair.getSecond().close();
+        LocalCluster cluster = pair.getFirst();
+        pair = Pair.of(cluster, cluster.createAdminClient(createClientConfig()));
+        CLUSTERS_AND_CLIENTS.set(clusterId, pair);
+        return pair.getSecond();
+    }
+
     protected void addSchema(int partitionedTableCount, int replicatedTableCount, String[] streamTargets)
             throws Exception {
         addSchema(partitionedTableCount, replicatedTableCount, 0, streamTargets);
@@ -430,7 +447,11 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     protected void generateTopicDDL(int topicNum, StringBuffer sb) {
-        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum);
+        generateTopicDDL(topicNum, "", sb);
+    }
+
+    protected void generateTopicDDL(int topicNum, String profileClause, StringBuffer sb) {
+        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum, profileClause);
     }
 
     /**

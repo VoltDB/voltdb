@@ -40,17 +40,20 @@ public interface BinaryDequeGapWriter<M> {
     /**
      * Method to write data at the appropriate location in the BinaryDeque.
      * The offer implementation should find the exact location where the data should
-     * be inserted and insert it there. The id range beign offered must not already
+     * be inserted and insert it there. The id range being offered must not already
      * exist in the BinaryDeque.
+     * <p>
+     * {@code data} will be guaranteed to be discarded before this method returns
      *
      * @param data the bytes to be written
      * @param startId starting id of the data block being offered
      * @param endId ending id of the data block being offered
+     * @param timestamp of this data
      * @return the number of bytes written
      * @throws IOException on any IO error writing the data
      * @throws IllegalArguementException if the id range being offered intersects with data in the BinaryDeque
      */
-    public int offer(BBContainer data, long startId, long endId) throws IOException;
+    public int offer(BBContainer data, long startId, long endId, long timestamp) throws IOException;
 
     /**
      * Close the writer and release any resources used only by this.

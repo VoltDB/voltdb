@@ -75,12 +75,13 @@ public interface BinaryDeque<M> {
      * @param BBContainer with the bytes to store
      * @param startId the id of the first row in the buffer
      * @param endId the id of the last row in the buffer
+     * @param timestamp of this object
      * @return the number of bytes written. If compression is enabled, the number of compressed bytes
      *         written is returned, which will be different from the number of bytes passed in.
      * @throws IOException if the object is larger then the implementation defined max,
      *         64 megabytes in the case of PersistentBinaryDeque.
      */
-    int offer(BBContainer object, long startId, long endId) throws IOException;
+    int offer(BBContainer object, long startId, long endId, long timestamp) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 
@@ -173,6 +174,19 @@ public interface BinaryDeque<M> {
     public boolean deletePBDSegment(BinaryDequeValidator<M> checker) throws IOException;
 
     /**
+     * Delete all segments up to and including this entryId.
+     * If the input entry id is in the middle of a segment, the segment
+     * containing the entry id will not be deleted nor will the segment be
+     * truncated at the beginning to this entry id.
+     * If the input entry id is the last entry in the segment, that segment will also be deleted,
+     * unless it is the last segment.
+     *
+     * @param entryId the entryId to which segments should be deleted.
+     * @throws IOException if an IO error occurs trying to delete the segments
+     */
+    public void deleteSegmentsToEntryId(long entryId) throws IOException;
+
+    /**
      * If pbd files should only be deleted based on some external events,
      * register a deferred action handler using this. All deletes will be sent
      * to the {@code deleter} as a Runnable, which may be executed later.
@@ -237,6 +251,15 @@ public interface BinaryDeque<M> {
      * @return if a retention policy is currently enforced
      */
     public boolean isRetentionPolicyEnforced();
+
+    /**
+     * Returns the id of the last entry that was deleted by retention policy on this BinaryDeque.
+     * This will return {@link PBDSegment.INVALID_ID} if this BinaryDeque does not have a retention policy
+     * or if this retention policy has not deleted anything since it was started up.
+     *
+     * @return id of the last entry that was deleted by retention policy
+     */
+    public long getRetentionDeletionPoint();
 
     public static class TruncatorResponse {
         public enum Status {

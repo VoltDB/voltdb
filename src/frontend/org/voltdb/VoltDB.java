@@ -710,7 +710,12 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
                 } else if (arg.equalsIgnoreCase("topicsHostPort")) {
-                    m_topicsHostPort = HostAndPort.fromString(args[++i].trim());
+                    String value = args[++i].trim();
+                    if (value.indexOf(':') >= 0) {
+                        m_topicsHostPort = HostAndPort.fromString(value);
+                    } else {
+                        m_topicsHostPort = HostAndPort.fromParts("", Integer.parseInt(value));
+                    }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
@@ -1188,8 +1193,8 @@ public class VoltDB {
         }
     }
 
-    public static void crashLocalVoltDB(String errMsg) {
-        crashLocalVoltDB(errMsg, false, null);
+    public static RuntimeException crashLocalVoltDB(String errMsg) {
+        return crashLocalVoltDB(errMsg, false, null);
     }
 
     /**

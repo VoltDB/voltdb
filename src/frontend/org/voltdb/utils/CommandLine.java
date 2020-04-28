@@ -818,7 +818,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("e3");
         }
 
-        if (m_topicsHostPort != null) {
+        if (m_topicsHostPort != null && m_topicsHostPort.hasPort()) {
             cmdline.add("topicsHostPort");
             cmdline.add(m_topicsHostPort.toString());
         }

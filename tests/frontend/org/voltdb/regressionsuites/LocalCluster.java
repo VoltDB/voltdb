@@ -292,7 +292,7 @@ public class LocalCluster extends VoltServerConfig {
         assert siteCount > 0 : "site count is less than 1";
         assert hostCount > 0 : "host count is less than 1";
 
-        numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        numberOfCoordinators = Math.max(kfactor + 1, Math.min(hostCount, 3));
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         m_additionalProcessEnv = env == null ? new HashMap<>() : env;

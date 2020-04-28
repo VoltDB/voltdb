@@ -79,6 +79,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     private int m_size = -1;
     private long m_startId = INVALID_ID;
     private long m_endId = INVALID_ID;
+    private long m_timestamp = INVALID_TIMESTAMP;
     private boolean m_compress;
     private int m_segmentRandomId;
     private int m_extraHeaderSize = 0;
@@ -121,6 +122,12 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     long getEndId() throws IOException {
         initializeFromHeader();
         return m_endId;
+    }
+
+    @Override
+    long getTimestamp() throws IOException {
+        initializeFromHeader();
+        return m_timestamp;
     }
 
     @Override
@@ -255,6 +262,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 int size = b.getInt();
                 long startId = b.getLong();
                 long endId = b.getLong();
+                long timestamp = b.getLong();
                 int segmentRandomId = b.getInt();
                 int extraHeaderSize = b.getInt();
                 int extraHeaderCrc = b.getInt();
@@ -289,6 +297,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_size = size;
                 m_startId = startId;
                 m_endId = endId;
+                m_timestamp = timestamp;
                 m_segmentRandomId = segmentRandomId;
                 m_extraHeaderSize = extraHeaderSize;
                 m_extraHeaderCrc = extraHeaderCrc;
@@ -313,6 +322,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         b.putInt(m_size);
         b.putLong(m_startId);
         b.putLong(m_endId);
+        b.putLong(m_timestamp);
         b.putInt(m_segmentRandomId);
         b.putInt(m_extraHeaderSize);
         b.putInt(m_extraHeaderCrc);
@@ -581,12 +591,13 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         return m_isFinal;
     }
 
-    private void updateHeaderDataAfterOffer(int size, long startId, long endId) throws IOException
+    private void updateHeaderDataAfterOffer(int size, long startId, long endId, long timestamp) throws IOException
     {
         m_numOfEntries++;
         m_size += size;
         m_startId = (m_startId == INVALID_ID) ? startId : m_startId;
         m_endId = endId;
+        m_timestamp = timestamp == INVALID_TIMESTAMP ? System.currentTimeMillis() : timestamp;
         writeOutHeader();
     }
 
@@ -679,17 +690,19 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     // Used by Export path
     @Override
-    int offer(DBBPool.BBContainer cont, long startId, long endId) throws IOException
+    int offer(DBBPool.BBContainer cont, long startId, long endId, long timestamp) throws IOException
     {
         assert(m_endId == INVALID_ID || startId == m_endId+1) : "Current endId=" + m_endId + ", input startId=" + startId;
         if (m_closed) {
             throw new IOException("Segment closed");
         }
+
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
         boolean compress = m_compress && remaining >= 32 && buf.isDirect();
 
-        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + ENTRY_HEADER_BYTES;
+        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining)
+                + ENTRY_HEADER_BYTES;
         if (remaining() < maxCompressedSize) {
             return -1;
         }
@@ -722,11 +735,10 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_fc.write(destBuf.b());
             }
             // Update segment header
-            updateHeaderDataAfterOffer(remaining, startId, endId);
+            updateHeaderDataAfterOffer(remaining, startId, endId, timestamp);
         } finally {
-            destBuf.discard();
             if (compress) {
-                cont.discard();
+                destBuf.discard();
             }
         }
 
@@ -735,8 +747,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     // Used by DR path
     @Override
-    int offer(DeferredSerialization ds) throws IOException
-    {
+    int offer(DeferredSerialization ds) throws IOException {
         if (m_closed) {
             throw new IOException("closed");
         }
@@ -750,22 +761,10 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         try {
             m_entryHeaderBuf.b().clear();
-            final int written = MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
+            MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
             destBuf.b().flip();
             // Write entry header
-            writeEntryHeader(destBuf.b(), PBDSegment.NO_FLAGS);
-            m_entryHeaderBuf.b().flip();
-            while (m_entryHeaderBuf.b().hasRemaining()) {
-                m_fc.write(m_entryHeaderBuf.b());
-            }
-            // Write entry
-            destBuf.b().flip();
-            while (destBuf.b().hasRemaining()) {
-                m_fc.write(destBuf.b());
-            }
-            // Update segment header
-            updateHeaderDataAfterOffer(written, INVALID_ID, INVALID_ID);
-            return written;
+            return offer(destBuf, INVALID_ID, INVALID_ID, INVALID_TIMESTAMP);
         } finally {
             destBuf.discard();
         }
@@ -913,6 +912,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return m_discardCount != m_objectReadIndex;
+        }
+
+        @Override
         public void markRestReadAndDiscarded() throws IOException {
             //TODO: This doesn't set bytesRead. But, looks like we don't really use bytesRead?
             int outstanding = m_objectReadIndex - m_discardCount;
@@ -995,17 +999,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_objectReadIndex++;
 
                 return new DBBPool.DBBDelegateContainer(retcont) {
-                    private boolean m_discarded = false;
-
                     @Override
                     public void discard() {
-                        checkDoubleFree();
-                        if (m_discarded) {
-                            m_usageSpecificLog.error("PBD Container discarded more than once");
-                            return;
-                        }
-
-                        m_discarded = true;
                         super.discard();
                         m_discardCount++;
                     }

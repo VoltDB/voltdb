@@ -93,7 +93,7 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     }
 
     @Override
-    int offer(BBContainer cont, long startId, long endId) {
+    int offer(BBContainer cont, long startId, long endId, long timestamp) {
         throw new UnsupportedOperationException();
     }
 
@@ -201,6 +201,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return false;
+        }
+
+        @Override
         public void close() {
         }
 
@@ -221,5 +226,10 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     @Override
     long getEndId() throws IOException {
         return PBDSegment.INVALID_ID;
+    }
+
+    @Override
+    long getTimestamp() throws IOException {
+        return PBDSegment.INVALID_TIMESTAMP;
     }
 }
