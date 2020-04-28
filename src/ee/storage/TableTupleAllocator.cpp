@@ -851,17 +851,9 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
 }
 
 inline void* CompactingChunks::allocate() {
-    /**
-     * In 3 situations, we need to allocate in a new chunk:
-     * 1. TXN is empty
-     * 2. last chunk is full
-     * 3. Frozen, TXN has a single chunk, which happens to be
-     *  the right frozen boundary
-     */
     auto& txn = beginTxn();
     void* r;
-    if (empty() || last()->full() ||
-            (frozenBoundaries() && frozenBoundaries()->right().chunkId() == last()->id())) {
+    if (empty() || last()->full()) {
         // Under some circumstances (e.g. truncation when frozen, followed by
         // allocation (still frozen)), the inserted chunk is not
         // the only chunk.
@@ -1984,24 +1976,30 @@ HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void const*>> const&)> const& cb) {
     // finalize before memcpy
     auto const finalized = CompactingChunks::m_batched.finalize();
-    bool const isFrozen = frozen();
-    if (isFrozen) {
-        // hook registration on movements only
+    if (frozen()) {
+        // hook registration on movements and deletes
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void const*> const& entry) {
+                    // we need to register both addresses:
+                    // we need to register tuples to be deleted for sure;
                     Hook::add(entry.first,
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                    // we also need to register tuple that
+                    // compacts to deleted tuple, see
+                    // testHookedCompactingChunksBatchRemove_single2a.
+                    // In most cases, this tuple had already been captured
+                    // in hook memory; but in rare cases, it may not be.
+                    Hook::add(entry.second,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
-        if (finalizerAndCopier()) {                   // deep copy on movements
-            for_each(CompactingChunks::m_batched.movements().cbegin(),
-                    CompactingChunks::m_batched.movements().cend(),
-                    [this](pair<void*, void const*> const& entry) {
-                        finalizerAndCopier().copy(entry.first, entry.second);
-                    });
-        }
+        for_each(CompactingChunks::m_batched.removed().cbegin(),
+                CompactingChunks::m_batched.removed().cend(),
+                [this](void const* p) {
+                    Hook::add(p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                });
     }
-    cb(CompactingChunks::m_batched.movements());      // shallow copy (with index update)
+    cb(CompactingChunks::m_batched.movements());      // finalize dst, shallow copy and with index update
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 

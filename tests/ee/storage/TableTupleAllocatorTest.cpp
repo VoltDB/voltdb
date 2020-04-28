@@ -652,7 +652,47 @@ void testHookedCompactingChunksBatchRemove_single2() {
             });
         assert(i == AllocsPerChunk);
     };
-    remove_multiple(alloc, addresses.cbegin(), next(addresses.cbegin(), 10));       // batch remove last 10 entries
+    remove_multiple(alloc, addresses.cbegin(), next(addresses.cbegin(), 10));       // batch remove first 10 entries -- triggers compaction
+    for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
+        memcpy(alloc.allocate(), gen.get(), TupleSize);
+    }
+    verify_snapshot_const();
+    alloc.template thaw<truth>();
+}
+
+template<typename Chunk, gc_policy pol>
+void testHookedCompactingChunksBatchRemove_single2a() {
+    using HookAlloc = NonCompactingChunks<Chunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    auto const& alloc_cref = alloc;
+    varray<AllocsPerChunk> addresses;
+    assert(alloc.empty());
+    size_t i;
+    for(i = 0; i < AllocsPerChunk; ++i) {
+        addresses[i] = alloc.allocate();
+        memcpy(const_cast<void*>(addresses[i]), gen.get(), TupleSize);
+    }
+    alloc.template freeze<truth>();
+    // verifies both const snapshot iterator, and destructuring iterator
+    auto const verify_snapshot_const = [&alloc, &alloc_cref]() {
+        using const_snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator;
+        using snapshot_iterator = typename IterableTableTupleChunks<Alloc, truth>::hooked_iterator;
+        size_t i = 0;
+        fold<const_snapshot_iterator>(alloc_cref, [&i](void const* p) {
+                assert(Gen::same(p, i++));
+            });
+        assert(i == AllocsPerChunk);
+        i = 0;
+        for_each<snapshot_iterator>(alloc, [&i](void const* p) {
+                assert(Gen::same(p, i++));
+            });
+        assert(i == AllocsPerChunk);
+    };
+    remove_multiple(alloc, addresses.cbegin(), next(addresses.cbegin(), 10));       // batch remove LAST 10 entries -- no compaction
     for (i = 0; i < 10; ++i) {       // inserts another 10 different entries
         memcpy(alloc.allocate(), gen.get(), TupleSize);
     }
@@ -842,6 +882,7 @@ template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
         // batch removal tests assume head-compacting direction
         testHookedCompactingChunksBatchRemove_single1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single2<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_single2a<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single3<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_single4<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi1<Chunk, pol>();
