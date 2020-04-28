@@ -664,10 +664,10 @@ void PersistentTable::finalizeRelease() {
     TableTuple destinationTuple(m_schema);
     TableTuple originalTuple(m_schema);
     allocator().template remove_force<storage::truth>(
-            [this, &destinationTuple, &originalTuple](vector<pair<void*, void*>> const& tuples) {
+            [this, &destinationTuple, &originalTuple](vector<pair<void*, void const*>> const& tuples) {    // shallow copy
         for(auto const& p : tuples) {
             destinationTuple.move(p.first);
-            originalTuple.move(p.second);
+            originalTuple.move(const_cast<void*>(p.second));
 
             decreaseStringMemCount(destinationTuple.getNonInlinedMemorySizeForPersistentTable());
             destinationTuple.freeObjectColumns();

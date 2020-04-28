@@ -538,7 +538,7 @@ inline void CompactingStorageTrait::freeze() {
     }
 }
 
-template<typename Pred> inline void CompactingStorageTrait::thaw(Pred&& pred) {
+inline void CompactingStorageTrait::thaw() {
     if (m_frozen) {                        // release all chunks invisible to txn
         if (! m_storage.empty()) {
             auto& storage = reinterpret_cast<CompactingChunks&>(m_storage);
@@ -558,8 +558,7 @@ template<typename Pred> inline void CompactingStorageTrait::thaw(Pred&& pred) {
                 while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
                     auto const& id = m_storage.front().id();
                     storage.pop_finalize(id == left_id ? left.address() :
-                                (id == right_id ? right.address() : m_storage.front().range_end()),
-                            pred);
+                                (id == right_id ? right.address() : m_storage.front().range_end()));
                 }
                 if (! m_storage.empty()) {                             // finalize on first txn chunk
                     auto const& front = m_storage.front();
@@ -576,9 +575,7 @@ template<typename Pred> inline void CompactingStorageTrait::thaw(Pred&& pred) {
                     if (dst != nullptr) {
                         for (char const* ptr = reinterpret_cast<char const*>(front.range_next());
                                 ptr < dst; ptr += storage.tupleSize()) {
-                            if (pred(ptr)) {
-                                storage.finalizerAndCopier().finalize(ptr);
-                            }
+                            storage.finalizerAndCopier().finalize(ptr);
                         }
                     }
                 }
@@ -666,7 +663,7 @@ CompactingChunks::CompactingChunks(size_t tupleSize) noexcept :
 
 CompactingChunks::~CompactingChunks() {
     while (cbegin() != cend()) {
-        pop_finalize();
+        pop_finalize(nullptr);
     }
 }
 
@@ -748,20 +745,15 @@ inline typename CompactingChunks::list_type::iterator CompactingChunks::releasab
     return beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
 }
 
-inline void CompactingChunks::pop_finalize() {
+inline void CompactingChunks::pop_finalize(const void* to) {
     assert(begin() != end());
-    pop_finalize(begin()->range_next(), truth{});
-}
-
-template<typename Pred> inline void
-CompactingChunks::pop_finalize(const void* to, Pred&& pred) {
-    assert(begin() != end());
+    if (to == nullptr) {
+        to = begin()->range_next();
+    }
     if (m_finalizerAndCopier && begin()->range_begin() < to) {
         for (char const* ptr = reinterpret_cast<char const*>(begin()->range_begin());
                 ptr < to; ptr += tupleSize()) {
-            if (pred(ptr)) {
-                m_finalizerAndCopier.finalize(ptr);
-            }
+            m_finalizerAndCopier.finalize(ptr);
         }
     }
     pop_front();
@@ -804,9 +796,8 @@ inline void CompactingChunks::freeze() {
     }
 }
 
-template<typename Pred>
-inline void CompactingChunks::thaw(Pred&& pred) {
-    CompactingStorageTrait::thaw(pred);
+inline void CompactingChunks::thaw() {
+    CompactingStorageTrait::thaw();
     m_frozenTxnBoundaries = {};
 }
 
@@ -850,7 +841,7 @@ inline void CompactingChunks::clear(Remove_cb const& cb) {
             m_allocs = 0;
         } else {                               // fast clear path
             while (begin() != end()) {
-                pop_finalize();
+                pop_finalize(nullptr);
             }
             list_type::clear();
             m_allocs = 0;
@@ -1228,7 +1219,7 @@ inline void CompactingChunks::DelayedRemover::mapping() {
                       } else {
                           transform(h.cbegin(), h.cend(), next(m_moved.cbegin(), n),
                                   back_inserter(m_movements),
-                                  [](void* r, void* l) noexcept { return make_pair(l, r); });
+                                  [](void* r, void* l) noexcept { return make_pair(l, static_cast<void const*>(r)); });
                           return n + h.size();
                       }
                   } else {
@@ -1263,7 +1254,7 @@ inline void CompactingChunks::DelayedRemover::shift() {
     }
 }
 
-inline vector<pair<void*, void*>> const& CompactingChunks::DelayedRemover::movements() const {
+inline vector<pair<void*, void const*>> const& CompactingChunks::DelayedRemover::movements() const {
     validate();
     return m_movements;
 }
@@ -1832,6 +1823,9 @@ FinalizerAndCopier const TxnPreHook<Alloc, Trait, E>::EMPTY_FINALIZER{};
 
 template<typename Alloc, typename Trait, typename E>
 inline TxnPreHook<Alloc, Trait, E>::~TxnPreHook() {
+    if (m_recording) {         // should rarely happen
+        thaw();
+    }
     if (m_finalizerAndCopier) {
         for_each(m_changes.cbegin(), m_changes.cend(),
                 [this] (typename map_type::value_type const& entry) {
@@ -1870,9 +1864,9 @@ template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, T
         auto const iter = m_changes.lower_bound(dst);
         if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
             void* fresh = m_changeStore.allocate();
-            m_changes.emplace_hint(iter, dst,
-                    m_finalizerAndCopier ? m_finalizerAndCopier.copy(fresh, dst) :
-                    memcpy(fresh, dst, m_changeStore.tupleSize()));
+            m_changes.emplace_hint(iter, dst, m_finalizerAndCopier ?
+                    m_finalizerAndCopier.copy(fresh, dst) :            // deep copy, or
+                    memcpy(fresh, dst, m_changeStore.tupleSize()));    // shallow copy
         }
     }
 }
@@ -1891,7 +1885,6 @@ template<typename Alloc, typename Trait, typename E> inline void TxnPreHook<Allo
             for_each(m_changes.begin(), m_changes.end(),
                     [this](typename map_type::value_type& p) { m_finalizerAndCopier.finalize(p.second); });
         }
-        m_removed.clear();
         m_changes.clear();
         m_changeStore.clear();
         m_recording = false;
@@ -1904,23 +1897,6 @@ template<typename Alloc, typename Trait, typename E>
 inline void const* TxnPreHook<Alloc, Trait, E>::operator()(void const* src) const {
     auto const& pos = m_changes.find(src);
     return pos == m_changes.cend() ? src : pos->second;
-}
-
-template<typename Alloc, typename Trait, typename E> inline bool
-TxnPreHook<Alloc, Trait, E>::removed_add(CompactingChunks const& c, void const* src) {
-    return m_removed.emplace(c, src).second;
-}
-
-template<typename Alloc, typename Trait, typename E> inline bool
-TxnPreHook<Alloc, Trait, E>::removed_contains(void const* p) const noexcept {
-    return m_removed.count({p});
-}
-
-template<typename Alloc, typename Trait, typename E> inline position_type const&
-TxnPreHook<Alloc, Trait, E>::removed_find(void const* p) const {
-    auto const& iter = m_removed.find({p});
-    assert(iter != m_removed.cend());
-    return *iter;
 }
 
 template<typename Alloc, typename Trait, typename E>
@@ -1980,11 +1956,9 @@ HookedCompactingChunks<Hook, E>::freeze() {
     return ptr;
 }
 
-template<typename Hook, typename E>
-template<typename Tag> inline void HookedCompactingChunks<Hook, E>::thaw() {
-    CompactingChunks::thaw([this](void const* p) noexcept {
-            return this->removed_contains(p);
-        });
+template<typename Hook, typename E> template<typename Tag> inline void
+HookedCompactingChunks<Hook, E>::thaw() {
+    CompactingChunks::thaw();
     Hook::thaw();
     reinterpret_cast<observer_type<Tag>&>(m_iterator_observer).reset();
 }
@@ -2007,40 +1981,27 @@ HookedCompactingChunks<Hook, E>::remove_reset() {
 template<typename Hook, typename E>
 template<typename Tag> inline pair<size_t, size_t>
 HookedCompactingChunks<Hook, E>::remove_force(
-        function<void(vector<pair<void*, void*>> const&)> const& cb) {
+        function<void(vector<pair<void*, void const*>> const&)> const& cb) {
     // finalize before memcpy
     auto const finalized = CompactingChunks::m_batched.finalize();
-    if (frozen()) {            // hook registration on movements only
+    bool const isFrozen = frozen();
+    if (isFrozen) {
+        // hook registration on movements only
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
-                [this](pair<void*, void*> const& entry) {
+                [this](pair<void*, void const*> const& entry) {
                     Hook::add(entry.first,
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
-        for_each(CompactingChunks::m_batched.removed().cbegin(),
-                CompactingChunks::m_batched.removed().cend(),
-                [this] (void const* pos) {
-                    if (! this->removed_add(*this, pos)) {         // report conflict
-                        auto const cur = position_type{*this, pos};
-                        auto const& existing = this->removed_find(pos);
-                        auto const& cur_chunk = this->find(cur.chunkId(), false),
-                            &existing_chunk = this->find(existing.chunkId(), false);
-                        assert(cur_chunk.first);
-                        assert(existing_chunk.first);
-                        snprintf(buf, sizeof buf,
-                                "Failed to add to Hook::m_removed: %lu: %p [%p - %p / %p] <=> %lu: %p [%p - %p / %p]\n",
-                                cur.chunkId(), cur.address(),
-                                cur_chunk.second->range_begin(), cur_chunk.second->range_next(),
-                                cur_chunk.second->range_end(),
-                                existing.chunkId(), existing.address(),
-                                existing_chunk.second->range_begin(), existing_chunk.second->range_next(),
-                                existing_chunk.second->range_end());
-                        buf[sizeof buf - 1] = 0;
-                        throw runtime_error(buf);
-                    }
-                });
+        if (finalizerAndCopier()) {                   // deep copy on movements
+            for_each(CompactingChunks::m_batched.movements().cbegin(),
+                    CompactingChunks::m_batched.movements().cend(),
+                    [this](pair<void*, void const*> const& entry) {
+                        finalizerAndCopier().copy(entry.first, entry.second);
+                    });
+        }
     }
-    cb(CompactingChunks::m_batched.movements());    // memcpy by call back
+    cb(CompactingChunks::m_batched.movements());      // shallow copy (with index update)
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 
@@ -2229,7 +2190,7 @@ template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, 
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
 template pair<size_t, size_t> HookedCompactingChunks<TxnPreHook<alloc,                   \
         HistoryRetainTrait<gc>>, void>::remove_force<tag>(                               \
-        function<void(vector<pair<void*, void*>> const&)> const&);                       \
+        function<void(vector<pair<void*, void const*>> const&)> const&);                 \
 HookedMethods3(tag, alloc, gc)
 
 #define HookedMethods1(tag, alloc)                                                       \

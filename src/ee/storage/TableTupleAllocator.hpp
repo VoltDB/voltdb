@@ -471,7 +471,7 @@ namespace voltdb {
             explicit CompactingStorageTrait(list_type&) noexcept;
             bool frozen() const noexcept;
             void freeze();
-            template<typename Pred> void thaw(Pred&& pred);
+            void thaw();
             /**
              * post-action when free() is called, only useful when shrinking
              * in head direction.
@@ -643,8 +643,7 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
-            void pop_finalize();
-            template<typename Pred> void pop_finalize(const void*, Pred&&);
+            void pop_finalize(const void*);
         protected:
             class DelayedRemover {
                 CompactingChunks& m_chunks;
@@ -662,7 +661,7 @@ namespace voltdb {
                 using map_type = map<id_type, RemovableRegion, less_rolling_type<id_type>>;
                 map_type m_removedRegions{};
                 vector<void*> m_moved{}, m_removed{};
-                vector<pair<void*, void*>> m_movements;// (dst, <= src)
+                vector<pair<void*, void const*>> m_movements;// (dst, <= src)
                 size_t m_size = 0;
                 void mapping();                        // set up m_movements
                 void shift();                          // adjust txn begin boundary
@@ -672,7 +671,7 @@ namespace voltdb {
                 void reserve(size_t);
                 // Register a single allocation to be removed later
                 void add(void*);
-                vector<pair<void*, void*>> const& movements() const;       // #2 copied over to #1
+                vector<pair<void*, void const*>> const& movements() const;       // #2 copied over to #1
                 vector<void*> const& removed() const;
                 /**
                  * finalize on removed addresses, and some dst of moved address.
@@ -737,7 +736,7 @@ namespace voltdb {
              * State changes
              */
             void freeze();
-            template<typename Pred> void thaw(Pred&&);          // when to apply finalizer
+            void thaw();          // when to apply finalizer
             /**
              * Auxillary others
              */
@@ -787,23 +786,11 @@ namespace voltdb {
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
-            using set_type = typename Collections<collections_type>::template    // NOTE: comparator ignores chunk id to help
-                set<position_type, position_type::less_address>;                 // detect duplicates
             static FinalizerAndCopier const EMPTY_FINALIZER;
             bool m_recording = false;            // in snapshot process?
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
-            set_type m_removed{};                // addr that's removed without getting compacted to other addresses. Used in lieu with finalization, "scopes" till thaw()
             Alloc m_changeStore;
             FinalizerAndCopier const& m_finalizerAndCopier;
-        protected:
-            bool removed_add(CompactingChunks const&, void const*);
-            set_type const& removed_all() const noexcept {
-                return m_removed;
-            }
-            // NOTE: exploits the fact that the set of
-            // position_type is compared based on address only
-            bool removed_contains(void const*) const noexcept;
-            position_type const& removed_find(void const*) const;
         public:
             using is_hook = true_type;
 
@@ -875,11 +862,13 @@ namespace voltdb {
              * NOTE: the remove_force method itself **does not**
              * "compact" tuples, and it is user's responsibility
              * to call `memcpy' in the call back, to copy the
-             * pair's 2nd content to 1st.
+             * pair's 2nd content to 1st. Note that the caller
+             * only need to do memcpy: deep copy is handled by
+             * this method after calling the call back.
              * \return (#removals, #finalizations)
              */
             template<typename Tag> pair<size_t, size_t>
-            remove_force(function<void(vector<pair<void*, void*>> const&)> const&);
+            remove_force(function<void(vector<pair<void*, void const*>> const&)> const&);
             void remove_reset();
             template<typename Tag> void clear();
             // Debugging aid, only prints in debug build
