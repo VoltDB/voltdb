@@ -32,6 +32,7 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,6 +56,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
 
 import com.google_voltpatches.common.collect.Sets;
 
@@ -1541,6 +1543,99 @@ public class TestPersistentBinaryDeque {
 
         cont.discard();
         assertEquals(1, getSortedDirectoryListing().size());
+    }
+
+    /*
+     * Test that seeking backwards on a reader works when there are buffers which are not discarded
+     */
+    @Test(timeout = 2_000)
+    public void seekBackwardWithOutstandingBuffers() throws Exception {
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(false).requiresId(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+
+        int numEntries = 2;
+        // write 4 segments
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < numEntries; j++) {
+                long entry = i * numEntries + j;
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), entry, entry, System.currentTimeMillis());
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+
+        assertEquals(4, getSortedDirectoryListing().size());
+
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        ArrayDeque<BinaryDequeReader.Entry<ExtraHeaderMetadata>> entries = new ArrayDeque<>();
+        // poll the first 3 segments + 1
+        for (int i = 0; i < numEntries * 3 + 1; ++i) {
+            entries.add(reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+        }
+
+        // Free the last 2 segment of entries. Leaving 3 outstanding buffers
+        for (int i = 0; i < numEntries * 2; ++i) {
+            entries.pollLast().free();
+        }
+
+        // seek to 3rd segment
+        reader.seekToSegment(numEntries * 2, SeekErrorRule.THROW);
+        assertEquals(4, getSortedDirectoryListing().size());
+
+        // release remaining polled entries which should delete the first segment
+        for (int i = 0; i < numEntries +1; ++i) {
+            entries.poll().release();
+        }
+
+        assertTrue(entries.isEmpty());
+        assertEquals(3, getSortedDirectoryListing().size());
+
+        // poll and discard the first entry of the segment after the seek should delete another segment
+        reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        assertEquals(2, getSortedDirectoryListing().size());
+    }
+
+    /*
+     * Test that Reader can seek forward with outstanding buffers
+     */
+    @Test(timeout = 2_000)
+    public void seekForwardWithOutstandingBuffers() throws Exception {
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(false).requiresId(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+
+        int numEntries = 2;
+        // write 4 segments
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < numEntries; j++) {
+                long entry = i * numEntries + j;
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), entry, entry, System.currentTimeMillis());
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+
+        assertEquals(4, getSortedDirectoryListing().size());
+
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead("testreader");
+        ArrayDeque<BinaryDequeReader.Entry<ExtraHeaderMetadata>> entries = new ArrayDeque<>();
+        // poll the first segment + 1
+        for (int i = 0; i < numEntries + 1; ++i) {
+            entries.add(reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+        }
+
+        // Seek to third segment
+        reader.seekToSegment(numEntries * 2, SeekErrorRule.THROW);
+        assertEquals(4, getSortedDirectoryListing().size());
+
+        // release all previously polled segments this should delete the first one
+        for (int i = 0; i < numEntries + 1; ++i) {
+            entries.poll().release();
+        }
+        assertEquals(4, getSortedDirectoryListing().size());
+
+        // poll and discard the first entry of the segment after the seek should delete another segment
+        reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        assertEquals(2, getSortedDirectoryListing().size());
     }
 
     static <M> BinaryDequeReader.Entry<M> pollOnceWithoutDiscard(BinaryDequeReader<M> reader) throws IOException {
