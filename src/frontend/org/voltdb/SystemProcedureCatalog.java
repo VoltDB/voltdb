@@ -310,7 +310,7 @@ public class SystemProcedureCatalog {
                         true, true, false, 0, VoltType.BIGINT,
                         false, true,  false, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
-        builder.put("@AdHoc_ZRO_SP",
+        builder.put("@AdHoc_RO_SP",
                 new Config("org.voltdb.sysprocs.AdHoc_RO_SP",
                         true,  true,  false, 0, VoltType.VARBINARY,
                         false, false, true, Durability.NOT_DURABLE,
