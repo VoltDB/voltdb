@@ -719,8 +719,6 @@ namespace voltdb {
              * Memory operations
              */
             void* allocate();
-            // apply finalizer (if set) to the given addr
-            void finalize(void const*) const;
             /**
              * Light weight free() operations from either end,
              * involving no compaction.

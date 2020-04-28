@@ -917,12 +917,6 @@ inline ChunksIdNonValidator& ChunksIdNonValidator::instance() {
     return s_singleton;
 }
 
-inline void CompactingChunks::finalize(void const* p) const {
-    if (m_finalizerAndCopier) {
-        m_finalizerAndCopier.finalize(p);
-    }
-}
-
 inline void CompactingChunks::free(typename CompactingChunks::remove_direction dir, void const* p) {
     switch (dir) {
         case remove_direction::from_head:
