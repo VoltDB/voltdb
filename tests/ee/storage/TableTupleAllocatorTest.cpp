@@ -821,7 +821,7 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     alloc.template freeze<truth>();
     i = 0;
     remove_multiple(alloc, accumulate(addresses.cbegin(), addresses.cend(),     // remove every other
-                varray<NumTuples / 2>{}, [&i](varray<NumTuples / 2>& acc, void const* p) {
+                varray<NumTuples / 2>{{}}, [&i](varray<NumTuples / 2>& acc, void const* p) {
                     if (i % 2 == 0) {
                         acc[i / 2] = p;
                     }
@@ -1257,7 +1257,7 @@ TEST_F(TableTupleAllocatorTest, TestBatchRemoveBug) {
         fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
                 a, [this, &i, &holes] (void const* p) {
                     if (! holes.count(i)) {
-                        assert(i++ == Gen::of(reinterpret_cast<unsigned char const*>(p)));
+                        ASSERT_EQ(i++, Gen::of(reinterpret_cast<unsigned char const*>(p)));
                     }
                 });
     };
@@ -1288,7 +1288,7 @@ TEST_F(TableTupleAllocatorTest, TestBatchRemoveBug) {
                 alloc.template remove_force<truth>([this](vector<pair<void*, void const*>> const& entries) noexcept {
                         ASSERT_TRUE(entries.empty());
                     }));
-    ordered_pred(alloc, AllocsPerChunk * 2, {{AllocsPerChunk * 3 - 1}});
+    ordered_pred(alloc, AllocsPerChunk * 2, {AllocsPerChunk * 3 - 1});
 }
 
 // Test that it should work without txn in progress
