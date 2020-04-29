@@ -92,7 +92,7 @@ public class QueryStats extends AdHocNTBase {
                 String.join("\n", Arrays.copyOfRange(lines, 0, 5));
     }
 
-    private static ClientResponse dispatchQueryStats(String sql) throws Exception {
+    private ClientResponse dispatchQueryStats(String sql) throws Exception {
         final List<String> tableNames = new LinkedList<>();
         final List<VoltTable> tables = new LinkedList<>();
         final StringBuffer buf = new StringBuffer();
@@ -103,12 +103,20 @@ public class QueryStats extends AdHocNTBase {
                 final int procArg = Integer.parseInt(m.group(2));
                 m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
                 tableNames.add(tempTableAlias + tables.size());
+                CompletableFuture<ClientResponse> cf = callProcedure("@Statistics", procName, procArg);
+                // TODO deal with exception and wrong/error result
+                CompletableFuture<Void> futureResult = cf.thenAccept(cr -> {
+                    tables.add(((ClientResponseImpl) cr).getResults()[0]);
+                });
+                futureResult.get();
+                /*
                 tables.add(VoltDB.instance().getStatsAgent().collectDistributedStats(
                         new JSONObject(new HashMap<String, Object>(){{
                             put("selector", "STATISTICS");
                             put("subselector", procName);
                             put("interval", procArg == 1);
                         }}))[0]);
+                 */
             } else {
                 throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
             }
