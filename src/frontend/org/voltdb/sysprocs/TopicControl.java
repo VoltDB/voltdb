@@ -102,7 +102,7 @@ public class TopicControl extends VoltSystemProcedure {
         topic = topic == null ? "" : topic;
         if (!StringUtil.isEmpty(topic)) {
             if (!CatalogUtil.isTopic(ctx.getDatabase(), topic)) {
-                results.addRow(topic, -1,"FAILED", "Topic stream " + topic + " does not exist.");
+                results.addRow(topic, -1,"FAILED", "Topic " + topic + " does not exist.");
                 return new VoltTable[] {results};
             }
         }
