@@ -928,7 +928,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void halt() {
+    public void halt(boolean pseudoKill) {
         assert (true);
     }
 

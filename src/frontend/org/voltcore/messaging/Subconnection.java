@@ -121,16 +121,19 @@ public class Subconnection {
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
-            message = String.format("Fatal error from id,hostname(%d,%s): %s",
-                    m_hostId, getHostnameAndIPAndPort(), message);
             //if poison pill with particular cause handle it.
             int cause = in.getInt();
             if (cause == ForeignHost.CRASH_ME) {
                 int hid = VoltDB.instance().getHostMessenger().getHostId();
-                hostLog.debug("Poison Pill with target me was sent.: " + hid);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Poison Pill with target me was sent.: " + hid);
+                }
                 //Killing myself.
-                VoltDB.instance().halt();
+                boolean pseudoKill = message.equals("@OpPseudoStop");
+                VoltDB.instance().halt(pseudoKill);
             } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
+                message = String.format("Fatal error from id,hostname(%d,%s): %s",
+                        m_hostId, getHostnameAndIPAndPort(), message);
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
             } else if (cause == ForeignHost.PRINT_STACKTRACE) {
                 //collect thread dumps
