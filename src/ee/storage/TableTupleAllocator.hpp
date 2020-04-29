@@ -791,7 +791,7 @@ namespace voltdb {
             FinalizerAndCopier const& m_finalizerAndCopier;
         public:
             using is_hook = true_type;
-
+            enum class add_cause : char {remove, update};
             TxnPreHook(size_t);                  // only used by eecheck test, as explicit unit-test of this class
             TxnPreHook(size_t, FinalizerAndCopier const&);
             TxnPreHook(TxnPreHook const&) = delete;
@@ -805,7 +805,7 @@ namespace voltdb {
             // \return whether finalize is called on the addr
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(void const*, IteratorObserver&);
+            void add(add_cause, void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
