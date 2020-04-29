@@ -427,6 +427,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 return false;
             }
 
+            if (!segmentReader.hasOutstandingEntries()) {
+                segmentReader.close();
+            }
             PBDSegment<M> oldSegment = m_segment;
             m_segment = entry.getValue();
             PBDSegment<M> segmentToDeleteBefore = isRetention ? m_segment : oldSegment;
@@ -696,8 +699,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         void close() {
-            if (m_segment != null) {
-                PBDSegmentReader<M> reader = m_segment.getReader(m_cursorId);
+            for (PBDSegment<M> segment : m_segments.values()) {
+                PBDSegmentReader<M> reader = segment.getReader(m_cursorId);
                 if (reader != null) {
                     try {
                         reader.close();
@@ -705,8 +708,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         m_usageSpecificLog.warn("Failed to close reader " + reader, e);
                     }
                 }
-                m_segment = null;
             }
+            m_segment = null;
             m_cursorClosed = true;
         }
 
