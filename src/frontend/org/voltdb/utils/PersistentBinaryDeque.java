@@ -141,12 +141,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 // verify that these ids don't already exist
                 if (prev!=null && startId <= prev.getEndId()) {
                     throw new IllegalArgumentException("PBD segment with range [" + prev.getStartId() + "-" + prev.getEndId() +
-                            "] already contains some entries offered in the range ]" + startId + "-" + endId + "]");
+                            "] already contains some entries offered in the range [" + startId + "-" + endId + "]");
                 }
 
                 if (next!=null && endId >= next.getStartId()) {
                     throw new IllegalArgumentException("PBD segment with range [" + next.getStartId() + "-" + next.getEndId() +
-                            "] already contains some entries offered in the range ]" + startId + "-" + endId + "]");
+                            "] already contains some entries offered in the range [" + startId + "-" + endId + "]");
                 }
 
                 // By now prev.endId < startId. But it may not be the next id, in which case, we need to start a new segment
@@ -247,7 +247,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 m_numRead++;
                 assertions();
                 assert (retcont.b() != null);
-                return wrapRetCont(m_segment, segmentReader.readIndex(), retcont);
+                return wrapRetCont(m_segment, segmentReader, retcont);
             }
         }
 
@@ -295,10 +295,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             assert(entryId >= 0);
 
             synchronized (PersistentBinaryDeque.this) {
-                // Support this for transient readers or readers which do not have outstanding entries
-                assert (m_isTransient || m_segments.values().stream().map(s -> s.getReader(m_cursorId))
-                        .allMatch(r -> r == null || !r.hasOutstandingEntries()));
-
                 PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
                 if (moveToValidSegment() == null) {
                     return;
@@ -576,10 +572,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private Wrapper wrapRetCont(PBDSegment<M> segment, int entryNumber, final BBContainer retcont) {
+        private Wrapper wrapRetCont(PBDSegment<M> segment, PBDSegmentReader<M> segmentReader,
+                final BBContainer retcont) {
             if (m_isTransient) {
                 return new Wrapper(retcont);
             }
+
+            int entryNumber = segmentReader.readIndex();
 
             return new Wrapper(retcont) {
                 @Override
@@ -588,13 +587,16 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         free();
 
                         assert m_cursorClosed || m_segments.containsKey(segment.segmentId());
+                        // Cursor or reader was closed so just essentially ignore this discard
                         if (m_cursorClosed) {
                             return;
                         }
 
-                        //Close and remove segment readers that were all acked and before current PBD reader segment.
-                        PBDSegmentReader<M> segmentReader = segment.getReader(m_cursorId);
-                        assert(segmentReader != null); // non-transient reader is only closed and removed after all are acked
+                        if (segment.getReader(m_cursorId) != segmentReader) {
+                            m_usageSpecificLog.warn(segment.m_file
+                                    + ": Reader removed or replaced. Ignoring discard of entry " + entryNumber);
+                            return;
+                        }
 
                         assert(m_segment != null);
                         // If the reader has moved past this and all have been acked close this segment reader.
@@ -602,7 +604,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                             try {
                                 segmentReader.close();
                             } catch(IOException e) {
-                                m_usageSpecificLog.warn("Unexpected error closing PBD file " + m_segment.m_file, e);
+                                m_usageSpecificLog.warn("Unexpected error closing PBD file " + segment.m_file, e);
                             }
                         }
 
@@ -1693,6 +1695,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             return;
         }
 
+        stopRetentionPolicyEnforcement();
         if (m_gapWriter != null) {
             m_gapWriter.close();
         }
