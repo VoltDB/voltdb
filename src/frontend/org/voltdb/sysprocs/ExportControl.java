@@ -32,17 +32,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.StreamControlOperation;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
 public class ExportControl extends VoltSystemProcedure {
 
     private static final VoltLogger LOG = new VoltLogger("EXPORT");
-
-    // support operations
-    public static enum OperationMode{ RELEASE
-                       //PAUSE, RESUME, TRUNCATE //for future use
-    }
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -73,7 +69,7 @@ public class ExportControl extends VoltSystemProcedure {
                 List<String> exportTargets = Arrays.asList(targets).stream().
                         filter(s -> (!StringUtil.isEmpty(s))).collect(Collectors.toList());
                 ExportManagerInterface.instance().processExportControl(exportSource, exportTargets,
-                        OperationMode.valueOf(operationMode.toUpperCase()), results);
+                        StreamControlOperation.valueOf(operationMode.toUpperCase()), results);
             }
 
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControl, results);
@@ -92,7 +88,7 @@ public class ExportControl extends VoltSystemProcedure {
                 new ColumnInfo("STATUS", VoltType.STRING),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
-            OperationMode.valueOf(operationMode.toUpperCase());
+            StreamControlOperation.valueOf(operationMode.toUpperCase());
         } catch (IllegalArgumentException e){
             results.addRow("", "", -1, "FAILURE", e.getMessage());
             return new VoltTable[] {results};
