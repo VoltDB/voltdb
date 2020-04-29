@@ -1638,6 +1638,53 @@ public class TestPersistentBinaryDeque {
         assertEquals(2, getSortedDirectoryListing().size());
     }
 
+    /*
+     * Test that a cursor can skip multiple times and be closed and reopened
+     */
+    @Test
+    public void reopenCursorAfterSkip() throws Exception {
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(false).requiresId(true)
+                .initialExtraHeader(m_metadata, SERIALIZER).build();
+
+        int numEntries = 2;
+        // write 4 segments
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < numEntries; j++) {
+                long entry = i * numEntries + j;
+                m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(0)), entry, entry, System.currentTimeMillis());
+            }
+            m_pbd.updateExtraHeader(null);
+        }
+
+        String cursorId = "testreader";
+        BinaryDequeReader<ExtraHeaderMetadata> cursor = m_pbd.openForRead(cursorId);
+
+        // Open a cursor and skip to the third segment
+        BBContainer container = cursor.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        assertEquals(1, openSegmentReaderCount(cursorId));
+        cursor.skipPast(numEntries * 2);
+        assertEquals(1, openSegmentReaderCount(cursorId));
+        cursor.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        assertEquals(2, openSegmentReaderCount(cursorId));
+        assertFalse(cursor.isEmpty());
+        container.discard();
+        assertEquals(1, openSegmentReaderCount(cursorId));
+
+        // Close and reopen the cursor and skip again
+        m_pbd.closeCursor(cursorId);
+        assertEquals(0, openSegmentReaderCount(cursorId));
+        cursor = m_pbd.openForRead(cursorId);
+        assertEquals(0, openSegmentReaderCount(cursorId));
+        cursor.skipPast(numEntries * 3);
+        assertEquals(0, openSegmentReaderCount(cursorId));
+        assertFalse(cursor.isEmpty());
+    }
+
+    private int openSegmentReaderCount(String cursorId) {
+        return m_pbd.getSegments().values().stream().mapToInt(r -> r.getReader(cursorId) == null ? 0 : 1).sum();
+    }
+
     static <M> BinaryDequeReader.Entry<M> pollOnceWithoutDiscard(BinaryDequeReader<M> reader) throws IOException {
         BinaryDequeReader.Entry<M> entry = reader
                 .pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
