@@ -121,7 +121,7 @@ public class QueryStats extends AdHocNTBase {
                     throw new RuntimeException(String.format("@Statistics procedure  \"%s\" failed with %s", procName, cri.getStatusString()));
                 }
             } else {
-                    throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
+                throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
             }
         }
         m.appendTail(buf);
