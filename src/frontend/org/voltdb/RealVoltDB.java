@@ -64,9 +64,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -270,9 +272,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "9.3";
+    static final String m_defaultVersionString = "10.0";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q9.3\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -369,11 +371,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
 
-    // Synchronize updates of catalog contexts across the multiple sites on this host.
-    // Ensure that the first site to reach catalogUpdate() does all the work and that no
-    // others enter until that's finished.  CatalogContext is immutable and volatile, accessors
-    // should be able to always get a valid context without needing this lock.
-    private final Object m_catalogUpdateLock = new Object();
+    /*
+     * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
+     * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
+     * execute will perform the actual update while the others wait.
+     */
+    private final UpdateBarrier m_catalogUpdateBarrier = new UpdateBarrier();
 
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
@@ -1001,6 +1004,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
+            m_catalogUpdateBarrier.setPartyCount(m_nodeSettings.getLocalSitesCount());
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate && m_nodeSettings.clean()) {
@@ -3905,7 +3909,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean hasSecurityUserChange)
     {
         try {
-            synchronized(m_catalogUpdateLock) {
+            m_catalogUpdateBarrier.await();
+
+            synchronized (m_catalogUpdateBarrier) {
                 final ReplicationRole oldRole = getReplicationRole();
 
                 m_statusTracker.set(NodeState.UPDATING);
@@ -4081,6 +4087,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 return m_catalogContext;
             }
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
         } finally {
             //Set state back to UP
             m_statusTracker.set(NodeState.UP);
@@ -4091,7 +4099,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public CatalogContext settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
     {
-        synchronized(m_catalogUpdateLock) {
+        synchronized (m_catalogUpdateBarrier) {
             int stamp [] = new int[]{0};
             ClusterSettings expect = m_clusterSettings.get(stamp);
             if (   stamp[0] == expectedVersionId
@@ -5256,7 +5264,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public void processReplicaDecommission(int leaderCount) {
-        synchronized(m_catalogUpdateLock) {
+        synchronized(m_catalogUpdateBarrier) {
             setMasterOnly();
             if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
@@ -5271,6 +5279,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_nodeSettings.store();
                 m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
                 hostLog.info("Update local active site count to :" + leaderCount);
+
+                // Update the catalog update barrier to expect the new partition count
+                m_catalogUpdateBarrier.setPartyCount(leaderCount);
 
                 // release export resources
                 ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionIds());
@@ -5287,6 +5298,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return (init != null && !(init.getServiceState().isNormal()));
         }
         return false;
+    }
+
+    /**
+     * Small wrapper class around a {@link CyclicBarrier}. This is used so that operations can synchronize on this
+     * instance and still be able to change the participant count in the barrier
+     */
+    private static final class UpdateBarrier {
+        private CyclicBarrier m_barrier;
+
+        UpdateBarrier() {}
+
+        synchronized void setPartyCount(int parties) {
+            if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
+                throw new IllegalStateException("Cannot change participant count while parties are waiting");
+            }
+            m_barrier = new CyclicBarrier(parties);
+        }
+
+        void await() throws InterruptedException, BrokenBarrierException {
+            m_barrier.await();
+        }
     }
 }
 
