@@ -779,7 +779,8 @@ public class DDLCompiler {
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
-                    + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); ",
+                    + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); "
+                    + "or CREATE STREAM <table> PARTITION ON COLUMN <column-name> AS TOPIC [PROFILE <profile>] [FORMAT <format>] [KEYS <keys>] [ALLOW <roles>] (column datatype, ...);",
                     statement.substring(0, statement.length() - 1)));
         }
     }
