@@ -75,7 +75,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     static final String TOPIC_TAG = "topic_";
     static final MessageFormat REPLICATED_TABLE_FMT = new MessageFormat("create table {0}" + REPLICATED_TAG
             + "{1} (key bigint not null, value bigint not null, PRIMARY KEY(key));" + "create procedure "
-            + INSERT_PREFIX + "{0}" + REPLICATED_TAG + "{1} as insert into {0}" + REPLICATED_TAG + "{1} values (?, ?);"
+            + INSERT_PREFIX + "{0}" + REPLICATED_TAG + "{1} as insert into {0}" + REPLICATED_TAG + "{1} (key, value) values (?, ?);"
             + "create procedure " + SELECT_ALL_PREFIX + "{0}" + REPLICATED_TAG + "{1} as select key, value from {0}"
             + REPLICATED_TAG + "{1} order by key;" + "dr table {0}" + REPLICATED_TAG + "{1};");
 
@@ -94,11 +94,11 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     public static final MessageFormat STREAM_FMT = new MessageFormat(
             "create stream {0}" + STREAM_TAG + "{1} export to target {2} (key bigint not null, value bigint not null);"
                     + "partition table {0}" + STREAM_TAG + "{1} on column key;"
-                    + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} values (?, ?);");
+                    + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} (key, value) values (?, ?);");
 
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
             "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic {2} (key bigint not null, value bigint not null);"
-                    + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} values (?, ?);");
+                    + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} (key, value) values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change
     private static final List<ClusterConfiguration> CLUSTER_CONFIGURATIONS = new ArrayList<>();

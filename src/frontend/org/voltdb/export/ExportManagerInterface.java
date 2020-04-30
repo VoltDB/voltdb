@@ -36,7 +36,6 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.deploymentfile.FeatureType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 
 /**
  * @author rdykiel
@@ -181,8 +180,12 @@ public interface ExportManagerInterface {
     public void updateDanglingExportStates(StreamStartAction action,
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers);
 
-    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
+    public void processExportControl(String exportSource, List<String> exportTargets, StreamControlOperation operation,
             VoltTable results);
+
+    default public void processTopicControl(String topic, StreamControlOperation operation, VoltTable results) {
+        throw new UnsupportedOperationException("Topics are not supported in this version");
+    }
 
     public void pushBuffer(
             int partitionId,

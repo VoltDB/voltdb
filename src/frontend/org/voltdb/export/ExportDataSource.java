@@ -60,7 +60,6 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.VoltFile;
 
@@ -1504,7 +1503,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         VoltDBInterface voltdb = VoltDB.instance();
         if (voltdb.isClusterComplete()) {
             if (ENABLE_AUTO_GAP_RELEASE) {
-                processStreamControl(OperationMode.RELEASE);
+                processStreamControl(StreamControlOperation.RELEASE);
             } else {
                 // Show warning only in full cluster.
                 String warnMsg = "Export is blocked, missing rows [" +
@@ -1522,7 +1521,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public synchronized boolean processStreamControl(OperationMode operation) {
+    public synchronized boolean processStreamControl(StreamControlOperation operation) {
         switch (operation) {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED) {

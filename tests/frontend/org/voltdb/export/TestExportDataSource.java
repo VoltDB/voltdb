@@ -69,7 +69,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.processors.GuestProcessor;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -768,7 +767,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(ExportDataSource.StreamStatus.BLOCKED, s.getStatus());
 
             // Do a release
-            assertTrue(s.processStreamControl(OperationMode.RELEASE));
+            assertTrue(s.processStreamControl(StreamControlOperation.RELEASE));
 
             // Verify we can poll the 2 buffers past the gap,
             // but wait for long enough to allow the runnable to get

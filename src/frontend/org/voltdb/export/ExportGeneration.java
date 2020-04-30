@@ -67,7 +67,6 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.PbdSegmentName;
 import org.voltdb.utils.PbdSegmentName.Result;
@@ -1037,7 +1036,7 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
+    public void processStreamControl(String exportSource, List<String> exportTargets, StreamControlOperation operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         targets.addAll(exportTargets);
