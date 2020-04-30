@@ -545,40 +545,16 @@ inline void CompactingStorageTrait::thaw() {
             auto const& beginTxn = storage.beginTxn();
             bool const empty = beginTxn.empty();
             auto const stop = empty ? 0 : beginTxn.iterator()->id();
-            if (! storage.frozenBoundaries() || // easy case: degenerated frozen boundary, or
-                    ! storage.finalizerAndCopier()) {                  // no finalizer involved
-                while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
-                    assert(storage.begin()->range_begin() == storage.begin()->range_next());
-                    storage.pop_front();
-                }
-            } else {                       // harder case: has frozen boundary
-                auto const& left = storage.frozenBoundaries()->left(),
-                     &right = storage.frozenBoundaries()->right();
-                auto const& left_id = left.chunkId(), &right_id = right.chunkId();
-                while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
-                    auto const& id = m_storage.front().id();
-                    storage.pop_finalize(id == left_id ? left.address() :
-                                (id == right_id ? right.address() : m_storage.front().range_end()));
-                }
-                if (! m_storage.empty()) {                             // finalize on first txn chunk
-                    auto const& front = m_storage.front();
-                    auto const& beg_id = front.id();
-                    void const* dst = nullptr;
-                    if (beg_id == right_id) {
-                        dst = right.address();
-                    } else if (beg_id == left_id) {
-                        dst = left.address();
-                    } else if (less<id_type>()(left_id, beg_id) &&
-                            less<id_type>()(beg_id, right_id)) {
-                        dst = front.range_end();
-                    }
-                    if (dst != nullptr) {
-                        for (char const* ptr = reinterpret_cast<char const*>(front.range_next());
-                                ptr < dst; ptr += storage.tupleSize()) {
-                            storage.finalizerAndCopier().finalize(ptr);
-                        }
-                    }
-                }
+            // NOTE: we **never** finalize a TXN chunk (that is
+            // only visible to snapshot), since they had been
+            // either:
+            // 1. removed without compaction at which time it is
+            // finalized; or
+            // 2. moved due to compaction, whence the move does
+            // *not* deep copy (see `remove_force()')
+            while (! m_storage.empty() && (empty || less_rolling(m_storage.front().id(), stop))) {
+                assert(storage.begin()->range_begin() == storage.begin()->range_next());
+                storage.pop_front();
             }
         }
         m_frozen = false;
@@ -1178,13 +1154,14 @@ inline void CompactingChunks::DelayedRemover::validate() const {
 }
 
 inline size_t CompactingChunks::DelayedRemover::finalize() const {
-    if (m_chunks.finalizerAndCopier() && ! (m_chunks.frozen() && m_chunks.frozenBoundaries())) {
-        // removed addresses need to be finalized right away
+    if (m_chunks.finalizerAndCopier()) {
+        // removed addresses (without compaction) need to be
+        // finalized right away, irrespective of whether we are frozen.
         for_each(m_removed.cbegin(), m_removed.cend(),
                 [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
         return m_removed.size();
-    } else {        // finalizer in frozen state must be postponed
-        return 0;
+    } else {
+        return 0lu;
     }
 }
 
@@ -1971,8 +1948,6 @@ template<typename Hook, typename E>
 template<typename Tag> inline pair<size_t, size_t>
 HookedCompactingChunks<Hook, E>::remove_force(
         function<void(vector<pair<void*, void const*>> const&)> const& cb) {
-    // finalize before memcpy
-    auto const finalized = CompactingChunks::m_batched.finalize();
     if (frozen()) {
         // hook registration on movements and deletes
         for_each(CompactingChunks::m_batched.movements().cbegin(),
@@ -1997,6 +1972,8 @@ HookedCompactingChunks<Hook, E>::remove_force(
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
     }
+    // finalize before memcpy, but after adding to hook memory
+    auto const finalized = CompactingChunks::m_batched.finalize();
     cb(CompactingChunks::m_batched.movements());      // finalize dst, shallow copy and with index update
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
