@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,6 +36,8 @@ import org.voltdb.volttableutil.VoltTableUtil;
  * Complex queries are supported, e.g.:
  * querystats select * from statistics(table, 0) inner join statistics(index, 0)
  * using (host_id, hostname, site_id, partition_id) where site_id = 0;
+ * For stats that return more than 1 table, you can specify the optional third argument as table index (0 indexed)
+ * i.e. sqlcmd: > querystats select * from statistics(DRPRODUCER, 0, 1); could retrieve the second table (node-level table)
  *
  * This is called "pseudo-", since under the hood fake, temporary table(s) is created
  * inside Calcite that stores query statistics and Calcite is used to run the query.
@@ -53,7 +56,7 @@ public class QueryStats extends AdHocNTBase {
             Arrays.stream(StatsSelector.getAllStatsCollector())
             .collect(Collectors.toMap(Enum::name, a -> a, (a, b) -> b));
     private static final Pattern PROC_PATTERN =
-            Pattern.compile("statistics\\s*\\(\\s*([a-z]+)\\s*,\\s*(\\d+)\\s*\\)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("statistics\\s*\\(\\s*([a-z]+)\\s*,\\s*(\\d+)\\s*(,\\s*(\\d+)\\s*)?\\)", Pattern.CASE_INSENSITIVE);
     private static final String tempTableAlias = "TT";
 
     @Override
@@ -100,25 +103,25 @@ public class QueryStats extends AdHocNTBase {
         while (m.find()) {
             final String procName = m.group(1).toUpperCase();
             if (STATISTICS.containsKey(procName)) {
-                final int procArg = Integer.parseInt(m.group(2));
+                final int interval = Integer.parseInt(m.group(2));
+                final int tableId = m.group(4) == null ? 0 :Integer.parseInt(m.group(4));
                 m.appendReplacement(buf, Matcher.quoteReplacement(tempTableAlias + tables.size()));
                 tableNames.add(tempTableAlias + tables.size());
-                CompletableFuture<ClientResponse> cf = callProcedure("@Statistics", procName, procArg);
-                // TODO deal with exception and wrong/error result
-                CompletableFuture<Void> futureResult = cf.thenAccept(cr -> {
-                    tables.add(((ClientResponseImpl) cr).getResults()[0]);
-                });
-                futureResult.get();
-                /*
-                tables.add(VoltDB.instance().getStatsAgent().collectDistributedStats(
-                        new JSONObject(new HashMap<String, Object>(){{
-                            put("selector", "STATISTICS");
-                            put("subselector", procName);
-                            put("interval", procArg == 1);
-                        }}))[0]);
-                 */
+
+                    CompletableFuture<ClientResponse> cf = callProcedure("@Statistics", procName, interval);
+                    // for making result table in order, has to sync the result to table
+                    ClientResponseImpl cri = (ClientResponseImpl) (cf.get(1, TimeUnit.MINUTES));
+                if (cri.getStatus() == ClientResponse.SUCCESS) {
+                    VoltTable[] results = cri.getResults();
+                    if (results.length <= tableId) {
+                        throw new RuntimeException(String.format("@Statistics procedure  \"%s\" does not have %dth table", procName, tableId));
+                    }
+                    tables.add(results[tableId]);
+                } else {
+                    throw new RuntimeException(String.format("@Statistics procedure  \"%s\" failed with %s", procName, cri.getStatusString()));
+                }
             } else {
-                throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
+                    throw new RuntimeException(String.format("Unrecognized @Statistics procedure name \"%s\"", procName));
             }
         }
         m.appendTail(buf);
