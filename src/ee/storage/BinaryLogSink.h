@@ -28,6 +28,7 @@ namespace voltdb {
 class PersistentTable;
 class Pool;
 class VoltDBEngine;
+class TableTuple;
 
 /*
  * Responsible for applying binary logs to table data
@@ -40,11 +41,20 @@ public:
                      Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                      const char *txnStart);
 
+    inline void enableIngoreConflicts() { m_drIgnoreConflicts = true; }
+
 private:
     int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                   boost::unordered_map<int64_t, PersistentTable*> &tables,
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                   const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow);
+
+    bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple,
+            const TableTuple *expectedTuple, TableTuple *newTuple, int64_t uniqueId, int32_t remoteClusterId,
+            DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
+
+private:
+    bool m_drIgnoreConflicts;
 };
 
 

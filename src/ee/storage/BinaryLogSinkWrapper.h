@@ -38,6 +38,11 @@ public:
 
     int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables,
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
+
+    inline void enableIgnoreConflicts() {
+        m_sink.enableIngoreConflicts();
+        m_compatibleSink.enableIngoreConflicts();
+    }
 private:
     BinaryLogSink m_sink;
     CompatibleBinaryLogSink m_compatibleSink;
