@@ -159,6 +159,16 @@ public:
         return m_schema->columnCount();
     }
 
+    bool areAllCollumnsVarAndNull() const {
+        int cols = columnCount();
+        for (int i = 0; i < cols; ++i) {
+            if (!isVarLengthType(i) || !isNull(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
         Determine the maximum number of bytes when serialized for Export.
         Excludes the bytes required by the row header (which includes
@@ -645,6 +655,13 @@ private:
 
     inline size_t maxExportSerializedHiddenColumnSize(int colIndex) const {
         return maxExportSerializedColumnSizeCommon(colIndex, true);
+    }
+
+    // exclude hidden column since it should nver be var-length type
+    inline bool isVarLengthType(int colIndex) const {
+        const TupleSchema::ColumnInfoBase *columnInfo = m_schema->getColumnInfo(colIndex);
+        ValueType columnType = columnInfo->getVoltType();
+        return columnType ==  ValueType::tVARCHAR || columnType ==  ValueType::tVARBINARY || columnType == ValueType::tGEOGRAPHY;
     }
 
     inline size_t maxExportSerializedColumnSizeCommon(int colIndex, bool isHidden) const {
