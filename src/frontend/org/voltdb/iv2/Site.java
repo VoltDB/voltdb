@@ -669,6 +669,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
+        final boolean drIgnoreConflicts = Boolean.getBoolean("DR_IGNORE_CONFLICTS");
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
@@ -680,6 +681,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
+                        drIgnoreConflicts,
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_hasMPDRGateway);
@@ -695,6 +697,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
+                        drIgnoreConflicts,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
@@ -712,6 +715,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             hostname,
                             m_context.cluster.getDrclusterid(),
                             defaultDrBufferSize,
+                            drIgnoreConflicts,
                             deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,

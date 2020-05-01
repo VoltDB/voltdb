@@ -623,6 +623,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final String hostname,
             final int drClusterId,
             final int defaultDrBufferSize,
+            final boolean drIgnoreConflicts,
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
@@ -654,6 +655,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostname,
                 drClusterId,
                 defaultDrBufferSize,
+                drIgnoreConflicts,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
                 createDrReplicatedStream);
@@ -692,6 +694,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final String hostname,
             final int drClusterId,
             final int defaultDrBufferSize,
+            final boolean drIgnoreConflicts,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
@@ -708,6 +711,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
         m_data.putInt(defaultDrBufferSize);
+        m_data.putInt(drIgnoreConflicts ? 1 : 0);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
         m_data.putInt(createDrReplicatedStream ? 1 : 0);
