@@ -126,6 +126,9 @@ public class StatusListener {
                 connector.setPort(port);
                 connector.setName("status-connector");
                 connector.setIdleTimeout(CONNTMO);
+                if (portReq != 0) { // only if port specified
+                    connector.setReuseAddress(true); // in case of fast fail/restart
+                }
                 connector.open();
                 return connector;
             }
