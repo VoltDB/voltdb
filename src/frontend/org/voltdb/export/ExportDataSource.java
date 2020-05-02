@@ -1526,37 +1526,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED) {
                 // Satisfy a pending poll request
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            // Check again in case of multiple export release tasks are queued
-                            // because restarted @ExportControl transaction
-                            if (m_status != StreamStatus.BLOCKED) {
-                                return;
-                            }
-                            if (isMaster() && m_pollTask != null) {
-                                long firstUnpolledSeqNo = m_firstUnpolledSeqNo;
-                                Pair<Long, Long> gap = m_gapTracker.getFirstGap(m_firstUnpolledSeqNo);
-                                if (gap != null) {
-                                    firstUnpolledSeqNo = gap.getSecond() + 1;
-                                    exportLog.warn("Export data is missing [" + gap.getFirst() + ", " + gap.getSecond() +
-                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
-                                } else {
-                                    firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
-                                    exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
-                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
-
-                                }
-                                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
-                                clearGap(true);
-                                pollImpl(m_pollTask);
-                            }
-                        } catch (Exception e) {
-                            exportLog.error("Exception polling export buffer after RELEASE", e);
-                        } catch (Error e) {
-                            VoltDB.crashLocalVoltDB("Error polling export bufferafter RELEASE", true, e);
+                m_es.execute(() -> {
+                    try {
+                        // Check again in case of multiple export release tasks are queued
+                        // because restarted @ExportControl transaction
+                        if (m_status != StreamStatus.BLOCKED || !isMaster() || m_pollTask == null) {
+                            return;
                         }
+
+                        Pair<Long, Long> gap = m_gapTracker.getFirstGap(m_firstUnpolledSeqNo);
+                        long firstUnpolledSeqNo = gap == null ? m_gapTracker.getFirstSeqNo() : gap.getSecond() + 1;
+                        exportLog.info("Skipping over gap [" + m_firstUnpolledSeqNo + '-' + (firstUnpolledSeqNo - 1)
+                                + "]  in " + this);
+                        m_firstUnpolledSeqNo = firstUnpolledSeqNo;
+                        clearGap(true);
+                        pollImpl(m_pollTask);
+                    } catch (Exception e) {
+                        exportLog.error("Exception polling export buffer after RELEASE", e);
+                    } catch (Error e) {
+                        VoltDB.crashLocalVoltDB("Error polling export bufferafter RELEASE", true, e);
                     }
                 });
                 return true;
