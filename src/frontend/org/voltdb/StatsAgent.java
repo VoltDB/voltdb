@@ -17,8 +17,8 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
@@ -87,6 +87,8 @@ public class StatsAgent extends OpsAgent
         case TASK_SCHEDULER:
             TaskStatsSource.convert(subselector, request.aggregateTables);
             break;
+        case SNAPSHOTSTATUSSUMMARY:
+            request.aggregateTables = SnapshotStatusSummary.summarize(request.aggregateTables[0]);
         default:
         }
     }

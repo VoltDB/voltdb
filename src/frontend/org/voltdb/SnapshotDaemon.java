@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -67,6 +68,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -76,8 +78,6 @@ import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -211,12 +211,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_prefixAndSeparator = null;
 
         // Register the snapshot status to the StatsAgent
-        SnapshotStatus snapshotStatus = new SnapshotStatus();
-        snapshotStatus.setSnapshotPath(VoltDB.instance().getCommandLogSnapshotPath(),
+        SnapshotStatus snapshotStatus = new SnapshotStatus(VoltDB.instance().getCommandLogSnapshotPath(),
                 VoltDB.instance().getSnapshotPath());
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);
+        // Snapshot status summary is a one-row-per-snapshot stats
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUSSUMMARY,
+                                                              0,
+                                                              new SnapshotStatusSummary(
+                                                                      VoltDB.instance().getCommandLogSnapshotPath(),
+                                                                      VoltDB.instance().getSnapshotPath()));
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 

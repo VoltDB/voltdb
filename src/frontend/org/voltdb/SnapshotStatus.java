@@ -23,11 +23,11 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
-import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
 
@@ -37,24 +37,28 @@ public class SnapshotStatus extends StatsSource {
         COMMANDLOG
     };
 
-    private File m_truncationSnapshotPath = null;
-    private File m_autoSnapshotPath = null;
+    static class SnapshotTypeChecker {
+        File m_truncationSnapshotPath = null;
+        File m_autoSnapshotPath = null;
 
-    public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
-        m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
-        m_autoSnapshotPath = new File(autoSnapshotPathStr);
-    }
+        public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
+            m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
+            m_autoSnapshotPath = new File(autoSnapshotPathStr);
+        }
 
-    private String getSnapshotType(String path) {
-        File thisSnapshotPath = new File(path);
-        if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.COMMANDLOG.name();
+        String getSnapshotType(String path) {
+            File thisSnapshotPath = new File(path);
+            if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
+                return SNAPSHOT_TYPE.COMMANDLOG.name();
+            }
+            else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
+                return SNAPSHOT_TYPE.AUTO.name();
+            }
+            return SNAPSHOT_TYPE.MANUAL.name();
         }
-        else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.AUTO.name();
-        }
-        return SNAPSHOT_TYPE.MANUAL.name();
     }
+    SnapshotTypeChecker m_typeChecker = new SnapshotTypeChecker();
+
 
     /**
      * Since there are multiple tables inside a Snapshot object, and we cannot
@@ -97,8 +101,9 @@ public class SnapshotStatus extends StatsSource {
         }
     }
 
-    public SnapshotStatus() {
+    public SnapshotStatus(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
         super(false);
+        m_typeChecker.setSnapshotPath(truncationSnapshotPathStr, autoSnapshotPathStr);
     }
 
     @Override
@@ -144,7 +149,7 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
         rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
-        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
+        rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path);
         super.updateStatsRow(rowKey, rowValues);
     }
 

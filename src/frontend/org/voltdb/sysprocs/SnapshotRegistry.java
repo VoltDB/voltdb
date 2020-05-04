@@ -105,11 +105,25 @@ public class SnapshotRegistry {
             public void next(Table t);
         }
 
+        public interface ErrorScanner {
+            public void update(boolean hasError);
+        }
+
         public void iterateTables(TableIterator ti) {
             synchronized (tables) {
                 for (Table t : tables.values()) {
                     ti.next(t);
                 }
+            }
+        }
+
+        public void iterateTableErrors(ErrorScanner sc) {
+            synchronized (tables) {
+                if (tables.isEmpty()) {
+                    return;
+                }
+                boolean hasError = tables.values().stream().anyMatch(t -> t.error != null);
+                sc.update(hasError);
             }
         }
 
