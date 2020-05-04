@@ -101,6 +101,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         private void finishActiveSegmentWrite() throws IOException {
             finishWrite(m_activeSegment);
+            if (m_retentionPolicy != null) {
+                m_retentionPolicy.finishedGapSegment();
+            }
             m_activeSegment = null;
         }
 
@@ -289,6 +292,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             return m_segment;
         }
 
+        public void seekToFirstSegment() throws IOException {
+            synchronized (PersistentBinaryDeque.this) {
+                if (m_segments.isEmpty() ||
+                    (getCurrentSegment() != null && getCurrentSegment().m_id == m_segments.firstKey())) {
+                    return;
+                }
+
+                seekToSegment(m_segments.firstEntry().getValue());
+            }
+        }
+
         @Override
         public void seekToSegment(long entryId, SeekErrorRule errorRule)
                 throws NoSuchOffsetException, IOException {
@@ -296,53 +310,57 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
             synchronized (PersistentBinaryDeque.this) {
                 PBDSegment<M> seekSegment = findSegmentWithEntry(entryId, errorRule);
-                if (moveToValidSegment() == null) {
-                    return;
-                }
+                seekToSegment(seekSegment);
+            }
+        }
 
-                if (m_segment.segmentId() == seekSegment.segmentId()) {
-                    //Close and open to rewind reader to the beginning and reset everything
-                    if (m_segment.getReader(m_cursorId) != null) {
-                        m_numRead -= m_segment.getReader(m_cursorId).readIndex();
-                        m_segment.getReader(m_cursorId).close();
-                        m_segment.openForRead(m_cursorId);
-                    }
-                } else { // rewind or fastforward, adjusting the numRead accordingly
-                    if (m_segment.segmentId() > seekSegment.segmentId()) { // rewind
-                        for (PBDSegment<M> curr : m_segments.tailMap(seekSegment.segmentId(), true).values()) {
-                            if (curr.segmentId() > m_segment.segmentId()) {
-                                break;
-                            }
-                            PBDSegmentReader<M> currReader = curr.getReader(m_cursorId);
-                            if (curr.segmentId() == m_segment.segmentId()) {
-                                if (currReader != null) {
-                                    m_numRead -= currReader.readIndex();
-                                }
-                            } else {
-                                m_numRead -= curr.getNumEntries();
-                            }
-                            if (currReader != null) {
-                                currReader.close();
-                            }
-                        }
-                    } else { // fastforward
-                        PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
-                        m_numRead += m_segment.getNumEntries();
-                        if (segmentReader != null) {
-                            m_numRead -= segmentReader.readIndex();
-                            segmentReader.close();
-                        }
-                        // increment numRead
-                        // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
-                        for (PBDSegment<M> curr : m_segments.tailMap(m_segment.segmentId(), false).values()) {
-                            if (curr.segmentId() == seekSegment.segmentId()) {
-                                break;
-                            }
-                            m_numRead += curr.getNumEntries();
-                        }
-                    }
-                    m_segment = seekSegment;
+        private void seekToSegment(PBDSegment<M> seekSegment) throws IOException {
+            if (moveToValidSegment() == null) {
+                return;
+            }
+
+            if (m_segment.segmentId() == seekSegment.segmentId()) {
+                //Close and open to rewind reader to the beginning and reset everything
+                if (m_segment.getReader(m_cursorId) != null) {
+                    m_numRead -= m_segment.getReader(m_cursorId).readIndex();
+                    m_segment.getReader(m_cursorId).close();
+                    m_segment.openForRead(m_cursorId);
                 }
+            } else { // rewind or fastforward, adjusting the numRead accordingly
+                if (m_segment.segmentId() > seekSegment.segmentId()) { // rewind
+                    for (PBDSegment<M> curr : m_segments.tailMap(seekSegment.segmentId(), true).values()) {
+                        if (curr.segmentId() > m_segment.segmentId()) {
+                            break;
+                        }
+                        PBDSegmentReader<M> currReader = curr.getReader(m_cursorId);
+                        if (curr.segmentId() == m_segment.segmentId()) {
+                            if (currReader != null) {
+                                m_numRead -= currReader.readIndex();
+                            }
+                        } else {
+                            m_numRead -= curr.getNumEntries();
+                        }
+                        if (currReader != null) {
+                            currReader.close();
+                        }
+                    }
+                } else { // fastforward
+                    PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
+                    m_numRead += m_segment.getNumEntries();
+                    if (segmentReader != null) {
+                        m_numRead -= segmentReader.readIndex();
+                        segmentReader.close();
+                    }
+                    // increment numRead
+                    // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
+                    for (PBDSegment<M> curr : m_segments.tailMap(m_segment.segmentId(), false).values()) {
+                        if (curr.segmentId() == seekSegment.segmentId()) {
+                            break;
+                        }
+                        m_numRead += curr.getNumEntries();
+                    }
+                }
+                m_segment = seekSegment;
             }
         }
 
@@ -458,16 +476,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return maxBytes;
                 }
 
-                long segmentSize = m_segment.getFileSize();
-
-                long lastSegmentId = m_activeSegment.segmentId();
-                if (m_segment.segmentId() == lastSegmentId) { // last segment, cannot skip
-                    long needed = maxBytes - segmentSize;
+                if (m_segment.isActive() || m_segment.segmentId() == m_segments.lastKey()) {
+                    long needed = maxBytes - remainingFileSize();
                     return (needed == 0) ? 1 : needed; // To fix: 0 is a special value indicating we skipped.
                 }
 
-                long readerSize = readerFileSize();
-                long diff = readerSize - segmentSize;
+                long diff = remainingFileSize();
                 if (diff < maxBytes) {
                     return maxBytes - diff;
                 }
@@ -477,9 +491,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        private long readerFileSize() {
+        private long remainingFileSize() {
             long size = 0;
-            for (PBDSegment<M> segment: m_segments.tailMap(m_segment.segmentId()).values()) {
+            for (PBDSegment<M> segment: m_segments.tailMap(m_segment.segmentId(), false).values()) {
                 size += segment.getFileSize();
             }
 
@@ -1935,7 +1949,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void setRetentionPolicy(RetentionPolicyType policyType, Object... params) {
+    public synchronized void setRetentionPolicy(RetentionPolicyType policyType, Object... params) {
         if (m_retentionPolicy != null) {
             assert !m_retentionPolicy.isPolicyEnforced()
                 : "Retention policy on PBD " + m_nonce + " must be stopped before replacing it";
@@ -1944,7 +1958,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void startRetentionPolicyEnforcement() {
+    public synchronized void startRetentionPolicyEnforcement() {
         try {
             if (m_retentionPolicy != null) {
                 m_retentionPolicy.startPolicyEnforcement();
@@ -1956,14 +1970,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public void stopRetentionPolicyEnforcement() {
+    public synchronized void stopRetentionPolicyEnforcement() {
         if (m_retentionPolicy != null) {
             m_retentionPolicy.stopPolicyEnforcement();
         }
     }
 
     @Override
-    public boolean isRetentionPolicyEnforced() {
+    public synchronized boolean isRetentionPolicyEnforced() {
         return m_retentionPolicy != null && m_retentionPolicy.isPolicyEnforced();
     }
 

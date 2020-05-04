@@ -72,7 +72,7 @@ public class RetentionPolicyMgr {
     private static long s_minBytesLimitMb = 64;
 
     private ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(2);
-    private Map<String, ScheduledFuture<?>> m_futures = new HashMap<>();
+    private Map<PersistentBinaryDeque<?>.ReadCursor, ScheduledFuture<?>> m_futures = new HashMap<>();
 
     private RetentionPolicyMgr() {
     }
@@ -107,17 +107,24 @@ public class RetentionPolicyMgr {
     /*
      * All tasks that delete segments based on time must be scheduled through this synchronized method.
      */
-    synchronized void scheduleTaskFor(String nonce, Runnable runnable, long delay) {
-        if (!m_futures.containsKey(nonce)) { // only schedule if one doesn't exist already in queue
-            m_futures.put(nonce, m_scheduler.schedule(runnable, delay, TimeUnit.MILLISECONDS));
+    synchronized void scheduleTaskFor(PersistentBinaryDeque<?>.ReadCursor reader, Runnable runnable, long delay) {
+        if (!m_futures.containsKey(reader)) { // only schedule if one doesn't exist already in queue
+            m_futures.put(reader, m_scheduler.schedule(runnable, delay, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    synchronized void replaceTaskFor(PersistentBinaryDeque<?>.ReadCursor reader, Runnable runnable, long delay) {
+        ScheduledFuture<?> old = m_futures.put(reader, m_scheduler.schedule(runnable, delay, TimeUnit.MILLISECONDS));
+        if (old != null) {
+            old.cancel(false);
         }
     }
 
     /*
      * Removal of futures must be done through this synchronized method.
      */
-    synchronized void removeTaskFuture(String nonce) {
-        m_futures.remove(nonce);
+    synchronized void removeTaskFuture(PersistentBinaryDeque<?>.ReadCursor reader) {
+        m_futures.remove(reader);
     }
 
     /**
@@ -133,9 +140,37 @@ public class RetentionPolicyMgr {
         }
 
         /**
-         * Method that does the actual cleaning up of PBD segments.
+         * Does some common operations and calls the actual retention code
          */
-        protected abstract void deleteOldSegments();
+        protected void deleteOldSegments(PersistentBinaryDeque<?>.ReadCursor reader) {
+            try {
+                removeTaskFuture(reader);
+                if (!reader.isOpen()) {
+                    return;
+                }
+
+                // Most of the time this is a no-op.
+                // But if data was added (gap filling) in a segment before the
+                // current retention point, we need to seek to the beginning
+                reader.seekToFirstSegment();
+
+                // Now delete
+                executeRetention(reader);
+            } catch(Throwable t) {
+                handleExecutionError(reader, t);
+            }
+        }
+
+        /**
+         * Retention policy enforcement implementations must implement this
+         * with the retention logic
+         */
+        protected abstract void executeRetention(PersistentBinaryDeque<?>.ReadCursor reader) throws IOException;
+
+        /**
+         * Implementation specific handling of any errors during {@link #executeRetention()}
+         */
+        protected abstract void handleExecutionError(PersistentBinaryDeque<?>.ReadCursor reader, Throwable t);
 
         @Override
         public void startPolicyEnforcement() throws IOException {
@@ -144,7 +179,7 @@ public class RetentionPolicyMgr {
                         " using " + this.getClass().getName());
             }
 
-            if (m_reader != null && m_reader.isOpen()) { // retention is already active
+            if (m_reader != null) { // retention is already active
                 if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
                     m_pbd.getUsageSpecificLog().debug("Retention policy for " + m_pbd.getNonce() + " is already active");
                 }
@@ -152,18 +187,24 @@ public class RetentionPolicyMgr {
             }
 
             m_reader = m_pbd.openForRead(getCursorId());
-            scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, 0);
+            scheduleRetentionTask(0);
         }
 
         @Override
         public void stopPolicyEnforcement() {
+            removeTaskFuture(m_reader);
+            m_reader = null;
             m_pbd.closeCursor(getCursorId());
-            removeTaskFuture(m_pbd.getNonce());
         }
 
         @Override
         public boolean isPolicyEnforced() {
-            return m_reader != null && m_reader.isOpen();
+            return m_reader != null;
+        }
+
+        protected void scheduleRetentionTask(long delay) {
+            PersistentBinaryDeque<?>.ReadCursor reader = m_reader;
+            scheduleTaskFor(reader, () -> deleteOldSegments(reader), delay);
         }
     }
 
@@ -194,14 +235,27 @@ public class RetentionPolicyMgr {
         // This is called from synchronized PBD method, so calls to this should be serialized as well.
         @Override
         public void newSegmentAdded() {
-            if (m_reader == null || !m_reader.isOpen()) { // not started yet
+            if (!isPolicyEnforced()) {
                 return;
             }
 
             if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
                 m_pbd.getUsageSpecificLog().debug("Processing newSegmentAdded for PBD " + m_pbd.getNonce());
             }
-            scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, MIN_DELAY);
+            scheduleRetentionTask(MIN_DELAY);
+        }
+
+        @Override
+        public void finishedGapSegment() {
+            if (!isPolicyEnforced()) {
+                return;
+            }
+
+            if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
+                m_pbd.getUsageSpecificLog().debug("Processing finishedGapProcessing for PBD " + m_pbd.getNonce());
+            }
+            PersistentBinaryDeque<?>.ReadCursor reader = m_reader;
+            replaceTaskFor(reader, () -> deleteOldSegments(reader), MIN_DELAY);
         }
 
         // Only executed in scheduler thread.
@@ -210,42 +264,41 @@ public class RetentionPolicyMgr {
         // a second one could get scheduled. Since PBD operations are synchronized,
         // the execution is thread-safe.
         @Override
-        protected void deleteOldSegments() {
+        protected void executeRetention(PersistentBinaryDeque<?>.ReadCursor reader) {
             try {
-                removeTaskFuture(m_pbd.getNonce()); // Remove future so that any callback after this point will queue a delete task.
+                while (reader.isOpen() && reader.skipToNextSegmentIfOlder(m_retainMillis));
+            } catch(IOException e) {
+                m_pbd.getUsageSpecificLog().warn("Unexpected error trying to check for PBD segments to be deleted", e);
+                // We will try this again when we get the next notification
+                // that something has changed.
+                return;
+            }
 
-                try {
-                    while (m_reader.isOpen() && m_reader.skipToNextSegmentIfOlder(m_retainMillis));
-                } catch(IOException e) {
-                    m_pbd.getUsageSpecificLog().warn("Unexpected error trying to check for PBD segments to be deleted", e);
-                    // We will try this again when we get the next notification
-                    // that something has changed.
+            if (reader.isOpen() && !reader.isCurrentSegmentActive()) {
+                long recordTime = reader.getSegmentTimestamp();
+                if (recordTime == PBDSegment.INVALID_TIMESTAMP) { // cannot read last record timestamp
+                    if (reader.getCurrentSegment() != null) {
+                        m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
+                                "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
+                                m_pbd.getNonce());
+                    }
+                    scheduleRetentionTask(m_retainMillis);
                     return;
                 }
 
-                if (m_reader.isOpen() && !m_reader.isCurrentSegmentActive()) {
-                    long recordTime = m_reader.getSegmentTimestamp();
-                    if (recordTime == PBDSegment.INVALID_TIMESTAMP) { // cannot read last record timestamp
-                        if (m_reader.getCurrentSegment() != null) {
-                            m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.WARN, null,
-                                    "Could not get last record time for segment in PBD %s. This may prevent enforcing time-based retention",
-                                    m_pbd.getNonce());
-                        }
-                        scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, m_retainMillis);
-                        return;
-                    }
-
-                    long timerDelay = m_retainMillis - (System.currentTimeMillis() - recordTime);
-                    if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
-                        m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.DEBUG, null,
-                                "Scheduling time-based retention for %s in %d milliseconds",
-                                m_pbd.getNonce(), Math.max(timerDelay,  MIN_DELAY));
-                    }
-                    scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, Math.max(timerDelay, MIN_DELAY));
+                long timerDelay = m_retainMillis - (System.currentTimeMillis() - recordTime);
+                if (m_pbd.getUsageSpecificLog().isDebugEnabled()) {
+                    m_pbd.getUsageSpecificLog().rateLimitedLog(60, Level.DEBUG, null,
+                            "Scheduling time-based retention for %s in %d milliseconds",
+                            m_pbd.getNonce(), Math.max(timerDelay,  MIN_DELAY));
                 }
-            } catch(Exception e) {
-                m_pbd.getUsageSpecificLog().error("Unexpected error running deleteOldSegements for pbd " + m_pbd.getNonce(), e);
+                scheduleRetentionTask(MIN_DELAY);
             }
+        }
+
+        @Override
+        protected void handleExecutionError(PersistentBinaryDeque<?>.ReadCursor reader, Throwable t) {
+            m_pbd.getUsageSpecificLog().error("Unexpected error running deleteOldSegements for pbd " + m_pbd.getNonce(), t);
         }
     }
 
@@ -269,29 +322,31 @@ public class RetentionPolicyMgr {
         }
 
         // Only executed in the retention policy thread.
-        // There will not be concurrent executions of this because
+        // There will not be concurrent executions of this most of the time because
         // of how we reset m_sizeNeeded to MAX_VALUE when we schedule this task.
+        // When gaps are filled, there is a possibility of scheduling a second task, but because
+        // of the synchronization on PBD object, this should not cause any problems due to race conditions
         @Override
-        protected void deleteOldSegments() {
-            try {
-                removeTaskFuture(m_pbd.getNonce());
-
-                while (m_reader.isOpen()) {
-                    long currValue = 0;
-                    synchronized(m_pbd) {
-                        if ((currValue = m_reader.skipToNextSegmentIfBigger(m_maxBytes)) != 0) {
-                            m_sizeNeeded = currValue;
-                            break;
-                        }
+        protected void executeRetention(PersistentBinaryDeque<?>.ReadCursor reader) throws IOException {
+            while (reader.isOpen()) {
+                long currValue = 0;
+                synchronized(m_pbd) {
+                    if ((currValue = reader.skipToNextSegmentIfBigger(m_maxBytes)) != 0) {
+                        m_sizeNeeded = currValue;
+                        break;
                     }
                 }
-            } catch(Exception e) {
-                if (e instanceof IOException && m_reader.isOpen()) {
-                    m_pbd.getUsageSpecificLog().debug("IOException running byte based retention on " + m_pbd.getNonce(), e);
-                }
-                m_pbd.getUsageSpecificLog().error("Unexpected error running byte based retention on " + m_pbd.getNonce(), e);
-                m_sizeNeeded = 4096; // Try running the policy again after 4K bytes are added. Arbitrary number of bytes here.
             }
+        }
+
+        @Override
+        protected void handleExecutionError(PersistentBinaryDeque<?>.ReadCursor reader, Throwable t) {
+            if (t instanceof IOException && !reader.isOpen()) { // reader got closed. May be we stopped retention enforcement
+                m_pbd.getUsageSpecificLog().debug("IOException running byte based retention on " + m_pbd.getNonce(), t);
+            } else {
+                m_pbd.getUsageSpecificLog().error("Unexpected error running byte based retention on " + m_pbd.getNonce(), t);
+            }
+            m_sizeNeeded = 4096; // Try running the policy again after 4K bytes are added. Arbitrary number of bytes here.
         }
 
         @Override
@@ -301,15 +356,25 @@ public class RetentionPolicyMgr {
 
         @Override
         public void bytesAdded(long numBytes) {
-            if (m_reader == null || !m_reader.isOpen()) {
+            if (!isPolicyEnforced()) {
                 return;
             }
 
             m_sizeNeeded -= numBytes;
             if (!m_reader.isCurrentSegmentActive() && m_sizeNeeded <= 0) {
                 m_sizeNeeded = Long.MAX_VALUE;
-                scheduleTaskFor(m_pbd.getNonce(), this::deleteOldSegments, 0);
+                scheduleRetentionTask(0);
             }
+        }
+
+        @Override
+        public void finishedGapSegment() {
+            if (!isPolicyEnforced()) {
+                return;
+            }
+
+            m_sizeNeeded = Long.MAX_VALUE;
+            scheduleRetentionTask(0);
         }
     }
 
