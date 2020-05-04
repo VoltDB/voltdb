@@ -60,6 +60,7 @@ class AddDropTableTest : public Test {
                              m_hostName,
                              m_drClusterId,
                              1024,
+                             false,
                              DEFAULT_TEMP_TABLE_MEMORY,
                              false);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
