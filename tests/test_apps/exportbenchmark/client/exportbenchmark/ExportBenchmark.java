@@ -170,9 +170,6 @@ public class ExportBenchmark {
         @Option(desc="How many targets to divide the multiplier into (default = 1)")
         int targets = 1;
 
-        @Option(desc="Insert into InsertExportTable only")
-        boolean table = false;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -234,7 +231,7 @@ public class ExportBenchmark {
     public ExportBenchmark(ExportBenchConfig config) {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setReconnectOnConnectionLoss(false);
+        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
@@ -419,17 +416,9 @@ public class ExportBenchmark {
             while (benchmarkWarmupEndTS > now) {
                 for (int t = 1; t <= config.targets; t++) {
                 try {
-                    if (config.table)
-                        client.callProcedure(
+                    client.callProcedure(
                             new NullCallback(),
-                            "InsertExportTable",
-                            rowId.getAndIncrement(),
-                            config.multiply,
-                            1);
-                    else
-                        client.callProcedure(
-                            new NullCallback(),
-                            "InsertExport" + t,
+                            "InsertExport"+t,
                             rowId.getAndIncrement(),
                             config.multiply,
                             1);

@@ -140,8 +140,6 @@ function run_benchmark() {
         exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \
-        --target=socket \
-        --table=true \
         --statsfile=exportbench.csv
 }
 

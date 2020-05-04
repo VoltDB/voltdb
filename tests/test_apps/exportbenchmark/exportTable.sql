@@ -2,11 +2,7 @@ LOAD CLASSES exportbenchmark-procedures.jar;
 
 file -inlinebatch END_OF_BATCH
 
--- CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
-
--- CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid AS TOPIC profile foo format csv (
-
-CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid AS TOPIC (
+CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
