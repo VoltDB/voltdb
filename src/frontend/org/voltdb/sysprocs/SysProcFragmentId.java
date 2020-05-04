@@ -280,6 +280,10 @@ public class SysProcFragmentId
     public static final int PF_stopReplicas = 402;
     public static final int PF_stopReplicasAggregate = 403;
 
+    // @TopicControl
+    public static final int PF_topicControl = 410;
+    public static final int PF_topicControlAggregate = 411;
+
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 

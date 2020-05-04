@@ -707,6 +707,21 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Test if a table with {@code name} is a topic
+     *
+     * @param db    {@link Database} instance
+     * @param       name of table
+     * @return      {@code true} if a table with {@code name} is a topic
+     */
+    public static boolean isTopic(Database db, String name) {
+        Table table = db.getTables().get(name);
+        if (table != null) {
+            return table.getIstopic();
+        }
+        return false;
+    }
+
+    /**
      * Return true if a table was explicitly declared as a STREAM in the DDL
      *
      * @param database
@@ -1375,10 +1390,14 @@ public abstract class CatalogUtil {
         // Validate topics in deployment file
         Map<String, TopicProfileType> profileMap = getDeploymentTopics(topicsType, errors);
         if (profileMap != null) {
+            Pattern profilePattern = Pattern.compile("^\\p{Alnum}[\\w]*$");
             for(TopicProfileType profile : profileMap.values()) {
                 String profName = profile.getName();
                 if (StringUtils.isBlank(profName)) {
                     errors.addErrorMessage("A topic profile cannot have a blank name");
+                } else if (!profilePattern.matcher(profName).matches()) {
+                    errors.addErrorMessage(
+                            "A topic profile name must be alphanumeric and can contain but not start with underscores (_)");
                 }
                 String what = "topic profile " + profile.getName();
                 validateRetention(what, profile.getRetention(), errors);

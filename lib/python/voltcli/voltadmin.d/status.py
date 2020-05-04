@@ -179,8 +179,10 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
     if "license" in host and\
             (majorVersion > RESIZE_MAJOR_VERSION or
              (majorVersion == RESIZE_MAJOR_VERSION and minorVersion >= RESIZE_MINOR_VERSION)):
-        result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
-                                  [2, '', '']).table(0)
+        result = runner.call_proc('@ElasticRemoveNT',
+                                  [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING,
+                                   VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_BIGINT],
+                                  [2, '', '', -1]).table(0)
         query_status = result.tuple(0).column_integer(0)
         elastic_status = result.tuple(0).column_string(1)
 

@@ -54,7 +54,6 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -647,7 +646,7 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
+    public void processExportControl(String exportStream, List<String> exportTargets, StreamControlOperation operation, VoltTable results) {
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
         }
