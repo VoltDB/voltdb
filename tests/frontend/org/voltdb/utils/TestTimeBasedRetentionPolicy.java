@@ -208,6 +208,54 @@ public class TestTimeBasedRetentionPolicy {
         }
     }
 
+    @Test(timeout = 30_000)
+    public void testWithGapFilling() throws Exception {
+        /*
+         * This tests gaps filled before the point at which the retention reader is.
+         */
+        // retention of 2 minutes
+        m_pbd.close();
+        long retention = 120 *1000;
+        m_pbd = PersistentBinaryDeque.builder(m_name.getMethodName(), TestPersistentBinaryDeque.TEST_DIR, s_logger)
+                        .compression(true)
+                        .requiresId(true)
+                        .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(retention));
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // segment with current time
+        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 501, 600, System.currentTimeMillis());
+        m_pbd.updateExtraHeader(null);
+        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 1001, 1100, System.currentTimeMillis()+ 60*1000);
+
+        // fill gap before the current segment with time before retention time
+        BinaryDequeGapWriter<ExtraHeaderMetadata> gapWriter = m_pbd.openGapWriter();
+        ExtraHeaderMetadata header = new ExtraHeaderMetadata(new Random(System.currentTimeMillis()));
+        long gapTime = System.currentTimeMillis() - 5*60*1000;
+        gapWriter.updateGapHeader(header);
+        // Fill gap segments and verify they are deleted because they are older
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 1, 100, gapTime);
+        gapWriter.updateGapHeader(header);
+        Thread.sleep(250);
+        assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 101, 200, gapTime);
+        gapWriter.updateGapHeader(header);
+        Thread.sleep(250);
+        assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 201, 300, gapTime);
+        gapWriter.updateGapHeader(header);
+        Thread.sleep(250);
+        assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        // fill newer gaps
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 601, 700, System.currentTimeMillis());
+        assertEquals(3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        gapWriter.updateGapHeader(header);
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 701, 800, System.currentTimeMillis());
+        gapWriter.close();
+        assertEquals(4, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
     private void readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws Exception {
         for (int i=0; i<numBuffers; i++) {
             BBContainer container = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);

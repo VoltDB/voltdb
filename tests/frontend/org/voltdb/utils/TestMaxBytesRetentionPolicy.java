@@ -172,6 +172,59 @@ public class TestMaxBytesRetentionPolicy {
         assertEquals(sizeToRetain, getPbdSize());
     }
 
+    @Test (timeout = 15_000)
+    public void testWithGapFilling() throws Exception {
+        m_pbd.close();
+        m_pbd = PersistentBinaryDeque.builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, s_logger)
+                        .compression(true)
+                        .requiresId(true)
+                        .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.MAX_BYTES, s_maxBytes);
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // Create a segment with maxBytes
+        long startId = 1000;
+        while (getPbdSize() < s_maxBytes) {
+            long endId = startId + 10 - 1;
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startId, endId, System.currentTimeMillis());
+            startId = endId + 1;
+        }
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        // fill gap in the beginning. Those should get deleted
+        BinaryDequeGapWriter<ExtraHeaderMetadata> gapWriter = m_pbd.openGapWriter();
+        ExtraHeaderMetadata header = new ExtraHeaderMetadata(new Random(System.currentTimeMillis()));
+        gapWriter.updateGapHeader(header);
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(0)), 1, 500, System.currentTimeMillis() - 60_000);
+        assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        gapWriter.updateGapHeader(header);
+        Thread.sleep(250);
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        // Start a new 'normal' segment and write gap segments and verify deletion when size exceeds
+        m_pbd.updateExtraHeader(header);
+        m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startId, startId+10-1, System.currentTimeMillis());
+        m_pbd.updateExtraHeader(header);
+        startId += 10;
+        assertEquals(2, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+        long gapStartId = startId + 1000;
+        long endId = gapStartId + 100 - 1;
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(0)), gapStartId, endId, System.currentTimeMillis());
+        gapWriter.updateGapHeader(header);
+        assertEquals(3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        // Create gap segment in the end
+        gapStartId = endId + 1;
+        long segmentSize = 0;
+        while (segmentSize < s_maxBytes) {
+            endId = gapStartId + 10 - 1;
+            segmentSize += gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), gapStartId, endId, System.currentTimeMillis());
+            gapStartId = endId + 1;
+        }
+        Thread.sleep(250);
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
     private long getPbdSize() throws IOException {
         List<File> files = TestPersistentBinaryDeque.getSortedDirectoryListing();
         long size = 0;
