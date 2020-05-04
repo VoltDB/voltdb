@@ -1,2 +1,0 @@
-formatter=org.voltdb.importer.formatter.builtin.VoltSuperCSVFormatter
-format=csv
