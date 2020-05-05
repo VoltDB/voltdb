@@ -1389,7 +1389,7 @@ public class SnapshotUtil {
         ArrayList<SnapshotTableInfo> tables = new ArrayList<>();
         for (Table table : database.getTables()) {
             // STREAM tables are not included in the snapshot.
-            if (TableType.isStream(table.getTabletype())) {
+            if (CatalogUtil.isStream(database, table)) {
                 continue;
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.
