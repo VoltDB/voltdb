@@ -123,7 +123,7 @@ public class TestTimeBasedRetentionPolicy {
             }
             writeBuffers(2);
         }
-        Thread.sleep(s_retainMillis - (System.currentTimeMillis() - lastTime));
+        Thread.sleep(s_retainMillis - (System.currentTimeMillis() - lastTime) + 100);
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());;
 
         // last segment shouldn't get deleted
