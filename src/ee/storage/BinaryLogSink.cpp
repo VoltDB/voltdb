@@ -305,9 +305,14 @@ void validateChecksum(uint32_t checksum, const char *start, const char *end) {
     }
 }
 
-bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple,
+} //end of anonymous namespace
+
+bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple,
         const TableTuple *expectedTuple, TableTuple *newTuple, int64_t uniqueId, int32_t remoteClusterId,
         DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+    if (m_drIgnoreConflicts) {
+        return true;
+    }
     if (!engine) {
         return false;
     }
@@ -484,9 +489,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     return true;
 }
 
-} //end of anonymous namespace
-
-BinaryLogSink::BinaryLogSink() {}
+BinaryLogSink::BinaryLogSink() : m_drIgnoreConflicts(false) {}
 
 int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                                 boost::unordered_map<int64_t, PersistentTable*> &tables,

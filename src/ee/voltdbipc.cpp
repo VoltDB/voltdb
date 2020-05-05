@@ -590,6 +590,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int drClusterId;
         int defaultDrBufferSize;
+        int drIgnoreConflicts;
         int64_t logLevels;
         int64_t tempTableMemory;
         int32_t createDrReplicatedStream;
@@ -608,10 +609,12 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->drClusterId = ntohl(cs->drClusterId);
     cs->defaultDrBufferSize = ntohl(cs->defaultDrBufferSize);
+    cs->drIgnoreConflicts = ntohl(cs->drIgnoreConflicts);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
     cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
     bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
+    bool drIgnoreConflicts = cs->drIgnoreConflicts != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -634,6 +637,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  hostname,
                                  cs->drClusterId,
                                  cs->defaultDrBufferSize,
+                                 drIgnoreConflicts,
                                  cs->tempTableMemory,
                                  createDrReplicatedStream) == true) {
             return kErrorCode_Success;
