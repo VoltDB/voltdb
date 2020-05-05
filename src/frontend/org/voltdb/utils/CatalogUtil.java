@@ -175,6 +175,7 @@ import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -3848,5 +3849,15 @@ public abstract class CatalogUtil {
 
     public static Database getDatabase(Catalog catalog) {
         return getCluster(catalog).getDatabases().get("database");
+    }
+
+    /**
+     * Split {@code input} on {@code ,} trimming any leading or trailing white spaces
+     *
+     * @param input to be split
+     * @return {@link Iterable} of {@link String}s from {@code input}
+     */
+    public static Iterable<String> splitOnCommas(String input) {
+        return Splitter.on(',').trimResults().split(input);
     }
 }
