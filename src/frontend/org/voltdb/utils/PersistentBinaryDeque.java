@@ -672,6 +672,9 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         private void callDeleteSegmentsBefore(PBDSegment<M> segment, int entryNumber, boolean isRetention) {
+            if (m_isTransient) {
+                return;
+            }
             // If this is the first entry of a segment, see if previous segments can be deleted or marked ready to
             // delete
             if (m_cursorClosed || m_segments.size() == 1 || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
@@ -1954,7 +1957,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             assert !m_retentionPolicy.isPolicyEnforced()
                 : "Retention policy on PBD " + m_nonce + " must be stopped before replacing it";
         }
-        m_retentionPolicy = RetentionPolicyMgr.getInstance().addRetentionPolicy(policyType, this, params);
+        if (policyType != null) {
+            m_retentionPolicy = RetentionPolicyMgr.getInstance().addRetentionPolicy(policyType, this, params);
+        }
+        else {
+            m_retentionPolicy = null;
+        }
     }
 
     @Override

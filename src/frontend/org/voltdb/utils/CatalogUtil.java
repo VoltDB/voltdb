@@ -1417,8 +1417,10 @@ public abstract class CatalogUtil {
                 continue;
             }
             else if (profileMap.get(profileName) == null) {
-                errors.addErrorMessage(String.format(
-                        "Topic %s refers to profile %s which is not defined in deployment.",
+                // Missing profile only generates warning
+                hostLog.warn(String.format(
+                        "Topic %s refers to profile %s which is not defined in deployment, "
+                        + "topic data will persist forever.",
                         t.getTypeName(), profileName));
             }
 
