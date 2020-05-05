@@ -418,6 +418,7 @@ public class SnapshotSiteProcessor {
     {
         // TRAIL [SnapSave:8] 4 [all SP] Initiate snapshot, build table streamers.
         ExecutionSitesCurrentlySnapshotting.add(this);
+        SNAP_LOG.info("Snapshot add site:" + m_siteTaskerQueue.getPartitionId());
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
         m_perSiteLastSnapshotSucceded = true;
@@ -692,6 +693,7 @@ public class SnapshotSiteProcessor {
                 }
                 IamLast = ExecutionSitesCurrentlySnapshotting.size() == 1;
                 if (!IamLast) {
+                    SNAP_LOG.info("Snapshot remove partition(696):" + m_siteTaskerQueue.getPartitionId());
                     ExecutionSitesCurrentlySnapshotting.remove(this);
                 }
             }
@@ -774,6 +776,7 @@ public class SnapshotSiteProcessor {
                                  * this snapshot is still in progress.
                                  */
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
+                                SNAP_LOG.info("Snapshot remove site(779):" + SnapshotSiteProcessor.this.m_siteTaskerQueue.getPartitionId());
                             }
 
                             logSnapshotCompleteToZK(txnId,

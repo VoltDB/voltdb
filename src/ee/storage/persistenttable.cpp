@@ -1809,6 +1809,9 @@ void PersistentTable::activateSnapshot(TableStreamType streamType) {
        stopSnapshot(TABLE_STREAM_SNAPSHOT, true);
        m_snapIt = allocator().template freeze<storage::truth>();
        m_snapshotStarted = true;
+       std::ostringstream buff;
+       buff << "Snapshot activated on " << name() << std::endl;
+       LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, buff.str().c_str());
        vassert(m_invisibleTuplesPendingDeleteCount == 0);
    } else if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
        m_elasticIt = std::make_shared<ElasticIndexIterator>(allocator());
@@ -1832,6 +1835,9 @@ bool PersistentTable::stopSnapshot(TableStreamType streamType, bool forceDeactiv
                     allocator().template thaw<storage::truth>();
                     m_snapIt.reset();
                 }
+                std::ostringstream buffer;
+                buffer << "Snapshot completed on " << name() << std::endl;
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,buffer.str().c_str());
                 return true;
             }
         }
