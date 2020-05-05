@@ -23,7 +23,6 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
@@ -850,42 +849,33 @@ public class SnapshotUtil {
         }
 
         if (!directory.exists()) {
-            System.err.println("Error: Directory " + directory.getPath() + " doesn't exist");
+            logger.error("Directory " + directory.getPath() + " doesn't exist");
             return;
         }
         if (!directory.canRead()) {
-            System.err.println("Error: Directory " + directory.getPath() + " is not readable");
+            logger.error("Directory " + directory.getPath() + " is not readable");
             return;
         }
         if (!directory.canExecute()) {
-            System.err.println("Error: Directory " + directory.getPath() + " is not executable");
+            logger.error("Directory " + directory.getPath() + " is not executable");
             return;
         }
 
         for (File f : directory.listFiles(filter)) {
             if (f.isDirectory()) {
                 if (!f.canRead() || !f.canExecute()) {
-                    System.err.println("Warning: Skipping directory " + f.getPath()
-                            + " due to lack of read permission");
+                    logger.warn("Skipping directory " + f.getPath() + " due to lack of read permission");
                 } else {
                     retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, stype, logger, recursion++);
                 }
                 continue;
             }
             if (!f.canRead()) {
-                System.err.println("Warning: " + f.getPath() + " is not readable");
+                logger.warn(f.getPath() + " is not readable");
                 continue;
             }
 
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(f);
-            } catch (FileNotFoundException e1) {
-                System.err.println(e1.getMessage());
-                continue;
-            }
-
-            try {
+            try (FileInputStream fis = new FileInputStream(f)) {
                 if (f.getName().endsWith(".digest")) {
                     JSONObject digest = CRCCheck(f, logger);
                     if (digest == null) {
@@ -927,10 +917,8 @@ public class SnapshotUtil {
                             HashinatorSnapshotData hashData = new HashinatorSnapshotData();
                             hashData.restoreFromFile(f);
                             named_s.m_hashConfig = f;
-                        }
-                        catch (IOException e) {
-                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'",
-                                                      f.getPath()));
+                        } catch (IOException e) {
+                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'", f.getPath()), e);
                             // Skip bad hashinator files.
                             continue;
                         }
@@ -968,20 +956,8 @@ public class SnapshotUtil {
                         saveFile.close();
                     }
                 }
-            } catch (IOException e) {
-                System.err.println(e.getMessage());
-                System.err.println("Error: Unable to process " + f.getPath());
-            } catch (JSONException e) {
-                System.err.println(e.getMessage());
-                System.err.println("Error: Unable to process " + f.getPath());
-            }
-            finally {
-                try {
-                    if (fis != null) {
-                        fis.close();
-                    }
-                } catch (IOException e) {
-                }
+            } catch (IOException | JSONException e) {
+                logger.error("Unable to process " + f.getPath(), e);
             }
         }
     }
