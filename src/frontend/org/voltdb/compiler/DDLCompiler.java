@@ -1655,9 +1655,10 @@ public class DDLCompiler {
         String topicKeyColumnNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
         if (topicKeyColumnNames != null) {
             List<String> definedColumns = new ArrayList<>();
-            for (String col : StringUtils.split(topicKeyColumnNames, ',')) {
+            for (String col : CatalogUtil.splitOnCommas(topicKeyColumnNames)) {
                 if (StringUtils.isBlank(col)) {
-                    continue;
+                    throw compiler.new VoltCompilerException(String
+                            .format("Blank column listed in the KEYS attribute of STREAM %s", table.getTypeName()));
                 }
                 if (definedColumns.contains(col)) {
                     // Do not tolerate any ambiguous key topic definition
@@ -1678,9 +1679,10 @@ public class DDLCompiler {
         String topicAllowedRoleNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES);
         if (topicAllowedRoleNames != null) {
             Set<String> definedRoles = new HashSet<>();
-            for (String role : StringUtils.split(topicAllowedRoleNames, ',')) {
+            for (String role : CatalogUtil.splitOnCommas(topicAllowedRoleNames)) {
                 if (StringUtils.isBlank(role)) {
-                    continue;
+                    throw compiler.new VoltCompilerException(String
+                            .format("Blank role listed in the ALLOW attribute of STREAM %s", table.getTypeName()));
                 }
                 if (definedRoles.contains(role)) {
                     // Tolerate duplicates
