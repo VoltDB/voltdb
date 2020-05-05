@@ -17,7 +17,9 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.TreeSet;
 
 import org.voltdb.SnapshotFormat;
@@ -101,30 +103,28 @@ public class SnapshotRegistry {
             public Table update(Table t);
         }
 
-        public interface TableIterator {
-            public void next(Table t);
+        public interface SnapshotScanner<T> {
+            public List<T> flatten(Snapshot s);
         }
 
-        public interface ErrorScanner {
-            public void update(boolean hasError);
-        }
-
-        public void iterateTables(TableIterator ti) {
+        public List<Table> iterateTables() {
+            List<Table> snapshotTables = new ArrayList<>();
             synchronized (tables) {
-                for (Table t : tables.values()) {
-                    ti.next(t);
-                }
+                snapshotTables.addAll(tables.values());
             }
+            return snapshotTables;
         }
 
-        public void iterateTableErrors(ErrorScanner sc) {
+        public List<Boolean> iterateTableErrors() {
+            List<Boolean> snapshotError  = new ArrayList<>();
             synchronized (tables) {
                 if (tables.isEmpty()) {
-                    return;
+                    return snapshotError;
                 }
                 boolean hasError = tables.values().stream().anyMatch(t -> t.error != null);
-                sc.update(hasError);
+                snapshotError.add(hasError);
             }
+            return snapshotError;
         }
 
         public void updateTable(String name, TableUpdater tu) {

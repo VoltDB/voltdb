@@ -87,8 +87,8 @@ public class StatsAgent extends OpsAgent
         case TASK_SCHEDULER:
             TaskStatsSource.convert(subselector, request.aggregateTables);
             break;
-        case SNAPSHOTSTATUSSUMMARY:
-            request.aggregateTables = SnapshotStatusSummary.summarize(request.aggregateTables[0]);
+        case SNAPSHOTSUMMARY:
+            request.aggregateTables = SnapshotSummary.summarize(request.aggregateTables[0]);
         default:
         }
     }

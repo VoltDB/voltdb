@@ -38,7 +38,7 @@ public enum StatsSelector {
     CPU,            // return CPU Stats
     MANAGEMENT(MEMORY, INITIATOR, PROCEDURE, IOSTATS, TABLE, INDEX, STARVATION, QUEUE, CPU), // Returns pretty much everything
     SNAPSHOTSTATUS(false),
-    SNAPSHOTSTATUSSUMMARY(false),
+    SNAPSHOTSUMMARY(false),
     PROCEDUREPROFILE(PROCEDURE), // performs an aggregation of the procedure statistics
     PROCEDUREINPUT(PROCEDURE),
     PROCEDUREOUTPUT(PROCEDURE),

@@ -217,9 +217,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                                               0,
                                                               snapshotStatus);
         // Snapshot status summary is a one-row-per-snapshot stats
-        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUSSUMMARY,
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSUMMARY,
                                                               0,
-                                                              new SnapshotStatusSummary(
+                                                              new SnapshotSummary(
                                                                       VoltDB.instance().getCommandLogSnapshotPath(),
                                                                       VoltDB.instance().getSnapshotPath()));
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);

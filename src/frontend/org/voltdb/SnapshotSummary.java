@@ -19,18 +19,19 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotStatus.SnapshotTypeChecker;
+import org.voltdb.SnapshotStatus.StatusIterator;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
+import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 
-public class SnapshotStatusSummary extends StatsSource {
+public class SnapshotSummary extends StatsSource {
 
     private enum SnapshotResult {
         SUCCESS,
@@ -39,48 +40,7 @@ public class SnapshotStatusSummary extends StatsSource {
 
     SnapshotTypeChecker m_typeChecker = new SnapshotTypeChecker();
 
-    /**
-     * Since there are multiple tables inside a Snapshot object, and we cannot
-     * get a copy of the tables directly, flattens the tables in a Snapshot
-     * object into a flat list.
-     */
-    private class StatusIterator implements Iterator<Object> {
-        private final List<Pair<Snapshot, Boolean>> m_snapshots;
-        private final Iterator<Pair<Snapshot, Boolean>> m_iter;
-
-        private StatusIterator(Iterator<Snapshot> i) {
-            m_snapshots = new LinkedList<Pair<Snapshot, Boolean>>();
-
-            while (i.hasNext()) {
-                final Snapshot s = i.next();
-                s.iterateTableErrors(new Snapshot.ErrorScanner() {
-                    @Override
-                    public void update(boolean hasError) {
-                        m_snapshots.add(Pair.of(s, hasError));
-                    }
-                });
-            }
-
-            m_iter = m_snapshots.iterator();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return m_iter.hasNext();
-        }
-
-        @Override
-        public Object next() {
-            return m_iter.next();
-        }
-
-        @Override
-        public void remove() {
-            m_iter.remove();
-        }
-    }
-
-    public SnapshotStatusSummary(String truncationSnapshotPath, String autoSnapshotPath) {
+    public SnapshotSummary(String truncationSnapshotPath, String autoSnapshotPath) {
         super(false);
         m_typeChecker.setSnapshotPath(truncationSnapshotPath, autoSnapshotPath);
     }
@@ -88,7 +48,7 @@ public class SnapshotStatusSummary extends StatsSource {
     // if any node has different result, that's a failure
     static VoltTable[] summarize(VoltTable perHostStats) {
         if (perHostStats.getRowCount() == 0) {
-            return new VoltTable[] { perHostStats};
+            return new VoltTable[] { perHostStats };
         }
         Map<String, VoltTableRow> snapshotMap = new TreeMap<>();
         perHostStats.resetRowPosition();
@@ -106,6 +66,8 @@ public class SnapshotStatusSummary extends StatsSource {
                             row.getLong("START_TIME"), row.getLong("END_TIME"),
                             row.getLong("DURATION"), SnapshotResult.FAILURE.toString(),
                             row.getString("TYPE"));
+                    // advance to first row of table
+                    newRow.advanceRow();
                     snapshotMap.put(nonce, newRow);
                 }
             }
@@ -117,6 +79,7 @@ public class SnapshotStatusSummary extends StatsSource {
         }
         return new VoltTable[] { perHostStats };
     }
+
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         columns.add(new ColumnInfo("NONCE", VoltType.STRING));
@@ -152,7 +115,13 @@ public class SnapshotStatusSummary extends StatsSource {
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new StatusIterator(SnapshotRegistry.getSnapshotHistory().iterator());
+        return new StatusIterator<Boolean>(
+                SnapshotRegistry.getSnapshotHistory().iterator(),
+                new SnapshotScanner<Boolean>() {
+                    public List<Boolean> flatten(Snapshot s) {
+                        return s.iterateTableErrors();
+                    }
+                });
     }
 
 }

@@ -27,6 +27,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
+import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 
 public class SnapshotStatus extends StatsSource {
@@ -65,21 +66,19 @@ public class SnapshotStatus extends StatsSource {
      * get a copy of the tables directly, flattens the tables in a Snapshot
      * object into a flat list.
      */
-    private class StatusIterator implements Iterator<Object> {
-        private final List<Pair<Snapshot, Table>> m_snapshots;
-        private final Iterator<Pair<Snapshot, Table>> m_iter;
+    static class StatusIterator<T> implements Iterator<Object> {
+        private final List<Pair<Snapshot, T>> m_snapshots;
+        private final Iterator<Pair<Snapshot, T>> m_iter;
 
-        private StatusIterator(Iterator<Snapshot> i) {
-            m_snapshots = new LinkedList<Pair<Snapshot, Table>>();
+        public StatusIterator(Iterator<Snapshot> i, SnapshotScanner<T> sc) {
+            m_snapshots = new LinkedList<Pair<Snapshot, T>>();
 
             while (i.hasNext()) {
                 final Snapshot s = i.next();
-                s.iterateTables(new Snapshot.TableIterator() {
-                    @Override
-                    public void next(Table t) {
-                        m_snapshots.add(Pair.of(s, t));
-                    }
-                });
+                List<T> objs = sc.flatten(s);
+                for (T t : objs) {
+                    m_snapshots.add(Pair.of(s, t));
+                }
             }
 
             m_iter = m_snapshots.iterator();
@@ -155,7 +154,13 @@ public class SnapshotStatus extends StatsSource {
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new StatusIterator(SnapshotRegistry.getSnapshotHistory().iterator());
+        return new StatusIterator<Table>(
+                SnapshotRegistry.getSnapshotHistory().iterator(),
+                new SnapshotScanner<Table>() {
+                    public List<Table> flatten(Snapshot s) {
+                        return s.iterateTables();
+                    }
+                });
     }
 
 }
