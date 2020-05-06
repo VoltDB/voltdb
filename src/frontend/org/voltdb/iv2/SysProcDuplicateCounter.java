@@ -100,7 +100,18 @@ public class SysProcDuplicateCounter extends DuplicateCounter
                 }
             }
 
-            tables.add(dep);
+
+            // Avoid mixing dummy fragment results with normal results
+            if (tables.isEmpty()) {
+                tables.add(dep);
+            } else {
+                if (dep.getTableSchema().length > 1 ||
+                        !TransactionTask.dummyResult.getTableSchema()[0].equals(dep.getTableSchema()[0])) {
+                   tables.add(dep);
+                }
+                // Remove dummy if any
+                tables.remove(TransactionTask.dummyResult);
+            }
         }
 
         // needs to be a three long array to work

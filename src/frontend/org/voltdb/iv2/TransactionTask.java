@@ -31,11 +31,11 @@ public abstract class TransactionTask extends SiteTasker
 {
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
-
+    public static VoltTable dummyResult;
     protected static final byte[] m_rawDummyResult;
 
     static {
-        VoltTable dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
+        dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
         m_rawDummyResult = dummyResult.buildReusableDependenyResult();
     }
 
