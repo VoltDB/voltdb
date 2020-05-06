@@ -111,7 +111,7 @@ public class KafkaClientVerifier {
         @Option(desc = " topic record position for tracking the source partition")
         Integer partitionfield;
 
-        @Option(desc = "does each data row include 6 metadata fields? Default: true")
+        @Option(desc = "does each data row include 6 metadata fields? Default: false")
         Boolean metadata = false;
 
         @Option(desc = " the number of consumers to create when reading a topic")
@@ -260,9 +260,7 @@ public class KafkaClientVerifier {
                         }
 
                         if (m_partitionFieldNum != null) {
-                            log.info("row[m_partitionFieldNum].trim(): " + row[m_partitionFieldNum].trim());
                             Integer partition = row[m_partitionFieldNum].trim() != "NULL" ? Integer.parseInt(row[m_partitionFieldNum].trim()) : 0;
-                            log.info("partition: " + partition);
 
                             if (TxnEgo.getPartitionId(rowTxnId) != partition) {
                                 log.error("ERROR mismatched exported partition for txid " + rowTxnId
@@ -485,7 +483,6 @@ public class KafkaClientVerifier {
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
         Boolean metadata = config.metadata;
-        log.info("+++ fulltopic: " + fulltopic);
         try {
             verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
                 config.partitionfield, config.usetableexport, metadata);
