@@ -260,9 +260,7 @@ public class KafkaClientVerifier {
                         }
 
                         if (m_partitionFieldNum != null) {
-                            log.info("row[m_partitionFieldNum].trim(): " + row[m_partitionFieldNum].trim());
                             Integer partition = row[m_partitionFieldNum].trim() != "NULL" ? Integer.parseInt(row[m_partitionFieldNum].trim()) : 0;
-                            log.info("partition: " + partition);
 
                             if (TxnEgo.getPartitionId(rowTxnId) != partition) {
                                 log.error("ERROR mismatched exported partition for txid " + rowTxnId
