@@ -186,6 +186,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
      * but only one read or write may happen concurrently.
      */
     class ReadCursor implements BinaryDequeReader<M> {
+        private final VoltLogger LOG = new VoltLogger("HOST");
         private final String m_cursorId;
         private PBDSegment<M> m_segment;
         // Number of objects out of the total
@@ -485,7 +486,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 if (diff < maxBytes) {
                     return maxBytes - diff;
                 }
-
+                LOG.info("XXX delete : " + m_segment.file().getName() + ", size: " + m_segment.getFileSize()
+                + ", remain: " + diff + ", total: " + (diff + m_segment.getFileSize()) + ", maxBytes: " + maxBytes);
                 skipToNextSegment(true);
                 return 0;
             }
