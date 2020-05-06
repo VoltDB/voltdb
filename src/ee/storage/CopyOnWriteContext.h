@@ -89,6 +89,8 @@ public:
      */
     virtual bool notifyTupleDelete(TableTuple &tuple);
 
+    virtual int64_t getRemainingCount();
+
 private:
 
     /**
