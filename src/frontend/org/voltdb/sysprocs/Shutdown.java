@@ -43,14 +43,19 @@ import org.voltdb.VoltType;
 public class Shutdown extends VoltSystemProcedure {
 
     private static AtomicBoolean m_failsafeArmed = new AtomicBoolean(false);
+    private static int FAILSAFE_TIMEOUT = 10_000;
+
     private static Thread m_failsafe = new Thread() {
         @Override
         public void run() {
+            long start = System.currentTimeMillis();
             try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {}
+                Thread.sleep(FAILSAFE_TIMEOUT);
+            } catch (InterruptedException e) { }
+            long end = System.currentTimeMillis();
             VoltLogger voltLogger = new VoltLogger("HOST");
-            String msg = "VoltDB shutting down as requested by @Shutdown command.";
+            String msg = String.format("VoltDB shutting down as requested by @Shutdown command, after %d seconds.",
+                                       (end - start) / 1000);
             CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
             System.exit(0);
         }
@@ -70,8 +75,7 @@ public class Shutdown extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                            long fragmentId,
                                            ParameterSet params,
-                                           SystemProcedureExecutionContext context)
-    {
+                                           SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_shutdownSync) {
             VoltDB.instance().getHostMessenger().prepareForShutdown();
             if (!m_failsafeArmed.getAndSet(true)) {
@@ -107,7 +111,9 @@ public class Shutdown extends VoltSystemProcedure {
                     }
                     else {
                         try {
-                            Thread.sleep(10000);
+                            do { // wait here until process exit
+                                Thread.sleep(10000);
+                            } while (true);
                         }
                         catch (InterruptedException e) {}
                     }
