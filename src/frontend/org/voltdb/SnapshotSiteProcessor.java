@@ -706,8 +706,12 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final ExtensibleSnapshotDigestData snapshotDataForZookeeper = m_extraSnapshotData;
                 m_extraSnapshotData = null;
-                final Thread terminatorThread =
-                    new Thread("Snapshot terminator") {
+                Thread.UncaughtExceptionHandler eh = new Thread.UncaughtExceptionHandler() {
+                    public void uncaughtException(Thread th, Throwable ex) {
+                        SNAP_LOG.warn("Error running snapshot completion task", ex);
+                    }
+                };
+                final Thread terminatorThread = new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
                         // TRAIL [SnapSave:11] 7 [1 site/host] The last finished site wlll close the targets.
@@ -730,10 +734,7 @@ public class SnapshotSiteProcessor {
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
                                     t.close();
-                                } catch (IOException e) {
-                                    snapshotSucceeded = false;
-                                    throw new RuntimeException(e);
-                                } catch (InterruptedException e) {
+                                } catch (IOException | InterruptedException e) {
                                     snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 }
@@ -782,7 +783,7 @@ public class SnapshotSiteProcessor {
                         }
                     }
                 };
-
+                terminatorThread.setUncaughtExceptionHandler(eh);
                 m_snapshotTargetTerminators.add(terminatorThread);
                 terminatorThread.start();
             }
