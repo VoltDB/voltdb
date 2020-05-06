@@ -165,6 +165,9 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
             try {
                 remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
             } catch (...) {
+                // Failed to serialize data but there are still more tuples to be streamed
+                // Return -2 (TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES) to prevent this stream
+                // from being dropped: SnapshotSiteProcessor keeps pulling until all tuples are streamed.
                 if ( remaining == TABLE_STREAM_SERIALIZATION_ERROR) {
                     if (streamPtr->m_context->getRemainingCount() > 0) {
                         remaining = TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES;
