@@ -1154,8 +1154,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter) {
-        Pair<byte[], Integer> result = m_ee.getSnapshotSchema(table.getTableId(), filter);
+    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter, boolean forceLive) {
+        Pair<byte[], Integer> result = m_ee.getSnapshotSchema(table.getTableId(), filter, forceLive);
         table.setSchema(result.getFirst(), result.getSecond());
     }
 

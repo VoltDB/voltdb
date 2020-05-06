@@ -192,7 +192,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter) {
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive) {
         return Pair.of(new byte[0], -1);
     }
 
