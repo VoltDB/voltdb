@@ -121,6 +121,8 @@ public class TableStreamer {
             for (SnapshotTableTask task : m_tableTasks) {
                 task.m_target.reportSerializationFailure(ex);
             }
+            // There may be more tuples to be streamed when the error occurs. Continue streaming until all
+            // tuples are pulled. Otherwise a stream could not be pulled again if it can not be reactivated.
             return Pair.of(null, remaining == SERIALIZATION_ERROR_MORE_TUPLES);
         }
 
