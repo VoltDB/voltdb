@@ -3517,18 +3517,6 @@ public abstract class CatalogUtil {
     public static DeploymentType shallowClusterAndPathsClone(DeploymentType o) {
         DeploymentType clone = new DeploymentType();
 
-        clone.setPartitionDetection(o.getPartitionDetection());
-        clone.setHeartbeat(o.getHeartbeat());
-        clone.setHttpd(o.getHttpd());
-        clone.setSnapshot(o.getSnapshot());
-        clone.setExport(o.getExport());
-        clone.setUsers(o.getUsers());
-        clone.setCommandlog(o.getCommandlog());
-        clone.setSystemsettings(o.getSystemsettings());
-        clone.setSecurity(o.getSecurity());
-        clone.setDr(o.getDr());
-        clone.setImport(o.getImport());
-
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();
 
@@ -3552,9 +3540,24 @@ public abstract class CatalogUtil {
         paths.setLargequeryswap(prev.getLargequeryswap());
 
         clone.setPaths(paths);
-        clone.setSsl(o.getSsl());
 
+        clone.setPartitionDetection(o.getPartitionDetection());
+        clone.setHeartbeat(o.getHeartbeat());
+        clone.setSsl(o.getSsl());
+        clone.setHttpd(o.getHttpd());
+        clone.setSnapshot(o.getSnapshot());
+        clone.setExport(o.getExport());
+        clone.setThreadpools(o.getThreadpools());
+        clone.setUsers(o.getUsers());
+        clone.setCommandlog(o.getCommandlog());
+        clone.setSystemsettings(o.getSystemsettings());
+        clone.setSecurity(o.getSecurity());
+        clone.setDr(o.getDr());
+        clone.setImport(o.getImport());
         clone.setSnmp(o.getSnmp());
+        clone.setFeatures(o.getFeatures());
+        clone.setTask(o.getTask());
+
         return clone;
     }
 
