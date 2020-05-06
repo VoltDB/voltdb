@@ -37,16 +37,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.time.LocalTime;
-import java.util.HashMap;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.iv2.TxnEgo;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * This verifier connects to kafka and consumes messages from a topic, it then
@@ -93,7 +91,7 @@ public class KafkaClientVerifier {
         @Option(desc = "Kafka brokers host:port")
         String brokers = "localhost";
 
-        // Topic prefixes maybe used when two or more instances of a tests share the same kafka cluster
+        // Topic prefixes may be used when two or more instances of a tests share the same kafka cluster
         // as a means to distinquish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
@@ -101,7 +99,7 @@ public class KafkaClientVerifier {
         @Option(desc = "use table export (CDC)")
         Boolean usetableexport = false;
 
-        @Option(desc = "topic .  NOTE topicprofix+topic == the topic used when quering kafka ")
+        @Option(desc = "topic .  NOTE topicprefix+topic == the topic used when querying kafka ")
         String topic = "";
 
         @Option(desc = " the record field position for tracking sequences")
@@ -113,6 +111,9 @@ public class KafkaClientVerifier {
         @Option(desc = " topic record position for tracking the source partition")
         Integer partitionfield;
 
+        @Option(desc = "does each data row include 6 metadata fields? Default: true")
+        Boolean metadata = false;
+
         @Option(desc = " the number of consumers to create when reading a topic")
         Integer consumers = 1;
 
@@ -122,9 +123,10 @@ public class KafkaClientVerifier {
 
         @Override
         public void validate() {
-            if ("".equals(topicprefix)) {
-                exitWithMessageAndUsage("topicprefix must not be empty");
-            }
+            // it's ok to have a empty prefix
+            // if ("".equals(topicprefix)) {
+            //     exitWithMessageAndUsage("topicprefix must not be empty");
+            // }
             if ("".equals(topic)) {
                 exitWithMessageAndUsage("topic must not be empty");
             }
@@ -171,16 +173,19 @@ public class KafkaClientVerifier {
         private final Integer m_sequenceFieldNum;
         private final Integer m_partitionFieldNum;
         private final Boolean m_usetableexport;
+        private final Boolean m_metadata;
         private final Integer timeoutSec;
 
         public TopicReader(KafkaConsumer<String, String> consumer, CountDownLatch cdl, Integer uniqueFieldNum,
-                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout, AtomicBoolean testGood, Boolean usetableexport) {
+                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout,
+                AtomicBoolean testGood, Boolean usetableexport, Boolean metadata) {
             this.consumer = consumer;
             m_cdl = cdl;
             m_uniqueFieldNum = uniqueFieldNum;
             m_sequenceFieldNum = sequenceFieldNum;
             m_partitionFieldNum = partitionFieldNum;
             m_usetableexport = usetableexport;
+            m_metadata = metadata; // no metadata if stream as topic
             timeoutSec = timeout;
 
         }
@@ -215,9 +220,13 @@ public class KafkaClientVerifier {
                     Integer mrs = Math.max(maxRecordSize.get(), smsg.getBytes().length);
                     maxRecordSize.set(mrs);
                     String row[] = RoughCSVTokenizer.tokenize(smsg);
-                    // System.out.println("Row: " + smsg);
-                    Long rowTxnId = Long.parseLong(row[m_uniqueFieldNum].trim());
-                    Long sequenceNum = Long.parseLong(row[m_sequenceFieldNum]);
+                    Long rowTxnId = new Long(0);
+                    Long sequenceNum = new Long(0);
+                    // log.info("Row: " + smsg);
+                    if (m_metadata) {
+                        rowTxnId = Long.parseLong(row[m_uniqueFieldNum].trim());
+                        sequenceNum = Long.parseLong(row[m_sequenceFieldNum]);
+                    }
 
                     // the number of expected rows should match the max of the
                     // field that contains the sequence field
@@ -242,22 +251,24 @@ public class KafkaClientVerifier {
                             log.info("Duplicate row found: " + smsg);
                         }
                     }
-                    foundRowIds.add(sequenceNum);
-                    if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
-                        log.info("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
-                                + " Last export sequence num: " + row[m_sequenceFieldNum] + ", txnid " + row[m_uniqueFieldNum] + ","
-                                + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
-                    }
+                    if (m_metadata) {
+                        foundRowIds.add(sequenceNum);
+                        if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
+                            log.info("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
+                            + " Last export sequence num: " + row[m_sequenceFieldNum] + ", txnid " + row[m_uniqueFieldNum] + ","
+                            + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
+                        }
 
-                    if (m_partitionFieldNum != null) {
-                        Integer partition = Integer.parseInt(row[m_partitionFieldNum].trim());
+                        if (m_partitionFieldNum != null) {
+                            Integer partition = row[m_partitionFieldNum].trim() != "NULL" ? Integer.parseInt(row[m_partitionFieldNum].trim()) : 0;
 
-                        if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                            log.error("ERROR mismatched exported partition for txid " + rowTxnId
-                                    + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
-                                    + ", while export record says " + partition);
+                            if (TxnEgo.getPartitionId(rowTxnId) != partition) {
+                                log.error("ERROR mismatched exported partition for txid " + rowTxnId
+                                        + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
+                                        + ", while export record says " + partition);
 
-                            testGood.set(false);
+                                testGood.set(false);
+                            }
                         }
                     }
                 }
@@ -322,7 +333,7 @@ public class KafkaClientVerifier {
      * @throws Exception
      */
     public void verifyTopic(String topic, Integer uniqueIndexFieldNum, Integer sequenceFieldNum,
-            Integer partitionFieldNum, Boolean usetableexport) throws Exception {
+            Integer partitionFieldNum, Boolean usetableexport, Boolean metadata) throws Exception {
 
         List<String> topics = new ArrayList<String>();
         topics.add(topic);
@@ -335,7 +346,7 @@ public class KafkaClientVerifier {
             consumer.subscribe(Arrays.asList(topic));
             log.info("Creating consumer for " + topic);
             TopicReader reader = new TopicReader(consumer, consumersLatch, uniqueIndexFieldNum, sequenceFieldNum,
-                    partitionFieldNum, consumerTimeoutSecs, testGood, usetableexport);
+                    partitionFieldNum, consumerTimeoutSecs, testGood, usetableexport, metadata);
             executor.execute(reader);
         }
 
@@ -471,8 +482,11 @@ public class KafkaClientVerifier {
         config.parse(KafkaClientVerifier.class.getName(), args);
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
+        Boolean metadata = config.metadata;
+        log.info("+++ fulltopic: " + fulltopic);
         try {
-            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield, config.usetableexport);
+            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
+                config.partitionfield, config.usetableexport, metadata);
         } catch (IOException e) {
             log.error(e.toString());
             e.printStackTrace(System.err);
