@@ -2551,10 +2551,11 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }
 
-int VoltDBEngine::getSnapshotSchema(const CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType) {
+int VoltDBEngine::getSnapshotSchema(const CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType,
+        bool forceLive) {
     PersistentTable *table;
-    if (m_snapshottingTables.empty()) {
-        // Called prior to snapshot being activated
+    if (forceLive || m_snapshottingTables.empty()) {
+        // forced to get live schema or called prior to snapshot being activated
         Table* found = getTableById(tableId);
 
          if (!found) {

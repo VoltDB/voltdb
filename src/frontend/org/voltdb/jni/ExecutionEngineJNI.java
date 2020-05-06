@@ -634,10 +634,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter)
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive)
             throws EEException {
         m_nextDeserializer.clear();
-        checkErrorCode(nativeGetSnapshotSchema(pointer, tableId, hiddenColumnFilter.getId()));
+        checkErrorCode(nativeGetSnapshotSchema(pointer, tableId, hiddenColumnFilter.getId(), forceLive));
         try {
             return Pair.of(m_nextDeserializer.readVarbinary(), m_nextDeserializer.readInt());
         } catch (IOException e) {

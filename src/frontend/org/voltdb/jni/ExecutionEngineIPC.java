@@ -1569,7 +1569,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter) {
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive) {
         throw new UnsupportedOperationException();
     }
 

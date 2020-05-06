@@ -47,5 +47,9 @@ public interface SiteSnapshotConnection
         }
     }
 
-    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter);
+    public default void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter) {
+        populateSnapshotSchema(table, filter, false);
+    }
+
+    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter, boolean forceLive);
 }

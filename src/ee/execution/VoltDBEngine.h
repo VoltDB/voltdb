@@ -499,7 +499,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_isLowestSite = true;
         }
 
-        int getSnapshotSchema(CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType);
+        int getSnapshotSchema(CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType, bool forceLive);
 
         /**
          * Activate a table stream of the specified type for the specified table.
