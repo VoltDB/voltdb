@@ -54,6 +54,13 @@ interface PBDRetentionPolicy {
     public void bytesAdded(long numBytes);
 
     /**
+     * Gaps may be filled anywhere in the PBD, so retention policy enforcement may
+     * need to do extra actions once gaps are filled. This callback is used to
+     * notify retention policy enforcement that a gap segment processing was completed.
+     */
+    public void finishedGapSegment();
+
+    /**
      * The id of the cursor that this retention policy implementation uses to read data from the {@link BinaryDeque}.
      *
      * @return cursor id used to read data from the {@link BinaryDeque}

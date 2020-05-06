@@ -175,6 +175,7 @@ import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -1416,8 +1417,10 @@ public abstract class CatalogUtil {
                 continue;
             }
             else if (profileMap.get(profileName) == null) {
-                errors.addErrorMessage(String.format(
-                        "Topic %s refers to profile %s which is not defined in deployment.",
+                // Missing profile only generates warning
+                hostLog.warn(String.format(
+                        "Topic %s refers to profile %s which is not defined in deployment, "
+                        + "topic data will persist forever.",
                         t.getTypeName(), profileName));
             }
 
@@ -3848,5 +3851,15 @@ public abstract class CatalogUtil {
 
     public static Database getDatabase(Catalog catalog) {
         return getCluster(catalog).getDatabases().get("database");
+    }
+
+    /**
+     * Split {@code input} on {@code ,} trimming any leading or trailing white spaces
+     *
+     * @param input to be split
+     * @return {@link Iterable} of {@link String}s from {@code input}
+     */
+    public static Iterable<String> splitOnCommas(String input) {
+        return Splitter.on(',').trimResults().split(input);
     }
 }

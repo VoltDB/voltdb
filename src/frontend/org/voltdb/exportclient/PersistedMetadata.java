@@ -20,12 +20,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Table;
 import org.voltdb.serdes.EncodeFormat;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
-import com.google.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
@@ -62,10 +63,10 @@ public class PersistedMetadata implements DeferredSerialization {
     public PersistedMetadata(Table table, int partitionId, long initialGenerationId, long generationId) {
         m_format = table.getIstopic() ? EncodeFormat.checkedValueOf(table.getTopicformat()) : EncodeFormat.INVALID;
         String keyColumns = table.getTopickeycolumnnames();
-        if (keyColumns == null) {
+        if (StringUtils.isBlank(keyColumns)) {
             m_keyColumns = ImmutableList.of();
         } else {
-            m_keyColumns = ImmutableList.copyOf(Splitter.on(',').trimResults().omitEmptyStrings().split(keyColumns));
+            m_keyColumns = ImmutableList.copyOf(CatalogUtil.splitOnCommas(keyColumns));
             if (m_keyColumns.size() > 0xFF) {
                 throw new IllegalArgumentException("Maximum number of key columns exceeded: " + m_keyColumns.size());
             }

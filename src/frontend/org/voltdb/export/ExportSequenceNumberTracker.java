@@ -357,6 +357,16 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
         return sizeInSequence(intersection);
     }
 
+    /**
+     * Test if all sequences in {@code other} are also in this tracker
+     *
+     * @param other {@link ExportSequenceNumberTracker}
+     * @return {@code true} if all sequences in {@code other} are in {@code this}
+     */
+    public boolean containsAllSequencesIn(ExportSequenceNumberTracker other) {
+        return m_map.enclosesAll(other.m_map);
+    }
+
     public String toShortString() {
         if (m_map.isEmpty()) {
             return "Empty Map";
