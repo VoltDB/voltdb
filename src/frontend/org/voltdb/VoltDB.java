@@ -654,7 +654,7 @@ public class VoltDB {
                     }
 
                     try {
-                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, argument.trim().toUpperCase());
+                        m_getOption = GetActionArgument.valueOf(argument.trim().toUpperCase());
                     } catch (IllegalArgumentException excp) {
                         System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Valid arguments for get command are: " + GetActionArgument.supportedVerbs());
                         referToDocAndExit();
