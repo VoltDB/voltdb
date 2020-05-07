@@ -352,9 +352,9 @@ public class AsyncExportClient
                                                       0);
                     }
                     catch (Exception e) {
-                        log.fatal("Exception: " + e);
+                        log.info("Exception: " + e);
                         e.printStackTrace();
-                        System.exit(-1);
+                        // System.exit(-1);
                     }
                 }
             }
