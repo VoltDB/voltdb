@@ -185,6 +185,7 @@ public class ServerThread extends Thread {
     public void shutdown() throws InterruptedException {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
+        VoltDB.replaceVoltDBInstanceForTest(new RealVoltDB());
         this.join();
         while (VoltDB.instance().isRunning()) {
             Thread.sleep(1);
