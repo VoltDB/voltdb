@@ -36,7 +36,6 @@ import com.google_voltpatches.common.collect.Sets;
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     public static final String JKEY_NEW_PARTITION_COUNT = "newPartitionCount";
-    public static final String JKEY_TRUNCATION_REQUEST_ID = "truncReqId";
     public static final String JKEY_TABLES = "tables";
     public static final String JKEY_SCHEMA_BUILDER = "schemaBuilder";
 
@@ -105,7 +104,7 @@ public class SnapshotRequestConfig {
         } else {
             emptyConfig = false;
             newPartitionCount = (Integer) jsData.opt(JKEY_NEW_PARTITION_COUNT);
-            truncationRequestId = (String) jsData.opt(JKEY_TRUNCATION_REQUEST_ID);
+            truncationRequestId = (String) jsData.opt(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID);
             hiddenColumnFilter = getHiddenColumnFilter(jsData);
         }
     }
