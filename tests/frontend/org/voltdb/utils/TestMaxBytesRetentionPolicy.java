@@ -229,7 +229,7 @@ public class TestMaxBytesRetentionPolicy {
         long bytesWritten = 0L;
         int maxNumBuffers = 100;
         while(bytesWritten < s_maxBytes * 3
-                && TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
+                || TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
             int numBuffers = random.nextInt(maxNumBuffers) + 1;
             bytesWritten += writeBuffers(numBuffers);
             Thread.sleep(250);
@@ -257,7 +257,7 @@ public class TestMaxBytesRetentionPolicy {
         long bytesWritten = 0L;
         int maxNumBuffers = 100;
         while(bytesWritten < s_maxBytes * 3
-                && TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
+                || TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
             int numBuffers = random.nextInt(maxNumBuffers) + 1;
             bytesWritten += writeBuffers(numBuffers);
             Thread.sleep(250);
@@ -265,8 +265,6 @@ public class TestMaxBytesRetentionPolicy {
             m_pbd.updateExtraHeader(null);
         }
         assertTrue(TestPersistentBinaryDeque.getSortedDirectoryListing().size() > 2);
-        System.out.println("XXX inter size: " + getPbdSize()
-            + " , segs: " + TestPersistentBinaryDeque.getSortedDirectoryListing().size());
 
         // Change the retention limit and verify effect on segments
         long newSize = s_maxBytes / 2;
@@ -287,7 +285,6 @@ public class TestMaxBytesRetentionPolicy {
         // Verify we are under the new smaller limit or down to 1 segment
         long finalSize = getPbdSize();
         int finalSegs = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
-        System.out.println("XXX final size: " + finalSize + " , segs: " + finalSegs);
         assertTrue(finalSize <= newSize || finalSegs == 1);
     }
 
