@@ -23,6 +23,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -70,6 +71,9 @@ public class TestMaxBytesRetentionPolicy {
             m_pbd.updateExtraHeader(null);
             loop++;
         }
+
+        // Verify more than 1 segments were written
+        assertTrue("loop " + loop, loop >= 2);
     }
 
     @Test
@@ -218,6 +222,93 @@ public class TestMaxBytesRetentionPolicy {
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
+    @Test (timeout = 15_000)
+    public void testChangeRetentionPolicy() throws Exception {
+        // Fill PBD above limit to kick size-based retention at least once and
+        // exit with more than 2 segments
+        Random random = new Random(System.currentTimeMillis());
+        long bytesWritten = 0L;
+        int maxNumBuffers = 100;
+        while(bytesWritten < s_maxBytes * 3
+                || TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
+            int numBuffers = random.nextInt(maxNumBuffers) + 1;
+            bytesWritten += writeBuffers(numBuffers);
+            Thread.sleep(400);
+            verifyPBDSegments();
+            m_pbd.updateExtraHeader(null);
+        }
+        assertTrue(m_pbd.isRetentionPolicyEnforced());
+        assertTrue(TestPersistentBinaryDeque.getSortedDirectoryListing().size() > 2);
+
+        // Change to a time-based retention policy and verify effect on segments
+        m_pbd.stopRetentionPolicyEnforcement();
+        assertFalse(m_pbd.isRetentionPolicyEnforced());
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(500));
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // Wait 4 times the retention, only 1 segment should remain
+        Thread.sleep(2_000);
+        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+        assertTrue(m_pbd.isRetentionPolicyEnforced());
+
+        // Revert to size-based retention policy
+        m_pbd.stopRetentionPolicyEnforcement();
+        assertFalse(m_pbd.isRetentionPolicyEnforced());
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.MAX_BYTES, Long.valueOf(s_maxBytes));
+        m_pbd.startRetentionPolicyEnforcement();
+
+        bytesWritten = 0L;
+        while(bytesWritten < s_maxBytes * 3
+                || TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
+            int numBuffers = random.nextInt(maxNumBuffers) + 1;
+            bytesWritten += writeBuffers(numBuffers);
+            Thread.sleep(400);
+            verifyPBDSegments();
+            m_pbd.updateExtraHeader(null);
+        }
+        int nSeg = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
+        assertTrue(nSeg > 2);
+
+        // Wait 4 times the time-based retention, and verify no changes
+        Thread.sleep(2_000);
+        assertEquals(nSeg, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    @Test (timeout = 15_000)
+    public void testChangeRetentionLimit() throws Exception {
+        // Fill PBD above limit to kick size-based retention at least once and
+        // exit with more than 2 segments
+        Random random = new Random(System.currentTimeMillis());
+        long bytesWritten = 0L;
+        int maxNumBuffers = 100;
+        while(bytesWritten < s_maxBytes * 3
+                || TestPersistentBinaryDeque.getSortedDirectoryListing().size() <= 2) {
+            int numBuffers = random.nextInt(maxNumBuffers) + 1;
+            bytesWritten += writeBuffers(numBuffers);
+            Thread.sleep(400);
+            verifyPBDSegments();
+            m_pbd.updateExtraHeader(null);
+        }
+        assertTrue(TestPersistentBinaryDeque.getSortedDirectoryListing().size() > 2);
+
+        // Change the retention limit and verify effect on segments
+        long newSize = s_maxBytes / 2;
+        assertTrue(m_pbd.isRetentionPolicyEnforced());
+        m_pbd.stopRetentionPolicyEnforcement();
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.MAX_BYTES, Long.valueOf(newSize));
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // Add at least 1 segment
+        bytesWritten = 0L;
+        while(bytesWritten < newSize * 3) {
+            int numBuffers = random.nextInt(maxNumBuffers) + 1;
+            bytesWritten += writeBuffers(numBuffers);
+            Thread.sleep(250);
+            verifyPBDSegments(newSize);
+            m_pbd.updateExtraHeader(null);
+        }
+    }
+
     private long getPbdSize() throws IOException {
         List<File> files = TestPersistentBinaryDeque.getSortedDirectoryListing();
         long size = 0;
@@ -229,6 +320,10 @@ public class TestMaxBytesRetentionPolicy {
     }
 
     private void verifyPBDSegments() {
+        verifyPBDSegments(s_maxBytes);
+    }
+
+    private void verifyPBDSegments(long maxBytes) {
         long firstSize = -1;
         long totalSize = 0;
         for (PBDSegment<ExtraHeaderMetadata> segment: m_pbd.getSegments().values()) {
@@ -239,8 +334,8 @@ public class TestMaxBytesRetentionPolicy {
             totalSize += size;
         }
 
-        assertTrue((totalSize <= s_maxBytes) ||
-                   (totalSize - firstSize < s_maxBytes));
+        assertTrue((totalSize <= maxBytes) ||
+                   (totalSize - firstSize < maxBytes));
     }
 
     private void readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws Exception {
