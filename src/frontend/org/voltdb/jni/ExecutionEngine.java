@@ -610,7 +610,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
-    public abstract Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter);
+    /**
+     * Retrieve the schema for a table from the EE
+     *
+     * @param tableId            ID of the table
+     * @param hiddenColumnFilter {@link HiddenColumnFilter} to indicate which hidden columns to include in the schema
+     * @param forceLive          if {@code true} the current catalog schema will be used and not the one associated with
+     *                           the snapshot
+     * @return {@link Pair} with {@code first} being the encoded schema and {@code second} being the partition column id
+     */
+    public abstract Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
@@ -1232,9 +1242,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer          Pointer to an engine instance
      * @param tableId          ID of the table whose schema is being retrieved
      * @param schemaFilterType Type of filter to apply to schema
+     * @param forceLive        Force the schema to be read from current catalog and not snapshot schemas
      * @return error code indicating status of execution
      */
-    protected native int nativeGetSnapshotSchema(long pointer, int tableId, byte schemaFilterType);
+    protected native int nativeGetSnapshotSchema(long pointer, int tableId, byte schemaFilterType, boolean forceLive);
 
     /**
      * Active a table stream of the specified type for a table.

@@ -34,6 +34,7 @@
   <xs:element name="deployment" type="deploymentType"/>
   <xs:complexType name="deploymentType">
     <xs:all>
+      <!--  If any types are added here CatalogUtil.shallowClusterAndPathsClone needs to be updated -->
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
