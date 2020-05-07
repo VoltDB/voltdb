@@ -21,9 +21,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -31,12 +32,13 @@ public abstract class TransactionTask extends SiteTasker
 {
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
-    public static VoltTable dummyResult;
-    protected static final byte[] m_rawDummyResult;
+    public static VoltTable DUMMAY_RESULT_TABLE;
+    protected static final byte[] RAW_DUMMY_RESULT;
 
     static {
-        dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
-        m_rawDummyResult = dummyResult.buildReusableDependenyResult();
+        DUMMAY_RESULT_TABLE = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
+        DUMMAY_RESULT_TABLE.setStatusCode(VoltTableUtil.DUMMY_DEPENDENCY_STATUS);
+        RAW_DUMMY_RESULT = DUMMAY_RESULT_TABLE.buildReusableDependenyResult();
     }
 
     final protected TransactionState m_txnState;
