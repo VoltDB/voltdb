@@ -436,7 +436,7 @@ public final class InvocationDispatcher {
             else if ("@Trace".equals(procName)) {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
-            else if ("@StopNode".equals(procName) || "@OpPseudoStop".equals(procName)) {
+            else if ("@StopNode".equals(procName)) {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
@@ -510,8 +510,7 @@ public final class InvocationDispatcher {
             if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName)
-                 || "@CancelShutdown".equals(procName)
-                 || "@OpPseudoShutdown".equals(procName))
+                 || "@CancelShutdown".equals(procName))
             {
                 if (handler.isAdmin() == false) {
                     return unexpectedFailureResponse(
@@ -781,16 +780,15 @@ public final class InvocationDispatcher {
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
-        String procName = task.getProcName();
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return gracefulFailureResponse(
-                    procName + " must provide hostId",
+                    "@StopNode must provide hostId",
                     task.clientHandle);
         }
         if (!(params[0] instanceof Integer)) {
             return gracefulFailureResponse(
-                    procName + " must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    "@StopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
                     task.clientHandle);
         }
         int ihid = (Integer) params[0];
@@ -801,7 +799,7 @@ public final class InvocationDispatcher {
                     "Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
-        String reason = m_cartographer.stopNodeIfClusterIsSafe(procName, liveHids, ihid);
+        String reason = m_cartographer.stopNodeIfClusterIsSafe(liveHids, ihid);
         if (reason != null) {
             hostLog.info("It's unsafe to shutdown node " + ihid
                     + ". Cannot stop the requested node. " + reason

@@ -105,12 +105,6 @@ public interface VoltDBInterface
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
     /**
-     * Do minimum cleanup (but don't kill database) so the system is ready to
-     * call initialize again. This is called from @OpPseudoShutdow only.
-     */
-    public void pseudoShutdown();
-
-    /**
      * Check if the host is in prepare-shutting down state.
      */
     public boolean isPreparingShuttingdown();
@@ -211,13 +205,9 @@ public interface VoltDBInterface
     public boolean isRunning();
 
     /**
-     * Halt a node used by @StopNode or @OpPseudoStop, the latter one is called
-     * by orchestration platform such as Kubernetes.
-     *
-     * pseudoKill set to true means no exit, everything still up except of
-     * generating a hostDown event to SNMP.
+     * Halt a node used by @StopNode
      */
-    public void halt(boolean pseudoKill);
+    public void halt();
 
     /**
      * @return The number of milliseconds the cluster has been up

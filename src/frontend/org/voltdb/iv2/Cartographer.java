@@ -666,7 +666,7 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized String stopNodeIfClusterIsSafe(String procName, final Set<Integer> liveHids, final int ihid) {
+    public synchronized String stopNodeIfClusterIsSafe(final Set<Integer> liveHids, final int ihid) {
         try {
             return m_es.submit(new Callable<String>() {
                 @Override
@@ -701,11 +701,10 @@ public class Cartographer extends StatsSource
                         int hid = m_hostMessenger.getHostId();
                         if (hid == ihid) {
                             //Killing myself no pill needs to be sent
-                            boolean pseudoKill = procName.equals("@OpPseudoStop");
-                            VoltDB.instance().halt(pseudoKill);
+                            VoltDB.instance().halt();
                         } else {
                             //Send poison pill with target to kill
-                            m_hostMessenger.sendPoisonPill(ihid, procName, ForeignHost.CRASH_ME);
+                            m_hostMessenger.sendPoisonPill(ihid, "@StopNode", ForeignHost.CRASH_ME);
                         }
                     } else {
                         // unsafe, clear the indicator
