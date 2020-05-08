@@ -100,6 +100,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
                     continue;
                 }
             }
+
             tables.add(dep);
         }
 
@@ -116,23 +117,14 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             new FragmentResponseMessage((FragmentResponseMessage)m_lastResponse);
         // union up all the deps we've collected and jam them in
         for (Entry<Integer, List<VoltTable>> dep : m_alldeps.entrySet()) {
-            List<VoltTable> depTables = dep.getValue();
-            VoltTable grouped;
-            if (depTables.size() == 1){
-                grouped = depTables.get(0);
+            List<VoltTable> depTables = dep.getValue().stream().filter(
+                    x -> x.getStatusCode() != VoltTableUtil.DUMMY_DEPENDENCY_STATUS).collect(Collectors.toList());
+
+            if (depTables.isEmpty()){
+                unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), TransactionTask.DUMMAY_RESULT_TABLE));
             } else {
-                // Remove dummy results
-                depTables =  depTables.stream().filter(
-                        x -> x.getStatusCode() != VoltTableUtil.DUMMY_DEPENDENCY_STATUS).collect(Collectors.toList());
-                if (depTables.isEmpty()) {
-                    grouped = TransactionTask.DUMMAY_RESULT_TABLE;
-                } else if (depTables.size() == 1){
-                    grouped = depTables.get(0);
-                } else {
-                    grouped = VoltTableUtil.unionTables(depTables);
-                }
+                unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), VoltTableUtil.unionTables(depTables)));
             }
-            unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), grouped));
         }
         // we should never rollback DR buffer for MP sysprocs because we don't report the DR buffer size and therefore don't know if it is empty or not.
         unioned.setDrBufferSize(1);
