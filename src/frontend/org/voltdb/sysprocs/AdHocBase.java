@@ -36,10 +36,11 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.ActivePlanRepository;
+
 import com.google_voltpatches.common.base.Charsets;
 
 /**
- * Base class for @AdHoc... system procedures.
+ * Base class for @AdHoc... and @SwapTablesCore system procedures.
  *
  * Provides default implementation for VoltSystemProcedure call-backs.
  */
@@ -70,7 +71,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * batch passed to an ad-hoc query. Used for debugging and logging.
      */
     public static String adHocSQLFromInvocationForDebug(StoredProcedureInvocation invocation) {
-        assert(invocation.getProcName().startsWith("@AdHoc"));
+        assert invocation.getProcName().startsWith("@AdHoc") : "Not valid procedure: " + invocation;
         ParameterSet params = invocation.getParams();
         // the final param is the byte array we need
         byte[] serializedBatchData = (byte[]) params.getParam(params.size() - 1);
