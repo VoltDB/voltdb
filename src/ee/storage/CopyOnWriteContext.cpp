@@ -342,6 +342,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     return retValue;
 }
 
+int64_t CopyOnWriteContext::getRemainingCount() {
+    return m_tuplesRemaining;
+}
+
 bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
     assert(m_iterator.get() != NULL);
 
