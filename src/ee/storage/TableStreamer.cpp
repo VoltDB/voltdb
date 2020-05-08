@@ -162,8 +162,19 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
         if (streamPtr->m_streamType == streamType) {
             // Assert that we didn't find the stream type twice.
             vassert(remaining == TABLE_STREAM_SERIALIZATION_ERROR);
-            remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
-            if (remaining <= 0) {
+            try {
+                remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
+            } catch (...) {
+                // Failed to serialize data but there are still more tuples to be streamed
+                // Return -2 (TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES) to prevent this stream
+                // from being dropped: SnapshotSiteProcessor keeps pulling until all tuples are streamed.
+                if ( remaining == TABLE_STREAM_SERIALIZATION_ERROR) {
+                    if (streamPtr->m_context->getRemainingCount() > 0) {
+                        remaining = TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES;
+                    }
+                }
+            }
+            if (remaining <= 0 && remaining > TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES) {
                 // Drop the stream if it doesn't need to hang around (e.g. elastic).
                 if (streamPtr->m_context->handleDeactivation(streamType)) {
                     m_streams.push_back(streamPtr);
