@@ -220,7 +220,7 @@ public class SnapshotSaveAPI
             }
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
-            m_isTruncation = finalJsData != null && finalJsData.has("truncReqId");
+            m_isTruncation = finalJsData != null && finalJsData.has(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID);
         }
 
         boolean runPostTasks = false;
@@ -418,7 +418,7 @@ public class SnapshotSaveAPI
             stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH, path);
             stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType);
             stringer.keySymbolValuePair(SnapshotUtil.JSON_NONCE, nonce);
-            stringer.keySymbolValuePair("truncReqId", truncReqId);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID, truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());

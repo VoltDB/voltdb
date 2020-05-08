@@ -338,6 +338,11 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
     }
 
     VoltDBEngine* engine = ExecutorContext::getEngine();
+    if (m_shadowStream != nullptr) {
+        m_shadowStream->moveWrapperTo(originalTable->m_shadowStream);
+        engine->setStreamTableByName(m_name, originalTable->m_shadowStream);
+    }
+
     auto views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH (auto originalView, views) {
@@ -529,6 +534,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         vassert(! emptyTable->hasPurgeFragment());
         boost::shared_ptr<ExecutorVector> evPtr = getPurgeExecutorVector();
         emptyTable->swapPurgeExecutorVector(evPtr);
+    }
+
+    if (m_shadowStream != nullptr) {
+        m_shadowStream->moveWrapperTo(emptyTable->m_shadowStream);
+        engine->setStreamTableByName(m_name, emptyTable->m_shadowStream);
     }
 
     engine->rebuildTableCollections(replicatedTable, false);
@@ -2503,7 +2513,7 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
-   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %ld, batch remaining: %ld",
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
         name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
    return true;
 }

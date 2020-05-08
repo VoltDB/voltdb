@@ -691,7 +691,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert truncReqId != null;
             String sData = "";
             JSONObject jsData = new JSONObject();
-            jsData.put("truncReqId", truncReqId);
+            jsData.put(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID, truncReqId);
             sData = jsData.toString();
             jsObj.put(SnapshotUtil.JSON_PATH, VoltDB.instance().getCommandLogSnapshotPath() );
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
