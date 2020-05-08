@@ -706,6 +706,11 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final ExtensibleSnapshotDigestData snapshotDataForZookeeper = m_extraSnapshotData;
                 m_extraSnapshotData = null;
+                Thread.UncaughtExceptionHandler eh = new Thread.UncaughtExceptionHandler() {
+                   public void uncaughtException(Thread th, Throwable ex) {
+                        SNAP_LOG.warn("Error running snapshot completion task", ex);
+                    }
+                };
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -782,7 +787,7 @@ public class SnapshotSiteProcessor {
                         }
                     }
                 };
-
+                terminatorThread.setUncaughtExceptionHandler(eh);
                 m_snapshotTargetTerminators.add(terminatorThread);
                 terminatorThread.start();
             }

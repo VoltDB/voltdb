@@ -2652,7 +2652,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
 
         remaining = table->streamMore(outputStreams, streamType, retPositions);
-        if (remaining <= 0) {
+        if (remaining <= 0 && remaining > TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES) {
             m_snapshottingTables.erase(tableId);
             if (table->isReplicatedTable()) {
                 ScopedReplicatedResourceLock scopedLock;
