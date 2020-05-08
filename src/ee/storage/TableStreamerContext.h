@@ -159,6 +159,7 @@ public:
         return NULL;
     }
 
+    virtual int64_t getRemainingCount() { return TABLE_STREAM_SERIALIZATION_ERROR;}
 protected:
 
     /**
