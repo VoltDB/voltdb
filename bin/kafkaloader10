@@ -115,7 +115,7 @@ CLASSPATH=${KAFKA_LOADER10_BUNDLE}
 
 
 # add voltdb artifacts to classpath
-VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-*.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=${VOLTDBJAR}:${CLASSPATH}
 else
