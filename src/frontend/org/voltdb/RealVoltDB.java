@@ -78,6 +78,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -181,6 +182,7 @@ import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.probe.MeshProber.Determination;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
@@ -283,6 +285,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
+    private AtomicReference<MeshProber> m_meshProbe = new AtomicReference<MeshProber>();
 
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -3259,6 +3262,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .missingHostCount(m_config.m_missingHostCount)
                 .build();
 
+        m_meshProbe.set(criteria);
         HostAndPort hostAndPort = criteria.getLeader();
         String hostname = hostAndPort.getHost();
         int port = hostAndPort.getPort();
@@ -3313,6 +3317,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
         MeshProber.Determination determination = criteria.waitForDetermination();
+        m_meshProbe.set(null);
+        if (determination.startAction == null) {
+            VoltDB.crashLocalVoltDB("Shutdown invoked before Cluster Mesh was established.", false, null);
+        }
 
         // paused is determined in the mesh formation exchanged
         if (determination.paused) {
@@ -3613,6 +3621,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     @Override
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
+        MeshProber criteria = m_meshProbe.get();
+        if (criteria != null) {
+            criteria.abortDetermination();
+        }
         synchronized(m_startAndStopLock) {
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
