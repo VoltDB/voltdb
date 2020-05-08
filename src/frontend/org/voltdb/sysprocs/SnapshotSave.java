@@ -185,8 +185,8 @@ public class SnapshotSave extends VoltSystemProcedure
         String truncReqId = "";
         if (data != null && !data.isEmpty()) {
             final JSONObject jsData = new JSONObject(data);
-            if (jsData.has("truncReqId")) {
-                truncReqId = jsData.getString("truncReqId");
+            if (jsData.has(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID)) {
+                truncReqId = jsData.getString(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID);
             }
         }
 

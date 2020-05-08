@@ -48,7 +48,7 @@ public class TableStreamer {
 
     // Error code returned by EE.tableStreamSerializeMore().
     private static final byte SERIALIZATION_ERROR = -1;
-
+    private static final byte SERIALIZATION_ERROR_MORE_TUPLES = SERIALIZATION_ERROR -1;
     private final int m_tableId;
     private final TableStreamType m_type;
     private final HiddenColumnFilter m_hiddenColumnFilter;
@@ -111,7 +111,8 @@ public class TableStreamer {
         prepareBuffers(outputBuffers);
 
         Pair<Long, int[]> serializeResult = context.tableStreamSerializeMore(m_tableId, m_type, outputBuffers);
-        if (serializeResult.getFirst() == SERIALIZATION_ERROR) {
+        long remaining = serializeResult.getFirst();
+        if ( remaining <= SERIALIZATION_ERROR ) {
             // Cancel the snapshot here
             for (DBBPool.BBContainer container : outputBuffers) {
                 container.discard();
@@ -120,7 +121,9 @@ public class TableStreamer {
             for (SnapshotTableTask task : m_tableTasks) {
                 task.m_target.reportSerializationFailure(ex);
             }
-            return Pair.of(null, false);
+            // There may be more tuples to be streamed when the error occurs. Continue streaming until all
+            // tuples are pulled. Otherwise a stream could not be pulled again if it can not be reactivated.
+            return Pair.of(null, remaining == SERIALIZATION_ERROR_MORE_TUPLES);
         }
 
         if (serializeResult.getSecond()[0] > 0) {
@@ -135,7 +138,7 @@ public class TableStreamer {
             }
         }
 
-        return Pair.of(writeFuture, serializeResult.getFirst() > 0);
+        return Pair.of(writeFuture, remaining > 0);
     }
 
     /**

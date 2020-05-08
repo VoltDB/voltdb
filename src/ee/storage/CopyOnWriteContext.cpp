@@ -181,6 +181,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     return retValue;
 }
 
+int64_t CopyOnWriteContext::getRemainingCount() {
+    return m_tuplesRemaining;
+}
+
 void CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
     m_allocator.template update<storage::truth>(tuple.address());
 }

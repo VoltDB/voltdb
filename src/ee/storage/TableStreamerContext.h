@@ -152,7 +152,7 @@ public:
         // do not need to be applied to the post-truncated copy of the table.
         return NULL;
     }
-
+    virtual int64_t getRemainingCount() { return TABLE_STREAM_SERIALIZATION_ERROR;}
 protected:
 
     /**

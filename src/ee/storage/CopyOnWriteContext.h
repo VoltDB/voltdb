@@ -63,6 +63,8 @@ public:
      */
     virtual void notifyTupleUpdate(TableTuple &tuple);
 
+    virtual int64_t getRemainingCount();
+
 private:
 
     /**
