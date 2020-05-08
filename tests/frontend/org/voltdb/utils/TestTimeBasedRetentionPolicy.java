@@ -33,6 +33,7 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -57,6 +58,7 @@ public class TestTimeBasedRetentionPolicy {
 
     @Test(timeout=60_000)
     public void testNoReadersOneSegment() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
         // In this test, retention policy has only one segment to delete at a time.
         int segmentsCount = 5;
 
@@ -110,6 +112,7 @@ public class TestTimeBasedRetentionPolicy {
 
     @Test
     public void testNoReadersMultiSegments() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
         // In this test, retention policy may have more than one segment to delete at a time.
         int segmentsCount = 5;
         Random rand = new Random();
@@ -268,6 +271,11 @@ public class TestTimeBasedRetentionPolicy {
         for (int i=0; i<numBuffers; i++) {
             m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(64)) );
         }
+    }
+
+    @BeforeClass
+    public static void setUpClass() {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
     }
 
     @Before

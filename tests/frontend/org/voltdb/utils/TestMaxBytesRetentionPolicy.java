@@ -37,6 +37,7 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -58,6 +59,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testNoReaders() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
         Random random = new Random(System.currentTimeMillis());
         int maxNumBuffers = 100;
         long numWritten = 0;
@@ -78,6 +80,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testWithReaders() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
         int numReaders = 2;
         @SuppressWarnings("unchecked")
         BinaryDequeReader<ExtraHeaderMetadata>[] readers = new BinaryDequeReader[numReaders];
@@ -356,6 +359,11 @@ public class TestMaxBytesRetentionPolicy {
         }
 
         return written;
+    }
+
+    @BeforeClass
+    public static void setUpClass() {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
     }
 
     @Before
