@@ -77,7 +77,7 @@ public class StatusListener {
      * @throws InitException
      */
     public StatusListener(String intf, int port, String publicIntf) throws InitException {
-        m_resolvedIntf = resolveInterface(intf, "");
+        m_resolvedIntf = resolveInterface(intf, null);
         m_publicIntf = resolveInterface(publicIntf, m_resolvedIntf);
         initServer(m_resolvedIntf, port);
    }
@@ -122,7 +122,7 @@ public class StatusListener {
         for (int port=portLo; port<=portHi; port++) {
             try {
                 ServerConnector connector = new ServerConnector(server);
-                connector.setHost(intf);
+                connector.setHost(intf); // null for all interfaces
                 connector.setPort(port);
                 connector.setName("status-connector");
                 connector.setIdleTimeout(CONNTMO);
@@ -147,7 +147,14 @@ public class StatusListener {
     }
 
     public String getListenInterface() {
-        return m_connector != null ? m_connector.getHost() : "";
+        String intf = "";
+        if (m_connector != null) {
+            String temp = m_connector.getHost();
+            if (temp != null) {
+                intf = temp;
+            }
+        }
+        return intf;
     }
 
     public int getAssignedPort() {
@@ -224,7 +231,7 @@ public class StatusListener {
     protected String getHostHeader() {
         if (m_hostHeader == null) {
             String intf;
-            if (!m_publicIntf.isEmpty()) {
+            if (m_publicIntf != null && !m_publicIntf.isEmpty()) {
                 intf = m_publicIntf;
             } else {
                 intf = getLocalAddress().getHostAddress();
