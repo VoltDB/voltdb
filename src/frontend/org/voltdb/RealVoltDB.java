@@ -3626,6 +3626,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             criteria.abortDetermination();
         }
         synchronized(m_startAndStopLock) {
+            if (!m_isRunning) {
+                // initialize() was never called or shutdown() was already called
+                // so there is nothing to clean up
+                return true;
+            }
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
