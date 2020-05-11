@@ -171,6 +171,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Table* getCatalogTable(std::string const& name) const;
         Table* getTableById(int32_t tableId) const;
         Table* getTableByName(std::string const& name) const;
+        StreamedTable* getStreamTableByName(std::string const& name) const;
+        void setStreamTableByName(std::string const& name, StreamedTable* newStreamTable);
         TableCatalogDelegate* getTableDelegate(std::string const& name) const;
         PersistentTable* getSystemTable(const SystemTableId id) const;
 
