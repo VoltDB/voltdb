@@ -152,7 +152,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
-    // public static final long UNUSED_CID              = Long.MIN_VALUE + 5;
+    public static final long EXPORT_MANAGER_CID         = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;

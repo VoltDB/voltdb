@@ -93,7 +93,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import org.eclipse.jetty.util.security.Password;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -219,6 +218,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContextBuilder;
+import sun.security.util.Password;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1430,6 +1430,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
+            ExportManager.instance().startListeners(m_clientInterface);
+
             // DR overflow directory
             if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
                 try {
@@ -1740,7 +1742,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                checkExportStreamLeadership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1832,18 +1833,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
             //The new leader is down, on old leader host:
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
-        }
-    }
-
-    // Check to see if stream master is co-located with partition leader.
-    private void checkExportStreamLeadership() {
-        for (Initiator initiator : m_iv2Initiators.values()) {
-            if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                SpInitiator spInitiator = (SpInitiator)initiator;
-                if (spInitiator.isLeader()) {
-                    ExportManager.instance().becomeLeader(spInitiator.getPartitionId());
-                }
-            }
         }
     }
 
@@ -2262,14 +2251,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }, 0, 6, TimeUnit.MINUTES));
 
-        // export stream master check
-        m_periodicWorks.add(scheduleWork(new Runnable() {
-            @Override
-            public void run() {
-                checkExportStreamLeadership();
-            }
-        }, 0, 1, TimeUnit.MINUTES));
-
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
         if (em != null) { em.setupMaintenaceTasks(); }
@@ -2277,6 +2258,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
+    @Override
     public boolean isClusterComplete() {
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }
