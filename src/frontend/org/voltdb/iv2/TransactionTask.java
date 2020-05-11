@@ -39,7 +39,7 @@ public abstract class TransactionTask extends SiteTasker
         VoltTable dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
         dummyResult.setStatusCode(VoltTableUtil.DUMMY_DEPENDENCY_STATUS);
         RAW_DUMMY_RESULT = dummyResult.buildReusableDependenyResult();
-        DUMMAY_RESULT_TABLE = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));;
+        DUMMAY_RESULT_TABLE = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
     }
 
     final protected TransactionState m_txnState;
