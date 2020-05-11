@@ -64,7 +64,7 @@ import org.voltdb.client.NoConnectionsException;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
-public class KafkaImportBenchmark {
+public class TopicImportBenchmark {
 
     static VoltLogger log = new VoltLogger("Benchmark");
 
@@ -187,7 +187,7 @@ public class KafkaImportBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public KafkaImportBenchmark(Config config) {
+    public TopicImportBenchmark(Config config) {
         this.config = config;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
@@ -358,9 +358,9 @@ public class KafkaImportBenchmark {
     }
 
     public static class BenchmarkRunner extends Thread {
-        private final KafkaImportBenchmark benchmark;
+        private final TopicImportBenchmark benchmark;
 
-        public BenchmarkRunner(KafkaImportBenchmark bm) {
+        public BenchmarkRunner(TopicImportBenchmark bm) {
             benchmark = bm;
         }
 
@@ -459,7 +459,7 @@ public class KafkaImportBenchmark {
         boolean testResult = true;
         // create a configuration from the arguments
         Config config = new Config();
-        config.parse(KafkaImportBenchmark.class.getName(), args);
+        config.parse(TopicImportBenchmark.class.getName(), args);
 
         // connect to one or more servers, method loops until success
         dbconnect(config);
@@ -475,8 +475,8 @@ public class KafkaImportBenchmark {
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
-        log.info("Starting KafkaImportBenchmark...");
-        KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
+        log.info("Starting TopicImportBenchmark...");
+        TopicImportBenchmark benchmark = new TopicImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
         runner.join(); // writers are done
