@@ -114,6 +114,12 @@ public class SnapshotUtil {
     public static final String JSON_ELASTIC_OPERATION = "elasticOperationMetadata";
 
     /**
+     * truncation request ID is the truncation request node path.
+     * Example: /db/request_truncation_snapshot/request_0000000001
+     */
+    public static final String JSON_TRUNCATION_REQUEST_ID = "truncReqId";
+
+    /**
      * milestone used to mark a shutdown save snapshot
      */
     public static final String JSON_TERMINUS = "terminus";

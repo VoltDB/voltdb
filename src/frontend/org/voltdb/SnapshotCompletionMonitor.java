@@ -218,7 +218,7 @@ public class SnapshotCompletionMonitor {
         // A truncation request ID is not always provided. It's used for
         // snapshots triggered indirectly via ZooKeeper so that the
         // triggerer can recognize the snapshot when it finishes.
-        String truncReqId = jsonObj.optString("truncReqId");
+        String truncReqId = jsonObj.optString(SnapshotUtil.JSON_TRUNCATION_REQUEST_ID);
 
         if (hostCount == 0) {
             /*

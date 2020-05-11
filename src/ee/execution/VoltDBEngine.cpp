@@ -354,6 +354,15 @@ Table* VoltDBEngine::getTableByName(const std::string& name) const {
     return findInMapOrNull(name, m_tablesByName);
 }
 
+StreamedTable* VoltDBEngine::getStreamTableByName(const std::string& name) const {
+    return findInMapOrNull(name, m_exportingTables);
+}
+
+void VoltDBEngine::setStreamTableByName(std::string const& name, StreamedTable* newStreamTable) {
+    vassert(findInMapOrNull(name, m_exportingTables) != NULL);
+    m_exportingTables[name] = newStreamTable;
+}
+
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(const std::string& name) const {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_delegatesByName);
@@ -1434,7 +1443,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
-                if (!tableSchemaChanged) {
+                if (!tableSchemaChanged && !persistentTable) {
                     continue;
                 }
             }
@@ -2652,7 +2661,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
 
         remaining = table->streamMore(outputStreams, streamType, retPositions);
-        if (remaining <= 0) {
+        if (remaining <= 0 && remaining > TABLE_STREAM_SERIALIZATION_ERROR_MORE_TUPLES) {
             m_snapshottingTables.erase(tableId);
             if (table->isReplicatedTable()) {
                 ScopedReplicatedResourceLock scopedLock;
