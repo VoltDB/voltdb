@@ -1084,6 +1084,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
 
     tuple.setActiveFalse();
 
+    bool isPendingDelete = tuple.isPendingDelete();
     // add to the free list
     m_tupleCount--;
     if (tuple.isPendingDelete()) {
@@ -1126,6 +1127,15 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
            m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
+        if (m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end()) {
+            VOLT_ERROR("XXX BLOCK PENDING SNAPSHOT: tuple pending delete %d\n", isPendingDelete);
+            if (m_tableStreamer == NULL) {
+                VOLT_ERROR("NO STREAMER\n");
+            }
+            else if (m_tableStreamer.get() == NULL) {
+                VOLT_ERROR("EMPTY STREAMER\n");
+            }
+        }
         vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
