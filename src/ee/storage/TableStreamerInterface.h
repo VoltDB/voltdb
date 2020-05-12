@@ -110,6 +110,10 @@ class PersistentTableSurgeon;
         {
             return (findStreamContext(streamType) != NULL);
         }
+
+        virtual size_t streamCount() const {
+            return 0;
+        }
     };
 
 } // namespace voltdb

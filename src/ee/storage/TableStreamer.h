@@ -158,6 +158,10 @@ public:
 
     virtual TableStreamerInterface* cloneForTruncatedTable(PersistentTableSurgeon &surgeon);
 
+    virtual size_t streamCount() const {
+        return m_streams.size();
+    }
+
 private:
 
     class Stream

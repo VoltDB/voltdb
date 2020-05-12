@@ -1135,6 +1135,9 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
             else if (m_tableStreamer.get() == NULL) {
                 VOLT_ERROR("EMPTY STREAMER\n");
             }
+            else {
+                VOLT_ERROR("STREAMER COUNT: %lu", m_tableStreamer->streamCount());
+            }
         }
         vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
