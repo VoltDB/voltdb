@@ -656,6 +656,7 @@ DISTRIBUTION
             <include name="lib/**" />
             <include name="draingen" />
             <include name="kubernetes/**" />
+            <include name="snapshotcomparer.sh" />
         </fileset>
     </copy>
 
