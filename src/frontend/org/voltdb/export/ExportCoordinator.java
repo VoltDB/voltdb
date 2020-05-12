@@ -363,7 +363,8 @@ public class ExportCoordinator {
                             } else {
                                 // Reset the safe point and resume polling to force a Mastership re-evaluation
                                 resetSafePoint();
-                                m_eds.resumePolling();                            }
+                                m_eds.resumePolling();
+                            }
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
 
