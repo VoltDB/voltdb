@@ -53,12 +53,11 @@ public class SysprocFragmentTask extends FragmentTaskBase
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
     boolean m_respBufferable = true;
-    static final byte[] m_rawDummyResponse;
-
+    static final byte[] RAW_DUMMY_RESPONSE;
     static {
         VoltTable dummyResponse = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
         dummyResponse.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
-        m_rawDummyResponse = dummyResponse.buildReusableDependenyResult();
+        RAW_DUMMY_RESPONSE = dummyResponse.buildReusableDependenyResult();
     }
 
     // This constructor is used during live rejoin log replay.
@@ -105,7 +104,7 @@ public class SysprocFragmentTask extends FragmentTaskBase
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
             response.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                    m_rawDummyResponse, 0, m_rawDummyResponse.length));
+                    RAW_DUMMY_RESPONSE, 0, RAW_DUMMY_RESPONSE.length));
         }
         response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
@@ -283,7 +282,7 @@ public class SysprocFragmentTask extends FragmentTaskBase
             // Make sure the response has at least 1 result with a valid DependencyId
             response.addDependency(new
                     DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+                            RAW_DUMMY_RESULT, 0, RAW_DUMMY_RESULT.length));
         }
     }
 

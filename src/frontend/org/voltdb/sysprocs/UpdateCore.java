@@ -409,6 +409,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 Arrays.equals(context.getCatalogHash(), catalogHash) &&
                 Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
                 log.info("Restarting catalog update");
+                // Catalog may have been published, reset the status to PENDING if COMPLETE
+                CatalogUtil.unPublishCatalog(zk, expectedCatalogVersion + 1);
             } else {
                 // impossible to happen since we only allow catalog update sequentially
                 String errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +

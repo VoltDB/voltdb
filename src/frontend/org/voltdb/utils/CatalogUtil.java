@@ -2940,6 +2940,28 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Change the state of given ZK node that represents catalog version from COMPLETE to PENDING
+     * @param zk
+     * @param version
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public static void unPublishCatalog(ZooKeeper zk, int version) throws KeeperException, InterruptedException {
+        String path = VoltZK.catalogbytes + "/" + version;
+        Stat stat = new Stat();
+        byte[] data = zk.getData(path, false, stat);
+        ByteBuffer buffer = ByteBuffer.wrap(data);// flag (byte) + expected catalog segment count (int) + txnId (long)
+        byte status = buffer.get();
+        if (status == (byte)ZKCatalogStatus.COMPLETE.ordinal()) {
+            int catalogSegmentCount = buffer.getInt();
+            // Rewrite the flag
+            buffer.position(0);
+            buffer.put((byte)ZKCatalogStatus.PENDING.ordinal());
+            buffer.putInt(catalogSegmentCount);
+            zk.setData(path, buffer.array(), stat.getVersion());
+        }
+    }
     public static void stageCatalogToZK(ZooKeeper zk, int version, long genId, long txnId, SegmentedCatalog catalogAndDeployment)
             throws KeeperException, InterruptedException {
         updateCatalogToZK(zk, version, genId, catalogAndDeployment, ZKCatalogStatus.PENDING, txnId);

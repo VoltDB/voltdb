@@ -390,7 +390,7 @@ public class FragmentTask extends FragmentTaskBase
                     if (currentFragResponse.getTableCount() == 0) {
                         // Make sure the response has at least 1 result with a valid DependencyId
                         currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                                RAW_DUMMY_RESULT, 0, RAW_DUMMY_RESULT.length));
                     }
                     exceptionThrown = true;
                 }
