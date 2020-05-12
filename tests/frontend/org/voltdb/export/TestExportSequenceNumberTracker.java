@@ -24,13 +24,14 @@
 package org.voltdb.export;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 
 public class TestExportSequenceNumberTracker {
 
@@ -39,10 +40,6 @@ public class TestExportSequenceNumberTracker {
     @Before
     public void setUp() throws IOException {
         tracker = new ExportSequenceNumberTracker();
-    }
-
-    @After
-    public void tearDown() throws InterruptedException {
     }
 
     @Test
@@ -229,5 +226,52 @@ public class TestExportSequenceNumberTracker {
         tracker.append(2L, 10L);
         assertEquals(1L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(1L, tracker.getFirstGap().getSecond().longValue());
+    }
+
+    @Test
+    public void intersectionSizeInSequences() {
+        tracker.addRange(200, 299);
+        tracker.addRange(500, 549);
+        tracker.addRange(730, 799);
+        ExportSequenceNumberTracker other = new ExportSequenceNumberTracker();
+        assertEquals(0, tracker.intersectionSizeInSequences(other));
+
+        // Add range which doesn't overlap
+        other.addRange(1, 199);
+        assertEquals(0, tracker.intersectionSizeInSequences(other));
+
+        // Add range which intersects with beginning of range
+        other.addRange(200, 219);
+        assertEquals(20, tracker.intersectionSizeInSequences(other));
+
+        // Add range which intersects with middle of range
+        other.addRange(510, 519);
+        assertEquals(30, tracker.intersectionSizeInSequences(other));
+
+        // Add range which intersects with end of range
+        other.addRange(750, 900);
+        assertEquals(80, tracker.intersectionSizeInSequences(other));
+
+        // Complete intersection
+        other.addRange(1, 900);
+        assertEquals(220, tracker.intersectionSizeInSequences(other));
+    }
+
+    @Test
+    public void gapOfEmptyTracker() {
+        assertEquals(Pair.of(ExportSequenceNumberTracker.MIN_SEQNO, ExportSequenceNumberTracker.INFINITE_SEQNO),
+                tracker.getFirstGap(Long.MAX_VALUE / 2));
+    }
+
+    /*
+     * Test that that imitating looping over gaps will return null if >= INFINTY is requested
+     */
+    @Test
+    public void getGapsFromNonNormalizedTracker() {
+        tracker.addRange(500, 999);
+
+        assertEquals(Pair.of(ExportSequenceNumberTracker.MIN_SEQNO, 499L), tracker.getFirstGap(1));
+        assertEquals(Pair.of(1000L, ExportSequenceNumberTracker.INFINITE_SEQNO), tracker.getFirstGap(500));
+        assertNull(tracker.getFirstGap(ExportSequenceNumberTracker.INFINITE_SEQNO + 1));
     }
 }

@@ -138,7 +138,6 @@ namespace voltdb {
 
         public:
             iterator() : m_node(NULL) {}
-            iterator(const iterator &iter) : m_node(iter.m_node) {}
 
             Key &key() const { return m_node->key; }
             Data &value() const { return m_node->value; }

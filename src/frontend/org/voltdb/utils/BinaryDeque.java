@@ -31,6 +31,14 @@ import org.voltcore.utils.Pair;
  * @param <M> Type of extra header metadata which can be associated with entries
  */
 public interface BinaryDeque<M> {
+    /**
+     * The different types of retention policies supported by BinaryDeque.
+     */
+    public static enum RetentionPolicyType {
+        TIME_MS,
+        MAX_BYTES;
+    }
+
     /*
      * Allocator for storage coming out of the BinaryDeque. Only
      * used if copying is necessary, otherwise a slice is returned
@@ -49,13 +57,31 @@ public interface BinaryDeque<M> {
     void updateExtraHeader(M extraHeader) throws IOException;
 
     /**
-     * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
-     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
+     * Store a buffer chain as a single object in the deque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
-     * @param object
-     * @throws IOException
+     * @param BBContainer with the bytes to store
+     * @return the number of bytes written. If compression is enabled, the number of compressed bytes
+     *         written is returned, which will be different from the number of bytes passed in.
+     * @throws IOException if the object is larger then the implementation defined max,
+     *         64 megabytes in the case of PersistentBinaryDeque.
      */
-    void offer(BBContainer object) throws IOException;
+    int offer(BBContainer object) throws IOException;
+
+    /**
+     * Store a buffer chain as a single object in the deque.
+     * If there is an exception attempting to write the buffers then all the buffers will be discarded.
+     * This version of offer also passes in the starting id value and ending id value in the buffer,
+     * which can be used to maintain what range of ids are available in each segment.
+     * @param BBContainer with the bytes to store
+     * @param startId the id of the first row in the buffer
+     * @param endId the id of the last row in the buffer
+     * @param timestamp of this object
+     * @return the number of bytes written. If compression is enabled, the number of compressed bytes
+     *         written is returned, which will be different from the number of bytes passed in.
+     * @throws IOException if the object is larger then the implementation defined max,
+     *         64 megabytes in the case of PersistentBinaryDeque.
+     */
+    int offer(BBContainer object, long startId, long endId, long timestamp) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 
@@ -86,12 +112,33 @@ public interface BinaryDeque<M> {
 
     /**
      * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * This is equivalent to {@link BinaryDeque#openForRead(cursorId, isTransient)} with false for {@code isTransient}.
      * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
      * the existing cursor will be returned.
      * @return a BinaryDequeReader for this cursorId
      * @throws IOException on any errors trying to read the PBD files
      */
     public BinaryDequeReader<M> openForRead(String cursorId) throws IOException;
+
+    /**
+     * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
+     * the existing cursor will be returned.
+     * @param isTransient true if this reader is transient, which means the BinaryDeque doesn't need to wait
+     *        discards of reads from this reader before deleting data.
+     * @return a BinaryDequeReader for this cursorId
+     * @throws IOException on any errors trying to read the PBD files
+     */
+    public BinaryDequeReader<M> openForRead(String cursorId, boolean isTransient) throws IOException;
+
+    /**
+     * Opens a {@link BinaryDequeGapWriter} for this BinaryDeque.
+     * Only one gap writer is allowed at a time in a BinaryDeque.
+     *
+     * @return new {@link BinaryDequeGapWriter}
+     * @throws IOException if a gap writer is already open for this BinaryDeque
+     */
+    public BinaryDequeGapWriter<M> openGapWriter() throws IOException;
 
     /**
      * Close a BinaryDequeReader reader, also close the SegmentReader for the segment if it is reading one.
@@ -127,6 +174,19 @@ public interface BinaryDeque<M> {
     public boolean deletePBDSegment(BinaryDequeValidator<M> checker) throws IOException;
 
     /**
+     * Delete all segments up to and including this entryId.
+     * If the input entry id is in the middle of a segment, the segment
+     * containing the entry id will not be deleted nor will the segment be
+     * truncated at the beginning to this entry id.
+     * If the input entry id is the last entry in the segment, that segment will also be deleted,
+     * unless it is the last segment.
+     *
+     * @param entryId the entryId to which segments should be deleted.
+     * @throws IOException if an IO error occurs trying to delete the segments
+     */
+    public void deleteSegmentsToEntryId(long entryId) throws IOException;
+
+    /**
      * If pbd files should only be deleted based on some external events,
      * register a deferred action handler using this. All deletes will be sent
      * to the {@code deleter} as a Runnable, which may be executed later.
@@ -147,16 +207,79 @@ public interface BinaryDeque<M> {
 
     public Pair<Integer, Long> getBufferCountAndSize() throws IOException;
 
+    /**
+     * Returns the offset of the first entry available in this binary deque.
+     * If there are none available yet (the binary deque is empty), this will return -1.
+     *
+     * @return the offset of the first available entry or -1 if no entries are available
+     * @throws IOException if any error occurs trying to read the entry
+     */
+    public long getFirstId() throws IOException;
+
     public void closeAndDelete() throws IOException;
+
+    /**
+     * Sets the retention policy to use on the PBD data.
+     * In the current implementation, only one retention policy may be set on a PBD.
+     * <p>
+     * This method can also be used to replace an existing retention policy on the PBD
+     * data, provided that {@code stopRetentionPolicyEnforcement} has been called beforehand
+     * to stop the enforcement.
+     *
+     * @param policyType the retention policy type
+     * @param params parameters specific to the retention policy type. For example, for time based
+     *        retention policy, the retain time in the correct unit may be the parameter.
+     */
+    public void setRetentionPolicy(RetentionPolicyType policyType, Object... params);
+
+    /**
+     * Indicates that the BinaryDeque can now start retention policy enforcement.
+     * <p>
+     * This will be typically called after the BinaryDeque is setup and required initializations
+     * are completed, or to start enforcing a new policy after a catalog update.
+     */
+    public void startRetentionPolicyEnforcement();
+
+    /**
+     * Indicates that the BinaryDeque must stop retention policy enforcement.
+     * <p>
+     * This will be typically on catalog update when a new policy must replace the current one.
+     */
+    public void stopRetentionPolicyEnforcement();
+
+    /**
+     * @return if a retention policy is currently enforced
+     */
+    public boolean isRetentionPolicyEnforced();
+
+    /**
+     * Returns the id of the last entry that was deleted by retention policy on this BinaryDeque.
+     * This will return {@link PBDSegment.INVALID_ID} if this BinaryDeque does not have a retention policy
+     * or if this retention policy has not deleted anything since it was started up.
+     *
+     * @return id of the last entry that was deleted by retention policy
+     */
+    public long getRetentionDeletionPoint();
 
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
-            PARTIAL_TRUNCATE
+            PARTIAL_TRUNCATE,
+            NO_TRUNCATE;
         }
-        public final Status status;
+        public final Status m_status;
+        public long m_rowId = -1;
+
         public TruncatorResponse(Status status) {
-            this.status = status;
+            m_status = status;
+        }
+        public TruncatorResponse(Status status, long rowId) {
+            m_status = status;
+            m_rowId = rowId;
+        }
+
+        public long getRowId() {
+            return m_rowId;
         }
 
         public int getTruncatedBuffSize() throws IOException {
@@ -186,7 +309,12 @@ public interface BinaryDeque<M> {
     }
 
     public interface BinaryDequeScanner {
-        public void scan(BBContainer bb);
+        /**
+         * @param bb
+         * @return id of the last entry in the buffer. Implementation may return -1,
+         *         if it doesn't care about storing rowId range in the PBD header.
+         */
+        public long scan(BBContainer bb);
     }
 
     public interface BinaryDequeValidator<M> {

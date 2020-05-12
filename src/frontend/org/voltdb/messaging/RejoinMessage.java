@@ -53,7 +53,6 @@ public class RejoinMessage extends VoltMessage {
     private Queue<BBContainer> m_compressedDataBufferPool = null;
     // number of sources sending to this site
     private long m_snapshotSinkHSId = -1;
-    private boolean m_schemaHasPersistentTables = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -77,14 +76,12 @@ public class RejoinMessage extends VoltMessage {
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
                          Queue<BBContainer> dataBufferPool,
-                         Queue<BBContainer> compressedDataBufferPool,
-                         boolean schemaHasPersistentTables) {
+                         Queue<BBContainer> compressedDataBufferPool) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
         m_dataBufferPool = dataBufferPool;
         m_compressedDataBufferPool = compressedDataBufferPool;
-        m_schemaHasPersistentTables = schemaHasPersistentTables;
     }
 
     /**
@@ -122,10 +119,6 @@ public class RejoinMessage extends VoltMessage {
     public Queue<BBContainer> getSnapshotCompressedDataBufferPool()
     {
         return m_compressedDataBufferPool;
-    }
-
-    public boolean schemaHasPersistentTables() {
-        return m_schemaHasPersistentTables;
     }
 
     /**

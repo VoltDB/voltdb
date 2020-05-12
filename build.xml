@@ -271,7 +271,7 @@
     <include name='org/hsqldb_voltpatches/Test*.class' />
     <include name='org/voltdb/TestAbstractTopology*.class' />
     <include name='org/voltdb/TestBuildString.class' />
-    <include name='org/voltdb/TestCLReplayAutoCatalogUpgrade.class' />
+    <include name='org/voltdb/TestCL*.class' />
     <include name='org/voltdb/TestExportInsertIntoSelectSuite.class' />
     <include name='org/voltdb/TestJoin.class' />
     <include name='org/voltdb/TestLeaderElections.class' />
@@ -300,6 +300,7 @@
     <include name='org/voltdb/TestVoltTableUtil.class' />
     <include name='org/voltdb/TestVoltType.class' />
     <include name='org/voltdb/canonicalddl/TestCanonicalDDLThroughSQLcmd.class' />
+    <include name='org/voltdb/catalog/Test*.class' />
     <include name='org/voltdb/common/TestPermission.class' />
     <include name='org/voltdb/compiler/TestAsyncCompilerAgent.class' />
     <include name='org/voltdb/compiler/TestCatalogVersionUpgrade.class' />
@@ -310,10 +311,6 @@
     <include name='org/voltdb/compiler/TestPartitionDDL.class' />
     <include name='org/voltdb/compiler/TestProcCompiler.class' />
     <include name='org/voltdb/compiler/TestVoltCompiler.class' />
-    <include name='org/voltdb/export/TestExportDataSource.class' />
-    <include name='org/voltdb/export/TestExportGeneration.class' />
-    <include name='org/voltdb/export/TestExportV2Suite.class' />
-    <include name='org/voltdb/export/TestExportV2SuitePro.class' />
     <include name='org/voltdb/exportclient/TestJDBCExportClient.class' />
     <include name='org/voltdb/exportclient/decode/TestEndpointExpander.class' />
     <include name='org/voltdb/exportclient/decode/TestJsonObjectDecoer.class' />
@@ -322,6 +319,8 @@
     <include name='org/voltdb/exportclient/kafka/TestKafkaExportClient.class' />
     <include name='org/voltdb/groovy/TestGroovyDeployment.class' />
     <include name='org/voltdb/importer/TestChannelDistributer.class' />
+    <include name='org/voltdb/np/Test*.class' />
+    <include name='org/voltdb/task/Test*.class' />
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
@@ -331,12 +330,9 @@
     <!-- Standard junit fileset -->
 
     <include name='org/voltcore/**/Test*.class' />
-    <include name='org/voltdb/catalog/Test*.class' />
     <include name='org/voltdb/client/Test*.class' />
     <include name='org/voltdb/TestAdhoc*.class' />
     <include name='org/voltdb/TestAdHoc*.class' />
-    <include name='org/voltdb/TestCLReplayLiveDDLSwitch.class' />
-    <include name='org/voltdb/TestCLReplayStringParam.class' />
     <include name='org/voltdb/TestClientInterface.class' />
     <include name='org/voltdb/TestClientInterfaceHandleManager.class' />
     <include name='org/voltdb/TestCommandLogReplayState.class' />
@@ -354,12 +350,9 @@
     <include name='org/voltdb/TestRejoinWithCatalogUpdates.class' />
     <include name='org/voltdb/TestRestoreAgent.class' />
     <include name='org/voltdb/TestVoltLicense.class' />
-    <include name='org/voltdb/catalog/TestCatalogSerialization.class' />
-    <include name='org/voltdb/catalog/TestDRCatalogDiffs.class' />
     <include name='org/voltdb/client/TestClientFeatures.class' />
     <include name='org/voltdb/dtxn/Test*.class' />
-    <include name='org/voltdb/export/TestExportSnapshotPreservesSequenceNumber.class' />
-    <include name='org/voltdb/export/TestStreamBlockQueue.class' />
+    <include name='org/voltdb/dr2/TestDR2Reset.class' />
     <include name='org/voltdb/exportclient/TestElasticSearchHttpExportClient.class' />
     <include name='org/voltdb/exportclient/TestExportDecoderBase.class' />
     <include name='org/voltdb/exportclient/TestExportToFileClient.class' />
@@ -371,8 +364,7 @@
     <include name='org/voltdb/jdbc/Test*.class' />
     <include name='org/voltdb/jni/TestExecutionEngine.class' />
     <include name='org/voltdb/jni/TestFragmentProgressUpdate.class' />
-    <include name='org/voltdb/elastic/TestDataMigrationSnapshotPlanner.class' />
-    <include name='org/voltdb/elastic/TestElasticJoinUtils.class' />
+    <include name='org/voltdb/elastic/Test*.class' />
     <include name='org/voltdb/messaging/TestVoltMessageSerialization.class' />
     <include name='org/voltdb/planner/TestAdHocPlans.class' />
     <include name='org/voltdb/planner/TestDeterminism.class' />
@@ -399,9 +391,33 @@
 <patternset id='junit.other.p3.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/dr2/**/Test*.class' />
+    <exclude name='org/voltdb/dr2/TestDR2Reset.class' />
     <include name='org/voltdb/TestExport*.class' />
-	<!-- E3-specific test cases  --> 
-    <include name='org/voltdb/e3/Test*.class' />
+    <include name='org/voltdb/export/TestExportAlterStreamEndToEnd.class' />
+    <include name='org/voltdb/export/TestExportBase.class' />
+    <include name='org/voltdb/export/TestExportBaseSocketExport.class' />
+    <include name='org/voltdb/export/TestExportClientBasic.class' />
+    <include name='org/voltdb/export/TestExportCoordinator.class' />
+    <include name='org/voltdb/export/TestExportDanglingSources.class' />
+    <include name='org/voltdb/export/TestExportDataSource.class' />
+    <include name='org/voltdb/export/TestExportEndToEnd.class' />
+    <include name='org/voltdb/export/TestExportFeatureOption.class' />
+    <include name='org/voltdb/export/TestExportGap.class' />
+    <include name='org/voltdb/export/TestExportGeneration.class' />
+    <include name='org/voltdb/export/TestExportInsertIntoSelectSuite.class' />
+    <include name='org/voltdb/export/TestExportLoopbackClient.class' />
+    <include name='org/voltdb/export/TestExportRejoin.class' />
+    <include name='org/voltdb/export/TestExportRollback.class' />
+    <include name='org/voltdb/export/TestExportSequenceNumberTracker.class' />
+    <include name='org/voltdb/export/TestExportSnapshot.class' />
+    <include name='org/voltdb/export/TestExportStatsSuite.class' />
+    <include name='org/voltdb/export/TestExportSuite.class' />
+    <include name='org/voltdb/export/TestExportV2Suite.class' />
+    <include name='org/voltdb/export/TestExportV2SuitePro.class' />
+    <include name='org/voltdb/export/TestMultiStreamPolling.class' />
+    <include name='org/voltdb/export/TestPersistentExport.class' />
+    <include name='org/voltdb/export/TestStreamBlockQueue.class' />
+
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>

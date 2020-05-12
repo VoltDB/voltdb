@@ -131,4 +131,6 @@ public interface SystemProcedureExecutionContext {
     public InitiatorMailbox getInitiatorMailbox();
 
     void decommissionSite(boolean remove, boolean promote, int newSitePerHost);
+
+    KiplingSystemTableConnection getKiplingSystemTableConnection();
 }

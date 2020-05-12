@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -98,7 +99,7 @@ public final class TaskManager {
     static final VoltLogger log = new VoltLogger("TASK");
     static final String HASH_ALGO = "SHA-512";
 
-    private Map<String, TaskHandler> m_handlers = Collections.emptyMap();
+    private Map<String, TaskHandler> m_handlers = new HashMap<>();
     private volatile boolean m_leader = false;
     private AuthSystem m_authSystem;
     volatile ManagerState m_managerState = ManagerState.SHUTDOWN;
@@ -263,7 +264,8 @@ public final class TaskManager {
             m_managerState = ManagerState.RUNNING;
 
             // Create a dummy stats source so something is always reported
-            TaskStatsSource.createDummy().register(m_statsAgent);
+            TaskStatsSource.createDummy(false).register(m_statsAgent);
+            TaskStatsSource.createDummy(true).register(m_statsAgent);
 
             return processCatalogInline(configuration, tasks, authSystem, classLoader, false);
         });
@@ -345,6 +347,69 @@ public final class TaskManager {
                 handler.updatePaused();
                 handler.start();
             }
+        });
+    }
+
+    /**
+     * Add a new system task to the task manager
+     *
+     * @param name    of the task
+     * @param scope   {@link TaskScope} for the scope
+     * @param factory to create new instances of the {@link ActionScheduler} to execute
+     * @return A {@link ListenableFuture} which completes once the task is added
+     */
+    public ListenableFuture<?> addSystemTask(String name, TaskScope scope,
+            Function<TaskHelper, ActionScheduler> factory) {
+        return execute(() -> {
+            TaskDefinition definition = new SystemTaskDefinition(name, scope);
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage(definition.getName(), "Creating task"));
+            }
+            TaskHandler handler = createTaskHandler(definition, scope, new SchedulerFactory() {
+                @Override
+                public boolean doHashesMatch(SchedulerFactory other) {
+                    return true;
+                }
+
+                @Override
+                public ActionScheduler construct(TaskHelper helper) {
+                    return factory.apply(helper);
+                }
+            });
+
+            if (handler != null) {
+                if (m_handlers.putIfAbsent(definition.getName(), handler) != null) {
+                    throw new IllegalArgumentException("Task already defined: " + name);
+                }
+
+                if (scope == TaskScope.PARTITIONS) {
+                    m_partitionedExecutor.setDynamicThreadCount(calculatePartitionedThreadPoolSize());
+                } else {
+                    m_singleExecutor.setDynamicThreadCount(1);
+                }
+
+                handler.start();
+            }
+        });
+    }
+
+    /**
+     * Remove a system task from the task manager
+     *
+     * @param name of task
+     * @return {@link ListenableFuture} which returns {@code true} if a task was removed
+     */
+    public ListenableFuture<Boolean> removeSystemTask(String name) {
+        return execute(() -> {
+            TaskHandler handler = m_handlers.remove(SystemTaskDefinition.createSystemTaskName(name));
+            if (handler == null) {
+                return false;
+            }
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage(handler.m_definition.getName(), "Removing task"));
+            }
+            handler.cancel();
+            return true;
         });
     }
 
@@ -692,10 +757,6 @@ public final class TaskManager {
         }
     }
 
-    AuthUser getUser(String userName) {
-        return m_authSystem.getUser(userName);
-    }
-
     static <T> ListenableFuture<T> addExceptionListener(ListenableFuture<T> future,
             Consumer<Throwable> exceptionHandler) {
         future.addListener(() -> {
@@ -776,15 +837,16 @@ public final class TaskManager {
             TaskScope scope = TaskScope.fromId(task.getScope());
             TaskValidationResult result = validateTask(task, scope, null, classLoader);
 
+            TaskDefinition definition = new CatalogTaskDefinition(task, scope);
             if (handler != null) {
                 // Do not restart a schedule if it has not changed
-                if (handler.isSameSchedule(task, result.m_factory, classesUpdated)) {
+                if (handler.isSameSchedule(definition, result.m_factory, classesUpdated)) {
                     if (log.isDebugEnabled()) {
                         log.debug(generateLogMessage(task.getName(),
                                 "Schedule is running and does not need to be restarted"));
                     }
                     newHandlers.put(task.getName(), handler);
-                    handler.updateDefinition(task);
+                    handler.updateDefinition(definition);
                     if (frequencyChanged) {
                         handler.setMaxFrequency(m_maxFrequency);
                     }
@@ -802,47 +864,36 @@ public final class TaskManager {
                 handler.cancel();
             }
 
-            if (m_leader || scope != TaskScope.DATABASE) {
-                if (!result.isValid()) {
-                    log.warn(generateLogMessage(task.getName(), result.getErrorMessage()),
-                            result.getException());
-                    continue;
-                }
+            if (!result.isValid()) {
+                log.warn(generateLogMessage(definition.getName(), result.getErrorMessage()), result.getException());
+                continue;
+            }
 
-                if (log.isDebugEnabled()) {
-                    log.debug(generateLogMessage(task.getName(), "Creating handler for scope: " + scope));
-                }
-
-                TaskHandler definition;
-                switch (scope) {
-                case HOSTS:
-                case DATABASE:
-                    definition = new SingleTaskHandler(task, scope, result.m_factory,
-                            m_singleExecutor.getExecutor());
-                    hasNonPartitionedSchedule = true;
-                    break;
-                case PARTITIONS:
-                    definition = new PartitionedTaskHandler(task, result.m_factory,
-                            m_partitionedExecutor.getExecutor());
-                    if (m_enableTasksOnPartitions) {
-                        for (Integer partitionId : m_locallyLedPartitions) {
-                            definition.promotedPartition(partitionId.intValue());
-                        }
-                    }
+            handler = createTaskHandler(definition, scope, result.m_factory);
+            if (handler != null) {
+                if (scope == TaskScope.PARTITIONS) {
                     hasPartitionedSchedule = true;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported run location: " + task.getScope());
+                } else {
+                    hasNonPartitionedSchedule = true;
                 }
-                modifications.put(task.getName(), Boolean.TRUE);
-                newHandlers.put(task.getName(), definition);
+                modifications.put(definition.getName(), Boolean.TRUE);
+                newHandlers.put(definition.getName(), handler);
             }
         }
 
         // Cancel all removed schedules
         for (TaskHandler handler : m_handlers.values()) {
-            handler.cancel();
-            modifications.put(handler.m_definition.getName(), Boolean.FALSE);
+            if (handler.m_definition.isSystemTask()) {
+                newHandlers.put(handler.m_definition.getName(), handler);
+                if (handler.m_definition.getScope() == TaskScope.PARTITIONS) {
+                    hasPartitionedSchedule = true;
+                } else {
+                    hasNonPartitionedSchedule= true;
+                }
+            }else {
+                handler.cancel();
+                modifications.put(handler.m_definition.getName(), Boolean.FALSE);
+            }
         }
 
         // Set the dynamic thread counts based on whether or not schedules exist and partition counts
@@ -856,6 +907,34 @@ public final class TaskManager {
 
         m_handlers = newHandlers;
         return modifications;
+    }
+
+    private TaskHandler createTaskHandler(TaskDefinition definition, TaskScope scope, SchedulerFactory factory) {
+        TaskHandler handler = null;
+        if (m_leader || scope != TaskScope.DATABASE) {
+
+            if (log.isDebugEnabled()) {
+                log.debug(generateLogMessage(definition.getName(), "Creating handler for scope: " + scope));
+            }
+
+            switch (scope) {
+            case HOSTS:
+            case DATABASE:
+                handler = new SingleTaskHandler(definition, scope, factory, m_singleExecutor.getExecutor());
+                break;
+            case PARTITIONS:
+                handler = new PartitionedTaskHandler(definition, factory, m_partitionedExecutor.getExecutor());
+                if (m_enableTasksOnPartitions) {
+                    for (Integer partitionId : m_locallyLedPartitions) {
+                        handler.promotedPartition(partitionId.intValue());
+                    }
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported run location: " + scope);
+            }
+        }
+        return handler;
     }
 
     private int getThreadPoolSize(TaskSettingsType configuration, boolean getHost) {
@@ -1029,13 +1108,204 @@ public final class TaskManager {
     }
 
     /**
+     * Abstraction around what defines a task
+     */
+    private interface TaskDefinition {
+        /**
+         * @return name of the task
+         */
+        String getName();
+
+        /**
+         * @return {@code true} if this task is enabled
+         */
+        boolean isEnabled();
+
+        /**
+         * @return The name of the user being used to execute any procedures
+         */
+        String getUserName();
+
+        /**
+         * @param auth Current {@link AuthSystem}
+         * @return {@link AuthUser} who will be used to execute any procedures
+         */
+        AuthUser getUser(AuthSystem auth);
+
+        /**
+         * @return {@link TaskScope} in which this task should be executed
+         */
+        TaskScope getScope();
+
+        /**
+         * @return How any errors should be handled
+         */
+        String getOnError();
+
+        /**
+         * @return {@code true} if this is a system task
+         */
+        boolean isSystemTask();
+
+        /**
+         * @param other definition to compare this one to
+         * @return {@code true} if this definition is the same as {@code other}
+         */
+        boolean isSameDefinition(TaskDefinition other);
+
+        /**
+         * Update this task definition using {@code other}
+         *
+         * @param other definition with updated values
+         */
+        void update(TaskDefinition other);
+    }
+
+    /**
+     * {@link TaskDefinition} which wraps a {@link Task}
+     */
+    private static class CatalogTaskDefinition implements TaskDefinition {
+        private final Task m_task;
+        private final TaskScope m_scope;
+
+        CatalogTaskDefinition(Task task, TaskScope scope) {
+            m_task = task;
+            m_scope = scope;
+        }
+
+        @Override
+        public String getName() {
+            return m_task.getName();
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return m_task.getEnabled();
+        }
+
+        @Override
+        public String getUserName() {
+            return m_task.getUser();
+        }
+
+        @Override
+        public AuthUser getUser(AuthSystem auth) {
+            return auth.getUser(m_task.getUser());
+        }
+
+        @Override
+        public TaskScope getScope() {
+            return m_scope;
+        }
+
+        @Override
+        public String getOnError() {
+            return m_task.getOnerror();
+        }
+
+        @Override
+        public boolean isSystemTask() {
+            return false;
+        }
+
+        @Override
+        public boolean isSameDefinition(TaskDefinition other) {
+            if (other.getClass() != getClass()) {
+                return false;
+            }
+
+            Task otherTask = ((CatalogTaskDefinition) other).m_task;
+
+            return Objects.equals(m_task.getName(), otherTask.getName())
+                    && Objects.equals(m_task.getScope(), otherTask.getScope())
+                    && Objects.equals(m_task.getUser(), otherTask.getUser())
+                    && Objects.equals(m_task.getSchedulerclass(), otherTask.getSchedulerclass())
+                    && Objects.equals(m_task.getSchedulerparameters(), otherTask.getSchedulerparameters())
+                    && Objects.equals(m_task.getActiongeneratorclass(), otherTask.getActiongeneratorclass())
+                    && Objects.equals(m_task.getActiongeneratorparameters(), otherTask.getActiongeneratorparameters())
+                    && Objects.equals(m_task.getScheduleclass(), otherTask.getScheduleclass())
+                    && Objects.equals(m_task.getScheduleparameters(), otherTask.getScheduleparameters());
+        }
+
+        @Override
+        public void update(TaskDefinition other) {
+            assert isSameDefinition(other);
+            m_task.setEnabled(other.isEnabled());
+            m_task.setOnerror(other.getOnError());
+        }
+    }
+
+    /**
+     * {@link TaskDefinition} which describes a system task
+     */
+    private static class SystemTaskDefinition implements TaskDefinition {
+        private static final String NAME_PREFIX = "_SYSTEM_";
+        private final String m_name;
+        private final TaskScope m_scope;
+
+        static String createSystemTaskName(String name) {
+            return NAME_PREFIX + name;
+        }
+
+        SystemTaskDefinition(String name, TaskScope scope) {
+            m_name = createSystemTaskName(name);
+            m_scope = scope;
+        }
+
+        @Override
+        public String getName() {
+            return m_name;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return true;
+        }
+
+        @Override
+        public String getUserName() {
+            return "INTERNAL";
+        }
+
+        @Override
+        public AuthUser getUser(AuthSystem auth) {
+            return auth.getInternalAdminUser();
+        }
+
+        @Override
+        public TaskScope getScope() {
+            return m_scope;
+        }
+
+        @Override
+        public String getOnError() {
+            return "IGNORE";
+        }
+
+        @Override
+        public boolean isSystemTask() {
+            return true;
+        }
+
+        @Override
+        public boolean isSameDefinition(TaskDefinition other) {
+            return false;
+        }
+
+        @Override
+        public void update(TaskDefinition other) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /**
      * Base class for wrapping a single scheduler configuration.
      */
     private abstract class TaskHandler {
-        final Task m_definition;
+        final TaskDefinition m_definition;
         private final SchedulerFactory m_factory;
 
-        TaskHandler(Task definition, SchedulerFactory factory) {
+        TaskHandler(TaskDefinition definition, SchedulerFactory factory) {
             m_definition = definition;
             m_factory = factory;
         }
@@ -1047,21 +1317,12 @@ public final class TaskManager {
          * @param factory    {@link SchedulerFactory} derived from {@code definition}
          * @return {@code true} if both {@code definition} and {@code factory} match those in this handler
          */
-        boolean isSameSchedule(Task definition, SchedulerFactory factory, boolean checkHashes) {
+        boolean isSameSchedule(TaskDefinition definition, SchedulerFactory factory, boolean checkHashes) {
             return isSameDefinition(definition) && (!checkHashes || m_factory.doHashesMatch(factory));
         }
 
-        private boolean isSameDefinition(Task definition) {
-            return Objects.equals(m_definition.getName(), definition.getName())
-                    && Objects.equals(m_definition.getScope(), definition.getScope())
-                    && Objects.equals(m_definition.getUser(), definition.getUser())
-                    && Objects.equals(m_definition.getSchedulerclass(), definition.getSchedulerclass())
-                    && Objects.equals(m_definition.getSchedulerparameters(), definition.getSchedulerparameters())
-                    && Objects.equals(m_definition.getActiongeneratorclass(), definition.getActiongeneratorclass())
-                    && Objects.equals(m_definition.getActiongeneratorparameters(),
-                            definition.getActiongeneratorparameters())
-                    && Objects.equals(m_definition.getScheduleclass(), definition.getScheduleclass())
-                    && Objects.equals(m_definition.getScheduleparameters(), definition.getScheduleparameters());
+        private boolean isSameDefinition(TaskDefinition definition) {
+            return m_definition.isSameDefinition(definition);
         }
 
         /**
@@ -1092,10 +1353,8 @@ public final class TaskManager {
          *
          * @param newDefintion Updated definition
          */
-        void updateDefinition(Task newDefintion) {
-            assert isSameDefinition(newDefintion);
-            m_definition.setEnabled(newDefintion.getEnabled());
-            m_definition.setOnerror(newDefintion.getOnerror());
+        void updateDefinition(TaskDefinition newDefintion) {
+            m_definition.update(newDefintion);
         }
 
         abstract void updatePaused();
@@ -1125,7 +1384,7 @@ public final class TaskManager {
     private class SingleTaskHandler extends TaskHandler {
         private final SchedulerWrapper<? extends SingleTaskHandler> m_wrapper;
 
-        SingleTaskHandler(Task definition, TaskScope scope, SchedulerFactory factory,
+        SingleTaskHandler(TaskDefinition definition, TaskScope scope, SchedulerFactory factory,
                 ListeningScheduledExecutorService executor) {
             super(definition, factory);
 
@@ -1147,14 +1406,14 @@ public final class TaskManager {
         }
 
         @Override
-        void updateDefinition(Task newDefintion) {
+        void updateDefinition(TaskDefinition newDefintion) {
             super.updateDefinition(newDefintion);
-            m_wrapper.evaluateState(newDefintion.getEnabled());
+            m_wrapper.evaluateState(newDefintion.isEnabled());
         }
 
         @Override
         void updatePaused() {
-            m_wrapper.evaluateState(m_definition.getEnabled());
+            m_wrapper.evaluateState(m_definition.isEnabled());
         }
 
         @Override
@@ -1182,7 +1441,8 @@ public final class TaskManager {
         private final Map<Integer, PartitionSchedulerWrapper> m_wrappers = new HashMap<>();
         private final ListeningScheduledExecutorService m_executor;
 
-        PartitionedTaskHandler(Task definition, SchedulerFactory factory, ListeningScheduledExecutorService executor) {
+        PartitionedTaskHandler(TaskDefinition definition, SchedulerFactory factory,
+                ListeningScheduledExecutorService executor) {
             super(definition, factory);
             m_executor = executor;
         }
@@ -1196,9 +1456,9 @@ public final class TaskManager {
         }
 
         @Override
-        void updateDefinition(Task newDefintion) {
+        void updateDefinition(TaskDefinition newDefintion) {
             super.updateDefinition(newDefintion);
-            boolean enabled = newDefintion.getEnabled();
+            boolean enabled = newDefintion.isEnabled();
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
                 wrapper.evaluateState(enabled);
             }
@@ -1206,7 +1466,7 @@ public final class TaskManager {
 
         @Override
         void updatePaused() {
-            boolean enabled = m_definition.getEnabled();
+            boolean enabled = m_definition.isEnabled();
             for (PartitionSchedulerWrapper wrapper : m_wrappers.values()) {
                 wrapper.evaluateState(enabled);
             }
@@ -1334,12 +1594,13 @@ public final class TaskManager {
             }
 
             if (m_stats == null) {
-                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getScopeId());
+                m_stats = TaskStatsSource.create(m_handler.m_definition.getName(), getScope(), getScopeId(),
+                        m_handler.m_definition.isSystemTask());
                 m_stats.register(m_statsAgent);
             }
 
             SchedulerWrapperState state;
-            if (!m_handler.m_definition.getEnabled()) {
+            if (!m_handler.m_definition.isEnabled()) {
                 state = SchedulerWrapperState.DISABLED;
             } else {
                 state = SchedulerWrapperState.RUNNING;
@@ -1468,10 +1729,9 @@ public final class TaskManager {
 
             modifyInvocation(procedure, invocation);
 
-            String userName = m_handler.m_definition.getUser();
-            AuthUser user = getUser(userName);
+            AuthUser user = m_handler.m_definition.getUser(m_authSystem);
             if (user == null) {
-                errorOccurred("User %s does not exist", userName);
+                errorOccurred("User %s does not exist", m_handler.m_definition.getUserName());
                 return;
             }
 
@@ -1505,7 +1765,7 @@ public final class TaskManager {
                                 + ((ClientResponseImpl) response).toStatusJSONString()));
                     }
                 } else {
-                    String onError = m_handler.m_definition.getOnerror();
+                    String onError = m_handler.m_definition.getOnError();
 
                     boolean isIgnore = "IGNORE".equalsIgnoreCase(onError);
                     if (!isIgnore || log.isDebugEnabled()) {

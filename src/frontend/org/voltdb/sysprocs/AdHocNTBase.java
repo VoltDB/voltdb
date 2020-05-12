@@ -30,8 +30,15 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -132,14 +139,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         final String readOnly = batch.readOnly ? "yes" : "no";
         final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
         final String user = getUsername();
-        final String[] groupNames = context.authSystem.getGroupNamesForUser(user);
-        final String groupList = StringUtils.join(groupNames, ',');
+        final List<String> groupNames = context.authSystem.getGroupNamesForUser(user);
 
         //String[] stmtArray = batch.stmts.stream().map(s -> new String(s.sql, Charsets.UTF_8)).toArray(String[]::new);
 
         adhocLog.debug(String.format(
-            "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=[%s]",
-            numStmts, numParams, readOnly, singlePartition, user, groupList));
+            "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=%s",
+            numStmts, numParams, readOnly, singlePartition, user, groupNames));
         for (int i = 0; i < batch.getPlannedStatementCount(); i++) {
             AdHocPlannedStatement stmt = batch.getPlannedStatement(i);
             String sql = stmt.sql == null ? "SQL_UNKNOWN" : new String(stmt.sql, Charsets.UTF_8);

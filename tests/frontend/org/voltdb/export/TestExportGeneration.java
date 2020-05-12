@@ -70,7 +70,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestExportGeneration {
 
@@ -176,7 +176,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
-                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))), false);
+                ImmutableMap.of(m_part, CoreUtils.getSiteIdFromHSId(m_site)), false);
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
@@ -265,7 +265,7 @@ public class TestExportGeneration {
                     0L,
                     foo.duplicate()
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            AckingContainer cont = m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));

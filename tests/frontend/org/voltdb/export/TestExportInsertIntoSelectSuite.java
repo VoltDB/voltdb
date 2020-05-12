@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Ignore;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -39,6 +38,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder.ReuseServer;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertFromTableSelectMP;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertNoNullsRepl;
@@ -296,7 +296,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, ReuseServer.NEVER);
 
         return builder;
     }

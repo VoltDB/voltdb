@@ -18,7 +18,6 @@
 package org.voltdb.export.processors;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -35,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
 import org.voltdb.export.AckingContainer;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
@@ -65,9 +63,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders = new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
-    private final long m_startTS = System.currentTimeMillis();
     private volatile boolean m_startPolling = false;
-    private long m_genId;
 
     // Instantiated at ExportManager
     public GuestProcessor() {
@@ -183,15 +179,10 @@ public class GuestProcessor implements ExportDataProcessor {
     private class ExportRunner implements Runnable {
         final ExportClientBase m_client;
         final ExportDataSource m_source;
-        final ArrayList<VoltType> m_types = new ArrayList<VoltType>();
 
         ExportRunner(String groupName, ExportClientBase client, ExportDataSource source) {
             m_client = Preconditions.checkNotNull(m_clientsByTarget.get(groupName), "null client");
             m_source = source;
-
-            for (int type : m_source.m_columnTypes) {
-                m_types.add(VoltType.get((byte)type));
-            }
         }
 
         @Override
@@ -199,28 +190,13 @@ public class GuestProcessor implements ExportDataProcessor {
             runDataSource();
         }
 
-        private void detectDecoder(ExportClientBase client, ExportDecoderBase edb) {
-            try {
-                Method m = edb.getClass().getDeclaredMethod("processRow", int.class, byte[].class);
-                if (m != null) {
-                    if (EXPORTLOG.isDebugEnabled()) {
-                        EXPORTLOG.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
-                    }
-                    edb.setLegacy(true);
-                }
-            } catch (Exception ex) {
-                if (EXPORTLOG.isDebugEnabled()) {
-                    EXPORTLOG.debug("Found Modern export client: " + client.getClass().getCanonicalName());
-                }
-            }
-        }
-
         //Utility method to build and add listener.
         private void buildListener(AdvertisedDataSource ads) {
             //Dont construct if we are shutdown
-            if (m_shutdown) return;
+            if (m_shutdown) {
+                return;
+            }
             final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
-            detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
             final ListenableFuture<AckingContainer> fut = m_source.poll();
@@ -233,17 +209,8 @@ public class GuestProcessor implements ExportDataProcessor {
         private void runDataSource() {
             synchronized (GuestProcessor.this) {
 
-                final AdvertisedDataSource ads =
-                        new AdvertisedDataSource(
-                                m_source.getPartitionId(),
-                                m_source.getTableName(),
-                                m_source.getPartitionColumnName(),
-                                System.currentTimeMillis(),
-                                m_source.getGeneration(),
-                                m_source.m_columnNames,
-                                m_types,
-                                m_source.m_columnLengths,
-                                m_source.getExportFormat());
+                final AdvertisedDataSource ads = new AdvertisedDataSource(m_source.getPartitionId(),
+                        m_source.getTableName());
 
                 // Ee cannot poll until the initial truncation is complete
                 final Runnable waitForBarrierRelease = new Runnable() {
@@ -392,48 +359,37 @@ public class GuestProcessor implements ExportDataProcessor {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
-                                    if (edb.isLegacy()) {
+
+                                    try {
                                         cont.updateStartTime(System.currentTimeMillis());
-                                        if (firstRowOfBlock) {
-                                            edb.onBlockStart();
-                                            firstRowOfBlock = false;
-                                        }
-                                        edb.processRow(length, rowdata);
-                                    } else {
-                                        //New style connector.
-                                        try {
-                                            cont.updateStartTime(System.currentTimeMillis());
-                                            ExportRow schema = edb.getExportRowSchema();
-                                            if (schema == null || schema.generation != cont.getSchema().generation) {
-                                                // Note {@code ExportRowSchema} is a special {@code ExportRow}
-                                                ExportRowSchema newSchema = cont.getSchema();
-                                                if (EXPORTLOG.isDebugEnabled()) {
-                                                    EXPORTLOG.debug("Set schema to: " + newSchema);
-                                                }
-                                                edb.setExportRowSchema(newSchema);
+                                        ExportRow schema = edb.getExportRowSchema();
+                                        if (schema == null || schema.generation != cont.getSchema().generation) {
+                                            // Note {@code ExportRowSchema} is a special {@code ExportRow}
+                                            ExportRowSchema newSchema = cont.getSchema();
+                                            if (EXPORTLOG.isDebugEnabled()) {
+                                                EXPORTLOG.debug("Set schema to: " + newSchema);
                                             }
-                                            row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(), m_startTS, rowdata);
-                                        } catch (IOException ioe) {
-                                            EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
-                                            cont.discard();
-                                            cont = null;
-                                            break;
+                                            edb.setExportRowSchema(newSchema);
                                         }
-                                        if (firstRowOfBlock) {
-                                            edb.onBlockStart(row);
-                                            firstRowOfBlock = false;
-                                        }
-                                        edb.processRow(row);
-                                        if (committedSpHandle == 0) {
-                                            committedSpHandle = extractCommittedSpHandle(row,
-                                                    cont.getCommittedSeqNo());
-                                        }
+                                        row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(),
+                                                rowdata);
+                                    } catch (IOException ioe) {
+                                        EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId()
+                                                + ". " + ioe.getMessage());
+                                        cont.discard();
+                                        cont = null;
+                                        break;
+                                    }
+                                    if (firstRowOfBlock) {
+                                        edb.onBlockStart(row);
+                                        firstRowOfBlock = false;
+                                    }
+                                    edb.processRow(row);
+                                    if (committedSpHandle == 0) {
+                                        committedSpHandle = extractCommittedSpHandle(row, cont.getCommittedSeqNo());
                                     }
                                 }
-                                if (edb.isLegacy()) {
-                                    edb.onBlockCompletion();
-                                }
-                                else if (row != null) {
+                                if (row != null) {
                                     edb.onBlockCompletion(row);
                                 }
                                 if (EXPORTLOG.isDebugEnabled()) {

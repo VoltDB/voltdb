@@ -33,21 +33,29 @@ public abstract class PBDSegment<M> {
 
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
+    static final long INVALID_ID = Long.MIN_VALUE;
+    static final long INVALID_TIMESTAMP = -1;
 
     // Segment Header layout:
     // - version of segment headers (4 bytes)
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
     //  - total bytes of data (4 bytes, uncompressed size),
+    //  - id of the first data entry (8 bytes)
+    //  - id of the last data entry (8 bytes)
+    // - timestamp last entry was added (8 bytes)
     //  - random id assigned to segment ( 4 bytes )
     //  - size in bytes of extra header ( 4 bytes )
     //  - crc for the extra header ( 4 bytes )
     public static final int HEADER_START_OFFSET = 0;
-    public static final int HEADER_VERSION_OFFSET = HEADER_START_OFFSET;
-    public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
-    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_CRC_OFFSET = HEADER_START_OFFSET;
+    public static final int HEADER_VERSION_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_VERSION_OFFSET + 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
-    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_START_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 8;
+    public static final int HEADER_END_ID_OFFSET = HEADER_START_ID_OFFSET + 8;
+    public static final int HEADER_LAST_TIMESTAMP = HEADER_END_ID_OFFSET + 8;
+    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_LAST_TIMESTAMP + 4;
     public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_RANDOM_ID_OFFSET + 4;
     public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
     static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
@@ -69,21 +77,17 @@ public abstract class PBDSegment<M> {
     public static final int ENTRY_HEADER_BYTES = ENTRY_HEADER_FLAG_OFFSET + 2;
 
     final File m_file;
-    // Index of this segment in the in-memory segment map
-    final long m_index;
-    // Persistent ID of this segment, based on managing a monotonic counter
+    // Persistent ID of this segment. This is monotonically increasing for PBDs with requiresId=false.
+    // It is the starting id in the segment otherwise, but still increasing value
     final long m_id;
     boolean m_deleteOnAck;
 
-    PBDSegment(File file, long index, long id) {
+    private long m_fileSize = -1;
+
+    PBDSegment(File file, long id) {
         super();
         m_file = file;
-        m_index = index;
         m_id = id;
-    }
-
-    long segmentIndex() {
-        return m_index;
     }
 
     long segmentId() {
@@ -93,6 +97,34 @@ public abstract class PBDSegment<M> {
     File file() {
         return m_file;
     }
+
+    public void saveFileSize() {
+        m_fileSize = m_file.length();
+    }
+
+    public long getFileSize() {
+        return (m_fileSize > 0) ? m_fileSize : m_file.length();
+    }
+
+    /**
+     * Returns the start id stored in this segment's header.
+     *
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getStartId() throws IOException;
+
+    /**
+     * Returns the end id stored in this segment's header.
+     *
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getEndId() throws IOException ;
+
+    /**
+     * @return the timestamp of the last entry or {@code -1} if there is no timestamp
+     * @throws IOException if an IO error occurs trying to read the header.
+     */
+    abstract long getTimestamp() throws IOException;
 
     abstract int getNumEntries() throws IOException;
 
@@ -133,7 +165,19 @@ public abstract class PBDSegment<M> {
 
     abstract boolean hasAllFinishedReading() throws IOException;
 
-    abstract boolean offer(DBBPool.BBContainer cont) throws IOException;
+    /**
+     * Writes passed in bytes to this segment as next entry in the PBD.
+     * @param cont BBContainer with the bytes to be written
+     * @param startId the starting id of the data that is being offered. This should be <code>INVALID_ID</code>
+     *        if the PBD does not require ids
+     * @param endId the ending id of the data that is being offered. This should be <code>INVALID_ID</code>
+     *        if the PBD does not require ids
+     * @return the number of bytes written. If compression is enables, bytes written will be
+     *         different from the number passed in. -1 will be returned if the bytes cannot
+     *         fit into this segment.
+     * @throws IOException if any IO error occurs trying to write to the pbd segment file.
+     */
+    abstract int offer(DBBPool.BBContainer cont, long startId, long endId, long timestamp) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
@@ -191,6 +235,13 @@ public abstract class PBDSegment<M> {
      * @throws IOException
      */
     abstract void finalize(boolean close) throws IOException;
+
+    /**
+     * Is this segment currently active for writing.
+     *
+     * @return returns true if this segment is currently active for writing, false otherwise
+     */
+    abstract boolean isActive();
 
     public static boolean setFinal(File file, boolean isFinal) {
 

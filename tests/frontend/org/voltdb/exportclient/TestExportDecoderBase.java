@@ -35,7 +35,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -47,7 +46,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
@@ -143,26 +141,6 @@ public class TestExportDecoderBase
             new VoltTable.ColumnInfo("geog", VoltType.GEOGRAPHY)
     );
 
-    static AdvertisedDataSource constructTestSource() {
-        return constructTestSource(0, "smallint");
-    }
-
-    static AdvertisedDataSource constructTestSource(int partition, String partitionColumn) {
-        ArrayList<String> col_names = new ArrayList<String>();
-        ArrayList<VoltType> col_types = new ArrayList<VoltType>();
-        for (int i = 0; i < COLUMN_TYPES.length; i++)
-        {
-            col_names.add(COLUMN_NAMES[i]);
-            col_types.add(COLUMN_TYPES[i]);
-        }
-        //clear the table
-        vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "yankeelover",
-                partitionColumn, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
-                AdvertisedDataSource.ExportFormat.SEVENDOTX);
-        return source;
-    }
-
     @Test
     public void testNullFlags() throws IOException
     {
@@ -171,8 +149,7 @@ public class TestExportDecoderBase
             byte[] flag = new byte[2];
             flag[0] = (byte) (1 << 8 - i - 1);
             flag[1] = (byte) (1 << 16 - i - 1);
-            FastDeserializer fds = new FastDeserializer(flag, ByteOrder.LITTLE_ENDIAN);
-            boolean[] nulls = ExportRow.extractNullFlags(fds, columnCount);
+            boolean[] nulls = ExportRow.extractNullFlags(ByteBuffer.wrap(flag), columnCount);
             for (int j = 0; j < COLUMN_TYPES.length; j++)
             {
                 if (j == i)
@@ -201,7 +178,7 @@ public class TestExportDecoderBase
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -260,7 +237,7 @@ public class TestExportDecoderBase
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -287,7 +264,7 @@ public class TestExportDecoderBase
         assertEquals(rd[15].toString(), GEOG.toString());
 
         bb.getInt(); // row size
-        rowdata = ExportRow.decodeRow(rowdata, 0, 0L, bb);
+        rowdata = ExportRow.decodeRow(rowdata, 0, bb);
         rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -338,10 +315,6 @@ public class TestExportDecoderBase
 
     @Test
     public void testExportDecoderPartitioning() throws IOException {
-        AdvertisedDataSource source = constructTestSource();
-
-        String pnames[] = {"tinyint", "smallint", "integer", "bigint", "float", "timestamp", "string", "decimal",
-                "geog_point", "geog"};
         Object evalues[] = {(byte) 1, (short) 2, 3, (long) 4, 5.5,
             new TimestampType(6L), "xx", VoltDecimalHelper.setDefaultScale(new BigDecimal(88)),
             GEOG_POINT, GEOG};
@@ -356,7 +329,7 @@ public class TestExportDecoderBase
             int schemaSize = bb.getInt();
             ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
             bb.getInt(); // row size
-            ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+            ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, bb);
             Object[] rd = rowdata.values;
 
             assertEquals(rd[0], l);

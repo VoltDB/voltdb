@@ -141,7 +141,11 @@ PersistentTable::PersistentTable(int partitionColumn,
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
 
-    ::memcpy(&m_signature, signature, 20);
+    if (signature) {
+        ::memcpy(&m_signature, signature, 20);
+    } else {
+        ::memset(&m_signature, 0, sizeof(m_signature));
+    }
 }
 
 void PersistentTable::initializeWithColumns(TupleSchema* schema,
@@ -244,8 +248,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             }
         }
 
-        tuple->move(retval.first);
-        tuple->resetHeader();
+        tuple->moveAndInitialize(retval.first);
         ++m_tupleCount;
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
@@ -281,8 +284,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         }
     }
 
-    tuple->move(retval.first);
-    tuple->resetHeader();
+    tuple->moveAndInitialize(retval.first);
     ++m_tupleCount;
     if (block->hasFreeTuples()) {
         m_blocksWithSpace.insert(block);
@@ -785,7 +787,7 @@ bool PersistentTable::insertTuple(TableTuple& source) {
     return true;
 }
 
-void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
+TableTuple PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
         std::ostringstream str;
         str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
@@ -817,6 +819,8 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     // SQLException, etc. The assumption we held that no other
     // exceptions should be thrown in the try-block is pretty
     // daring and likely not correct.
+
+    return target;
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,

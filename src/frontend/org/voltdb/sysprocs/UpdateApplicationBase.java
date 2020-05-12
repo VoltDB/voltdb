@@ -236,6 +236,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
+            VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval);
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
