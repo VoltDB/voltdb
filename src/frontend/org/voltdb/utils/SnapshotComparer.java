@@ -371,13 +371,13 @@ class SnapshotLoader {
                     System.err.println("Error: " + path + " does not have execute permission set");
                     invalidDir = true;
                 }
-                directories.add(f);
                 if (invalidDir) {
                     System.exit(STATUS_INVALID_INPUT);
                 }
-                if (directories.isEmpty()) {
-                    directories.add(new File("."));
-                }
+                directories.add(f);
+            }
+            if (directories.isEmpty()) {
+                directories.add(new File("."));
             }
         } else {
             // if from remote, first fetch to local
@@ -782,7 +782,6 @@ class SnapshotLoader {
     static String PATHSEPARATOR = "/";
 
     private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath) {
-        ;
         ChannelSftp channelSftp = null;
         try {
             channelSftp = setupJsch(username, remoteHost);
@@ -793,11 +792,8 @@ class SnapshotLoader {
             //Iterate through list of folder content
             for (ChannelSftp.LsEntry item : fileAndFolderList) {
                 if (!item.getAttrs().isDir()) { // Check if it is a file (not a directory).
-                    if (!(new File(destinationPath + PATHSEPARATOR + item.getFilename())).exists()
-                            || (item.getAttrs().getMTime() > Long
-                            .valueOf(new File(destinationPath + PATHSEPARATOR + item.getFilename()).lastModified()
-                                    / (long) 1000)
-                            .intValue())) { // Download only if changed later.
+                    if (!(new File(destinationPath + PATHSEPARATOR + item.getFilename())).exists() ||
+                            (item.getAttrs().getMTime() > Long.valueOf(new File(destinationPath + PATHSEPARATOR + item.getFilename()).lastModified() / (long) 1000).intValue())) { // Download only if changed later.
                         new File(destinationPath + PATHSEPARATOR + item.getFilename());
                         channelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(),
                                 destinationPath + PATHSEPARATOR + item.getFilename()); // Download file from source (source filename, destination filename).

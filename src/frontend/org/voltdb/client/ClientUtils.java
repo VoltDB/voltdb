@@ -53,6 +53,7 @@ public class ClientUtils {
         return checksum;
     }
 
+    // rolling checksum with both position and value as input
     public static final long cheesyBufferCheckSumWithOrder(ByteBuffer buffer) {
         final int mypos = buffer.position();
         buffer.position(0);

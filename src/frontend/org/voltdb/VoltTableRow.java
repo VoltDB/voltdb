@@ -1063,7 +1063,6 @@ public abstract class VoltTableRow {
         return new String(stringData, encoding);
     }
 
-
     public String getRow() {
         StringBuilder buffer = new StringBuilder();
         for (int i = 0; i < getColumnCount(); i++) {
