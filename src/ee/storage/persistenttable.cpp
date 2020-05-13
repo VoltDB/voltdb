@@ -135,6 +135,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_releaseReplicated(this)
     , m_tableType(tableType)
     , m_shadowStream(nullptr)
+    , isTest(false)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
