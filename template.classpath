@@ -17,6 +17,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/jcommon-1.0.16.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jfreechart-1.0.13.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/junit-dep-4.10.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/system-rules-1.19.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
@@ -92,5 +93,6 @@
 	<classpathentry kind="lib" path="lib/jetty-security-9.3.27.v20190418.jar"/>
 	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.27.Final.jar"/>
 	<classpathentry kind="lib" path="lib/netty-all-4.1.43.Final.jar"/>
+        <classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
