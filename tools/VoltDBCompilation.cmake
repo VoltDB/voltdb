@@ -103,6 +103,7 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # for each of them. These are the versions of gcc and cmake for
 # each version of Linux we support.
 # OS Ver.        gcc vers     cmake ver.   Clang version
+# Centos6:          4.4.7     2.8.12.2
 # Ubuntu 14.04      4.8.4     2.8.12.2
 # Centos7:          4.8.5     2.8.12.2
 # Ubuntu 16.04      5.4.0     3.5.1
@@ -114,7 +115,7 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # will build and run correctly.
 #
 ########################################################################
-SET (VOLTDB_COMPILER_U14p04 "4.8.4")
+SET (VOLTDB_COMPILER_C6     "4.4.7")
 #
 #
 #
@@ -125,11 +126,15 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs)
 
   # Some supported versions of cmake do not support VERSION_GREATER_EQUAL so use NOT ... VERSION_LESS
-  IF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS VOLTDB_COMPILER_U14p04)
-    message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_U14p04}.")
+  IF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS VOLTDB_COMPILER_C6)
+    message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_C6}.")
   ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5")
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-float-conversion -Wno-conversion)
-    SET (CXX_VERSION_FLAG -std=c++11)
+    IF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8.1")
+      SET (CXX_VERSION_FLAG -std=c++0x)
+    ELSE()
+      SET (CXX_VERSION_FLAG -std=c++11)
+    ENDIF()
   ELSE()
     SET (CXX_VERSION_FLAG -std=c++14)
 
