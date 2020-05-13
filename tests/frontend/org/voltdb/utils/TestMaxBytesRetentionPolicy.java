@@ -30,6 +30,7 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -225,7 +226,7 @@ public class TestMaxBytesRetentionPolicy {
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
-    @Test (timeout = 15_000)
+    @Test (timeout = 30_000)
     public void testChangeRetentionPolicy() throws Exception {
         // Fill PBD above limit to kick size-based retention at least once and
         // exit with more than 2 segments
@@ -329,16 +330,18 @@ public class TestMaxBytesRetentionPolicy {
     private void verifyPBDSegments(long maxBytes) {
         long firstSize = -1;
         long totalSize = 0;
+        LinkedHashSet<Long> sizes = new LinkedHashSet<>();
         for (PBDSegment<ExtraHeaderMetadata> segment: m_pbd.getSegments().values()) {
             long size = segment.getFileSize();
+            sizes.add(size);
             if (firstSize == -1) {
                 firstSize = size;
             }
             totalSize += size;
         }
 
-        assertTrue((totalSize <= maxBytes) ||
-                   (totalSize - firstSize < maxBytes));
+        assertTrue("sizes=" + sizes,
+                   (totalSize <= maxBytes) || (totalSize - firstSize < maxBytes));
     }
 
     private void readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws Exception {
@@ -413,7 +416,7 @@ public class TestMaxBytesRetentionPolicy {
         }
         for (String limStr : s_invalidLimits) {
             try {
-                long lim = RetentionPolicyMgr.parseByteLimit(limStr);
+                RetentionPolicyMgr.parseByteLimit(limStr);
                 fail();
             }
             catch (RetentionLimitException expected) {

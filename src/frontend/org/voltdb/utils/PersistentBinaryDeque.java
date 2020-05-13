@@ -1370,7 +1370,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         m_segments.put(newSegment.segmentId(), newSegment);
 
         if (m_retentionPolicy != null) {
-            m_retentionPolicy.newSegmentAdded();
+            m_retentionPolicy.newSegmentAdded(newSegment.m_file.length());
         }
 
         return newSegment;

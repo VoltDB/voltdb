@@ -44,8 +44,9 @@ interface PBDRetentionPolicy {
     /**
      * This will be used by the {@link BinaryDeque} to notify the retention policy implementation that a new segment of data
      * has been added to it.
+     * @param The length of the file at initialization time. This is usually the size of the segment header.
      */
-    public void newSegmentAdded();
+    public void newSegmentAdded(long initialBytes);
 
     /**
      * Callback from BinaryDeque saying bytes were added to the PBD and how many bytes.
