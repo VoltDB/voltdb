@@ -128,6 +128,7 @@ import org.voltdb.CatalogContext.CatalogInfo;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltDB.UpdatableBarrier;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -182,7 +183,6 @@ import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
-import org.voltdb.probe.MeshProber.Determination;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
@@ -374,13 +374,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
-
-    /*
-     * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
-     * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
-     * execute will perform the actual update while the others wait.
-     */
-    private final UpdateBarrier m_catalogUpdateBarrier = new UpdateBarrier();
 
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
@@ -1019,7 +1012,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
-            m_catalogUpdateBarrier.setPartyCount(m_nodeSettings.getLocalSitesCount());
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate && m_nodeSettings.clean()) {
@@ -3951,9 +3943,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean hasSecurityUserChange)
     {
         try {
-            m_catalogUpdateBarrier.await();
+            /*
+             * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
+             * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
+             * execute will perform the actual update while the others wait.
+             */
+            final UpdatableBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
+            sysProcBarrier.await();
 
-            synchronized (m_catalogUpdateBarrier) {
+            synchronized (sysProcBarrier) {
                 final ReplicationRole oldRole = getReplicationRole();
 
                 m_statusTracker.set(NodeState.UPDATING);
@@ -4142,7 +4140,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public CatalogContext settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
     {
-        synchronized (m_catalogUpdateBarrier) {
+        synchronized (m_startAndStopLock) {
             int stamp [] = new int[]{0};
             ClusterSettings expect = m_clusterSettings.get(stamp);
             if (   stamp[0] == expectedVersionId
@@ -5307,7 +5305,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public void processReplicaDecommission(int leaderCount) {
-        synchronized(m_catalogUpdateBarrier) {
+        synchronized(m_startAndStopLock) {
             setMasterOnly();
             if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
@@ -5323,8 +5321,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
                 hostLog.info("Update local active site count to :" + leaderCount);
 
-                // Update the catalog update barrier to expect the new partition count
-                m_catalogUpdateBarrier.setPartyCount(leaderCount);
+                // Update the catalog update and log update barrier to expect the new partition count
+                VoltDB.getSiteCountBarrier().setPartyCount(leaderCount);
 
                 // release export resources
                 VoltDB.getExportManager().releaseResources(getNonLeaderPartitionIds());
@@ -5341,27 +5339,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return (init != null && !(init.getServiceState().isNormal()));
         }
         return false;
-    }
-
-    /**
-     * Small wrapper class around a {@link CyclicBarrier}. This is used so that operations can synchronize on this
-     * instance and still be able to change the participant count in the barrier
-     */
-    private static final class UpdateBarrier {
-        private CyclicBarrier m_barrier;
-
-        UpdateBarrier() {}
-
-        synchronized void setPartyCount(int parties) {
-            if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
-                throw new IllegalStateException("Cannot change participant count while parties are waiting");
-            }
-            m_barrier = new CyclicBarrier(parties);
-        }
-
-        void await() throws InterruptedException, BrokenBarrierException {
-            m_barrier.await();
-        }
     }
 }
 

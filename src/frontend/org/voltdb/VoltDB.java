@@ -38,6 +38,8 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -1466,6 +1468,8 @@ public class VoltDB {
         singleton.s_config = config;
         singleton.s_fromServerThread = fromServerThread;
         instance().initialize(config);
+        singleton.s_siteCountBarrier.setPartyCount(
+                instance().getCatalogContext().getNodeSettings().getLocalSitesCount());
     }
 
     /**
@@ -1591,6 +1595,31 @@ public class VoltDB {
         return true;
     }
 
+    /**
+     * Small wrapper class around a {@link CyclicBarrier}. This is used so that operations can synchronize on this
+     * instance and still be able to change the participant count in the barrier
+     */
+    public static final class UpdatableBarrier {
+        private CyclicBarrier m_barrier;
+
+        UpdatableBarrier() {}
+
+        synchronized void setPartyCount(int parties) {
+            if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
+                throw new IllegalStateException("Cannot change participant count while parties are waiting");
+            }
+            m_barrier = new CyclicBarrier(parties);
+        }
+
+        public void await() throws InterruptedException, BrokenBarrierException {
+            m_barrier.await();
+        }
+
+        public void reset() {
+            m_barrier.reset();
+        }
+    }
+
     private static class VoltDBInstance {
         // NOTE: an explicit exception to the pattern is the Hashinator (which is a static map)
         //       because the initialize method explicitly resets the map.
@@ -1602,6 +1631,7 @@ public class VoltDB {
         E3ExecutorFactoryInterface s_e3ExecutorFactory;
         ShutdownHooks s_shutdownHooks;
         volatile TTLManager s_ttlManager;
+        UpdatableBarrier s_siteCountBarrier;
 
         VoltDBInstance(VoltDB.Configuration emptyConfig) {
             s_fromServerThread = false;
@@ -1612,6 +1642,7 @@ public class VoltDB {
             s_e3ExecutorFactory = null;
             s_shutdownHooks = new ShutdownHooks();
             s_ttlManager = null;
+            s_siteCountBarrier = new UpdatableBarrier();
         }
     }
 
@@ -1661,6 +1692,10 @@ public class VoltDB {
             }
         }
         return singleton.s_ttlManager;
+    }
+
+    public static UpdatableBarrier getSiteCountBarrier() {
+        return singleton.s_siteCountBarrier;
     }
 
     public static void resetSingletonsForTest() {
