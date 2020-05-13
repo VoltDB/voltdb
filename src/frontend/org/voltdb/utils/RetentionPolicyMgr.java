@@ -76,8 +76,10 @@ public class RetentionPolicyMgr {
     }
 
     void updateThreadPoolSize(int numThreads) {
-        m_scheduler.setCorePoolSize(numThreads);
-        LOG.info("Updated PBD to use " + numThreads + " threads to enforce retention policy");
+        if (numThreads != m_scheduler.getCorePoolSize()) {
+            m_scheduler.setCorePoolSize(numThreads);
+            LOG.info("Updated PBD to use " + numThreads + " threads to enforce retention policy");
+        }
     }
 
     public int getRetentionThreadPoolSize() {
@@ -241,7 +243,7 @@ public class RetentionPolicyMgr {
 
         // This is called from synchronized PBD method, so calls to this should be serialized as well.
         @Override
-        public void newSegmentAdded() {
+        public void newSegmentAdded(long initialBytes) {
             if (!isPolicyEnforced()) {
                 return;
             }
@@ -357,8 +359,8 @@ public class RetentionPolicyMgr {
         }
 
         @Override
-        public void newSegmentAdded() {
-            // Just adding a new segment does not increase the data size of the PBD. no-op.
+        public void newSegmentAdded(long initialBytes) {
+            bytesAdded(initialBytes);
         }
 
         @Override
