@@ -59,7 +59,7 @@ public class VoltTableUtil {
     // VoltTable status code to indicate null dependency table. Joining SPI replies to fragment
     // task messages with this.
     public static byte NULL_DEPENDENCY_STATUS = -1;
-
+    public static byte DUMMY_DEPENDENCY_STATUS = -2;
     private static final ThreadLocal<SimpleDateFormat> m_sdf = new ThreadLocal<SimpleDateFormat>() {
         @Override
         public SimpleDateFormat initialValue() {
