@@ -71,12 +71,13 @@ public class GeographyPointValue {
         m_latitude = latitude + 0.0;
         m_longitude = longitude + 0.0;
 
-        if (m_latitude < -90.0 || m_latitude > 90.0) {
-            throw new IllegalArgumentException("Latitude out of range in GeographyPointValue constructor");
+        // Use this style check to implicitly catch NaN values
+        if (!(m_latitude >= -90.0 && m_latitude <= 90.0)) {
+            throw new IllegalArgumentException("Latitude out of bounds: " + m_latitude);
         }
 
-        if (m_longitude < -180.0 || m_longitude > 180.0) {
-            throw new IllegalArgumentException("Longitude out of range in GeographyPointValue constructor");
+        if (!(m_longitude >= -180.0 && m_longitude <= 180.0)) {
+            throw new IllegalArgumentException("Longitude out of bounds: " + m_longitude);
         }
     }
 
@@ -97,12 +98,6 @@ public class GeographyPointValue {
             // Add 0.0 to avoid -0.0.
             double longitude = toDouble(m.group(1), m.group(2)) + 0.0;
             double latitude  = toDouble(m.group(3), m.group(4)) + 0.0;
-            if (Math.abs(latitude) > 90.0) {
-                throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
-            }
-            if (Math.abs(longitude) > 180.0) {
-                throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
-            }
             return new GeographyPointValue(longitude, latitude);
         } else {
             throw new IllegalArgumentException("Cannot construct GeographyPointValue value from \"" + param + "\"");
