@@ -539,14 +539,10 @@ public class MpScheduler extends Scheduler
             if (txn == null) {
                 // The thread (updateReplicas) could wipe out duplicate counters for run-everywhere system procedures
                 // if the duplicate counters contain only the partition masters from failed hosts.
-                // If a response from a failed partition master get here after the transaction has been declared completed, ignore it.
-                final Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                if (liveHosts.contains(CoreUtils.getHostIdFromHSId(message.m_sourceHSId))) {
-                    // This should not happen
-                    tmLog.warn("Received InitiateResponseMessage after the transaction is completed from " + CoreUtils.hsIdToString(message.m_sourceHSId));
-                    assert(false);
-                }
-                // Message is from a dead host
+                // A response could get here after the transaction has been declared completed from a failed partition master could get here or
+                // from a previous partition master which handles the transaction upon leader migration:
+                // partition master has been moved to a host but the host fails.
+                tmLog.info("Received InitiateResponseMessage after the transaction is completed from " + CoreUtils.hsIdToString(message.m_sourceHSId));
                 return;
             }
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
