@@ -53,6 +53,8 @@ public class ClientUtils {
         return checksum;
     }
 
+    // rolling checksum with both position and value as input
+    // TODO: explore CRC or farmHash for more accurate checksum
     public static final long cheesyBufferCheckSumWithOrder(ByteBuffer buffer) {
         final int mypos = buffer.position();
         buffer.position(0);
@@ -61,11 +63,11 @@ public class ClientUtils {
             final byte bytes[] = buffer.array();
             final int end = buffer.arrayOffset() + mypos;
             for (int ii = buffer.arrayOffset(); ii < end; ii++) {
-                checksum += bytes[ii] * ii;
+                checksum += bytes[ii] * (1+ii);
             }
         } else {
             for (int ii = 0; ii < mypos; ii++) {
-                checksum += buffer.get() * ii;
+                checksum += buffer.get() * (1+ii);
             }
         }
         buffer.position(mypos);
