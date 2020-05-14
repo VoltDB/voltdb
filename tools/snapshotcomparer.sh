@@ -56,7 +56,16 @@
 
 # resolve symlinks and canonicalize the path (make it absolute)
 pushd . > /dev/null
-this=$(realpath $0)
+this=$0
+cd `dirname $this`
+this=`basename $this`
+while [ -L "$this" ]
+do
+    this=`readlink $this`
+    cd `dirname $this`
+    this=`basename $this`
+done
+this="$(pwd -P)/$this"
 popd > /dev/null
 # the root of the VoltDB installation
 export VOLTDB_HOME=$(dirname $(dirname "$this"))
