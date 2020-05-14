@@ -46,13 +46,13 @@ public class GeographyPointValue {
     //   10. Some optional space.
     //   11. The end of the string.
     //
-    private static final Pattern wktPattern
-        = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?\\d+)(?:[.](\\d*))?\\s+([-]?\\d+)(?:[.](\\d*))?\\s*[)]\\s*\\z",
-                          Pattern.CASE_INSENSITIVE);
+    private static final Pattern wktPattern = Pattern.compile(
+            "^\\s*point\\s*\\(\\s*(-?\\d+(?:\\.\\d*)?)?\\s+(-?\\d+(?:\\.\\d*)?)\\s*\\)\\s*\\z",
+            Pattern.CASE_INSENSITIVE);
     private final double m_latitude;
     private final double m_longitude;
 
-    private static final int BYTES_IN_A_COORD = Double.SIZE / 8;
+    private static final int BYTES_IN_A_COORD = Double.BYTES;
     static final double EPSILON = 1.0e-12;
 
     // We use this value to represent a null point.
@@ -81,9 +81,6 @@ public class GeographyPointValue {
         }
     }
 
-    private static double toDouble(String aInt, String aFrac) {
-        return Double.parseDouble(aInt + "." + (aFrac == null ? "0" : aFrac));
-    }
     /**
      * Create a GeographyPointValue from a well-known text string.
      * @param param  A well-known text string.
@@ -95,9 +92,8 @@ public class GeographyPointValue {
         }
         Matcher m = wktPattern.matcher(param);
         if (m.find()) {
-            // Add 0.0 to avoid -0.0.
-            double longitude = toDouble(m.group(1), m.group(2)) + 0.0;
-            double latitude  = toDouble(m.group(3), m.group(4)) + 0.0;
+            double longitude = Double.parseDouble(m.group(1));
+            double latitude = Double.parseDouble(m.group(2));
             return new GeographyPointValue(longitude, latitude);
         } else {
             throw new IllegalArgumentException("Cannot construct GeographyPointValue value from \"" + param + "\"");
