@@ -532,7 +532,16 @@ public class MpScheduler extends Scheduler
             // Only advance the truncation point on committed transactions that sent fragments to SPIs.
             advanceRepairTruncationHandle(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
-            assert(txn != null);
+            if (txn == null) {
+                // The thread (updateReplicas) could wipe out duplicate counters for run-everywhere system procedures
+                // if the duplicate counters contain only the partition masters from failed hosts.
+                // A response could get here after the transaction has been declared completed from a failed partition master could get here or
+                // from a previous partition master which handles the transaction upon leader migration:
+                // partition master has been moved to a host but the host fails.
+                tmLog.info(String.format("Received InitiateResponseMessage after the transaction %s is completed from %s",
+                        TxnEgo.txnIdToString(message.getTxnId()), CoreUtils.hsIdToString(message.m_sourceHSId)));
+                return;
+            }
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
