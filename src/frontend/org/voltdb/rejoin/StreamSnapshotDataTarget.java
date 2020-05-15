@@ -99,6 +99,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
+    private Runnable m_inProgressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
@@ -752,5 +753,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (m_writeFailed.compareAndSet(null, exception)) {
             notifyAll();
         }
+    }
+
+    public void setInProgressHandler(Runnable inProgress) {
+        m_inProgressHandler = inProgress;
+    }
+
+    public void trackProgress() {
+        m_inProgressHandler.run();
     }
 }
