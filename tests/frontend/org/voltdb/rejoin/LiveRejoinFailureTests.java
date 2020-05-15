@@ -156,7 +156,7 @@ public class LiveRejoinFailureTests extends JUnit4LocalClusterTest {
         Thread.sleep(1500);
 
         System.out.println("Recovering node 0.");
-        cluster.recoverOne(0, 1, "", true);
+        cluster.recoverOne(0, 1, true);
 
         System.out.println("Recovered.");
 

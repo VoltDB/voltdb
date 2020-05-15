@@ -1319,9 +1319,9 @@ public class LocalCluster extends VoltServerConfig {
         }
     }
 
-    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
+    public boolean recoverOne(int hostId, Integer portOffset, boolean liveRejoin) {
         StartAction startAction = isNewCli ? StartAction.PROBE : (liveRejoin ? StartAction.LIVE_REJOIN : StartAction.REJOIN);
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, startAction);
+        return recoverOne(false, 0, hostId, portOffset, startAction);
     }
 
     public void joinOne(int hostId) {
@@ -1414,34 +1414,34 @@ public class LocalCluster extends VoltServerConfig {
         m_removedHosts = removeHosts;
     }
 
-    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, StartAction.REJOIN);
+    public boolean recoverOne(int hostId, Integer leaderHostId) {
+        return recoverOne(false, 0, hostId, leaderHostId, StartAction.REJOIN);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
+        return recoverOne( logtime, startTime, hostId, null, StartAction.REJOIN);
     }
 
     // Re-start a (dead) process. HostId is the enumeration of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
-    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
-                               String rejoinHost, StartAction startAction) {
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer leaderHostId,
+                               StartAction startAction) {
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
         // based on other state in this class except to say that whoever wrote
         // it this way originally probably eats kittens and hates cake.
-        if (rejoinHostId == null || (m_hasLocalServer && hostId != 0)) {
-            rejoinHostId = 0;
+        if (leaderHostId == null || (m_hasLocalServer && hostId != 0)) {
+            leaderHostId = 0;
         }
         if (isNewCli) {
             //If this is new CLI we use probe
             startAction = StartAction.PROBE;
         }
-        int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+        int portNoToRejoin = m_cmdLines.get(leaderHostId).internalPort();
 
         if (hostId == 0 && m_hasLocalServer) {
             templateCmdLine.leaderPort(portNoToRejoin);
-            startLocalServer(rejoinHostId, false, startAction);
+            startLocalServer(leaderHostId, false, startAction);
             m_localServer.waitForRejoin();
             return true;
         }
@@ -1449,7 +1449,7 @@ public class LocalCluster extends VoltServerConfig {
         // For some mythical reason rejoinHostId is not actually used for the newly created host,
         // hostNum is used by default (in fact hostNum should equal to hostId, otherwise some tests
         // may fail)
-        log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
+        log.info("Rejoining " + hostId + " to hostID: " + leaderHostId);
 
         // rebuild the EE proc set.
         if (templateCmdLine.target().isIPC && m_eeProcs.size() < hostId) {
@@ -1485,7 +1485,7 @@ public class LocalCluster extends VoltServerConfig {
             if (m_debug) {
                 rejoinCmdLn.debugPort(portGenerator.next());
             }
-            rejoinCmdLn.leader(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            rejoinCmdLn.leader(":" + String.valueOf(portNoToRejoin));
 
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();

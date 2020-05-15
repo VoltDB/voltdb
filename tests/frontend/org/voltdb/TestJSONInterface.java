@@ -1036,7 +1036,7 @@ public class TestJSONInterface extends TestCase {
             cluster.killSingleHost(0);
             assertFalse("Http port failed to close when the node is offline", canAccessHttpPort(port0));
 
-            cluster.recoverOne(0, 0, "", true);
+            cluster.recoverOne(0, 0, true);
             startTime = System.currentTimeMillis();
             port0 = cluster.httpPort(3);
             while ( !canAccessHttpPort(port0)|| !canAccessHttpPort(port1) || !canAccessHttpPort(port2)) {

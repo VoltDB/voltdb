@@ -174,7 +174,7 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
             for (int ii = 0; ii < 3; ii++) {
                 cluster.killSingleHost(1);
                 Thread.sleep(1000);
-                cluster.recoverOne( 1, 0, "");
+                cluster.recoverOne( 1, 0);
 
                 File newCatalog = new File(Configuration.getPathToCatalogForTest("rejoin.jar"));
                 File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
