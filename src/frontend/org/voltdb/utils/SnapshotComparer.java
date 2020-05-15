@@ -99,11 +99,12 @@ public class SnapshotComparer {
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --self --nonce nonce1 --paths path1,path2 --hosts host1,host2 --user username");
         System.out.println();
         System.out.println("Peer Comparision, verify data consistency among snapshots: snapshotComparer nonce1 nonce2");
-        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer  --nonce1 nonce1 --dir1 dir1-1,dir1-2,dir1-3 nonce2 --dir2 dir2-1,dir2-2,dir2-3");
+        System.out.println("for local snapshots, use --dirs for specify directories: snapshotComparer  --nonce1 nonce1 --dirs1 dir1-1,dir1-2,dir1-3 nonce2 --dirs2 dir2-1,dir2-2,dir2-3");
         System.out.println("for remote snapshots, use --paths and --hosts for specify remote directories: snapshotComparer --nonce1 nonce1 --paths1 path1,path2 --hosts1 host1,host2 --nonce2 nonce2 --paths2 path1,path2 --hosts2 host1,host2 --user username");
         System.out.println();
-        System.out.println("For integrity check only without row order, use --ignoreOrder");
-        System.out.println("For integrity check only with only chunk level row order, use --ignoreChunkOrder");
+        System.out.println("For fast integrity check only without row order, use --fastscan");
+        System.out.println("For integrity check with full divergence report, use --deepscan");
+        // System.out.println("For integrity check only with only chunk level row order, use --ignoreChunkOrder");
         System.exit(code);
     }
 
