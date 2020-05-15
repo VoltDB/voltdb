@@ -599,8 +599,11 @@ class SnapshotLoader {
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 if (orderLevel >= 2) {
-                                    refCheckSum = tr.updateCheckSum(refCheckSum);
-                                    compCheckSum = tc.updateCheckSum(compCheckSum);
+                                    refCheckSum += tr.getCheckSum();
+                                    compCheckSum += tc.getCheckSum();
+                                    if (CONSOLE_LOG.isDebugEnabled()) {
+                                        CONSOLE_LOG.debug("Checksum for " + tableName + " partition " + partitionid + " on host" + baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
+                                    }
                                 } else if (!tr.hasSameContents(tc, orderLevel == 1)) {
                                     // seek to find where discrepancy happened
                                     if (SNAPSHOT_LOG.isDebugEnabled()) {
@@ -636,16 +639,17 @@ class SnapshotLoader {
                         }
 
                         if (orderLevel >= 2) {
-                            isConsistent = isConsistent && (refCheckSum == compCheckSum);
-                            // for orderLevel 2. drill down the discrepancies by reorder the whole table to csv then diff
+                            isConsistent = (refCheckSum == compCheckSum);
+                            // for orderLevel 3. drill down the discrepancies by reorder the whole table to csv then diff
                             if (!isConsistent && orderLevel == 3) {
+                                CONSOLE_LOG.warn("Checksum for " + tableName + " partition " + partitionid + " on host"+baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
                                 // For every output file that will be created attempt to instantiate and print an error  couldn't be created.
                                 String baseOutfileName = (isReplicated ? "Replicated" : "Partitioned") + "-Table-" + tableName + "-host" + baseHostId + "-partition" + partitionid;
-                                if (!inconsistentTable.contains(tableName)) {// first time hit consistency issue, need cover host 0 too
-                                    convertTableToCSV(baseOutfileName, tableName, partitionid, partitionToFiles.get(p).get(0), TEMP_FOLDER, DELIMITER, isReplicated);
-                                }
+                                convertTableToCSV(baseOutfileName, tableName, partitionid, partitionToFiles.get(p).get(0), TEMP_FOLDER, DELIMITER, isReplicated, true);
+
                                 String compareOutfileName = (isReplicated ? "Replicated" : "Partitioned") + "-Table-" + tableName + "-host" + compareHostId + "-partition" + partitionid;
-                                convertTableToCSV(compareOutfileName, tableName, partitionid, partitionToFiles.get(p).get(target), TEMP_FOLDER, DELIMITER, isReplicated);
+                                convertTableToCSV(compareOutfileName, tableName, partitionid, partitionToFiles.get(p).get(target), TEMP_FOLDER, DELIMITER, isReplicated, false);
+
                                 String diffFileName = tableName + "-partition" + partitionid + "-host" + baseHostId + "-vs-host"+ compareHostId + ".diff";
                                 generateDiffOutput(TEMP_FOLDER, baseOutfileName, compareOutfileName, diffFileName);
                             }
@@ -694,13 +698,19 @@ class SnapshotLoader {
         return false;
     }
 
-    private static boolean convertTableToCSV(String outfileName, String tableName, int partitionid, File infile, String outputFolder, char delimiter, boolean isReplicated) {
+    private static boolean convertTableToCSV(String outfileName, String tableName, int partitionid, File infile, String outputFolder, char delimiter, boolean isReplicated, boolean skipExist) {
         File outfile = new File(outputFolder + outfileName + ".tsv");
 
         try {
-            if (!outfile.createNewFile()) {
+            if (outfile.exists()) {
+                if (skipExist) {
+                    return true;
+                }
                 System.err.println("Error: Failed to create output file "
                         + outfile.getPath() + " for table " + tableName + "\n File already exists");
+                return false;
+            }
+            if (!outfile.createNewFile()) {
                 return false;
             }
         } catch (IOException e) {
