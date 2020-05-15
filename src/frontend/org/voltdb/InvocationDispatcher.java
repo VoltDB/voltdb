@@ -527,8 +527,12 @@ public final class InvocationDispatcher {
             try {
                 partitions = getPartitionsForProcedure(catProc, task);
                 if (partitions == null) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
-                            "Partition does not exist: " + task.getPartitionDestination(), task.clientHandle);
+                    String errorMessage = task.getPartitionDestination() == -1
+                            ? "Illegal partition parameter. Value cannot be " + task.getParameterAtIndex(
+                                    ((CatalogContext.ProcedurePartitionInfo) catProc.getAttachment()).index)
+                            : "Partition does not exist: " + task.getPartitionDestination();
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0], errorMessage,
+                            task.clientHandle);
                 }
             } catch (Exception e) {
                 // unable to hash to a site, return an error
@@ -1464,7 +1468,9 @@ public final class InvocationDispatcher {
                 // but without partition params, since replicated table reads can
                 // be done on any partition, round-robin the procedure to local
                 // partitions to spread the traffic.
-                assert (task.getProcName().equals("@AdHoc_RO_SP")): task.getProcName();
+                if (!task.getProcName().equals("@AdHoc_RO_SP")) {
+                    return null;
+                }
 
                 List<Integer> partitionIds = m_partitionIds;
                 int partitionIdIndex = Math.abs(m_nextPartition.getAndIncrement()) % partitionIds.size();
