@@ -617,8 +617,8 @@ class SnapshotLoader {
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 if (orderLevel >= 2) {
-                                    refCheckSum += tr.getCheckSum();
-                                    compCheckSum += tc.getCheckSum();
+                                    refCheckSum += tr.getTableCheckSum();
+                                    compCheckSum += tc.getTableCheckSum();
                                     if (CONSOLE_LOG.isDebugEnabled()) {
                                         CONSOLE_LOG.debug("Checksum for " + tableName + " partition " + partitionid + " on host" + baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
                                     }
