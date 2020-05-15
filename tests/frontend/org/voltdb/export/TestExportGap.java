@@ -131,7 +131,7 @@ public class TestExportGap extends ExportLocalClusterBase {
         m_client.drain();
 
         // Recover host 0 and reopen client
-        m_cluster.recoverOne(0, null, "");
+        m_cluster.recoverOne(0, null);
         Thread.sleep(500);
         m_client = getClient(m_cluster);
 
@@ -155,7 +155,7 @@ public class TestExportGap extends ExportLocalClusterBase {
         m_client.drain();
 
         // Recover host 1 and reopen client
-        m_cluster.recoverOne(1, null, "");
+        m_cluster.recoverOne(1, null);
         Thread.sleep(500);
         m_client = getClient(m_cluster);
 
