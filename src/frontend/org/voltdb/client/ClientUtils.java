@@ -35,17 +35,22 @@ public class ClientUtils {
      * @return the cheesy checksum of this VoltTable
      */
     public static final long cheesyBufferCheckSum(ByteBuffer buffer) {
+        return cheesyBufferCheckSum(buffer, false);
+    }
+    public static final long cheesyBufferCheckSum(ByteBuffer buffer, boolean skipHeader) {
         final int mypos = buffer.position();
-        buffer.position(0);
+        // row data start at buffer.getInt(0) + 4, with first 4 bit as row count
+        int startPosition = skipHeader ? buffer.getInt(0) + 8 : 0;
+        buffer.position(startPosition);
         long checksum = 0;
         if (buffer.hasArray()) {
             final byte bytes[] = buffer.array();
-            final int end = buffer.arrayOffset() + mypos;
+            final int end = buffer.arrayOffset() + mypos - startPosition;
             for (int ii = buffer.arrayOffset(); ii < end; ii++) {
                 checksum += bytes[ii];
             }
         } else {
-            for (int ii = 0; ii < mypos; ii++) {
+            for (int ii = startPosition; ii < mypos; ii++) {
                 checksum += buffer.get();
             }
         }
