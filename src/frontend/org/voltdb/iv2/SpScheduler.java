@@ -1359,7 +1359,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final TransactionState txn = m_outstandingTxns.remove(msg.getTxnId());
             m_duplicateCounters.remove(duplicateCounterKey);
 
-            if (txn != null) {
+            if (txn != null && !txn.isReadOnly()) {
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
