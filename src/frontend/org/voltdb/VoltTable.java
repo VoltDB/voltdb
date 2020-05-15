@@ -1634,6 +1634,27 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         return js;
     }
 
+    // crc32 based checksum for whole table
+    public long getTableCheckSum() {
+        VoltTableRow row = cloneRow();
+        row.resetRowPosition();
+        int columnCount = getColumnCount();
+        long checksum = 0;
+        PureJavaCrc32 rowCRC = new PureJavaCrc32();
+        while (row.advanceRow()) {
+            // Todo: switch to hybridCrc32 when volt client also include hybridcrc32
+            // or switch to java crc32 if starting runing java9+
+            // HybridCrc32 rowCRC = new HybridCrc32();
+            // rowCRC.update(getRawRow());
+            rowCRC.reset();
+            for (int i = 0; i < columnCount; i++) {
+                rowCRC.update(row.getRaw(i));
+            }
+            checksum += rowCRC.getValue();
+        }
+        return checksum;
+    }
+
     /**
      * Construct a table from a JSON string. Only parses VoltDB VoltTable JSON format.
      *
@@ -1757,13 +1778,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
         }
         boolean checksum = (checksum1 == checksum2);
-        assert(verifyTableInvariants());
-        return checksum;
-    }
-
-    public long getCheckSum() {
-        assert(verifyTableInvariants());
-        long checksum = ClientUtils.cheesyBufferCheckSum(m_buffer, true);
         assert(verifyTableInvariants());
         return checksum;
     }
