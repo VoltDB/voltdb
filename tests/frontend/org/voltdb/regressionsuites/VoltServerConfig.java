@@ -187,13 +187,15 @@ public abstract class VoltServerConfig {
     }
 
     protected static void addInstance(VoltServerConfig config) {
-        org.junit.Assert.assertTrue("JUnit tests that instantiate instances of LocalCluster must either a) inherit from RegressionSuite, "
-                + "or b) be a JUnit 4-style unit test that inherits from JUnit4LocalClusterTest.  "
-                + "These super classes ensure unconditional deterministic shutdown of clusters "
-                + "so that memory errors will be detected and cause JUnit tests to fail.  "
-                + "Your cooperation is appreciated to ensure product quality!",
-                s_instanceSet != null);
-        s_instanceSet.add(config);
+        if (config.isValgrind()) {
+            org.junit.Assert.assertTrue("JUnit tests that instantiate instances of LocalCluster must either a) inherit from RegressionSuite, "
+                            + "or b) be a JUnit 4-style unit test that inherits from JUnit4LocalClusterTest.  "
+                            + "These super classes ensure unconditional deterministic shutdown of clusters "
+                            + "so that memory errors will be detected and cause JUnit tests to fail.  "
+                            + "Your cooperation is appreciated to ensure product quality!",
+                    s_instanceSet != null);
+            s_instanceSet.add(config);
+        }
     }
 
     protected static void removeInstance(VoltServerConfig config) {
