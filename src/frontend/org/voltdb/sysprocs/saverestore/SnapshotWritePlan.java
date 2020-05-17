@@ -74,11 +74,11 @@ import com.google_voltpatches.common.collect.Maps;
  * generate SnapshotWritePlans for each thing we want to do and then do some
  * sane unioning of those plans.
  */
-public abstract class SnapshotWritePlan
+public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
 {
     static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
-    class TargetStatsClosure implements Runnable
+    static class TargetStatsClosure implements Runnable
     {
         final private String m_tableName;
         final private SnapshotDataTarget m_sdt;
@@ -127,6 +127,7 @@ public abstract class SnapshotWritePlan
 
     protected List<SnapshotDataTarget> m_targets = new ArrayList<SnapshotDataTarget>();
     protected SnapshotRegistry.Snapshot m_snapshotRecord = null;
+    protected C m_config;
 
     /**
      * Given the giant list of inputs, generate the snapshot write plan
@@ -138,12 +139,18 @@ public abstract class SnapshotWritePlan
     abstract public Callable<Boolean> createSetup(
             String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            JSONObject jsData, SystemProcedureExecutionContext context,
+            SystemProcedureExecutionContext context,
             final VoltTable result,
             ExtensibleSnapshotDigestData extraSnapshotData,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp);
+
+    public abstract void setConfiguration(SystemProcedureExecutionContext context, JSONObject jsData);
+
+    public C getConfiguration() {
+        return m_config;
+    }
 
     /**
      * Get the task lists for each site.  Will only be useful after
@@ -183,16 +190,16 @@ public abstract class SnapshotWritePlan
                     }
                 }
 
-                SnapshotDataTarget target = targets.get(task.m_table.getRelativeIndex());
+                SnapshotDataTarget target = targets.get(task.m_tableInfo.getTableId());
                 if (target == null) {
                     target = new DevNullSnapshotTarget(lastWriteException);
                     final Runnable onClose = new TargetStatsClosure(target,
-                            task.m_table.getTypeName(),
+                            task.m_tableInfo.getName(),
                             numTargets,
                             m_snapshotRecord);
                     target.setOnCloseHandler(onClose);
 
-                    targets.put(task.m_table.getRelativeIndex(), target);
+                    targets.put(task.m_tableInfo.getTableId(), target);
                     m_targets.add(target);
                     numTargets.incrementAndGet();
                 }

@@ -267,16 +267,25 @@ size_t Table::getColumnHeaderSizeToSerialize() {
     return m_columnHeaderSize = bytes;
 }
 
-
 void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
+    serializeColumnHeaderTo(serialOutput, nullptr);
+}
+
+void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput, HiddenColumnFilter::Type hiddenColumnFilter) {
+    HiddenColumnFilter filter = HiddenColumnFilter::create(hiddenColumnFilter, m_schema);
+    serializeColumnHeaderTo(serialOutput, &filter);
+}
+
+// Serialize scheam to serialOutput. If hiddenColumnFilter is not null include hidden columns which should be included
+void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput, HiddenColumnFilter *hiddenColumnFilter) {
     /* NOTE:
        VoltDBEngine uses a binary template to create tables of single integers.
        It's called m_templateSingleLongTable and if you are seeing a serialization
        bug in tables of single integers, make sure that's correct.
     */
 
-    // use a cache
-    if (m_columnHeaderData) {
+    // use a cache if we are not including hidden columns
+    if (m_columnHeaderData && !(hiddenColumnFilter && hiddenColumnFilter->getHiddenColumnCount())) {
         vassert(m_columnHeaderSize != -1);
         serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
         return;
@@ -292,12 +301,22 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
     serialOutput.writeByte(-128);
 
     // column counts as a short
-    serialOutput.writeShort(static_cast<int16_t>(m_columnCount));
+    serialOutput.writeShort(static_cast<int16_t>(m_columnCount +
+            (hiddenColumnFilter ? hiddenColumnFilter->getHiddenColumnCount() : 0)));
 
     // write an array of column types as bytes
     for (int i = 0; i < m_columnCount; ++i) {
-        ValueType type = m_schema->columnType(i);
+        const ValueType type = m_schema->columnType(i);
         serialOutput.writeByte(static_cast<int8_t>(type));
+    }
+
+    if (hiddenColumnFilter) {
+        for (short i = 0; i < m_schema->hiddenColumnCount(); ++i) {
+            if (hiddenColumnFilter->include(i)) {
+                const ValueType type = m_schema->getHiddenColumnInfo(i)->getVoltType();
+                serialOutput.writeByte(static_cast<int8_t>(type));
+            }
+        }
     }
 
     // write the array of column names as voltdb strings
@@ -314,16 +333,31 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
         serialOutput.writeBytes(name.data(), length);
     }
 
+    if (hiddenColumnFilter) {
+        for (short i = 0; i < m_schema->hiddenColumnCount(); ++i) {
+            if (hiddenColumnFilter->include(i)) {
+                HiddenColumn::Type type = m_schema->getHiddenColumnInfo(i)->columnType;
+                const char *name = HiddenColumn::getName(type);
 
-    // write the header size which is a non-inclusive int
-    getColumnHeaderSizeToSerialize();
-    vassert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
-    int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
-    serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
+                int32_t length = static_cast<int32_t>(::strlen(name));
+                serialOutput.writeInt(length);
+                serialOutput.writeBytes(name, length);
+            }
+        }
 
-    // cache the results
-    m_columnHeaderData = new char[m_columnHeaderSize];
-    memcpy(m_columnHeaderData, static_cast<const char*>(serialOutput.data()) + start, m_columnHeaderSize);
+        int32_t nonInclusiveHeaderSize = serialOutput.position() - start - sizeof(int32_t);
+        serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
+    } else {
+        // write the header size which is a non-inclusive int
+        getColumnHeaderSizeToSerialize();
+        vassert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
+        int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
+        serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
+
+        // cache the results
+        m_columnHeaderData = new char[m_columnHeaderSize];
+        memcpy(m_columnHeaderData, static_cast<const char*>(serialOutput.data()) + start, m_columnHeaderSize);
+    }
 }
 
 void Table::serializeTo(SerializeOutput &serialOutput) {

@@ -32,6 +32,14 @@ public abstract class PrivateVoltTableFactory {
         return new VoltTable();
     }
 
+    public static VoltTable createVoltTableFromSchemaBytes(byte[] schema) {
+        ByteBuffer buffer = ByteBuffer.allocate(schema.length + 4);
+        buffer.put(schema);
+        buffer.putInt(0);
+        buffer.rewind();
+        return createVoltTableFromBuffer(buffer, false);
+    }
+
     public static VoltTable createVoltTableFromBuffer(ByteBuffer backing, boolean readOnly) {
         return new VoltTable(backing, readOnly);
     }

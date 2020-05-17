@@ -49,6 +49,8 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
             return "VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE";
         case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND:
             return "VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND";
+        case VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_INVALID_MESSAGE:
+            return "VOLT_EE_EXCEPTION_TYPE_INVALID_MESSAGE";
         default:
             return "UNKNOWN";
     }

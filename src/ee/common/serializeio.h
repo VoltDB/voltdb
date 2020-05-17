@@ -229,6 +229,16 @@ public:
         return m_current < m_end;
     }
 
+    int64_t remaining() {
+        return m_end - m_current;
+    }
+
+    // Reduce the size of this input down to limit. Limit must be less then current end
+    void limit(size_t limit) {
+        vassert(m_current + limit <= m_end);
+        m_end = m_current + limit;
+    }
+
 private:
     template <typename T>
     T readPrimitive() {
@@ -421,6 +431,12 @@ public:
         assureExpand(length);
         memset(m_buffer + m_position, 0, length);
         m_position += length;
+    }
+
+    void writeVarBinary(std::function<void(SerializeOutput&)> writer) {
+        int pos = reserveBytes(sizeof(int32_t));
+        writer(*this);
+        writeIntAt(pos, position() - pos - sizeof(int32_t));
     }
 
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */

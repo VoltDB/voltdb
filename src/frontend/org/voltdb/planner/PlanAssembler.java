@@ -17,10 +17,15 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableType;
@@ -165,15 +170,14 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
-        // list of all export tables (assume uppercase)
-        Set<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
-
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
-        return tableList.stream().anyMatch(table ->
-                exportTables.contains(table.getTypeName()) &&
-                        TableType.isStream(table.getTabletype()));
+        return tableList.stream().anyMatch(PlanAssembler::isStream);
+    }
+
+    private static boolean isStream(Table table) {
+        return TableType.isStream(table.getTabletype());
     }
 
     private boolean isPartitionColumnInGroupbyList(List<ParsedColInfo> groupbyColumns) {
@@ -238,7 +242,7 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    private void setupForNewPlans(AbstractParsedStmt parsedStmt) {
+    private void setupForNewPlans(AbstractParsedStmt parsedStmt, boolean isForView) {
         m_bestAndOnlyPlanWasGenerated = false;
         m_partitioning.analyzeTablePartitioning(parsedStmt.allScans());
 
@@ -248,7 +252,7 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedSelectStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
+            if (!isForView && tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
                         "Illegal to read a stream.");
             }
@@ -422,6 +426,10 @@ public class PlanAssembler {
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
     CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+        return getBestCostPlan(parsedStmt, false);
+    }
+
+    CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean isForView) {
         // parse any ephemeral table queries that the statement contains
         List<StmtEphemeralTableScan> scanNodes = parsedStmt.getEphemeralTableScans();
         ParsedResultAccumulator fromSubqueryResult = null;
@@ -462,7 +470,7 @@ public class PlanAssembler {
 
 
         // set up the plan assembler for this statement
-        setupForNewPlans(parsedStmt);
+        setupForNewPlans(parsedStmt, isForView);
 
         /*
          * If this is a select statement with a common table expression, then make sure

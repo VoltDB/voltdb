@@ -45,6 +45,11 @@ interface PBDSegmentReader<M> {
     public boolean allReadAndDiscarded();
 
     /**
+     * @return {@code true} if any entries have been polled but not freed
+     */
+    boolean hasOutstandingEntries();
+
+    /**
      * Read the next entry from the segment for this reader.
      * Returns null if all entries in this segment were already read by this reader.
      *
@@ -108,4 +113,12 @@ interface PBDSegmentReader<M> {
      * Has this reader been closed.
      */
     public boolean isClosed();
+
+    /**
+     * Mark all entries left to read in this segment as read and discarded.
+     * If there were any entries that were read, but not discarded, they will be left as undiscarded.
+     *
+     * @throws IOException
+     */
+    public void markRestReadAndDiscarded() throws IOException;
 }

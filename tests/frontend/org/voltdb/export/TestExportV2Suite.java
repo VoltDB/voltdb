@@ -37,8 +37,8 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
@@ -82,7 +82,6 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();
@@ -125,13 +124,8 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         // Trigger hash mismatch
         if (MiscUtils.isPro()) {
             client.callProcedure("TestExportV2Suite$NonDeterministicProc", 100);
-            verifyTopologyAfterHashMismatch(client);
-            VoltTable vt = client.callProcedure("@Statistics", "export", 0).getResults()[0];
 
-            // All replicas are gone
-            while (vt.advanceRow()) {
-                assert("TRUE".equals(vt.getString("ACTIVE")));
-            }
+            verifyTopologyAfterHashMismatch(client);
         }
 
         for (int i= 100 ; i < 200; i++) {
@@ -211,39 +205,57 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         builder.addServerConfig(config);
         return builder;
     }
-    private void verifyTopologyAfterHashMismatch(Client client) {
-        //allow time to get the stats
-        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
-        boolean done = false;
+
+    private void verifyTopologyAfterHashMismatch(Client client) throws Exception {
+        // allow time to get the stats
+        final long maxSleep = TimeUnit.MINUTES.toMillis(1);
         long start = System.currentTimeMillis();
-        while (!done) {
+        while (true) {
             boolean inprogress = false;
-            try {
-                Thread.sleep(5000);
-                VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
-                while (vt.advanceRow()) {
-                    long pid = vt.getLong(0);
-                    if (pid != MpInitiator.MP_INIT_PID) {
-                        String replicasStr = vt.getString(1);
-                        String[] replicas = replicasStr.split(",");
-                        if (replicas.length != 1) {
-                            inprogress = true;
-                            break;
-                        }
+            VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+
+            while (vt.advanceRow()) {
+                long pid = vt.getLong(0);
+                if (pid != MpInitiator.MP_INIT_PID) {
+                    String replicasStr = vt.getString(1);
+                    String[] replicas = replicasStr.split(",");
+                    if (replicas.length != 1) {
+                        inprogress = true;
+                        break;
                     }
                 }
-                if (!inprogress) {
-                   return;
-                }
+            }
 
-                if (maxSleep < (System.currentTimeMillis() - start)) {
+            if (!inprogress) {
+                break;
+            }
+
+            if (maxSleep < (System.currentTimeMillis() - start)) {
+                fail("TIMEOUT: Some replicas are still up");
+            }
+            Thread.sleep(1000);
+        }
+
+        while (true) {
+            VoltTable vt = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+
+            boolean allActive = true;
+            // All replicas are gone every export manager should be active
+            while (vt.advanceRow()) {
+                if (!"TRUE".equals(vt.getString("ACTIVE"))) {
+                    allActive = false;
                     break;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
+
+            if (allActive) {
+                return;
+            }
+            if (maxSleep < (System.currentTimeMillis() - start)) {
+                fail("TIMEOUT: Non active export managers exist");
+            }
+            Thread.sleep(500);
         }
-        assert(done);
     }
 
 }

@@ -89,6 +89,7 @@ public class VoltDB {
     public static final int DEFAULT_HTTPS_PORT = 8443;
     public static final int AUTO_STATUS_PORT = 0;
     public static final int DEFAULT_STATUS_PORT = 11780;
+    public static final int DEFAULT_KIPLING_PORT = 9092;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
     // Staged filenames for advanced deployments
@@ -355,6 +356,8 @@ public class VoltDB {
                 System.getProperty("DISABLE_PLACEMENT_RESTORE", System.getenv("DISABLE_PLACEMENT_RESTORE")));
 
         public String m_recoveredPartitions = "";
+
+        public HostAndPort m_topicsHostPort = null;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -668,7 +671,7 @@ public class VoltDB {
                     }
 
                     try {
-                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, argument.trim().toUpperCase());
+                        m_getOption = GetActionArgument.valueOf(argument.trim().toUpperCase());
                     } catch (IllegalArgumentException excp) {
                         System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Valid arguments for get command are: " + GetActionArgument.supportedVerbs());
                         referToDocAndExit();
@@ -723,6 +726,13 @@ public class VoltDB {
                     m_exporterVersion = ExporterVersion.E2;
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
+                } else if (arg.equalsIgnoreCase("topicsHostPort")) {
+                    String value = args[++i].trim();
+                    if (value.indexOf(':') >= 0) {
+                        m_topicsHostPort = HostAndPort.fromString(value);
+                    } else {
+                        m_topicsHostPort = HostAndPort.fromParts("", Integer.parseInt(value));
+                    }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
@@ -1299,7 +1309,7 @@ public class VoltDB {
                 try {
                     VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
                                                   TimeUnit.SECONDS.toMillis(10));
-                } catch (IOException ignored) {}
+                } catch (Exception ignored) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis

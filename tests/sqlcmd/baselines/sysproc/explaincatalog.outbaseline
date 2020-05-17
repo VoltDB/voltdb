@@ -56,6 +56,11 @@ set $PREV tuplelimit 2147483647
 set $PREV isDRed false
 set $PREV tableType 1
 set $PREV migrationTarget ""
+set $PREV isTopic false
+set $PREV topicProfile ""
+set $PREV topicFormat ""
+set $PREV topicKeyColumnNames ""
+set $PREV topicAllowedRoleNames ""
 add /clusters#cluster/databases#database/tables#EMPLOYEES columns EMP_ID
 set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#EMP_ID index 1
 set $PREV type 5

@@ -19,6 +19,9 @@ package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.messaging.VoltMessageFactory;
+import org.voltdb.e3.GapFillContinue;
+import org.voltdb.e3.GapFillRequest;
+import org.voltdb.e3.GapFillResponse;
 import org.voltdb.rejoin.RejoinDataAckMessage;
 import org.voltdb.rejoin.RejoinDataMessage;
 
@@ -56,6 +59,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte FLUSH_RO_TXN_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 30;
     final public static byte START_TASKS_ID = VOLTCORE_MESSAGE_ID_MAX + 31;
     final public static byte HASH_MISMATCH_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 32;
+    final public static byte E3_GAP_FILL_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 33;
+    final public static byte E3_GAP_FILL_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 34;
+    final public static byte E3_GAP_FILL_CONTINUE = VOLTCORE_MESSAGE_ID_MAX + 35;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -162,6 +168,12 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case HASH_MISMATCH_MESSAGE_ID:
             message = new HashMismatchMessage();
             break;
+        case E3_GAP_FILL_REQUEST:
+            return new GapFillRequest();
+        case E3_GAP_FILL_RESPONSE:
+            return new GapFillResponse();
+        case E3_GAP_FILL_CONTINUE:
+            return new GapFillContinue();
         default:
             message = null;
         }

@@ -26,8 +26,8 @@ import java.util.SortedMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
@@ -54,7 +54,7 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
 
     public final Collection<PartitionRanges> partitionRanges;
 
-    public IndexSnapshotRequestConfig(List<Table> tables, Collection<PartitionRanges> partitionRanges)
+    public IndexSnapshotRequestConfig(List<SnapshotTableInfo> tables, Collection<PartitionRanges> partitionRanges)
     {
         super(tables);
         this.partitionRanges = ImmutableList.copyOf(partitionRanges);

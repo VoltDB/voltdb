@@ -21,11 +21,11 @@ package org.voltdb.task;
  * Simple {@link ActionScheduler} implementation which takes a {@link ActionGenerator} and {@link IntervalGenerator} and
  * combines the results of those two instances to make a {@link ScheduledAction}
  */
-final class CompositeActionScheduler implements ActionScheduler {
+public final class CompositeActionScheduler implements ActionScheduler {
     private final ActionGenerator m_actionGenerator;
     private final IntervalGenerator m_intervalGenerator;
 
-    CompositeActionScheduler(ActionGenerator actionGenerator, IntervalGenerator intervalGenerator) {
+    public CompositeActionScheduler(ActionGenerator actionGenerator, IntervalGenerator intervalGenerator) {
         super();
         m_actionGenerator = actionGenerator;
         m_intervalGenerator = intervalGenerator;

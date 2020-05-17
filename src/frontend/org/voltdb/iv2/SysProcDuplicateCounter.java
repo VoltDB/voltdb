@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.DependencyPair;
@@ -116,8 +117,14 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             new FragmentResponseMessage((FragmentResponseMessage)m_lastResponse);
         // union up all the deps we've collected and jam them in
         for (Entry<Integer, List<VoltTable>> dep : m_alldeps.entrySet()) {
-            VoltTable grouped = VoltTableUtil.unionTables(dep.getValue());
-            unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), grouped));
+            List<VoltTable> depTables = dep.getValue().stream().filter(
+                    x -> x.getStatusCode() != VoltTableUtil.DUMMY_DEPENDENCY_STATUS).collect(Collectors.toList());
+
+            if (depTables.isEmpty()){
+                unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), TransactionTask.DUMMAY_RESULT_TABLE));
+            } else {
+                unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), VoltTableUtil.unionTables(depTables)));
+            }
         }
         // we should never rollback DR buffer for MP sysprocs because we don't report the DR buffer size and therefore don't know if it is empty or not.
         unioned.setDrBufferSize(1);

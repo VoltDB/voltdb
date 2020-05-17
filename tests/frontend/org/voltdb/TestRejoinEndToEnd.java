@@ -47,7 +47,6 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.exportclient.SocketExporter;
-import org.voltdb.exportclient.SocketExporterLegacy;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -1096,11 +1095,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test(timeout = 120_000)
     public void testRejoinWithOnlyAStream() throws Exception {
         testRejoinWithOnlyAStreamCommon(SocketExporter.class.getName());
-    }
-
-    @Test(timeout = 120_000)
-    public void testRejoinWithOnlyAStreamLegacy() throws Exception {
-        testRejoinWithOnlyAStreamCommon(SocketExporterLegacy.class.getName());
     }
 
     private void testRejoinWithOnlyAStreamCommon(String exportClassName) throws Exception {

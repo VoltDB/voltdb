@@ -21,13 +21,18 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
 public class PortGenerator {
+    private static int portOffset = 100; // Shift ports away from defaults for testing
     private int nextPort = 12000;
-    private static int portOffset = 100;    // Shift ports away from defaults for testing
-    private int nextCport = VoltDB.DEFAULT_PORT+portOffset;
-    private int nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
+    private int nextCport;
+    private int nextAport;
+    private int nextKport;
 
     final int MIN_STATIC_PORT = 10000;
     final int MAX_STATIC_PORT = 49151;
+
+    public PortGenerator() {
+        reset();
+    }
 
     public synchronized void setNext(int port) {
         nextPort = port;
@@ -72,8 +77,19 @@ public class PortGenerator {
         throw new RuntimeException("Exhausted all possible http ports");
     }
 
+    public synchronized int nextKipling() {
+        while (nextCport <= MAX_STATIC_PORT) {
+            int port = nextKport++;
+            if (MiscUtils.isBindable(port)) {
+                return port;
+            }
+        }
+        throw new RuntimeException("Exhausted all possible kipling ports");
+    }
+
     public synchronized void reset() {
-        nextCport = VoltDB.DEFAULT_PORT+portOffset;
-        nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
+        nextCport = VoltDB.DEFAULT_PORT + portOffset;
+        nextAport = VoltDB.DEFAULT_ADMIN_PORT + portOffset;
+        nextKport = VoltDB.DEFAULT_KIPLING_PORT + portOffset;
     }
 }

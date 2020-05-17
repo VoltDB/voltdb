@@ -185,7 +185,7 @@ public class PlannerTool {
         try (QueryPlanner planner = new QueryPlanner(
                 sql, "PlannerTool", "PlannerToolProc", m_database,
                 partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-                costModel, null, null, DeterminismMode.FASTER, false)) {
+                costModel, null, null, DeterminismMode.FASTER, false, false)) {
 
             // do the expensive full planning.
             planner.parse();

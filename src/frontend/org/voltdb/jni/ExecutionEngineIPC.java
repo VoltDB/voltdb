@@ -54,6 +54,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
@@ -141,7 +142,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , SetViewsEnabled(31)
         , DeleteMigratedRows(32)
         , DisableExternalStreams(33)
-        , ExternalStreamsEnabled(34);
+        , ExternalStreamsEnabled(34)
+        , StoreKiplingGroup(35)
+        , DeleteKiplingGroup(36)
+        , FetchKiplingGroups(37)
+        , CommitKiplingGroupOffsets(38)
+        , FetchKiplingGroupOffsets(39)
+        , DeleteExpiredKiplingOffsets(40);
 
         Commands(final int id) {
             m_id = id;
@@ -980,7 +987,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
     }
 
-    private StringBuffer m_history = new StringBuffer();
+    private final StringBuffer m_history = new StringBuffer();
     @Override
     public void release() throws EEException, InterruptedException {
         System.out.println("Shutdown IPC connection in progress.");
@@ -1562,6 +1569,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean activateTableStream(
             int tableId,
             TableStreamType streamType,
@@ -1666,12 +1679,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String mStreamName) {
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String mStreamName) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
-            m_data.putInt(syncAction ? 1 : 0);
             m_data.putLong(sequences.getAckOffset());
             m_data.putLong(sequences.getSequenceNumber());
             m_data.putLong(sequences.getGenerationId());
@@ -1684,19 +1695,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.flip();
             m_connection.write();
 
-            ByteBuffer results = ByteBuffer.allocate(8);
-            while (results.remaining() > 0) {
-                m_connection.m_socketChannel.read(results);
-            }
-            results.flip();
-            long result_offset = results.getLong();
-            if (result_offset < 0) {
-                System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
-                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
-                    ", generationId: " + sequences.getGenerationId() +
-                    ", partitionId: " + partitionId +
-                    ", streamName: " + mStreamName);
-            }
+            m_connection.readStatusByte();
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
@@ -2008,4 +2007,140 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException();
         }
     }
+
+    @Override
+    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+        verifyDataCapacity(Integer.BYTES * 2 + Long.BYTES + serializedGroup.length);
+
+        m_data.clear();
+        m_data.putInt(Commands.StoreKiplingGroup.m_id);
+        m_data.putLong(undoToken);
+        m_data.putInt(serializedGroup.length);
+        m_data.put(serializedGroup);
+        m_data.flip();
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void deleteKiplingGroup(long undoToken, String groupId) {
+        byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
+        verifyDataCapacity(Integer.BYTES * 2 + Long.BYTES + groupIdBytes.length);
+
+        m_data.clear();
+        m_data.putInt(Commands.DeleteKiplingGroup.m_id);
+        m_data.putLong(undoToken);
+        m_data.putInt(groupIdBytes.length);
+        m_data.put(groupIdBytes);
+        m_data.flip();
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+        byte[] groupIdBytes = startGroupId == null ? new byte[0] : startGroupId.getBytes(Constants.UTF8ENCODING);
+        verifyDataCapacity(Integer.BYTES * 3 + groupIdBytes.length);
+
+        m_data.clear();
+        m_data.putInt(Commands.FetchKiplingGroups.m_id);
+        m_data.putInt(maxResultSize);
+        m_data.putInt(groupIdBytes.length);
+        m_data.put(groupIdBytes);
+        m_data.flip();
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            byte moreGroups = m_connection.readByte();
+            int length = m_connection.readInt();
+            ByteBuffer data = m_connection.getBytes(length);
+            return Pair.of(moreGroups != 0, data.array());
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+            byte[] offsets) {
+        byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
+        verifyDataCapacity(Integer.BYTES * 3 + Long.BYTES * 2 + Short.BYTES + groupIdBytes.length + offsets.length);
+
+        m_data.clear();
+        m_data.putInt(Commands.CommitKiplingGroupOffsets.m_id);
+        m_data.putLong(spUniqueId);
+        m_data.putLong(undoToken);
+        m_data.putShort(requestVersion);
+        m_data.putInt(groupIdBytes.length);
+        m_data.putInt(offsets.length);
+        m_data.put(groupIdBytes);
+        m_data.put(offsets);
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            int length = m_connection.readInt();
+            return m_connection.getBytes(length).array();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
+        verifyDataCapacity(Integer.BYTES * 3 + Short.BYTES + groupIdBytes.length + offsets.length);
+
+        m_data.clear();
+        m_data.putInt(Commands.FetchKiplingGroupOffsets.m_id);
+        m_data.putShort(requestVersion);
+        m_data.putInt(groupIdBytes.length);
+        m_data.putInt(offsets.length);
+        m_data.put(groupIdBytes);
+        m_data.put(offsets);
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            int length = m_connection.readInt();
+            return m_connection.getBytes(length).array();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+        verifyDataCapacity(Long.BYTES * 2);
+
+        m_data.clear();
+        m_data.putInt(Commands.DeleteExpiredKiplingOffsets.m_id);
+        m_data.putLong(undoToken);
+        m_data.putLong(deleteOlderThan.getTime());
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
 }

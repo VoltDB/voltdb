@@ -37,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.FlakyTestRule;
 import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.MockVoltDB;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTable;
@@ -158,10 +159,7 @@ public class TestReplicatedTableSaveFileState
             }
         }
 
-        Table test_table = catalog_creator.getTable(TABLE_NAME);
-
-        SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
+        SynthesizedPlanFragment[] test_plan = generateRestorePlan(catalog_creator);
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
@@ -218,10 +216,7 @@ public class TestReplicatedTableSaveFileState
             }
         }
 
-        Table test_table = catalog_creator.getTable(TABLE_NAME);
-
-        SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
+        SynthesizedPlanFragment[] test_plan = generateRestorePlan(catalog_creator);
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
@@ -257,6 +252,13 @@ public class TestReplicatedTableSaveFileState
     {
         m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, 0, "FALSE", 0, 2);
+    }
+
+    private SynthesizedPlanFragment[] generateRestorePlan(MockVoltDB mvdb) {
+        Table testTable = mvdb.getTable(TABLE_NAME);
+
+        return m_state.generateRestorePlan(new SnapshotTableInfo(testTable),
+                VoltDB.instance().getSiteTrackerForSnapshot());
     }
 
     private ReplicatedTableSaveFileState m_state;

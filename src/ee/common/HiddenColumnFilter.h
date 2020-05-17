@@ -31,15 +31,22 @@ class HiddenColumnFilter {
 public:
     // Values must match those also in java enum HiddenColumnFilterType
     enum Type : uint8_t {
-        NONE = 0,
-        EXCLUDE_MIGRATE = 1
+        ALL = 0,
+        NONE = 1,
+        EXCLUDE_MIGRATE = 2
     };
 
     inline static const HiddenColumnFilter create(Type type, const TupleSchema *schema) {
         uint8_t skip;
+        uint8_t reduceCount = 0;
+
         switch (type) {
+        case ALL:
+            return HiddenColumnFilter(TupleSchema::UNSET_HIDDEN_COLUMN, 0);
+            break;
         case EXCLUDE_MIGRATE:
             skip = schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
+            reduceCount = skip != TupleSchema::UNSET_HIDDEN_COLUMN;
             break;
         default:
             vassert(false);
@@ -47,19 +54,24 @@ public:
         case NONE:
             skip = TupleSchema::UNSET_HIDDEN_COLUMN;
         }
-        return HiddenColumnFilter(skip);
+
+        uint8_t hiddenCount = schema->hiddenColumnCount() - reduceCount;
+        return HiddenColumnFilter(skip, hiddenCount);
     }
 
-    HiddenColumnFilter() : m_skip(TupleSchema::UNSET_HIDDEN_COLUMN) {}
-
     inline bool include(uint16_t index) const {
-        return index != m_skip;
+        return index != m_skip && m_hiddenCount;
+    }
+
+    inline const uint8_t getHiddenColumnCount() const {
+        return m_hiddenCount;
     }
 
 private:
-    HiddenColumnFilter(uint8_t skip) : m_skip(skip) {}
+    HiddenColumnFilter(uint8_t skip, uint8_t hiddenCount) : m_skip(skip), m_hiddenCount(hiddenCount) {}
 
     const uint8_t m_skip;
+    const uint8_t m_hiddenCount;
 };
 
 }

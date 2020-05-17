@@ -25,7 +25,7 @@ package org.voltdb.rejoin;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -185,7 +185,7 @@ public class TestIv2RejoinCoordinator {
         hsids.add(1l);
         hsids.add(2l);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3",
-                                              null, null, true);
+                null, null);
         verifySent(hsids, msg);
 
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());

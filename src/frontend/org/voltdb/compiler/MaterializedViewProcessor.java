@@ -17,8 +17,13 @@
 
 package org.voltdb.compiler;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -45,7 +50,11 @@ import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.*;
+import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.ParsedColInfo;
+import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -644,16 +653,8 @@ public class MaterializedViewProcessor {
             Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
             fallbackQueryStmt.setSqltext(query);
-            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
-                              m_hsql,
-                              db,
-                              estimates,
-                              fallbackQueryStmt,
-                              fallbackQueryXML,
-                              fallbackQueryStmt.getSqltext(),
-                              null, // no user-supplied join order
-                              DeterminismMode.FASTER,
-                              StatementPartitioning.forceSP());
+            compileStatementAndUpdateCatalog(db, estimates, fallbackQueryStmt, fallbackQueryXML,
+                    StatementPartitioning.forceSP());
         }
     }
 
@@ -669,16 +670,8 @@ public class MaterializedViewProcessor {
             Statement fallbackQueryStmt = mvHandlerInfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
             fallbackQueryStmt.setSqltext(query);
-            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
-                              m_hsql,
-                              db,
-                              estimates,
-                              fallbackQueryStmt,
-                              fallbackQueryXML,
-                              fallbackQueryStmt.getSqltext(),
-                              null, // no user-supplied join order
-                              DeterminismMode.FASTER,
-                              StatementPartitioning.forceSP());
+            compileStatementAndUpdateCatalog(db, estimates, fallbackQueryStmt, fallbackQueryXML,
+                    StatementPartitioning.forceSP());
         }
     }
 
@@ -699,28 +692,18 @@ public class MaterializedViewProcessor {
         Statement createQuery = mvHandlerInfo.getCreatequery().add("createQuery");
         createQueryInfer.setSqltext(query);
         createQuery.setSqltext(query);
-        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
-                          m_hsql,
-                          db,
-                          estimates,
-                          createQueryInfer,
-                          xmlquery,
-                          createQueryInfer.getSqltext(),
-                          null, // no user-supplied join order
-                          DeterminismMode.FASTER,
-                          StatementPartitioning.inferPartitioning());
+        compileStatementAndUpdateCatalog(db, estimates, createQueryInfer, xmlquery,
+                StatementPartitioning.inferPartitioning());
 
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
-        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
-                          m_hsql,
-                          db,
-                          estimates,
-                          createQuery,
-                          xmlquery,
-                          createQuery.getSqltext(),
-                          null, // no user-supplied join order
-                          DeterminismMode.FASTER,
-                          StatementPartitioning.forceSP());
+        compileStatementAndUpdateCatalog(db, estimates, createQuery, xmlquery, StatementPartitioning.forceSP());
+    }
+
+    private void compileStatementAndUpdateCatalog(Database db, DatabaseEstimates estimates, Statement createQuery,
+            VoltXMLElement xmlquery, StatementPartitioning partitioning) throws VoltCompilerException {
+        // no user-supplied join order
+        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler, m_hsql, db, estimates, createQuery, xmlquery,
+                createQuery.getSqltext(), null, DeterminismMode.FASTER, partitioning, true);
     }
 
     private PlanNodeTree getPlanNodeTreeFromCatalogStatement(Database db, Statement stmt) {

@@ -178,6 +178,11 @@ begin Table                                  "A table (relation) in the database
   TimeToLive* timeToLive                     "Time to live"
   int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
   string migrationTarget                     "The target where the data are migrated to"
+  bool isTopic                               "Is this a topic stream?"
+  string topicProfile                        "The deployment profile of the topic"
+  string topicFormat                         "The format of the topic"
+  string topicKeyColumnNames                 "A CSV string of the key column names, ordered"
+  string topicAllowedRoleNames               "A CSV string of the roles allowed to access this topic"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

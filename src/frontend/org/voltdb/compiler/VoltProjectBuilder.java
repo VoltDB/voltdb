@@ -79,6 +79,7 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
@@ -336,6 +337,7 @@ public class VoltProjectBuilder {
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
+    private TopicsType m_kiplingConfiguration;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -405,6 +407,13 @@ public class VoltProjectBuilder {
         exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
         exportFeature.setOption(mode.name());
         m_featureOptions.getFeature().add(exportFeature);
+    }
+
+    public TopicsType getKiplingConfiguration() {
+        if (m_kiplingConfiguration == null) {
+            m_kiplingConfiguration = new TopicsType();
+        }
+        return m_kiplingConfiguration;
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -580,8 +589,9 @@ public class VoltProjectBuilder {
 
     public void addMultiPartitionProcedures(final Class<?>... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
-        for (final Class<?> procedure : procedures)
+        for (final Class<?> procedure : procedures) {
             procArray.add(new ProcedureInfo(procedure));
+        }
         addProcedures(procArray);
     }
 
@@ -603,8 +613,9 @@ public class VoltProjectBuilder {
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
-        for (final ProcedureInfo procedure : procedures)
+        for (final ProcedureInfo procedure : procedures) {
             procArray.add(procedure);
+        }
         addProcedures(procArray);
     }
 
@@ -623,8 +634,8 @@ public class VoltProjectBuilder {
             StringBuffer roleInfo = new StringBuffer();
             if(procedure.roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.roles.length; i++) {
-                    roleInfo.append(procedure.roles[i] + ",");
+                for (String role : procedure.roles) {
+                    roleInfo.append(role + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
@@ -661,8 +672,9 @@ public class VoltProjectBuilder {
 
     public void addSupplementalClasses(final Class<?>... supplementals) {
         final ArrayList<Class<?>> suppArray = new ArrayList<>();
-        for (final Class<?> supplemental : supplementals)
+        for (final Class<?> supplemental : supplementals) {
             suppArray.add(supplemental);
+        }
         addSupplementalClasses(suppArray);
     }
 
@@ -676,8 +688,9 @@ public class VoltProjectBuilder {
         }
 
         // add the supplemental classes
-        for (final Class<?> supplemental : supplementals)
+        for (final Class<?> supplemental : supplementals) {
             m_supplementals.add(supplemental);
+        }
     }
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
@@ -1197,9 +1210,11 @@ public class VoltProjectBuilder {
         deployment.setSecurity(security);
         security.setEnabled(m_securityEnabled);
         SecurityProviderString provider = SecurityProviderString.HASH;
-        if (m_securityEnabled) try {
-            provider = SecurityProviderString.fromValue(m_securityProvider);
-        } catch (IllegalArgumentException shouldNotHappenSeeSetter) {
+        if (m_securityEnabled) {
+            try {
+                provider = SecurityProviderString.fromValue(m_securityProvider);
+            } catch (IllegalArgumentException shouldNotHappenSeeSetter) {
+            }
         }
         security.setProvider(provider);
 
@@ -1256,8 +1271,9 @@ public class VoltProjectBuilder {
                 if (info.roles.length > 0) {
                     final StringBuilder roles = new StringBuilder();
                     for (final String role : info.roles) {
-                        if (roles.length() > 0)
+                        if (roles.length() > 0) {
                             roles.append(",");
+                        }
                         roles.append(role);
                     }
                     user.setRoles(roles.toString());
@@ -1375,6 +1391,7 @@ public class VoltProjectBuilder {
         }
 
         deployment.setFeatures(m_featureOptions);
+        setKiplingConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1385,6 +1402,12 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
+    }
+
+    private void setKiplingConfiguration(DeploymentType deployment) {
+        if (m_kiplingConfiguration != null) {
+            deployment.setTopics(m_kiplingConfiguration);
+        }
     }
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
@@ -1400,8 +1423,12 @@ public class VoltProjectBuilder {
         }
         if (m_elasticThroughput != null || m_elasticDuration != null) {
             SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
-            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
-            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
+            if (m_elasticThroughput != null) {
+                elastic.setThroughput(m_elasticThroughput);
+            }
+            if (m_elasticDuration != null) {
+                elastic.setDuration(m_elasticDuration);
+            }
             systemSettingType.setElastic(elastic);
         }
         if (m_queryTimeout != null) {

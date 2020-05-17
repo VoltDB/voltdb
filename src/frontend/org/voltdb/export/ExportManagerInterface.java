@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -37,7 +36,6 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.deploymentfile.FeatureType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 
 /**
  * @author rdykiel
@@ -52,7 +50,7 @@ public interface ExportManagerInterface {
         BASIC("org.voltdb.export.ExportManager"),
         ADVANCED("org.voltdb.e3.E3ExportManager");
 
-        private String m_mgrClassName;
+        private final String m_mgrClassName;
 
         private ExportMode(String mgrClassName) {
             m_mgrClassName = mgrClassName;
@@ -111,17 +109,20 @@ public interface ExportManagerInterface {
     public static void initialize(
             FeaturesType deploymentFeatures,
             int myHostId,
+            VoltDB.Configuration configuration,
             CatalogContext catalogContext,
             boolean isRejoin,
             boolean forceCreate,
             HostMessenger messenger,
-            List<Pair<Integer, Integer>> partitions)
+            Map<Integer, Integer> partitions)
             throws ExportManagerInterface.SetupException, ReflectiveOperationException
     {
         ExportMode mode = getExportFeatureMode(deploymentFeatures);
         Class<?> exportMgrClass = Class.forName(mode.m_mgrClassName);
-        Constructor<?> constructor = exportMgrClass.getConstructor(int.class, CatalogContext.class, HostMessenger.class);
-        ExportManagerInterface em = (ExportManagerInterface) constructor.newInstance(myHostId, catalogContext, messenger);
+        Constructor<?> constructor = exportMgrClass.getConstructor(int.class, VoltDB.Configuration.class,
+                CatalogContext.class, HostMessenger.class);
+        ExportManagerInterface em = (ExportManagerInterface) constructor.newInstance(myHostId, configuration,
+                catalogContext, messenger);
         m_self.set(em);
         if (forceCreate) {
             em.clearOverflowData();
@@ -181,7 +182,7 @@ public interface ExportManagerInterface {
         return count;
     }
 
-    public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+    public void initialize(CatalogContext catalogContext, Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin);
 
     public void startListeners(ClientInterface cif);
@@ -191,7 +192,7 @@ public interface ExportManagerInterface {
     public void startPolling(CatalogContext catalogContext, StreamStartAction action);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
+            boolean requiresNewExportGeneration, Map<Integer, Integer> localPartitionsToSites);
 
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
             StreamStartAction action,
@@ -200,8 +201,12 @@ public interface ExportManagerInterface {
     public void updateDanglingExportStates(StreamStartAction action,
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers);
 
-    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
+    public void processExportControl(String exportSource, List<String> exportTargets, StreamControlOperation operation,
             VoltTable results);
+
+    default public void processTopicControl(String topic, StreamControlOperation operation, VoltTable results) {
+        throw new UnsupportedOperationException("Topics are not supported in this version");
+    }
 
     public void pushBuffer(
             int partitionId,

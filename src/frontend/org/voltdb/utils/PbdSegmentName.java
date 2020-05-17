@@ -34,12 +34,12 @@ import org.voltcore.logging.VoltLogger;
  * </ul>
  */
 public final class PbdSegmentName {
-    // 1(nonce) + 1(_) + 10(currCounter) + 1(_) + 10(prevCounter) + 4(.pbd)
-    private static final int MINIMUM_LENGTH = 27;
+    // 1(nonce) + 1(_) + 15(segmentId) + 1(_) + 4(.pbd)
+    private static final int MINIMUM_LENGTH = 22;
     static final String PBD_SUFFIX = ".pbd";
     private static final String PBD_QUARANTINED = "_q";
     private static final MessageFormat FORMAT = new MessageFormat(
-            "{0}_{1,number,0000000000}_{2,number,0000000000}{3}" + PBD_SUFFIX);
+            "{0}_{1,number,000000000000000}{2}" + PBD_SUFFIX);
 
     private static final PbdSegmentName NOT_PBD = new PbdSegmentName(Result.NOT_PBD);
     private static final PbdSegmentName INVALID_NAME = new PbdSegmentName(Result.INVALID_NAME);
@@ -52,13 +52,11 @@ public final class PbdSegmentName {
     public final String m_nonce;
     /** The id of this segment */
     public final long m_id;
-    /** The id of the previous segment */
-    public final long m_prevId;
     /** Whether or not this PBD segment was marked quarantined */
     public final boolean m_quarantined;
 
-    public static String createName(String nonce, long id, long prevId, boolean quarantine) {
-        return FORMAT.format(new Object[] { nonce, id, prevId, quarantine ? PBD_QUARANTINED : "" });
+    public static String createName(String nonce, long id, boolean quarantine) {
+        return FORMAT.format(new Object[] { nonce, id, quarantine ? PBD_QUARANTINED : "" });
     }
 
     public static PbdSegmentName asQuarantinedSegment(VoltLogger logger, File file) {
@@ -72,8 +70,8 @@ public final class PbdSegmentName {
         }
 
         File quarantinedFile = new File(file.getParentFile(),
-                createName(current.m_nonce, current.m_id, current.m_prevId, true));
-        return new PbdSegmentName(quarantinedFile, current.m_nonce, current.m_id, current.m_prevId, true);
+                createName(current.m_nonce, current.m_id, true));
+        return new PbdSegmentName(quarantinedFile, current.m_nonce, current.m_id, true);
     }
 
     public static PbdSegmentName parseFile(VoltLogger logger, File file) {
@@ -92,22 +90,15 @@ public final class PbdSegmentName {
             return INVALID_NAME;
         }
 
-        int endOfPrevId = fileName.length() - PBD_SUFFIX.length();
+        int endOfId = fileName.length() - PBD_SUFFIX.length();
         boolean quarantined = false;
-        if (fileName.regionMatches(endOfPrevId - PBD_QUARANTINED.length(), PBD_QUARANTINED, 0,
+        if (fileName.regionMatches(endOfId - PBD_QUARANTINED.length(), PBD_QUARANTINED, 0,
                 PBD_QUARANTINED.length())) {
             quarantined = true;
-            endOfPrevId -= PBD_QUARANTINED.length();
+            endOfId -= PBD_QUARANTINED.length();
         }
 
-        int startOfPrevId = fileName.lastIndexOf('_', endOfPrevId - 1);
-        if (startOfPrevId <= 0) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("File " + fileName + " does not have a _ in it for previous id");
-            }
-            return INVALID_NAME;
-        }
-        int startOfId = fileName.lastIndexOf('_', startOfPrevId - 1);
+        int startOfId = fileName.lastIndexOf('_', endOfId - 1);
         if (startOfId <= 0) {
             if (logger.isTraceEnabled()) {
                 logger.trace("File " + fileName + " does not have a _ in it for id");
@@ -115,16 +106,15 @@ public final class PbdSegmentName {
             return INVALID_NAME;
         }
 
-        long id, prevId;
+        long id;
         try {
-            id = Long.parseLong(fileName.substring(startOfId + 1, startOfPrevId));
-            prevId = Long.parseLong(fileName.substring(startOfPrevId + 1, endOfPrevId));
+            id = Long.parseLong(fileName.substring(startOfId + 1, endOfId));
         } catch (NumberFormatException e) {
             logger.warn("Failed to parse IDs in " + fileName);
             return INVALID_NAME;
         }
 
-        return new PbdSegmentName(file, fileName.substring(0, startOfId), id, prevId, quarantined);
+        return new PbdSegmentName(file, fileName.substring(0, startOfId), id, quarantined);
     }
 
     private PbdSegmentName(Result result) {
@@ -132,16 +122,14 @@ public final class PbdSegmentName {
         m_file = null;
         m_nonce = null;
         m_id = -1;
-        m_prevId = -1;
         m_quarantined = false;
     }
 
-    private PbdSegmentName(File file, String nonce, long id, long prevId, boolean quarantined) {
+    private PbdSegmentName(File file, String nonce, long id, boolean quarantined) {
         m_result = Result.OK;
         m_file = file;
         m_nonce = nonce;
         m_id = id;
-        m_prevId = prevId;
         m_quarantined = quarantined;
     }
 
