@@ -34,6 +34,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -158,7 +159,17 @@ public class VoltPhysicalMergeExchange extends Exchange implements VoltPhysicalR
             opn.addInlinePlanNode(lpn);
         }
         rpn.addInlinePlanNode(opn);
+
+        setOutputSchema(rpn);
         return rpn;
+    }
+
+    private void setOutputSchema(MergeReceivePlanNode rpn) {
+        rpn.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(getRowType(), 0));
+        rpn.setHaveSignificantOutputSchema(true);
+
+        // TODO need to take inline aggr into an account if exists
+        rpn.setPreInlineAggOutputSchema(rpn.getOutputSchema());
     }
 
     public RelDistribution getChildDistribution() {

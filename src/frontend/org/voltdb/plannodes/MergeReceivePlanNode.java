@@ -117,4 +117,10 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         return true;
     }
 
+    // Calcite needs to set the aggregate schema
+    // TODO
+    public void setPreInlineAggOutputSchema(NodeSchema preInlineAggSchema) {
+        m_outputSchemaPreInlineAgg = preInlineAggSchema;
+    }
+
 }

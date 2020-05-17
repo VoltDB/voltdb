@@ -370,6 +370,15 @@ public class TestPhysicalInline extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testMergeReceiveWIthIndexScan() {
+        m_tester.sql("select * from PI1 order by I")
+        .transform("VoltPhysicalMergeExchange(distribution=[single], childDistribution=[hash[0]], collation=[[0]])\n" +
+                "  VoltPhysicalTableIndexScan(table=[[public, PI1]], expr#0..5=[{inputs}], proj#0..5=[{exprs}], index=[VOLTDB_AUTOGEN_IDX_PK_PI1_I_ASCEQ0_0])\n"
+                )
+        .json("{\"PLAN_NODES\":[{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[4]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"MERGERECEIVE\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"SORT_DIRECTION\":\"ASC\"}]}],\"CHILDREN_IDS\":[3],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}},{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"F\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":8,\"COLUMN_IDX\":4}},{\"COLUMN_NAME\":\"V\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"COLUMN_IDX\":5}}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[1]},{\"ID\":1,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"II\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}},{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"F\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":8,\"COLUMN_IDX\":4}},{\"COLUMN_NAME\":\"V\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"COLUMN_IDX\":5}}]}],\"TARGET_TABLE_NAME\":\"PI1\",\"TARGET_TABLE_ALIAS\":\"PI1\",\"LOOKUP_TYPE\":\"EQ\",\"SORT_DIRECTION\":\"ASC\",\"TARGET_INDEX_NAME\":\"VOLTDB_AUTOGEN_IDX_PK_PI1_I\"}],\"EXECUTE_LIST\":[1,3,4,6],\"IS_LARGE_QUERY\":false}")
+        .pass();
+    }
+
 //    public void testFullJoinWithUsing() {
 //        m_tester.sql("SELECT * FROM R1 FULL JOIN R2 USING (I, SI)")
 //        .json("")
