@@ -767,4 +767,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     protected byte[] getSchema(int tableId) {
         return m_schemas.get(tableId).getSecond();
     }
+
+    // No in use
+    public void setInProgressHandler(Runnable inProgress) {}
+
+    // No need to track stream snapshot progress
+    public void trackProgress() {}
 }
