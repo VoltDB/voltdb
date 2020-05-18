@@ -184,7 +184,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
 
         // check if the hashinator was updated to the newer version
@@ -325,7 +325,7 @@ public class TestMpPromoteAlgo
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
         needsRepair.add(2L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
     }
 

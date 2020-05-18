@@ -258,14 +258,6 @@ public final class DBBPool {
         }
     }
 
-    public static class DBBDelegateContainer extends BBContainer {
-        protected final BBContainer m_delegate;
-        
-        protected DBBDelegateContainer(BBContainer delegate) {
-            super(delegate.b());
-            m_delegate = delegate;
-        }
-
     public static class MBBContainer extends BBContainer {
         private MBBContainer(MappedByteBuffer buf) {
             super(buf);
