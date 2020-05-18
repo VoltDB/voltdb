@@ -43,7 +43,7 @@ public class SnapshotSummary extends StatsSource {
         START_TIME,
         END_TIME,
         DURATION,
-        PROGRESS,
+        PROGRESS_PCT,
         RESULT,
         TYPE;
     }
@@ -51,12 +51,12 @@ public class SnapshotSummary extends StatsSource {
     private static class StatsRow {
         public VoltTableRow statsRow;
         public String result;
-        public double progress;
+        public float progressPct;
 
-        public StatsRow(VoltTableRow row, String result, double progress) {
+        public StatsRow(VoltTableRow row, String result, float progressPct) {
             this.statsRow = row;
             this.result = result;
-            this.progress = progress;
+            this.progressPct = progressPct;
         }
     }
 
@@ -77,13 +77,13 @@ public class SnapshotSummary extends StatsSource {
         while (perHostStats.advanceRow()) {
             String nonce = perHostStats.getString(ColumnName.NONCE.toString());
             String result = perHostStats.getString(ColumnName.RESULT.toString());
-            double progress = perHostStats.getDouble(ColumnName.PROGRESS.toString());
+            float progressPct = (float)perHostStats.getDouble(ColumnName.PROGRESS_PCT.toString());
             List<StatsRow> statsRows = snapshotMap.get(nonce);
             if (statsRows == null) {
                 statsRows = new ArrayList<StatsRow>();
                 snapshotMap.put(nonce, statsRows);
             }
-            StatsRow row = new StatsRow(perHostStats.cloneRow(), result, progress);
+            StatsRow row = new StatsRow(perHostStats.cloneRow(), result, progressPct);
             statsRows.add(row);
         }
 
@@ -96,7 +96,7 @@ public class SnapshotSummary extends StatsSource {
             StatsRow lastRow = null;
             double duration = 0;
             for (StatsRow row : e.getValue()) {
-                avgProgress += row.progress;
+                avgProgress += row.progressPct;
                 if (!row.result.equalsIgnoreCase(SnapshotResult.SUCCESS.toString())) {
                     success = false;
                 }
@@ -134,7 +134,7 @@ public class SnapshotSummary extends StatsSource {
         columns.add(new ColumnInfo(ColumnName.START_TIME.toString(), VoltType.BIGINT));
         columns.add(new ColumnInfo(ColumnName.END_TIME.toString(), VoltType.BIGINT));
         columns.add(new ColumnInfo(ColumnName.DURATION.toString(), VoltType.BIGINT));
-        columns.add(new ColumnInfo(ColumnName.PROGRESS.toString(), VoltType.FLOAT));
+        columns.add(new ColumnInfo(ColumnName.PROGRESS_PCT.toString(), VoltType.FLOAT));
         columns.add(new ColumnInfo(ColumnName.RESULT.toString(), VoltType.STRING));
     }
 
@@ -150,7 +150,7 @@ public class SnapshotSummary extends StatsSource {
         rowValues[columnNameToIndex.get(ColumnName.TYPE.toString())] = m_typeChecker.getSnapshotType(s.path);
         rowValues[columnNameToIndex.get(ColumnName.START_TIME.toString())] = s.timeStarted;
         rowValues[columnNameToIndex.get(ColumnName.END_TIME.toString())] = s.timeFinished;
-        rowValues[columnNameToIndex.get(ColumnName.PROGRESS.toString())] = s.progress();
+        rowValues[columnNameToIndex.get(ColumnName.PROGRESS_PCT.toString())] = (float)s.progress();
         rowValues[columnNameToIndex.get(ColumnName.RESULT.toString())] =
                 hasError ? SnapshotResult.FAILURE.toString() : SnapshotResult.SUCCESS.toString();
     }

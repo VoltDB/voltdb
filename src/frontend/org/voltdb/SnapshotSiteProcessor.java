@@ -612,7 +612,6 @@ public class SnapshotSiteProcessor {
          */
         Iterator<Map.Entry<Integer, Collection<SnapshotTableTask>>> taskIter =
                 m_snapshotTableTasks.asMap().entrySet().iterator();
-        m_snapshotTableTasks.size();
         while (taskIter.hasNext()) {
             Map.Entry<Integer, Collection<SnapshotTableTask>> taskEntry = taskIter.next();
             final int tableId = taskEntry.getKey();
@@ -663,7 +662,8 @@ public class SnapshotSiteProcessor {
              * enclosing loop ensures that the next table is then addressed.
              */
             if (!streamResult.getSecond()) {
-                for (final SnapshotTableTask tableTask : tableTasks) {
+                // Task done, move the snapshot progress tracker forward.
+                for (SnapshotTableTask tableTask : tableTasks) {
                     tableTask.getTarget().trackProgress();
                 }
                 asyncTerminateReplicatedTableTasks(tableTasks);
