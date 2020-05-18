@@ -30,6 +30,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     Runnable m_onClose = null;
+    Runnable m_inProgress = null;
     Exception m_lastWriteException = null;
     volatile IOException m_reportedSerializationFailure = null;
 
@@ -108,5 +109,13 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     @Override
     public int getInContainerRowCount(BBContainer tupleData) {
         return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
+    }
+
+    public void setInProgressHandler(Runnable inProgress) {
+        m_inProgress = inProgress;
+    }
+
+    public void trackProgress() {
+        m_inProgress.run();
     }
 }
