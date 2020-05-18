@@ -30,7 +30,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -73,8 +72,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         assert(m_subquery.getSubqueryStmt() != null);
         m_subqueryId = m_subquery.getSubqueryStmt().getStmtId();
         if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
-            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
-            m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
+            super.setSubqueryNode(m_subquery.getBestCostPlan().rootPlanGraph);
         }
         m_args = new ArrayList<>();
         resolveCorrelations();
@@ -109,11 +107,6 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public int getSubqueryNodeId() {
-        return m_subqueryNodeId;
-    }
-
-    @Override
     public AbstractPlanNode getSubqueryNode() {
         return m_subqueryNode;
     }
@@ -132,11 +125,10 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     @Override
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
-        m_subqueryNode = subqueryNode;
+        super.setSubqueryNode(subqueryNode);
         if (m_subquery != null && m_subquery.getBestCostPlan() != null) {
             m_subquery.getBestCostPlan().rootPlanGraph = m_subqueryNode;
         }
-        resetSubqueryNodeId();
     }
 
     @Override
