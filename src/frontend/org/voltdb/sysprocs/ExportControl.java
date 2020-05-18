@@ -20,32 +20,25 @@ package org.voltdb.sysprocs;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.StreamControlOperation;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
 public class ExportControl extends VoltSystemProcedure {
 
     private static final VoltLogger LOG = new VoltLogger("EXPORT");
-
-    // support operations
-    public static enum OperationMode{ RELEASE
-                       //PAUSE, RESUME, TRUNCATE //for future use
-    }
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -75,8 +68,8 @@ public class ExportControl extends VoltSystemProcedure {
                 final String operationMode = (String) params.toArray()[2];
                 List<String> exportTargets = Arrays.asList(targets).stream().
                         filter(s -> (!StringUtil.isEmpty(s))).collect(Collectors.toList());
-                ExportManagerInterface.instance().processStreamControl(exportSource, exportTargets,
-                        OperationMode.valueOf(operationMode.toUpperCase()), results);
+                ExportManagerInterface.instance().processExportControl(exportSource, exportTargets,
+                        StreamControlOperation.valueOf(operationMode.toUpperCase()), results);
             }
 
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControl, results);
@@ -95,7 +88,7 @@ public class ExportControl extends VoltSystemProcedure {
                 new ColumnInfo("STATUS", VoltType.STRING),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
-            OperationMode.valueOf(operationMode.toUpperCase());
+            StreamControlOperation.valueOf(operationMode.toUpperCase());
         } catch (IllegalArgumentException e){
             results.addRow("", "", -1, "FAILURE", e.getMessage());
             return new VoltTable[] {results};
@@ -103,10 +96,7 @@ public class ExportControl extends VoltSystemProcedure {
 
         streamName = streamName == null ? "" : streamName;
         if (!StringUtil.isEmpty(streamName)) {
-            RealVoltDB volt = (RealVoltDB)VoltDB.instance();
-            Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
-            boolean isThere = exportStreams.stream().anyMatch(streamName::equalsIgnoreCase);
-            if (!isThere) {
+            if (!CatalogUtil.isExportTable(ctx.getDatabase(), streamName)) {
                 results.addRow(streamName, "", -1,"FAILURE", "Export stream " + streamName + " does not exist.");
                 return new VoltTable[] {results};
             }

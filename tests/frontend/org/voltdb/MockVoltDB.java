@@ -57,6 +57,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.NodeState;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
@@ -64,6 +65,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -215,6 +217,12 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
+    public void addTopic(String topicName) {
+        addTable(topicName, false);
+        getTable(topicName).setIstopic(true);
+        getTable(topicName).setTopicformat(EncodeFormat.CSV.name());
+    }
+
     public void setDRProducerEnabled()
     {
         getCluster().setDrproducerenabled(true);
@@ -262,12 +270,16 @@ public class MockVoltDB implements VoltDBInterface
     {
         int index = getTable(tableName).getColumns().size();
         getTable(tableName).getColumns().add(columnName);
-        getColumnFromTable(tableName, columnName).setIndex(index);
-        getColumnFromTable(tableName, columnName).setType(columnType.getValue());
-        getColumnFromTable(tableName, columnName).setNullable(isNullable);
-        getColumnFromTable(tableName, columnName).setName(columnName);
-        getColumnFromTable(tableName, columnName).setDefaultvalue(defaultValue);
-        getColumnFromTable(tableName, columnName).setDefaulttype(defaultType.getValue());
+        Column column = getColumnFromTable(tableName, columnName);
+        column.setIndex(index);
+        column.setType(columnType.getValue());
+        column.setNullable(isNullable);
+        column.setName(columnName);
+        column.setDefaultvalue(defaultValue);
+        column.setDefaulttype(defaultType.getValue());
+        if (!columnType.isVariableLength()) {
+            column.setSize(columnType.getLengthInBytesForFixedTypesWithoutCheck());
+        }
     }
 
     public Cluster getCluster()
@@ -581,8 +593,8 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public String getExportOverflowPath() {
-        return "export_overflow";
+    public File getExportOverflowPath() {
+        return new File("export_overflow");
     }
 
     @Override
@@ -598,6 +610,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getExportCursorPath() {
         return  "export_cursor";
+    }
+
+    @Override
+    public File getTopicsDataPath() {
+        return new File("topic_data");
     }
 
     @Override
@@ -1021,4 +1038,17 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setMasterOnly() {}
+
+    @Override
+    public void registerCatalogValidator(CatalogValidator validator) {
+    }
+
+    @Override
+    public void unregisterCatalogValidator(CatalogValidator validator) {
+    }
+
+    @Override
+    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+        return true;
+    }
 }

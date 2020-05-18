@@ -75,7 +75,7 @@ public class SystemProcedureCatalog {
         private Durability durable = Durability.DURABLE;
         private boolean allowedInShutdown = false;
         private final boolean transactional;
-        private Restartability restartable;
+        private final Restartability restartable;
 
         static Builder createSp(String className, VoltType partitionParamType) {
             return createSp(className, 0, partitionParamType);
@@ -118,6 +118,7 @@ public class SystemProcedureCatalog {
                 throw new IllegalArgumentException("RO not supported for MP transactions");
             }
             readOnly = true;
+            durable = Durability.NOT_APPLICABLE;
             return this;
         }
 
@@ -230,7 +231,7 @@ public class SystemProcedureCatalog {
         }
 
         public boolean isDurable() {
-            return durable == Durability.DURABLE;
+            return !readOnly && durable == Durability.DURABLE;
         }
 
         public boolean isRestartable() {
@@ -634,6 +635,12 @@ public class SystemProcedureCatalog {
                         false, false, false, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
+        // @TopicControl is like @ExportControl but for topic streams in PRO
+        builder.put("@TopicControl",
+                new Config("org.voltdb.sysprocs.TopicControl",
+                        false, false, false, 0, VoltType.INVALID,
+                        true, false, true, Durability.NOT_DURABLE,
+                        false, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsAcked_SP",
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",
                         true, false, false, 0, VoltType.INVALID,
@@ -675,6 +682,23 @@ public class SystemProcedureCatalog {
                         false, false, false,  0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
+        builder.put("@StoreKiplingGroup", Builder
+                .createSp("org.voltdb.sysprocs.KiplingProcedures$StoreGroup", VoltType.STRING).commercial().build());
+        builder.put("@DeleteKiplingGroup", Builder
+                .createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteGroup", VoltType.STRING).commercial().build());
+        builder.put("@FetchKiplingGroups",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroups", -1, VoltType.INVALID).commercial()
+                        .readOnly().notDurable().build());
+        builder.put("@CommitKiplingGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$CommitGroupOffsets", VoltType.STRING)
+                        .commercial().build());
+        builder.put("@FetchKiplingGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroupOffsets", VoltType.STRING)
+                        .commercial().readOnly().build());
+        builder.put("@DeleteExpiredKiplingOffsets",
+                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteExpiredOffsets", -1, VoltType.INVALID)
+                        .commercial().build());
+
         listing = builder.build();
     }
 

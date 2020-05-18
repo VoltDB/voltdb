@@ -403,4 +403,10 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     public int getInContainerRowCount(BBContainer tupleData) {
         return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
+
+    // Not in use
+    public void setInProgressHandler(Runnable inProgress) {}
+
+    // Not in use for this target
+    public void trackProgress() {}
 }

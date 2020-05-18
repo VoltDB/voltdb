@@ -74,6 +74,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private final RateLimitedLogger m_syncServiceLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toNanos(1), SNAP_LOG, Level.ERROR);
     private Runnable m_onCloseHandler = null;
+    private Runnable m_inProgressHandler = null;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -158,7 +159,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int numPartitions,
             final boolean isReplicated,
             final List<Integer> partitionIds,
-            final VoltTable schemaTable,
+            final byte[] schemaBytes,
             final long txnId,
             final long timestamp) throws IOException {
         this(
@@ -170,7 +171,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 numPartitions,
                 isReplicated,
                 partitionIds,
-                schemaTable,
+                schemaBytes,
                 txnId,
                 timestamp,
                 new int[] { 0, 0, 0, 2 });
@@ -185,7 +186,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final int numPartitions,
             final boolean isReplicated,
             final List<Integer> partitionIds,
-            final VoltTable schemaTable,
+            final byte[] schemaBytes,
             final long txnId,
             final long timestamp,
             int version[]
@@ -246,9 +247,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b().position(4);
         container.b().putInt(container.b().remaining() - 4);
         container.b().position(0);
-
-        final byte schemaBytes[];
-        schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);
@@ -618,5 +616,13 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 }
             }
         });
+    }
+
+    public void setInProgressHandler(Runnable inProgress) {
+        m_inProgressHandler = inProgress;
+    }
+
+    public void trackProgress() {
+        m_inProgressHandler.run();
     }
 }

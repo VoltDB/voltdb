@@ -36,18 +36,15 @@ public class TestPbdSegmentName {
 
     @Test
     public void testValidPbdName() {
-        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456" + PBD_SUFFIX, "abc_def", 123,
-                456, false);
-        assertPbdSegmentNameDeserialize("abc_def_0000000123_0000000456_q" + PBD_SUFFIX, "abc_def",
-                123, 456, true);
+        assertPbdSegmentNameDeserialize("abc_def_0000000123" + PBD_SUFFIX, "abc_def", 123, false);
+        assertPbdSegmentNameDeserialize("abc_def_0000000123_q" + PBD_SUFFIX, "abc_def", 123, true);
     }
 
     @Test
     public void testCreateParseName() {
         long id = 987654156L;
-        long prevId = 21654564L;
-        assertPbdSegmentNameSerializeDeserialize("this_is_my_nonce", id, prevId, false);
-        assertPbdSegmentNameSerializeDeserialize("this_is_my_nonce", id, prevId, true);
+        assertPbdSegmentNameSerializeDeserialize("this_is_my_nonce", id, false);
+        assertPbdSegmentNameSerializeDeserialize("this_is_my_nonce", id, true);
     }
 
     @Test
@@ -62,17 +59,18 @@ public class TestPbdSegmentName {
     @Test
     public void testInvalidName() {
         for (String name : new String[] { PBD_SUFFIX, "abc" + PBD_SUFFIX,
-                "abcdefghijklmnopqrstuvwxqz_0000000123" + PBD_SUFFIX,
-                "abc_abc_def_ghi_jkl_0000000123" + PBD_SUFFIX,
+                "abcdefghijklmnopqrstuvwxqz_0x00000123" + PBD_SUFFIX,
+                "a_00000123" + PBD_SUFFIX,
+                "abc_abc_def_ghi_jkl_000000012z" + PBD_SUFFIX,
                 "nonce_0000001234_0000000456_a" + PBD_SUFFIX,
-                "_00000000123_00000000456" + PBD_SUFFIX }) {
+                "_00000000456" + PBD_SUFFIX }) {
             assertResult(PbdSegmentName.Result.INVALID_NAME, name);
         }
     }
 
     @Test
     public void testAsQuarantinedFile() {
-        assertEquals(new File("a/b/c/abc_def_0000000123_0000000456_q" + PBD_SUFFIX),
+        assertEquals(new File("a/b/c/abc_def_0000000123_000000000000456_q" + PBD_SUFFIX),
                 PbdSegmentName.asQuarantinedSegment(LOG,
                         new File("a/b/c/abc_def_0000000123_0000000456" + PBD_SUFFIX)).m_file);
     }
@@ -87,18 +85,14 @@ public class TestPbdSegmentName {
         PbdSegmentName.asQuarantinedSegment(LOG, new File("abc_def_123_456_q" + PBD_SUFFIX));
     }
 
-    private static void assertPbdSegmentNameSerializeDeserialize(String nonce, long id, long prevId,
-            boolean quarantine) {
-        assertPbdSegmentNameDeserialize(PbdSegmentName.createName(nonce, id, prevId, quarantine), nonce, id, prevId,
-                quarantine);
+    private static void assertPbdSegmentNameSerializeDeserialize(String nonce, long id, boolean quarantine) {
+        assertPbdSegmentNameDeserialize(PbdSegmentName.createName(nonce, id, quarantine), nonce, id, quarantine);
     }
 
-    private static void assertPbdSegmentNameDeserialize(String name, String nonce, long id, long prevId,
-            boolean quarantine) {
+    private static void assertPbdSegmentNameDeserialize(String name, String nonce, long id, boolean quarantine) {
         PbdSegmentName pbdSegmentName = assertResult(PbdSegmentName.Result.OK, name);
         assertEquals(nonce, pbdSegmentName.m_nonce);
         assertEquals(id, pbdSegmentName.m_id);
-        assertEquals(prevId, pbdSegmentName.m_prevId);
         assertEquals(quarantine, pbdSegmentName.m_quarantined);
     }
 

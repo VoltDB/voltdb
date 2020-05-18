@@ -55,6 +55,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
@@ -609,6 +610,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
+    /**
+     * Retrieve the schema for a table from the EE
+     *
+     * @param tableId            ID of the table
+     * @param hiddenColumnFilter {@link HiddenColumnFilter} to indicate which hidden columns to include in the schema
+     * @param forceLive          if {@code true} the current catalog schema will be used and not the one associated with
+     *                           the snapshot
+     * @return {@link Pair} with {@code first} being the encoded schema and {@code second} being the partition column id
+     */
+    public abstract Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
@@ -828,8 +840,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Export action against the execution engine.
      */
-    public abstract void exportAction( boolean syncAction,
-            ExportSnapshotTuple sequences, int partitionId, String streamName);
+    public abstract void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String streamName);
 
     /**
      * Execute an Delete of migrated rows in the execution engine.
@@ -918,6 +929,66 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Return the EE state that indicates if external streams are enabled for this Site or not.
      */
     public abstract boolean externalStreamsEnabled();
+
+    /**
+     * Store a kipling group and its members in the system tables
+     *
+     * @param undoToken       to be used for this transaction
+     * @param serializedGroup kipling group serialized into a byte[]
+     */
+    public abstract void storeKiplingGroup(long undoToken, byte[] serializedGroup);
+
+    /**
+     * Delete a kiplng group, all members and all offsets
+     *
+     * @param undoToken to be used for this transaction
+     * @param groupId   ID of group to be dleted
+     */
+    public abstract void deleteKiplingGroup(long undoToken, String groupId);
+
+    /**
+     * Start or continue a fetch of all group from this site.
+     *
+     * If the Boolean in the return is {@code true} then there are more groups to fetch and this method should be called
+     * repeatedly with the last groupId returned until {@code false} is returned.
+     *
+     * @param maxResultSize for any result returned by this fetch
+     * @param groupId       non-inclusive start point for iterating over groups. {@code null} means start at begining
+     * @return A {@link Pair} indicating if there are more groups and the serialized groups
+     */
+    public abstract Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String groupId);
+
+    /**
+     * Commit topic partition offsets for a kipling group in the system tables
+     *
+     * @param spUniqueId     for this transaction
+     * @param undoToken      to be used for this transaction
+     * @param requestVersion Version of the kipling message making this request
+     * @param groupId        ID of the group
+     * @param offsets        serialized offsets to be stored
+     * @return response to requester
+     */
+    public abstract byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion,
+            String groupId, byte[] offsets);
+
+    /**
+     * Fetch topic partition offsets for a kipling group from the system tables
+     *
+     * @param requestVersion version of the kipling message making this request
+     * @param groupId        IF of group
+     * @param offsets        serialized offsets being requested
+     * @return response to requester
+     */
+    public abstract byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets);
+
+    /**
+     * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
+     * deleteOlderThan
+     *
+     * @param undoToken       to be used for this transaction
+     * @param deleteOlderThan timestamp to use to select what offsets should be deleted
+     */
+    public abstract void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1039,10 +1110,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
 
     /**
+     * This method is called to initially load table data from a direct byte buffer
+     *
+     * @param pointer               the VoltDBEngine pointer
+     * @param table_id              catalog ID of the table
+     * @param serializedTable       the table data to be loaded
+     * @param txnId                 ID of the transaction
+     * @param spHandle              SP handle for this transaction
+     * @param lastCommittedSpHandle Most recently committed SP Handled
+     * @param uniqueId              Unique ID for the transaction
+     * @param undoToken             token for undo quantum where changes should be logged.
+     * @param callerId              ID of the caller who is invoking load table
+     */
+    protected native int nativeLoadTable(long pointer, int table_id, ByteBuffer serializedTable, long txnId,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
+
+    /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
-     * @param pointer the VoltDBEngine pointer
+     *
+     * @param pointer         the VoltDBEngine pointer
      * @param planFragmentIds ID of the plan fragment to be executed.
-     * @param inputDepIds list of input dependency ids or null if no deps expected
+     * @param inputDepIds     list of input dependency ids or null if no deps expected
      * @return error code
      */
     protected native int nativeExecutePlanFragments(
@@ -1151,6 +1239,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native boolean nativeSetLogLevels(long pointer, long logLevels);
 
     /**
+     * @param pointer          Pointer to an engine instance
+     * @param tableId          ID of the table whose schema is being retrieved
+     * @param schemaFilterType Type of filter to apply to schema
+     * @param forceLive        Force the schema to be read from current catalog and not snapshot schemas
+     * @return error code indicating status of execution
+     */
+    protected native int nativeGetSnapshotSchema(long pointer, int tableId, byte schemaFilterType, boolean forceLive);
+
+    /**
      * Active a table stream of the specified type for a table.
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
@@ -1205,9 +1302,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param mStreamName Name of the stream being acted against
      * @return
      */
-    protected native long nativeExportAction(
+    protected native void nativeSetExportStreamPositions(
             long pointer,
-            boolean syncAction,
             long mAckOffset,
             long seqNo,
             long generationId,
@@ -1268,6 +1364,75 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public native static byte[] getTestDRBuffer(int drProtocolVersion, int partitionId,
                                                 int partitionKeyValues[], int flags[],
                                                 long startSequenceNumber);
+
+    // --------------------------------------------------------
+    // Kipling methods
+    // --------------------------------------------------------
+    /**
+     * Store a kipling group in the kipling system tables. The serialized group should be put in the m_psetBuffer
+     *
+     * @param pointer   to execution engine
+     * @param undoToken to use to be able to rollback the store
+     * @return 0 on succes otherwise 1
+     */
+    native static protected int nativeStoreKiplingGroup(long pointer, long undoToken);
+
+    /**
+     * Delete a kipling group, all members and offsets
+     *
+     * @param pointer   to execution engine
+     * @param undoToken to use to be able to rollback the delete
+     * @param groupId   of the group to delete
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeDeleteKiplingGroup(long pointer, long undoToken, byte[] groupId);
+
+    /**
+     * Start or continue a fetch of all groups from this site. The response will be in m_nextDeserializer
+     *
+     * @param pointer      to execution engine
+     * @param maxResponse  size for any response. If {@code <= 0} this is a continue of a fetch else a new fetch will be
+     *                     started
+     * @param startGroupId Non inclusive groupId from which to start fetching groups
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeFetchKiplingGroups(long pointer, int maxResponse, byte[] startGroupId);
+
+    /**
+     * Commit topic partition offsets for the kipling group. The serialized offsets should be put in the m_psetBuffer
+     * and the response will be in m_nextDeserializer
+     *
+     * @param pointer        to execution engine
+     * @param spUniqueId     for this transaction
+     * @param undoToken      to use to be able to rollback the commit
+     * @param requestVersion of the kipling request
+     * @param groupId        of the group these offsets should be associated with
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeCommitKiplingGroupOffsets(long pointer, long spUniqueId, long undoToken,
+            short requestVersion, byte[] groupId);
+
+    /**
+     * Fetch topic partition offsets for a group. The serialized offsets being requested should be put in the
+     * m_psetBuffer and the response will be in m_nextDeserializer
+     *
+     * @param pointer        to execution engine
+     * @param requestVersion of the kipling request
+     * @param groupId        of the group to fetch offsets from
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeFetchKiplingGroupOffsets(long pointer, short requestVersion, byte[] groupId);
+
+    /**
+     * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
+     * deleteOlderThan
+     *
+     * @param pointer         to execution engine
+     * @param undoToken       to use to be able to rollback the delete
+     * @param deleteOlderThan timestamp to use to select what offsets should be deleted
+     * @return 0 on success otherwise 1
+     */
+    native static protected int nativeDeleteExpiredKiplingOffsets(long pointer, long undoToken, long deleteOlderThan);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

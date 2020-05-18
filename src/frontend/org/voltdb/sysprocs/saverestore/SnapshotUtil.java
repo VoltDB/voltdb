@@ -23,7 +23,6 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
@@ -48,6 +47,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -71,6 +72,7 @@ import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB;
@@ -78,13 +80,14 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -112,6 +115,12 @@ public class SnapshotUtil {
     public static final String JSON_TABLES = "tables";
     public static final String JSON_SKIPTABLES = "skiptables";
     public static final String JSON_ELASTIC_OPERATION = "elasticOperationMetadata";
+
+    /**
+     * truncation request ID is the truncation request node path.
+     * Example: /db/request_truncation_snapshot/request_0000000001
+     */
+    public static final String JSON_TRUNCATION_REQUEST_ID = "truncReqId";
 
     /**
      * milestone used to mark a shutdown save snapshot
@@ -163,7 +172,7 @@ public class SnapshotUtil {
         String path,
         String pathType,
         String nonce,
-        List<Table> tables,
+        List<SnapshotTableInfo> tables,
         int hostId,
         Map<Integer, Long> partitionTransactionIds,
         ExtensibleSnapshotDigestData extraSnapshotData,
@@ -194,8 +203,8 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
-                for (int ii = 0; ii < tables.size(); ii++) {
-                    stringer.value(tables.get(ii).getTypeName());
+                for (SnapshotTableInfo table : tables) {
+                    stringer.value(table.getName());
                 }
                 stringer.endArray();
 
@@ -713,7 +722,7 @@ public class SnapshotUtil {
         private final String m_nonce;
         private InstanceId m_instanceId = null;
         private long m_txnId;
-        private List<Integer> m_missingPartitions = new ArrayList<Integer>();
+        private final List<Integer> m_missingPartitions = new ArrayList<Integer>();
     }
 
     /**
@@ -752,7 +761,7 @@ public class SnapshotUtil {
             }
             return false;
         }
-    };
+    }
 
     /**
      * Filter that looks for files related to a specific snapshot.
@@ -846,42 +855,33 @@ public class SnapshotUtil {
         }
 
         if (!directory.exists()) {
-            System.err.println("Error: Directory " + directory.getPath() + " doesn't exist");
+            logger.error("Directory " + directory.getPath() + " doesn't exist");
             return;
         }
         if (!directory.canRead()) {
-            System.err.println("Error: Directory " + directory.getPath() + " is not readable");
+            logger.error("Directory " + directory.getPath() + " is not readable");
             return;
         }
         if (!directory.canExecute()) {
-            System.err.println("Error: Directory " + directory.getPath() + " is not executable");
+            logger.error("Directory " + directory.getPath() + " is not executable");
             return;
         }
 
         for (File f : directory.listFiles(filter)) {
             if (f.isDirectory()) {
                 if (!f.canRead() || !f.canExecute()) {
-                    System.err.println("Warning: Skipping directory " + f.getPath()
-                            + " due to lack of read permission");
+                    logger.warn("Skipping directory " + f.getPath() + " due to lack of read permission");
                 } else {
                     retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, stype, logger, recursion++);
                 }
                 continue;
             }
             if (!f.canRead()) {
-                System.err.println("Warning: " + f.getPath() + " is not readable");
+                logger.warn(f.getPath() + " is not readable");
                 continue;
             }
 
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(f);
-            } catch (FileNotFoundException e1) {
-                System.err.println(e1.getMessage());
-                continue;
-            }
-
-            try {
+            try (FileInputStream fis = new FileInputStream(f)) {
                 if (f.getName().endsWith(".digest")) {
                     JSONObject digest = CRCCheck(f, logger);
                     if (digest == null) {
@@ -923,10 +923,8 @@ public class SnapshotUtil {
                             HashinatorSnapshotData hashData = new HashinatorSnapshotData();
                             hashData.restoreFromFile(f);
                             named_s.m_hashConfig = f;
-                        }
-                        catch (IOException e) {
-                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'",
-                                                      f.getPath()));
+                        } catch (IOException e) {
+                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'", f.getPath()), e);
                             // Skip bad hashinator files.
                             continue;
                         }
@@ -964,20 +962,8 @@ public class SnapshotUtil {
                         saveFile.close();
                     }
                 }
-            } catch (IOException e) {
-                System.err.println(e.getMessage());
-                System.err.println("Error: Unable to process " + f.getPath());
-            } catch (JSONException e) {
-                System.err.println(e.getMessage());
-                System.err.println("Error: Unable to process " + f.getPath());
-            }
-            finally {
-                try {
-                    if (fis != null) {
-                        fis.close();
-                    }
-                } catch (IOException e) {
-                }
+            } catch (IOException | JSONException e) {
+                logger.error("Unable to process " + f.getPath(), e);
             }
         }
     }
@@ -1033,8 +1019,8 @@ public class SnapshotUtil {
              * Summarize what was inconsistent/consistent
              */
             if (!inconsistent) {
-                for (int ii = 0; ii < snapshot.m_digests.size(); ii++) {
-                    pw.println(indentString + snapshot.m_digests.get(ii).getPath());
+                for (File element : snapshot.m_digests) {
+                    pw.println(indentString + element.getPath());
                 }
             } else {
                 pw.println(indentString + "Not all digests are consistent");
@@ -1058,8 +1044,8 @@ public class SnapshotUtil {
             pw.print(indentString + "Tables: ");
             int ii = 0;
 
-            for (int jj = 0; jj < snapshot.m_digestTables.size(); jj++) {
-                for (String table : snapshot.m_digestTables.get(jj)) {
+            for (Set<String> element : snapshot.m_digestTables) {
+                for (String table : element) {
                     digestTablesSeen.add(table);
                 }
             }
@@ -1234,7 +1220,7 @@ public class SnapshotUtil {
      * @param fileNonce
      * @param hostId
      */
-    public static final String constructFilenameForTable(Table table,
+    public static final String constructFilenameForTable(SnapshotTableInfo table,
                                                          String fileNonce,
                                                          SnapshotFormat format,
                                                          int hostId)
@@ -1246,8 +1232,8 @@ public class SnapshotUtil {
 
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
-        filename_builder.append(table.getTypeName());
-        if (!table.getIsreplicated())
+        filename_builder.append(table.getName());
+        if (!table.isReplicated())
         {
             filename_builder.append("-host_");
             filename_builder.append(hostId);
@@ -1256,7 +1242,7 @@ public class SnapshotUtil {
         return filename_builder.toString();
     }
 
-    public static final File constructFileForTable(Table table,
+    public static final File constructFileForTable(SnapshotTableInfo table,
             String filePath,
             String fileNonce,
             SnapshotFormat format,
@@ -1296,34 +1282,152 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
-    public static final List<Table> getTablesToSave(Database database) {
-        CatalogMap<Table> all_tables = database.getTables();
-        ArrayList<Table> my_tables = new ArrayList<Table>();
-        for (Table table : all_tables) {
+    /**
+     * Test if a table is a persistent table view and should be included in the snapshot.
+     *
+     * @param db    The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a persistent table view that should be snapshotted.
+     */
+    public static boolean isSnapshotablePersistentTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (CatalogUtil.isStream(db, materializer)) {
+            // The view source table should not be a streamed table.
+            return false;
+        }
+        if (!table.getIsreplicated() && table.getPartitioncolumn() == null) {
+            // If the view table is implicitly partitioned (maybe was not in snapshot),
+            // its maintenance is not turned off during the snapshot restore process.
+            // Let it take care of its own data by itself.
+            // Do not attempt to restore data for it.
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a streamed table view and should be included in the snapshot.
+     *
+     * @param db    The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a streamed table view that should be snapshotted.
+     */
+    public static boolean isSnapshotableStreamedTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (!CatalogUtil.isStream(db, materializer)) {
+            // Test if the view source table is a streamed table.
+            return false;
+        }
+        // Non-partitioned export table are not allowed so it should not get here.
+        Column sourcePartitionColumn = materializer.getPartitioncolumn();
+        if (sourcePartitionColumn == null) {
+            return false;
+        }
+        // Make sure the partition column is present in the view.
+        // Export table views are special, we use column names to match..
+        Column pc = table.getColumns().get(sourcePartitionColumn.getName());
+        if (pc == null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Get all required snapshotable tables from an in-memory catalog jar file.
+     *
+     * @param jarFile a in-memory catalog jar file
+     * @return {@link Set} of table names which must be included in a snapshot for it to be valid
+     */
+    public static Set<String> getRequiredSnapshotableTableNames(InMemoryJarfile jarFile) {
+        Database database = CatalogUtil.getDatabaseFrom(jarFile);
+        // Snapshotable persistent table views are considered optional. ENG-11578, ENG-14145
+        return getTablesToSave(database, t -> !isSnapshotablePersistentTableView(database, t), false).stream()
+                .map(SnapshotTableInfo::getName)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get all normal tables from the catalog. A normal table is one that's NOT a materialized view, nor an export
+     * table. For the lack of a better name, I call it normal.
+     *
+     * @param catalog      Catalog database
+     * @param isReplicated true to return only replicated tables, false to return all partitioned tables
+     * @return A list of tables
+     */
+    public static final List<SnapshotTableInfo> getPartitionedNormalTablesToSave(Database database) {
+        return getTablesToSave(database,
+                t -> !t.getIsreplicated()
+                        && (t.getMaterializer() == null || TableType.isStream(t.getMaterializer().getTabletype())),
+                true);
+    }
+
+    /**
+     * @param database from which to retrieve tables
+     * @return All tables and system tables which are eligible to be snapshotted
+     */
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database) {
+        return getTablesToSave(database, t -> true, st -> true);
+    }
+
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> predicate,
+            boolean includeSystemTables) {
+        return getTablesToSave(database, predicate, t -> includeSystemTables);
+    }
+
+    /**
+     * Create a list of {@link SnapshotTableInfo} that have been selected for a snapshot
+     *
+     * @param database             from which to retrieve tables
+     * @param tablePredicate       Predicate to apply to all tables from {@code database}
+     * @param systemTablePredicate Predicate to apply to {@link SystemTable}s
+     * @return List of tables selected for a snapshot
+     */
+    public static final List<SnapshotTableInfo> getTablesToSave(Database database, Predicate<Table> tablePredicate,
+            Predicate<SystemTable> systemTablePredicate) {
+        ArrayList<SnapshotTableInfo> tables = new ArrayList<>();
+        for (Table table : database.getTables()) {
             // STREAM tables are not included in the snapshot.
-            if (TableType.isStream(table.getTabletype())) {
+            if (CatalogUtil.isStream(database, table)) {
                 continue;
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.
             if (table.getMaterializer() != null
-                    && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
-                    && ! CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
+                    && !isSnapshotableStreamedTableView(database, table)
+                    && !isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
-            my_tables.add(table);
+            if (tablePredicate.test(table)) {
+                tables.add(new SnapshotTableInfo(table));
+            }
         }
-        return my_tables;
+
+        for (SystemTable table : SystemTable.values()) {
+            if (systemTablePredicate.test(table)) {
+                tables.add(table.getTableInfo());
+            }
+        }
+
+        return tables;
     }
 
     public static File[] retrieveRelevantFiles(String filePath,
                                                final String fileNonce)
     {
+        String matchNonce = fileNonce + "-";
         FilenameFilter has_nonce = new FilenameFilter()
         {
             @Override
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(fileNonce) && file.endsWith(".vpt");
+                return file.startsWith(matchNonce) && file.endsWith(".vpt");
             }
         };
 

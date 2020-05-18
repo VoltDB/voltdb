@@ -60,6 +60,7 @@
 #include "stats/StatsAgent.h"
 
 #include "storage/BinaryLogSinkWrapper.h"
+#include "storage/SystemTableId.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -104,6 +105,10 @@ class TempTableLimits;
 class Topend;
 class TheHashinator;
 class ExportTupleStream;
+
+namespace kipling {
+class GroupStore;
+}
 
 class TempTableTupleDeleter {
 public:
@@ -166,7 +171,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Table* getCatalogTable(std::string const& name) const;
         Table* getTableById(int32_t tableId) const;
         Table* getTableByName(std::string const& name) const;
+        StreamedTable* getStreamTableByName(std::string const& name) const;
+        void setStreamTableByName(std::string const& name, StreamedTable* newStreamTable);
         TableCatalogDelegate* getTableDelegate(std::string const& name) const;
+        PersistentTable* getSystemTable(const SystemTableId id) const;
 
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
@@ -493,6 +501,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_isLowestSite = true;
         }
 
+        int getSnapshotSchema(CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType, bool forceLive);
+
         /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
@@ -518,18 +528,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 ReferenceSerializeInputBE& serializeIn, std::vector<int>& retPositions);
 
         /**
-         * Perform an action on behalf of Export.
+         * Set the export stream positions for the given stream
          *
-         * @param syncAction if syncAction is true, the stream offset being set for a table
          * @param ackOffset the reference to the USO of the next row inserted in the stream
          * @param seqNo the reference to the sequenceNumber of the next inserted row
          * @param generationIdCreated the reference to the initial creation generation ID of the export stream
          * @param streamName the name of the stream we want to update the state for
-         * @return the universal offset for any poll results
-         * (results returned separately via QueryResults buffer)
          */
-        int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                int64_t generationIdCreated, std::string streamName);
+        void setExportStreamPositions(int64_t ackOffset, int64_t seqNo, int64_t generationIdCreated,
+                std::string streamName);
 
         /**
          * Complete the deletion of the Migrated Table rows.
@@ -598,6 +605,38 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void disableExternalStreams();
 
         bool externalStreamsEnabled();
+
+        /**
+         * Store a kipling group in the system tables
+         */
+        int32_t storeKiplingGroup(int64_t undoToken, SerializeInputBE& in);
+
+        /**
+         * Delete a kipling group and all related metadata
+         */
+        int32_t deleteKiplingGroup(int64_t undoToken, const NValue& groupId);
+
+        /**
+         * Start or continue a fetch of all kipling groups.
+         * Return 1 if there are more groups to fetch, 0 if there are no more groups or -1 if there was an error
+         */
+        int32_t fetchKiplingGroups(int32_t maxResultSize, const NValue& startGroupId);
+
+        /**
+         * Store topic parition offsets for a kipling group
+         */
+        int32_t commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
+                const NValue& groupId, SerializeInputBE& in);
+
+        /**
+         * Fetch topic parition offsets for a kipling group
+         */
+        int32_t fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
+
+        /*
+         * Delete expired offsets of standalone groups
+         */
+        int32_t deleteExpiredKiplingOffsets(int64_t undoToken, int64_t deleteOlderThan);
 
     private:
         /*
@@ -672,6 +711,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         NValue udfResultHelper(int32_t returnCode, bool partition_table, ValueType type);
 
+        void createSystemTables();
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
@@ -708,6 +749,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;
+
+        // map system table id to table pointers
+        std::map<SystemTableId, PersistentTable *> m_systemTables;
 
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
@@ -882,6 +926,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
+
+        std::unique_ptr<kipling::GroupStore> m_groupStore;
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;

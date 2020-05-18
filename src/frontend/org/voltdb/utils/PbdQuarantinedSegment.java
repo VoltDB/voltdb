@@ -32,8 +32,8 @@ import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
  * corruption but is kept around in case any data in the segment is needed to recover data.
  */
 class PbdQuarantinedSegment<M> extends PBDSegment<M> {
-    PbdQuarantinedSegment(File file, long index, long id) {
-        super(file, index, id);
+    PbdQuarantinedSegment(File file, long id) {
+        super(file, id);
     }
 
     @Override
@@ -93,7 +93,7 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     }
 
     @Override
-    boolean offer(BBContainer cont) {
+    int offer(BBContainer cont, long startId, long endId, long timestamp) {
         throw new UnsupportedOperationException();
     }
 
@@ -141,6 +141,11 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     @Override
     M getExtraHeader() {
         return null;
+    }
+
+    @Override
+    boolean isActive() {
+        return false;
     }
 
     private static final PBDSegmentReader<Void> READER = new PBDSegmentReader<Void>() {
@@ -196,11 +201,35 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
+        public boolean hasOutstandingEntries() {
+            return false;
+        }
+
+        @Override
         public void close() {
         }
 
         @Override
         public void closeAndSaveReaderState() {
         }
+
+        @Override
+        public void markRestReadAndDiscarded() {
+        }
     };
+
+    @Override
+    long getStartId() throws IOException {
+        return PBDSegment.INVALID_ID;
+    }
+
+    @Override
+    long getEndId() throws IOException {
+        return PBDSegment.INVALID_ID;
+    }
+
+    @Override
+    long getTimestamp() throws IOException {
+        return PBDSegment.INVALID_TIMESTAMP;
+    }
 }

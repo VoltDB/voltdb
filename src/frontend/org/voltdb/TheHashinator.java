@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -224,6 +225,19 @@ public abstract class TheHashinator {
         } else {
             return pHashinateBytes(bytes);
         }
+    }
+
+    /**
+     * Given an Object calculate the hash token of that object. The token can be used with
+     * {@link #getPartitionFromHashedToken(int)} to retrieve the corresponding partition
+     *
+     * @param value to hash
+     * @return The hash token of {@code value}
+     */
+    public static int hashinateObject(Object value) {
+        byte[] bytes = VoltType.valueToBytes(value);
+        ByteBuffer buf = ByteBuffer.wrap(bytes);
+        return MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
     }
 
     /**

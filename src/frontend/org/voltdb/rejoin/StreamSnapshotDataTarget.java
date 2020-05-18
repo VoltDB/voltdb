@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -42,6 +44,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
@@ -75,11 +78,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final static int DATA_HEADER_BYTES = contentOffset + 4 + 4;
 
     // schemas for all the tables on this partition
-    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas = new HashMap<>();
+    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas;
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
-    private boolean m_replicatedTableTarget;
+    private final boolean m_replicatedTableTarget;
     // input and output threads
     private final SnapshotSender m_sender;
     private final StreamSnapshotAckReceiver m_ackReceiver;
@@ -103,19 +106,21 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
-                                    SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+            byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver)
     {
-        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, tables, DEFAULT_WRITE_TIMEOUT_MS, sender,
+                ackReceiver);
     }
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
-                                    long writeTimeout, SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+            byte[] hashinatorConfig, List<SnapshotTableInfo> tables, long writeTimeout, SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver)
     {
         super();
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
-        m_schemas.putAll(schemas);
+        m_schemas = tables.stream().collect(
+                Collectors.toMap(SnapshotTableInfo::getTableId, t -> Pair.of(t.isReplicated(), t.getSchema())));
         m_destHSId = HSId;
         m_replicatedTableTarget = lowestDestSite;
         m_otherDestHostHSIds = new HashSet<>(allDestHostHSIds);
@@ -512,6 +517,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     chunkC = tupleData.call();
                     chunk = chunkC.b();
                 } catch (Exception e) {
+                    setWriteFailed(e);
                     return Futures.immediateFailedFuture(e);
                 }
 
@@ -753,4 +759,18 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             notifyAll();
         }
     }
+
+    /**
+     * @param tableId ID of table
+     * @return serialized schema for {@code tableId} or {@code null} if the schema has already been sent
+     */
+    protected byte[] getSchema(int tableId) {
+        return m_schemas.get(tableId).getSecond();
+    }
+
+    // No in use
+    public void setInProgressHandler(Runnable inProgress) {}
+
+    // No need to track stream snapshot progress
+    public void trackProgress() {}
 }

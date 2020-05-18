@@ -17,35 +17,47 @@
 
 package org.voltdb.utils;
 
-import com.jcraft.jsch.ChannelSftp;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.JSchException;
-import com.jcraft.jsch.Session;
-import com.jcraft.jsch.SftpException;
+import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
+import static org.voltdb.utils.SnapshotComparer.CONSOLE_LOG;
+import static org.voltdb.utils.SnapshotComparer.SNAPSHOT_LOG;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INCONSISTENCY;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INVALID_INPUT;
+import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
+import static org.voltdb.utils.SnapshotComparer.remoteSnapshotFolder;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.Vector;
+
 import org.apache.commons.io.FileUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RestoreAgent;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.*;
-
-import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
-import static org.voltdb.utils.SnapshotComparer.*;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpException;
 
 
 /**
@@ -344,7 +356,6 @@ class SnapshotLoader {
     final String[] dirs;
     final String[] hosts;
     InMemoryJarfile jar;
-    SnapShotMetaData metaData;
     ElasticHashinator hashinator;
     final Snapshot snapshot;
     final Map<String, Boolean> tables;
@@ -439,23 +450,16 @@ class SnapshotLoader {
             e.printStackTrace();
             System.exit(STATUS_INVALID_INPUT);
         }
-        // Construct SnapShotMetaData object to hold database and table information
-        metaData = new SnapShotMetaData(nonce, jar);
+
         // Deserialize hashinator from .hash file
         // Use HASH_EXTENSION
         // ElasticHashinator hashinator = getHashinatorFromFile(dirs[0], nonce, Integer.parseInt(hosts.get(0)));
         // Validate SnapshotName
         // Collect tables
         tables = new HashMap<>();
-        // if not supply tables
-        if (tables.isEmpty()) {
             // check all tables, get from catalog
-            for (Table table : metaData.getAllReplicatedTables()) {
-                tables.put(table.getTypeName(), true);
-            }
-            for (Table table : metaData.getAllPartitionedTables()) {
-                tables.put(table.getTypeName(), false);
-            }
+        for (SnapshotTableInfo sti : SnapshotUtil.getTablesToSave(CatalogUtil.getDatabaseFrom(jar))) {
+            tables.put(sti.getName(), sti.isReplicated());
         }
     }
 
@@ -514,19 +518,16 @@ class SnapshotLoader {
             for (int p = 0; p < partitionToFiles.size(); p++) {
                 Integer[] relevantPartition = isReplicated ? null : new Integer[]{p};
                 int partitionid = isReplicated ? 16383 : p;
-                TableSaveFile referenceSaveFile = null, compareSaveFile = null;
-                try {
-                    for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
-                        boolean isConsistent = true;
+                for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
+                    boolean isConsistent = true;
 
-                        referenceSaveFile =
-                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
-                                        1, relevantPartition);
-                        compareSaveFile =
-                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(target)),
-                                        1, relevantPartition);
+                    long refCheckSum = 0l, compCheckSum = 0l;
+                    try (TableSaveFile referenceSaveFile = new TableSaveFile(
+                            new FileInputStream(partitionToFiles.get(p).get(0)), 1, relevantPartition);
+                            TableSaveFile compareSaveFile = new TableSaveFile(
+                                    new FileInputStream(partitionToFiles.get(p).get(target)), 1, relevantPartition)) {
                         DBBPool.BBContainer cr = null, cc = null;
-                        long refCheckSum = 0l, compCheckSum = 0l;
+
                         while (referenceSaveFile.hasMoreChunks() && compareSaveFile.hasMoreChunks()) {
                             // skip chunk for irrelevant partition
                             cr = referenceSaveFile.getNextChunk();
@@ -535,43 +536,43 @@ class SnapshotLoader {
                             if (cr == null && cc == null) { // both reached EOF
                                 break;
                             }
-                            // TODO: chunk not aligned?
-                            if (cr != null && cc == null) {
-                                isConsistent = false;
-                                System.err.println("Reference file still contain chunks while comparing file does not");
-                                break;
-                            }
-                            if (cr == null && cc != null) {
-                                isConsistent = false;
-                                System.err.println("Comparing file still contain chunks while Reference file does not");
-                                break;
-                            }
                             try {
+                                // TODO: chunk not aligned?
+                                if (cr != null && cc == null) {
+                                    System.err.println("Reference file still contain chunks while comparing file does not");
+                                    break;
+                                }
+                                if (cr == null && cc != null) {
+                                    System.err.println("Comparing file still contain chunks while reference file does not");
+                                    break;
+                                }
+
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 if (orderLevel == 2) {
                                     refCheckSum = tr.updateCheckSum(refCheckSum);
                                     compCheckSum = tc.updateCheckSum(compCheckSum);
-                                } else {
-                                    if (!tr.hasSameContents(tc, orderLevel == 1)) {
-                                        // seek to find where discrepancy happened
-                                        if (SNAPSHOT_LOG.isDebugEnabled()) {
-                                            SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
-                                            SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
-                                        }
-
-                                        int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
-                                        int[][] lookup = new int[trSize + 1][tcSize + 1];
-                                        // fill lookup table
-                                        LCSLength(tr, tc, trSize, tcSize, lookup);
-                                        // find difference
-                                        StringBuilder output = new StringBuilder();
-                                        output.append("Diffs between file " + partitionToFiles.get(p).get(0) + " and file " + partitionToFiles.get(p).get(target) + " \n");
-                                        diff(tr, tc, trSize, tcSize, lookup, output);
-                                        CONSOLE_LOG.info(output.toString());
-                                        isConsistent = false;
-                                        break;
+                                } else if (!tr.hasSameContents(tc, orderLevel == 1)) {
+                                    // seek to find where discrepancy happened
+                                    if (SNAPSHOT_LOG.isDebugEnabled()) {
+                                        SNAPSHOT_LOG.debug(
+                                                "table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
+                                        SNAPSHOT_LOG.debug(
+                                                "table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
                                     }
+
+                                    int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
+                                    int[][] lookup = new int[trSize + 1][tcSize + 1];
+                                    // fill lookup table
+                                    lcsLength(tr, tc, trSize, tcSize, lookup);
+                                    // find difference
+                                    StringBuilder output = new StringBuilder().append("Diffs between file ")
+                                            .append(partitionToFiles.get(p).get(0)).append(" and file ")
+                                            .append(partitionToFiles.get(p).get(target)).append(" \n");
+                                    diff(tr, tc, trSize, tcSize, lookup, output);
+                                    CONSOLE_LOG.info(output.toString());
+                                    isConsistent = false;
+                                    break;
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
@@ -584,36 +585,22 @@ class SnapshotLoader {
                                 }
                             }
                         }
+
                         if (orderLevel == 2) {
                             isConsistent = isConsistent && (refCheckSum == compCheckSum);
                         }
                         if (isConsistent) {
-                            SNAPSHOT_LOG.info((isReplicated ? "Replicated" : "Partitioned") + " Table " + tableName + " is consistent between host0 with host" + target +
-                                    " on partition " + partitionid);
+                            SNAPSHOT_LOG.info((isReplicated ? "Replicated" : "Partitioned") + " Table " + tableName
+                                    + " is consistent between host0 with host" + target + " on partition "
+                                    + partitionid);
                         } else {
                             inconsistentTable.add(tableName);
-                            SNAPSHOT_LOG.warn((isReplicated ? "Replicated" : "Partitioned") + " Table " + tableName + " is inconsistent between host0 with host" + target +
-                                    " on partition " + partitionid);
+                            SNAPSHOT_LOG.warn((isReplicated ? "Replicated" : "Partitioned") + " Table " + tableName
+                                    + " is inconsistent between host0 with host" + target + " on partition "
+                                    + partitionid);
                         }
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    if (referenceSaveFile != null) {
-                        try {
-                            referenceSaveFile.close();
-                        } catch (IOException e) {
-                            System.err.println("Exception for closing reference file " + referenceSaveFile);
-                            e.printStackTrace();
-                        }
-                    }
-                    if (compareSaveFile != null) {
-                        try {
-                            compareSaveFile.close();
-                        } catch (IOException e) {
-                            System.err.println("Exception for closing compare file " + referenceSaveFile);
-                            e.printStackTrace();
-                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
             }
@@ -659,7 +646,7 @@ class SnapshotLoader {
     }
 
     // Function to fill lookup table by finding the length of LCS
-    private static void LCSLength(VoltTable X, VoltTable Y, int m, int n,
+    private static void lcsLength(VoltTable X, VoltTable Y, int m, int n,
                                  int[][] lookup) {
         // first column of the lookup table will be all 0
         for (int i = 0; i <= m; i++) {
@@ -782,7 +769,6 @@ class SnapshotLoader {
     static String PATHSEPARATOR = "/";
 
     private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath) {
-        ;
         ChannelSftp channelSftp = null;
         try {
             channelSftp = setupJsch(username, remoteHost);
@@ -796,7 +782,7 @@ class SnapshotLoader {
                     if (!(new File(destinationPath + PATHSEPARATOR + item.getFilename())).exists()
                             || (item.getAttrs().getMTime() > Long
                             .valueOf(new File(destinationPath + PATHSEPARATOR + item.getFilename()).lastModified()
-                                    / (long) 1000)
+                                    / 1000)
                             .intValue())) { // Download only if changed later.
                         new File(destinationPath + PATHSEPARATOR + item.getFilename());
                         channelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(),
@@ -813,76 +799,5 @@ class SnapshotLoader {
             }
         }
         return true;
-    }
-}
-
-class SnapShotMetaData {
-    private String nonce;
-    private Catalog catalog;
-    private Cluster cluster;
-    private Database database;
-    private List<Table> partitionedTables;
-    private List<Table> replicatedTables;
-    private List<String> tableNames;
-
-
-    public SnapShotMetaData(String nonce, InMemoryJarfile jarfile) {
-        // TODO: handle exceptions
-        this.nonce = nonce;
-        catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(jarfile));
-        cluster = catalog.getClusters().get("cluster");
-        database = cluster.getDatabases().get("database");
-        replicatedTables = new ArrayList<>();
-        partitionedTables = new ArrayList<>();
-        tableNames = new ArrayList<>();
-
-        assert database != null;
-        for (Table table : CatalogUtil.getNormalTables(database, true)) {
-            replicatedTables.add(table);
-            tableNames.add(table.getTypeName());
-        }
-        for (Table table : CatalogUtil.getNormalTables(database, false)) {
-            partitionedTables.add(table);
-            tableNames.add(table.getTypeName());
-        }
-
-        // also have to capture snapshotable views
-        for (Table table : CatalogUtil.getAllSnapshotableViews(database)) {
-            if (table.getIsreplicated()) {
-                replicatedTables.add(table);
-            } else {
-                partitionedTables.add(table);
-            }
-            tableNames.add(table.getTypeName());
-        }
-    }
-
-    public String getNonce() {
-        return nonce;
-    }
-
-    public Catalog getCatalog() {
-        return catalog;
-    }
-
-    public Cluster getCluster() {
-        return cluster;
-    }
-
-    public Database getDatabase() {
-        return database;
-    }
-
-    public List<Table> getAllPartitionedTables() {
-        return partitionedTables;
-    }
-
-    public List<Table> getAllReplicatedTables() {
-        return replicatedTables;
-    }
-
-    public List<String> getTableNames() {
-        return tableNames;
     }
 }

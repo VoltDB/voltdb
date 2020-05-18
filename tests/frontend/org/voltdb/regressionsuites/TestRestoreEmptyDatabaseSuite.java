@@ -24,10 +24,13 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertNotEquals;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
 import org.voltdb.BackendTarget;
@@ -35,9 +38,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.utils.VoltFile;
 
 public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
+
+    private static final int SITE_COUNT = 4;
+    private static final int HOST_COUNT = 3;
 
     static LocalCluster m_nonEmptyConfig;
     static LocalCluster m_emptyConfig;
@@ -62,8 +69,9 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     {
         final Object[] params = new Object[rowdata.length + 1];
         params[0] = i;
-        for (int ii=0; ii < rowdata.length; ++ii)
+        for (int ii=0; ii < rowdata.length; ++ii) {
             params[ii+1] = rowdata[ii];
+        }
         return params;
     }
 
@@ -107,7 +115,9 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
     public void testEmptySnapshotSaveRestore() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("testEmptySnapshotSaveRestore");
         m_nonEmptyConfig.shutDown();
@@ -120,7 +130,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                 .getResults();
 
         while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            assertEquals("SUCCESS", results[0].getString("RESULT"));
         }
 
         // Kill and restart all the execution sites.
@@ -129,30 +139,26 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
+        try {
             String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
-            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
-                    TESTNONCE).getResults();
+            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR, TESTNONCE).getResults();
 
-            assertEquals(results[0].getRowCount(), 0);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
+            assertEquals(getSystemTableRowCount(), results[0].getRowCount());
+        } catch (ProcCallException e) {
+            System.err.println(Arrays.toString(e.getClientResponse().getResults()));
+            throw e;
         }
 
-        deleteTestFiles(TESTNONCE);
         System.out.println("finished testEmptySnapshotSaveRestore");
     }
 
     public void testSaveAndRestoreFromEmptyDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("testSaveAndRestoreFromEmptyDatabase");
-        setConfig(m_nonEmptyConfig);
         Client client = getClient();
 
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -171,18 +177,10 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         }
 
         // Kill and restart all the execution sites.
-        m_nonEmptyConfig.shutDown();
-
-        m_emptyConfig.getSubRoots().clear();
-        m_emptyConfig.startUp(false);
-
-        moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, m_emptyConfig);
-
-        setConfig(m_emptyConfig);
+        switchRunningConfig(m_emptyConfig);
         client = getClient();
 
-        try
-        {
+        try {
             String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
             results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
                     TESTNONCE).getResults();
@@ -192,25 +190,23 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-            // 6 tables with 12 rows each in the result == 72
-            assertEquals(results[0].getRowCount(), 72);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
+            // 6 tables with 12 rows each in the result == 72 + system table rows
+            assertEquals(72 + getSystemTableRowCount(), results[0].getRowCount());
+        } catch (ProcCallException e) {
+            System.err.println(Arrays.toString(e.getClientResponse().getResults()));
+            throw e;
         }
 
-        deleteTestFiles(TESTNONCE);
         System.out.println("finished testSaveAndRestoreFromEmptyDatabase");
     }
 
     public void testSaveAndRestoreFromNonEmptyDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("testSaveAndRestoreFromNonEmptyDatabase");
-        setConfig(m_nonEmptyConfig);
         Client client = getClient();
 
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -229,45 +225,35 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         }
 
         // Kill and restart all the execution sites.
-        m_nonEmptyConfig.shutDown();
-        m_emptyConfig.startUp(false);
+        switchRunningConfig(m_emptyConfig);
 
-        moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, m_emptyConfig);
-
-        setConfig(m_emptyConfig);
         client = getClient();
 
         client.callProcedure("@AdHoc", "CREATE TABLE foo (a integer)");
 
-        try
-        {
+        try {
             String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
             results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
                     TESTNONCE).getResults();
 
             while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
+                assertNotEquals(results[0].getString("ERR_MSG"), "FAILURE", results[0].getString("RESULT"));
             }
-            assertEquals(results[0].getRowCount(), 0);
+            assertEquals(getSystemTableRowCount(), results[0].getRowCount());
+        } catch (ProcCallException e) {
+            System.err.println(Arrays.toString(e.getClientResponse().getResults()));
+            throw e;
         }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        deleteTestFiles(TESTNONCE);
         System.out.println("finished testSaveAndRestoreFromNonEmptyDatabase");
     }
 
     public void testSaveAndRestoreFromCatalogDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("testSaveAndRestoreFromCatalogDatabase");
-        setConfig(m_nonEmptyConfig);
         Client client = getClient();
 
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -282,16 +268,11 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
                 .getResults();
 
         while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+            assertEquals("SUCCESS", results[0].getString("RESULT"));
         }
 
         // Kill and restart all the execution sites.
-        m_nonEmptyConfig.shutDown();
-        m_emptyCatalogConfig.startUp(false);
-
-        moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, m_emptyCatalogConfig);
-
-        setConfig(m_emptyCatalogConfig);
+        switchRunningConfig(m_emptyCatalogConfig);
         client = getClient();
 
         try
@@ -299,14 +280,39 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
             String necPath = m_emptyCatalogConfig.getSubRoots().get(0).getAbsolutePath();
             results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
                     TESTNONCE).getResults();
+            fail("Should have thrown ProcCallException");
         }
         catch (ProcCallException ex)
         {
             assertEquals(ex.getMessage(), "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.");
         }
 
-        deleteTestFiles(TESTNONCE);
         System.out.println("finished testSaveAndRestoreFromCatalogDatabase");
+    }
+
+    /**
+     * Switch the running config from {@link #m_nonEmptyConfig} to {@code newConfig}
+     *
+     * @param newConfig New configuration to be started
+     * @throws InterruptedException
+     */
+    private void switchRunningConfig(LocalCluster newConfig) throws InterruptedException {
+        m_nonEmptyConfig.shutDown();
+        newConfig.setCallingMethodName(m_methodName);
+        newConfig.getSubRoots().clear();
+        newConfig.startUp(false);
+
+        moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, newConfig);
+
+        setConfig(newConfig);
+    }
+
+    /**
+     * @return the number of rows expected in the restore result which are from system tables
+     */
+    private static int getSystemTableRowCount() {
+        // One row for each table for each partition
+        return SystemTable.values().length * SITE_COUNT * HOST_COUNT;
     }
 
     public TestRestoreEmptyDatabaseSuite(final String name) {
@@ -316,13 +322,13 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     static public junit.framework.Test suite() throws Exception
     {
         final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestRestoreEmptyDatabaseSuite.class);
+                new MultiConfigSuiteBuilder(TestRestoreEmptyDatabaseSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
 
-        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_nonEmptyConfig.setNewCli(false);
         boolean compile = m_nonEmptyConfig.compile(project);
@@ -330,7 +336,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         builder.addServerConfig(m_nonEmptyConfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
-        m_emptyConfig = new LocalCluster("empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyConfig = new LocalCluster("empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_emptyConfig.setNewCli(false);
         project = new VoltProjectBuilder();
@@ -339,7 +345,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         assertTrue(compile);
 
 
-        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
         m_emptyCatalogConfig.setNewCli(false);
         project = new VoltProjectBuilder();

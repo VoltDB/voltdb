@@ -502,14 +502,14 @@ public class SnapshotSiteProcessor {
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
 
             // Add the task to the task list for the given table
-            m_snapshotTableTasks.put(task.m_table.getRelativeIndex(), task);
+            m_snapshotTableTasks.put(task.m_tableInfo.getTableId(), task);
 
             // Make sure there is a predicate object for each table, the predicate could contain
             // empty expressions. So activateTableStream() doesn't have to do a null check.
-            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_table.getRelativeIndex());
+            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_tableInfo.getTableId());
             if (predicates == null) {
-                predicates = new SnapshotPredicates(task.m_table.getRelativeIndex());
-                tablesAndPredicates.put(task.m_table.getRelativeIndex(), predicates);
+                predicates = new SnapshotPredicates(task.m_tableInfo.getTableId());
+                tablesAndPredicates.put(task.m_tableInfo.getTableId(), predicates);
             }
 
             predicates.addPredicate(task.m_predicate, task.m_deleteTuples);
@@ -559,7 +559,7 @@ public class SnapshotSiteProcessor {
              * is responsible for closing the data target. Done in a separate
              * thread so the EE can continue working.
              */
-            if (tableTask.m_table.getIsreplicated() &&
+            if (tableTask.m_tableInfo.isReplicated() &&
                 tableTask.m_target.getFormat().canCloseEarly()) {
                 final Thread terminatorThread =
                     new Thread("Replicated SnapshotDataTarget terminator ") {
@@ -662,12 +662,16 @@ public class SnapshotSiteProcessor {
              * enclosing loop ensures that the next table is then addressed.
              */
             if (!streamResult.getSecond()) {
+                // Task done, move the snapshot progress tracker forward.
+                for (SnapshotTableTask tableTask : tableTasks) {
+                    tableTask.getTarget().trackProgress();
+                }
                 asyncTerminateReplicatedTableTasks(tableTasks);
                 // XXX: Guava's multimap will clear the tableTasks collection when the entry is
                 // removed from the containing map, so don't use the collection after removal!
-                taskIter.remove();
                 SNAP_LOG.debug("Finished snapshot tasks for table " + tableId +
-                               ": " + tableTasks);
+                        ": " + tableTasks);
+                taskIter.remove();
             } else {
                 break;
             }
@@ -706,8 +710,12 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final ExtensibleSnapshotDigestData snapshotDataForZookeeper = m_extraSnapshotData;
                 m_extraSnapshotData = null;
-                final Thread terminatorThread =
-                    new Thread("Snapshot terminator") {
+                Thread.UncaughtExceptionHandler eh = new Thread.UncaughtExceptionHandler() {
+                    public void uncaughtException(Thread th, Throwable ex) {
+                        SNAP_LOG.warn("Error running snapshot completion task", ex);
+                    }
+                };
+                final Thread terminatorThread = new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
                         // TRAIL [SnapSave:11] 7 [1 site/host] The last finished site wlll close the targets.
@@ -730,10 +738,7 @@ public class SnapshotSiteProcessor {
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
                                     t.close();
-                                } catch (IOException e) {
-                                    snapshotSucceeded = false;
-                                    throw new RuntimeException(e);
-                                } catch (InterruptedException e) {
+                                } catch (IOException | InterruptedException e) {
                                     snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 }
@@ -782,7 +787,7 @@ public class SnapshotSiteProcessor {
                         }
                     }
                 };
-
+                terminatorThread.setUncaughtExceptionHandler(eh);
                 m_snapshotTargetTerminators.add(terminatorThread);
                 terminatorThread.start();
             }

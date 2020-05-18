@@ -1190,7 +1190,7 @@ public class VoltCompiler {
             StatementCompiler.compileStatementAndUpdateCatalog(
                     this, hsql, db, m_estimates, stmt, xml, stmt.getSqltext(),
                     null, // no user-supplied join order
-                    DeterminismMode.FASTER, StatementPartitioning.partitioningForRowLimitDelete());
+                    DeterminismMode.FASTER, StatementPartitioning.partitioningForRowLimitDelete(), false);
         }
     }
 

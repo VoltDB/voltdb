@@ -730,12 +730,13 @@ public class Inits {
                 ExportManagerInterface.initialize(
                         features,
                         m_rvdb.m_myHostId,
+                        m_config,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
                         //If durability is off and we are told not to join but create by mesh clear overflow.
                         (m_config.m_startAction==StartAction.CREATE && (m_config.m_forceVoltdbCreate || !m_durable)),
                         m_rvdb.m_messenger,
-                        m_rvdb.m_partitionsToSitesAtStartupForExportInit
+                        m_rvdb.getPartitionToSiteMap()
                         );
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error setting up export", true, t);

@@ -35,11 +35,9 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotFormat;
-import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -126,7 +124,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasPersistentTables)
+    private void initiateRejoinOnSites(List<Long> HSIds)
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
@@ -143,8 +141,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
                                               m_snapshotDataBufPool,
-                                              m_snapshotCompressedDataBufPool,
-                                              schemaHasPersistentTables);
+                                              m_snapshotCompressedDataBufPool);
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -205,13 +202,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
-        boolean schemaHasPersistentTables = false;
-        for (Table t : catalog.getTables()) {
-            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.CONNECTOR_LESS_STREAM.get()) {
-                schemaHasPersistentTables = true;
-                break;
-            }
-        }
         m_startTime = System.currentTimeMillis();
         List<Long> firstSites = new ArrayList<Long>();
         synchronized (m_lock) {
@@ -222,7 +212,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             VoltDB.instance().reportNodeStartupProgress(0, m_initialSiteCount);
         }
         REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
-        initiateRejoinOnSites(firstSites, schemaHasPersistentTables);
+        initiateRejoinOnSites(firstSites);
 
         return true;
     }
