@@ -384,7 +384,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(VoltType.VARBINARY);
-        schemaExpr.setValueSize(1048576);
+        schemaExpr.setValueSize(10485760);
     }
 
     // This method updates m_isWorker at a given index
