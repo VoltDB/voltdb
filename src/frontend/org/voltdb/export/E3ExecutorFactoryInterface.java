@@ -59,4 +59,9 @@ public interface E3ExecutorFactoryInterface {
      * @param partitionId
      */
     public void freeExecutor(int partitionId);
+
+    /**
+     * Shutdown all the executors
+     */
+    public void shutdown();
 }
