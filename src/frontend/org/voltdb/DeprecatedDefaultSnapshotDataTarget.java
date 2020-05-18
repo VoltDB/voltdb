@@ -57,7 +57,6 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final FileOutputStream m_fos;
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private Runnable m_onCloseHandler = null;
-    private Runnable m_inProgressHandler = null;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -405,11 +404,9 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
 
-    public void setInProgressHandler(Runnable inProgress) {
-        m_inProgressHandler = inProgress;
-    }
+    // Not in use
+    public void setInProgressHandler(Runnable inProgress) {}
 
-    public void trackProgress() {
-        m_inProgressHandler.run();
-    }
+    // Not in use for this target
+    public void trackProgress() {}
 }
