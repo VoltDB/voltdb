@@ -315,19 +315,6 @@ public final class ExpressionUtil {
         }
     }
 
-    // A terminal node of an expression is the one that does not have left/right child, nor any parameters (null / 0 parameter);
-    private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
-        if (expr != null) {
-            collectTerminals(expr.getLeft(), accum);
-            collectTerminals(expr.getRight(), accum);
-            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
-                expr.getArgs().forEach(e -> collectTerminals(e, accum));
-            } else if (expr.getLeft() == null && expr.getRight() == null) {
-                accum.add(expr);
-            }
-        }
-    }
-
     private static boolean containsTerminalParentPairs(
             AbstractExpression expr, AbstractExpression parent,
             Predicate<Pair<AbstractExpression, AbstractExpression>> predicate) {
