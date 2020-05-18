@@ -74,6 +74,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private final RateLimitedLogger m_syncServiceLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toNanos(1), SNAP_LOG, Level.ERROR);
     private Runnable m_onCloseHandler = null;
+    private Runnable m_inProgressHandler = null;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -615,5 +616,13 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 }
             }
         });
+    }
+
+    public void setInProgressHandler(Runnable inProgress) {
+        m_inProgressHandler = inProgress;
+    }
+
+    public void trackProgress() {
+        m_inProgressHandler.run();
     }
 }

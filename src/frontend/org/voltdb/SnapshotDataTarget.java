@@ -62,6 +62,8 @@ public interface SnapshotDataTarget {
 
     public void setOnCloseHandler(Runnable onClose);
 
+    public void setInProgressHandler(Runnable inProgress);
+
     /**
      * Get last cached exception that occurred during writes
      */
@@ -79,4 +81,9 @@ public interface SnapshotDataTarget {
      *   ROW_COUNT_UNSUPPORTED if the implementor does not support it
      */
     public int getInContainerRowCount(BBContainer tupleData);
+
+    /**
+     * Track the progress of snapshot write
+     */
+    public void trackProgress();
 }

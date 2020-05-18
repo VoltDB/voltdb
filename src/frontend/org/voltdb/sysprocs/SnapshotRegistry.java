@@ -55,6 +55,9 @@ public class SnapshotRegistry {
 
         public final long bytesWritten;
 
+        public int finishedTasks = 0;
+        public int totalTasks = 0;
+
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
         private Snapshot(long txnId, long timeStarted, int hostId, String path, String nonce,
@@ -84,6 +87,8 @@ public class SnapshotRegistry {
             timeStarted = incomplete.timeStarted;
             path = incomplete.path;
             nonce = incomplete.nonce;
+            totalTasks = incomplete.totalTasks;
+            finishedTasks = incomplete.finishedTasks;
             this.timeFinished = timeFinished;
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
@@ -98,6 +103,18 @@ public class SnapshotRegistry {
             }
             this.bytesWritten = bytesWritten;
             this.result = result;
+        }
+
+        public void setTotalTasks(int total) {
+            totalTasks = total;
+        }
+
+        public synchronized void taskFinished() {
+            finishedTasks++;
+        }
+
+        public double progress() {
+            return totalTasks == 0 ? 100 : (finishedTasks * 100.0) / totalTasks;
         }
 
         public interface TableUpdater {

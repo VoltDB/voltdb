@@ -44,6 +44,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final RandomAccessFile m_ras;
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
+    private Runnable m_inProgress;
     private boolean m_needsFinalClose;
 
     /*
@@ -227,5 +228,13 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public int getInContainerRowCount(BBContainer tupleData) {
         return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
+    }
+
+    public void setInProgressHandler(Runnable inProgress) {
+        m_inProgress = inProgress;
+    }
+
+    public void trackProgress() {
+        m_inProgress.run();
     }
 }
