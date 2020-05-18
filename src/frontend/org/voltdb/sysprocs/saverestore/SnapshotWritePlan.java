@@ -122,6 +122,21 @@ public abstract class SnapshotWritePlan
         }
     }
 
+    class TargetStatsProgress implements Runnable
+    {
+        final private SnapshotRegistry.Snapshot m_snapshotRecord;
+
+        TargetStatsProgress(SnapshotRegistry.Snapshot snapshotRecord)
+        {
+            m_snapshotRecord = snapshotRecord;
+        }
+
+        @Override
+        public void run() {
+            m_snapshotRecord.taskFinished();
+        }
+    }
+
     protected final Map<Long, Deque<SnapshotTableTask>> m_taskListsForHSIds =
         new HashMap<Long, Deque<SnapshotTableTask>>();
 

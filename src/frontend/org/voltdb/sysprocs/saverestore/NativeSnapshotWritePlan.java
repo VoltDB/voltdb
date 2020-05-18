@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -150,8 +151,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         // Native snapshots place the partitioned tasks on every site and round-robin the
         // replicated tasks across all the sites on every host
-        placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
-        placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
+        List<Long> sitesOnThisHost = tracker.getSitesForHost(context.getHostId());
+        placePartitionedTasks(partitionedSnapshotTasks, sitesOnThisHost);
+        placeReplicatedTasks(replicatedSnapshotTasks, sitesOnThisHost);
+
+        // Update the total task count, which used in snapshot progress tracking
+        int totalPartTasks = partitionedSnapshotTasks.size() * sitesOnThisHost.size();
+        int totalRepTasks = replicatedSnapshotTasks.size();
+        m_snapshotRecord.setTotalTasks(totalPartTasks + totalRepTasks);
 
         /*
          * Force this to act like a truncation snaphsot when there is no config or the data config has a partition
@@ -296,6 +303,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
         sdt.setOnCloseHandler(onClose);
+        final Runnable inProgress = new TargetStatsProgress(snapshotRecord);
+        sdt.setInProgressHandler(inProgress);
 
         return sdt;
     }
