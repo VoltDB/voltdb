@@ -1842,6 +1842,47 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
+    @Test
+    public void testSnapshotAndLoad() throws Exception {
+        int expectedLineCnt = 5;
+        client.callProcedure("@AdHoc",
+                "INSERT INTO BLAH VALUES (1,1,1,11111111,'first',1.10,1.11,'7777-12-25 14:35:26',"
+                        + "PointFromText('POINT(1 1)'), PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))'));");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO BLAH VALUES (2,2,2,222222,'second',2.20,2.22,'7777-12-25 14:35:26', "
+                        + "PointFromText('POINT(2 2)'), PolygonFromText('POLYGON((0 0, 2 0, 0 2, 0 0))'));");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO BLAH VALUES (3,3,3,333333, 'third' ,3.33, 3.33,'7777-12-25 14:35:26', "
+                        + "PointFromText('POINT(3 3)'), PolygonFromText('POLYGON((0 0, 3 0, 0 3, 0 0))'));");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO BLAH VALUES (4,4,4,444444, 'fourth' ,4.40 ,4.44,'7777-12-25 14:35:26', "
+                        + "PointFromText('POINT(4 4)'), PolygonFromText('POLYGON((0 0, 4 0, 0 4, 0 0))'));");
+        client.callProcedure("@AdHoc",
+                "INSERT INTO BLAH VALUES (5,5,5,5555555, 'fifth', 5.50, 5.55,'7777-12-25 14:35:26', "
+                        + "PointFromText('POINT(5 5)'), PolygonFromText('POLYGON((0 0, 5 0, 0 5, 0 0))'));");
+
+        client.callProcedure("@SnapshotSave",
+                String.format("{uripath:\"file:///tmp\",nonce:\"%s\",block:true,format:\"csv\"}", dbName));
+
+        // clear the table then try to load the csv file
+        client.callProcedure("@AdHoc", "DELETE FROM BLAH;");
+        String[] my_options = { "-f" + "/tmp/" + dbName + "-BLAH-host_0.csv", "--maxerrors=50", "--user=",
+                "--password=", "--port=", "--separator=,", "--quotechar=\"", "--escape=\\", "--skip=0", "BLAH" };
+        prepare();
+        // put CSVLoader in test mode so it wont exit after done.
+        CSVLoader.testMode = true;
+        CSVLoader.main(my_options);
+        File file = new File(String.format("/tmp/%s-BLAH-host_0.csv", dbName));
+        file.delete();
+
+        // do the test
+        VoltTable modCount;
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+        System.out.println("data inserted to table BLAH:\n" + modCount);
+        int rowct = modCount.getRowCount();
+        assertEquals(expectedLineCnt, rowct);
+    }
+
     private void createCSVFile(String encoding) {
         String FILENAME = encoding+"_encoded_text.csv";
         BufferedWriter bw = null;

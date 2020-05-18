@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,22 +15,17 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.exportclient;
+#pragma once
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
+#include <stdint.h>
 
-import org.voltdb.utils.BinaryDequeDeferredSerializer;
+namespace voltdb {
 
-/**
- * @author rdykiel
- *
- */
-public class ExportRowSchemaSerializer extends BinaryDequeDeferredSerializer<ExportRowSchema> {
-
-    @Override
-    public ExportRowSchema read(ByteBuffer buffer) throws IOException {
-        return ExportRowSchema.deserialize(buffer);
-    }
+// These IDs must be shared between the EE and the jvm layer
+enum class SystemTableId : int32_t {
+    KIPLING_GROUP = -1,
+    KIPLING_GROUP_MEMBER = -2,
+    KIPLING_GROUP_OFFSET = -3
+};
 
 }

@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import static org.junit.Assert.fail;
+
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -49,8 +51,6 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlannerType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-
-import static org.junit.Assert.fail;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.
@@ -157,7 +157,7 @@ public class PlannerTestAideDeCamp {
         // This is required until we figure out how to do parallel planning.
         try (QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false)) {
+                costModel, null, joinOrder, detMode, false, false)) {
 
             switch (plannerType) {
                 case VOLTDB: {

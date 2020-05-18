@@ -28,9 +28,10 @@ import static junit.framework.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -43,13 +44,11 @@ import org.junit.Test;
 import org.voltcore.messaging.MockMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
-import com.google.common.primitives.Longs;
-import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.util.concurrent.Callables;
 
@@ -57,7 +56,7 @@ public class TestStreamSnapshotDataTarget {
     private MockMailbox m_mb;
     private StreamSnapshotDataTarget.SnapshotSender m_sender;
     private StreamSnapshotAckReceiver m_ack;
-    private Map<Integer, Pair<Boolean, byte[]>> m_schemas;
+    private List<SnapshotTableInfo> m_tables;
 
     private ExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("Close stream thread", 10000);
 
@@ -79,9 +78,11 @@ public class TestStreamSnapshotDataTarget {
         new Thread(m_sender, "test sender").start();
         new Thread(m_ack, "test ack").start();
 
-        m_schemas = Maps.newHashMap();
+        m_tables = new ArrayList<>(20);
         for (int i = 0; i < 20; i++) {
-            m_schemas.put(i, Pair.of(new Boolean(false), Ints.toByteArray(i)));
+            SnapshotTableInfo table = new SnapshotTableInfo(Integer.toString(i), i);
+            table.setSchema(Ints.toByteArray(i), 0);
+            m_tables.add(table);
         }
     }
 
@@ -102,7 +103,7 @@ public class TestStreamSnapshotDataTarget {
         }
 
         return new StreamSnapshotDataTarget(destHSId, lowestSite, new HashSet<Long>(Arrays.asList(destHSId)),
-                hashinatorBytes, m_schemas, m_sender, m_ack);
+                hashinatorBytes, m_tables, m_sender, m_ack);
     }
 
     private Callable<DBBPool.BBContainer> makeTuples()

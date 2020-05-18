@@ -29,6 +29,8 @@ import static org.junit.Assert.fail;
 
 import java.util.Properties;
 
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
@@ -93,5 +95,20 @@ public class TestKafkaExportClient extends ExportClientTestBase {
             fail("argument check failed");
         } catch (IllegalArgumentException e) {
         }
+    }
+
+    @Test
+    public void testAvroConfig() throws Exception
+    {
+        final KafkaExportClient client = new KafkaExportClient();
+        final Properties config = new Properties();
+        config.setProperty("metadata.broker.list", "fakehost1");
+        config.setProperty("type", "avro");
+        config.setProperty("schema.registry.url", "fakehost2");
+        client.configure(config);
+        assertEquals("fakehost1", client.m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
+        assertEquals(KafkaAvroSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG));
+        assertEquals(StringSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG));
+        assertEquals("fakehost2", client.m_producerConfig.getProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG));
     }
 }

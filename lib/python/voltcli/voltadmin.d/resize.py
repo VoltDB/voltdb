@@ -41,6 +41,8 @@ def hostIdsToNames(hostId, hosts):
                                   '''Conditions that can be ignored when resizing the cluster:
                                   disabled_export -- ignore pending export data for targets that are disabled''',
                                   default = ''),
+            VOLT.IntegerOption(None, '--delay', 'shutdown_delay', 'Delay the shutdown of the hosts which are being removed. '
+                               + 'This needs to be specified if topics are being used. Unit is minutes.', default=-1),
             VOLT.StringOption(None, '--test', 'opt', 'Check the feasibility of current resizing plan.', action='store_const', const=Option.TEST, default=Option.START),
             VOLT.StringOption(None, '--restart', 'opt', 'Restart the previous failed resizing operation.', action='store_const', const=Option.RESTART),
             VOLT.StringOption(None, '--status', 'opt', 'Check the resizing progress.', action='store_const', const=Option.STATUS),
@@ -71,9 +73,11 @@ def resize(runner):
     if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
         runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
 
+    # Convert shutdown delay input of minutes to millis
+    shutdown_delay = runner.opts.shutdown_delay * 60000 if runner.opts.shutdown_delay > 0 else -1
     option = runner.opts.opt
-    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [option, '', ','.join(runner.opts.skip_requirements)]).table(0)
+    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_BIGINT],
+                              [option, '', ','.join(runner.opts.skip_requirements), shutdown_delay]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
     if option in (Option.TEST, Option.START) and "host ids:" in message:

@@ -84,7 +84,7 @@ public class TestPersistentBinaryDequeCorruption {
 
     @Parameters
     public static Collection<Object[]> parameters() {
-        CorruptionChecker scanEntries = pbd -> pbd.scanEntries(b -> {});
+        CorruptionChecker scanEntries = pbd -> pbd.scanEntries(b -> { return -1; });
         CorruptionChecker parseAndTruncate = pbd -> pbd.parseAndTruncate(b -> null);
 
         ImmutableList.Builder<Object[]> args = ImmutableList.builder();
@@ -279,7 +279,7 @@ public class TestPersistentBinaryDequeCorruption {
             }
             m_pbd.updateExtraHeader(m_extraHeader);
         }
-        assertEquals(6, testDir.getRoot().list().length);
+        assertEquals(5, testDir.getRoot().list().length);
 
         int i = 0;
         for (PBDSegment<?> segment : getSegmentMap().values()) {
@@ -293,13 +293,13 @@ public class TestPersistentBinaryDequeCorruption {
             }
         }
 
-        verifySegmentCount(6, 0);
+        verifySegmentCount(5, 0);
 
         m_checker.run(m_pbd);
         BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
         BinaryDequeReader<ExtraHeaderMetadata> reader2 = m_pbd.openForRead(CURSOR_ID + 2);
 
-        verifySegmentCount(6, 2);
+        verifySegmentCount(5, 2);
 
         for (i = 0; i < 15; ++i) {
             pollOnceAndVerify(reader2, data);
@@ -310,13 +310,13 @@ public class TestPersistentBinaryDequeCorruption {
             for (int j = 0; j < 5; ++j) {
                 pollOnceAndVerify(reader, data);
                 if (j == 0) {
-                    assertEquals(6 - (i * 2), testDir.getRoot().list().length);
+                    assertEquals(5 - (i * 2), testDir.getRoot().list().length);
                 }
             }
         }
         pollOnceAndVerify(reader, null);
 
-        verifySegmentCount(2, 0);
+        verifySegmentCount(1, 0);
         m_pbd.offer(defaultContainer());
         pollOnceAndVerify(reader, data);
         verifySegmentCount(2, 0);
@@ -391,12 +391,12 @@ public class TestPersistentBinaryDequeCorruption {
         try {
             ByteBuffer data = defaultBuffer();
             m_checker.run(pbd);
-            verifySegmentCount(2, corruptedEntry == ENTRY_FIRST ? 1 : 0);
+            verifySegmentCount(1, corruptedEntry == ENTRY_FIRST ? 1 : 0);
             for (int i = 0; i < corruptedEntry - 1; ++i) {
                 pollOnceAndVerify(reader, data);
             }
             pollOnceAndVerify(reader, null);
-            verifySegmentCount(2, corruptedEntry == ENTRY_FIRST ? 1 : 0);
+            verifySegmentCount(1, corruptedEntry == ENTRY_FIRST ? 1 : 0);
             pbd.offer(defaultContainer());
             pollOnceAndVerify(reader, data);
             verifySegmentCount(1, 0);
@@ -412,8 +412,8 @@ public class TestPersistentBinaryDequeCorruption {
     private void corruptSegment(PBDSegment<?> segment, ByteBuffer corruptData, int position) throws IOException {
         File file = segment.file();
         if (m_corruptionPoints == null) {
-        try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
-            channel.write(corruptData, position);
+            try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
+                channel.write(corruptData, position);
             }
         } else {
             m_corruptionPoints.put(file.getName(), Long.valueOf(position));
@@ -448,9 +448,9 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     private class CorruptingPBDSegment<M> extends PBDRegularSegment<M> {
-        CorruptingPBDSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+        CorruptingPBDSegment(long id, File file, VoltLogger usageSpecificLog,
                 BinaryDequeSerializer<M> extraHeaderSerializer) {
-            super(index, id, file, usageSpecificLog, extraHeaderSerializer);
+            super(id, file, usageSpecificLog, extraHeaderSerializer);
         }
 
         @Override

@@ -367,7 +367,8 @@ class JavaBundle(object):
            cli.StringOption(None, '--status', 'statusport', 'specify the port used for status monitoring via http, as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
-           cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'))
+           cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'),
+           cli.StringOption(None, '--topicsport', 'topicsport', 'specify the topics port as [ipaddress:]port-number'))
 
 
     def start(self, verb, runner):
@@ -546,6 +547,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.opts.drpublic:
             final_args.extend(['drpublic', runner.opts.drpublic])
+        if runner.opts.topicsport:
+            final_args.extend(('topicsHostPort', runner.opts.topicsport))
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])

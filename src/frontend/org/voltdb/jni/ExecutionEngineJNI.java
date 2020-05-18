@@ -50,6 +50,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.SerializationHelper;
 
 
@@ -512,16 +513,23 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
         }
-        byte[] serialized_table = PrivateVoltTableFactory.getTableDataReference(table).array();
+
+        ByteBuffer serializedTable = PrivateVoltTableFactory.getTableDataReference(table);
         if (HOST_TRACE_ENABLED) {
-            LOG.trace("passing " + serialized_table.length + " bytes to EE...");
+            LOG.trace("passing " + serializedTable.capacity() + " bytes to EE...");
         }
 
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              undoToken, caller.getId());
+        final int errorCode;
+        if (serializedTable.hasArray()) {
+            errorCode = nativeLoadTable(pointer, tableId, serializedTable.array(), txnId, spHandle,
+                    lastCommittedSpHandle, uniqueId, undoToken, caller.getId());
+        } else {
+            assert serializedTable.isDirect();
+            errorCode = nativeLoadTable(pointer, tableId, serializedTable, txnId, spHandle, lastCommittedSpHandle,
+                    uniqueId, undoToken, caller.getId());
+        }
         checkErrorCode(errorCode);
 
         try {
@@ -626,6 +634,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive)
+            throws EEException {
+        m_nextDeserializer.clear();
+        checkErrorCode(nativeGetSnapshotSchema(pointer, tableId, hiddenColumnFilter.getId(), forceLive));
+        try {
+            return Pair.of(m_nextDeserializer.readVarbinary(), m_nextDeserializer.readInt());
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
                                        HiddenColumnFilter hiddenColumnFilter,
                                        long undoQuantumToken,
@@ -672,28 +693,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String streamName)
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String streamName)
     {
         if (EXPORT_LOG.isDebugEnabled()) {
-            EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
+            EXPORT_LOG.debug("exportAction on partition " + partitionId + ", uso: "
+                    +
                     sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
                     ", generationId:" + sequences.getGenerationId() + ", streamName: " + streamName);
         }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
-        long retval = nativeExportAction(pointer,
-                                         syncAction,
-                                         sequences.getAckOffset(),
-                                         sequences.getSequenceNumber(),
-                                         sequences.getGenerationId(),
-                                         getStringBytes(streamName));
-        if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
-                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
-                    ", generationId:" + sequences.getGenerationId() + ", partitionId: " + partitionId +
-                    ", streamName: " + streamName);
-        }
+        nativeSetExportStreamPositions(pointer,
+                                       sequences.getAckOffset(),
+                                       sequences.getSequenceNumber(),
+                                       sequences.getGenerationId(),
+                                       getStringBytes(streamName));
     }
 
     @Override
@@ -841,20 +855,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throwable = ex2;
         }
         // Getting here means the execution was not successful.
-        try {
-            assert(throwable != null);
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-            // But you never know.
-            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
-                resizeUDFBuffer(errorMsg.length + 4);
-            }
-            m_udfBuffer.clear();
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        assert(throwable != null);
+        byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+        // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+        // But you never know.
+        if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+            resizeUDFBuffer(errorMsg.length + 4);
         }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        m_udfBuffer.clear();
+        SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
         return -1;
     }
 
@@ -867,20 +876,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     private void handleUDAFError(Throwable throwable) {
         // Getting here means the execution was not successful.
-        try {
-            assert(throwable != null);
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-            // But you never know.
-            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
-                resizeUDFBuffer(errorMsg.length + 4);
-            }
-            m_udfBuffer.clear();
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        assert(throwable != null);
+        byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+        // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+        // But you never know.
+        if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+            resizeUDFBuffer(errorMsg.length + 4);
         }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        m_udfBuffer.clear();
+        SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
     }
 
     private void resizeUDAFBuffer(Object returnValue, VoltType returnType) {
@@ -1118,5 +1122,77 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public boolean externalStreamsEnabled() {
         return nativeExternalStreamsEnabled(pointer);
+    }
+
+    @Override
+    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+        clearPsetAndEnsureCapacity(serializedGroup.length);
+        m_psetBuffer.put(serializedGroup);
+        checkErrorCode(nativeStoreKiplingGroup(pointer, undoToken));
+    }
+
+    @Override
+    public void deleteKiplingGroup(long undoToken, String groupId) {
+        checkErrorCode(nativeDeleteKiplingGroup(pointer, undoToken, groupId.getBytes(Constants.UTF8ENCODING)));
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+        byte[] groupIdBytes = startGroupId == null ? null : startGroupId.getBytes(Constants.UTF8ENCODING);
+        m_nextDeserializer.clear();
+        int result = nativeFetchKiplingGroups(pointer, maxResultSize, groupIdBytes);
+        if (result < 0) {
+            checkErrorCode(ERRORCODE_ERROR);
+        }
+        try {
+            return Pair.of(result != 0, readVarbinary(m_nextDeserializer));
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
+    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+            byte[] offsets) {
+        clearPsetAndEnsureCapacity(offsets.length);
+        m_psetBuffer.putInt(offsets.length);
+        m_psetBuffer.put(offsets);
+        m_nextDeserializer.clear();
+        checkErrorCode(nativeCommitKiplingGroupOffsets(pointer, spUniqueId, undoToken, requestVersion,
+                groupId.getBytes(Constants.UTF8ENCODING)));
+        try {
+            return readVarbinary(m_nextDeserializer);
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
+    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        clearPsetAndEnsureCapacity(offsets.length);
+        m_psetBuffer.putInt(offsets.length);
+        m_psetBuffer.put(offsets);
+        m_nextDeserializer.clear();
+        checkErrorCode(
+                nativeFetchKiplingGroupOffsets(pointer, requestVersion, groupId.getBytes(Constants.UTF8ENCODING)));
+        try {
+            return readVarbinary(m_nextDeserializer);
+        } catch (IOException e) {
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+        checkErrorCode(nativeDeleteExpiredKiplingOffsets(pointer, undoToken, deleteOlderThan.getTime()));
+    }
+
+    private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {
+        try {
+            return (m_fallbackBuffer == null ? defaultDeserializer : new FastDeserializer(m_fallbackBuffer))
+                    .readVarbinary();
+        } finally {
+            m_fallbackBuffer = null;
+        }
     }
 }

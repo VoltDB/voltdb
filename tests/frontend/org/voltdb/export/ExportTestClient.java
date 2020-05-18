@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Properties;
 import java.util.TreeSet;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
@@ -36,7 +35,6 @@ import org.voltdb.exportclient.ExportDecoderBase;
 
 public class ExportTestClient extends ExportClientBase
 {
-    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     // hash table name + partition to verifier
     public static final HashMap<String, ExportTestVerifier> m_verifiers = new HashMap<String, ExportTestVerifier>();
     public static final HashMap<String, Boolean> m_seen_verifiers = new HashMap<String, Boolean>();
@@ -70,9 +68,7 @@ public class ExportTestClient extends ExportClientBase
         if (verifier == null) {
             System.out.println("No verifier for table " + tableName + " and partition " + partition);
             System.out.println("Expected Verifiers registered: " + m_verifiers);
-            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, tableName,
-                    "", 0, 0, null, null, null,
-                    AdvertisedDataSource.ExportFormat.SEVENDOTX);
+            AdvertisedDataSource source = new AdvertisedDataSource((int) partition, tableName);
             verifier = new ExportTestVerifier(source);
             m_verifiers.put(key, verifier);
         }

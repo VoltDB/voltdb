@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.AccountExpiredException;
@@ -283,12 +285,8 @@ public class AuthSystem {
          * Get group names.
          * @return group name array
          */
-        public final String[] getGroupNames() {
-            String[] groupNames = new String[m_groups.size()];
-            for (int i = 0; i < m_groups.size(); ++i) {
-                groupNames[i] = m_groups.get(i).m_name;
-            }
-            return groupNames;
+        public final List<String> getGroupNames() {
+            return m_groups.stream().map(g -> g.m_name).collect(Collectors.toList());
         }
 
         public boolean authorizeConnector(String connectorClass) {
@@ -670,13 +668,13 @@ public class AuthSystem {
         return m_users.get(name);
     }
 
-    public String[] getGroupNamesForUser(String userName) {
+    public List<String> getGroupNamesForUser(String userName) {
         if (userName == null) {
-            return new String[] {};
+            return Collections.emptyList();
         }
         AuthUser user = getUser(userName);
         if (user == null) {
-            return new String[] {};
+            return Collections.emptyList();
         }
         return user.getGroupNames();
     }
@@ -694,6 +692,14 @@ public class AuthSystem {
             return new String[] {};
         }
         return user.m_permissions_list;
+    }
+
+    public AuthProvider getAuthProvider() {
+        return m_authProvider;
+    }
+
+    public boolean enabled() {
+        return m_enabled;
     }
 
     public class HashAuthenticationRequest extends AuthenticationRequest {
@@ -721,29 +727,7 @@ public class AuthSystem {
                 return false;
             }
 
-            boolean matched = true;
-            if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
-                MessageDigest md = null;
-                try {
-                    md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
-                } catch (NoSuchAlgorithmException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-                byte passwordHash[] = md.digest(m_password);
-
-                /*
-                 * A n00bs attempt at constant time comparison
-                 */
-                byte shaShadowPassword[] = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
-                for (int ii = 0; ii < passwordHash.length; ii++) {
-                    if (passwordHash[ii] != shaShadowPassword[ii]){
-                        matched = false;
-                    }
-                }
-            } else {
-                String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
-                matched = BCrypt.checkpw(Encoder.hexEncode(m_password), pwToCheck);
-            }
+            boolean matched = isPasswordMatch(user, scheme, m_password);
 
             if (matched) {
                 m_authenticatedUser = m_user;
@@ -754,6 +738,33 @@ public class AuthSystem {
             logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
             return false;
         }
+    }
+
+    public boolean isPasswordMatch(AuthUser user, ClientAuthScheme scheme, byte[] password) {
+        boolean matched = true;
+        if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
+            } catch (NoSuchAlgorithmException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+            byte passwordHash[] = md.digest(password);
+
+            /*
+             * A n00bs attempt at constant time comparison
+             */
+            byte shaShadowPassword[] = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
+            for (int ii = 0; ii < passwordHash.length; ii++) {
+                if (passwordHash[ii] != shaShadowPassword[ii]){
+                    matched = false;
+                }
+            }
+        } else {
+            String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+            matched = BCrypt.checkpw(Encoder.hexEncode(password), pwToCheck);
+        }
+        return matched;
     }
 
     private static void logAuthSuccess(String user, String fromAddress) {

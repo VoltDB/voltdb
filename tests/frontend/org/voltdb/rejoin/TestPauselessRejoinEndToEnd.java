@@ -130,7 +130,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
 
         client.close();
 
-        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
         config.m_startAction = cluster.isNewCli() ? StartAction.PROBE : StartAction.LIVE_REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -199,7 +199,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         cluster.killSingleHost(0);
         Thread.sleep(1000);
 
-        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
         config.m_startAction = cluster.isNewCli() ? StartAction.PROBE : StartAction.LIVE_REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -207,7 +207,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         if (cluster.isNewCli()) {
             config.m_voltdbRoot = new File(cluster.getServerSpecificRoot("0"));
             config.m_forceVoltdbCreate = false;
-            config.m_hostCount = 2;
+            config.m_hostCount = 4;
         } else {
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         }
@@ -353,7 +353,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
 
         localServer = null;
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+            VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
             config.m_startAction = cluster.isNewCli() ? StartAction.PROBE : StartAction.LIVE_REJOIN;            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_leader = ":" + cluster.internalPort(1);
             config.m_coordinators = cluster.coordinators(1);
@@ -617,7 +617,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
             assertFalse(loadThreadHasFailed.get());
             assertFalse(adhocThreadHasFailed.get());
 
-            VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+            VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
             config.m_startAction = cluster.isNewCli() ? StartAction.PROBE : StartAction.LIVE_REJOIN;            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_leader = ":" + cluster.internalPort(1);
             config.m_coordinators = cluster.coordinators(1);

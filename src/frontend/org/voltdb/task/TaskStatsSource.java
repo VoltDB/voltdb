@@ -75,6 +75,7 @@ public class TaskStatsSource extends StatsSource {
     private static List<ColumnAs> s_schedulersConvert;
     private static List<ColumnAs> s_procedursConvert;
 
+    private final StatsSelector m_selector;
     private final String m_name;
     private final TaskScope m_scope;
     private final int m_partitionId;
@@ -110,6 +111,7 @@ public class TaskStatsSource extends StatsSource {
             columnConversion = getSchedulersConverter(source);
             break;
         case TASK:
+        case SYSTEM_TASK:
             return;
         default:
             throw new IllegalArgumentException("Unsupported selector: " + subselector);
@@ -164,16 +166,18 @@ public class TaskStatsSource extends StatsSource {
         return builder.build();
     }
 
-    static TaskStatsSource createDummy() {
-        return new TaskStatsSource(null, null, -1);
+    static TaskStatsSource createDummy(boolean system) {
+        return new TaskStatsSource(null, null, -1, system);
     }
 
-    static TaskStatsSource create(String name, TaskScope scope, int partitionId) {
-        return new TaskStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId);
+    static TaskStatsSource create(String name, TaskScope scope, int partitionId, boolean systemTask) {
+        return new TaskStatsSource(Objects.requireNonNull(name), Objects.requireNonNull(scope), partitionId,
+                systemTask);
     }
 
-    private TaskStatsSource(String name, TaskScope scope, int partitionId) {
+    private TaskStatsSource(String name, TaskScope scope, int partitionId, boolean systemTask) {
         super(false);
+        m_selector = systemTask ? StatsSelector.SYSTEM_TASK : StatsSelector.TASK;
         m_name = name;
         m_scope = scope;
         m_partitionId = partitionId;
@@ -188,11 +192,11 @@ public class TaskStatsSource extends StatsSource {
     }
 
     void register(StatsAgent agent) {
-        agent.registerStatsSource(StatsSelector.TASK, m_partitionId, this);
+        agent.registerStatsSource(m_selector, m_partitionId, this);
     }
 
     void deregister(StatsAgent agent) {
-        agent.deregisterStatsSource(StatsSelector.TASK, m_partitionId, this);
+        agent.deregisterStatsSource(m_selector, m_partitionId, this);
     }
 
     @Override

@@ -37,6 +37,7 @@ import org.voltdb.exceptions.SQLException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.types.TimestampType;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -191,6 +192,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public Pair<byte[], Integer> getSnapshotSchema(int tableId, HiddenColumnFilter hiddenColumnFilter,
+            boolean forceLive) {
+        return Pair.of(new byte[0], -1);
+    }
+
+    @Override
     public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
             long undoQuantumToken, byte[] predicates) {
         return false;
@@ -203,8 +210,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
-            int partitionId, String mStreamName) {
+    public void setExportStreamPositions(ExportSnapshotTuple sequences, int partitionId, String mStreamName) {
     }
 
     @Override
@@ -275,4 +281,36 @@ public class MockExecutionEngine extends ExecutionEngine {
     public boolean externalStreamsEnabled() {
         return true;
     }
+
+    @Override
+    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deleteKiplingGroup(long undoToken, String groupId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+            byte[] offsets) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+        throw new UnsupportedOperationException();
+    }
+
 }

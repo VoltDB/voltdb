@@ -170,6 +170,12 @@ def test_python_version(output):
                 return
     output['Python'] = ["PASS", pythonVersion]
 
+def test_username(output):
+    if os.geteuid()==0:
+        output['RootUser'] = ["WARN", "Running the VoltDB server software from the system root account is not recommended"]
+    else:
+        output['RootUser'] = ["PASS", "Not running as root"]
+
 def test_thp_config(output):
     thpError = _check_thp_config()
     if thpError is not None:
@@ -230,6 +236,7 @@ def test_full_config(output):
     test_ntp(output)
     test_java_version(output)
     test_python_version(output)
+    test_username(output)
     if platform.system() == "Linux":
         test_host_memory(output)
         test_swappinness(output)

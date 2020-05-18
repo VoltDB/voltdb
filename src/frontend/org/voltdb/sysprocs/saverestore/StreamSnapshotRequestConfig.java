@@ -26,8 +26,8 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -70,7 +70,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
      * @param streams            Stream configurations
      * @param shouldTruncate     true to also generate a truncation snapshot
      */
-    public StreamSnapshotRequestConfig(List<Table> tables,
+    public StreamSnapshotRequestConfig(List<SnapshotTableInfo> tables,
                                        List<Stream> streams,
                                        boolean shouldTruncate)
     {
@@ -80,7 +80,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         this.shouldTruncate = shouldTruncate;
     }
 
-    public StreamSnapshotRequestConfig(List<Table> tables, int newPartitionCount, List<Stream> streams,
+    public StreamSnapshotRequestConfig(List<SnapshotTableInfo> tables, int newPartitionCount, List<Stream> streams,
             boolean shouldTruncate) {
         super(tables, newPartitionCount);
 

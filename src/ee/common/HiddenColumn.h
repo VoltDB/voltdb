@@ -39,6 +39,11 @@ public:
      * Get the default NValue for the given hidden column type
      */
     static NValue getDefaultValue(Type type);
+
+    /**
+     * Get the name of the hidden column
+     */
+    static const char *getName(Type type);
 };
 
 }

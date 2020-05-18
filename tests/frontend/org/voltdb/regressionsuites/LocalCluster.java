@@ -65,6 +65,7 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -291,7 +292,7 @@ public class LocalCluster extends VoltServerConfig {
         assert siteCount > 0 : "site count is less than 1";
         assert hostCount > 0 : "host count is less than 1";
 
-        numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        numberOfCoordinators = Math.max(kfactor + 1, Math.min(hostCount, 3));
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         m_additionalProcessEnv = env == null ? new HashMap<>() : env;
@@ -488,6 +489,9 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+            if (builder.getKiplingConfiguration().isEnabled()) {
+                templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
+            }
         }
         return m_compiled;
     }
@@ -650,6 +654,10 @@ public class LocalCluster extends VoltServerConfig {
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
+        if (cmdln.m_topicsHostPort != null) {
+            cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
+        }
+
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
@@ -1161,6 +1169,10 @@ public class LocalCluster extends VoltServerConfig {
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
                 cmdln.enableAdd(true);
+            }
+
+            if (cmdln.m_topicsHostPort != null) {
+                cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
             }
 
             // If local directories are being cleared
@@ -1810,10 +1822,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
-        return getListenerAddresses(false);
+        return getListenerAddresses(ListenerPort.SQL);
     }
 
-    public List<String> getListenerAddresses(boolean useAdmin) {
+    public List<String> getListenerAddresses(ListenerPort port) {
         if (!m_running) {
             return null;
         }
@@ -1823,7 +1835,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
+                listeners.add("localhost:" + port.getPort(cl));
             }
         }
         return listeners;
@@ -2334,7 +2346,7 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        for (String address : getListenerAddresses(true)) {
+        for (String address : getListenerAddresses(ListenerPort.ADMIN)) {
             client.createConnection(address);
         }
         return client;
@@ -2413,5 +2425,28 @@ public class LocalCluster extends VoltServerConfig {
     private void resetLogMessageMatchResults(int hostId) {
         assertTrue(m_logMessageMatchResults.containsKey(hostId));
         m_logMessageMatchResults.get(hostId).clear();
+    }
+
+    public enum ListenerPort {
+        SQL {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_port;
+            }
+        },
+        ADMIN {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_adminPort;
+            }
+        },
+        KIPLING {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_topicsHostPort.getPort();
+            }
+        };
+
+        abstract int getPort(CommandLine cl);
     }
 }

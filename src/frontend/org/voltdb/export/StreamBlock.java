@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.BinaryDequeReader;
 
@@ -55,8 +56,31 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
-    public StreamBlock(BinaryDequeReader.Entry<ExportRowSchema> entry, long startSequenceNumber, long committedSequenceNumber,
-            int rowCount, long uniqueId, boolean isPersisted) {
+    private final AtomicInteger m_refCount = new AtomicInteger(1);
+    private final long m_startSequenceNumber;
+    private final long m_committedSequenceNumber;
+    private final int m_rowCount;
+    private final long m_uniqueId;
+    private final long m_totalSize;
+    private final BinaryDequeReader.Entry<PersistedMetadata> m_entry;
+    // index of the last row that has been released.
+    private int m_releaseOffset = -1;
+    // If true free entry rather than releasing it
+    private volatile boolean m_freeOnly = false;
+
+    public static StreamBlock from(BinaryDequeReader.Entry<PersistedMetadata> entry) {
+        ByteBuffer b = entry.getData();
+        b.order(ByteOrder.LITTLE_ENDIAN);
+        long seqNo = b.getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
+        long committedSeqNo = b.getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
+        int tupleCount = b.getInt(StreamBlock.ROW_NUMBER_OFFSET);
+        long uniqueId = b.getLong(StreamBlock.UNIQUE_ID_OFFSET);
+
+        return new StreamBlock(entry, seqNo, committedSeqNo, tupleCount, uniqueId);
+    }
+
+    public StreamBlock(BinaryDequeReader.Entry<PersistedMetadata> entry, long startSequenceNumber,
+            long committedSequenceNumber, int rowCount, long uniqueId) {
         assert(entry != null);
         m_entry  = entry;
         m_startSequenceNumber = startSequenceNumber;
@@ -67,25 +91,20 @@ public class StreamBlock {
         // if we end up persisting
         m_entry.getData().position(HEADER_SIZE);
         m_totalSize = m_entry.getData().remaining();
-        //The first 8 bytes are space for us to store the sequence number if we end up persisting
-        m_isPersisted = isPersisted;
     }
-
-    private final AtomicInteger m_refCount = new AtomicInteger(1);
 
     /*
      * Call discard on the underlying buffer used for storage
      */
     public void discard() {
-        final int count = m_refCount.decrementAndGet();
-        if (count == 0) {
-            m_entry.release();
-        } else if (count < 0) {
-            VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
-        }
+        decrementReference(false);
     }
 
     public ExportRowSchema getSchema() {
+        return m_entry.getExtraHeader().getSchema();
+    }
+
+    public PersistedMetadata getMetadata() {
         return m_entry.getExtraHeader();
     }
 
@@ -114,12 +133,16 @@ public class StreamBlock {
         return m_rowCount;
     }
 
-    long uniqueId() {
+    public long uniqueId() {
         return m_uniqueId;
     }
 
+    public long getTimestampMs() {
+        return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId);
+    }
+
     public long getTimestamp() {
-        return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId) * 1000;
+        return getTimestampMs() * 1000;
     }
 
     /**
@@ -145,25 +168,6 @@ public class StreamBlock {
         m_releaseOffset = releaseSequenceNumber >= lastSequenceNumber() ?
                 (m_rowCount - 1) : (int)(releaseSequenceNumber - m_startSequenceNumber);
     }
-
-    boolean isPersisted() {
-        return m_isPersisted;
-    }
-
-    private final long m_startSequenceNumber;
-    private long m_committedSequenceNumber;
-    private final int m_rowCount;
-    private final long m_uniqueId;
-    private final long m_totalSize;
-    private BinaryDequeReader.Entry<ExportRowSchema> m_entry;
-    // index of the last row that has been released.
-    private int m_releaseOffset = -1;
-
-    /*
-     * True if this block is still backed by a file and false
-     * if the buffer is only stored in memory. No guarantees about fsync though
-     */
-    private final boolean m_isPersisted;
 
     /**
      * Use this when we need a copy BBContainer with refcount incremented.
@@ -199,8 +203,39 @@ public class StreamBlock {
         b.putLong(COMMIT_SEQUENCE_NUMBER_OFFSET, committedSequenceNumber());
         b.putInt(ROW_NUMBER_OFFSET, rowCount());
         b.putLong(UNIQUE_ID_OFFSET, uniqueId());
-        b.position(SEQUENCE_NUMBER_OFFSET);
         b.order(ByteOrder.BIG_ENDIAN);
-        return getRefCountingContainer(b.asReadOnlyBuffer());
+
+        ByteBuffer view = b.asReadOnlyBuffer();
+        view.position(SEQUENCE_NUMBER_OFFSET);
+        return getRefCountingContainer(view);
     }
+
+    /**
+     * Free the memory backed by this entry but do not release the entries
+     */
+    public void free() {
+        decrementReference(true);
+    }
+
+    private void decrementReference(boolean freeOnly) {
+        m_freeOnly |= freeOnly;
+        final int count = m_refCount.decrementAndGet();
+        if (count == 0) {
+            if (m_freeOnly) {
+                m_entry.free();
+            } else {
+                m_entry.release();
+            }
+        } else if (count < 0) {
+            VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "StreamBlock [m_startSequenceNumber=" + m_startSequenceNumber + ", m_committedSequenceNumber="
+                + m_committedSequenceNumber + ", m_rowCount=" + m_rowCount + ", m_uniqueId=" + m_uniqueId
+                + ", m_totalSize=" + m_totalSize + "]";
+    }
+
 }

@@ -49,6 +49,7 @@ public interface NodeSettings extends Settings {
     public final static String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
     public final static String EXPORT_CURSOR_PATH_KEY = "org.voltdb.path.export_cursor";
     public final static String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
+    public final static String TOPICS_DATA_PATH_KEY = "org.voltdb.path.topics_data";
     public final static String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
     public final static String LARGE_QUERY_SWAP_PATH_KEY = "org.voltdb.path.large_query_swap";
     public final static String LOCAL_SITES_COUNT_KEY = "org.voltdb.local_sites_count";
@@ -72,6 +73,10 @@ public interface NodeSettings extends Settings {
     @Key(EXPORT_CURSOR_PATH_KEY)
     @DefaultValue("export_cursor") // must match value in voltdb/compiler/DeploymentFileSchema.xsd
     public File getExportCursor();
+
+    @Key(TOPICS_DATA_PATH_KEY)
+    @DefaultValue("topics_data")
+    public File getTopicsData();
 
     @Key(DR_OVERFLOW_PATH_KEY)
     public File getDROverflow();
@@ -117,6 +122,7 @@ public interface NodeSettings extends Settings {
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
                 .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))
                 .put(EXPORT_CURSOR_PATH_KEY, resolve(getExportCursor()))
+                .put(TOPICS_DATA_PATH_KEY, resolve(getTopicsData()))
                 .build();
     }
 
@@ -199,7 +205,9 @@ public interface NodeSettings extends Settings {
         boolean archivedSnapshots = archiveSnapshotDirectory();
         for (File path: getManagedArtifactPaths().values()) {
             File [] children = path.listFiles();
-            if (children == null) continue;
+            if (children == null) {
+                continue;
+            }
             for (File child: children) {
                 MiscUtils.deleteRecursively(child);
             }
@@ -264,6 +272,8 @@ public interface NodeSettings extends Settings {
         }
 
         File deprectedConfigFH = new File(getVoltDBRoot(),".paths");
-        if (deprectedConfigFH.exists()) deprectedConfigFH.delete();
+        if (deprectedConfigFH.exists()) {
+            deprectedConfigFH.delete();
+        }
     }
 }

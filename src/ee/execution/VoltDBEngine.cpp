@@ -79,11 +79,14 @@
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/streamedtable.h"
+#include "storage/SystemTableFactory.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
 #include "storage/DRTupleStream.h"
+
+#include "kipling/GroupStore.h"
 
 #if !defined(NDEBUG) && defined(MACOSX)
 // Mute EXC_BAD_ACCESS in the debug mode for running LLDB.
@@ -212,6 +215,7 @@ VoltDBEngine::initialize(
     EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
     SynchronizedThreadLock::init(sitesPerHost, newLocals);
     SynchronizedThreadLock::unlockReplicatedResourceForInit();
+    m_groupStore.reset(new kipling::GroupStore());
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -263,6 +267,11 @@ VoltDBEngine::~VoltDBEngine() {
 
             m_catalogDelegates.erase(eraseThis->first);
         }
+
+        for (auto entry : m_systemTables) {
+            entry.second->decrementRefcount();
+        }
+        m_systemTables.clear();
 
         if (isLowestSite()) {
             SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
@@ -386,6 +395,10 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
         throwFatalException("Unable to find table for TableId '%d'", (int) tableId);
     }
     table->serializeTo(out);
+}
+
+PersistentTable* VoltDBEngine::getSystemTable(const SystemTableId id) const {
+    return findInMapOrNull(id, m_systemTables);
 }
 
 // ------------------------------------------------------------------
@@ -1001,6 +1014,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
+    createSystemTables();
+
     //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
     std::map<std::string, ExportTupleStream*> purgedStreams;
     if (processCatalogAdditions(timestamp, false, true, purgedStreams) == false) {
@@ -1250,6 +1265,18 @@ static bool haveDifferentSchema(
     }
 
     return false;
+}
+
+void VoltDBEngine::createSystemTables() {
+    SystemTableFactory factory(m_compactionThreshold);
+    for (SystemTableId id : SystemTableFactory::getAllSystemTableIds()) {
+        vassert(m_systemTables.find(id) == m_systemTables.end());
+        PersistentTable *table = factory.create(id);
+        table->incrementRefcount();
+        m_systemTables[id] = table;
+    }
+
+    m_groupStore->initialize(this);
 }
 
 /*
@@ -1942,6 +1969,10 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         // need to re-map all the table ids / indexes
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
+
+        for (auto entry : m_systemTables) {
+            m_tables[static_cast<CatalogId>(entry.first)] = entry.second;
+        }
     }
 
     // Walk through table delegates and update local table collections
@@ -2052,6 +2083,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             }
         }
     }
+
     resetDRConflictStreamedTables();
 }
 
@@ -2528,6 +2560,41 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }
 
+int VoltDBEngine::getSnapshotSchema(const CatalogId tableId, HiddenColumnFilter::Type hiddenColumnFilterType,
+        bool forceLive) {
+    PersistentTable *table;
+    if (forceLive || m_snapshottingTables.empty()) {
+        // forced to get live schema or called prior to snapshot being activated
+        Table* found = getTableById(tableId);
+
+         if (!found) {
+             return -1;
+         }
+
+         table = dynamic_cast<PersistentTable*>(found);
+         if (table == NULL) {
+             vassert(table != NULL);
+             return -1;
+         }
+    } else {
+        // Called after snapshot has been activated
+        table = findInMapOrNull(tableId, m_snapshottingTables);
+
+        if (table == NULL) {
+            return -1;
+        }
+    }
+
+    resetReusedResultOutputBuffer();
+
+    size_t sizeOffset = m_resultOutput.reserveBytes(sizeof(int32_t));
+
+    table->serializeColumnHeaderTo(m_resultOutput, hiddenColumnFilterType);
+    m_resultOutput.writeIntAt(sizeOffset, m_resultOutput.position() - (sizeOffset + sizeof(int32_t)));
+    m_resultOutput.writeInt(table->partitionColumn());
+    return 0;
+}
+
 /**
  * Activate a table stream for the specified table
  * Serialized data:
@@ -2711,30 +2778,14 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     return remaining;
 }
 
-int64_t VoltDBEngine::exportAction(bool syncAction, int64_t uso,
+void VoltDBEngine::setExportStreamPositions(int64_t uso,
         int64_t seqNo, int64_t generationIdCreated, std::string streamName) {
     std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
-    // return no data and polled offset for unavailable tables.
-    if (pos == m_exportingTables.end()) {
-        // ignore trying to sync a non-exported table
-        if (syncAction) {
-            return 0;
-        }
-
-        m_resultOutput.writeInt(0);
-        if (uso < 0) {
-            return 0;
-        } else {
-            return uso;
-        }
+    // ignore trying to sync a non-exported table
+    if (pos != m_exportingTables.end()) {
+        pos->second->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
     }
-
-    Table *table_for_el = pos->second;
-    if (syncAction) {
-        table_for_el->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
-    }
-    return 0;
 }
 
 bool VoltDBEngine::deleteMigratedRows(
@@ -3078,6 +3129,73 @@ void VoltDBEngine::disableExternalStreams() {
 
 bool VoltDBEngine::externalStreamsEnabled() {
     return m_executorContext->externalStreamsEnabled();
+}
+
+int32_t VoltDBEngine::storeKiplingGroup(int64_t undoToken, SerializeInputBE& in){
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->storeGroup(in);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::deleteKiplingGroup(int64_t undoToken, const NValue& groupId){
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->deleteGroup(groupId);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::fetchKiplingGroups(int32_t maxResultSize, const NValue& startGroupId) {
+    resetReusedResultOutputBuffer();
+    try {
+        return m_groupStore->fetchGroups(maxResultSize, startGroupId, m_resultOutput) ? 1 : 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return -1;
+}
+
+int32_t VoltDBEngine::commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
+        const NValue& groupId, SerializeInputBE& in) {
+    setUndoToken(undoToken);
+    resetReusedResultOutputBuffer();
+    try {
+        m_groupStore->commitOffsets(UniqueId::ts(spUniqueId), requestVersion, groupId, in, m_resultOutput);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in) {
+    resetReusedResultOutputBuffer();
+    try {
+        m_groupStore->fetchOffsets(requestVersion, groupId, in, m_resultOutput);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::deleteExpiredKiplingOffsets(int64_t undoToken, int64_t deleteOlderThan) {
+    setUndoToken(undoToken);
+    try {
+        m_groupStore->deleteExpiredOffsets(deleteOlderThan);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
 }
 
 void VoltDBEngine::loadBuiltInJavaFunctions() {

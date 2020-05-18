@@ -93,11 +93,12 @@ public abstract class StatementCompiler {
      * @param  joinOrder    Pass through parameter to QueryPlanner
      * @param  detMode      Pass through parameter to QueryPlanner
      * @param  partitioning Partition info for statement
+     * @param  isForView    {@code true} if this statement is being planned for a view
     */
     static boolean compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Database db, DatabaseEstimates estimates,
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
-            DeterminismMode detMode, StatementPartitioning partitioning)
+            DeterminismMode detMode, StatementPartitioning partitioning, boolean isForView)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility
@@ -205,7 +206,7 @@ public abstract class StatementCompiler {
             try (QueryPlanner planner = new QueryPlanner(
                     sql, stmtName, procName,  db,
                     partitioning, hsql, estimates, false,
-                    costModel, null, joinOrder, detMode, false)) {
+                    costModel, null, joinOrder, detMode, false, isForView)) {
                 if (xml != null) {
                     planner.parseFromXml(xml);
                 }
@@ -454,7 +455,7 @@ public abstract class StatementCompiler {
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
         return compileStatementAndUpdateCatalog(compiler, hsql, db, estimates, catalogStmt,
-                null, sqlText, joinOrder, detMode, partitioning);
+                null, sqlText, joinOrder, detMode, partitioning, false);
     }
 
     /**
