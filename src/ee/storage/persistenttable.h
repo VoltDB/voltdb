@@ -1154,8 +1154,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
             else {
                 VOLT_ERROR("STREAMER COUNT: %lu", m_tableStreamer->streamCount());
             }
+            vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         }
-        vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     } else if (transitioningToBlockWithSpace) {
