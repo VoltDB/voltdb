@@ -30,6 +30,7 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -37,6 +38,7 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -58,6 +60,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testNoReaders() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
         Random random = new Random(System.currentTimeMillis());
         int maxNumBuffers = 100;
         long numWritten = 0;
@@ -78,6 +81,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testWithReaders() throws Exception {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
         int numReaders = 2;
         @SuppressWarnings("unchecked")
         BinaryDequeReader<ExtraHeaderMetadata>[] readers = new BinaryDequeReader[numReaders];
@@ -222,7 +226,7 @@ public class TestMaxBytesRetentionPolicy {
         assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
-    @Test (timeout = 15_000)
+    @Test (timeout = 30_000)
     public void testChangeRetentionPolicy() throws Exception {
         // Fill PBD above limit to kick size-based retention at least once and
         // exit with more than 2 segments
@@ -326,16 +330,18 @@ public class TestMaxBytesRetentionPolicy {
     private void verifyPBDSegments(long maxBytes) {
         long firstSize = -1;
         long totalSize = 0;
+        LinkedHashSet<Long> sizes = new LinkedHashSet<>();
         for (PBDSegment<ExtraHeaderMetadata> segment: m_pbd.getSegments().values()) {
             long size = segment.getFileSize();
+            sizes.add(size);
             if (firstSize == -1) {
                 firstSize = size;
             }
             totalSize += size;
         }
 
-        assertTrue((totalSize <= maxBytes) ||
-                   (totalSize - firstSize < maxBytes));
+        assertTrue("sizes=" + sizes,
+                   (totalSize <= maxBytes) || (totalSize - firstSize < maxBytes));
     }
 
     private void readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws Exception {
@@ -356,6 +362,11 @@ public class TestMaxBytesRetentionPolicy {
         }
 
         return written;
+    }
+
+    @BeforeClass
+    public static void setUpClass() {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
     }
 
     @Before
@@ -405,7 +416,7 @@ public class TestMaxBytesRetentionPolicy {
         }
         for (String limStr : s_invalidLimits) {
             try {
-                long lim = RetentionPolicyMgr.parseByteLimit(limStr);
+                RetentionPolicyMgr.parseByteLimit(limStr);
                 fail();
             }
             catch (RetentionLimitException expected) {

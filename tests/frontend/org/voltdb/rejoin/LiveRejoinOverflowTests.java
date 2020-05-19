@@ -176,7 +176,7 @@ public class LiveRejoinOverflowTests extends JUnit4LocalClusterTest {
         t.start();
 
         System.out.println("Recovering node 0.");
-        cluster.recoverOne(0, 1, "", true);
+        cluster.recoverOne(0, 1, true);
 
         System.out.println("Recovered.");
 
@@ -184,7 +184,7 @@ public class LiveRejoinOverflowTests extends JUnit4LocalClusterTest {
         t.join();
 
         System.out.println("Recovering node 0.");
-        cluster.recoverOne(0, 1, "", true);
+        cluster.recoverOne(0, 1, true);
 
         Thread.sleep(1000000);
 

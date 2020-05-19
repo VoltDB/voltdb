@@ -1478,6 +1478,7 @@ if __name__ == "__main__":
                             ['Object not found'],
                             ['View does not support COUNT(DISTINCT) expression'],
                             ['Table', 'cannot be swapped since it is used for exporting'],
+                            ['Illegal partition parameter. Value cannot be']
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of

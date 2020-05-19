@@ -57,6 +57,20 @@ import com.google_voltpatches.common.base.Throwables;
  * @param M Type of extra header metadata stored in the PBD
  */
 public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
+    private static RetentionPolicyMgr s_retentionPolicyMgr;
+
+    public static synchronized void setupRetentionPolicyMgr(int numThreads) {
+        if (s_retentionPolicyMgr == null) {
+            s_retentionPolicyMgr = new RetentionPolicyMgr(numThreads);
+        } else {
+            s_retentionPolicyMgr.updateThreadPoolSize(numThreads);
+        }
+    }
+
+    public static RetentionPolicyMgr getRetentionPolicyMgr() {
+        return s_retentionPolicyMgr;
+    }
+
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
         private static final VoltLogger LOG = new VoltLogger("HOST");
 
@@ -1356,7 +1370,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         m_segments.put(newSegment.segmentId(), newSegment);
 
         if (m_retentionPolicy != null) {
-            m_retentionPolicy.newSegmentAdded();
+            m_retentionPolicy.newSegmentAdded(newSegment.m_file.length());
         }
 
         return newSegment;
@@ -1957,12 +1971,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             assert !m_retentionPolicy.isPolicyEnforced()
                 : "Retention policy on PBD " + m_nonce + " must be stopped before replacing it";
         }
-        if (policyType != null) {
-            m_retentionPolicy = RetentionPolicyMgr.getInstance().addRetentionPolicy(policyType, this, params);
-        }
-        else {
-            m_retentionPolicy = null;
-        }
+
+        m_retentionPolicy = (policyType == null) ? null : s_retentionPolicyMgr.addRetentionPolicy(policyType, this, params);
     }
 
     @Override

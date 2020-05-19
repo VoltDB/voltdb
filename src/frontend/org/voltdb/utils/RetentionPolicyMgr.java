@@ -20,13 +20,13 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.BinaryDeque.RetentionPolicyType;
 
 import com.google.common.collect.ImmutableMap;
@@ -35,11 +35,7 @@ import com.google.common.collect.ImmutableMap;
  *  Manager class that is the entry point for adding a time based or size based retention policy to a PBD.
  */
 public class RetentionPolicyMgr {
-    // TODO: Is there a way to avoid the static?
-    private static final RetentionPolicyMgr s_instance = new RetentionPolicyMgr();
-    public static RetentionPolicyMgr getInstance() {
-        return s_instance;
-    }
+    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     public static class RetentionLimitException extends Exception {
         private static final long serialVersionUID = 1L;
@@ -71,10 +67,23 @@ public class RetentionPolicyMgr {
     }
     private static long s_minBytesLimitMb = 64;
 
-    private ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(2);
-    private Map<PersistentBinaryDeque<?>.ReadCursor, ScheduledFuture<?>> m_futures = new HashMap<>();
+    private final ScheduledThreadPoolExecutor m_scheduler;
+    private final Map<PersistentBinaryDeque<?>.ReadCursor, ScheduledFuture<?>> m_futures = new HashMap<>();
 
-    private RetentionPolicyMgr() {
+    RetentionPolicyMgr(int numThreads) {
+        m_scheduler = new ScheduledThreadPoolExecutor(numThreads);
+        LOG.info("Initialized PBD with " + numThreads + " threads to enforce retention policy");
+    }
+
+    void updateThreadPoolSize(int numThreads) {
+        if (numThreads != m_scheduler.getCorePoolSize()) {
+            m_scheduler.setCorePoolSize(numThreads);
+            LOG.info("Updated PBD to use " + numThreads + " threads to enforce retention policy");
+        }
+    }
+
+    public int getRetentionThreadPoolSize() {
+        return m_scheduler.getCorePoolSize();
     }
 
     public PBDRetentionPolicy addRetentionPolicy(RetentionPolicyType policyType, PersistentBinaryDeque<?> pbd, Object... params) {
@@ -234,7 +243,7 @@ public class RetentionPolicyMgr {
 
         // This is called from synchronized PBD method, so calls to this should be serialized as well.
         @Override
-        public void newSegmentAdded() {
+        public void newSegmentAdded(long initialBytes) {
             if (!isPolicyEnforced()) {
                 return;
             }
@@ -350,8 +359,8 @@ public class RetentionPolicyMgr {
         }
 
         @Override
-        public void newSegmentAdded() {
-            // Just adding a new segment does not increase the data size of the PBD. no-op.
+        public void newSegmentAdded(long initialBytes) {
+            bytesAdded(initialBytes);
         }
 
         @Override
