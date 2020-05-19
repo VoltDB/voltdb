@@ -75,6 +75,7 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.client.ProcCallException;
 
 public class AsyncExportClient
 {
@@ -518,8 +519,8 @@ public class AsyncExportClient
         catch (Exception e) {
             // log it and otherwise ignore it.  it's not fatal to fail if the
             // SELECTS due to a migrate or some other exception
-            log.fatal("log_migrating_counts exception: " + e);
-            e.printStackTrace();
+            log.warn("log_migrating_counts exception: " + e);
+            //e.printStackTrace();
         }
     }
 
@@ -543,9 +544,13 @@ public class AsyncExportClient
                          ", jdbc: " + results[3].asScalarLong()
                          );
             }
-        }
-        catch (Exception e) {
-            log.fatal("Exception: " + e);
+        } catch (ProcCallException e1) {
+            log.warn("problem connecting to volt, retrying in 10 sec: "+e1.getMessage());
+            try { Thread.sleep(10000); } catch ( InterruptedException e) { return; };
+            trigger_migrate(time_window);
+
+        } catch (Exception e) {
+            log.fatal("problem in trigger_migrate: Exception: " + e);
             e.printStackTrace();
             System.exit(-1);
         }
