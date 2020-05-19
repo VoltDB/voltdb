@@ -306,11 +306,17 @@ if __name__ == "__main__":
     parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
     parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
     parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
+    parser.add_argument('--norabbitmq', action='store_true', help="Don't build rabbit-nq")
     args = parser.parse_args()
+
 
     proTreeish = args.pro_sha
     voltdbTreeish = args.voltdb_sha
-    rbmqExportTreeish = args.rabbitmq_sha
+
+    if args.norabbitmq:
+        rbmqExportTreeish = None
+    else:
+        rbmqExportTreeish = args.rabbitmq_sha
 
     print args
 
@@ -371,12 +377,14 @@ if __name__ == "__main__":
             #print "VERSION: " + versionCentos
             if build_community:
                 buildCommunity()
-                buildRabbitMQExport(versionCentos, "community")
+                if not args.norabbitmq:
+                    buildRabbitMQExport(versionCentos, "community")
                 copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
                 makeMavenJars()
                 copyMavenJarsToReleaseDir(releaseDir, versionCentos)
             buildEnterprise(versionCentos)
-            buildRabbitMQExport(versionCentos, "ent")
+            if not args.norabbitmq:
+                buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
             copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
             licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)
