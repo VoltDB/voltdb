@@ -32,6 +32,13 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 
 public class SnapshotStatus extends StatsSource {
 
+    // Item order matters, SnapshotSummary manipulates the result by checking the ordinal
+    public enum SnapshotResult {
+        FAILURE,
+        IN_PROGRESS,
+        SUCCESS;
+    }
+
     enum SNAPSHOT_TYPE {
         AUTO,
         MANUAL,
@@ -147,7 +154,14 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("SIZE")] = t.size;
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
-        rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
+        String result;
+        if (t.error == null && t.size == 0) {
+            // still in progress
+            result = SnapshotResult.IN_PROGRESS.toString();
+        } else {
+            result = t.error == null ? SnapshotResult.SUCCESS.toString() : SnapshotResult.FAILURE.toString();
+        }
+        rowValues[columnNameToIndex.get("RESULT")] = result;
         rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path);
         super.updateStatsRow(rowKey, rowValues);
     }
