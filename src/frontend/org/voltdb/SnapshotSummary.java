@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.SnapshotStatus.SnapshotResult;
 import org.voltdb.SnapshotStatus.SnapshotTypeChecker;
 import org.voltdb.SnapshotStatus.StatusIterator;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -33,10 +34,6 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 
 public class SnapshotSummary extends StatsSource {
 
-    private enum SnapshotResult {
-        SUCCESS,
-        FAILURE;
-    }
     private enum ColumnName {
         NONCE,
         TXNID,
@@ -89,17 +86,18 @@ public class SnapshotSummary extends StatsSource {
 
         VoltTable resultTable = new VoltTable(perHostStats.getTableSchema());
         for (Map.Entry<String, List<StatsRow>> e : snapshotMap.entrySet()) {
-            double avgProgress = 0;
-            boolean success = true;
+            float avgProgress = 0;
+            SnapshotResult sr;
             long startTime = Long.MAX_VALUE;
             long endTime = 0;
             StatsRow lastRow = null;
             double duration = 0;
+            // 1-failure, 2-in_progress, 3-success
+            int lowestOrdinal = SnapshotResult.SUCCESS.ordinal();
             for (StatsRow row : e.getValue()) {
                 avgProgress += row.progressPct;
-                if (!row.result.equalsIgnoreCase(SnapshotResult.SUCCESS.toString())) {
-                    success = false;
-                }
+                sr = SnapshotResult.valueOf(row.result);
+                lowestOrdinal = Math.min(sr.ordinal(), lowestOrdinal);
                 long tmpStartTime = row.statsRow.getLong(ColumnName.START_TIME.toString());
                 if (tmpStartTime < startTime) {
                     startTime = tmpStartTime;
@@ -120,8 +118,8 @@ public class SnapshotSummary extends StatsSource {
                     startTime,
                     endTime,
                     duration,
-                    avgProgress,
-                    success ? SnapshotResult.SUCCESS.toString() : SnapshotResult.FAILURE.toString());
+                    Math.round(avgProgress * 10.0) / 10.0, // round to 1 decimal places
+                    SnapshotResult.values()[lowestOrdinal].toString());
         }
         return new VoltTable[] { resultTable };
     }
@@ -141,9 +139,9 @@ public class SnapshotSummary extends StatsSource {
     @SuppressWarnings("unchecked")
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        Pair<Snapshot, Boolean> p = (Pair<Snapshot, Boolean>) rowKey;
+        Pair<Snapshot, SnapshotResult> p = (Pair<Snapshot, SnapshotResult>) rowKey;
         Snapshot s = p.getFirst();
-        Boolean hasError = p.getSecond();
+        SnapshotResult sr = p.getSecond();
 
         rowValues[columnNameToIndex.get(ColumnName.NONCE.toString())] = s.nonce;
         rowValues[columnNameToIndex.get(ColumnName.TXNID.toString())] = s.txnId;
@@ -151,16 +149,15 @@ public class SnapshotSummary extends StatsSource {
         rowValues[columnNameToIndex.get(ColumnName.START_TIME.toString())] = s.timeStarted;
         rowValues[columnNameToIndex.get(ColumnName.END_TIME.toString())] = s.timeFinished;
         rowValues[columnNameToIndex.get(ColumnName.PROGRESS_PCT.toString())] = (float)s.progress();
-        rowValues[columnNameToIndex.get(ColumnName.RESULT.toString())] =
-                hasError ? SnapshotResult.FAILURE.toString() : SnapshotResult.SUCCESS.toString();
+        rowValues[columnNameToIndex.get(ColumnName.RESULT.toString())] = sr.toString();
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new StatusIterator<Boolean>(
+        return new StatusIterator<SnapshotResult>(
                 SnapshotRegistry.getSnapshotHistory().iterator(),
-                new SnapshotScanner<Boolean>() {
-                    public List<Boolean> flatten(Snapshot s) {
+                new SnapshotScanner<SnapshotResult>() {
+                    public List<SnapshotResult> flatten(Snapshot s) {
                         return s.iterateTableErrors();
                     }
                 });
