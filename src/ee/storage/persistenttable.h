@@ -884,7 +884,7 @@ private:
     typedef std::map<int64_t, MigratingBatch> MigratingRows;
     MigratingRows m_migratingRows;
 
-    // XXX
+    // XXX set to true to test instrumentation manually
     bool isTest;
 };
 
@@ -1087,7 +1087,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
 
     tuple.setActiveFalse();
 
+    // XXX instrumentation
     bool isPendingDelete = tuple.isPendingDelete();
+    char * tupleAddress = tuple.address();
+
     // add to the free list
     m_tupleCount--;
     if (tuple.isPendingDelete()) {
@@ -1099,32 +1102,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
         block = findBlock(tuple.address(), m_data, m_tableAllocationSize);
         if (block.get() == NULL) {
             throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
-    }
-
-    // Dump block state before hitting pending snapshot assertion
-    if ((isTest || m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end())
-            && block->activeTuples() == 1) {
-
-        VOLT_ERROR("XXX BLOCK PENDING SNAPSHOT - tuple %p pending delete %d, dumping blocks:", tuple.address(), isPendingDelete);
-        VOLT_ERROR("\tCurrent block %p, activeTuples: %d, pending %d", block->address(), block->activeTuples(),
-                m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-
-        for (TBMapI it = m_data.begin(); it != m_data.end(); it++) {
-            TBPtr b = it.data();
-            VOLT_ERROR("\tblock %p, activeTuples: %d, pending %d", b->address(), b->activeTuples(),
-                    m_blocksPendingSnapshot.find(b) != m_blocksPendingSnapshot.end());
-        }
-
-        VOLT_ERROR("Dumping streamer:");
-        if (m_tableStreamer == NULL) {
-            VOLT_ERROR("NO STREAMER");
-        }
-        else if (m_tableStreamer.get() == NULL) {
-            VOLT_ERROR("EMPTY STREAMER");
-        }
-        else {
-            VOLT_ERROR("STREAMER COUNT: %lu", m_tableStreamer->streamCount());
         }
     }
     bool transitioningToBlockWithSpace = ! block->hasFreeTuples();
@@ -1155,6 +1132,29 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
            m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
+        // Dump block state before hitting pending snapshot assertion
+        if (isTest || (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end())) {
+
+            VOLT_ERROR("XXX BLOCK %p PENDING SNAPSHOT - tuple %p pending delete %d, dumping blocks:",
+                    block->address(),tupleAddress, isPendingDelete);
+
+            for (TBMapI it = m_data.begin(); it != m_data.end(); it++) {
+                TBPtr b = it.data();
+                VOLT_ERROR("\tblock %p, activeTuples: %d, pending %d", b->address(), b->activeTuples(),
+                        m_blocksPendingSnapshot.find(b) != m_blocksPendingSnapshot.end());
+            }
+
+            VOLT_ERROR("Dumping streamer:");
+            if (m_tableStreamer == NULL) {
+                VOLT_ERROR("NO STREAMER");
+            }
+            else if (m_tableStreamer.get() == NULL) {
+                VOLT_ERROR("EMPTY STREAMER");
+            }
+            else {
+                VOLT_ERROR("STREAMER COUNT: %lu", m_tableStreamer->streamCount());
+            }
+        }
         vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
