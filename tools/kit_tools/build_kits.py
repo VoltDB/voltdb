@@ -261,7 +261,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Create a full kit. With no args, will do build of master")
     parser.add_argument('voltdb_sha', nargs="?", default="master", help="voltdb repository commit, tag or branch" )
     parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository commit, tag or branch" )
-    parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
     parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
     parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
     parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
