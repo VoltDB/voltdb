@@ -211,6 +211,14 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test (timeout = 10_000)
+    public void testRetentionThreads() {
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        assertEquals(2, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
+        PersistentBinaryDeque.setupRetentionPolicyMgr(5);
+        assertEquals(5, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
+    }
+
+    @Test (timeout = 10_000)
     public void testFileNamesNoIds() throws Exception {
         testFileNames(false);
     }

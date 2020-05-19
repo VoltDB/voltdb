@@ -13,6 +13,11 @@
     <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
     <property name="log.dir"     value="${basedir}/log"/>
 
+    <property environment="env"/>
+    <condition property="connectionpooldir" value="${env.CONNECTIONPOOLLIB}" else="/home/opt/connection-pool">
+      <isset property="env.CONNECTIONPOOLLIB" />
+    </condition>
+
     <target name="all" depends="jars"/>
 
     <target name="clean">
@@ -33,7 +38,7 @@
            <!-- <include name="voltdbclient*.jar"/> -->
          <include name="*.jar"/>
        </fileset>
-       <fileset dir="/home/opt/connection-pool">
+       <fileset dir="${connectionpooldir}">
            <!-- <include name="voltdbclient*.jar"/> -->
          <include name="*.jar"/>
        </fileset>

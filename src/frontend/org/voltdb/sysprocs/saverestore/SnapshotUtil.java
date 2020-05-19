@@ -1421,12 +1421,13 @@ public class SnapshotUtil {
     public static File[] retrieveRelevantFiles(String filePath,
                                                final String fileNonce)
     {
+        String matchNonce = fileNonce + "-";
         FilenameFilter has_nonce = new FilenameFilter()
         {
             @Override
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(fileNonce) && file.endsWith(".vpt");
+                return file.startsWith(matchNonce) && file.endsWith(".vpt");
             }
         };
 
