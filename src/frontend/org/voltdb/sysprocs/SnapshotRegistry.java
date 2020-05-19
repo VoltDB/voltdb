@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.TreeSet;
 
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotStatus.SnapshotResult;
 import org.voltdb.SnapshotTableInfo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -133,14 +134,21 @@ public class SnapshotRegistry {
             return snapshotTables;
         }
 
-        public List<Boolean> iterateTableErrors() {
-            List<Boolean> snapshotError  = new ArrayList<>();
+        public List<SnapshotResult> iterateTableErrors() {
+            List<SnapshotResult> snapshotError  = new ArrayList<>();
             synchronized (tables) {
                 if (tables.isEmpty()) {
                     return snapshotError;
                 }
-                boolean hasError = tables.values().stream().anyMatch(t -> t.error != null);
-                snapshotError.add(hasError);
+                SnapshotResult sr;
+                if (tables.values().stream().allMatch(t -> t.error == null && t.size != 0)) {
+                    sr = SnapshotResult.SUCCESS;
+                } else if (tables.values().stream().anyMatch(t -> t.error != null && t.size != 0)) {
+                    sr = SnapshotResult.FAILURE;
+                } else {
+                    sr = SnapshotResult.IN_PROGRESS;
+                }
+                snapshotError.add(sr);
             }
             return snapshotError;
         }
