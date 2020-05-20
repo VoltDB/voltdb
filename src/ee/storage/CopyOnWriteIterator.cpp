@@ -51,6 +51,22 @@ CopyOnWriteIterator::CopyOnWriteIterator(
     m_blockOffset = 0;
 }
 
+std::string CopyOnWriteIterator::debug(const std::string &spacer) const {
+    std::ostringstream buffer;
+    std::string infoSpacer = spacer + " | ";
+
+    buffer << infoSpacer << "COWIterator - tableEmpty: " << m_tableEmpty
+            << ", location: " << static_cast<void*>(m_location) << "\n";
+    if (m_currentBlock == NULL || m_currentBlock.get() == NULL) {
+        buffer << infoSpacer << "no currentBlock" << "\n";
+    }
+    else {
+        buffer << infoSpacer << "currentBlock: " << static_cast<void*>(m_currentBlock->address())
+                << ", activeTuples: " << m_currentBlock->activeTuples()<< "\n";
+    }
+    return buffer.str();
+}
+
 /**
  * When a tuple is "dirty" it is still active, but will never be a "found" tuple
  * since it is skipped. The tuple may be dirty because it was deleted (this is why it is always skipped). In that

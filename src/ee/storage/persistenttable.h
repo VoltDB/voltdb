@@ -1089,6 +1089,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
 
     // XXX instrumentation
     bool isPendingDelete = tuple.isPendingDelete();
+    bool isDirty = tuple.isDirty();
     char * tupleAddress = tuple.address();
 
     // add to the free list
@@ -1135,8 +1136,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
         // Dump block state before hitting pending snapshot assertion
         if (isTest || (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end())) {
 
-            VOLT_ERROR("XXX BLOCK %p PENDING SNAPSHOT - tuple %p pending delete %d, dumping blocks:",
-                    block->address(),tupleAddress, isPendingDelete);
+            VOLT_ERROR("XXX BLOCK %p PENDING SNAPSHOT - tuple %p pending delete %d, is dirty %d, dumping blocks:",
+                    block->address(),tupleAddress, isPendingDelete, isDirty);
 
             for (TBMapI it = m_data.begin(); it != m_data.end(); it++) {
                 TBPtr b = it.data();
@@ -1153,6 +1154,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
             }
             else {
                 VOLT_ERROR("STREAMER COUNT: %lu", m_tableStreamer->streamCount());
+                TableStreamerContextPtr sptr = m_tableStreamer->findStreamContext(TABLE_STREAM_SNAPSHOT);
+                if (sptr) {
+                    VOLT_ERROR("XXX SNAP STREAMER:\n%s", sptr->debug(" ").c_str());
+                }
             }
             vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         }

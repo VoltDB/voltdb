@@ -53,6 +53,15 @@ public:
 
     virtual ~TableStreamerContext() {}
 
+    std::string debug() const {
+        return debug("");
+    }
+    virtual std::string debug(const std::string &spacer) const {
+        std::ostringstream buffer;
+        buffer << "debug unsupported";
+        return buffer.str();
+    }
+
     /**
      * Optional activation handler.
      *  Called after creating the context to see if activation is allowed.

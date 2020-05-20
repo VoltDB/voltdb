@@ -346,6 +346,16 @@ int64_t CopyOnWriteContext::getRemainingCount() {
     return m_tuplesRemaining;
 }
 
+std::string CopyOnWriteContext::debug(const std::string &spacer) const {
+    std::ostringstream buffer;
+    std::string infoSpacer = spacer + " | ";
+
+    buffer << infoSpacer << "COWContext - finishedTableScan: " << m_finishedTableScan << "\n";
+    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+    buffer << iter->debug(infoSpacer + " ");
+    return buffer.str();
+}
+
 bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
     vassert(m_iterator.get() != NULL);
 

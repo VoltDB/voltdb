@@ -54,6 +54,8 @@ public:
 
     virtual ~CopyOnWriteContext();
 
+    virtual std::string debug(const std::string &spacer) const;
+
     /**
      * Activation handler.
      */

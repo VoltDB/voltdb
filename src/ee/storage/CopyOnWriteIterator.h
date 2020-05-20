@@ -39,6 +39,8 @@ public:
 
     bool next(TableTuple &out);
 
+    std::string debug(const std::string &spacer) const;
+
     void notifyBlockWasCompactedAway(TBPtr block) {
         if (m_blockIterator != m_end) {
             TBPtr nextBlock = m_blockIterator.data();
