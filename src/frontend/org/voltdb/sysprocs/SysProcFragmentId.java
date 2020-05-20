@@ -283,12 +283,6 @@ public class SysProcFragmentId
     public static final int PF_topicControl = 410;
     public static final int PF_topicControlAggregate = 411;
 
-    // @UpdateLicense
-    public static final int PF_updateLicenseBarrier = 415;
-    public static final int PF_updateLicenseBarrierAggregate = 416;
-    public static final int PF_updateLicense = 417;
-    public static final int PF_updateLicenseAggregate = 418;
-
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 

@@ -35,10 +35,17 @@ def license(runner):
         licenseBytes = license_file.read_hex()
         # call_proc() aborts with an error if the update failed.
         response = runner.call_proc('@UpdateLicense', [VOLT.FastSerializer.VOLTTYPE_STRING], [licenseBytes])
-        print response
         if response.status() != 1:
-            runner.abort('The license update failed with status: %d' % response.response.statusString)
-        else:
-            runner.info('The license is updated successfully.')
+            runner.abort('Failed to update the license. Response status: %d' % response.response.statusString)
+        for row in response.table(0).tuples():
+            procStatus, errStr = row[0], row[1]
+            # 0-Failure, 1-Success
+            if procStatus != 0:
+                runner.abort("Failed to update the license: %s" % errStr)
+        runner.info("The license is updated successfully.")
+        # display new license information
+        response = runner.call_proc('@SystemInformation', [VOLT.FastSerializer.VOLTTYPE_STRING], ['LICENSE']);
+        print response.table(0).format_table(caption = 'License Information')
+        # exception is handled in utility.File
     finally:
         license_file.close();

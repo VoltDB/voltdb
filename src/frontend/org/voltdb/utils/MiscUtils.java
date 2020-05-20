@@ -472,12 +472,21 @@ public class MiscUtils {
      */
     public static String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense) {
         if ( !newLicense.getLicenseType().equalsIgnoreCase(currentLicense.getLicenseType()) ) {
-            return "Can not change " + currentLicense.getLicenseType() + " to " + newLicense.getLicenseType();
+            return "Change license type from " + currentLicense.getLicenseType() + " to " + newLicense.getLicenseType() + " is disallowed. " +
+                    "A maintenance window is needed to do that change.";
         }
-        if ( newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed() ||
-             newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed() ||
-             newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() ) {
-            return "Can not change allowed features in license update.";
+        // Commandlogging is always allowed in enterprise/trail/pro license, check for extra caution
+        if (newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed()) {
+            return (newLicense.isCommandLoggingAllowed() ? "add" : "remove") + " feature command logging is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        if ( newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed()) {
+            return (newLicense.isDrActiveActiveAllowed() ? "add" : "remove") + " feature XDCR is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        if (newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() ) {
+            return (newLicense.isDrReplicationAllowed() ? "add" : "remove") + " feature DR is disallowed. " +
+                    "A maintenance window is needed to do that change.";
         }
         if ( newLicense.hardExpiration() != currentLicense.hardExpiration() ) {
             return "Can not change license from " +
