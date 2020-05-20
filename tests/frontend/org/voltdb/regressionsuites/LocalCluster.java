@@ -1740,6 +1740,9 @@ public class LocalCluster extends VoltServerConfig {
         int previousMemberCount = members.size();
         if (m_cluster != null && m_cluster.size() > previousMemberCount) {
             members.clear();
+            for (int ii = 0; ii < previousMemberCount; ii++) {
+                members.add(null);
+            }
             members.addAll(m_cluster.subList(previousMemberCount, m_cluster.size()));
             return true;
         }

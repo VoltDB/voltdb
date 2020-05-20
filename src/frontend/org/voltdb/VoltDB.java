@@ -41,7 +41,6 @@ import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
@@ -1608,7 +1607,9 @@ public class VoltDB {
             if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
                 throw new IllegalStateException("Cannot change participant count while parties are waiting");
             }
+            CyclicBarrier oldBarrier = m_barrier;
             m_barrier = new CyclicBarrier(parties);
+            oldBarrier.reset();
         }
 
         public void await() throws InterruptedException, BrokenBarrierException {
