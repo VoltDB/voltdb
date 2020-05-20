@@ -1703,11 +1703,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
 
                 /*
-                 * Extract last seen unique ids from remote data centers into a map
-                 * for each DC and return in the result. This will merge and return
-                 * the largest ID for each DC and partition
+                 * For recover, extract last seen unique ids from remote data centers into a map for each DC and return
+                 * in the result. This will merge and return the largest ID for each DC and partition
                  */
-                if (digest.has("drMixedClusterSizeConsumerState")) {
+                if (isRecover && digest.has("drMixedClusterSizeConsumerState")) {
                     JSONObject consumerPartitions = digest.getJSONObject("drMixedClusterSizeConsumerState");
                     Iterator<String> cpKeys = consumerPartitions.keys();
                     while (cpKeys.hasNext()) {
