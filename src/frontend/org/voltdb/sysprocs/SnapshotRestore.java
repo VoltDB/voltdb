@@ -294,10 +294,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
              * will be used
              */
             context.getSiteProcedureConnection().setPerPartitionTxnIds(perPartitionTxnIds, false);
-            try {
-                ByteArrayInputStream bais = new ByteArrayInputStream(jsonDigest);
-                ObjectInputStream ois = new ObjectInputStream(bais);
-
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(jsonDigest);
+                    ObjectInputStream ois = new ObjectInputStream(bais)) {
                 //Sequence numbers for every table and partition
                 @SuppressWarnings("unchecked")
                 Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers =
@@ -321,8 +319,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             drMixedClusterSizeConsumerState, disabledStreams);
                 }
             } catch (Exception e) {
-                e.printStackTrace();//l4j doesn't print the stack trace
-                SNAP_LOG.error(e);
+                SNAP_LOG.error("Unexpected error restoring digest state", e);
                 result.addRow("FAILURE");
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers, result);
@@ -366,14 +363,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         }
                     }
                 } catch (Exception e) {
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    pw.flush();
-                    e.printStackTrace();//l4j doesn't print stack traces
-                    SNAP_LOG.error(e);
-                    result.addRow(null, "FAILURE", sw.toString());
-                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDigestScan, result);
+                    SNAP_LOG.error("Unexpected error during digest scan", e);
+                    result.addRow(null, "FAILURE", e.toString());
                 }
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDigestScan, result);
@@ -407,13 +398,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     configs = SnapshotUtil.retrieveHashinatorConfigs(
                                     m_filePath, m_fileNonce, 1, SNAP_LOG);
                     for (ByteBuffer config : configs) {
-                        assert(config.hasArray());
+                        assert (config.hasArray());
                         result.addRow(config.array(), "SUCCESS", null);
                     }
                 } catch (IOException e) {
-                    String errMsg = e.toString();
-                    SNAP_LOG.error(errMsg);
-                    result.addRow(null, "FAILURE", errMsg);
+                    SNAP_LOG.error("Unexpected error retrieving hashinator configs", e);
+                    result.addRow(null, "FAILURE", e.toString());
                 }
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreHashinatorScan, result);
@@ -546,7 +536,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         // database out of the files it sees available.
                         //
                         // Maybe just a log message?  Later.
-                        e.printStackTrace();
+                        SNAP_LOG.warn("Unexpected error encountered reading files", e);
                     }
                 }
             }
@@ -1204,12 +1194,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         m_selectedReportPartition.clear();
         CONSOLE_LOG.info("Finished restore of " + path + " with nonce: "
                 + nonce + " in " + sw.toString() + " seconds");
-        //        m_sampler.setShouldStop();
-        //        try {
-        //            m_sampler.join();
-        //        } catch (InterruptedException e) {
-        //            e.printStackTrace();
-        //        }
 
         /*
          * ENG-1858, make data loaded by snapshot restore durable
@@ -2471,10 +2455,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
             {
                 partition = hashinator.getHashedPartitionForParameter(partitionParamType,
                         loadedTable.get(partitionCol, partitionParamType));
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
             VoltTable cacheTable = partitioned_tables[partition];
