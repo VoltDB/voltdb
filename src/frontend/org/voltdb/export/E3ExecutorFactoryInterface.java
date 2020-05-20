@@ -21,31 +21,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface E3ExecutorFactoryInterface {
     /**
-     * @return the min thread count this factory is currently operating upon
-     */
-    int getMinThreads();
-
-    /**
-     * @return max threads configured, package private for JUnit tests
-     */
-    Integer getConfigMaxThreads();
-
-    /**
-     * @return local sites count, or 0 if undefined, package private for JUnit tests
-     */
-    int getLocalSitesCount();
-
-    /**
-     * @return the max thread count this factory is currently operating upon, or 0 if uninitialized
-     */
-    public int getMaxThreadCount();
-
-    /**
-     * @return current thread count
-     */
-    public int getCurrentThreadCount();
-
-    /**
      * Get an executor for an {@link E3ExportDataSource} identified by partitionId and tableName
      *
      * @param partitionId

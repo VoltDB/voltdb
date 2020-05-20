@@ -1609,7 +1609,9 @@ public class VoltDB {
             }
             CyclicBarrier oldBarrier = m_barrier;
             m_barrier = new CyclicBarrier(parties);
-            oldBarrier.reset();
+            if (oldBarrier != null) {
+                oldBarrier.reset();
+            }
         }
 
         public void await() throws InterruptedException, BrokenBarrierException {
