@@ -261,9 +261,9 @@ public class DuplicateCounter
     protected HashResult checkCommon(int[] hashes, boolean recovering, VoltMessage message, byte status, String statusString)
     {
         if (!recovering) {
-            m_lastResponse = message;
             // Every partition sys proc InitiateResponseMessage
             if (m_everySiteMPSysProc || m_transactionRepair) {
+                m_lastResponse = message;
                 int pos = -1;
                 if (m_responseHashes == null) {
                     m_responseHashes = hashes;
@@ -291,15 +291,13 @@ public class DuplicateCounter
                     m_statusString = statusString;
                 }
             }
-        }
-
-        /*
-         * Set m_lastResponse to a response once at least. It's possible
-         * that all responses are dummy responses in the case of elastic
-         * join. So only setting m_lastResponse when the message is not
-         * a dummy will leave the variable as null.
-         */
-        if (m_lastResponse == null) {
+        } else if (m_lastResponse == null) {
+            /*
+             * Set m_lastResponse to a response once at least. It's possible
+             * that all responses are dummy responses in the case of elastic
+             * join. So only setting m_lastResponse when the message is not
+             * a dummy will leave the variable as null.
+             */
             m_lastResponse = message;
             m_status = status;
             m_statusString = statusString;
