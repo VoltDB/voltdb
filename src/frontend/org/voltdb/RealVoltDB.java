@@ -2703,8 +2703,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to get voltdbroot path", false, e);
         }
-        // delete the prior license if exists
+        // Don't stage the staged file on top of itself.
         File destF = new VoltFile(path, Constants.LICENSE_FILE_NAME);
+        String destPath = destF.getAbsolutePath();
+        if (destPath.equals(licensePath)) {
+            hostLog.info("License file already staged: " + destPath);
+            return;
+        }
+        // delete the prior license if exists
         if (config.m_forceVoltdbCreate && destF.exists()) {
             destF.delete();
         }
@@ -2713,7 +2719,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File licenseF = new File(licensePath);
             try {
                 Files.copy(licenseF, destF);
-                hostLog.info("License file is copied to VoltDB root directory: " + destF.getAbsolutePath());
+                hostLog.info("License file is copied to VoltDB root directory: " + destPath);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to copy license file to " + path, false, e);
             }
