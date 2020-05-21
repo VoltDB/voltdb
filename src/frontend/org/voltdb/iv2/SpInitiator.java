@@ -111,18 +111,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                         m_promoted = true;
                     }
                     break;
-                } else if (info.m_lastHSId == getInitiatorHSId() && info.m_isMigratePartitionLeaderRequested){
-                    // When leader is migrated to a new host, the new host could fail before leader appointer get chance to elect a new leader
-                    // since leader appointer still sees the original leader and its appointee. Under this race condition, leader appointer takes not action.
-                    // Unfortunately original initiator has marked itself as non-leader, the partition could end up without a leader.
-                    // In this case, reset original leader.
-                    if (!m_messenger.getLiveHostIds().contains(CoreUtils.getSiteIdFromHSId(info.m_HSId))){
-                        if (!m_promoted) {
-                            acceptPromotionImpl(info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
-                            m_promoted = true;
-                            break;
-                        }
-                    }
                 }
             }
 
