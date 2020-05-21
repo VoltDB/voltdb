@@ -898,43 +898,58 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         VoltDB.exit(returnStatus);
     }
 
-    private LicenseApi loadLicenseApi(Configuration config) {
+    // Search in a few default places (voltdbroot, ./, jar file directory and ~/) when license
+    // isn't specified in command line.
+    private Pair<LicenseApi, String> searchDefaultDirs(Configuration config) {
         LicenseApi api = null;
+        String licensePath = null;
+        String[] defaultDirs = MiscUtils.buildDefaultLicenseDirs(config.m_voltdbRoot);
+        for (String path : defaultDirs) {
+            hostLog.info("Searching for license file located at " + path);
+            api = MiscUtils.createLicenseApi(path);
+            if (api != null) {
+                hostLog.info("Found VoltDB license file at " + path);
+                licensePath = path;
+                break;
+            }
+        }
+        return new Pair<>(api, licensePath);
+    }
+
+    private Pair<LicenseApi, String> getLicense(String licensePath) {
+        Pair<LicenseApi, String> pair = null;
+        LicenseApi api = MiscUtils.createLicenseApi(licensePath);
+        if (api == null) {
+            hostLog.fatal("Unable to open license file in provided path: " + licensePath);
+        } else {
+            pair = new Pair<>(api, licensePath);
+        }
+        return pair;
+    }
+
+    private Pair<LicenseApi, String> loadLicenseApi(Configuration config) {
+        Pair<LicenseApi, String> pair = null;
         if (config.m_startAction == StartAction.INITIALIZE) {
-            // init without a license is not fatal
-            if (config.m_pathToLicense != null) {
-                api = MiscUtils.createLicenseApi(config.m_pathToLicense);
-                if (api == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
-                }
+            if (config.m_pathToLicense == null) {
+                pair = searchDefaultDirs(config);
+                // init without a license is not fatal
+            } else {
+                pair = getLicense(config.m_pathToLicense);
             }
         } else {
             if (config.m_pathToLicense == null) {
                 consoleLog.warn("Searching license file in default directories is deprecated in \"voltdb start\" command, "
                         + "please use --license option in \"voltdb init\".");
-                // Search in a few default places (voltdbroot, ./, jar file directory and ~/) when license
-                // isn't specified in command line.
-                String[] defaultDirs = MiscUtils.buildDefaultLicenseDirs(config.m_voltdbRoot);
-                for (String path : defaultDirs) {
-                    hostLog.info("Searching for license file located at " + path);
-                    api = MiscUtils.createLicenseApi(path);
-                    if (api != null) {
-                        hostLog.info("Found VoltDB license file at " + path);
-                        break;
-                    }
-                }
-                if (api == null) {
+                pair = searchDefaultDirs(config);
+                if (pair.getFirst() == null) {
                     hostLog.fatal("Unable to open license file in default directories");
                 }
             } else {
                 consoleLog.warn("--license is deprecated in \"voltdb start\" command, please use it in \"voltdb init\".");
-                api = MiscUtils.createLicenseApi(config.m_pathToLicense);
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
-                }
+                pair = getLicense(config.m_pathToLicense);
             }
         }
-        return api;
+        return pair;
     }
 
     private void determineEdition(Configuration config, LicenseApi api) {
@@ -1014,7 +1029,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // Check license availability
-            m_licenseApi = loadLicenseApi(config);
+            Pair<LicenseApi, String> licenseApiAndPath = loadLicenseApi(config);
+            String licensePath = null;
+            if (licenseApiAndPath != null) {
+                m_licenseApi = licenseApiAndPath.getFirst();
+                licensePath = licenseApiAndPath.getSecond();
+            } else {
+                // Some JUnit server thread tests reuse the license api
+                m_licenseApi = null;
+            }
 
             // Read build info and print license type on the console
             determineEdition(config, m_licenseApi);
@@ -1072,7 +1095,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
-                stageLicenseFile(config);
+                stageLicenseFile(config, licensePath);
                 stageSchemaFiles(config,
                         readDepl.deployment.getDr() != null &&
                                 DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
@@ -1081,7 +1104,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             } else {
-                stageLicenseFile(config);
+                stageLicenseFile(config, licensePath);
             }
 
             if (config.m_startAction.isLegacy()) {
@@ -2633,7 +2656,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
 
-    private void stageLicenseFile(Configuration config) {
+    private void stageLicenseFile(Configuration config, String licensePath) {
         // No such need in community version
         if (!MiscUtils.isPro()) {
             return;
@@ -2650,8 +2673,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             destF.delete();
         }
         // copy new license to voltdb root
-        if (config.m_pathToLicense != null) {
-            File licenseF = new File(config.m_pathToLicense);
+        if (licensePath != null) {
+            File licenseF = new File(licensePath);
             try {
                 Files.copy(licenseF, destF);
                 hostLog.info("License file is copied to VoltDB root directory: " + destF.getAbsolutePath());
