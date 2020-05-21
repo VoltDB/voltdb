@@ -69,7 +69,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -128,7 +127,7 @@ import org.voltdb.CatalogContext.CatalogInfo;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.UpdatableBarrier;
+import org.voltdb.VoltDB.UpdatableSiteCoordinationBarrier;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -3948,7 +3947,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
              * execute will perform the actual update while the others wait.
              */
-            final UpdatableBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
+            final UpdatableSiteCoordinationBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
             sysProcBarrier.await();
 
             synchronized (sysProcBarrier) {

@@ -1596,12 +1596,12 @@ public class VoltDB {
 
     /**
      * Small wrapper class around a {@link CyclicBarrier}. This is used so that operations can synchronize on this
-     * instance and still be able to change the participant count in the barrier
+     * instance and still be able to change the participant count in the barrier when the site count changes (decommission)
      */
-    public static final class UpdatableBarrier {
+    public static final class UpdatableSiteCoordinationBarrier {
         private CyclicBarrier m_barrier;
 
-        UpdatableBarrier() {}
+        UpdatableSiteCoordinationBarrier() {}
 
         synchronized void setPartyCount(int parties) {
             if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
@@ -1634,7 +1634,7 @@ public class VoltDB {
         E3ExecutorFactoryInterface s_e3ExecutorFactory;
         ShutdownHooks s_shutdownHooks;
         volatile TTLManager s_ttlManager;
-        UpdatableBarrier s_siteCountBarrier;
+        UpdatableSiteCoordinationBarrier s_siteCountBarrier;
 
         VoltDBInstance(VoltDB.Configuration emptyConfig) {
             s_fromServerThread = false;
@@ -1645,7 +1645,7 @@ public class VoltDB {
             s_e3ExecutorFactory = null;
             s_shutdownHooks = new ShutdownHooks();
             s_ttlManager = null;
-            s_siteCountBarrier = new UpdatableBarrier();
+            s_siteCountBarrier = new UpdatableSiteCoordinationBarrier();
         }
     }
 
@@ -1697,7 +1697,7 @@ public class VoltDB {
         return singleton.s_ttlManager;
     }
 
-    public static UpdatableBarrier getSiteCountBarrier() {
+    public static UpdatableSiteCoordinationBarrier getSiteCountBarrier() {
         return singleton.s_siteCountBarrier;
     }
 
