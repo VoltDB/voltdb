@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -61,8 +60,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     public static enum ServiceState {
         NORMAL(0),
         ELIGIBLE_REMOVAL(1),
@@ -105,7 +102,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 if (info.m_HSId == getInitiatorHSId()){
 
                     // Test case: Interrupt leader promotion process
-                    if (info.m_lastHSId == LeaderCache.TEST_LAST_HSID) {
+                    if (info.m_lastHSId < 0) {
                         break;
                     }
                     boolean reinstate = reinstateAsLeader(info);
@@ -114,6 +111,18 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                         m_promoted = true;
                     }
                     break;
+                } else if (info.m_lastHSId == getInitiatorHSId() && info.m_isMigratePartitionLeaderRequested){
+                    // When leader is migrated to a new host, the new host could fail before leader appointer get chance to elect a new leader
+                    // since leader appointer still sees the original leader and its appointee. Under this race condition, leader appointer takes not action.
+                    // Unfortunately original initiator has marked itself as non-leader, the partition could end up without a leader.
+                    // In this case, reset original leader.
+                    if (!m_messenger.getLiveHostIds().contains(CoreUtils.getSiteIdFromHSId(info.m_HSId))){
+                        if (!m_promoted) {
+                            acceptPromotionImpl(info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
+                            m_promoted = true;
+                            break;
+                        }
+                    }
                 }
             }
 
