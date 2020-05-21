@@ -55,6 +55,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
@@ -72,7 +73,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final String licenseFileName = "license.xml";
+
     private static final boolean assertsEnabled;
 
     static {
@@ -113,7 +114,7 @@ public class MiscUtils {
      * Instantiate the license api impl based on enterprise/community editions
      * @return a valid API for community and pro editions, or null on error.
      */
-    public static LicenseApi licenseApiFactory(String pathToLicense) {
+    public static LicenseApi createLicenseApi(String pathToLicense) {
 
         if (MiscUtils.isPro() == false) {
             return new LicenseApi() {
@@ -301,41 +302,30 @@ public class MiscUtils {
         return licenseApi;
     }
 
-    /**
-     * Instantiate the license api impl based on enterprise/community editions
-     * For enterprise edition, look in default locations ./, ~/, jar file directory
-     * @return a valid API for community and pro editions, or null on error.
-     */
-    public static LicenseApi licenseApiFactory()
-    {
-        String licensePath = System.getProperty("user.dir") + "/" + licenseFileName;
-        LicenseApi licenseApi = MiscUtils.licenseApiFactory(licensePath);
-        if (licenseApi == null) {
-            try {
-                // Get location of jar file
-                String jarLoc = VoltDB.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                // Strip of file name
-                int lastSlashOff = jarLoc.lastIndexOf("/");
-                if (lastSlashOff == -1) {
-                    // Jar is at root directory
-                    licensePath = "/" + licenseFileName;
-                }
-                else {
-                    licensePath = jarLoc.substring(0, lastSlashOff+1) + licenseFileName;
-                }
-                licenseApi = MiscUtils.licenseApiFactory(licensePath);
+    public static String[] buildDefaultLicenseDirs(File voltdbroot) {
+        // First starts from voltdbroot directory
+        File licenseF = new VoltFile(voltdbroot, Constants.LICENSE_FILE_NAME);
+        String vdbrt = licenseF.getAbsolutePath();
+        // Then search current directory
+        String crt = System.getProperty("user.dir") + File.separator + Constants.LICENSE_FILE_NAME;
+        // Then search jar file directory
+        String jar = null;
+        try {
+            String jarLoc = VoltDB.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+            // Strip of file name
+            int lastSlashOff = jarLoc.lastIndexOf(File.separator);
+            if (lastSlashOff == -1) {
+                // Jar is at root directory
+                jar = File.separator + Constants.LICENSE_FILE_NAME;
             }
-            catch (URISyntaxException e) {
+            else {
+                jar = jarLoc.substring(0, lastSlashOff+1) + Constants.LICENSE_FILE_NAME;
             }
-        }
-        if (licenseApi == null) {
-            licensePath = System.getProperty("user.home") + "/" + licenseFileName;
-            licenseApi = MiscUtils.licenseApiFactory(licensePath);
-        }
-        if (licenseApi != null) {
-            hostLog.info("Searching for license file located " + licensePath);
-        }
-        return licenseApi;
+        } catch (URISyntaxException dontcare) {}
+        // Last search user home directory
+        String home = System.getProperty("user.home") + File.separator + Constants.LICENSE_FILE_NAME;
+
+        return new String[] {vdbrt, crt, jar, home};
     }
 
     /**
@@ -443,6 +433,52 @@ public class MiscUtils {
         consoleLog.info(msg);
 
         return true;
+    }
+
+    /**
+     * Compare the new and current license, see if the difference is allowed to be updated in live database.
+     * <p>Currently only following types of change is allowed in live cluster:
+     * <li>expiration date, and</li>
+     * <li>max host count</li>
+     * </p>
+     * <p>Ignore differences like license version/scheme, issuer information and licensee name.</p>
+     * @param newLicense
+     * @param currentLicense
+     * @return error message if change is disallowed, null string if change is allowed.
+     */
+    public static String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense) {
+        if ( !newLicense.getLicenseType().equalsIgnoreCase(currentLicense.getLicenseType()) ) {
+            return "Change license type from " + currentLicense.getLicenseType() + " to " + newLicense.getLicenseType() + " is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        // Commandlogging is always allowed in enterprise/trail/pro license, check for extra caution
+        if (newLicense.isCommandLoggingAllowed() != currentLicense.isCommandLoggingAllowed()) {
+            return (newLicense.isCommandLoggingAllowed() ? "add" : "remove") + " feature command logging is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        if ( newLicense.isDrActiveActiveAllowed() != currentLicense.isDrActiveActiveAllowed()) {
+            return (newLicense.isDrActiveActiveAllowed() ? "add" : "remove") + " feature XDCR is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        if (newLicense.isDrReplicationAllowed() != currentLicense.isDrReplicationAllowed() ) {
+            return (newLicense.isDrReplicationAllowed() ? "add" : "remove") + " feature DR is disallowed. " +
+                    "A maintenance window is needed to do that change.";
+        }
+        if ( newLicense.hardExpiration() != currentLicense.hardExpiration() ) {
+            return "Can not change license from " +
+                    (currentLicense.hardExpiration() ? "hard expiration" : "soft expiration") +
+                    " to " + (newLicense.hardExpiration() ? "hard expiration" : "soft expiration");
+        }
+        if ( newLicense.isUnrestricted() != currentLicense.isUnrestricted()) {
+            return "Can not change license from " +
+                    (currentLicense.isUnrestricted() ? "unrestricted" : "restricted") +
+                    " to " + (newLicense.isUnrestricted() ? "unrestricted" : "restricted");
+        }
+        return null;
+    }
+
+    public static boolean isCommunity(LicenseApi api) {
+        return !api.isEnterprise() && !api.isPro() && !api.isAnyKindOfTrial() && !api.isAWSMarketplace();
     }
 
     /**

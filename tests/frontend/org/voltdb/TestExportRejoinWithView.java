@@ -83,7 +83,7 @@ public class TestExportRejoinWithView extends TestExportBase {
 
         //Recycle through all hosts and verify view is uptodate.
         ((LocalCluster) m_config).killSingleHost(1);
-        ((LocalCluster) m_config).recoverOne(1, null, "");
+        ((LocalCluster) m_config).recoverOne(1, null);
         Thread.sleep(500);
         client = getClient();
         response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");
@@ -111,7 +111,7 @@ public class TestExportRejoinWithView extends TestExportBase {
 
         //Recycle through all hosts and verify view is up to date.
         ((LocalCluster) m_config).killSingleHost(1);
-        ((LocalCluster) m_config).recoverOne(1, null, "");
+        ((LocalCluster) m_config).recoverOne(1, null);
         Thread.sleep(500);
         client = getClient();
         response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");
@@ -134,7 +134,7 @@ public class TestExportRejoinWithView extends TestExportBase {
 
         //Recycle through all hosts and verify view is uptodate.
         ((LocalCluster) m_config).killSingleHost(1);
-        ((LocalCluster) m_config).recoverOne(1, null, "");
+        ((LocalCluster) m_config).recoverOne(1, null);
         Thread.sleep(500);
         client = getClient();
         response = client.callProcedure("@AdHoc", "select KEYCOUNT from V_EXPORT_WITH_VIEW");
@@ -161,7 +161,7 @@ public class TestExportRejoinWithView extends TestExportBase {
 
         //Recycle through all hosts and verify view is uptodate.
         ((LocalCluster) m_config).killSingleHost(1);
-        ((LocalCluster) m_config).recoverOne(1, null, "");
+        ((LocalCluster) m_config).recoverOne(1, null);
         Thread.sleep(500);
         client = getClient();
         response = client.callProcedure("@AdHoc", "select count(*) from V_EXPORT_WITH_VIEW");

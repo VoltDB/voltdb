@@ -708,6 +708,12 @@ public class SystemProcedureCatalog {
         builder.put("@DeleteExpiredKiplingOffsets",
                 Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteExpiredOffsets", -1, VoltType.INVALID)
                         .commercial().build());
+        builder.put("@UpdateLicense",
+                Builder.createNp("org.voltdb.sysprocs.UpdateLicense").commercial().allowedInReplica().build());
+        builder.put("@LicenseValidation",
+                Builder.createNp("org.voltdb.sysprocs.UpdateLicense$LicenseValidation").commercial().allowedInReplica().build());
+        builder.put("@LiveLicenseUpdate",
+                Builder.createNp("org.voltdb.sysprocs.UpdateLicense$LiveLicenseUpdate").commercial().allowedInReplica().build());
 
         listing = builder.build();
     }
