@@ -4328,17 +4328,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return partitions;
     }
 
-    Map<Integer, Integer> getPartitionToSiteMap() {
-        Map<Integer, Integer> partitions = new HashMap<>();
-        for (Initiator initiator : m_iv2Initiators.values()) {
-            int partition = initiator.getPartitionId();
-            if (partition != MpInitiator.MP_INIT_PID) {
-                partitions.put(partition, CoreUtils.getSiteIdFromHSId(initiator.getInitiatorHSId()));
-            }
-        }
-        return partitions;
-    }
-
     @Override
     public CatalogContext settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
