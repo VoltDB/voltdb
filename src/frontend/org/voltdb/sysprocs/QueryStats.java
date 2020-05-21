@@ -24,7 +24,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.json_voltpatches.JSONObject;
 import org.voltdb.*;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.volttableutil.VoltTableUtil;

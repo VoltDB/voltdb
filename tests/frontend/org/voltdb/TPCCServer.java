@@ -84,7 +84,7 @@ public class TPCCServer {
             }
         }
 
-        VoltDB.initialize(config);
+        VoltDB.initialize(config, false);
         VoltDB.instance().run();
     }
 }

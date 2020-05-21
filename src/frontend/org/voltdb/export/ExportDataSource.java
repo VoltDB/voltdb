@@ -905,7 +905,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Shutdown executor");
         }
         m_es.shutdown();
-        ExportManagerInterface.instance().onClosedSource(m_tableName, m_partitionId);
+        VoltDB.getExportManager().onClosedSource(m_tableName, m_partitionId);
     }
 
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.

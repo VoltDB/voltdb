@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.voltcore.utils.Pair;
-import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;

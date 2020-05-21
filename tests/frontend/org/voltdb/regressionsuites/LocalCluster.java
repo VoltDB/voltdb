@@ -47,6 +47,7 @@ import java.util.regex.Pattern;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.NativeLibraryLoader;
+import org.voltdb.RealVoltDB;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -680,9 +681,11 @@ public class LocalCluster extends VoltServerConfig {
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
-        m_cluster.add(null);
-        m_pipes.add(null);
-        m_cmdLines.add(cmdln);
+        synchronized(this) {
+            m_cluster.add(null);
+            m_pipes.add(null);
+            m_cmdLines.add(cmdln);
+        }
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(action == StartAction.JOIN);
@@ -1246,7 +1249,9 @@ public class LocalCluster extends VoltServerConfig {
                 }
             }
             Process proc = m_procBuilder.start();
-            m_cluster.add(proc);
+            synchronized(this) {
+                m_cluster.add(proc);
+            }
             String fileName = testoutputdir
                     + File.separator
                     + "LC-"
@@ -1731,11 +1736,27 @@ public class LocalCluster extends VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public void waitForNodesToShutdown() {
-        if (m_cluster != null) {
+    private synchronized boolean buildSafeClusterMemberList(ArrayList<Process> members) {
+        int previousMemberCount = members.size();
+        if (m_cluster != null && m_cluster.size() > previousMemberCount) {
+            members.clear();
+            for (int ii = 0; ii < previousMemberCount; ii++) {
+                members.add(null);
+            }
+            members.addAll(m_cluster.subList(previousMemberCount, m_cluster.size()));
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
 
+    public void waitForNodesToShutdown() {
+        ArrayList<Process> members = new ArrayList<>();
+        while (buildSafeClusterMemberList(members)) {
+            // It is possible to have a ConcurrentModificationException here so make a copy to be safe
             // join on all procs
-            for (Process proc : m_cluster) {
+            for (Process proc : members) {
                 if (proc == null) {
                     continue;
                 }
@@ -1774,9 +1795,10 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public synchronized void shutDownExternal(boolean forceKillEEProcs) {
-        if (m_cluster != null) {
+        ArrayList<Process> members = new ArrayList<>();
+        while (buildSafeClusterMemberList(members)) {
             // kill all procs
-            for (Process proc : m_cluster) {
+            for (Process proc : members) {
                 if (proc == null) {
                     continue;
                 }
@@ -1887,7 +1909,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public boolean areAllNonLocalProcessesDead() {
-        for (Process proc : m_cluster){
+        ArrayList<Process> members = new ArrayList<>();
+        buildSafeClusterMemberList(members);
+        for (Process proc : members){
             try {
                 if (proc != null) {
                     proc.exitValue();
@@ -1905,8 +1929,9 @@ public class LocalCluster extends VoltServerConfig {
             count++;
         }
 
-        if (m_cluster != null) {
-            for (Process proc : m_cluster) {
+        ArrayList<Process> members = new ArrayList<>();
+        if (buildSafeClusterMemberList(members)) {
+            for (Process proc : members) {
                 try {
                     if (proc != null) {
                         proc.exitValue();
