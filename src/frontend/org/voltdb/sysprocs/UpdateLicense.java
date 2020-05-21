@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
@@ -65,14 +66,18 @@ public class UpdateLicense extends VoltNTSystemProcedure {
                 return constructFailureResponse(vt, "Failed to write the new license to disk: " + e.getMessage(), null);
             }
             // validate the license format and signature
-            LicenseApi newLicense = MiscUtils.licenseApiFactory(tmpLicense.getAbsolutePath());
+            LicenseApi newLicense = MiscUtils.createLicenseApi(tmpLicense.getAbsolutePath());
             if (newLicense == null) {
                 return constructFailureResponse(vt, "Invalid license format", tmpLicense);
             }
             // Has the new license expired already?
             Date today = Calendar.getInstance().getTime();
             if (newLicense.expires().before(today)) {
-                return constructFailureResponse(vt, "Failed to update the license because new license is expired", tmpLicense);
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                return constructFailureResponse(vt,
+                        "Failed to update the license because new license expires at " +
+                                sdf.format(newLicense.expires().getTime()),
+                        tmpLicense);
             }
 
             // Are the changes allowed?
@@ -102,7 +107,7 @@ public class UpdateLicense extends VoltNTSystemProcedure {
             }
             File licenseF = new File(VoltDB.instance().getVoltDBRootPath(), Constants.LICENSE_FILE_NAME);
             tmpLicense.renameTo(licenseF);
-            LicenseApi newLicense = MiscUtils.licenseApiFactory(licenseF.getAbsolutePath());
+            LicenseApi newLicense = MiscUtils.createLicenseApi(licenseF.getAbsolutePath());
             if (newLicense == null) {
                 return constructFailureResponse(vt, "Invalid license format", licenseF);
             }
@@ -184,8 +189,8 @@ public class UpdateLicense extends VoltNTSystemProcedure {
             return new VoltTable[] { vt };
         }
 
-        log.info("License is updated successfully.");
-        vt.addRow(VoltSystemProcedure.STATUS_OK, "");
+        log.info("License updated successfully.");
+        vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
         return new VoltTable[] { vt };
 
     }

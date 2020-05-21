@@ -898,6 +898,92 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         VoltDB.exit(returnStatus);
     }
 
+    private LicenseApi loadLicenseApi(Configuration config) {
+        LicenseApi api = null;
+        if (config.m_startAction == StartAction.INITIALIZE) {
+            // init without a license is not fatal
+            if (config.m_pathToLicense != null) {
+                api = MiscUtils.createLicenseApi(config.m_pathToLicense);
+                if (api == null) {
+                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                }
+            }
+        } else {
+            if (config.m_pathToLicense == null) {
+                consoleLog.warn("Searching license file in default directories is deprecated in \"voltdb start\" command, "
+                        + "please use --license option in \"voltdb init\".");
+                // Search in a few default places (voltdbroot, ./, jar file directory and ~/) when license
+                // isn't specified in command line.
+                String[] defaultDirs = MiscUtils.buildDefaultLicenseDirs(config.m_voltdbRoot);
+                for (String path : defaultDirs) {
+                    hostLog.info("Searching for license file located at " + path);
+                    api = MiscUtils.createLicenseApi(path);
+                    if (api != null) {
+                        hostLog.info("Found VoltDB license file at " + path);
+                        break;
+                    }
+                }
+                if (api == null) {
+                    hostLog.fatal("Unable to open license file in default directories");
+                }
+            } else {
+                consoleLog.warn("--license is deprecated in \"voltdb start\" command, please use it in \"voltdb init\".");
+                api = MiscUtils.createLicenseApi(config.m_pathToLicense);
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                }
+            }
+        }
+        return api;
+    }
+
+    private void determineEdition(Configuration config, LicenseApi api) {
+        String edition = "Community Edition";
+        if (api == null) {
+            // init without specifying license is not fatal
+            if (config.m_startAction == StartAction.INITIALIZE && config.m_pathToLicense == null) {
+                return;
+            }
+            hostLog.fatal("Please contact sales@voltdb.com to request a license.");
+            VoltDB.crashLocalVoltDB(
+                    "Failed to initialize license verifier. " + "See previous log message for details.", false,
+                    null);
+        }
+        if (System.getProperty("user.name").equals("root")) {
+            hostLog.warn("VoltDB is running as root. " +
+                         "Running the VoltDB server software from the system root account is not recommended.");
+        }
+
+        if (config.m_isEnterprise) {
+            if (api.isEnterprise()) {
+                edition = "Enterprise Edition";
+            }
+            if (api.isPro()) {
+                edition = "Pro Edition";
+            }
+            if (api.isEnterpriseTrial()) {
+                edition = "Enterprise Edition";
+            }
+            if (api.isProTrial()) {
+                edition = "Pro Edition";
+            }
+            if (api.isAWSMarketplace()) {
+                edition = "AWS Marketplace Edition";
+            }
+        }
+
+        // this also prints out the license type on the console
+        readBuildInfo(edition);
+
+        // print out the licensee on the license
+        if (config.m_isEnterprise) {
+            String licensee = api.licensee();
+            if ((licensee != null) && (licensee.length() > 0)) {
+                consoleLog.info(String.format("Licensed to: %s", licensee));
+            }
+        }
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config configuration that gets passed in from command line.
@@ -924,75 +1010,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
-            // print the ascii art!.
-            // determine the edition
-            // Check license availability
-            String edition = "Community Edition";
+            // Print the ascii art!
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            // load license API
-            if (config.m_startAction == StartAction.INITIALIZE) {
-                // init without a license is not fatal
-                if (config.m_pathToLicense != null) {
-                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
-                    if (m_licenseApi == null) {
-                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
-                    }
-                }
-            } else {
-                if (config.m_pathToLicense == null) {
-                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_voltdbRoot);
-                    if (m_licenseApi == null) {
-                        hostLog.fatal("Unable to open license file in default directories");
-                    }
-                } else {
-                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
-                    if (m_licenseApi == null) {
-                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
-                    }
-                }
-            }
 
-            if (config.m_startAction != StartAction.INITIALIZE || config.m_pathToLicense != null) {
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Please contact sales@voltdb.com to request a license.");
-                    VoltDB.crashLocalVoltDB(
-                            "Failed to initialize license verifier. " + "See previous log message for details.", false,
-                            null);
-                }
-                if (System.getProperty("user.name").equals("root")) {
-                    hostLog.warn("VoltDB is running as root. " +
-                                 "Running the VoltDB server software from the system root account is not recommended.");
-                }
+            // Check license availability
+            m_licenseApi = loadLicenseApi(config);
 
-                if (config.m_isEnterprise) {
-                    if (m_licenseApi.isEnterprise()) {
-                        edition = "Enterprise Edition";
-                    }
-                    if (m_licenseApi.isPro()) {
-                        edition = "Pro Edition";
-                    }
-                    if (m_licenseApi.isEnterpriseTrial()) {
-                        edition = "Enterprise Edition";
-                    }
-                    if (m_licenseApi.isProTrial()) {
-                        edition = "Pro Edition";
-                    }
-                    if (m_licenseApi.isAWSMarketplace()) {
-                        edition = "AWS Marketplace Edition";
-                    }
-                }
-
-                // this also prints out the license type on the console
-                readBuildInfo(edition);
-
-                // print out the licensee on the license
-                if (config.m_isEnterprise) {
-                    String licensee = m_licenseApi.licensee();
-                    if ((licensee != null) && (licensee.length() > 0)) {
-                        consoleLog.info(String.format("Licensed to: %s", licensee));
-                    }
-                }
-            }
+            // Read build info and print license type on the console
+            determineEdition(config, m_licenseApi);
 
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
@@ -1034,6 +1059,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
             m_catalogUpdateBarrier.setPartyCount(m_nodeSettings.getLocalSitesCount());
 
+            // stage deployment, license, schema, and hidden initialization marker file
+            // under voltdbroot
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate && m_nodeSettings.clean()) {
                     String msg = "Archived previous snapshot directory to " + m_nodeSettings.getSnapshoth() + ".1";
@@ -1054,9 +1081,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             } else {
-                //[Deprecated] allow other start actions stage license file to voltdb root directory
                 stageLicenseFile(config);
             }
+
             if (config.m_startAction.isLegacy()) {
                 consoleLog.warn("The \"" + config.m_startAction.m_verb +
                         "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");

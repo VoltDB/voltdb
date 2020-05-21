@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2020 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,7 @@ def license(runner):
             runner.abort('Failed to update the license. Response status: %d' % response.response.statusString)
         for row in response.table(0).tuples():
             procStatus, errStr = row[0], row[1]
-            # 0-Failure, 1-Success
+            # 0-Success, 1-Failure
             if procStatus != 0:
                 runner.abort("Failed to update the license: %s" % errStr)
         runner.info("The license is updated successfully.")
