@@ -24,7 +24,11 @@ import org.voltdb.VoltDB;
 
 public class VoltUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
-    @Override
+    // As near as I can tell this holds a reference to the VoltLogger so that
+    // log submits during a failure don't throw rejected execution exceptions.
+    private final VoltLogger log = new VoltLogger("HOST");
+
+        @Override
     public void uncaughtException(Thread t, Throwable e) {
         VoltDB.crashLocalVoltDB("VoltDB has encountered an unrecoverable error and is exiting."
                 + "\nThe log may contain additional information.", true, e);
