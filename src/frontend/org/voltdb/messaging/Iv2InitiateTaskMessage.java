@@ -257,14 +257,14 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         if (m_isSinglePartition) {
             flags |= SINGLE_PARTITION_MASK;
         }
+        if (m_isEveryPartition) {
+            flags |= EVERY_PARTITION_MASK;
+        }
+        if (m_shouldReturnResultTables) {
+            flags |= SHOULD_RETURN_TABLES_MASK;
+        }
         if (m_nPartitions != null) {
             flags |= N_PARTITION_MASK;
-        }
-        if (m_shouldReturnResultTables) {
-            flags |= SHOULD_RETURN_TABLES_MASK;
-        }
-        if (m_shouldReturnResultTables) {
-            flags |= SHOULD_RETURN_TABLES_MASK;
         }
 
         //Should never generate a response if we have to forward to a replica
