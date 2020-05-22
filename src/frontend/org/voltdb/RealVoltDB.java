@@ -2260,7 +2260,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             configInfoDir.mkdirs();
 
             try {
-                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar", mode);
+                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), InMemoryJarfile.CATALOG_JAR_FILENAME, mode);
             } catch (IOException e) {
                 hostLog.error("Failed to writing catalog jar to disk: " + e.getMessage(), e);
                 e.printStackTrace();

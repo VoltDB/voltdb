@@ -534,7 +534,7 @@ public class Inits {
 
         @Override
         public void run() {
-            hostLog.info("LoadCatalog");
+            hostLog.info("SetupCommandLogging");
             final org.voltdb.catalog.CommandLog logConfig = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
             assert logConfig != null;
 

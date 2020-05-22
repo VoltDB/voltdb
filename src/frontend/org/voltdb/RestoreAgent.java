@@ -1052,10 +1052,10 @@ SnapshotCompletionInterest, Promotable
         Iterator<Entry<String, Set<SnapshotInfo>>> it = snapshotFragments.entrySet().iterator();
         SnapshotInfo newest = null;
         while (it.hasNext()) {
-            Entry<String, Set<SnapshotInfo>> e = it.next();
+            Entry<String, Set<SnapshotInfo>> sentry = it.next();
             Set<String> fileTables = new HashSet<String>();
             Set<String> digestTables = null;
-            String nonce = e.getKey();
+            String nonce = sentry.getKey();
             Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(nonce);
             if (tablePartitions == null) {
                 tablePartitions = new HashMap<String, Set<Integer>>();
@@ -1064,40 +1064,40 @@ SnapshotCompletionInterest, Promotable
 
             int totalPartitions = -1;
             boolean inconsistent = false;
-            Set<SnapshotInfo> fragments = e.getValue();
-            for (SnapshotInfo s : fragments) {
+            Set<SnapshotInfo> fragments = sentry.getValue();
+            for (SnapshotInfo sInfo : fragments) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("SnapshotInfo " + s.nonce + " claims digest tables: " + s.digestTables);
-                    LOG.debug("SnapshotInfo " + s.nonce + " claims files for tables: " + s.fileTables);
+                    LOG.debug("SnapshotInfo " + sInfo.nonce + " claims digest tables: " + sInfo.digestTables);
+                    LOG.debug("SnapshotInfo " + sInfo.nonce + " claims files for tables: " + sInfo.fileTables);
                 }
                 if (digestTables == null) {
-                    digestTables = new HashSet<String>(s.digestTables);
+                    digestTables = new HashSet<String>(sInfo.digestTables);
                 }
-                else if (!digestTables.equals(s.digestTables)) {
+                else if (!digestTables.equals(sInfo.digestTables)) {
                     m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                    .append(s.nonce)
+                                    .append(sInfo.nonce)
                                     .append(" due to disagreement in digest table list.  Got ")
-                                    .append(s.digestTables)
+                                    .append(sInfo.digestTables)
                                     .append(", expecting ")
                                     .append(digestTables);
                     inconsistent = true;
                     break;
                 }
-                fileTables.addAll(s.fileTables);
+                fileTables.addAll(sInfo.fileTables);
                 if (totalPartitions == -1) {
-                    totalPartitions = s.partitionCount;
-                } else if (totalPartitions != s.partitionCount) {
+                    totalPartitions = sInfo.partitionCount;
+                } else if (totalPartitions != sInfo.partitionCount) {
                     m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                    .append(s.nonce)
+                                    .append(sInfo.nonce)
                                     .append(" due to partition count mismatch. Got ")
-                                    .append(s.partitionCount)
+                                    .append(sInfo.partitionCount)
                                     .append(", expecting ")
                                     .append(totalPartitions);
                     inconsistent = true;
                     break;
                 }
 
-                for (Entry<String, Set<Integer>> entry : s.partitions.entrySet()) {
+                for (Entry<String, Set<Integer>> entry : sInfo.partitions.entrySet()) {
                     Set<Integer> partitions = tablePartitions.get(entry.getKey());
                     if (partitions == null) {
                         tablePartitions.put(entry.getKey(), entry.getValue());
