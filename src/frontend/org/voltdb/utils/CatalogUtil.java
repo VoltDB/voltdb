@@ -3232,10 +3232,10 @@ public abstract class CatalogUtil {
                              params[12]);           // hasSecurityUserChange
     }
 
-    public static int getZKCatalogVersion(ZooKeeper zk, long txnId) {
+    public static int getZKCatalogVersion(ZooKeeper zk, ZKCatalogStatus catStatus, long txnId) {
         Pair<String, Integer> catalogPair = null;
         try {
-            catalogPair = findLatestViableCatalog(zk, null, txnId);
+            catalogPair = findLatestViableCatalog(zk, catStatus, txnId);
         } catch (KeeperException | InterruptedException ignore) {
             VoltDB.crashLocalVoltDB("Unable to retrieve ZK catalog node", false, null);
         }
