@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -55,7 +56,7 @@ import org.voltdb.utils.PosixAdvise;
  * as well as a byte to that is set once the file is completely written and synced.
  * A VoltTable header describing the schema follows the JSON blob.
  */
-public class TableSaveFile
+public class TableSaveFile implements Closeable
 {
 
     public static enum ChecksumType {
@@ -74,10 +75,12 @@ public class TableSaveFile
         @Override
         public void discard() {
             checkDoubleFree();
-            if (m_hasMoreChunks.get() == false) {
-                m_origin.discard();
-            } else {
-                m_buffers.add(m_origin);
+            synchronized (TableSaveFile.this) {
+                if (m_hasMoreChunks.get() == false) {
+                    m_origin.discard();
+                } else {
+                    m_buffers.add(m_origin);
+                }
             }
         }
 
@@ -384,6 +387,7 @@ public class TableSaveFile
         return m_timestamp;
     }
 
+    @Override
     public void close() throws IOException {
         Thread chunkReader;
         synchronized (this) {
@@ -775,7 +779,9 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } finally {
-                    if (c != null) c.discard();
+                    if (c != null) {
+                        c.discard();
+                    }
                 }
             }
             fileInputBufferC.discard();
@@ -1038,7 +1044,9 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } finally {
-                    if (c != null) c.discard();
+                    if (c != null) {
+                        c.discard();
+                    }
                 }
             }
             fileInputBufferC.discard();
