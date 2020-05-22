@@ -2075,7 +2075,7 @@ public class SynchronizedStatesManager {
     }
 
     public void shutdownSynchronizedStatesManager() throws InterruptedException {
-        ListenableFuture<?> disableComplete = s_sharedEs.submit(disableInstances);
+        ListenableFuture<?> disableComplete = shutdownSynchronizedStatesManagerAsync();
         try {
             disableComplete.get();
         }
@@ -2084,6 +2084,10 @@ public class SynchronizedStatesManager {
             throw new RuntimeException(e.getCause());
         }
 
+    }
+
+    public ListenableFuture<?> shutdownSynchronizedStatesManagerAsync() {
+        return s_sharedEs.submit(disableInstances);
     }
 
     boolean isRunning() {

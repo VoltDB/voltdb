@@ -51,7 +51,9 @@ public class UserDefinedFunctionManager {
     }
 
     // Load all the UDFs recorded in the catalog. Instantiate and register them in the system.
-    public void loadFunctions(CatalogContext catalogContext) {
+    // WARNING: This is called from all sites in parallel but updates a shared static
+    //          data structure in FunctionForVoltDB
+    public synchronized void loadFunctions(CatalogContext catalogContext) {
         final CatalogMap<Function> catalogFunctions = catalogContext.database.getFunctions();
         // Remove obsolete tokens (scalar)
         for (UserDefinedScalarFunctionRunner runner : m_udfs.values()) {

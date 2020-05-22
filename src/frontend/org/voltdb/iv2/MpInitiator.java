@@ -207,7 +207,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                     // in the promotion algorithm.
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(), "MpInitiator", m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-                    TTLManager.instance().scheduleTTLTasks();
+                    VoltDB.getTTLManager().scheduleTTLTasks();
                     m_replicaRemovalCache.start(true);
                 }
                 else {

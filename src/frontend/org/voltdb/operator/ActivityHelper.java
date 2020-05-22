@@ -228,7 +228,7 @@ class ActivityHelper {
     private boolean checkExporter() {
         long pend = 0;
         try {
-            ExportManagerInterface em = ExportManagerInterface.instance();
+            ExportManagerInterface em = VoltDB.getExportManager();
             if (em != null) {
                 pend = em.getTotalPendingCount();
             }
@@ -247,7 +247,7 @@ class ActivityHelper {
     private boolean checkExportMastership() {
         int masters = 0;
         try {
-            ExportManagerInterface em = ExportManagerInterface.instance();
+            ExportManagerInterface em = VoltDB.getExportManager();
             if (em != null) {
                 masters = em.getMastershipCount();
             }

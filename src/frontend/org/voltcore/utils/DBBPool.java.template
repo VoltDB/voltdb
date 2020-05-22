@@ -439,8 +439,8 @@ public final class DBBPool {
         return cont;
     }
 
-    //In OOM conditions try clearing the pool
-    private static void clear() {
+    //In OOM conditions (and new instances of LocalServerThread) try clearing the pool
+    public static void clear() {
         long startingBytes = bytesAllocatedGlobally.get();
         for (ConcurrentLinkedQueue<BBContainer> pool : m_pooledBuffers.values()) {
             BBContainer cont = null;

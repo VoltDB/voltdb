@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.settings.NodeSettings;
 
 public class TestNativeLibraryLoader {
 
@@ -52,7 +53,7 @@ public class TestNativeLibraryLoader {
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
         VoltDB.wasCrashCalled = false;
-        VoltDB.initialize(configuration);
+        VoltDB.initialize(configuration, true);
         assertFalse(NativeLibraryLoader.loadVoltDB(true));
         assertFalse(VoltDB.wasCrashCalled);
 
@@ -64,13 +65,18 @@ public class TestNativeLibraryLoader {
             .thenReturn(realvolt.getEELibraryVersionString());
         CatalogContext catContext = mock(CatalogContext.class);
         Cluster cluster = mock(Cluster.class);
+        NodeSettings settings = mock(NodeSettings.class);
         when(catContext.getCluster())
             .thenReturn(cluster);
         when(mockitovolt.getCatalogContext())
             .thenReturn(catContext);
+        when(catContext.getNodeSettings())
+            .thenReturn(settings);
+        when(settings.getLocalSitesCount())
+            .thenReturn(1);
 
         VoltDB.replaceVoltDBInstanceForTest(mockitovolt);
-        VoltDB.initialize(configuration);
+        VoltDB.initialize(configuration, true);
         assertTrue(NativeLibraryLoader.loadVoltDB(true));
     }
 }
