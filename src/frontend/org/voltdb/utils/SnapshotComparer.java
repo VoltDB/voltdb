@@ -614,11 +614,11 @@ class SnapshotLoader {
                                 if (orderLevel >= 2) {
                                     if (cr != null) {
                                         refCheckSum += PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true)
-                                                .getTableCheckSum();
+                                                .getTableCheckSum(false);
                                     }
                                     if (cc != null) {
                                         compCheckSum += PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true)
-                                                .getTableCheckSum();
+                                                .getTableCheckSum(false);
                                     }
                                     if (CONSOLE_LOG.isDebugEnabled()) {
                                         CONSOLE_LOG.debug("Checksum for " + tableName + " partition " + partitionid + " on host" + baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
