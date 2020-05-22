@@ -223,7 +223,7 @@ public class TopicBenchmark {
         VoltTable stats = null;
         while (retryStats-- > 0) {
             try {
-                stats = client.callProcedure("@Statistics", "topics", 0).getResults()[0];
+                stats = client.callProcedure("@Statistics", "topic", 0).getResults()[0];
                 break;
             } catch (ProcCallException e) {
                 log.warn("Error while calling procedures: ");
@@ -254,12 +254,14 @@ public class TopicBenchmark {
                 String source = stats.getString("TOPIC");
                 Long tupleCount = stats.getLong("LAST_OFFSET");
                 String tablePart = source + "_" + partitionid;
+                log.info("Topic: " + source + ", Partition ID: " + partitionid + ", Tuple count: " + tupleCount);
                 if (! partitionMap.containsKey(tablePart)) {
                     // only put this table+partition count in the map once
                     partitionMap.put(tablePart, tupleCount);
                     totalTupleCount += tupleCount;
                 }
             }
+            log.info("Total tuple count: " + totalTupleCount);
             if (totalTupleCount == insertCount) {
                 long settleTimeMillis = System.currentTimeMillis() - st;
                 log.info("LAST_OFFSET settled in " + settleTimeMillis/1000.0 + " seconds");
@@ -270,7 +272,7 @@ public class TopicBenchmark {
                 log.info("Waited too long...");
                 return false;
             }
-            Thread.sleep(1000);
+            Thread.sleep(5000);
         }
     }
 

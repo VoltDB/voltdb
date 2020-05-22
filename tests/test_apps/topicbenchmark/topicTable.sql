@@ -1,6 +1,9 @@
 LOAD CLASSES topicbenchmark-procedures.jar;
 
-file -inlinebatch END_OF_BATCH
+-- file -inlinebatch END_OF_BATCH
+
+DROP PROCEDURE InsertTopic1 if exists;
+DROP TABLE ALL_VALUES1 if exists;
 
 CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid AS TOPIC PROFILE topicbenchmark (
   txnid                     BIGINT        NOT NULL
@@ -30,4 +33,4 @@ CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid AS TOPIC PROFILE topicbenchm
 
 CREATE PROCEDURE PARTITION ON TABLE ALL_VALUES1 COLUMN rowid PARAMETER 0 FROM CLASS topicbenchmark.InsertTopic1;
 
-END_OF_BATCH
+-- END_OF_BATCH

@@ -121,7 +121,8 @@ function run_benchmark() {
     java -classpath topicbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         topicbenchmark.TopicBenchmark \
         --duration=30 \
-        --servers=localhost
+        --servers=localhost \
+        --count=500000
 }
 
 function run_benchmark_10x() {
