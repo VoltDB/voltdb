@@ -58,7 +58,6 @@ public class ImportManager implements ChannelChangeCallback {
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
-    private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
     private final int m_myHostId;
@@ -80,7 +79,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @return The global single instance of the ImportManager.
      */
     public static ImportManager instance() {
-        return m_self;
+        return VoltDB.getImportManager();
     }
 
     private ModuleManager getModuleManager() {
@@ -117,7 +116,7 @@ public class ImportManager implements ChannelChangeCallback {
                 myHostId,
                 statsCollector);
 
-        m_self = em;
+        VoltDB.setImportManagerInstance(em);
         em.create(catalogContext);
     }
 
@@ -264,8 +263,8 @@ public class ImportManager implements ChannelChangeCallback {
 }
 
     public static int getPartitionsCount() {
-        if (m_self.m_processor.get() != null) {
-            return m_self.m_processor.get().getPartitionsCount();
+        if (VoltDB.getImportManager().m_processor.get() != null) {
+            return VoltDB.getImportManager().m_processor.get().getPartitionsCount();
         }
         return 0;
     }
@@ -288,8 +287,8 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void resume(OperationMode mode) {
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        m_self.create(catalogContext);
-        m_self.readyForDataInternal(mode);
+        VoltDB.getImportManager().create(catalogContext);
+        VoltDB.getImportManager().readyForDataInternal(mode);
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {

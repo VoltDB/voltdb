@@ -42,7 +42,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.sysprocs.SnapshotRegistry;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -242,7 +241,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestCo
                     @Override
                     public void run()
                     {
-                        ExportManagerInterface.instance().sync();
+                        VoltDB.getExportManager().sync();
                     }
                 });
 

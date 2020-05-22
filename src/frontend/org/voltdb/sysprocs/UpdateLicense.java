@@ -21,19 +21,21 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.licensetool.LicenseApi;
@@ -71,7 +73,7 @@ public class UpdateLicense extends VoltNTSystemProcedure {
                 return constructFailureResponse(vt, "Invalid license format", tmpLicense);
             }
             // Has the new license expired already?
-            Date today = Calendar.getInstance().getTime();
+            Calendar today = Calendar.getInstance();
             if (newLicense.expires().before(today)) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
                 return constructFailureResponse(vt,
@@ -172,26 +174,39 @@ public class UpdateLicense extends VoltNTSystemProcedure {
         log.info("Received user request to update database license.");
         VoltTable vt = constructResultTable();
 
-        // validate the new license on every host
-        Map<Integer, ClientResponse> result;
-        result = callNTProcedureOnAllHosts("@LicenseValidation", licenseBytes).get();
-        String err = checkResult(result);
-        if (err != null) {
-            vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
+        final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        String errMsg = VoltZK.createActionBlocker(zk, VoltZK.licenseUpdateInProgress, CreateMode.EPHEMERAL,
+                log, "live license update" );
+        if (errMsg != null) {
+            log.info(errMsg);
+            vt.addRow(VoltSystemProcedure.STATUS_FAILURE, errMsg);
             return new VoltTable[] { vt };
         }
 
-        // update the new license on every host
-        result = callNTProcedureOnAllHosts("@LiveLicenseUpdate").get();
-        err = checkResult(result);
-        if (err != null) {
-            vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
-            return new VoltTable[] { vt };
-        }
+        try {
+            // validate the new license on every host
+            Map<Integer, ClientResponse> result;
+            result = callNTProcedureOnAllHosts("@LicenseValidation", licenseBytes).get();
+            String err = checkResult(result);
+            if (err != null) {
+                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
+                return new VoltTable[] { vt };
+            }
 
-        log.info("License updated successfully.");
-        vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
-        return new VoltTable[] { vt };
+            // update the new license on every host
+            result = callNTProcedureOnAllHosts("@LiveLicenseUpdate").get();
+            err = checkResult(result);
+            if (err != null) {
+                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
+                return new VoltTable[] { vt };
+            }
+
+            log.info("License updated successfully.");
+            vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
+            return new VoltTable[] { vt };
+        } finally {
+            VoltZK.removeActionBlocker(zk, VoltZK.licenseUpdateInProgress, log);
+        }
 
     }
 }

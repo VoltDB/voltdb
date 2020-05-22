@@ -30,8 +30,8 @@ public class EstTimeUpdater {
     public static final int ESTIMATED_TIME_UPDATE_FREQUENCY = Integer.getInteger("ESTIMATED_TIME_UPDATE_FREQUENCY", 5);
     public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
 
-    public static volatile boolean pause = false;
-    public static final AtomicBoolean done = new AtomicBoolean(true);
+    public static volatile boolean s_pause = false;
+    public static final AtomicBoolean s_done = new AtomicBoolean(true);
 
     private final static Runnable updaterRunnable = new Runnable() {
         @Override
@@ -41,12 +41,12 @@ public class EstTimeUpdater {
                 try {
                     Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
                 } catch (InterruptedException e) {
-                    if (done.get()) {
+                    if (s_done.get()) {
                         EstTimeUpdater.update(Long.MIN_VALUE);
                         return;
                     }
                 }
-                if (pause) continue;
+                if (s_pause) continue;
                 Long delta = EstTimeUpdater.update(System.currentTimeMillis());
                 if ( delta != null ) {
                     new VoltLogger("HOST").info(delta +" estimated time update.");
@@ -58,7 +58,7 @@ public class EstTimeUpdater {
     private static final AtomicReference<Thread> updater = new AtomicReference<>();
 
     public static synchronized void stop() {
-        if (done.compareAndSet(false, true)) {
+        if (s_done.compareAndSet(false, true)) {
             Thread updaterThread = updater.get();
             if (updater.compareAndSet(updaterThread, null)) {
                 updaterThread.interrupt();
@@ -71,7 +71,7 @@ public class EstTimeUpdater {
     }
 
     public static synchronized void start() {
-        if (done.compareAndSet(true, false)) {
+        if (s_done.compareAndSet(true, false)) {
             if (updater.compareAndSet(null, new Thread(updaterRunnable))) {
                 updater.get().setDaemon(true);
                 updater.get().setName("Estimated Time Updater");

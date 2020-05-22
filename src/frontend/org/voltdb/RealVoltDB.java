@@ -69,7 +69,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -78,6 +77,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -127,6 +127,7 @@ import org.voltdb.CatalogContext.CatalogInfo;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltDB.UpdatableSiteCoordinationBarrier;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -160,7 +161,6 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -289,6 +289,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
+    private AtomicReference<MeshProber> m_meshProbe = new AtomicReference<MeshProber>();
 
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -380,13 +381,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
-
-    /*
-     * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
-     * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
-     * execute will perform the actual update while the others wait.
-     */
-    private final UpdateBarrier m_catalogUpdateBarrier = new UpdateBarrier();
 
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
@@ -946,8 +940,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         } else {
             if (config.m_pathToLicense == null) {
-                consoleLog.warn("Searching license file in default directories is deprecated in \"voltdb start\" command, "
-                        + "please use --license option in \"voltdb init\".");
                 pair = searchDefaultDirs(config);
                 if (pair.getFirst() == null) {
                     hostLog.fatal("Unable to open license file in default directories");
@@ -1111,7 +1103,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
-            m_catalogUpdateBarrier.setPartyCount(m_nodeSettings.getLocalSitesCount());
 
             // stage deployment, license, schema, and hidden initialization marker file
             // under voltdbroot
@@ -1659,7 +1650,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            ExportManagerInterface.instance().startListeners(m_clientInterface);
+            VoltDB.getExportManager().startListeners(m_clientInterface);
             m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
                     m_config.m_startAction == StartAction.JOIN,
                     // Task manager is read only if db is paused or this is a replica
@@ -1841,8 +1832,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-            TTLManager.initialze();
-            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
+            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, VoltDB.getTTLManager());
             // Start elastic services
             try {
                 if (m_config.m_isEnterprise) {
@@ -2697,21 +2687,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!MiscUtils.isPro()) {
             return;
         }
-        String path = null;
-        try {
-            path = config.m_voltdbRoot.getCanonicalPath();
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to get voltdbroot path", false, e);
-        }
+        String vdbroot = config.m_voltdbRoot.getPath();
         // Don't stage the staged file on top of itself.
-        File destF = new VoltFile(path, Constants.LICENSE_FILE_NAME);
+        File destF = new VoltFile(vdbroot, Constants.LICENSE_FILE_NAME);
         String destPath = destF.getAbsolutePath();
         if (destPath.equals(licensePath)) {
             hostLog.info("License file already staged: " + destPath);
             return;
         }
         // delete the prior license if exists
-        if (config.m_forceVoltdbCreate && destF.exists()) {
+        if (config.m_startAction == StartAction.INITIALIZE && config.m_forceVoltdbCreate && destF.exists()) {
             destF.delete();
         }
         // copy new license to voltdb root
@@ -2721,7 +2706,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Files.copy(licenseF, destF);
                 hostLog.info("License file is copied to VoltDB root directory: " + destPath);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to copy license file to " + path, false, e);
+                VoltDB.crashLocalVoltDB("Unable to copy license file to " + vdbroot, false, e);
             }
         }
     }
@@ -3400,6 +3385,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .missingHostCount(m_config.m_missingHostCount)
                 .build();
 
+        m_meshProbe.set(criteria);
         HostAndPort hostAndPort = criteria.getLeader();
         String hostname = hostAndPort.getHost();
         int port = hostAndPort.getPort();
@@ -3455,6 +3441,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // This is where we wait
         MeshProber.Determination determination = criteria.waitForDetermination();
+        m_meshProbe.set(null);
+        if (determination.startAction == null) {
+            VoltDB.crashLocalVoltDB("Shutdown invoked before Cluster Mesh was established.", false, null);
+        }
 
         // paused is determined in the mesh formation exchanged
         if (determination.paused) {
@@ -3755,7 +3745,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     @Override
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
+        MeshProber criteria = m_meshProbe.get();
+        if (criteria != null) {
+            criteria.abortDetermination();
+        }
         synchronized(m_startAndStopLock) {
+            if (!m_isRunning) {
+                // initialize() was never called or shutdown() was already called
+                // so there is nothing to clean up
+                return true;
+            }
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
@@ -3782,8 +3781,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_taskManager.shutdown();
 
                 //Shutdown import processors.
-                ImportManager.instance().shutdown();
-                TTLManager.instance().shutDown();
+                VoltDB.getImportManager().shutdown();
+                VoltDB.getTTLManager().shutDown();
                 // clear resMonitorWork
                 resMonitorWork = null;
 
@@ -3835,7 +3834,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // shut down Export and its connectors.
-                ExportManagerInterface.instance().shutdown();
+                VoltDB.getExportManager().shutdown();
 
                 // After sites are terminated, shutdown the DRProducer.
                 // The DRProducer is shared by all sites; don't kill it while any site is active.
@@ -3946,7 +3945,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Shut down Export and its connectors.
             // Sync dirty buffer to disk.
-            ExportManagerInterface.instance().shutdown();
+            VoltDB.getExportManager().shutdown();
 
             // At this stage all sites are idle (quiesced and stop accepting new transaction)
             // it's safe to shutdown DR producer
@@ -4143,17 +4142,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requiresNewExportGeneration,
             boolean hasSecurityUserChange)
     {
+        NodeState prevNodeState = null;
         try {
-            m_catalogUpdateBarrier.await();
-        } catch (InterruptedException | BrokenBarrierException e) {
-            throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
-        }
+            /*
+             * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
+             * only performed after all sites reach catalogUpdate(). Once all sites have reached this point the first site to
+             * execute will perform the actual update while the others wait.
+             */
+            final UpdatableSiteCoordinationBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
+            sysProcBarrier.await();
 
-        synchronized (m_catalogUpdateBarrier) {
-            NodeState prevNodeState = m_statusTracker.set(NodeState.UPDATING);
-            try {
+            synchronized (sysProcBarrier) {
                 final ReplicationRole oldRole = getReplicationRole();
 
+                prevNodeState = m_statusTracker.set(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                     if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
                         throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -4211,7 +4213,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                            hasSchemaChange);
 
                 // 1. update the export manager.
-                ExportManagerInterface.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
+                VoltDB.getExportManager().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
                         requiresNewExportGeneration, getPartitionToSiteMap());
 
                 // 1.1 Update the elastic service throughput settings
@@ -4257,7 +4259,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // Update catalog for import processor this should be just/stop start and update partitions.
-                ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
+                VoltDB.getImportManager().updateCatalog(m_catalogContext, m_messenger);
 
                 // 6. Perform updates required by the DR subsystem
 
@@ -4304,7 +4306,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //TTL control works on the host with MPI
                 if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
-                    TTLManager.instance().scheduleTTLTasks();
+                    VoltDB.getTTLManager().scheduleTTLTasks();
                 }
                 // restart resource usage monitoring task
                 startHealthMonitor();
@@ -4314,13 +4316,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 checkThreadsSanity();
 
+                m_statusTracker.set(prevNodeState);
+                prevNodeState = null;
+
                 return m_catalogContext;
-            } finally {
-                // Set node state to what it was on entry
-                //  (still under synchronization)
+            } // end of synchronization on sysProcBarrier
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
+        } finally {
+            // Set state back to what it was, if we did not already do that
+            // TODO: rearrange code so that we do this under sync
+            if (prevNodeState != null) {
                 m_statusTracker.set(prevNodeState);
             }
-        } // end of sync on m_catalogUpdateBarrier
+        }
     }
 
     Map<Integer, Integer> getPartitionToSiteMap() {
@@ -4338,7 +4347,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public CatalogContext settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
     {
-        synchronized (m_catalogUpdateBarrier) {
+        synchronized (m_startAndStopLock) {
             int stamp [] = new int[]{0};
             ClusterSettings expect = m_clusterSettings.get(stamp);
             if (   stamp[0] == expectedVersionId
@@ -4593,10 +4602,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // Allow export datasources to start consuming their binary deques safely
         // as at this juncture the initial truncation snapshot is already complete
-        ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.REJOIN);
+        VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.REJOIN);
 
         //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData();
+        VoltDB.getImportManager().readyForData();
 
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
@@ -4861,10 +4870,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
-            ExportManagerInterface.instance().startPolling(m_catalogContext, StreamStartAction.RECOVER);
+            VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.RECOVER);
 
             //Tell import processors that they can start ingesting data.
-            ImportManager.instance().readyForData();
+            VoltDB.getImportManager().readyForData();
 
             try {
                 if (m_adminListener != null) {
@@ -5291,8 +5300,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         int partitions = getLocalPartitionCount();
         int replicates = m_configuredReplicationFactor;
         int importPartitions = ImportManager.getPartitionsCount();
-        int exportTableCount = ExportManagerInterface.instance().getExportTablesCount();
-        int exportNonceCount = ExportManagerInterface.instance().getConnCount();
+        int exportTableCount = VoltDB.getExportManager().getExportTablesCount();
+        int exportNonceCount = VoltDB.getExportManager().getConnCount();
 
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
 
@@ -5559,7 +5568,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public void processReplicaDecommission(int leaderCount) {
-        synchronized(m_catalogUpdateBarrier) {
+        synchronized(m_startAndStopLock) {
             setMasterOnly();
             if (leaderCount != m_nodeSettings.getLocalActiveSitesCount()) {
                 NavigableMap<String, String> settings = m_nodeSettings.asMap();
@@ -5575,11 +5584,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
                 hostLog.info("Update local active site count to :" + leaderCount);
 
-                // Update the catalog update barrier to expect the new partition count
-                m_catalogUpdateBarrier.setPartyCount(leaderCount);
+                // Update the catalog update and log update barrier to expect the new partition count
+                VoltDB.getSiteCountBarrier().setPartyCount(leaderCount);
 
                 // release export resources
-                ExportManagerInterface.instance().releaseResources(getNonLeaderPartitionIds());
+                VoltDB.getExportManager().releaseResources(getNonLeaderPartitionIds());
                 if (m_commandLog != null) {
                     m_commandLog.notifyDecommissionPartitions(getNonLeaderPartitionIds());
                 }
@@ -5594,26 +5603,4 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         return false;
     }
-
-    /**
-     * Small wrapper class around a {@link CyclicBarrier}. This is used so that operations can synchronize on this
-     * instance and still be able to change the participant count in the barrier
-     */
-    private static final class UpdateBarrier {
-        private CyclicBarrier m_barrier;
-
-        UpdateBarrier() {}
-
-        synchronized void setPartyCount(int parties) {
-            if (m_barrier != null && m_barrier.getNumberWaiting() != 0) {
-                throw new IllegalStateException("Cannot change participant count while parties are waiting");
-            }
-            m_barrier = new CyclicBarrier(parties);
-        }
-
-        void await() throws InterruptedException, BrokenBarrierException {
-            m_barrier.await();
-        }
-    }
 }
-

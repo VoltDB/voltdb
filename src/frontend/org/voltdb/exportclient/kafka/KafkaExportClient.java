@@ -45,7 +45,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
@@ -338,7 +337,7 @@ public class KafkaExportClient extends ExportClientBase {
                 m_csvDecoder = builder.build();
             }
 
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 m_es = CoreUtils.getListeningSingleThreadExecutor(
                         "Kafka Export decoder for partition " +
                                 source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
