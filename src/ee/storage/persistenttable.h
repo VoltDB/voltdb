@@ -1115,7 +1115,14 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
         }
     }
 
-    if (block->isEmpty()) {
+    // XXX REMOVEME XXX
+    if (block->isEmpty() && m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+        VOLT_ERROR("XXX BLOCK %p PENDING SNAPSHOT XXX", block->address());
+    }
+
+    // if the block is empty, release it, unless it is pending snapshot in which case let
+    // the streamer do it
+    if (block->isEmpty() && m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end()) {
         if (m_data.size() > 1 || deleteLastEmptyBlock) {
             // Release the empty block unless it's the only remaining block and caller has requested not to do so.
             // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
@@ -1126,7 +1133,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
            m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
-        vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     } else if (transitioningToBlockWithSpace) {
