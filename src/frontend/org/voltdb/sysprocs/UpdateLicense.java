@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -74,7 +73,7 @@ public class UpdateLicense extends VoltNTSystemProcedure {
                 return constructFailureResponse(vt, "Invalid license format", tmpLicense);
             }
             // Has the new license expired already?
-            Date today = Calendar.getInstance().getTime();
+            Calendar today = Calendar.getInstance();
             if (newLicense.expires().before(today)) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
                 return constructFailureResponse(vt,
