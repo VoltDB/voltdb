@@ -23,16 +23,24 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertNotEquals;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.sql.Date;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
@@ -51,6 +59,7 @@ public class TestVoltTable extends TestCase {
 
     private static final GeographyValue GEOG_VALUE = GeographyValue.fromWKT("POLYGON((0 0, 0 1, -1 1, -1 0, 0 0))");
     private static final GeographyPointValue GEOG_PT_VALUE = GeographyPointValue.fromWKT("POINT(-122.0264 36.9719)");
+    private final RandomTestRule m_random = new RandomTestRule();
 
     @Override
     public void setUp() {
@@ -59,6 +68,7 @@ public class TestVoltTable extends TestCase {
         LONG_FIVE.addRow(5L);
         t = new VoltTable();
         t2 = new VoltTable();
+        m_random.setMethodName(getName());
     }
 
     VoltTable roundTrip(VoltTable t) {
@@ -1562,5 +1572,113 @@ public class TestVoltTable extends TestCase {
                 }
             }
         }
+    }
+
+    /*
+     * Test that checksum and same contents methods generate the expected results for different tables
+     */
+    public void testTableChecksumAndSameContents() {
+        t = new VoltTable(new ColumnInfo[] { new ColumnInfo("1", VoltType.TINYINT),
+                new ColumnInfo("2", VoltType.SMALLINT), new ColumnInfo("3", VoltType.INTEGER),
+                new ColumnInfo("4", VoltType.BIGINT), new ColumnInfo("5", VoltType.STRING) });
+        List<Object[]> rows = new ArrayList<>(1000);
+        for (int i =0;i<1000;++i) {
+            Object[] row = new Object[] { nextValue(Byte.class), nextValue(Short.class), nextValue(Integer.class),
+                    nextValue(Long.class), nextValue(String.class) };
+            t.addRow(row);
+            rows.add(row);
+        }
+
+        // Hashing the same volt table should be equal
+        assertEquals(t.getTableCheckSum(true), t.getTableCheckSum(true));
+        assertEquals(t.getTableCheckSum(false), t.getTableCheckSum(false));
+        assertTrue(t.hasSameContents(t, true));
+        assertTrue(t.hasSameContents(t, false));
+
+        // With header should not equal without header
+        assertNotEquals(t.getTableCheckSum(true), t.getTableCheckSum(false));
+
+        t2 = new VoltTable(t.getTableSchema());
+        t2.addTable(t);
+
+        // Hashing two identical volt tables should be equal
+        assertEquals(t.getTableCheckSum(true), t2.getTableCheckSum(true));
+        assertEquals(t.getTableCheckSum(false), t2.getTableCheckSum(false));
+        assertTrue(t.hasSameContents(t2, true));
+        assertTrue(t.hasSameContents(t2, false));
+
+        t2 = new VoltTable(t.getTableSchema());
+        rows.forEach(t2::addRow);
+
+        // Hashing two identical volt tables should be equal
+        assertEquals(t.getTableCheckSum(true), t2.getTableCheckSum(true));
+        assertEquals(t.getTableCheckSum(false), t2.getTableCheckSum(false));
+        assertTrue(t.hasSameContents(t2, true));
+        assertTrue(t.hasSameContents(t2, false));
+
+        Collections.shuffle(rows);
+
+        t2 = new VoltTable(t.getTableSchema());
+        rows.forEach(t2::addRow);
+
+        // Hashing two tables with different row order should be equal
+        assertEquals(t.getTableCheckSum(true), t2.getTableCheckSum(true));
+        assertEquals(t.getTableCheckSum(false), t2.getTableCheckSum(false));
+        assertTrue(t.hasSameContents(t2, true));
+        assertFalse(t.hasSameContents(t2, false));
+
+        // Add hashes of multiple tables together and make sure it is the same the whole table when headers are not
+        // included
+        VoltTable[] tables = new VoltTable[m_random.nextInt(10) + 2];
+        for (int i = 0; i < tables.length; ++i) {
+            tables[i] = new VoltTable(t.getTableSchema());
+        }
+        Iterator<Object[]> iter = rows.iterator();
+
+        while (iter.hasNext()) {
+            for (int i = 0; i < tables.length && iter.hasNext(); ++i) {
+                tables[i].addRow(iter.next());
+            }
+        }
+
+        assertNotEquals(t.getTableCheckSum(true), getTablesChecksum(tables, true));
+        assertEquals(t.getTableCheckSum(false), getTablesChecksum(tables, false));
+        for (int i = 0; i < tables.length; ++i) {
+            assertFalse(t.hasSameContents(tables[i], true));
+            assertFalse(t.hasSameContents(tables[i], false));
+        }
+    }
+
+    private long getTablesChecksum(VoltTable[] tables, boolean includeHeader) {
+        long result = 0;
+        for (VoltTable table : tables) {
+            result += table.getTableCheckSum(includeHeader);
+        }
+        return result;
+    }
+
+    private Object nextValue(Class<?> clazz) {
+        if (m_random.nextGaussian() < 0.05) {
+            return null;
+        }
+
+        if (clazz == Byte.class) {
+            return (byte) m_random.nextInt();
+        } else if (clazz == Short.class) {
+            return (short) m_random.nextInt();
+        } else if (clazz == Integer.class) {
+            return m_random.nextInt();
+        } else if (clazz == Long.class) {
+            return m_random.nextLong();
+        } else if (clazz == String.class) {
+            return RandomStringUtils.random(m_random.nextInt(4096));
+        } else if (clazz == byte[].class) {
+            byte[] data = new byte[m_random.nextInt(4096)];
+            m_random.nextBytes(data);
+            return data;
+        } else if (clazz == Date.class) {
+            return new Date(m_random.nextLong());
+        }
+        throw new IllegalArgumentException(clazz.getName());
     }
 }
