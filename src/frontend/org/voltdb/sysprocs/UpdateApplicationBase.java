@@ -478,8 +478,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     CompletableFuture<ClientResponse> updateApplication(
             String invocationName, final byte[] operationBytes, final String operationString,
-            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
-            final boolean isPromotion) {
+            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final boolean isPromotion) {
         final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         final CatalogChangeResult ccr;
 
@@ -493,7 +492,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         try {
             ccr = prepareApplicationCatalogDiff(
                     invocationName, operationBytes, operationString, adhocDDLStmts, sqlNodes,
-                    replayHashOverride, isPromotion, getUsername());
+                    null, isPromotion, getUsername());
         } catch (Exception e) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
