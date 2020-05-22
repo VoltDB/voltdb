@@ -33,7 +33,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RestoreAgent;
-
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -567,32 +566,28 @@ class SnapshotLoader {
             for (int p = 0; p < partitionToFiles.size(); p++) {
                 Integer[] relevantPartition = isReplicated ? null : new Integer[]{p};
                 int partitionid = isReplicated ? 16383 : p;
-                TableSaveFile referenceSaveFile = null, compareSaveFile = null;
                 // figure out real hostId;
                 int baseHostId = 0;
                 Matcher matcher = VPTFILE_PATTERN.matcher(partitionToFiles.get(p).get(0).getName());
                 if (matcher.find()) {
                     baseHostId = Integer.parseInt(matcher.group(1));
                 }
-                try {
-                    for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
-                        boolean isConsistent = true;
-                        // figure out real comparing hostId
-                        int compareHostId = target;
-                        Matcher matcher2 = VPTFILE_PATTERN.matcher(partitionToFiles.get(p).get(target).getName());
-                        if (matcher2.find()) {
-                            compareHostId = Integer.parseInt(matcher2.group(1));
-                        }
+                for (int target = 1; target < partitionToFiles.get(p).size(); target++) {
+                    boolean isConsistent = true;
+                    // figure out real comparing hostId
+                    int compareHostId = target;
+                    Matcher matcher2 = VPTFILE_PATTERN.matcher(partitionToFiles.get(p).get(target).getName());
+                    if (matcher2.find()) {
+                        compareHostId = Integer.parseInt(matcher2.group(1));
+                    }
 
-
-                        referenceSaveFile =
-                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(0)),
-                                        1, relevantPartition);
-                        compareSaveFile =
-                                new TableSaveFile(new FileInputStream(partitionToFiles.get(p).get(target)),
-                                        1, relevantPartition);
+                    long refCheckSum = 0l, compCheckSum = 0l;
+                    try (TableSaveFile referenceSaveFile = new TableSaveFile(
+                            new FileInputStream(partitionToFiles.get(p).get(0)), 1, relevantPartition);
+                            TableSaveFile compareSaveFile = new TableSaveFile(
+                                    new FileInputStream(partitionToFiles.get(p).get(target)), 1, relevantPartition)) {
                         DBBPool.BBContainer cr = null, cc = null;
-                        long refCheckSum = 0l, compCheckSum = 0l;
+
                         while (referenceSaveFile.hasMoreChunks() && compareSaveFile.hasMoreChunks()) {
                             // skip chunk for irrelevant partition
                             cr = referenceSaveFile.getNextChunk();
@@ -601,19 +596,17 @@ class SnapshotLoader {
                             if (cr == null && cc == null) { // both reached EOF
                                 break;
                             }
-
-                            // TODO: chunk not aligned?
-                            if (cr != null && cc == null) {
-                                isConsistent = false;
-                                System.err.println("Reference file still contain chunks while comparing file does not");
-                                break;
-                            }
-                            if (cr == null && cc != null) {
-                                isConsistent = false;
-                                System.err.println("Comparing file still contain chunks while reference file does not");
-                                break;
-                            }
                             try {
+                                // TODO: chunk not aligned?
+                                if (cr != null && cc == null) {
+                                    System.err.println("Reference file still contain chunks while comparing file does not");
+                                    break;
+                                }
+                                if (cr == null && cc != null) {
+                                    System.err.println("Comparing file still contain chunks while reference file does not");
+                                    break;
+                                }
+
                                 final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
                                 final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 if (orderLevel >= 2) {
@@ -682,25 +675,8 @@ class SnapshotLoader {
                                     + " is inconsistent between host" + baseHostId + " with host" + compareHostId + " on partition "
                                     + partitionid);
                         }
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    if (referenceSaveFile != null) {
-                        try {
-                            referenceSaveFile.close();
-                        } catch (IOException e) {
-                            System.err.println("Exception for closing reference file " + referenceSaveFile);
-                            e.printStackTrace();
-                        }
-                    }
-                    if (compareSaveFile != null) {
-                        try {
-                            compareSaveFile.close();
-                        } catch (IOException e) {
-                            System.err.println("Exception for closing compare file " + referenceSaveFile);
-                            e.printStackTrace();
-                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
             }
