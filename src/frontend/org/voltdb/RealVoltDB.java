@@ -4318,7 +4318,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 m_statusTracker.set(prevNodeState);
                 prevNodeState = null;
-        
+
                 return m_catalogContext;
             } // end of synchronization on sysProcBarrier
         } catch (InterruptedException | BrokenBarrierException e) {
@@ -5604,4 +5604,3 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return false;
     }
 }
-
