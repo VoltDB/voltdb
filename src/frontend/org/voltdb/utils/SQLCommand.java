@@ -1221,6 +1221,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
         Procedures.put("@UpdateLogging",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@UpdateLicense",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Ping",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
         Procedures.put("@Promote",

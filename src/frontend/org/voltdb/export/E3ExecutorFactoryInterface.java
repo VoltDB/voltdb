@@ -15,23 +15,28 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb.export;
 
-import java.lang.Thread.UncaughtExceptionHandler;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB;
+public interface E3ExecutorFactoryInterface {
+    /**
+     * Get an executor for an {@link E3ExportDataSource} identified by partitionId and tableName
+     *
+     * @param partitionId
+     * @return {@link ListeningExecutorService} allocated
+     */
+    public ListeningExecutorService getExecutor(int partitionId);
 
-public class VoltUncaughtExceptionHandler implements UncaughtExceptionHandler {
+    /**
+     * Free an executor used by an export data source identified by partitionId and tableName
+     *
+     * @param partitionId
+     */
+    public void freeExecutor(int partitionId);
 
-    // As near as I can tell this holds a reference to the VoltLogger so that
-    // log submits during a failure don't throw rejected execution exceptions.
-    private final VoltLogger log = new VoltLogger("HOST");
-
-        @Override
-    public void uncaughtException(Thread t, Throwable e) {
-        VoltDB.crashLocalVoltDB("VoltDB has encountered an unrecoverable error and is exiting."
-                + "\nThe log may contain additional information.", true, e);
-    }
-
+    /**
+     * Shutdown all the executors
+     */
+    public void shutdown();
 }

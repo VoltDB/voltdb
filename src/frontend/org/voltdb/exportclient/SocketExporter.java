@@ -39,7 +39,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
@@ -132,7 +131,7 @@ public class SocketExporter extends ExportClientBase {
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 m_es =
                         CoreUtils.getListeningSingleThreadExecutor(
                                 "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);

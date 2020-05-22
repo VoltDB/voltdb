@@ -33,7 +33,6 @@ import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;

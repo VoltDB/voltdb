@@ -143,13 +143,14 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        VoltDB.initialize(m_config);
+        VoltDB.resetSingletonsForTest();
+        VoltDB.initialize(m_config, true);
         VoltDB.instance().run();
     }
 
     //Call this if you are doing init only or action GET
     public void initialize() {
-        VoltDB.initialize(m_config);
+        VoltDB.initialize(m_config, true);
     }
 
     //Call this if you are doing init only or action GET
@@ -184,10 +185,17 @@ public class ServerThread extends Thread {
     public void shutdown() throws InterruptedException {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
+        VoltDB.replaceVoltDBInstanceForTest(new RealVoltDB());
         this.join();
         while (VoltDB.instance().isRunning()) {
             Thread.sleep(1);
         }
+    }
+
+    // For TestStartActionWithLicenseOption only, that test want to validate given
+    // license file instead of the default file.
+    public void ignoreDefaultLicense() {
+        m_config.m_pathToLicense = null;
     }
 
     /**

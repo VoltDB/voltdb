@@ -764,7 +764,7 @@ public class ExportGeneration implements Generation {
         //Do closings outside the synchronized block
         for (ExportDataSource source : doneSources) {
             exportLog.info("Finished processing " + source);
-            ExportManagerInterface.instance().onClosingSource(source.getTableName(), source.getPartitionId());
+            VoltDB.getExportManager().onClosingSource(source.getTableName(), source.getPartitionId());
             source.closeAndDelete();
         }
     }
@@ -803,7 +803,7 @@ public class ExportGeneration implements Generation {
         }
 
         //Do closing outside the synchronized block.
-        ExportManagerInterface.instance().onClosingSource(tableName, partitionId);
+        VoltDB.getExportManager().onClosingSource(tableName, partitionId);
         source.closeAndDelete();
 
     }

@@ -563,7 +563,7 @@ public class ExportManager implements ExportManagerInterface
         if (bufferPtr != 0) {
             DBBPool.registerUnsafeMemory(bufferPtr);
         }
-        ExportManagerInterface instance = ExportManagerInterface.instance();
+        ExportManagerInterface instance = VoltDB.getExportManager();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
                 tupleCount, uniqueId, buffer);
@@ -629,7 +629,7 @@ public class ExportManager implements ExportManagerInterface
 
     private static void syncSources() {
 
-        Generation generation = ExportManagerInterface.instance().getGeneration();
+        Generation generation = VoltDB.getExportManager().getGeneration();
         if (generation != null) {
             generation.sync();
         }
