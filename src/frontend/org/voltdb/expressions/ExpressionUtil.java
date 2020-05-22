@@ -41,6 +41,7 @@ import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.QuantifierType;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Lists;
 
 /**
@@ -48,26 +49,35 @@ import com.google_voltpatches.common.collect.Lists;
  */
 public final class ExpressionUtil {
 
-    private static Map<String, ExpressionType> mapOfVoltXMLOpType = new HashMap<String, ExpressionType>() {{
-       put("or", ExpressionType.CONJUNCTION_OR);
-       put("and", ExpressionType.CONJUNCTION_AND);
-       put("greaterthan", ExpressionType.COMPARE_GREATERTHAN);
-       put("lessthan", ExpressionType.COMPARE_LESSTHAN);
-       put("greaterthanorequalto", ExpressionType.COMPARE_GREATERTHANOREQUALTO);
-       put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
-       put("equal", ExpressionType.COMPARE_EQUAL);
-       put("notequal", ExpressionType.COMPARE_NOTEQUAL);
-       put("notdistinct", ExpressionType.COMPARE_NOTDISTINCT);
-       put("in", ExpressionType.COMPARE_IN);
-       put("not", ExpressionType.OPERATOR_NOT);
-       put("exists", ExpressionType.OPERATOR_EXISTS);
-       put("add", ExpressionType.OPERATOR_PLUS);
-       put("subtract", ExpressionType.OPERATOR_MINUS);
-       put("multiply", ExpressionType.OPERATOR_MULTIPLY);
-       put("divide", ExpressionType.OPERATOR_DIVIDE);
-       put("is_null", ExpressionType.OPERATOR_IS_NULL);
-       put("like", ExpressionType.COMPARE_LIKE);
-    }};
+    private static final Map<String, ExpressionType> mapOfVoltXMLOpType = ImmutableMap.<String, ExpressionType>builder()
+           // Conjunctions
+           .put("or", ExpressionType.CONJUNCTION_OR)
+           .put("and", ExpressionType.CONJUNCTION_AND)
+
+           // Compares
+           .put("equal", ExpressionType.COMPARE_EQUAL)
+           .put("notequal", ExpressionType.COMPARE_NOTEQUAL)
+           .put("lessthan", ExpressionType.COMPARE_LESSTHAN)
+           .put("greaterthan", ExpressionType.COMPARE_GREATERTHAN)
+           .put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO)
+           .put("greaterthanorequalto", ExpressionType.COMPARE_GREATERTHANOREQUALTO)
+           .put("like", ExpressionType.COMPARE_LIKE)
+           .put("startswith", ExpressionType.COMPARE_STARTSWITH)
+           .put("in", ExpressionType.COMPARE_IN)
+           .put("notdistinct", ExpressionType.COMPARE_NOTDISTINCT)
+
+           // Operators
+           .put("add", ExpressionType.OPERATOR_PLUS)
+           .put("subtract", ExpressionType.OPERATOR_MINUS)
+           .put("multiply", ExpressionType.OPERATOR_MULTIPLY)
+           .put("divide", ExpressionType.OPERATOR_DIVIDE)
+           .put("concat", ExpressionType.OPERATOR_CONCAT)
+           .put("mod", ExpressionType.OPERATOR_MOD)
+           .put("cast", ExpressionType.OPERATOR_CAST)
+           .put("not", ExpressionType.OPERATOR_NOT)
+           .put("is_null", ExpressionType.OPERATOR_IS_NULL)
+           .put("exists", ExpressionType.OPERATOR_EXISTS)
+           .put("negate", ExpressionType.OPERATOR_UNARY_MINUS).build();
 
     private ExpressionUtil() {}
 
@@ -88,7 +98,7 @@ public final class ExpressionUtil {
         } else {
             assert name.equals("operation") : "unknown VoltXMLElement type: " + name;
             final ExpressionType op = mapOfVoltXMLOpType.get(elm.attributes.get("optype"));
-            assert op != null;
+            assert op != null : "No operation of type: " + elm.attributes.get("optype");
             switch (op) {
                 case CONJUNCTION_OR:                    // two operators
                 case CONJUNCTION_AND:
@@ -99,6 +109,7 @@ public final class ExpressionUtil {
                 case COMPARE_NOTDISTINCT:
                 case COMPARE_GREATERTHANOREQUALTO:
                 case COMPARE_LESSTHANOREQUALTO:
+                case COMPARE_STARTSWITH:
                 case OPERATOR_PLUS:
                 case OPERATOR_MINUS:
                 case OPERATOR_MULTIPLY:
@@ -112,9 +123,10 @@ public final class ExpressionUtil {
                 case OPERATOR_EXISTS:
                 case OPERATOR_NOT:
                 case OPERATOR_UNARY_MINUS:
+                case OPERATOR_CAST:
                     return isParameterized(elm.children.get(0));
                 default:
-                    assert false;
+                    assert false : op;
                     return false;
             }
         }
@@ -179,6 +191,7 @@ public final class ExpressionUtil {
                 case OPERATOR_CONCAT:
                 case OPERATOR_MOD:
                 case COMPARE_IN:
+                case COMPARE_STARTSWITH:
                     final VoltXMLElement left = elm.children.get(0), right = elm.children.get(1);
                     return isParameterized(left) ? getType(db, right) : getType(db, left);
                 case OPERATOR_UNARY_MINUS:
@@ -187,7 +200,7 @@ public final class ExpressionUtil {
                 case OPERATOR_EXISTS:
                     return "";
                 default:
-                    assert false;
+                    assert false : op;
                     return "";
             }
         }
@@ -265,7 +278,8 @@ public final class ExpressionUtil {
                         case COMPARE_NOTDISTINCT:
                         case COMPARE_GREATERTHANOREQUALTO:
                         case COMPARE_LESSTHANOREQUALTO:
-                        case COMPARE_LIKE: {
+                        case COMPARE_LIKE:
+                        case COMPARE_STARTSWITH: {
                             final ComparisonExpression expr = new ComparisonExpression(op,
                                     from(db, elm.children.get(0), hint),
                                     from(db, elm.children.get(1), hint));
@@ -292,25 +306,12 @@ public final class ExpressionUtil {
                             return expr;
                         }
                         default:
-                            assert false;
+                            assert false : op;
                     }
                 default:
                     assert false;
             }
             return null;
-        }
-    }
-
-    // A terminal node of an expression is the one that does not have left/right child, nor any parameters (null / 0 parameter);
-    private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
-        if (expr != null) {
-            collectTerminals(expr.getLeft(), accum);
-            collectTerminals(expr.getRight(), accum);
-            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
-                expr.getArgs().forEach(e -> collectTerminals(e, accum));
-            } else if (expr.getLeft() == null && expr.getRight() == null) {
-                accum.add(expr);
-            }
         }
     }
 

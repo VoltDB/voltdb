@@ -171,7 +171,7 @@ public class TestPauselessRejoinFuzz extends RejoinTestBase {
                                 haveFailed.set(true);
                                 break;
                             }
-                            if (cluster.recoverOne( dead, toConnectTo, "", true)) {
+                            if (cluster.recoverOne( dead, toConnectTo, true)) {
                                 break;
                             }
                             attempts++;
@@ -281,7 +281,7 @@ public class TestPauselessRejoinFuzz extends RejoinTestBase {
                                     haveFailed.set(true);
                                     break;
                                 }
-                                if (cluster.recoverOne( recover, toConnectTo, "", true)) {
+                                if (cluster.recoverOne( recover, toConnectTo, true)) {
                                     break;
                                 }
                                 attempts++;
