@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google_voltpatches.common.base.Preconditions;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
-import sun.misc.Cleaner;
+import org.voltcore.utils.VoltUnsafe;
 import sun.nio.ch.DirectBuffer;
 
 #ifndef NO_MEMCHECK
@@ -45,6 +45,7 @@ public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
     private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
+
 #ifndef NO_MEMCHECK
 
     static {
@@ -234,6 +235,26 @@ public final class DBBPool {
         public final void discard() {
             final ByteBuffer buf = checkDoubleFree();
             DBBPool.cleanByteBuffer(buf);
+        }
+    }
+
+    /**
+     * Wrapper for native allocated direct memory
+     *
+     */
+    public static final class NDBBWrapperContainer extends BBContainer {
+        private NDBBWrapperContainer(ByteBuffer b) {
+            super( b );
+        }
+
+        @Override
+        public final void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            if (buf == null || !buf.isDirect()) {
+               return;
+            }
+            final DirectBuffer dbuf = (DirectBuffer) buf;
+            deleteCharArrayMemory(dbuf.address());
         }
     }
 
@@ -544,7 +565,7 @@ public final class DBBPool {
     private static native void nativeDeleteCharArrayMemory(long pointer);
 
     public static BBContainer allocateUnsafeByteBuffer(long size) {
-        final BBContainer retcont = DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
+        final BBContainer retcont = new NDBBWrapperContainer(nativeAllocateUnsafeByteBuffer(size));
 #ifdef MEMCHECK_FULL
         final long pointer = retcont.address();
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
@@ -566,11 +587,12 @@ public final class DBBPool {
      * called deleteCharArrayMemory on the address
      */
     private static void cleanByteBuffer(ByteBuffer buf) {
-        if (buf == null) return;
-        if (!buf.isDirect()) return;
+        if (buf == null || !buf.isDirect()) {
+            return;
+        }
         final DirectBuffer dbuf = (DirectBuffer) buf;
-        final Cleaner cleaner = dbuf.cleaner();
-        if (cleaner != null) cleaner.clean();
-        else deleteCharArrayMemory(dbuf.address());
+        if (!VoltUnsafe.cleanDirectBuffer(buf)) {
+            deleteCharArrayMemory(dbuf.address());
+        }
     }
 }

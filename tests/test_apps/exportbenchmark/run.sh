@@ -94,7 +94,7 @@ function server() {
     cp exportbenchmark-exporter.jar ${VOLTDB_LIB}/extension
 
     # Set up options
-    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+    VOLTDB_OPTS="-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
     [[ -d log && -w log ]] && > log/volt.log
     # run the server

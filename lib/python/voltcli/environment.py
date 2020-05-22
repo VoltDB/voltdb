@@ -99,7 +99,6 @@ java_opts.append('-Dsun.net.inetaddr.ttl=300')
 java_opts.append('-Dsun.net.inetaddr.negative.ttl=3600')
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
-java_opts.append('-XX:+UseParNewGC')
 java_opts.append('-XX:+UseConcMarkSweepGC')
 java_opts.append('-XX:+CMSParallelRemarkEnabled')
 java_opts.append('-XX:+UseTLAB')
@@ -114,9 +113,16 @@ java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
 java_opts.append('-XX:+CMSClassUnloadingEnabled')
 
-# skip PermSize in Java 8
-if "1.8" not in java_version:
+# skip PermSize in Java 8 and above
+if "1.7" in java_version:
     java_opts.append('-XX:PermSize=64m')
+
+# Suppress Illegal reflective access warning
+if "11." in java_version:
+    java_opts.extend(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.net=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.nio=ALL-UNNAMED'])
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
