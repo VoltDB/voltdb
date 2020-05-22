@@ -938,8 +938,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         } else {
             if (config.m_pathToLicense == null) {
-                consoleLog.warn("Searching license file in default directories is deprecated in \"voltdb start\" command, "
-                        + "please use --license option in \"voltdb init\".");
                 pair = searchDefaultDirs(config);
                 if (pair.getFirst() == null) {
                     hostLog.fatal("Unable to open license file in default directories");
@@ -2661,15 +2659,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!MiscUtils.isPro()) {
             return;
         }
-        String path = null;
-        try {
-            path = config.m_voltdbRoot.getCanonicalPath();
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to get voltdbroot path", false, e);
+        String vdbroot = config.m_voltdbRoot.getPath();
+        // Don't stage the staged file on top of itself.
+        File destF = new VoltFile(vdbroot, Constants.LICENSE_FILE_NAME);
+        String destPath = destF.getAbsolutePath();
+        if (destPath.equals(licensePath)) {
+            hostLog.info("License file already staged: " + destPath);
+            return;
         }
         // delete the prior license if exists
-        File destF = new VoltFile(path, Constants.LICENSE_FILE_NAME);
-        if (config.m_forceVoltdbCreate && destF.exists()) {
+        if (config.m_startAction == StartAction.INITIALIZE && config.m_forceVoltdbCreate && destF.exists()) {
             destF.delete();
         }
         // copy new license to voltdb root
@@ -2677,9 +2676,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File licenseF = new File(licensePath);
             try {
                 Files.copy(licenseF, destF);
-                hostLog.info("License file is copied to VoltDB root directory: " + destF.getAbsolutePath());
+                hostLog.info("License file is copied to VoltDB root directory: " + destPath);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to copy license file to " + path, false, e);
+                VoltDB.crashLocalVoltDB("Unable to copy license file to " + vdbroot, false, e);
             }
         }
     }
