@@ -167,7 +167,6 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
-import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.RejoinProducer;
@@ -1941,39 +1940,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
-        MigratePartitionLeaderInfo info = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
-        if (info == null) {
+        MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
+        if (migratePartitionLeaderInfo == null) {
             return;
         }
 
-        final int oldHostId = info.getOldLeaderHostId();
-        final int newHostId = info.getNewLeaderHostId();
+        final int oldHostId = migratePartitionLeaderInfo.getOldLeaderHostId();
+        final int newHostId = migratePartitionLeaderInfo.getNewLeaderHostId();
 
         //The host which initiates MigratePartitionLeader is down before it gets chance to notify new leader that
         //all sp transactions are drained.
         //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
         if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
-            Initiator initiator = m_iv2Initiators.get(info.getPartitionId());
+            Initiator initiator = m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
             hostLog.info("The host that initiated @MigratePartitionLeader possibly went down before migration completed. Reset MigratePartitionLeader status on "
                           + CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
             ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
         } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
+            //The new leader is down, on old leader host:
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
-            // When leader is migrated to a new host, the new host could fail before leader appointer get chance to elect a new leader
-            // since leader appointer still sees the original leader and its appointee. Under this race condition, leader appointer takes not action.
-            // Unfortunately original initiator has marked itself as non-leader, the partition could end up without a leader.
-            // In this case, reset original leader.
-            String masterPair = Long.toString(info.getOldLeaderHsid()) +
-                    "/" + Long.toString(info.getOldLeaderHsid());
-            try {
-                LeaderCache appointee = new LeaderCache(m_messenger.getZK(),
-                        "migartion-" + info.getPartitionId(), VoltZK.iv2appointees);
-                appointee.put(info.getPartitionId(), masterPair);
-                hostLog.info("reinstate master for partition " + info.getPartitionId() + " to " + CoreUtils.hsIdToString(info.getOldLeaderHsid()));
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to appoint new master", true, e);
-            }
         }
     }
 
@@ -5363,4 +5349,3 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 }
-
