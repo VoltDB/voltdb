@@ -1419,6 +1419,7 @@ public final class InvocationDispatcher {
                     uniqueId,
                     isReadOnly,
                     isSinglePartition,
+                    isEveryPartition,
                     (partitions == null) || (partitions.length < 2) ? null : partitions,
                     invocation,
                     handle,
