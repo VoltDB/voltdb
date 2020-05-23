@@ -332,7 +332,7 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
                 m_jsonStringDecoder = builder.build();
                 m_entityDecoder = null;
             }
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 // TODO: how to make it named unique
                 m_es = CoreUtils.getListeningSingleThreadExecutor(
                         "Elastic Export Decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);

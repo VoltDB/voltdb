@@ -519,6 +519,12 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             long mprows = vt.asScalarLong();
             client.drain();
 
+            File tempDir = new File(TMPDIR);
+            if (!tempDir.exists()) {
+                assertTrue(tempDir.mkdirs());
+            }
+            deleteTestFiles(TESTNONCE);
+
             System.out.println("Saving snapshot...");
             ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
             vt = resp.getResults()[0];

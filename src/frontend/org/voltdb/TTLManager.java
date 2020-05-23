@@ -193,29 +193,12 @@ public class TTLManager extends StatsSource{
     }
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private ScheduledThreadPoolExecutor m_timeToLiveExecutor;
-    private static volatile TTLManager m_self;
     private final Map<String, TTLTask> m_tasks = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> m_futures = new ConcurrentHashMap<>();
     private final Map<String, TTLStats> m_stats = new ConcurrentHashMap<>();
 
-    public static void initialze() {
-        if (m_self == null) {
-            synchronized (TTLManager.class) {
-                if (m_self == null) {
-                    m_self = new TTLManager();
-                }
-            }
-        }
-    }
-
-    private TTLManager() {
+    TTLManager() {
         super(false);
-    }
-
-    public static TTLManager instance() {
-        //could be called before initialized.
-        initialze();
-        return m_self;
     }
 
     /**

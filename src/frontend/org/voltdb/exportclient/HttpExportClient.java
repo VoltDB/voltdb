@@ -104,7 +104,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.util.Objects;
 
 import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 
 import static org.voltdb.utils.HDFSUtils.OctetStreamContentTypeHeader;
@@ -916,7 +915,7 @@ public class HttpExportClient extends ExportClientBase {
             }
 
             m_exportPath = null;
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 m_es = CoreUtils.getListeningSingleThreadExecutor(
                         "HTTP Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
             } else {

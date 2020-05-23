@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.voltdb.ExportStatsBase;
+import org.voltdb.VoltDB;
 
 /**
  * @author rdykiel
@@ -37,7 +38,7 @@ public class ExportStats extends ExportStatsBase {
 
     @Override
     public Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        m_stats = ExportManagerInterface.instance().getStats(interval);
+        m_stats = VoltDB.getExportManager().getStats(interval);
         return buildIterator();
     }
 

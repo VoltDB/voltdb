@@ -646,7 +646,7 @@ public class ExportToFileClient extends ExportClientBase {
                 try {
                     // TODO: if same export client is getting used, unregisterSelf(not implemented) during generation change
                     registerSelf(row);
-                    if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC && m_es == null) {
+                    if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC && m_es == null) {
                         ListeningExecutorService executor = m_decoderExecutor.get(row.tableName);
                         if (executor == null) {
                             executor = CoreUtils.getListeningSingleThreadExecutor(

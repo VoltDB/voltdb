@@ -149,7 +149,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         m_serverSocket.verifyExportedTuples(50);
 
         config.killSingleHost(1);
-        config.recoverOne(1, 0, "");
+        config.recoverOne(1, 0);
         Thread.sleep(2000);
         insertSql = new StringBuilder();
         for (int i=50;i<100;i++) {
@@ -162,7 +162,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         m_serverSocket.verifyExportedTuples(100);
 
         config.killSingleHost(2);
-        config.recoverOne(2, 0, "");
+        config.recoverOne(2, 0);
         Thread.sleep(2000);
         insertSql = new StringBuilder();
         for (int i=100;i<150;i++) {
@@ -176,7 +176,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
 
         //Kill host with all masters now.
         config.killSingleHost(0);
-        config.recoverOne(0, 1, "");
+        config.recoverOne(0, 1);
         Thread.sleep(4000);
         client = ClientFactory.createClient(cconfig);
         client.createConnection("localhost", config.port(0));

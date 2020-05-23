@@ -49,7 +49,7 @@ def repoCheckout(repo, treeish):
 # CHECKOUT CODE INTO A TEMP DIR
 ################################################
 
-def checkoutCode(voltdbGit, proGit, rbmqExportGit, gitloc):
+def checkoutCode(voltdbGit, proGit, gitloc):
     global buildir
     # clean out the existing dir
     run("rm -rf " + builddir)
@@ -70,13 +70,6 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit, gitloc):
             checkout_succeeded = repoCheckout(repo, proGit)
             if not checkout_succeeded:
                 message += "\nCheckout of '%s' from %s repository failed." % (proGit, repo)
-
-        if rbmqExportGit:
-            #rabbitmq isn't mirrored internally, so always go out to github
-            repo = "git@github.com:VoltDB/export-rabbitmq.git"
-            checkout_succeeded = repoCheckout(repo, rbmqExportGit)
-            if not checkout_succeeded:
-                message += "\nCheckout of '%s' from %s repository failed." % (rbmqExportGit, repo)
 
         if len(message) > 0:
             abort(message)
@@ -135,40 +128,6 @@ def buildEnterprise(version):
         clean dist.pro" \
             % (defaultlicensedays, licensee, packageMacLib, build_args))
 
-################################################
-# BUILD THE PRO VERSION
-################################################
-
-#
-
-################################################
-# BUILD THE RABBITMQ EXPORT CONNECTOR
-################################################
-#Build rabbit MQ Exporter
-def buildRabbitMQExport(version, dist_type):
-    # Paths to the final kit for unpacking/repacking with rmq export
-    paths = {
-        'community': builddir + "/voltdb/obj/release",
-        'ent' : builddir + "/pro/obj/pro/"
-        }
-    # Untar
-    with cd(paths[dist_type]):
-        run ("pwd")
-        run ("mkdir -p restage")
-        run ("tar xf voltdb-%s-%s.tar.gz -C restage" % (dist_type, version))
-        run ("rm -f voltdb-%s-%s.tar.gz" % (dist_type, version))
-
-    # Build RabbitMQ export jar and put it into the untarred kit
-    with cd(builddir + "/export-rabbitmq"):
-        run("pwd")
-        run("git status")
-        run("VOLTDIST=%s/restage/voltdb-%s-%s ant" % (paths[dist_type], dist_type, version))
-
-    # Retar
-    with cd(paths[dist_type]):
-        run("pwd")
-        run("tar -C restage -czf voltdb-%s-%s.tar.gz voltdb-%s-%s" % (dist_type, version, dist_type, version))
-        run ("rm -Rf restage")
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
@@ -302,15 +261,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Create a full kit. With no args, will do build of master")
     parser.add_argument('voltdb_sha', nargs="?", default="master", help="voltdb repository commit, tag or branch" )
     parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository commit, tag or branch" )
-    parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
     parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
     parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
     parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
     args = parser.parse_args()
 
+
     proTreeish = args.pro_sha
     voltdbTreeish = args.voltdb_sha
-    rbmqExportTreeish = args.rabbitmq_sha
 
     print args
 
@@ -348,7 +306,7 @@ if __name__ == "__main__":
     if build_mac or build_community:
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-                versionMac = checkoutCode(voltdbTreeish, None, None, args.gitloc)
+                versionMac = checkoutCode(voltdbTreeish, None, args.gitloc)
                 buildCommunity(ee_only=True)
         except Exception as e:
             print traceback.format_exc()
@@ -358,7 +316,7 @@ if __name__ == "__main__":
     # build kits on 15f
     try:
         with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-            versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
+            versionCentos = checkoutCode(voltdbTreeish, proTreeish, args.gitloc)
             if build_mac:
                 assert versionCentos == versionMac
 
@@ -371,12 +329,10 @@ if __name__ == "__main__":
             #print "VERSION: " + versionCentos
             if build_community:
                 buildCommunity()
-                buildRabbitMQExport(versionCentos, "community")
                 copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
                 makeMavenJars()
                 copyMavenJarsToReleaseDir(releaseDir, versionCentos)
             buildEnterprise(versionCentos)
-            buildRabbitMQExport(versionCentos, "ent")
             makeSHA256SUM(versionCentos,"ent")
             copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
             licensefile = makeTrialLicense(licensee="VoltDB Internal Use Only " + versionCentos)

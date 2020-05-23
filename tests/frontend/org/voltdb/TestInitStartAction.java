@@ -57,12 +57,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+import org.voltdb_testprocs.fakeusecase.greetings.GetGreetingBase;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.io.CharStreams;
 import com.google_voltpatches.common.reflect.ClassPath;
 import com.google_voltpatches.common.reflect.ClassPath.ClassInfo;
-import org.voltdb_testprocs.fakeusecase.greetings.GetGreetingBase;
 
 /** Tests starting the server with init + start without a schema,
  * and 'init --schema --classes'.

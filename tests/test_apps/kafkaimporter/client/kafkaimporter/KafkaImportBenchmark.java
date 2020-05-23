@@ -169,7 +169,7 @@ public class KafkaImportBenchmark {
         String password = "";
 
         @Option(desc = "Enable topology awareness")
-        boolean topologyaware = false;
+        boolean topologyaware = true;
 
         @Override
         public void validate() {

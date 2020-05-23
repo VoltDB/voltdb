@@ -78,6 +78,8 @@ public class Shutdown extends VoltSystemProcedure {
                                            SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_shutdownSync) {
             VoltDB.instance().getHostMessenger().prepareForShutdown();
+            // If this is executed on the LocalServerThread, the static will cause problems for subsequent tests.
+            assert(!VoltDB.instanceOnServerThread());
             if (!m_failsafeArmed.getAndSet(true)) {
                 m_failsafe.start();
                 VoltLogger voltLogger = new VoltLogger("HOST");

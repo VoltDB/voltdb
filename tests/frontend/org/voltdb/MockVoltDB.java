@@ -913,6 +913,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public void updateLicenseApi(LicenseApi newLicense) { }
+
+    @Override
     public String getLicenseInformation() {
         return "";
     }

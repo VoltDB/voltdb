@@ -336,7 +336,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         cluster.killSingleHost(0);
-        cluster.recoverOne( 0, 1, "");
+        cluster.recoverOne( 0, 1);
 
         cluster.shutDown();
     }
@@ -741,7 +741,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         // shutdown and rejoin a node
         cluster.killSingleHost(1);
-        assertTrue(cluster.recoverOne(1, 0, ""));
+        assertTrue(cluster.recoverOne(1, 0));
 
         // reuse the previous client to do a snapshot save
         response = client.callProcedure("@SnapshotSave", snapshotDir, "testnonce", (byte) 1);
@@ -969,7 +969,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         config.m_isRejoinTest = true;
         cluster.setPortsFromConfig(0, config);
-        cluster.recoverOne(0, 1, "");
+        cluster.recoverOne(0, 1);
 
         Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
@@ -1063,7 +1063,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_isRejoinTest = true;
         cluster.setPortsFromConfig(0, config);
 
-        cluster.recoverOne(0, 1, "");
+        cluster.recoverOne(0, 1);
 
         Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
@@ -1119,7 +1119,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             }
             for (int i = 0; i < 2; ++i) {
                 lc.killSingleHost(i);
-                lc.recoverOne(i, (i + 1) % 2, "");
+                lc.recoverOne(i, (i + 1) % 2);
             }
 
             client.close();
@@ -1157,7 +1157,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             Client client = lc.createClient(new ClientConfig());
             client.callProcedure("@SnapshotSave", "{nonce:\"mydb\",block:true,format:\"csv\"}");
 
-            assertFalse(lc.recoverOne(1, 0, ""));
+            assertFalse(lc.recoverOne(1, 0));
         } finally {
             lc.shutDown();
         }

@@ -51,16 +51,6 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                     true, e);
         }
         Logger.getRootLogger().setResourceBundle(rb);
-
-        // Make the LogManager shutdown hook the last thing to be done,
-        // so that we'll get logging from any other shutdown behavior.
-        ShutdownHooks.registerFinalShutdownAction(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        LogManager.shutdown();
-                    }
-                });
     }
 
 
@@ -191,6 +181,16 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      * @param logRootDH log directory root
      */
     public static void setFileLoggerRoot(File logRootDH) {
+
+        // Make the LogManager shutdown hook the last thing to be done,
+        // so that we'll get logging from any other shutdown behavior.
+        ShutdownHooks.registerFinalShutdownAction(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        LogManager.shutdown();
+                    }
+                });
         if (System.getProperty("log4j.configuration", "").toLowerCase().contains("/voltdb/tests/")) {
             return;
         }

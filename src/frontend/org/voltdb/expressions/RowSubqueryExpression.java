@@ -49,7 +49,7 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
             collectParameterValueExpressions(expr, pves);
         }
         String tableName = AbstractParsedStmt.TEMP_TABLE_NAME + "_" + m_subqueryId;
-        m_subqueryNode = new TupleScanPlanNode(tableName, pves);
+        setSubqueryNode(new TupleScanPlanNode(tableName, pves));
     }
 
     @Override
