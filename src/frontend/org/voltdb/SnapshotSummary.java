@@ -25,6 +25,7 @@ import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotStatus.SnapshotResult;
+import org.voltdb.SnapshotStatus.SnapshotType;
 import org.voltdb.SnapshotStatus.SnapshotTypeChecker;
 import org.voltdb.SnapshotStatus.StatusIterator;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -141,11 +142,12 @@ public class SnapshotSummary extends StatsSource {
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
         Pair<Snapshot, SnapshotResult> p = (Pair<Snapshot, SnapshotResult>) rowKey;
         Snapshot s = p.getFirst();
+        SnapshotType type = m_typeChecker.getSnapshotType(s.path, s.nonce);
         SnapshotResult sr = p.getSecond();
 
         rowValues[columnNameToIndex.get(ColumnName.NONCE.name())] = s.nonce;
         rowValues[columnNameToIndex.get(ColumnName.TXNID.name())] = s.txnId;
-        rowValues[columnNameToIndex.get(ColumnName.TYPE.name())] = m_typeChecker.getSnapshotType(s.path);
+        rowValues[columnNameToIndex.get(ColumnName.TYPE.name())] = type.name();
         rowValues[columnNameToIndex.get(ColumnName.START_TIME.name())] = s.timeStarted;
         rowValues[columnNameToIndex.get(ColumnName.END_TIME.name())] = s.timeFinished;
         rowValues[columnNameToIndex.get(ColumnName.PROGRESS_PCT.name())] = (float)s.progress();
@@ -154,10 +156,16 @@ public class SnapshotSummary extends StatsSource {
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+
         return new StatusIterator<SnapshotResult>(
                 SnapshotRegistry.getSnapshotHistory().iterator(),
                 new SnapshotScanner<SnapshotResult>() {
                     public List<SnapshotResult> flatten(Snapshot s) {
+                        // Ignore join and index snapshot
+                        SnapshotType type = m_typeChecker.getSnapshotType(s.path, s.nonce);
+                        if (type == SnapshotType.ELASTIC) {
+                            return new ArrayList<>();
+                        }
                         return s.iterateTableErrors();
                     }
                 });
