@@ -143,7 +143,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan<IndexSnapshotReque
         // create a null data target
         final DevNullSnapshotTarget dataTarget = new DevNullSnapshotTarget();
         final Runnable onClose = new TargetStatsClosure(dataTarget,
-                table.getName(),
+                                                        Arrays.asList(table.getName()),
                                                         numTables,
                                                         snapshotRecord);
         dataTarget.setOnCloseHandler(onClose);

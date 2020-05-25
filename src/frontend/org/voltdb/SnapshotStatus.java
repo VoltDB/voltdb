@@ -42,7 +42,8 @@ public class SnapshotStatus extends StatsSource {
     enum SNAPSHOT_TYPE {
         AUTO,
         MANUAL,
-        COMMANDLOG
+        COMMANDLOG,
+        REJOIN;
     };
 
     static class SnapshotTypeChecker {
@@ -61,6 +62,9 @@ public class SnapshotStatus extends StatsSource {
             }
             else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
                 return SNAPSHOT_TYPE.AUTO.name();
+            }
+            else if (path.startsWith("Rejoin")) {
+                return SNAPSHOT_TYPE.REJOIN.name();
             }
             return SNAPSHOT_TYPE.MANUAL.name();
         }
