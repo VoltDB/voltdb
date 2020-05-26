@@ -102,6 +102,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
+    private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
@@ -770,9 +771,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         return m_schemas.get(tableId).getSecond();
     }
 
-    // No in use
-    public void setInProgressHandler(Runnable inProgress) {}
+    public void setInProgressHandler(Runnable handler) {
+        m_progressHandler = handler;
+    }
 
-    // No need to track stream snapshot progress
-    public void trackProgress() {}
+    public void trackProgress() {
+        m_progressHandler.run();
+    }
 }

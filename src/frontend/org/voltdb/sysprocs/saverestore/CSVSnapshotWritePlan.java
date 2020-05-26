@@ -155,6 +155,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan<CsvSnapshotRequestCo
         // one node, we can go ahead and distribute them across all of the sites on that node.
         placePartitionedTasks(partitionedSnapshotTasks, sitesToInclude);
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
+        snapshotRecord.setTotalTasks(partitionedSnapshotTasks.size() * sitesToInclude.size() + replicatedSnapshotTasks.size());
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, m_config.tables, txnId, partitionTransactionIds,
@@ -220,8 +221,10 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan<CsvSnapshotRequestCo
         sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.isReplicated());
 
         m_targets.add(sdt);
-        final Runnable onClose = new TargetStatsClosure(sdt, table.getName(), numTables, snapshotRecord);
+        final Runnable onClose = new TargetStatsClosure(sdt, Arrays.asList(table.getName()), numTables, snapshotRecord);
         sdt.setOnCloseHandler(onClose);
+        final Runnable inProgress = new TargetStatsProgress(snapshotRecord);
+        sdt.setInProgressHandler(inProgress);
 
         return sdt;
     }
