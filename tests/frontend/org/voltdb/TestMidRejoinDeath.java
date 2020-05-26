@@ -55,7 +55,10 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             boolean success = cluster.compile(builder);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-            cluster.setHasLocalServer(false);
+
+            // WARNING: This may never be set to true or it will trigger an assert in StreamSnapshotDataTarget
+            final boolean DONT_USE_LOCAL_SERVER_THREAD = false;
+            cluster.setHasLocalServer(DONT_USE_LOCAL_SERVER_THREAD);
 
             cluster.startUp();
 

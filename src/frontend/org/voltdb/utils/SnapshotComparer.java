@@ -18,12 +18,30 @@
 package org.voltdb.utils;
 
 import static org.voltdb.RestoreAgent.checkSnapshotIsComplete;
-import static org.voltdb.utils.SnapshotComparer.*;
+import static org.voltdb.utils.SnapshotComparer.CONSOLE_LOG;
+import static org.voltdb.utils.SnapshotComparer.DELIMITER;
+import static org.voltdb.utils.SnapshotComparer.DIFF_FOLDER;
+import static org.voltdb.utils.SnapshotComparer.REMOTE_SNAPSHOT_FOLDER;
+import static org.voltdb.utils.SnapshotComparer.SNAPSHOT_LOG;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INCONSISTENCY;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INVALID_INPUT;
+import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
+import static org.voltdb.utils.SnapshotComparer.TEMP_FOLDER;
+import static org.voltdb.utils.SnapshotComparer.VPTFILE_PATTERN;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,7 +53,6 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RestoreAgent;
 import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltTable;
-import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -578,7 +595,7 @@ class SnapshotLoader {
                                     new FileInputStream(partitionToFiles.get(p).get(target)), 1, relevantPartition)) {
                         DBBPool.BBContainer cr = null, cc = null;
 
-                        while (referenceSaveFile.hasMoreChunks() && compareSaveFile.hasMoreChunks()) {
+                        while (referenceSaveFile.hasMoreChunks() || compareSaveFile.hasMoreChunks()) {
                             // skip chunk for irrelevant partition
                             cr = referenceSaveFile.getNextChunk();
                             cc = compareSaveFile.getNextChunk();
@@ -587,45 +604,59 @@ class SnapshotLoader {
                                 break;
                             }
                             try {
-                                // TODO: chunk not aligned?
-                                if (cr != null && cc == null) {
-                                    System.err.println("Reference file still contain chunks while comparing file does not");
-                                    break;
-                                }
-                                if (cr == null && cc != null) {
-                                    System.err.println("Comparing file still contain chunks while reference file does not");
-                                    break;
-                                }
-
-                                final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true);
-                                final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true);
                                 if (orderLevel >= 2) {
-                                    refCheckSum += tr.getTableCheckSum();
-                                    compCheckSum += tc.getTableCheckSum();
-                                    if (CONSOLE_LOG.isDebugEnabled()) {
-                                        CONSOLE_LOG.debug("Checksum for " + tableName + " partition " + partitionid + " on host" + baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
+                                    if (cr != null) {
+                                        refCheckSum += PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(), true)
+                                                .getTableCheckSum(false);
                                     }
-                                } else if (!tr.hasSameContents(tc, orderLevel == 1)) {
-                                    // seek to find where discrepancy happened
-                                    if (SNAPSHOT_LOG.isDebugEnabled()) {
-                                        SNAPSHOT_LOG.debug(
-                                                "table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
-                                        SNAPSHOT_LOG.debug(
-                                                "table from file: " + partitionToFiles.get(p).get(target) + " : " + tc);
+                                    if (cc != null) {
+                                        compCheckSum += PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(), true)
+                                                .getTableCheckSum(false);
+                                    }
+                                    if (CONSOLE_LOG.isDebugEnabled()) {
+                                        CONSOLE_LOG.debug("Checksum for " + tableName + " partition " + partitionid
+                                                + " on host" + baseHostId + " is " + refCheckSum + " on host"
+                                                + compareHostId + " is " + compCheckSum);
+                                    }
+                                } else {
+                                    if (cr != null && cc == null) {
+                                        System.err.println(
+                                                "Reference file still contains chunks while comparing file does not");
+                                        break;
+                                    }
+                                    if (cr == null && cc != null) {
+                                        System.err.println(
+                                                "Comparing file still contains chunks while reference file does not");
+                                        break;
                                     }
 
-                                    int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
-                                    int[][] lookup = new int[trSize + 1][tcSize + 1];
-                                    // fill lookup table
-                                    lcsLength(tr, tc, trSize, tcSize, lookup);
-                                    // find difference
-                                    StringBuilder output = new StringBuilder().append("Diffs between file ")
-                                            .append(partitionToFiles.get(p).get(0)).append(" and file ")
-                                            .append(partitionToFiles.get(p).get(target)).append(" \n");
-                                    diff(tr, tc, trSize, tcSize, lookup, output);
-                                    CONSOLE_LOG.info(output.toString());
-                                    isConsistent = false;
-                                    break;
+                                    final VoltTable tr = PrivateVoltTableFactory.createVoltTableFromBuffer(cr.b(),
+                                            true);
+                                    final VoltTable tc = PrivateVoltTableFactory.createVoltTableFromBuffer(cc.b(),
+                                            true);
+
+                                    if (!tr.hasSameContents(tc, orderLevel == 1)) {
+                                        // seek to find where discrepancy happened
+                                        if (SNAPSHOT_LOG.isDebugEnabled()) {
+                                            SNAPSHOT_LOG.debug(
+                                                    "table from file: " + partitionToFiles.get(p).get(0) + " : " + tr);
+                                            SNAPSHOT_LOG.debug("table from file: " + partitionToFiles.get(p).get(target)
+                                                    + " : " + tc);
+                                        }
+
+                                        int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
+                                        int[][] lookup = new int[trSize + 1][tcSize + 1];
+                                        // fill lookup table
+                                        lcsLength(tr, tc, trSize, tcSize, lookup);
+                                        // find difference
+                                        StringBuilder output = new StringBuilder().append("Diffs between file ")
+                                                .append(partitionToFiles.get(p).get(0)).append(" and file ")
+                                                .append(partitionToFiles.get(p).get(target)).append(" \n");
+                                        diff(tr, tc, trSize, tcSize, lookup, output);
+                                        CONSOLE_LOG.info(output.toString());
+                                        isConsistent = false;
+                                        break;
+                                    }
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
@@ -643,7 +674,9 @@ class SnapshotLoader {
                             isConsistent = (refCheckSum == compCheckSum);
                             // for orderLevel 3. drill down the discrepancies by reorder the whole table to csv then diff
                             if (!isConsistent && orderLevel == 3) {
-                                CONSOLE_LOG.warn("Checksum for " + tableName + " partition " + partitionid + " on host"+baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is " + compCheckSum);
+                                CONSOLE_LOG.warn("Checksum for " + tableName + " partition " + partitionid + " on host"
+                                        + baseHostId + " is " + refCheckSum + " on host" + compareHostId + " is "
+                                        + compCheckSum);
                                 // For every output file that will be created attempt to instantiate and print an error  couldn't be created.
                                 String baseOutfileName = (isReplicated ? "Replicated" : "Partitioned") + "-Table-" + tableName + "-host" + baseHostId + "-partition" + partitionid;
                                 convertTableToCSV(baseOutfileName, tableName, partitionid, partitionToFiles.get(p).get(0), TEMP_FOLDER, DELIMITER, isReplicated, true);
@@ -743,12 +776,13 @@ class SnapshotLoader {
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
             StringBuilder out = new StringBuilder();
             String line = null, previous = null;
-            while ((line = br.readLine()) != null)
+            while ((line = br.readLine()) != null) {
                 if (!line.equals(previous)) {
                     previous = line;
                     out.append(line).append('\n');
                     System.out.println(line);
                 }
+            }
 
             //Check result
             if (p.waitFor() == 0) {
@@ -885,13 +919,6 @@ class SnapshotLoader {
         return CatalogUtil.loadInMemoryJarFile(bytes);
     }
 
-    private static ElasticHashinator getHashinatorFromFile(String location, String nonce, int hostId) throws IOException {
-        File hashFile = new File(location + '/' + nonce + "-host_" + hostId + ".hash");
-        HashinatorSnapshotData hashinatorSSData = new HashinatorSnapshotData();
-        hashinatorSSData.restoreFromFile(hashFile);
-        return new ElasticHashinator(hashinatorSSData.m_serData, true);
-    }
-
     /**
      * using publickey for auth
      */
@@ -925,11 +952,13 @@ class SnapshotLoader {
             //Iterate through list of folder content
             for (ChannelSftp.LsEntry item : fileAndFolderList) {
                 if (!item.getAttrs().isDir()) { // Check if it is a file (not a directory).
-                    if (!(new File(destinationPath + PATHSEPARATOR + item.getFilename())).exists() ||
-                            (item.getAttrs().getMTime() > Long.valueOf(new File(destinationPath + PATHSEPARATOR + item.getFilename()).lastModified() / (long) 1000).intValue())) { // Download only if changed later.
+                    File file = new File(destinationPath + PATHSEPARATOR + item.getFilename());
+                    if (!file.exists() || item.getAttrs().getMTime() > file.lastModified() / 1000) {
+                        // Download only if changed later.
                         new File(destinationPath + PATHSEPARATOR + item.getFilename());
+                        // Download file from source (source filename, destination filename).
                         channelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(),
-                                destinationPath + PATHSEPARATOR + item.getFilename()); // Download file from source (source filename, destination filename).
+                                destinationPath + PATHSEPARATOR + item.getFilename());
                     }
                 }
             }
