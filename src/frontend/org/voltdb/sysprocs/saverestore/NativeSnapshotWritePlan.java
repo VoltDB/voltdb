@@ -20,6 +20,7 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,7 +304,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestCo
                 timestamp);
 
         m_targets.add(sdt);
-        final Runnable onClose = new TargetStatsClosure(sdt, table.getName(), numTables, snapshotRecord);
+        final Runnable onClose = new TargetStatsClosure(sdt, Arrays.asList(table.getName()), numTables, snapshotRecord);
         sdt.setOnCloseHandler(onClose);
         final Runnable inProgress = new TargetStatsProgress(snapshotRecord);
         sdt.setInProgressHandler(inProgress);
