@@ -118,16 +118,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotReq
             createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
-        // Mark snapshot start in registry
-        m_snapshotRecord =
-            SnapshotRegistry.startSnapshot(
-                    txnId,
-                    context.getHostId(),
-                    file_path,
-                    file_nonce,
-                    SnapshotFormat.STREAM,
-                    m_config.tables);
-
         List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, m_config.tables);
 
         // If there's no work to do on this host, just claim success, return an empty plan,
@@ -146,6 +136,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotReq
             totalTaskNum += table.isReplicated() ? 1 : hsIds.size();
             result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getName(), "SUCCESS", "");
         }
+
+        // Mark snapshot start in registry
+        Set<SnapshotTableInfo> streamTables = tasks.values().stream()
+                                                            .map(task -> task.m_tableInfo)
+                                                            .collect(Collectors.toSet());
+        m_snapshotRecord =
+            SnapshotRegistry.startSnapshot(
+                    txnId,
+                    context.getHostId(),
+                    file_path,
+                    file_nonce,
+                    SnapshotFormat.STREAM,
+                    new ArrayList<SnapshotTableInfo>(streamTables));
 
         // Register stats close handler and progress tracker
         registerOnCloseHandler(tasks, m_snapshotRecord, totalTaskNum);
@@ -365,7 +368,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotReq
             dataTarget.setInProgressHandler(inProgress);
         }
         // Update the total task count, which used in snapshot progress tracking
-        snapshotRecord.setTotalTasks(totalTaskNum);
+        snapshotRecord.setTotalTasks(tasks.size());
     }
 
     /**

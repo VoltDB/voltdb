@@ -100,16 +100,15 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
         public void run() {
             for (String tableName : m_tableNames) {
                 m_snapshotRecord.updateTable(tableName,
-                        new SnapshotRegistry.Snapshot.TableUpdater() {
-                            @Override
-                            public SnapshotRegistry.Snapshot.Table update(
-                                SnapshotRegistry.Snapshot.Table registryTable) {
-                                return m_snapshotRecord.new Table(
-                                    registryTable,
-                                    m_sdt.getBytesWritten(), /* number is bloated for stream snapshot target */
-                                    m_sdt.getLastWriteException());
-                                }
-                        });
+                    new SnapshotRegistry.Snapshot.TableUpdater() {
+                        @Override
+                        public SnapshotRegistry.Snapshot.Table update(SnapshotRegistry.Snapshot.Table registryTable) {
+                            return m_snapshotRecord.new Table(
+                                registryTable,
+                                m_sdt.getBytesWritten(), /* Bytes written is shared between multiple stream snapshot tables */
+                                m_sdt.getLastWriteException());
+                            }
+                    });
                 int tablesLeft = m_numTables.decrementAndGet();
                 if (tablesLeft == 0) {
                     final SnapshotRegistry.Snapshot completed =
