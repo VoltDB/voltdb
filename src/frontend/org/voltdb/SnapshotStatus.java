@@ -39,10 +39,12 @@ public class SnapshotStatus extends StatsSource {
         SUCCESS;
     }
 
-    enum SNAPSHOT_TYPE {
+    enum SnapshotType {
         AUTO,
         MANUAL,
-        COMMANDLOG
+        COMMANDLOG,
+        REJOIN,
+        ELASTIC;
     };
 
     static class SnapshotTypeChecker {
@@ -54,15 +56,20 @@ public class SnapshotStatus extends StatsSource {
             m_autoSnapshotPath = new File(autoSnapshotPathStr);
         }
 
-        String getSnapshotType(String path) {
+        SnapshotType getSnapshotType(String path, String nonce) {
             File thisSnapshotPath = new File(path);
             if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
-                return SNAPSHOT_TYPE.COMMANDLOG.name();
+                if (nonce.startsWith("JOIN")) {
+                    return SnapshotType.ELASTIC;
+                } else {
+                    return SnapshotType.COMMANDLOG;
+                }
+            } else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
+                return SnapshotType.AUTO;
+            } else if (path.equals("") && nonce.startsWith("Rejoin")) {
+                return SnapshotType.REJOIN;
             }
-            else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
-                return SNAPSHOT_TYPE.AUTO.name();
-            }
-            return SNAPSHOT_TYPE.MANUAL.name();
+            return SnapshotType.MANUAL;
         }
     }
     SnapshotTypeChecker m_typeChecker = new SnapshotTypeChecker();
@@ -162,7 +169,7 @@ public class SnapshotStatus extends StatsSource {
             result = t.error == null ? SnapshotResult.SUCCESS.toString() : SnapshotResult.FAILURE.toString();
         }
         rowValues[columnNameToIndex.get("RESULT")] = result;
-        rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path);
+        rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path, s.nonce).name();
         super.updateStatsRow(rowKey, rowValues);
     }
 
