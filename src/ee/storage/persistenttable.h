@@ -1115,14 +1115,14 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
         }
     }
 
-    // XXX REMOVEME XXX
-    if (block->isEmpty() && m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-        VOLT_ERROR("XXX BLOCK %p PENDING SNAPSHOT XXX", block->address());
+    bool isPendingSnapshot = m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end();
+    if (isPendingSnapshot) {
+        vassert(m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_SNAPSHOT));
     }
 
     // if the block is empty, release it, unless it is pending snapshot in which case let
     // the streamer do it
-    if (block->isEmpty() && m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end()) {
+    if (block->isEmpty() && !isPendingSnapshot) {
         if (m_data.size() > 1 || deleteLastEmptyBlock) {
             // Release the empty block unless it's the only remaining block and caller has requested not to do so.
             // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
