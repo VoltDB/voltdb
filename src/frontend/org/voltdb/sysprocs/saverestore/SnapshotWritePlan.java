@@ -19,6 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
@@ -80,44 +81,45 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
 
     static class TargetStatsClosure implements Runnable
     {
-        final private String m_tableName;
+        final private List<String> m_tableNames;
         final private SnapshotDataTarget m_sdt;
         final private AtomicInteger m_numTables;
         final private SnapshotRegistry.Snapshot m_snapshotRecord;
 
-        TargetStatsClosure(SnapshotDataTarget sdt, String tableName,
+        TargetStatsClosure(SnapshotDataTarget sdt, List<String> tableNames,
                 AtomicInteger numTables,
                 SnapshotRegistry.Snapshot snapshotRecord)
         {
             m_sdt = sdt;
-            m_tableName = tableName;
+            m_tableNames = tableNames;
             m_numTables = numTables;
             m_snapshotRecord = snapshotRecord;
         }
 
         @Override
         public void run() {
-            m_snapshotRecord.updateTable(m_tableName,
+            for (String tableName : m_tableNames) {
+                m_snapshotRecord.updateTable(tableName,
                     new SnapshotRegistry.Snapshot.TableUpdater() {
                         @Override
-                        public SnapshotRegistry.Snapshot.Table update(
-                            SnapshotRegistry.Snapshot.Table registryTable) {
+                        public SnapshotRegistry.Snapshot.Table update(SnapshotRegistry.Snapshot.Table registryTable) {
                             return m_snapshotRecord.new Table(
                                 registryTable,
-                                m_sdt.getBytesWritten(),
+                                m_sdt.getBytesWritten(), /* Bytes written is shared between multiple stream snapshot tables */
                                 m_sdt.getLastWriteException());
                             }
                     });
-            int tablesLeft = m_numTables.decrementAndGet();
-            if (tablesLeft == 0) {
-                final SnapshotRegistry.Snapshot completed =
-                    SnapshotRegistry.finishSnapshot(m_snapshotRecord);
-                final double duration =
-                    (completed.timeFinished - completed.timeStarted) / 1000.0;
-                SNAP_LOG.info(
-                        "Snapshot " + m_snapshotRecord.nonce + " finished at " +
-                        completed.timeFinished + " and took " + duration
-                        + " seconds ");
+                int tablesLeft = m_numTables.decrementAndGet();
+                if (tablesLeft == 0) {
+                    final SnapshotRegistry.Snapshot completed =
+                        SnapshotRegistry.finishSnapshot(m_snapshotRecord);
+                    final double duration =
+                        (completed.timeFinished - completed.timeStarted) / 1000.0;
+                    SNAP_LOG.info(
+                            "Snapshot " + m_snapshotRecord.nonce + " finished at " +
+                            completed.timeFinished + " and took " + duration
+                            + " seconds ");
+                }
             }
         }
     }
@@ -209,7 +211,7 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
                 if (target == null) {
                     target = new DevNullSnapshotTarget(lastWriteException);
                     final Runnable onClose = new TargetStatsClosure(target,
-                            task.m_tableInfo.getName(),
+                            Arrays.asList(task.m_tableInfo.getName()),
                             numTargets,
                             m_snapshotRecord);
                     target.setOnCloseHandler(onClose);
