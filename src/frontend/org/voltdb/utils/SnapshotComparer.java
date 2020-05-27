@@ -430,7 +430,7 @@ class SnapshotLoader {
             for (int i = 0; i < hosts.length; i++) {
                 File localDir = new File(localRootDir.getPath() + PATHSEPARATOR + hosts[i]);
                 localDir.mkdirs();
-                if (!downloadFiles(username, hosts[i], dirs[i], localDir.getPath())) {
+                if (!downloadFiles(username, hosts[i], dirs[i], localDir.getPath(), nonce)) {
                     System.exit(STATUS_INVALID_INPUT);
                 }
                 directories.add(localDir);
@@ -941,7 +941,8 @@ class SnapshotLoader {
      */
     static String PATHSEPARATOR = "/";
 
-    private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath) {
+    private boolean downloadFiles(String username, String remoteHost, String sourcePath, String destinationPath,
+            String nonce) {
         ChannelSftp channelSftp = null;
         try {
             channelSftp = setupJsch(username, remoteHost);
@@ -951,14 +952,13 @@ class SnapshotLoader {
             Vector<ChannelSftp.LsEntry> fileAndFolderList = channelSftp.ls(sourcePath);
             //Iterate through list of folder content
             for (ChannelSftp.LsEntry item : fileAndFolderList) {
-                if (!item.getAttrs().isDir()) { // Check if it is a file (not a directory).
+                // Check if it is a file (not a directory).and starts with the desired nonce
+                if (!item.getAttrs().isDir() && item.getFilename().startsWith(nonce)) {
                     File file = new File(destinationPath + PATHSEPARATOR + item.getFilename());
                     if (!file.exists() || item.getAttrs().getMTime() > file.lastModified() / 1000) {
                         // Download only if changed later.
-                        new File(destinationPath + PATHSEPARATOR + item.getFilename());
                         // Download file from source (source filename, destination filename).
-                        channelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(),
-                                destinationPath + PATHSEPARATOR + item.getFilename());
+                        channelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(), file.getPath());
                     }
                 }
             }
