@@ -73,6 +73,7 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.iv2.TxnEgo;
 
