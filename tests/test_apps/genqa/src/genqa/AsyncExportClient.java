@@ -545,10 +545,10 @@ public class AsyncExportClient
             }
         }
         catch (ProcCallException e1) {
-            if (e1.getMessage().contains(“was lost before a response was received”)) {
-                log.warn(“Possible problem executing “ + config.procedure + ”, procedure may not have completed”);
+            if (e1.getMessage().contains("was lost before a response was received")) {
+                log.warn("Possible problem executing " + config.procedure + ", procedure may not have completed");
             } else {
-                log.fatal(“Exception: ” + e1);
+                log.fatal("Exception: " + e1);
                 e1.printStackTrace();
                 System.exit(-1);
             }
