@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -38,6 +37,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
@@ -61,8 +61,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     public static enum ServiceState {
         NORMAL(0),
         ELIGIBLE_REMOVAL(1),
@@ -92,6 +90,10 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         @Override
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
+            if (failedLeaderMigration(cache)) {
+                return;
+            }
+
             String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
             if (cache != null && tmLog.isDebugEnabled()) {
                 tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
@@ -104,8 +106,8 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 leaders.add(info.m_HSId);
                 if (info.m_HSId == getInitiatorHSId()){
 
-                    // Test case: Interrupt leader promotion process
-                    if (info.m_lastHSId == LeaderCache.TEST_LAST_HSID) {
+                    // Special case for testing
+                    if (info.m_lastHSId < 0) {
                         break;
                     }
                     boolean reinstate = reinstateAsLeader(info);
@@ -133,6 +135,30 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
             }
         }
     };
+
+    private boolean failedLeaderMigration(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
+        RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        if (!db.isRunning()) {
+            return false;
+        }
+        // The supposed new leader is gone, Catographer(ZooKeeper) still gets the older
+        // leader, so LeaderAppointer won't act. Re-instate the leader
+        if (getInitiatorHSId() == db.getCartographer().getHSIdForMaster(m_partitionId) &&
+                !m_scheduler.m_isLeader) {
+            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                LeaderCallBackInfo info = entry.getValue();
+                if (!info.m_isMigratePartitionLeaderRequested ||
+                        m_messenger.getLiveHostIds().contains(CoreUtils.getHostIdFromHSId(info.m_HSId))) {
+                    continue;
+                }
+                m_scheduler.m_isLeader = true;
+                m_initiatorMailbox.m_repairLog.m_isLeader = true;
+                m_promoted = true;
+                return true;
+            }
+        }
+        return false;
+    }
 
     // When the leader is migrated away from this site, m_scheduler is marked as not-a-leader. If the host for new leader fails
     // before leader migration is completed. The previous leader, the current site, must be reinstated.
