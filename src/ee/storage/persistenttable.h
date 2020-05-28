@@ -1104,16 +1104,42 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
     if (retval != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            // std::cout << "Swapping NPS block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
         } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping PS block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
         } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
+            //std::cout << "NOT Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
         }
     }
+
+    if (block->isEmpty()) {
+        if (m_data.size() > 1 || deleteLastEmptyBlock) {
+            // Release the empty block unless it's the only remaining block and caller has requested not to do so.
+            // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
+            m_data.erase(block->address());
+            m_blocksWithSpace.erase(block);
+        } else if (transitioningToBlockWithSpace) {
+           // In the unlikely event that tuplesPerBlock == 1
+           m_blocksWithSpace.insert(block);
+        }
+        m_blocksNotPendingSnapshot.erase(block);
+        if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            // A block was emptied while pending snapshot
+            vassert(m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_SNAPSHOT));
+            m_blocksPendingSnapshot.erase(block);
+            m_tableStreamer->notifyBlockWasCompactedAway(block);
+        }
+        //Eliminates circular reference
+        block->swapToBucket(TBBucketPtr());
+    } else if (transitioningToBlockWithSpace) {
+        m_blocksWithSpace.insert(block);
+    }
+
 
     bool isPendingSnapshot = m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end();
     if (isPendingSnapshot) {
@@ -1121,7 +1147,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
     }
 
     // if the block is empty, release it, unless it is pending snapshot in which case let
-    // the streamer do it
+    // the streamer walk over it and snapshot scan take care of it.
     if (block->isEmpty() && !isPendingSnapshot) {
         if (m_data.size() > 1 || deleteLastEmptyBlock) {
             // Release the empty block unless it's the only remaining block and caller has requested not to do so.
