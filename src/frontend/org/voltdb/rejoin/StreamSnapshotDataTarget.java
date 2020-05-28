@@ -102,6 +102,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
+    private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
@@ -118,6 +119,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             StreamSnapshotAckReceiver ackReceiver)
     {
         super();
+        // A unit test should never set a static test variable because it will bleed into other tests
+        assert(VoltDB.instanceOnServerThread() ? !m_rejoinDeathTestMode : true);
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
         m_schemas = tables.stream().collect(
                 Collectors.toMap(SnapshotTableInfo::getTableId, t -> Pair.of(t.isReplicated(), t.getSchema())));
@@ -766,5 +769,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     protected byte[] getSchema(int tableId) {
         return m_schemas.get(tableId).getSecond();
+    }
+
+    public void setInProgressHandler(Runnable handler) {
+        m_progressHandler = handler;
+    }
+
+    public void trackProgress() {
+        m_progressHandler.run();
     }
 }

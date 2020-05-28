@@ -254,10 +254,6 @@ public class DRConsumerDrIdTracker implements Serializable {
         return m_producerPartitionId;
     }
 
-    public void setProducerPartitionId(int m_producerPartitionId) {
-        this.m_producerPartitionId = m_producerPartitionId;
-    }
-
     public int getSerializedSize() {
         return 8        // m_lastSpUniqueId
              + 8        // m_lastMpUniqueId

@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
@@ -62,7 +63,7 @@ public class DiscardingExportClient extends ExportClientBase {
             super(source);
             m_atomicWorkLock.lock();
             try {
-                if (s_es == null && ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+                if (s_es == null && VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                     s_es = CoreUtils.getListeningSingleThreadExecutor(
                             "Common Discarding Export decoder thread", CoreUtils.MEDIUM_STACK_SIZE);
                 }

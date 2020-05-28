@@ -643,6 +643,9 @@ public class MeshProber implements JoinAcceptor {
         return new Determination(null,-1, false, null);
     }
 
+    public void abortDetermination() {
+        m_probedDetermination.set(new Determination(null,-1, false, null));
+    }
     @Generated("by eclipse's equals and hashCode source generators")
     @Override
     public String toString() {

@@ -26,7 +26,6 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 
@@ -374,22 +373,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
         }
         return js.toString();
-    }
-
-    /**
-     * @return MD5 hash as int of the tables in the result. Only hashes first bits of big results.
-     */
-    public int getHashOfTableResults() {
-        try {
-            long cheesyChecksum = 0;
-            for (int i = 0; i < results.length; ++i) {
-                cheesyChecksum += ClientUtils.cheesyBufferCheckSum(results[i].m_buffer);
-            }
-            return (int)cheesyChecksum;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0;
-        }
     }
 
     public void dropResultTable() {

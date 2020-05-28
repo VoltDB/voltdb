@@ -109,4 +109,10 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     public int getInContainerRowCount(BBContainer tupleData) {
         return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
+
+    // Not in use.
+    public void setInProgressHandler(Runnable inProgress) {}
+
+    // No need to track snapshot write to dev null
+    public void trackProgress() {}
 }

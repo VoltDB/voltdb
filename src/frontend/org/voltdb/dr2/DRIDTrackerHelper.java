@@ -22,12 +22,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
@@ -65,42 +62,6 @@ public class DRIDTrackerHelper {
         stringer.endObject();
         stringer.endObject();
         return stringer.toString();
-    }
-
-    /**
-     * Deserialize the trackers retrieved from each consumer partitions.
-     *
-     * @param jsonData Tracker data retrieved from each consumer partition.
-     * @param partitionsMissingTracker
-     * @return A map of producer cluster ID to tracker for each producer
-     * partition. If no tracker information is found, the map will be empty.
-     * @throws JSONException
-     */
-    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData, boolean resetLastReceivedLogIds)
-    throws JSONException
-    {
-        Map<Integer, Map<Integer, DRSiteDrIdTracker>> producerTrackers = new HashMap<>();
-
-        JSONObject clusterData = new JSONObject(jsonData);
-        final JSONObject trackers = clusterData.getJSONObject("trackers");
-        Iterator<String> clusterIdKeys = trackers.keys();
-        while (clusterIdKeys.hasNext()) {
-            final String clusterIdStr = clusterIdKeys.next();
-            final int clusterId = Integer.parseInt(clusterIdStr);
-            final JSONObject trackerData = trackers.getJSONObject(clusterIdStr);
-            Iterator<String> srcPidKeys = trackerData.keys();
-            while (srcPidKeys.hasNext()) {
-                final String srcPidStr = srcPidKeys.next();
-                final int srcPid = Integer.valueOf(srcPidStr);
-                final JSONObject ids = trackerData.getJSONObject(srcPidStr);
-                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids, resetLastReceivedLogIds);
-
-                Map<Integer, DRSiteDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
-                clusterTrackers.put(srcPid, tracker);
-            }
-        }
-
-        return producerTrackers;
     }
 
     /**

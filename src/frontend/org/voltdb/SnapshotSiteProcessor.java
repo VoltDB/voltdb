@@ -662,12 +662,16 @@ public class SnapshotSiteProcessor {
              * enclosing loop ensures that the next table is then addressed.
              */
             if (!streamResult.getSecond()) {
+                // Task done, move the snapshot progress tracker forward.
+                for (SnapshotTableTask tableTask : tableTasks) {
+                    tableTask.getTarget().trackProgress();
+                }
                 asyncTerminateReplicatedTableTasks(tableTasks);
                 // XXX: Guava's multimap will clear the tableTasks collection when the entry is
                 // removed from the containing map, so don't use the collection after removal!
-                taskIter.remove();
                 SNAP_LOG.debug("Finished snapshot tasks for table " + tableId +
-                               ": " + tableTasks);
+                        ": " + tableTasks);
+                taskIter.remove();
             } else {
                 break;
             }
