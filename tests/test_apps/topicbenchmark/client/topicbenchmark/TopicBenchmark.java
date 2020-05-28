@@ -65,7 +65,8 @@ import org.voltdb.client.ProcedureCallback;
  */
 public class TopicBenchmark {
 
-    static VoltLogger log = new VoltLogger("TopicBenchmark");
+    static VoltLogger log = new VoltLogger("ExportBenchmark");
+    // static VoltLogger log = new VoltLogger("TopicBenchmark");
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
@@ -254,14 +255,12 @@ public class TopicBenchmark {
                 String source = stats.getString("TOPIC");
                 Long tupleCount = stats.getLong("LAST_OFFSET");
                 String tablePart = source + "_" + partitionid;
-                log.info("Topic: " + source + ", Partition ID: " + partitionid + ", Tuple count: " + tupleCount);
                 if (! partitionMap.containsKey(tablePart)) {
                     // only put this table+partition count in the map once
                     partitionMap.put(tablePart, tupleCount);
                     totalTupleCount += tupleCount;
                 }
             }
-            log.info("Total tuple count: " + totalTupleCount);
             if (totalTupleCount == insertCount) {
                 long settleTimeMillis = System.currentTimeMillis() - st;
                 log.info("LAST_OFFSET settled in " + settleTimeMillis/1000.0 + " seconds");
@@ -272,7 +271,7 @@ public class TopicBenchmark {
                 log.info("Waited too long...");
                 return false;
             }
-            Thread.sleep(5000);
+            Thread.sleep(1000);
         }
     }
 
@@ -347,13 +346,14 @@ public class TopicBenchmark {
 
         // Insert objects until we've run for long enough
         log.info("Running benchmark...");
-        now = System.currentTimeMillis();
+        long benchmarkStart = 0;
+        benchmarkStart = now = System.currentTimeMillis();
         while (true) {
             if ((benchmarkEndTS != 0) && (now > benchmarkEndTS)) {
                 break;
             }
             //If we are count based use count.
-            if ( (config.count > 0) && (totalInserts > config.count) ) {
+            if ( (config.count > 0) && (totalInserts >= config.count) ) {
                 break;
             }
 
@@ -377,6 +377,8 @@ public class TopicBenchmark {
             }
             }
         }
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - benchmarkStart;
 
         try {
             client.drain();
@@ -436,21 +438,23 @@ public class TopicBenchmark {
         }
 
         // Do the inserts in a separate thread
+        long xyz = System.currentTimeMillis();
         log.info("Creating thread ");
         writes = new Thread(new Runnable() {
           @Override
           public void run() {
-            log.info("Creating thread target " + target);
-            doInserts(client);
+                log.info("Creating thread target " + target);
+                doInserts(client);
             }
         });
         writes.start();
         writes.join();
+        long duration = System.currentTimeMillis() - xyz;
 
         log.info("Finished benchmark");
 
         // Print results & close
-        printResults(benchmarkEndTS-benchmarkWarmupEndTS);
+        printResults(duration);
         client.close();
 
         if (!success) {

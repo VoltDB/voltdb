@@ -16,7 +16,7 @@
      </properties>
      <profiles>
        <profile name="topicbenchmark">
-         <retention policy="time" limit="4 mn" />
+         <retention policy="time" limit="1 hr" />
        </profile>
      </profiles>
    </topics>

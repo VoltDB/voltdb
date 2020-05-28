@@ -59,11 +59,15 @@ function parse_command_line() {
 # compile the source code for procedures and the client into jarfiles
 function srccompile() {
     javac -classpath $APPCLASSPATH procedures/topicbenchmark/*.java
-    javac -classpath $CLIENTCLASSPATH client/topicbenchmark/TopicBenchmark.java
+    javac -classpath $CLIENTCLASSPATH client/topicbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
     jar cf topicbenchmark-client.jar -C client topicbenchmark
     jar cf topicbenchmark-procedures.jar -C procedures topicbenchmark
+    # add KafkaClientVerifier from genqa
+    /bin/pwd > /tmp/dirIam
+    cd genqa; ./run.sh jars ; cd ../
+    jar uf topicbenchmark-client.jar -C genqa/obj genqa
 }
 
 function jars() {
