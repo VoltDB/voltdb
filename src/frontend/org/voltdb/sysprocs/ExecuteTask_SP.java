@@ -20,15 +20,11 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.json_voltpatches.JSONException;
-import org.voltcore.utils.Pair;
-import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 
 public class ExecuteTask_SP extends VoltSystemProcedure {
@@ -60,16 +56,6 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
         byte taskId = params[0];
         TaskType taskType = TaskType.values()[taskId];
         switch (taskType) {
-        case SP_JAVA_GET_DRID_TRACKER:
-            Map<Integer, Map<Integer, DRSiteDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
-            Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
-            try {
-                setAppStatusString(DRIDTrackerHelper.jsonifyClusterTrackers(lastConsumerUniqueIds, drIdTrackers));
-            } catch (JSONException e) {
-                throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
-            }
-
-            break;
         case RESET_DR_APPLIED_TRACKER_SINGLE:
             assert params.length == 2;
             byte clusterId = params[1];
