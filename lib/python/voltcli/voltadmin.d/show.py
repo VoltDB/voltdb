@@ -26,9 +26,12 @@ def show_license(runner):
                                 ['LICENSE'])
     print response.table(0).format_table(caption = 'License Information')
     if response.table(0).tuple(2).column(1) != "Community Edition":
-        expiration = datetime.datetime.strptime(response.table(0).tuple(7).column(1), "%a %b %d, %Y")
-        daysUntilExpiration = expiration - datetime.datetime.today()
-        print "Days until expiration: " + str(daysUntilExpiration.days)
+        for tuple in response.table(0).tuples():
+            if tuple[0] == 'EXPIRATION':
+                expiration = datetime.datetime.strptime(tuple[1], "%a %b %d, %Y")
+                daysUntilExpiration = expiration - datetime.datetime.today()
+                print "License expires on " + tuple[1] + " (" + str(daysUntilExpiration.days) + " days remaining)."
+                break
 
 
 @VOLT.Multi_Command(
