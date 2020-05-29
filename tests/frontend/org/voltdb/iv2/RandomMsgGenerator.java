@@ -76,7 +76,7 @@ public class RandomMsgGenerator
             when(spi.getProcName()).thenReturn("dummy");
         }
         Iv2InitiateTaskMessage msg =
-                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,
+                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, false, spi,
                         0l, 0l, false);
         return msg;
     }
