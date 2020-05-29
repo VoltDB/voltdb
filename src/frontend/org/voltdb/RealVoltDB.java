@@ -3901,6 +3901,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public CatalogContext catalogUpdate(
             String diffCommands,
             int expectedCatalogVersion,
+            int nextCatalogVersion,
             long genId,
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
@@ -3920,8 +3921,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         throw new RuntimeException("Trying to update main catalog context with diff " +
                                 "commands generated for an out-of date catalog. Expected catalog version: " +
                                 expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
-                    };
-                    assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
+                    }
+                    assert(m_catalogContext.catalogVersion == nextCatalogVersion);
                     return m_catalogContext;
                 }
 
@@ -3966,6 +3967,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext = m_catalogContext.update(isForReplay,
                                                            newCatalog,
+                                                           nextCatalogVersion,
                                                            genId,
                                                            catalogInfo,
                                                            m_messenger,

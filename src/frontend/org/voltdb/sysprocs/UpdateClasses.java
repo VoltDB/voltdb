@@ -52,7 +52,6 @@ public class UpdateClasses extends UpdateApplicationBase {
                                 classesToDeleteSelector,
                                 new String[0],
                                 Collections.emptyList(),
-                                null,
                                 false /* isPromotion */
                                 );
     }
