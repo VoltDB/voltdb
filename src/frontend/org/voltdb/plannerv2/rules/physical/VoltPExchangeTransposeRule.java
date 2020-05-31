@@ -19,6 +19,7 @@ package org.voltdb.plannerv2.rules.physical;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import org.apache.calcite.plan.RelOptRule;
@@ -181,6 +182,51 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         mExchangeType = exchangeType;
     }
 
+    /**
+     * If DISTINCT is specified, don't do push-down for
+     * count() and sum() when not group by partition column.
+     * An exception is the aggregation arguments are the partition column (ENG-4980).
+     */
+
+    @Override
+    public boolean matches(RelOptRuleCall call) {
+        switch (mExchangeType) {
+        case AGGREGATE_EXCHANGE:
+            return canTrahsposeAggregate((VoltPhysicalAggregate) call.rels[0], (VoltPhysicalExchange) call.rels[1]);
+        case CALC_AGGREGATE_EXCHANGE:
+            return canTrahsposeAggregate((VoltPhysicalAggregate) call.rels[1], (VoltPhysicalExchange) call.rels[2]);
+        default:
+            return true;
+        }
+    }
+
+    private boolean canTrahsposeAggregate(VoltPhysicalAggregate aggregate, VoltPhysicalExchange exchange) {
+        RelDistribution dist = exchange.getChildDistribution();
+        final Set<Integer> groupByColumns = aggregate.getGroupSet().asSet();
+        boolean canTranspose = aggregate.getAggCallList()
+                .stream()
+                .filter(aggrCall ->
+                aggrCall.isDistinct() &&
+                (aggrCall.getAggregation().kind == SqlKind.COUNT ||
+                aggrCall.getAggregation().kind == SqlKind.SUM ||
+                aggrCall.getAggregation().kind == SqlKind.SUM0)
+                        )
+                .noneMatch(aggrCall -> {
+                    List<Integer> partitioningColumns = dist.getKeys();
+                    if (partitioningColumns.isEmpty()) {
+                        // Partitioning column is not part of the record any more
+                        // Can't transpose SUM / COUNT and EXCHANGE
+                        return true;
+                    }
+                    List<Integer> aggrColumns = aggrCall.getArgList();
+                    boolean aggrColumnsHavePartitioning = aggrColumns.containsAll(partitioningColumns);
+                    boolean groupByColumnsHavePartitionin = groupByColumns.containsAll(partitioningColumns);
+                    boolean canPushDown = aggrColumnsHavePartitioning || groupByColumnsHavePartitionin;
+                    return !canPushDown;
+                });
+        return canTranspose;
+    }
+
     @Override
     public void onMatch(RelOptRuleCall call) {
         switch (mExchangeType) {
@@ -336,7 +382,7 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
             exhangeInput = fragmentAggregate;
         }
         // New exchange.
-        Exchange newExchange = new VoltPhysicalExchange(exchange.getCluster(),
+        VoltPhysicalExchange newExchange = new VoltPhysicalExchange(exchange.getCluster(),
                 exchange.getTraitSet(),
                 exhangeInput,
                 exchange.getDistribution(),
@@ -345,69 +391,62 @@ public class VoltPExchangeTransposeRule extends RelOptRule {
         // Coordinator fragment. Replace all occurrences of COUNT with SUM
         // The input for a newly created SUM0FZROMCOUNT AggregateCall must be
         // the output from the fragment's COUNT aggregate
-//        List<AggregateCall> aggCalls = aggregate.getAggCallList().stream()
-//                .map(oldCall -> {
-//                    if (oldCall.getAggregation().kind == SqlKind.COUNT) {
-//                        final AggregateCall sumCall =
-//                                AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
-//                                    oldCall.isDistinct(),
-//                                    oldCall.isApproximate(),
-//                                    oldCall.getArgList(),
-//                                    oldCall.filterArg,
-//                                    aggregate.getGroupCount(),
-//                                    aggregate,
-//                                    oldCall.getType(),
-//                                    null);
-//                        return sumCall;
-//                    } else {
-//                        return oldCall;
-//                    }
-//                })
-//                .collect(Collectors.toList());
 
-        // It seems that aggregate call fields are the last ones in the Aggregate output record.
-        int aggCallIdx = aggregate.getRowType().getFieldCount() - aggregate.getAggCallList().size();
-        assert (aggCallIdx >= 0);
-        List<AggregateCall> aggCalls = Lists.newArrayList();
-        for(AggregateCall oldCall: aggregate.getAggCallList()) {
-            if (oldCall.getAggregation().kind == SqlKind.COUNT) {
-                final AggregateCall sumCall =
-                        AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
-                                oldCall.isDistinct(),
-                                oldCall.isApproximate(),
-                                Lists.newArrayList(aggCallIdx),
-                                oldCall.filterArg,
-                                aggregate.getGroupCount(),
-                                aggregate,
-                                oldCall.getType(),
-                                null);
-                aggCalls.add(sumCall);
-            } else {
-                aggCalls.add(oldCall);
+        // Coordinator aggregate is not required if GROUP BY a partition column.
+        List<Integer> partitioningColumns = newExchange.getChildDistribution().getKeys();
+        Set<Integer> groupByColumns = aggregate.getGroupSet().asSet();
+        boolean coordinatorAggrRequered =
+                partitioningColumns.isEmpty() || !groupByColumns.containsAll(partitioningColumns);
+
+        RelNode finalResult;
+        if (coordinatorAggrRequered) {
+            // It seems that aggregate call fields are the last ones in the Aggregate output record.
+            int aggCallIdx = aggregate.getRowType().getFieldCount() - aggregate.getAggCallList().size();
+            assert (aggCallIdx >= 0);
+            List<AggregateCall> aggCalls = Lists.newArrayList();
+            for(AggregateCall oldCall: aggregate.getAggCallList()) {
+                if (oldCall.getAggregation().kind == SqlKind.COUNT) {
+                    final AggregateCall sumCall =
+                            // Use Volt SUM0FROMCOUNT extension that matches the COUNT data type
+                            // Otherwise Row type won't match
+                            AggregateCall.create(SqlStdOperatorTable.SUM0FROMCOUNT,
+                                    oldCall.isDistinct(),
+                                    oldCall.isApproximate(),
+                                    Lists.newArrayList(aggCallIdx),
+                                    oldCall.filterArg,
+                                    aggregate.getGroupCount(),
+                                    aggregate,
+                                    oldCall.getType(),
+                                    null);
+                    aggCalls.add(sumCall);
+                } else {
+                    aggCalls.add(oldCall);
+                }
+                aggCallIdx += 1;
             }
-            aggCallIdx += 1;
+
+            finalResult = aggregate.copy(
+                    aggregate.getCluster(),
+                    aggregate.getTraitSet(),
+                    newExchange,
+                    aggregate.indicator,
+                    aggregate.getGroupSet(),
+                    aggregate.getGroupSets(),
+                    aggCalls,
+                    aggregate.getPostPredicate(),
+                    true);
+        } else {
+            finalResult = newExchange;
         }
 
-        VoltPhysicalAggregate coordinatorAggregate = aggregate.copy(
-                aggregate.getCluster(),
-                aggregate.getTraitSet(),
-                newExchange,
-                aggregate.indicator,
-                aggregate.getGroupSet(),
-                aggregate.getGroupSets(),
-                aggCalls,
-                aggregate.getPostPredicate(),
-                true);
-        final RelNode finalResult;
         if (mExchangeType == ExchangeType.CALC_AGGREGATE_EXCHANGE) {
             finalResult = aggrCalc.copy(
                     aggrCalc.getTraitSet(),
-                    coordinatorAggregate,
+                    finalResult,
                     aggrCalc.getProgram(),
                     true);
-        } else {
-            finalResult = coordinatorAggregate;
         }
+
         call.transformTo(finalResult);
     }
 }
