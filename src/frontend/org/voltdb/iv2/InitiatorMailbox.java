@@ -408,16 +408,21 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        SpScheduler scheduler = (SpScheduler)m_scheduler;
-        scheduler.checkPointMigratePartitionLeader();
-        scheduler.m_isLeader = false;
-        m_newLeaderHSID.set(newLeaderHSId);
-        m_leaderMigrationState.set(LeaderMigrationState.STARTED);
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(),
                 "initiateSPIMigrationIfRequested-" + m_partitionId, VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
+            if (!m_messenger.getLiveHostIds().contains(hostId)) {
+                tmLog.info("Can not move partition leader to dead host: " + CoreUtils.hsIdToString(newLeaderHSId));
+                return;
+            }
+            SpScheduler scheduler = (SpScheduler)m_scheduler;
+            scheduler.checkPointMigratePartitionLeader();
+            scheduler.m_isLeader = false;
+            m_newLeaderHSID.set(newLeaderHSId);
+            m_leaderMigrationState.set(LeaderMigrationState.STARTED);
+
             leaderAppointee.put(pid, LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
         } catch (InterruptedException | ExecutionException | KeeperException e) {
             VoltDB.crashLocalVoltDB("fail to start MigratePartitionLeader",true, e);

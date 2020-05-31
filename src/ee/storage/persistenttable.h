@@ -1104,14 +1104,16 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
     if (retval != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-            //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
+            // std::cout << "Swapping NPS block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
         } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            //std::cout << "Swapping PS block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
         } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
+            //std::cout << "NOT Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
         }
     }
 
@@ -1126,7 +1128,12 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
            m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
-        vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            // A block was emptied while pending snapshot
+            vassert(m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_SNAPSHOT));
+            m_blocksPendingSnapshot.erase(block);
+            m_tableStreamer->notifyBlockWasCompactedAway(block);
+        }
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     } else if (transitioningToBlockWithSpace) {

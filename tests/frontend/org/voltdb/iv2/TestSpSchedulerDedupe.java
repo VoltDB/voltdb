@@ -133,6 +133,7 @@ public class TestSpSchedulerDedupe
                                        UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, 0), // uniqueID
                                        readOnly, // readonly
                                        singlePart, // single-part
+                                       false, // every-part
                                        spi, // invocation
                                        Long.MAX_VALUE, // client interface handle
                                        Long.MAX_VALUE, // connectionId

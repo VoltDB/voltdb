@@ -61,7 +61,8 @@ public class SystemProcedureCatalog {
 
     static enum Initiator {
         SINGLE_PARTITION, /* Executes on one target partition. */
-        MULTI_PARTITION /* Executes on MPI and generates FragmentTasks for each SP Partition. */
+        MULTI_PARTITION, /* Executes on MPI and generates FragmentTasks for each SP Partition. */
+        RUN_EVERYWHERE, /* ROUTED TO MPI who scatter gather the procedure call to all SPIs */
     }
 
     static enum Mutable {
@@ -75,7 +76,6 @@ public class SystemProcedureCatalog {
         private final String className;
         private Mutable mutable = Mutable.READ_WRITE;
         private final Initiator initiator;
-        private final boolean everySite;
         private final int partitionParam;
         private final VoltType partitionParamType;
         private boolean commercial = false;
@@ -91,26 +91,25 @@ public class SystemProcedureCatalog {
         }
 
         static Builder createSp(String className, int partitionParam, VoltType partitionParamType) {
-            return new Builder(className, Initiator.SINGLE_PARTITION, false, partitionParam, partitionParamType, true, Restartability.NOT_APPLICABLE);
+            return new Builder(className, Initiator.SINGLE_PARTITION, partitionParam, partitionParamType, true, Restartability.NOT_APPLICABLE);
         }
 
         static Builder createMp(String className) {
-            return new Builder(className, Initiator.MULTI_PARTITION, false, 0, VoltType.INVALID, true, Restartability.RESTARTABLE);
+            return new Builder(className, Initiator.MULTI_PARTITION, 0, VoltType.INVALID, true, Restartability.RESTARTABLE);
         }
 
         static Builder createNp(String className) {
-            return new Builder(className, Initiator.MULTI_PARTITION, false, 0, VoltType.INVALID, false, Restartability.NOT_APPLICABLE).notDurable();
+            return new Builder(className, Initiator.MULTI_PARTITION, 0, VoltType.INVALID, false, Restartability.NOT_APPLICABLE).notDurable();
         }
 
         static Builder createEverySite(String className, int partitionParam, VoltType partitionParamType) {
-            return new Builder(className, Initiator.MULTI_PARTITION, true, partitionParam, partitionParamType, true, Restartability.NOT_RESTARTABLE);
+            return new Builder(className, Initiator.RUN_EVERYWHERE, partitionParam, partitionParamType, true, Restartability.NOT_RESTARTABLE);
         }
 
-        private Builder(String className, Initiator initiator, boolean everySite, int partitionParam,
+        private Builder(String className, Initiator initiator, int partitionParam,
                 VoltType partitionParamType, boolean transactional, Restartability restartable) {
             this.className = className;
             this.initiator = initiator;
-            this.everySite = everySite;
             this.partitionParam = partitionParam;
             this.partitionParamType = partitionParamType;
             this.transactional = transactional;
@@ -183,7 +182,7 @@ public class SystemProcedureCatalog {
 
 
         Config build() {
-            return new Config(className, initiator, mutable, everySite, partitionParam, partitionParamType,
+            return new Config(className, initiator, mutable, partitionParam, partitionParamType,
                     commercial, terminatesReplication, allowedInReplica, durable, allowedInShutdown, transactional,
                     restartable);
         }
@@ -217,9 +216,9 @@ public class SystemProcedureCatalog {
         // MP durable and not restartable no
         // MP not durable and not restartable yes
 
-        Config(String className, Initiator initiator, Mutable mutable, boolean everySite, int partitionParam,
-                VoltType partitionParamType, boolean commercial, boolean terminatesReplication, boolean allowedInReplica,
-                Durability durable, boolean allowedInShutdown, boolean transactional, Restartability restartable) {
+        Config(String className, Initiator initiator, Mutable mutable, int partitionParam, VoltType partitionParamType,
+                boolean commercial, boolean terminatesReplication, boolean allowedInReplica, Durability durable,
+                boolean allowedInShutdown, boolean transactional, Restartability restartable) {
             Preconditions.checkArgument(!transactional || initiator == Initiator.SINGLE_PARTITION ||
                     durable != Durability.DURABLE || restartable == Restartability.RESTARTABLE ,
                     "Restartable but not durable MP System procedure %s has a risk of "
@@ -227,7 +226,7 @@ public class SystemProcedureCatalog {
             this.className = className;
             this.singlePartition = initiator == Initiator.SINGLE_PARTITION;
             this.readOnly = mutable == Mutable.READ_ONLY;
-            this.everySite = everySite;
+            this.everySite = initiator == Initiator.RUN_EVERYWHERE;
             this.partitionParam = partitionParam;
             this.partitionParamType = partitionParamType;
             this.commercial = commercial;
@@ -303,381 +302,381 @@ public class SystemProcedureCatalog {
         // Special case: replica acceptability by DR version
         builder.put("@AdHoc_RW_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@AdHoc_RW_SP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_SP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         false, false, false,Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@AdHoc_RO_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RO_MP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@MigratePartitionLeader",
                 new Config("org.voltdb.sysprocs.MigratePartitionLeader",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.BIGINT,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.BIGINT,
                         false, true,  false, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@AdHoc_RO_SP",
                 new Config("org.voltdb.sysprocs.AdHoc_RO_SP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.VARBINARY,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@JStack",
                 new Config(null,
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@Pause",
                 new Config("org.voltdb.sysprocs.Pause",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, true,  0, VoltType.INVALID,
+                        Initiator.RUN_EVERYWHERE, Mutable.READ_WRITE,  0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@QueryStats",
                 new Config("org.voltdb.sysprocs.QueryStats",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@Resume",
                 new Config("org.voltdb.sysprocs.Resume",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, true,  0, VoltType.INVALID,
+                        Initiator.RUN_EVERYWHERE, Mutable.READ_WRITE,  0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@Quiesce",
                 new Config("org.voltdb.sysprocs.Quiesce",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@SnapshotSave",
                 new Config("org.voltdb.sysprocs.SnapshotSave",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@SnapshotRestore",
                 new Config("org.voltdb.sysprocs.SnapshotRestore",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, true,false, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE ));
         builder.put("@SnapshotStatus",
                 new Config("org.voltdb.sysprocs.SnapshotStatus",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SnapshotScan",
                 new Config("org.voltdb.sysprocs.SnapshotScan",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SnapshotDelete",
                 new Config("org.voltdb.sysprocs.SnapshotDelete",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@Shutdown",
                 new Config("org.voltdb.sysprocs.Shutdown",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@ProfCtl",
                 new Config("org.voltdb.sysprocs.ProfCtl",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, true, 0, VoltType.INVALID,
+                        Initiator.RUN_EVERYWHERE, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@Statistics",
                 new Config("org.voltdb.sysprocs.Statistics",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@SystemCatalog",
                 new Config("org.voltdb.sysprocs.SystemCatalog",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.STRING,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.STRING,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SystemInformation",
                 new Config("org.voltdb.sysprocs.SystemInformation",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@UpdateLogging",
                 new Config("org.voltdb.sysprocs.UpdateLogging",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, true, 0, VoltType.INVALID,
+                        Initiator.RUN_EVERYWHERE, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@BalancePartitions",
                 new Config("org.voltdb.sysprocs.BalancePartitions",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, false, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@UpdateCore",
                 new Config("org.voltdb.sysprocs.UpdateCore",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@VerifyCatalogAndWriteJar",
                 new Config("org.voltdb.sysprocs.VerifyCatalogAndWriteJar",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@UpdateApplicationCatalog",
                 new Config("org.voltdb.sysprocs.UpdateApplicationCatalog",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@UpdateClasses",
                 new Config("org.voltdb.sysprocs.UpdateClasses",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@LoadMultipartitionTable",
                 new Config("org.voltdb.sysprocs.LoadMultipartitionTable",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@LoadSinglepartitionTable",
                 new Config("org.voltdb.sysprocs.LoadSinglepartitionTable",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         false, false, false, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE ));
         builder.put("@Promote",
                 new Config("org.voltdb.sysprocs.Promote",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ValidatePartitioning",
                 new Config("org.voltdb.sysprocs.ValidatePartitioning",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@GetHashinatorConfig",
                 new Config("org.voltdb.sysprocs.GetHashinatorConfig",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@ApplyBinaryLogSP",
                 new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         true, false, true, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@ApplyBinaryLogMP",
                 new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@LoadVoltTableSP",
                 new Config("org.voltdb.sysprocs.LoadVoltTableSP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         true, false, true, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@LoadVoltTableMP",
                 new Config("org.voltdb.sysprocs.LoadVoltTableMP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         // DR state is determined by state machine and pbd files, that's the reason why ResetDR
         // neither commandlogged or restartable.
         builder.put("@ResetDR",
                 new Config("org.voltdb.sysprocs.ResetDR",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         /* @ExecuteTask is a all-in-one system store procedure and should be ONLY used for internal purpose */
         builder.put("@ExecuteTask",
                 new Config("org.voltdb.sysprocs.ExecuteTask",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@ExecuteTask_SP",
                 new Config("org.voltdb.sysprocs.ExecuteTask_SP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@UpdateSettings",
                 new Config("org.voltdb.sysprocs.UpdateSettings",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@Ping",
                 new Config(null,
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@PingPartitions",
                 new Config("org.voltdb.sysprocs.PingPartitions",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@GetPartitionKeys",
                 new Config(null,
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  true,  0, VoltType.INVALID,
+                        Initiator.RUN_EVERYWHERE, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@Subscribe",
                 new Config(null,
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_RESTARTABLE));
         builder.put("@GC",
                 new Config("org.voltdb.sysprocs.GC",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@AdHoc",
                 new Config("org.voltdb.sysprocs.AdHoc",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@AdHocSpForTest",
                 new Config("org.voltdb.sysprocs.AdHocSpForTest",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@AdHocLarge",
                 new Config("org.voltdb.sysprocs.AdHocLarge",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@StopNode",
                 new Config(null,
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@PrepareStopNode",
                 new Config(null,
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@Explain",
                 new Config("org.voltdb.sysprocs.Explain",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ExplainProc",
                 new Config("org.voltdb.sysprocs.ExplainProc",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ExplainView",
                 new Config("org.voltdb.sysprocs.ExplainView",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ExplainJSON",
                 new Config("org.voltdb.sysprocs.ExplainJSON",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ExplainCatalog",
                 new Config("org.voltdb.sysprocs.ExplainCatalog",
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@PrepareShutdown",
                 new Config("org.voltdb.sysprocs.PrepareShutdown",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@CancelShutdown",
                 new Config("org.voltdb.sysprocs.CancelShutdown",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@SwapTables",
                 new Config("org.voltdb.sysprocs.SwapTables",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0,    VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0,    VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@SwapTablesCore",
                 new Config("org.voltdb.sysprocs.SwapTablesCore",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@Trace",
                 new Config(null,
-                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY,  false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@CheckUpgradePlanNT",
                 new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@PrerequisitesCheckNT",
                 new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@RestartDRConsumerNT",
                 new Config("org.voltdb.sysprocs.RestartDRConsumerNT",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ShutdownNodeDRConsumerNT",
                 new Config("org.voltdb.sysprocs.RestartDRConsumerNT$ShutdownNodeDRConsumerNT",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@StartNodeDRConsumerNT",
                 new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@NibbleDeleteSP",
                 new Config("org.voltdb.sysprocs.NibbleDeleteSP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@NibbleDeleteMP",
                 new Config("org.voltdb.sysprocs.NibbleDeleteMP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@LowImpactDeleteNT",
                 new Config("org.voltdb.sysprocs.LowImpactDeleteNT",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@ExportControl",
                 new Config("org.voltdb.sysprocs.ExportControl",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         // @TopicControl is like @ExportControl but for topic streams in PRO
         builder.put("@TopicControl",
                 new Config("org.voltdb.sysprocs.TopicControl",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsAcked_SP",
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.DURABLE,
                         true, true, Restartability.NOT_APPLICABLE));
         builder.put("@MigrateRowsAcked_MP",
                 new Config("org.voltdb.sysprocs.MigrateRowsAcked_MP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         false, false, false, Durability.DURABLE,
                         true, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsSP",
                 new Config("org.voltdb.sysprocs.MigrateRowsSP",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.DURABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@MigrateRowsMP",
                 new Config("org.voltdb.sysprocs.MigrateRowsMP",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.VARBINARY,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.VARBINARY,
                         false, false, false, Durability.DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@MigrateRowsNT",
                 new Config("org.voltdb.sysprocs.MigrateRowsNT",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.NOT_APPLICABLE,
                         false, false, Restartability.NOT_APPLICABLE));
         builder.put("@MigrateRowsDeleterNT",
                 new Config("org.voltdb.sysprocs.MigrateRowsDeleterNT",
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, false, Durability.NOT_APPLICABLE,
                         true, false, Restartability.NOT_APPLICABLE));
         builder.put("@ElasticRemoveNT",
@@ -688,7 +687,7 @@ public class SystemProcedureCatalog {
                         .allowedInReplica().build());
         builder.put("@StopReplicas",
                 new Config("org.voltdb.sysprocs.StopReplicas",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false,  0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
         builder.put("@OpPseudoShutdown",

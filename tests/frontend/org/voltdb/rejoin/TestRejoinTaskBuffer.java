@@ -209,6 +209,6 @@ public class TestRejoinTaskBuffer {
     }
 
     private TransactionInfoBaseMessage createTask(StoredProcedureInvocation invocation) {
-        return new Iv2InitiateTaskMessage(0, 0, 0, 42, 42, false, true, invocation, 0, 0, true);
+        return new Iv2InitiateTaskMessage(0, 0, 0, 42, 42, false, true, false, invocation, 0, 0, true);
     }
 }
