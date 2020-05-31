@@ -87,7 +87,7 @@ public class TestTaskLog {
 
             Iv2InitiateTaskMessage task =
                 new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
-                        false, true, invocation, 4, 5, false);
+                        false, true, false, invocation, 4, 5, false);
             task.setSpHandle(spego.getTxnId());
             spego = spego.makeNext();
             m_log.logTask(task);
@@ -136,7 +136,7 @@ public class TestTaskLog {
 
             Iv2InitiateTaskMessage task =
                 new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
-                        false, true, invocation, 4, 5, false);
+                        false, true, false, invocation, 4, 5, false);
             task.setSpHandle(spego.getTxnId());
             spego = spego.makeNext();
             m_log.logTask(task);
@@ -182,7 +182,7 @@ public class TestTaskLog {
 
             Iv2InitiateTaskMessage task =
                 new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
-                        false, true, invocation, 4, 5, false);
+                        false, true, false, invocation, 4, 5, false);
             task.setSpHandle(spego.getTxnId());
             spego = spego.makeNext();
             m_log.logTask(task);
@@ -225,7 +225,7 @@ public class TestTaskLog {
 
             Iv2InitiateTaskMessage task =
                 new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
-                        false, true, invocation, 4, 5, false);
+                        false, true, false, invocation, 4, 5, false);
             task.setSpHandle(spego.getTxnId());
             spego = spego.makeNext();
             m_log.logTask(task);
@@ -276,7 +276,7 @@ public class TestTaskLog {
 
                 Iv2InitiateTaskMessage task =
                     new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, 0, 0,
-                            false, true, invocation, 4, 5, false);
+                            false, true, false, invocation, 4, 5, false);
                 m_log.logTask(task);
             }
 
@@ -293,7 +293,7 @@ public class TestTaskLog {
 
                     Iv2InitiateTaskMessage task =
                         new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, 0, 0,
-                                false, true, invocation, 4, 5, false);
+                                false, true, false, invocation, 4, 5, false);
                     m_log.logTask(task);
                 } else {
                     Iv2InitiateTaskMessage message = null;
@@ -328,7 +328,7 @@ public class TestTaskLog {
 
             Iv2InitiateTaskMessage task =
                     new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
-                            false, true, invocation, 4, 5, false);
+                            false, true, false, invocation, 4, 5, false);
             task.setSpHandle(spego.getTxnId());
             spego = spego.makeNext();
             m_log.logTask(task);

@@ -36,7 +36,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -315,8 +314,9 @@ public class MpScheduler extends Scheduler
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
 
         // Handle every-site system procedures (at the MPI)
-        final Config sysprocConfig = SystemProcedureCatalog.listing.get(procedureName);
-        if (sysprocConfig != null &&  sysprocConfig.getEverysite()) {
+        if (message.isEveryPartition()) {
+            assert(SystemProcedureCatalog.listing.get(procedureName) != null &&
+                    SystemProcedureCatalog.listing.get(procedureName).getEverysite());
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
@@ -327,6 +327,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    true, // isEveryPartition
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -356,6 +357,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    false,
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -456,6 +458,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    message.isEveryPartition(),
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),

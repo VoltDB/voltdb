@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.zip.CRC32;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -33,7 +34,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -1788,27 +1788,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         return js;
     }
 
-    // crc32 based checksum for whole table
-    public long getTableCheckSum() {
-        VoltTableRow row = cloneRow();
-        row.resetRowPosition();
-        int columnCount = getColumnCount();
-        long checksum = 0;
-        PureJavaCrc32 rowCRC = new PureJavaCrc32();
-        while (row.advanceRow()) {
-            // Todo: switch to hybridCrc32 when volt client also include hybridcrc32
-            // or switch to java crc32 if starting runing java9+
-            // HybridCrc32 rowCRC = new HybridCrc32();
-            // rowCRC.update(getRawRow());
-            rowCRC.reset();
-            for (int i = 0; i < columnCount; i++) {
-                rowCRC.update(row.getRaw(i));
-            }
-            checksum += rowCRC.getValue();
-        }
-        return checksum;
-    }
-
     /**
      * Construct a table from a JSON string. Only parses VoltDB VoltTable JSON format.
      *
@@ -1921,22 +1900,59 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             return true;
         }
 
-        int mypos = m_buffer.position();
-        int theirpos = other.m_buffer.position();
-        if (mypos != theirpos) {
+        if (m_buffer.position() != other.m_buffer.position()) {
             return false;
         }
-        long checksum1, checksum2;
         if (ignoreOrder) {
-            checksum1 = ClientUtils.cheesyBufferCheckSum(m_buffer);
-            checksum2 = ClientUtils.cheesyBufferCheckSum(other.m_buffer);
+            return getTableCheckSum(true) == other.getTableCheckSum(true);
         } else {
-            checksum1 = ClientUtils.cheesyBufferCheckSumWithOrder(m_buffer);
-            checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
+            ByteBuffer thisBuffer = m_buffer.duplicate();
+            thisBuffer.limit(thisBuffer.position()).rewind();
+            ByteBuffer otherBuffer = other.m_buffer.duplicate();
+            otherBuffer.limit(otherBuffer.position()).rewind();
+            return thisBuffer.equals(otherBuffer);
         }
-        boolean checksum = (checksum1 == checksum2);
-        assert(verifyTableInvariants());
-        return checksum;
+    }
+
+    /**
+     * Calculate a rudimentary checksum of the table. The result of this method will be the same for two tables with the
+     * same rows but not necessarily in the same order.
+     * <p>
+     * When {@code includeHeader} is {@code false} the result of this checksum can be added to the result from another
+     * table to affectively concatenate the hash from this table with another to compare across tables.
+     *
+     * @param includeHeader If {@code true} the table header will be included in the checksum
+     * @return checksum of table
+     */
+    public long getTableCheckSum(boolean includeHeader) {
+        ByteBuffer buffer = m_buffer.asReadOnlyBuffer();
+        int limit = buffer.position();
+        long hash = 0;
+        // Better off using native since the most common user uses direct byte buffers
+        CRC32 crc = new CRC32();
+
+        if (includeHeader) {
+            buffer.rewind().limit(m_rowStart + Integer.BYTES);
+            crc.update(buffer);
+            hash = crc.getValue();
+        } else {
+            buffer.position(m_rowStart + Integer.BYTES);
+        }
+
+        int position = buffer.position();
+        for (int i = 0; i < m_rowCount; ++i) {
+            buffer.limit(limit);
+            int length = buffer.getInt(position) + Integer.BYTES;
+            buffer.limit(position + length);
+            crc.reset();
+            crc.update(buffer);
+            hash += crc.getValue();
+            position += length;
+            assert position == buffer.position();
+        }
+
+        assert limit == position && buffer.limit() == limit;
+        return hash;
     }
 
     /**
