@@ -20,7 +20,6 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
  * Helper methods duplicated from MiscUtils to avoid linking with
@@ -28,57 +27,6 @@ import java.nio.ByteBuffer;
  *
  */
 public class ClientUtils {
-
-    /**
-     * I heart commutativity
-     * @param buffer ByteBuffer assumed position is at end of data
-     * @return the cheesy checksum of this VoltTable
-     */
-    public static final long cheesyBufferCheckSum(ByteBuffer buffer) {
-        return cheesyBufferCheckSum(buffer, false);
-    }
-    public static final long cheesyBufferCheckSum(ByteBuffer buffer, boolean skipHeader) {
-        final int mypos = buffer.position();
-        // row data start at buffer.getInt(0) + 4, with first 4 bit as row count
-        int startPosition = skipHeader ? buffer.getInt(0) + 8 : 0;
-        buffer.position(startPosition);
-        long checksum = 0;
-        if (buffer.hasArray()) {
-            final byte bytes[] = buffer.array();
-            final int end = buffer.arrayOffset() + mypos - startPosition;
-            for (int ii = buffer.arrayOffset(); ii < end; ii++) {
-                checksum += bytes[ii];
-            }
-        } else {
-            for (int ii = startPosition; ii < mypos; ii++) {
-                checksum += buffer.get();
-            }
-        }
-        buffer.position(mypos);
-        return checksum;
-    }
-
-    // rolling checksum with both position and value as input
-    // TODO: explore CRC or farmHash for more accurate checksum
-    public static final long cheesyBufferCheckSumWithOrder(ByteBuffer buffer) {
-        final int mypos = buffer.position();
-        buffer.position(0);
-        long checksum = 0;
-        if (buffer.hasArray()) {
-            final byte bytes[] = buffer.array();
-            final int end = buffer.arrayOffset() + mypos;
-            for (int ii = buffer.arrayOffset(); ii < end; ii++) {
-                checksum += bytes[ii] * (1+ii);
-            }
-        } else {
-            for (int ii = 0; ii < mypos; ii++) {
-                checksum += buffer.get() * (1+ii);
-            }
-        }
-        buffer.position(mypos);
-        return checksum;
-    }
-
     /**
      * Serialize a file into bytes. Used to serialize catalog and deployment
      * file for UpdateApplicationCatalog on the client.

@@ -50,8 +50,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
 
-    // HSID for test only
-    public static long TEST_LAST_HSID = Long.MAX_VALUE -1;
     protected final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     protected final Callback m_cb; // the callback when the cache changes
