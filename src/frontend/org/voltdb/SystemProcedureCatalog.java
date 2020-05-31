@@ -296,8 +296,8 @@ public class SystemProcedureCatalog {
     static ImmutableSet<String> s_allowableSysprocsInTaskLog;
     static {
         final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
-        //              SP/MP   RO/RW    every-site    Param  ParamType
-        //              PRO     killDR   replica-ok    durable
+        //              SP/MP   RO/RW    ParamNum    ParamType
+        //              PRO     killDR   replica-ok  durable
         //              allowedInShutdown  transactional  restartable
         // Special case: replica acceptability by DR version
         builder.put("@AdHoc_RW_MP",
@@ -692,12 +692,12 @@ public class SystemProcedureCatalog {
                         false, true, Restartability.RESTARTABLE));
         builder.put("@OpPseudoShutdown",
                 new Config("org.voltdb.operator.OpPseudoShutdown",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_DURABLE,
                         true, true, Restartability.NOT_RESTARTABLE));
         builder.put("@OpPseudoStop",
                 new Config(null,
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, false, 0, VoltType.INVALID,
+                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@StoreKiplingGroup", Builder
