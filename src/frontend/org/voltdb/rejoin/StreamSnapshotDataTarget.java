@@ -334,14 +334,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
+                long bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOS_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
                 }
-                if (bytesWritten > 0) {
+                if (bytesSentSinceLastCheck > 0) {
                     m_lastDataSent = System.currentTimeMillis();
                 } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDataSent) > 1) {
                     // No data sent for one long minute and destination host is not alive, stop watching
