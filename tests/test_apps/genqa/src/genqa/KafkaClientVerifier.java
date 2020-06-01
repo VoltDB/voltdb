@@ -23,6 +23,7 @@
 
 package genqa;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +45,15 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
+import org.voltdb.CLIConfig.Option;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientStats;
 import org.voltdb.iv2.TxnEgo;
+
+// import TopicBenchmark.TopicBenchConfig;
+
+// import TopicBenchmark.TopicBenchConfig;
 
 /**
  * This verifier connects to kafka and consumes messages from a topic, it then
@@ -74,6 +83,7 @@ public class KafkaClientVerifier {
     private final AtomicLong verifiedRows = new AtomicLong(0);
     private final AtomicLong duplifiedRows = new AtomicLong(0);
     private final AtomicBoolean testGood = new AtomicBoolean(true);
+    final VerifierCliConfig config;
     private final AtomicInteger maxRecordSize = new AtomicInteger(0); // use
                                                                       // this to
                                                                       // calculate
@@ -114,8 +124,17 @@ public class KafkaClientVerifier {
         @Option(desc = "does each data row include 6 metadata fields? Default: false")
         Boolean metadata = false;
 
+        @Option(desc = "does each data row include 6 metadata fields? Default: false")
+        Integer count = 0;
+
         @Option(desc = " the number of consumers to create when reading a topic")
         Integer consumers = 1;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+
+        @Option(desc = "Filename to write periodic stat infomation in CSV format")
+        String csvfile = "";
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
         Integer timeout = 60;
@@ -175,10 +194,11 @@ public class KafkaClientVerifier {
         private final Boolean m_usetableexport;
         private final Boolean m_metadata;
         private final Integer timeoutSec;
+        private final Integer m_count;
 
         public TopicReader(KafkaConsumer<String, String> consumer, CountDownLatch cdl, Integer uniqueFieldNum,
                 Integer sequenceFieldNum, Integer partitionFieldNum, int timeout,
-                AtomicBoolean testGood, Boolean usetableexport, Boolean metadata) {
+                AtomicBoolean testGood, Boolean usetableexport, Boolean metadata, Integer count) {
             this.consumer = consumer;
             m_cdl = cdl;
             m_uniqueFieldNum = uniqueFieldNum;
@@ -186,6 +206,7 @@ public class KafkaClientVerifier {
             m_partitionFieldNum = partitionFieldNum;
             m_usetableexport = usetableexport;
             m_metadata = metadata; // no metadata if stream as topic
+            m_count = count;
             timeoutSec = timeout;
 
         }
@@ -228,10 +249,15 @@ public class KafkaClientVerifier {
                         sequenceNum = Long.parseLong(row[m_sequenceFieldNum]);
                     }
 
-                    // the number of expected rows should match the max of the
+                    // if count is passed in, run til "count" rows consumed
+                    // otherwise the number of expected rows should match the max of the
                     // field that contains the sequence field
-                    long maxRow = Math.max(expectedRows.get(), sequenceNum); // TODO: rework based on partitionid + sequence number
-                    expectedRows.set(maxRow);
+                    if (m_count.intValue() > 0) {
+                        expectedRows.set(m_count);
+                    } else {
+                        long maxRow = Math.max(expectedRows.get(), sequenceNum); // TODO: rework based on partitionid + sequence number
+                        expectedRows.set(maxRow);
+                    }
 
                     // new code to check for dupes using the combination of partition id and sequence number
                     // since sequence number by itself is zero-based per partition
@@ -284,6 +310,8 @@ public class KafkaClientVerifier {
     public KafkaClientVerifier(VerifierCliConfig config) {
         // Use a random groupId for this consumer group so we don't conflict
         // with any other consumers.
+
+        this.config = config;
         groupId = String.valueOf(System.currentTimeMillis());
         consumerTimeoutSecs = config.timeout;
         Properties props = new Properties();
@@ -333,7 +361,7 @@ public class KafkaClientVerifier {
      * @throws Exception
      */
     public void verifyTopic(String topic, Integer uniqueIndexFieldNum, Integer sequenceFieldNum,
-            Integer partitionFieldNum, Boolean usetableexport, Boolean metadata) throws Exception {
+            Integer partitionFieldNum, Boolean usetableexport, Boolean metadata, Integer count) throws Exception {
 
         List<String> topics = new ArrayList<String>();
         topics.add(topic);
@@ -346,7 +374,7 @@ public class KafkaClientVerifier {
             consumer.subscribe(Arrays.asList(topic));
             log.info("Creating consumer for " + topic);
             TopicReader reader = new TopicReader(consumer, consumersLatch, uniqueIndexFieldNum, sequenceFieldNum,
-                    partitionFieldNum, consumerTimeoutSecs, testGood, usetableexport, metadata);
+                    partitionFieldNum, consumerTimeoutSecs, testGood, usetableexport, metadata, count);
             executor.execute(reader);
         }
 
@@ -376,6 +404,7 @@ public class KafkaClientVerifier {
 
         consumersLatch.await();
         log.info("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
+
         if (consumedRows.get() == 0) {
             log.error("No rows were consumed.");
             testGood.set(false);
@@ -485,7 +514,7 @@ public class KafkaClientVerifier {
         Boolean metadata = config.metadata;
         try {
             verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
-                config.partitionfield, config.usetableexport, metadata);
+                config.partitionfield, config.usetableexport, metadata, config.count);
         } catch (IOException e) {
             log.error(e.toString());
             e.printStackTrace(System.err);

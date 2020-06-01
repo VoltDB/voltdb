@@ -65,7 +65,6 @@ function srccompile() {
     jar cf topicbenchmark-client.jar -C client topicbenchmark
     jar cf topicbenchmark-procedures.jar -C procedures topicbenchmark
     # add KafkaClientVerifier from genqa
-    /bin/pwd > /tmp/dirIam
     cd genqa; ./run.sh jars ; cd ../
     jar uf topicbenchmark-client.jar -C genqa/obj genqa
 }
