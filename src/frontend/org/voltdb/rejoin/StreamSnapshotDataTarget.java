@@ -105,6 +105,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
+    private long m_lastDataSent;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
             byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
@@ -340,11 +341,22 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
                 }
+                if (bytesWritten > 0) {
+                    m_lastDataSent = System.currentTimeMillis();
+                } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDataSent) > 1) {
+                    // No data sent for one long minute and destination host is not alive, stop watching
+                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                    if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
+                        m_closed.set(true);
+                    }
+                }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
             } finally {
                 // schedule to run again
-                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                if (!m_closed.get()) {
+                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                }
             }
         }
     }
