@@ -653,6 +653,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
     }
 
+    private static String[] ignoredFilenames = { "lost+found" };
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute()) {
@@ -660,10 +662,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else {
             managedPath = new VoltFile(voltDbRoot, path);
         }
-        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0) {
-            return managedPath.getAbsolutePath();
+        if (!managedPath.exists()) {
+            return null; // if it does not exist, there's nothing in it
         }
-        return null;
+        String absPath = managedPath.getAbsolutePath();
+        if (!managedPath.canRead()) { // can't read? assume empty but note in log
+            hostLog.warn(String.format("Cannot read directory '%s'", absPath));
+            return null;
+        }
+        Collection<String> ignorable = Arrays.asList(ignoredFilenames); // HashSet<> is overkill
+        String[] content = managedPath.list((dir,name) -> !ignorable.contains(name));
+        if (content.length == 0) { // nothing we care about
+            return null;
+        }
+        // Directory contains files we should not ignore
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("Directory '").append(absPath).append("' contains:");
+        for (int i=0; i<10 && i<content.length; i++) {
+            sb.append(' ').append(content[i]);
+        }
+        if (content.length > 10) {
+            sb.append(" ...");
+        }
+        hostLog.warn(sb.toString());
+        return absPath;
     }
 
     private void managedPathsEmptyCheck(Configuration config) {
