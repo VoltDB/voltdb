@@ -343,8 +343,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     clearOutstanding(); // idempotent
                 }
                 if (bytesSentSinceLastCheck > 0) {
-                    m_lastDataSent = System.currentTimeMillis();
-                } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDataSent) > 1) {
+                    m_lastDataSent = System.nanoTime();
+                } else if (TimeUnit.MINUTES.convert((System.nanoTime() - m_lastDataSent), TimeUnit.NANOSECONDS) > 1) {
                     // No data sent for one long minute and destination host is not alive, stop watching
                     Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                     if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
