@@ -42,13 +42,15 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public static int SINGLE_PARTITION_MASK = 1;
     public static int N_PARTITION_MASK = 2;
-    public static int SHOULD_RETURN_TABLES_MASK = 2;
+    public static int SHOULD_RETURN_TABLES_MASK = 4;
+    public static int EVERY_PARTITION_MASK = 8;
 
     long m_clientInterfaceHandle;
     long m_connectionId;
     boolean m_isSinglePartition;
+    boolean m_isEveryPartition;
     int[] m_nPartitions;
-    //Flag to indicate the the replica applying the write transaction
+    //Flag to indicate that the replica applying the write transaction
     //doesn't need to send back the result tables
     boolean m_shouldReturnResultTables = true;
     StoredProcedureInvocation m_invocation;
@@ -68,6 +70,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             long uniqueId,
             boolean isReadOnly,
             boolean isSinglePartition,
+            boolean isEveryPartition,
             StoredProcedureInvocation invocation,
             long clientInterfaceHandle,
             long connectionId,
@@ -80,6 +83,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             uniqueId,
             isReadOnly,
             isSinglePartition,
+            isEveryPartition,
             invocation,
             clientInterfaceHandle,
             connectionId,
@@ -95,6 +99,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long uniqueId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
+                        boolean isEveryPartition,
                         StoredProcedureInvocation invocation,
                         long clientInterfaceHandle,
                         long connectionId,
@@ -103,6 +108,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
+        m_isEveryPartition = isEveryPartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
@@ -117,6 +123,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             long uniqueId,
             boolean isReadOnly,
             boolean isSinglePartition,
+            boolean isEveryPartition,
             int[] nPartitions,
             StoredProcedureInvocation invocation,
             long clientInterfaceHandle,
@@ -127,6 +134,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
+        m_isEveryPartition = isEveryPartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
@@ -146,10 +154,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     {
         super(initiatorHSId, coordinatorHSId, rhs);
         m_isSinglePartition = rhs.m_isSinglePartition;
+        m_isEveryPartition = rhs.m_isEveryPartition;
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
         m_nPartitions = rhs.m_nPartitions;
+        m_shouldReturnResultTables = false;
         m_isForReplica = toReplica;
     }
 
@@ -161,6 +171,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     @Override
     public boolean isSinglePartition() {
         return m_isSinglePartition;
+    }
+
+    public boolean isEveryPartition() {
+        return m_isEveryPartition;
     }
 
     public short getNPartCount() {
@@ -222,8 +236,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         int msgsize = super.getSerializedSize();
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
-        msgsize += 1; // is single partition flag
-        msgsize += 1; // should generate a response
         msgsize += 1; // flags (SP/NP/return tables)
         if (m_nPartitions != null) {
             msgsize += 2 + m_nPartitions.length * 4; // 2 for length prefix and 4 each
@@ -245,6 +257,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         if (m_isSinglePartition) {
             flags |= SINGLE_PARTITION_MASK;
         }
+        if (m_isEveryPartition) {
+            flags |= EVERY_PARTITION_MASK;
+        }
+        if (m_shouldReturnResultTables) {
+            flags |= SHOULD_RETURN_TABLES_MASK;
+        }
         if (m_nPartitions != null) {
             flags |= N_PARTITION_MASK;
         }
@@ -256,8 +274,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super.flattenToBuffer(buf);
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
-        buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         buf.put(flags);
         if (m_nPartitions != null) {
             buf.putShort((short) m_nPartitions.length);
@@ -276,10 +292,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super.initFromBuffer(buf);
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
-        m_isSinglePartition = buf.get() == 1;
-        m_shouldReturnResultTables = buf.get() != 0;
         byte flags = buf.get();
         m_isSinglePartition = (flags & SINGLE_PARTITION_MASK) != 0;
+        m_isEveryPartition = (flags & EVERY_PARTITION_MASK) != 0;
         m_shouldReturnResultTables = (flags & SHOULD_RETURN_TABLES_MASK) != 0;
         if ((flags & N_PARTITION_MASK) != 0) {
             int partitionCount = buf.getShort();

@@ -71,30 +71,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         return s_retentionPolicyMgr;
     }
 
-    public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
-        private static final VoltLogger LOG = new VoltLogger("HOST");
-
-        @Override
-        public BBContainer getContainer(int minimumSize) {
-              final BBContainer origin = DBBPool.allocateUnsafeByteBuffer(minimumSize);
-              final BBContainer retcont = new BBContainer(origin.b()) {
-                  private boolean discarded = false;
-
-                  @Override
-                  public synchronized void discard() {
-                      checkDoubleFree();
-                      if (discarded) {
-                          LOG.error("Avoided double discard in PBD");
-                          return;
-                      }
-                      discarded = true;
-                      origin.discard();
-                  }
-              };
-              return retcont;
-        }
-    }
-
     class GapWriter implements BinaryDequeGapWriter<M> {
         private M m_gapHeader;
         private PBDSegment<M> m_activeSegment;
@@ -777,7 +753,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
     }
 
-    public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();
+    public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = DBBPool::allocateUnsafeByteBuffer;
 
     /**
      * Processors also log using this facility.

@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProducerDRGateway;
@@ -36,6 +38,8 @@ import org.voltdb.VoltType;
 import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
+
+import io.netty.buffer.ByteBuf;
 
 // ExecuteTask is now a restartable system procedure
 // make sure each sub task is either idempotent or can rollback (e.g. generateDREvent)
@@ -179,6 +183,12 @@ public class ExecuteTask extends VoltSystemProcedure
                 }
                 break;
             }
+            case JAVA_GET_DRID_TRACKER:
+                Map<Integer, Map<Integer, DRSiteDrIdTracker>> drIdTrackers = context.getDrAppliedTrackers();
+                Pair<Long, Long> lastConsumerUniqueIds = context.getDrLastAppliedUniqueIds();
+                ByteBuf data = DRIDTrackerHelper.serializeClustersTrackers(lastConsumerUniqueIds, drIdTrackers, buffer);
+                result = VoltTableUtil.splitLargeBuffer(context.getPartitionId(), data);
+                break;
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }

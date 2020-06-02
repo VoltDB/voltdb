@@ -93,7 +93,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     public static CatalogChangeResult prepareApplicationCatalogDiff(
             String invocationName, final byte[] operationBytes, final String operationString,
             final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
-            final boolean isPromotion, String user) {
+            final boolean isPromotion, String user, int nextCatVer) {
         final DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
         // create the change result and set up all the boiler plate
@@ -263,6 +263,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // verified when / if the update procedure runs in order to verify
             // catalogs only move forward
             retval.expectedCatalogVersion = context.catalogVersion;
+
+            // In C/L replay path the next catalog version may not be the expected version plus 1,
+            // because C/L reinitiator may queue multiple UACs before any of those get executed,
+            // failed UAC also consumes a version number.
+            retval.nextCatalogVersion = nextCatVer;
 
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
@@ -478,8 +483,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     CompletableFuture<ClientResponse> updateApplication(
             String invocationName, final byte[] operationBytes, final String operationString,
-            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
-            final boolean isPromotion) {
+            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final boolean isPromotion) {
         final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         final CatalogChangeResult ccr;
 
@@ -491,9 +495,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         // Now we holds the UAC blocker lock
         try {
+            int nextCataVer = VoltDB.instance().getCatalogContext().catalogVersion + 1;
             ccr = prepareApplicationCatalogDiff(
                     invocationName, operationBytes, operationString, adhocDDLStmts, sqlNodes,
-                    replayHashOverride, isPromotion, getUsername());
+                    null, isPromotion, getUsername(), nextCataVer);
         } catch (Exception e) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
@@ -538,7 +543,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         hostLog.info("About to call @UpdateCore");
         try {
-            CatalogUtil.stageCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId, -1,
+            CatalogUtil.stageCatalogToZK(zk, ccr.nextCatalogVersion, genId, -1,
                     SegmentedCatalog.create(ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes));
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing stage catalog bytes on ZK during " + invocationName;
@@ -555,7 +560,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // update the catalog jar
         CompletableFuture<ClientResponse> first = callProcedure(
                 "@UpdateCore", ccr.encodedDiffCommands, ccr.expectedCatalogVersion,
-                genId, ccr.catalogHash, ccr.deploymentHash,
+                ccr.nextCatalogVersion, genId, ccr.catalogHash, ccr.deploymentHash,
                 ccr.worksWithElastic ? 1 : 0, ccr.tablesThatMustBeEmpty, ccr.reasonsForEmptyTables,
                 ccr.requiresSnapshotIsolation ? 1 : 0, ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                 ccr.hasSchemaChange ?  1 : 0, ccr.requiresNewExportGeneration ? 1 : 0,

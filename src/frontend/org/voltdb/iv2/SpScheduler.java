@@ -570,6 +570,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    message.isEveryPartition(),
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -581,9 +582,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
-            if (SystemProcedureCatalog.listing.get(procedureName) == null ||
-                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite())
-            {
+            if (msg.isEveryPartition()) {
+                assert(SystemProcedureCatalog.listing.get(procedureName) != null &&
+                        SystemProcedureCatalog.listing.get(procedureName).getEverysite());
+            }
+            else {
                 msg.setTxnId(newSpHandle);
                 msg.setUniqueId(uniqueId);
             }
@@ -609,6 +612,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getUniqueId(),
                             msg.isReadOnly(),
                             msg.isSinglePartition(),
+                            msg.isEveryPartition(),
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
@@ -1158,6 +1162,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         uac.getUniqueId(),
                         uac.isReadOnly(),
                         uac.isSinglePartition(),
+                        uac.isEveryPartition(),
                         uac.getNParitionIds(),
                         invocation,
                         uac.getClientInterfaceHandle(),
