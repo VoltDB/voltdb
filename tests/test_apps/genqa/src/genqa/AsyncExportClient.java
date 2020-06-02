@@ -389,7 +389,7 @@ public class AsyncExportClient
                 while (count > 0 && tries < 10) {
                     Thread.sleep(30000);
                     count = getCount();
-                    long.info("draining " + tries);
+                    log.info("draining " + tries);
                     tries--;
                 }
                 
