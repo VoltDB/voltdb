@@ -212,6 +212,11 @@ public class AsyncExportClient
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
 
+    private static String[] TABLES = { "EXPORT_PARTITIONED_TABLE_JDBC",
+                                       "EXPORT_REPLICATED_TABLE_JDBC",
+                                       "EXPORT_PARTITIONED_TABLE_KAFKA",
+                                       "EXPORT_REPLICATED_TABLE_KAFKA"};
+
     static {
         VoltDB.setDefaultTimezone();
     }
@@ -367,21 +372,33 @@ public class AsyncExportClient
             // likewise for the migrate task
             migrateTimer.cancel();
             if (config.migrateWithoutTTL) {
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-
+                for (String t : TABLES) {
+                    log_migrating_counts(t);
+                }
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
-                log.info("triggering final migrate");
-                trigger_migrate(0);
-                Thread.sleep(7500);
-
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                int count = getCount();
+                if (count > 0) {
+                    Thread.sleep(7500);
+                    log.info("triggering final migrate");
+                    trigger_migrate(0);
+                }
+                //give more time
+                count = getCount();
+                int tries = 1;
+                while (count > 0 && tries < 10) {
+                    Thread.sleep(30000);
+                    count = getCount();
+                    long.info("draining " + tries);
+                    tries--;
+                }
+                
+                // log final count
+                if (count > 0) {
+                    for (String t : TABLES) {
+                        log_migrating_counts(t);
+                    }
+                }
             }
 
             shutdown.compareAndSet(false, true);
@@ -561,7 +578,17 @@ public class AsyncExportClient
         }
     }
 
-
+    private static long getCount() {
+        long count = 0;
+        for (String t : TABLES) {
+            count = get_table_count(t);
+            if (count == 0) {
+                return count;
+            }
+        }
+        return count;
+    }
+    
     private static long get_table_count(String sqlTable) {
         long count = 0;
         try {
