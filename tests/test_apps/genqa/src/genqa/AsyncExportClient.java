@@ -392,7 +392,7 @@ public class AsyncExportClient
                     log.info("draining " + tries);
                     tries--;
                 }
-                
+
                 // log final count
                 if (count > 0) {
                     for (String t : TABLES) {
@@ -588,7 +588,7 @@ public class AsyncExportClient
         }
         return count;
     }
-    
+
     private static long get_table_count(String sqlTable) {
         long count = 0;
         try {
