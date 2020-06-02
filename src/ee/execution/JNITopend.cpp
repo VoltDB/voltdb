@@ -170,7 +170,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJJJJLjava/nio/ByteBuffer;)V");
+            "(ILjava/lang/String;JJJJJLorg/voltcore/utils/DBBPool$BBContainer;)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_pushExportBufferMID != NULL);
@@ -274,6 +274,27 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_releaseLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_releaseLargeTempTableBlockMID != 0);
+        throw std::exception();
+    }
+
+    m_NDBBWClass = m_jniEnv->FindClass("org/voltcore/utils/DBBPool$NDBBWrapperContainer");
+    if (m_NDBBWClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_NDBBWClass != NULL);
+        throw std::exception();
+    }
+
+    m_NDBBWClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_NDBBWClass));
+    if (m_NDBBWClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_NDBBWClass != NULL);
+        throw std::exception();
+    }
+
+    m_NDBBWConstructorMID = m_jniEnv->GetMethodID(m_NDBBWClass, "<init>", "(Ljava/nio/ByteBuffer;)V");
+    if (m_NDBBWConstructorMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_NDBBWConstructorMID != 0);
         throw std::exception();
     }
 }
@@ -567,6 +588,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
     m_jniEnv->DeleteGlobalRef(m_decompressionClass);
+    m_jniEnv->DeleteGlobalRef(m_NDBBWClass);
 }
 
 void JNITopend::pushExportBuffer(
@@ -581,6 +603,7 @@ void JNITopend::pushExportBuffer(
             m_jniEnv->ExceptionDescribe();
             throw std::exception();
         }
+        jobject container = m_jniEnv->NewObject(m_NDBBWClass, m_NDBBWConstructorMID, buffer);
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
@@ -591,8 +614,9 @@ void JNITopend::pushExportBuffer(
                 block->getRowCount(),
                 block->lastSpUniqueId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
-                buffer);
+                container);
         m_jniEnv->DeleteLocalRef(buffer);
+        m_jniEnv->DeleteLocalRef(container);
     } else {
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,

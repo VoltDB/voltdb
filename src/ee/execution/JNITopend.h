@@ -112,9 +112,11 @@ private:
     jmethodID m_storeLargeTempTableBlockMID;
     jmethodID m_loadLargeTempTableBlockMID;
     jmethodID m_releaseLargeTempTableBlockMID;
+    jmethodID m_NDBBWConstructorMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
+    jclass m_NDBBWClass;
     jmethodID initJavaUserDefinedMethod(const char* name);
 };
 

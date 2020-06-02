@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,7 +37,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DBBPool.NDBBWrapperContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -560,9 +558,8 @@ public class ExportManager implements ExportManagerInterface
             long tupleCount,
             long uniqueId,
             long bufferPtr,
-            ByteBuffer buffer) {
+            BBContainer container) {
         //For validating that the memory is released
-        BBContainer container = buffer == null ? null : new NDBBWrapperContainer(buffer);
         if (bufferPtr != 0) {
             DBBPool.registerUnsafeMemory(bufferPtr);
         }
