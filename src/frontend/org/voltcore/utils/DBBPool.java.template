@@ -247,7 +247,7 @@ public final class DBBPool {
      *
      */
     public static final class NDBBWrapperContainer extends BBContainer {
-        private NDBBWrapperContainer(ByteBuffer b) {
+        public NDBBWrapperContainer(ByteBuffer b) {
             super( b );
         }
 

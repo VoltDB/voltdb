@@ -23,22 +23,13 @@
 
 package org.voltdb.export;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.hamcrest.MockitoHamcrest.argThat;
-import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,17 +37,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
-import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
@@ -66,13 +49,9 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.VoltFile;
-
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import junit.framework.TestCase;
 
@@ -128,7 +107,7 @@ public class TestExportDataSource extends TestCase {
         @Override
         public void pushExportBuffer(int partitionId, String signature,
                 long seqNo, long committedSeqNo, int tupleCount,
-                long uniqueId, ByteBuffer buffer) {
+                long uniqueId, BBContainer cont) {
         }
 
         @Override
@@ -265,7 +244,7 @@ public class TestExportDataSource extends TestCase {
             }
         }
     }
-
+/*
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
