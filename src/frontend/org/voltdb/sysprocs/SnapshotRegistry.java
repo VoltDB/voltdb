@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotStatus.SnapshotResult;
 import org.voltdb.SnapshotTableInfo;
@@ -33,6 +34,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
  *
  */
 public class SnapshotRegistry {
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private static final int m_maxStatusHistory = 10;
 
     private static final TreeSet<Snapshot> m_snapshots = new TreeSet<Snapshot>(
@@ -108,10 +110,12 @@ public class SnapshotRegistry {
 
         public void setTotalTasks(int total) {
             totalTasks = total;
+            SNAP_LOG.info("***Set total task to " + totalTasks);
         }
 
         public synchronized void taskFinished() {
             finishedTasks++;
+            SNAP_LOG.info("Finished task " + finishedTasks + "/" + totalTasks);
         }
 
         public double progress() {

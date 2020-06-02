@@ -62,9 +62,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="SNAPSHOT">
-        <level value="INFO"/>
-    </logger -->
+    <logger name="SNAPSHOT">
+        <level value="DEBUG"/>
+    </logger>
 
     <!-- logger name="IV2TRACE">
         <level value="TRACE"/>
