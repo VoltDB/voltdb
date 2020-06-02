@@ -243,11 +243,12 @@ public final class DBBPool {
     }
 
     /**
-     * Wrapper for native allocated direct memory
+     * Wrapper for native allocated direct memory, only instantiated
+     * in the native JNI topend.
      *
      */
     public static final class NDBBWrapperContainer extends BBContainer {
-        public NDBBWrapperContainer(ByteBuffer b) {
+        private NDBBWrapperContainer(ByteBuffer b) {
             super( b );
         }
 
