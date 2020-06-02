@@ -267,16 +267,17 @@ public class UpdateCore extends VoltSystemProcedure {
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
-            String catalogDiffCommands = (String)params.toArray()[0];
+            Object[] paramsList = params.toArray();
+            String catalogDiffCommands = (String)paramsList[0];
             String commands = CompressionService.decodeBase64AndDecompress(catalogDiffCommands);
-            int expectedCatalogVersion = (Integer)params.toArray()[1];
-            int nextCatalogVersion = (Integer)params.toArray()[2];
-            boolean requiresSnapshotIsolation = ((Byte) params.toArray()[3]) != 0;
-            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[4]) != 0;
-            boolean hasSchemaChange = ((Byte) params.toArray()[5]) != 0;
-            boolean requiresNewExportGeneration = ((Byte) params.toArray()[6]) != 0;
-            long genId = (Long) params.toArray()[7];
-            boolean hasSecurityUserChange = ((Byte) params.toArray()[8]) != 0;
+            int expectedCatalogVersion = (Integer)paramsList[1];
+            int nextCatalogVersion = (Integer)paramsList[2];
+            boolean requiresSnapshotIsolation = ((Byte) paramsList[3]) != 0;
+            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) paramsList[4]) != 0;
+            boolean hasSchemaChange = ((Byte) paramsList[5]) != 0;
+            boolean requiresNewExportGeneration = ((Byte) paramsList[6]) != 0;
+            long genId = (Long) paramsList[7];
+            boolean hasSecurityUserChange = ((Byte) paramsList[8]) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
 
