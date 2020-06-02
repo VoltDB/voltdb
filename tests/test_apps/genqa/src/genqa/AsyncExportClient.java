@@ -377,7 +377,7 @@ public class AsyncExportClient
                 }
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
-                int count = getCount();
+                long count = getCount();
                 if (count > 0) {
                     Thread.sleep(7500);
                     log.info("triggering final migrate");
