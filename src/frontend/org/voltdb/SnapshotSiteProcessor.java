@@ -566,6 +566,7 @@ public class SnapshotSiteProcessor {
                         @Override
                         public void run() {
                             try {
+                                SNAP_LOG.info("Attempting to close replicated data target " + tableTask.m_target);
                                 tableTask.m_target.close();
                             } catch (IOException e) {
                                 m_perSiteLastSnapshotSucceded = false;
@@ -737,6 +738,7 @@ public class SnapshotSiteProcessor {
                             }
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
+                                    SNAP_LOG.info("Attempting to close data target " + t);
                                     t.close();
                                 } catch (IOException | InterruptedException e) {
                                     snapshotSucceeded = false;

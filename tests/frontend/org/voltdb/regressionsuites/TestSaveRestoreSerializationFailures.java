@@ -47,6 +47,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotSummary;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -451,7 +452,7 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", TABLE_COUNT * SITE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", 2 /*first and second*/);
         }
         catch (Exception ex)
         {
@@ -572,11 +573,11 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
             String result, Integer rowCount)
             throws NoConnectionsException, IOException, ProcCallException {
 
-        // Execute @SnapshotStatus to get raw results.
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
+        // Execute @SnapshotSummary to get raw results.
+        VoltTable statusResults[] = client.callProcedure("@Statistics", "SnapshotSummary", 0).getResults();
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
-        assertEquals( 15, statusResults[0].getColumnCount());
+        assertEquals( SnapshotSummary.ColumnName.values().length, statusResults[0].getColumnCount());
 
         // Validate row count if requested.
         Integer resultRowCount = statusResults[0].getRowCount();
@@ -589,12 +590,9 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
         for (int i = 0; i < resultRowCount; i++) {
             assertTrue(statusResults[0].advanceRow());
             results[i] = new SnapshotResult();
-            results[i].hostID = statusResults[0].getLong("HOST_ID");
-            results[i].table = statusResults[0].getString("TABLE");
-            results[i].path = statusResults[0].getString("PATH");
-            results[i].filename = statusResults[0].getString("FILENAME");
             results[i].nonce = statusResults[0].getString("NONCE");
             results[i].txnID = statusResults[0].getLong("TXNID");
+            results[i].path = statusResults[0].getString("PATH");
             results[i].endTime = statusResults[0].getLong("END_TIME");
             results[i].result = statusResults[0].getString("RESULT");
 

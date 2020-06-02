@@ -98,7 +98,9 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
 
         @Override
         public void run() {
+            SNAP_LOG.info("data target " + m_sdt + " is closed.");
             for (String tableName : m_tableNames) {
+                SNAP_LOG.info("update table " + tableName + " " + m_sdt.getBytesWritten() + "," + m_sdt.getLastWriteException());
                 m_snapshotRecord.updateTable(tableName,
                     new SnapshotRegistry.Snapshot.TableUpdater() {
                         @Override
@@ -110,6 +112,7 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
                             }
                     });
                 int tablesLeft = m_numTables.decrementAndGet();
+                SNAP_LOG.info("Tables left " + tablesLeft);
                 if (tablesLeft == 0) {
                     final SnapshotRegistry.Snapshot completed =
                         SnapshotRegistry.finishSnapshot(m_snapshotRecord);
