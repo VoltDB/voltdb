@@ -23,13 +23,22 @@
 
 package org.voltdb.export;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.hamcrest.MockitoHamcrest.argThat;
+import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,8 +46,18 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
@@ -49,9 +68,13 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.VoltFile;
+
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import junit.framework.TestCase;
 
@@ -223,6 +246,12 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    private BBContainer getBuffer(int buffSize) {
+        ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+        foo.duplicate().put(new byte[buffSize]);
+        return DBBPool.wrapBB(foo);
+    }
+
     public void testExportDataSource() throws Exception {
         System.out.println("Running testExportDataSource");
         String[] tables = {"TableName", "RepTableName"};
@@ -244,7 +273,7 @@ public class TestExportDataSource extends TestCase {
             }
         }
     }
-/*
+
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
@@ -262,19 +291,13 @@ public class TestExportDataSource extends TestCase {
             waitForMaster(s);
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
-            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo);
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
             assertEquals(s.sizeInBytes(), 40);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, foo);
+            s.pushExportBuffer(3, 3, 1, 0, getBuffer(buffSize));
 
             assertEquals(s.sizeInBytes(), 60);
 
@@ -291,7 +314,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals( 60, s.sizeInBytes());
             assertEquals( 1, cont.m_lastSeqNo);
 
-            foo = ByteBuffer.allocateDirect(buffSize);
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
             foo.position(StreamBlock.HEADER_SIZE);
             foo = foo.slice();
@@ -357,9 +380,7 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
 
             // Push a first buffer - and read it back
-            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
-            foo0.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo0);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
 
             AckingContainer cont0 = s.poll().get();
             cont0.updateStartTime(System.currentTimeMillis());
@@ -388,9 +409,7 @@ public class TestExportDataSource extends TestCase {
             }
 
             // Push a buffer - should satisfy fut1
-            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
-            foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo1);
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
 
             // Verify the pushed buffer can be got
             AckingContainer cont1 = fut1.get();
@@ -425,18 +444,13 @@ public class TestExportDataSource extends TestCase {
             s.setReadyForPolling(true);
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
-
-            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
-            foo0.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo0);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
 
             AckingContainer cont0 = s.poll().get();
             cont0.updateStartTime(System.currentTimeMillis());
 
             // Push a buffer - should satisfy fut1
-            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
-            foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo1);
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
 
             // Verify the pushed buffer can be got
             AckingContainer cont1 = s.poll().get();
@@ -473,21 +487,10 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
 
             // Push 4 buffers with seqNo [1 .. 4]
-            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
-            foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo1);
-
-            ByteBuffer foo2 = ByteBuffer.allocateDirect(buffSize);
-            foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo2);
-
-            ByteBuffer foo3 = ByteBuffer.allocateDirect(buffSize);
-            foo3.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, foo3);
-
-            ByteBuffer foo4 = ByteBuffer.allocateDirect(buffSize);
-            foo4.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(4, 4, 1, 0, foo4);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(3, 3, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(4, 4, 1, 0, getBuffer(buffSize));
 
             // Poll the first buffer: creates a read-only copy and
             // increments refcount on StreamBlock
@@ -552,17 +555,17 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(1, 1, 1, 0, foo);
+        s.pushExportBuffer(1, 1, 1, 0, DBBPool.wrapBB(foo));
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(2, 2, 1, 0, foo);
+        s.pushExportBuffer(2, 2, 1, 0, DBBPool.wrapBB(foo));
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(3, 3, 1, 0, foo);
+        s.pushExportBuffer(3, 3, 1, 0, DBBPool.wrapBB(foo));
 
         assertEquals(s.sizeInBytes(), 60);
 
@@ -640,7 +643,7 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(101, 101, 1, 0, foo);
+            s.pushExportBuffer(101, 101, 1, 0, DBBPool.wrapBB(foo));
             long sz = s.sizeInBytes();
             assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();
@@ -656,7 +659,7 @@ public class TestExportDataSource extends TestCase {
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(111, 111, 1, 0, foo2);
+            s.pushExportBuffer(111, 111, 1, 0, DBBPool.wrapBB(foo2));
             sz = s.sizeInBytes();
             assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
@@ -712,20 +715,12 @@ public class TestExportDataSource extends TestCase {
 
             // Push 2 buffers with contiguous sequence numbers
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
-            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
 
             // Push 2 more creating a gap
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(10, 10, 1, 0, foo);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(11, 11, 1, 0, foo);
+            s.pushExportBuffer(10, 10, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(11, 11, 1, 0, getBuffer(buffSize));
 
             // Poll the 2 first buffers
             AckingContainer cont = s.poll().get();
@@ -789,18 +784,10 @@ public class TestExportDataSource extends TestCase {
 
             // Push 4 buffers with contiguous sequence numbers
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
-            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, foo);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, foo);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, foo);
-            foo = ByteBuffer.allocateDirect(buffSize);
-            foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(4, 4, 1, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(2, 2, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(3, 3, 1, 0, getBuffer(buffSize));
+            s.pushExportBuffer(4, 4, 1, 0, getBuffer(buffSize));
 
             // Poll the 2 first buffers
             AckingContainer cont = s.poll().get();

@@ -23,11 +23,14 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -39,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -46,9 +50,11 @@ import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
@@ -59,10 +65,12 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.export.ExportMatchers.AckPayloadMessage;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestExportGeneration {
@@ -235,7 +243,6 @@ public class TestExportGeneration {
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
 
-    /*
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
@@ -257,7 +264,7 @@ public class TestExportGeneration {
                     seqNo,
                     1,
                     0L,
-                    foo.duplicate()
+                    DBBPool.wrapBB(foo.duplicate())
                     );
             AckingContainer cont = m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
@@ -283,11 +290,11 @@ public class TestExportGeneration {
         m_exportGeneration.pushExportBuffer(
                 m_part,
                 m_streamName,
-                1L,
+                /*seqNo*/1L,
                 1L,
                 1,
                 0L,
-                foo.duplicate()
+                DBBPool.wrapBB(foo.duplicate())
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -332,11 +339,11 @@ public class TestExportGeneration {
         m_exportGeneration.pushExportBuffer(
                 m_part,
                 m_streamName,
-                1L,
+                /*seqNo*/1L,
                 1L,
                 1,
                 0L,
-                foo.duplicate()
+                DBBPool.wrapBB(foo.duplicate())
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -392,5 +399,4 @@ public class TestExportGeneration {
 
         return otherHsid;
     }
-    */
 }
