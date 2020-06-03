@@ -21,15 +21,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the native VoltDB client
- * library.
+ * This client inserts a specified number of rows into a Volt stream as topic.
  *
- * While synchronous processing can cause performance bottlenecks (each
- * caller waits for a transaction answer before calling another
- * transaction), the VoltDB cluster at large is still able to perform at
- * blazing speeds when many clients are connected to it.
+ * Another client or clients consume rows from the stream topic.
  */
 
 package topicbenchmark;
