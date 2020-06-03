@@ -453,10 +453,10 @@
                      VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
                          if (result == true) {
                              VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                             if (adminReset) {
-                                 connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
-                              }
-                              onConnectionAdded(connection, status);
+                                 if (adminReset) {
+                                     connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                                 }
+                                 onConnectionAdded(connection, status);
                              });
                          }
                      });
@@ -502,10 +502,12 @@
              _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
              if (_connection == null) {
                  VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                    if (result == true) {
                          VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                              statusCallback(connection);
                          });
-                     });
+                     }
+                 });
              } else {
                  VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                     statusCallback(connection);
