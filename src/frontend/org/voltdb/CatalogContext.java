@@ -274,6 +274,7 @@ public class CatalogContext {
     public CatalogContext update(
             boolean isForReplay,
             Catalog newCatalog,
+            int nextCatalogVersion,
             long genId,
             CatalogInfo catalogInfo,
             HostMessenger messenger,
@@ -290,7 +291,7 @@ public class CatalogContext {
             new CatalogContext(
                     newCatalog,
                     this.m_dbSettings,
-                    catalogVersion + 1, // version increment
+                    nextCatalogVersion, // version increment
                     genId,
                     catalogInfo,
                     m_defaultProcs,

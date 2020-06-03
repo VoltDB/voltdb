@@ -28,6 +28,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -267,15 +268,17 @@ public class UpdateCore extends VoltSystemProcedure {
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
-            String catalogDiffCommands = (String)params.toArray()[0];
+            Object[] paramsList = params.toArray();
+            String catalogDiffCommands = (String)paramsList[0];
             String commands = CompressionService.decodeBase64AndDecompress(catalogDiffCommands);
-            int expectedCatalogVersion = (Integer)params.toArray()[1];
-            boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
-            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
-            boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
-            boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
-            long genId = (Long) params.toArray()[6];
-            boolean hasSecurityUserChange = ((Byte) params.toArray()[7]) != 0;
+            int expectedCatalogVersion = (Integer)paramsList[1];
+            int nextCatalogVersion = (Integer)paramsList[2];
+            boolean requiresSnapshotIsolation = ((Byte) paramsList[3]) != 0;
+            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) paramsList[4]) != 0;
+            boolean hasSchemaChange = ((Byte) paramsList[5]) != 0;
+            boolean requiresNewExportGeneration = ((Byte) paramsList[6]) != 0;
+            long genId = (Long) paramsList[7];
+            boolean hasSecurityUserChange = ((Byte) paramsList[8]) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
 
@@ -290,6 +293,7 @@ public class UpdateCore extends VoltSystemProcedure {
                         VoltDB.instance().catalogUpdate(
                                 commands,
                                 expectedCatalogVersion,
+                                nextCatalogVersion,
                                 genId,
                                 isForReplay,
                                 requireCatalogDiffCmdsApplyToEE,
@@ -314,7 +318,7 @@ public class UpdateCore extends VoltSystemProcedure {
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
             }
             // if seen before by this code, then check to see if this is a restart
-            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1)) {
+            else if (context.getCatalogVersion() == nextCatalogVersion) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId())));
             }
@@ -355,6 +359,7 @@ public class UpdateCore extends VoltSystemProcedure {
     private final VoltTable[] performCatalogUpdateWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
+            int nextCatalogVersion,
             byte requiresSnapshotIsolation,
             byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange,
@@ -364,7 +369,7 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalog,
                 SysProcFragmentId.PF_updateCatalogAggregate, catalogDiffCommands, expectedCatalogVersion,
-                requiresSnapshotIsolation, requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
+                nextCatalogVersion, requiresSnapshotIsolation, requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
                 requiresNewExportGeneration, genId, hasSecurityUserChange);
     }
 
@@ -376,6 +381,7 @@ public class UpdateCore extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
                            int expectedCatalogVersion,
+                           int nextCatalogVersion,
                            long genId,
                            byte[] catalogHash,
                            byte[] deploymentHash,
@@ -405,12 +411,12 @@ public class UpdateCore extends VoltSystemProcedure {
                 throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
             }
         } else {
-            if (context.catalogVersion == (expectedCatalogVersion + 1) &&
+            if (context.catalogVersion == nextCatalogVersion &&
                 Arrays.equals(context.getCatalogHash(), catalogHash) &&
                 Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
                 log.info("Restarting catalog update");
                 // Catalog may have been published, reset the status to PENDING if COMPLETE
-                CatalogUtil.unPublishCatalog(zk, expectedCatalogVersion + 1);
+                CatalogUtil.unPublishCatalog(zk, nextCatalogVersion);
             } else {
                 // impossible to happen since we only allow catalog update sequentially
                 String errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
@@ -428,7 +434,7 @@ public class UpdateCore extends VoltSystemProcedure {
         log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
         log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
                 ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10) +
-                ", version: " + (expectedCatalogVersion + 1));
+                ", version: " + nextCatalogVersion);
 
         start = System.nanoTime();
 
@@ -439,11 +445,12 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
+            ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
             throw vae;
         }
 
         try {
-            CatalogUtil.publishCatalog(zk, expectedCatalogVersion + 1);
+            CatalogUtil.publishCatalog(zk, nextCatalogVersion);
         } catch (KeeperException | InterruptedException e) {
             log.error("error writing catalog bytes on ZK during @UpdateCore");
             throw e;
@@ -452,6 +459,7 @@ public class UpdateCore extends VoltSystemProcedure {
         performCatalogUpdateWork(
                 catalogDiffCommands,
                 expectedCatalogVersion,
+                nextCatalogVersion,
                 requiresSnapshotIsolation,
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,

@@ -47,7 +47,6 @@ public class Promote extends UpdateApplicationBase {
                                 null,
                                 new String[0],
                                 Collections.emptyList(),
-                                null,
                                 true /* isPromotion */
                                 );
     }

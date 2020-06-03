@@ -61,7 +61,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                                 deploymentString,
                                 new String[0],
                                 Collections.emptyList(),
-                                null,
                                 false /* isPromotion */
                                 );
 
