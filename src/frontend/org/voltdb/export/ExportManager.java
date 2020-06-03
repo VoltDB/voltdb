@@ -35,7 +35,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -559,10 +558,6 @@ public class ExportManager implements ExportManagerInterface
             long uniqueId,
             long bufferPtr,
             BBContainer container) {
-        //For validating that the memory is released
-        if (bufferPtr != 0) {
-            DBBPool.registerUnsafeMemory(bufferPtr);
-        }
         ExportManagerInterface instance = VoltDB.getExportManager();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,

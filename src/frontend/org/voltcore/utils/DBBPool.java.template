@@ -250,6 +250,9 @@ public final class DBBPool {
     public static final class NDBBWrapperContainer extends BBContainer {
         private NDBBWrapperContainer(ByteBuffer b) {
             super( b );
+            assert b.isDirect();
+            final DirectBuffer dbuf = (DirectBuffer) b;
+            registerUnsafeMemory(dbuf.address());
         }
 
         @Override

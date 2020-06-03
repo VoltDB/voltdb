@@ -22,7 +22,6 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionCommitInterest;
@@ -177,7 +176,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
     public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
     public long onBinaryDR(long lastCommittedSpHandle, int partitionId, long startSequenceNumber, long lastSequenceNumber,
                            long lastSpUniqueId, long lastMpUniqueId, EventType eventType, BBContainer cont) {
-        DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
         return -1;
     }
