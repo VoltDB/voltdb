@@ -312,7 +312,6 @@ public class AsyncExportClient
 
             benchmarkStartTS = System.currentTimeMillis();
             AtomicLong rowId = new AtomicLong(0);
-
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
             Random r = new Random();
@@ -371,6 +370,17 @@ public class AsyncExportClient
             timer.cancel();
             // likewise for the migrate task
             migrateTimer.cancel();
+            clientRef.get().drain();
+            int tries = 0;
+            // Give some time for inflight transactions to be completed
+            while ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 && tries < 5) {
+                Thread.sleep(20000);
+                tries++;
+            }
+            if ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 ) {
+                log.info("WARNING Tracking results total doesn't match final sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+            }
+
             if (config.migrateWithoutTTL) {
                 for (String t : TABLES) {
                     log_migrating_counts(t);
@@ -378,26 +388,17 @@ public class AsyncExportClient
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
                 long count = getCount();
-                if (count > 0) {
-                    Thread.sleep(7500);
-                    log.info("triggering final migrate");
+                tries = 1;
+                if (count > 0 && tries < 3) {
+                    Thread.sleep(10000);
+                    log.info("triggering final migrate " + tries);
                     trigger_migrate(0);
-                }
-                //give more time
-                count = getCount();
-                int tries = 1;
-                while (count > 0 && tries < 10) {
-                    Thread.sleep(30000);
-                    count = getCount();
-                    log.info("draining " + tries);
-                    tries--;
-                }
-
-                // log final count
-                if (count > 0) {
+                    Thread.sleep(20000);
                     for (String t : TABLES) {
                         log_migrating_counts(t);
                     }
+                    tries++;
+                    count = getCount();
                 }
             }
 
@@ -582,7 +583,7 @@ public class AsyncExportClient
         long count = 0;
         for (String t : TABLES) {
             count = get_table_count(t);
-            if (count == 0) {
+            if (count > 0) {
                 return count;
             }
         }
