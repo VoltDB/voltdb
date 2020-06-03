@@ -1051,11 +1051,20 @@ public class RegressionSuite extends TestCase {
                 long val = ((Short)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             } else if (expectedObj instanceof Byte) {
-                long val = ((Byte)expectedObj).longValue();
+                long val = ((Byte) expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             } else if (expectedObj instanceof Double) {
                 Double expectedValue = (Double)expectedObj;
-                double actualValue = actualRow.getDouble(i);
+                final Double actualValue;
+                switch (actualRow.getColumnType(i)) {
+                    case DECIMAL:
+                        final BigDecimal val = actualRow.getDecimalAsBigDecimal(i);
+                        actualValue = val == null ? null : val.doubleValue();
+                        break;
+                    case FLOAT:
+                    default:
+                        actualValue = actualRow.getDouble(i);
+                }
                 // Either both are null or neither is null
                 assertEquals(msg+"expected "+expectedValue+" but got "+actualValue+": checking for null FLOAT: ",
                         expectedValue == null, actualRow.wasNull());

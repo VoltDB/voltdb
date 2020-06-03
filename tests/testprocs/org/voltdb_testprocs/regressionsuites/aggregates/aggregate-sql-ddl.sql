@@ -65,3 +65,18 @@ CREATE TABLE ENG10429 (a INT, b INT, c INT);
 
 CREATE TABLE Eng18917 (ID integer NOT NULL, PART smallint NOT NULL, A0 varchar(1));
 PARTITION TABLE Eng18917 ON COLUMN PART;
+
+CREATE TABLE Eng19702_Balance (
+    SubscriberId            VARCHAR(255) NOT NULL,
+    BalanceId               VARCHAR(255) NOT NULL,
+    ExpiryDate              TIMESTAMP,
+    PRIMARY KEY             (SubscriberId, BalanceId)
+);
+
+CREATE TABLE Eng19702_BalanceValue (
+    SubscriberId            VARCHAR(255) NOT NULL,
+    BalanceId               VARCHAR(255) NOT NULL,
+    BalanceValue            DECIMAL,
+    LastUpdated             TIMESTAMP
+);
+
