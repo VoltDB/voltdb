@@ -449,10 +449,6 @@
                 callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
 
-            var unauthorizedTimeout = setTimeout(function () {
-                callback(false, { "status": -100, "statusstring": "Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser" }, isLoginTest);
-            }, callbackTimeout);
-
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
@@ -460,7 +456,6 @@
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
                     } else if(response.status == 401){
-                        clearTimeout(unauthorizedTimeout);
                         callback(true, response, isLoginTest);
                     }else{
                         callback(false, response, isLoginTest);
