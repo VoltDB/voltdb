@@ -600,16 +600,7 @@ void JNITopend::pushExportBuffer(
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
     if (block != NULL) {
-        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
-        if (buffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
-        jobject container = m_jniEnv->NewObject(m_NDBBWClass, m_NDBBWConstructorMID, buffer);
-        if (container == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+        jobject container = getDirectBufferContainer(block->rawPtr(), block->rawLength());
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
@@ -622,7 +613,6 @@ void JNITopend::pushExportBuffer(
                 reinterpret_cast<jlong>(block->rawPtr()),
                 container);
         m_jniEnv->DeleteLocalRef(container);
-        m_jniEnv->DeleteLocalRef(buffer);
     } else {
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
@@ -663,16 +653,7 @@ void JNITopend::pushEndOfStream(
 int64_t JNITopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
     int64_t retval = -1;
     if (block != NULL) {
-        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
-        if (buffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
-        jobject container = m_jniEnv->NewObject(m_NDBBWClass, m_NDBBWConstructorMID, buffer);
-        if (container == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+        jobject container = getDirectBufferContainer(block->rawPtr(), block->rawLength());
         retval = m_jniEnv->CallStaticLongMethod(
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
@@ -685,7 +666,6 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
                 block->drEventType(),
                 container);
         m_jniEnv->DeleteLocalRef(container);
-        m_jniEnv->DeleteLocalRef(buffer);
     }
     return retval;
 }
@@ -694,16 +674,7 @@ void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStrea
     jstring jReason = m_jniEnv->NewStringUTF(reason.c_str());
 
     if (block != NULL) {
-        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
-        if (buffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
-        jobject container = m_jniEnv->NewObject(m_NDBBWClass, m_NDBBWConstructorMID, buffer);
-        if (container == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+        jobject container = getDirectBufferContainer(block->rawPtr(), block->rawLength());
         m_jniEnv->CallStaticLongMethod(
                 m_partitionDRGatewayClass,
                 m_pushPoisonPillMID,
@@ -711,7 +682,6 @@ void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStrea
                 jReason,
                 container);
         m_jniEnv->DeleteLocalRef(container);
-        m_jniEnv->DeleteLocalRef(buffer);
     }
     m_jniEnv->DeleteLocalRef(jReason);
 }

@@ -118,6 +118,25 @@ private:
     jclass m_decompressionClass;
     jclass m_NDBBWClass;
     jmethodID initJavaUserDefinedMethod(const char* name);
+
+    /**
+     * return a direct ByteBuffer wrapped into a NDBBWrapperContainer ensuring proper
+     * release of the EE memory.
+     */
+    jobject getDirectBufferContainer(char* data, int length) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer(data, length);
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        jobject container = m_jniEnv->NewObject(m_NDBBWClass, m_NDBBWConstructorMID, buffer);
+        if (container == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        m_jniEnv->DeleteLocalRef(buffer);
+        return container;
+    }
 };
 
 }
