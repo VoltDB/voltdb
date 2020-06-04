@@ -558,7 +558,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         final Client client = getClient();
         client.callProcedure("@AdHoc", "INSERT INTO Eng19702_Balance VALUES ('asi', 'abi', '2020-06-09')");
         client.callProcedure("@AdHoc", "INSERT INTO Eng19702_BalanceValue VALUES ('asi', 'abi', 1000.0, '2020-05-01')");
-        assertContentOfTable(new Object[][]{{1000.00}},
+        assertContentOfTable(new Object[][]{{new BigDecimal("1000.0")}},
                 client.callProcedure("@AdHoc",
                         "SELECT Checksum from (\n" +
                                 "   SELECT B.SubscriberId, B.BalanceId,\n" +
