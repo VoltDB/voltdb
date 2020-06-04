@@ -657,7 +657,7 @@ private:
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
     // Add truncate operation to dr log stream if dr is enabled and running
-    void drLogTruncate(ExecutorContext* ec, bool fallible);
+    void drLogTruncate(const ExecutorContext* ec, bool fallible);
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
@@ -717,7 +717,7 @@ private:
 
     TBPtr allocateNextBlock();
 
-    AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
+    AbstractDRTupleStream* getDRTupleStream(const ExecutorContext* ec) {
         if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         }
