@@ -91,7 +91,7 @@ public:
     /** write a tuple to the stream */
     virtual size_t appendTuple(
             VoltDBEngine* engine,
-            int64_t spHandle,
+            int64_t txnId,
             int64_t seqNo,
             int64_t uniqueId,
             const TableTuple &tuple,
@@ -99,7 +99,7 @@ public:
             ExportTupleStream::STREAM_ROW_TYPE type);
 
     /** Close Txn and send full buffers with committed data to the top end. */
-    void commit(VoltDBEngine* engine, int64_t spHandle, int64_t uniqueId);
+    void commit(VoltDBEngine* engine, int64_t txnId, int64_t uniqueId);
     inline void rollbackExportTo(size_t mark, int64_t seqNo) {
         // make the stream of tuples contiguous outside of actual system failures
         vassert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
@@ -132,7 +132,7 @@ public:
         return (timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));
     }
     virtual bool periodicFlush(int64_t timeInMillis,
-                               int64_t lastComittedSpHandle);
+                               int64_t lastComittedTxnId);
     virtual void extendBufferChain(size_t minLength);
 
     virtual int partitionId() { return m_partitionId; }

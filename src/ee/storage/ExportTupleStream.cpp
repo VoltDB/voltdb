@@ -65,7 +65,7 @@ void ExportTupleStream::setGenerationIdCreated(int64_t generation) {
  */
 size_t ExportTupleStream::appendTuple(
         VoltDBEngine* engine,
-        int64_t spHandle,
+        int64_t txnId,
         int64_t seqNo,
         int64_t uniqueId,
         const TableTuple &tuple,
@@ -77,14 +77,14 @@ size_t ExportTupleStream::appendTuple(
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
+    if (txnId < m_openSpHandle)
     {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
+                (intmax_t)m_openSpHandle, (intmax_t)txnId
                 );
     }
-    m_openSpHandle = spHandle;
+    m_openSpHandle = txnId;
     m_openUniqueId = uniqueId;
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -116,7 +116,7 @@ size_t ExportTupleStream::appendTuple(
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + streamHeaderSz, m_currBlock->remaining() - streamHeaderSz);
 
     // write metadata columns - data we always write this.
-    io.writeLong(spHandle);
+    io.writeLong(txnId);
     io.writeLong(UniqueId::ts(uniqueId));
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
@@ -230,9 +230,9 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
 /*
  * Handoff fully committed blocks to the top end.
  */
-void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId)
+void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentTxnId, int64_t uniqueId)
 {
-    vassert(currentSpHandle == m_openSpHandle && uniqueId == m_openUniqueId);
+    vassert(currentTxnId == m_openSpHandle && uniqueId == m_openUniqueId);
 
     if (m_uso != m_committedUso) {
         m_committedUso = m_uso;
@@ -296,7 +296,7 @@ void ExportTupleStream::pushEndOfStream() {
  * pending list for commit to operate against.
  */
 bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
-                                      int64_t lastCommittedSpHandle)
+                                      int64_t lastCommittedTxnId)
 {
     // negative timeInMillis instructs a mandatory flush
     vassert(timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));

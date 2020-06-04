@@ -101,16 +101,13 @@ PersistentTable::PersistentTable(int partitionColumn,
                                  bool drEnabled,
                                  bool isReplicated,
                                  TableType tableType)
-    : Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize)
+    : ViewableAndReplicableTable(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize, partitionColumn, isReplicated)
     , m_data()
     , m_iter(this, m_data.begin())
     , m_isMaterialized(isMaterialized)   // Other constructors are dependent on this one
-    , m_isReplicated(isReplicated)
     , m_allowNulls()
-    , m_partitionColumn(partitionColumn)
     , m_tupleLimit(tupleLimit)
     , m_purgeExecutorVector()
-    , m_views()
     , m_stats(this)
     , m_blocksNotPendingSnapshotLoad()
     , m_blocksPendingSnapshotLoad()
@@ -136,6 +133,11 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_tableType(tableType)
     , m_shadowStream(nullptr)
 {
+    if (!m_isMaterialized && m_isReplicated != (m_partitionColumn == -1)) {
+        VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name: %s, m_isMaterialized: %s, m_partitionColumn: %d, m_isReplicated: %s\n",
+                m_name.c_str(), m_isMaterialized ? "true" : "false", m_partitionColumn, m_isReplicated ? "true" : "false");
+    }
+
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -184,12 +186,6 @@ PersistentTable::~PersistentTable() {
     while (ti.next(tuple)) {
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
-    }
-
-    // note this class has ownership of the views, even if they
-    // were allocated by VoltDBEngine
-    BOOST_FOREACH (auto view, m_views) {
-        delete view;
     }
 
     // clean up indexes
@@ -1041,8 +1037,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(
        NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
        if (txnId.isNull()) {
            if (fromMigrate) {
-               int64_t spHandle = ec->currentSpHandle();
-               sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
+               int64_t txnId = getTableTxnId();
+               sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(txnId));
            }
        } else {
            sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(ValueType::tBIGINT));
@@ -1142,7 +1138,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
-        migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
+        migratingAdd(getTableTxnId(), targetTupleToUpdate);
         // add to shadow stream if the table is partitioned or partition 0 for replicated table
         if (!isReplicatedTable() || ec->getPartitionId() == 0) {
             m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE, doDRActions(drStream) ? drStream : NULL);
@@ -1261,7 +1257,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     if (fromMigrate) {
         vassert(m_shadowStream != nullptr);
         vassert(targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex()).isNull());
-        migratingRemove(ExecutorContext::getExecutorContext()->currentSpHandle(), targetTupleToUpdate);
+        migratingRemove(getTableTxnId(), targetTupleToUpdate);
     } else if (isTableWithMigrate(m_tableType)) {
         NValue const txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
@@ -1577,32 +1573,6 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
     }
 
     return true;
-}
-
-/*
- * claim ownership of a view. table is responsible for this view*
- */
-void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view) {
-    m_views.push_back(view);
-}
-
-/*
- * drop a view. the table is no longer feeding it.
- * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
- */
-void PersistentTable::dropMaterializedView(MaterializedViewTriggerForWrite* targetView) {
-    vassert( ! m_views.empty());
-    MaterializedViewTriggerForWrite* lastView = m_views.back();
-    if (targetView != lastView) {
-        // iterator to vector element:
-        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
-        vassert(toView != m_views.end());
-        // Use the last view to patch the potential hole.
-        *toView = lastView;
-    }
-    // The last element is now excess.
-    m_views.pop_back();
-    delete targetView;
 }
 
 // ------------------------------------------------------------------
