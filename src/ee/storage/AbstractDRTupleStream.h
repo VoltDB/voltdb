@@ -163,7 +163,7 @@ private:
 
 class DRTupleStreamDisableGuard {
 public:
-    DRTupleStreamDisableGuard(ExecutorContext *ec, bool ignore) :
+    DRTupleStreamDisableGuard(const ExecutorContext *ec, bool ignore) :
             m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
             m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
@@ -171,7 +171,7 @@ public:
             setGuard();
         }
     }
-    DRTupleStreamDisableGuard(ExecutorContext *ec) :
+    DRTupleStreamDisableGuard(const ExecutorContext *ec) :
             m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
             m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
