@@ -49,7 +49,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.TreeMap;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,6 +75,7 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 
 public class AsyncExportClient
@@ -294,13 +295,20 @@ public class AsyncExportClient
             // Use a separate Timer object to get a dedicated manual migration thread
             Timer migrateTimer = new Timer(true);
             Random migrateInterval = new Random();
+            VoltTable vt = clientRef.get().callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
+            Map<Long, Long> partitionKeys = new HashMap<>();
+            while (vt.advanceRow()) {
+                if (vt.getLong("PARTITION_ID") != MpInitiator.MP_INIT_PID) {
+                    partitionKeys.put(vt.getLong("PARTITION_ID"), vt.getLong("PARTITION_KEY"));
+                }
+            }
             if (config.migrateWithoutTTL) {
                 migrateTimer.scheduleAtFixedRate(new TimerTask()
                 {
                     @Override
                     public void run()
                     {
-                        trigger_migrate(migrateInterval.nextInt(10)); // vary the migrate/delete interval a little
+                        trigger_migrate(migrateInterval.nextInt(10), partitionKeys); // vary the migrate/delete interval a little
                     }
                 }
                 , 3000l
@@ -389,10 +397,10 @@ public class AsyncExportClient
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
                 long count = getCount();
                 tries = 1;
-                if (count > 0 && tries < 3) {
+                while (count > 0 && tries < 3) {
                     Thread.sleep(10000);
                     log.info("triggering final migrate " + tries);
-                    trigger_migrate(0);
+                    trigger_migrate(0, partitionKeys);
                     Thread.sleep(20000);
                     for (String t : TABLES) {
                         log_migrating_counts(t);
@@ -542,17 +550,21 @@ public class AsyncExportClient
         }
     }
 
-    private static void trigger_migrate(int time_window) {
+    private static void trigger_migrate(int time_window, Map<Long, Long> partitionKeys) {
         try {
             VoltTable[] results;
             if (config.procedure.equals("JiggleExportGroupSinglePartition")) {
-                results = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults();
-                log.info("Partitioned Migrate - window: " + time_window + " seconds" +
+                // could use callAllPartitionProcedure for simplicity
+                for (Map.Entry<Long, Long> pkey : partitionKeys.entrySet()) {
+                   results = clientRef.get().callProcedure("MigratePartitionedExport", pkey.getValue(), time_window).getResults();
+                   log.info("Partitioned Migrate - window: " + time_window + " seconds" +
                          ", kafka: " + results[0].asScalarLong() +
                          ", rabbit: " + results[1].asScalarLong() +
                          ", file: " + results[2].asScalarLong() +
-                         ", jdbc: " + results[3].asScalarLong()
+                         ", jdbc: " + results[3].asScalarLong() +
+                         ", on partition " + pkey.getKey()
                          );
+                }
             } else {
                 results = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults();
                 log.info("Replicated Migrate - window: " + time_window + " seconds" +
