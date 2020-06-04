@@ -690,16 +690,6 @@ public class SystemProcedureCatalog {
                         Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
-        builder.put("@OpPseudoShutdown",
-                new Config("org.voltdb.operator.OpPseudoShutdown",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_DURABLE,
-                        true, true, Restartability.NOT_RESTARTABLE));
-        builder.put("@OpPseudoStop",
-                new Config(null,
-                        Initiator.SINGLE_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_APPLICABLE,
-                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@StoreKiplingGroup", Builder
                 .createSp("org.voltdb.sysprocs.KiplingProcedures$StoreGroup", VoltType.STRING).commercial().build());
         builder.put("@DeleteKiplingGroup", Builder

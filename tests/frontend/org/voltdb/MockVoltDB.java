@@ -948,7 +948,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void halt(boolean pseudoKill) {
+    public void halt() {
         assert (true);
     }
 
@@ -1041,9 +1041,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setMasterOnly() {}
-
-    @Override
-    public void pseudoShutdown() {}
 
     @Override
     public void registerCatalogValidator(CatalogValidator validator) {

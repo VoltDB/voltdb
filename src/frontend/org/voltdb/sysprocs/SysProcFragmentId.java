@@ -283,12 +283,6 @@ public class SysProcFragmentId
     public static final int PF_topicControl = 410;
     public static final int PF_topicControlAggregate = 411;
 
-    // @OpPseudoShutdown
-    public static final int PF_pseudoShutdownSync = 420;
-    public static final int PF_pseudoShutdownSyncDone = 421;
-    public static final int PF_pseudoShutdown = 422;
-    public static final int PF_pseudoShutdownDone = 423;
-
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
