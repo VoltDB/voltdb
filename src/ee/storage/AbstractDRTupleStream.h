@@ -61,7 +61,7 @@ public:
         // Set m_opened = false first otherwise checkOpenTransaction() may
         // consider the transaction being rolled back as open.
         if (mark == INVALID_DR_MARK) {
-            m_openSpHandle = m_committedSpHandle;
+            m_openTxnId = m_committedTxnId;
             m_openUniqueId = m_committedUniqueId;
             m_openSequenceNumber = m_committedSequenceNumber;
             m_opened = false;

@@ -78,14 +78,13 @@ size_t ExportTupleStream::appendTuple(
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (txnId < m_openSpHandle)
+    if (txnId < m_openTxnId)
     {
         throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)txnId
-                );
+                "Active transactions moving backwards: openTxnId is %jd, while the append txnId is %jd",
+                (intmax_t)m_openTxnId, (intmax_t)txnId);
     }
-    m_openSpHandle = txnId;
+    m_openTxnId = txnId;
     m_openUniqueId = uniqueId;
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -234,13 +233,13 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
  */
 void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentTxnId, int64_t uniqueId)
 {
-    vassert(currentTxnId == m_openSpHandle && uniqueId == m_openUniqueId);
+    vassert(currentTxnId == m_openTxnId && uniqueId == m_openUniqueId);
 
     if (m_uso != m_committedUso) {
         m_committedUso = m_uso;
         m_committedUniqueId = m_openUniqueId;
         // Advance the tip to the new transaction.
-        m_committedSpHandle = m_openSpHandle;
+        m_committedTxnId = m_openTxnId;
         if (m_currBlock->startSequenceNumber() > m_committedSequenceNumber) {
             // Started a new block so reset the flush timeout
             m_lastFlush = UniqueId::tsInMillis(m_committedUniqueId);
