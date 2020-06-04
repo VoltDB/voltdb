@@ -31,8 +31,6 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.Expression;
-
 /**
  * Implementation of an ordered Set which maintains the inserted order of
  * elements and allows access by index. Iterators return the
