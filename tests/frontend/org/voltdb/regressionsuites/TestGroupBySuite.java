@@ -48,7 +48,7 @@ import org.voltdb.planner.TestPlansGroupBy;
 public class TestGroupBySuite extends RegressionSuite {
     private static final boolean TEST_NORMAL_TABLES = true;
     private static final boolean TEST_LARGE_TABLES = false;
-    private static final boolean TEST_HSQL = true;
+    private static final boolean TEST_HSQL = false;
 
     static final Class<?>[] MP_PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,

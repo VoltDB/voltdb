@@ -3571,11 +3571,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         assertTrue(success);
         builder.addServerConfig(config);
 
-        config = new LocalCluster("subselect-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
         /*/ disable for now -- doesn't add much but runtime, anyway. // Cluster
         config = new LocalCluster("subselect-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);

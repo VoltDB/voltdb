@@ -1084,24 +1084,22 @@ public class RegressionSuite extends TestCase {
             else if (expectedObj instanceof Short) {
                 long val = ((Short)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Byte) {
-                long val = ((Byte)expectedObj).longValue();
+            } else if (expectedObj instanceof Byte) {
+                long val = ((Byte) expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             }
             else if (expectedObj instanceof Double) {
                 Double expectedValue = (Double)expectedObj;
-                double actualValue = actualRow.getDouble(i);
+                final Double actualValue = actualRow.getDouble(i);
                 // Either both are null or neither is null
                 assertEquals(msg+"expected "+expectedValue+" but got "+actualValue+": checking for null FLOAT: ",
                         expectedValue == null, actualRow.wasNull());
                 if (epsilon <= 0 || !Double.isFinite(expectedValue)) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
-                }
-                else {
-                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
-                                                         Math.abs(expectedValue - actualValue), epsilon);
+                } else {
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e: expected %f, got %f",
+                            Math.abs(expectedValue - actualValue), epsilon, expectedValue, actualValue);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
             }

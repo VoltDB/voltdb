@@ -3279,12 +3279,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         builder.addServerConfig(config);
         // end of normally disabled section */
 
-        //* CONFIG #2: HSQL
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // end of HSQLDB config */
         return builder;
     }
 }
