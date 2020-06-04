@@ -54,6 +54,7 @@ import org.junit.Test;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
@@ -263,7 +264,7 @@ public class TestExportGeneration {
                     seqNo,
                     1,
                     0L,
-                    foo.duplicate()
+                    DBBPool.wrapBB(foo.duplicate())
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
@@ -293,7 +294,7 @@ public class TestExportGeneration {
                 1L,
                 1,
                 0L,
-                foo.duplicate()
+                DBBPool.wrapBB(foo.duplicate())
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -342,7 +343,7 @@ public class TestExportGeneration {
                 1L,
                 1,
                 0L,
-                foo.duplicate()
+                DBBPool.wrapBB(foo.duplicate())
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
