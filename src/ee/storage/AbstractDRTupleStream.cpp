@@ -41,8 +41,8 @@ AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, size_t defaultBuff
 void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
 {
     vassert(capacity > 0);
-    if (m_uso != 0 || m_openSpHandle != 0 ||
-        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    if (m_uso != 0 || m_openTxnId != 0 ||
+        m_openTransactionUso != 0 || m_committedTxnId != 0)
     {
         throwFatalException("setSecondaryCapacity only callable before "
                             "TupleStreamBase is used");
@@ -63,27 +63,27 @@ bool AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
-        int64_t currentSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
+        int64_t currentSpHandle = std::max(m_openTxnId, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
         }
 
-        if (currentSpHandle < m_openSpHandle) {
-            fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+        if (currentSpHandle < m_openTxnId) {
+            fatalDRErrorWithPoisonPill(m_openTxnId, m_openUniqueId,
                     "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
-                    (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle);
+                    (intmax_t)m_openTxnId, (intmax_t)currentSpHandle);
             return false;
         }
 
         // more data for an ongoing transaction with no new committed data
-        if ((currentSpHandle == m_openSpHandle) &&
-                (lastCommittedSpHandle == m_committedSpHandle)) {
+        if ((currentSpHandle == m_openTxnId) &&
+                (lastCommittedSpHandle == m_committedTxnId)) {
             extendBufferChain(0);
             return true;
         }
 
         // the open transaction should be committed
-        if (m_openSpHandle <= lastCommittedSpHandle) {
+        if (m_openTxnId <= lastCommittedSpHandle) {
             extendBufferChain(0);
             return true;
         }
@@ -148,7 +148,7 @@ void AbstractDRTupleStream::fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t
 
 void AbstractDRTupleStream::openTransactionCommon(int64_t spHandle, int64_t uniqueId)
 {
-    m_openSpHandle = spHandle;
+    m_openTxnId = spHandle;
     m_openUniqueId = uniqueId;
 
     m_opened = true;
@@ -156,7 +156,7 @@ void AbstractDRTupleStream::openTransactionCommon(int64_t spHandle, int64_t uniq
 
 void AbstractDRTupleStream::commitTransactionCommon()
 {
-    m_committedSpHandle = m_openSpHandle;
+    m_committedTxnId = m_openTxnId;
     m_committedUniqueId = m_openUniqueId;
     m_committedSequenceNumber = m_openSequenceNumber;
 
