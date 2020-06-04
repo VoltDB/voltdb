@@ -393,8 +393,10 @@ public class TestNTProcs extends TestCase {
             try {
                 Arrays.stream(crs)
                     .forEach(crwp -> {
-                        if (crwp.response.getStatus() != expectedCode) {
-                            if (crwp.response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+                        short status = crwp.response.getStatus();
+                        if (status != expectedCode) {
+                            if (status == ClientResponse.RESPONSE_UNKNOWN
+                                || status == ClientResponse.SERVER_UNAVAILABLE) {
                                 // nothing to do here I guess
                             }
                             else {
