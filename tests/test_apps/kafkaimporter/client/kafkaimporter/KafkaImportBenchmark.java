@@ -168,8 +168,8 @@ public class KafkaImportBenchmark {
         @Option(desc = "password.")
         String password = "";
 
-        @Option(desc = "Enable topology awareness")
-        boolean topologyaware = true;
+        @Option(desc = "Enable autoreconnect (setReconnectOnConnectionLoss)")
+        boolean autoreconnect = false;
 
         @Override
         public void validate() {
@@ -229,9 +229,11 @@ public class KafkaImportBenchmark {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
-        clientConfig.setReconnectOnConnectionLoss(true);
 
-        if (config.topologyaware) {
+        if (config.autoreconnect) {
+            clientConfig.setReconnectOnConnectionLoss(true);
+        }
+        else {
             clientConfig.setTopologyChangeAware(true);
         }
 
