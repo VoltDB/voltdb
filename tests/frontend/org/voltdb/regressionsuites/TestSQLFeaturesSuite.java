@@ -419,6 +419,32 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{2, "updated"}}, vt[0]);
     }
 
+    /*
+     * Test that order by statements can not contain constants or references to values other than columns which are part
+     * of the select
+     */
+    public void testInvalidOrderByTypes() throws Exception {
+        Client client = getClient();
+        executeBadSql(client, "SELECT * FROM ITEM ORDER BY -1;", "ORDER BY cannot contain constant values");
+        executeBadSql(client, "SELECT * FROM ITEM A WHERE A.I_ID = (SELECT NO_O_ID FROM NEW_ORDER ORDER BY A.I_ID)",
+                "ORDER BY cannot contain references to columns or values which are not involved in the current select");
+    }
+
+    /*
+     * Assert that statement encounters an error and that the error is the expected error
+     */
+    private void executeBadSql(Client client, String statement, String errorMsg) throws IOException {
+        try {
+            client.callProcedure("@AdHoc", statement);
+            fail("Should have thrown ProcCallException: " + statement);
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(
+                    "Expected error message to contain: " + errorMsg + " but it was: "
+                            + e.getClientResponse().getStatusString(),
+                    e.getClientResponse().getStatusString().contains(errorMsg));
+        }
+    }
     // procedures used by these tests
     static final Class<?>[] MP_PROCEDURES = {
         FeaturesSelectAll.class, SelectOrderLineByDistInfo.class,
