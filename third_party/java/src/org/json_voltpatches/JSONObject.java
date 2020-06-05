@@ -30,11 +30,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -133,8 +133,11 @@ public class JSONObject {
 
     /**
      * The map where the JSONObject's properties are kept.
+     * <p>
+     * This uses a tree map so that the order of iteration is the same when the keys are all the same regardless of
+     * order of insertion.
      */
-    private final Map<String, Object> m_map = new HashMap<>();
+    private final Map<String, Object> m_map = new TreeMap<>();
 
 
     /**
