@@ -79,7 +79,6 @@ public:
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
         kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
-        kErrorCode_pushEndOfStream = 113,              // Push EOF for dropped stream.
         kErrorCode_callJavaUserDefinedAggregateStart = 114,  // Notify the frontend to call a Java user-defined aggregate function start method.
         kErrorCode_callJavaUserDefinedAggregateAssemble = 115,  // Notify the frontend to call a Java user-defined aggregate function assemble method.
         kErrorCode_callJavaUserDefinedAggregateCombine = 116,  // Notify the frontend to call a Java user-defined aggregate function combine method.
@@ -151,7 +150,6 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block);
-    void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
@@ -1876,21 +1874,6 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
-}
-
-void VoltDBIPC::pushEndOfStream(
-        int32_t partitionId,
-        std::string signature) {
-    int32_t index = 0;
-    m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
-    index += 4;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(static_cast<int32_t>(signature.size()));
-    index += 4;
-    ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
-    index += static_cast<int32_t>(signature.size());
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
-    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {

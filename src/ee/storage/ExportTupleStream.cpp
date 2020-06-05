@@ -285,12 +285,6 @@ void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block) {
                     block);
 }
 
-void ExportTupleStream::pushEndOfStream() {
-    ExecutorContext::getPhysicalTopend()->pushEndOfStream(
-                    m_partitionId,
-                    m_tableName);
-}
-
 /*
  * Create a new buffer and flush all pending committed data.
  * Creating a new buffer will push all queued data into the
