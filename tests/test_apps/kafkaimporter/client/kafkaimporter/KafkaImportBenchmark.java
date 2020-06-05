@@ -168,8 +168,8 @@ public class KafkaImportBenchmark {
         @Option(desc = "password.")
         String password = "";
 
-        @Option(desc = "Enable autoreconnect (setReconnectOnConnectionLoss)")
-        boolean autoreconnect = false;
+        @Option(desc = "Set to autoreconnect (setReconnectOnConnectionLoss) or topoaware (setTopologyChangeAware)")
+        String connectoption = "topoaware";
 
         @Override
         public void validate() {
@@ -179,6 +179,8 @@ public class KafkaImportBenchmark {
             // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (!connectoption.equalsIgnoreCase("topoaware") && !connectoption.equalsIgnoreCase("autoreconnect"))
+                exitWithMessageAndUsage("connect option must be one of topoaware or autoreconnect");
             log.info("finished validating args");
         }
     }
@@ -230,7 +232,10 @@ public class KafkaImportBenchmark {
             clientConfig.enableSSL();
         }
 
-        if (config.autoreconnect) {
+
+        // NB: set only one of setReconnectOnConnectionLoss or setTopologyChangeAware.
+        // They're mutually exclusive.
+        if (config.connectoption.equalsIgnoreCase("autoreconnect")) {
             clientConfig.setReconnectOnConnectionLoss(true);
         }
         else {
