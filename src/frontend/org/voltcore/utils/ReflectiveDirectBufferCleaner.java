@@ -49,14 +49,11 @@ public class ReflectiveDirectBufferCleaner implements DirectBufferCleaner {
     }
 
     @Override
-    public boolean clean(ByteBuffer buf) {
+    public void clean(ByteBuffer buf) {
         try {
             Object cleaner = cleanerMtd.invoke(buf);
-            if (cleaner == null) {
-                return false;
-            }
+            assert cleaner != null;
             cleanMtd.invoke(cleaner);
-            return true;
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to invoke direct buffer cleaner", e);
         }

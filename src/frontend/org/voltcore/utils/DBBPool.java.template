@@ -239,12 +239,15 @@ public final class DBBPool {
     }
 
     /**
-     * Wrapper for native allocated direct memory
+     * Wrapper for native allocated direct memory, only instantiated
+     * in the native JNI topend. Ensures the native memory is properly
+     * discarded.
      *
      */
     public static final class NDBBWrapperContainer extends BBContainer {
         private NDBBWrapperContainer(ByteBuffer b) {
             super( b );
+	        assert b.isDirect();
         }
 
         @Override
@@ -254,7 +257,7 @@ public final class DBBPool {
                return;
             }
             final DirectBuffer dbuf = (DirectBuffer) buf;
-            deleteCharArrayMemory(dbuf.address());
+            nativeDeleteCharArrayMemory(dbuf.address());
         }
     }
 
@@ -511,88 +514,27 @@ public final class DBBPool {
         }
     }
 
-    public static void registerUnsafeMemory(long pointer) {
-#ifdef MEMCHECK_FULL
-        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" registered " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
-        m_deletedStuff.remove(pointer);
-#endif
-    }
-#ifdef MEMCHECK_FULL
-
-    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
-    private static NonBlockingHashMap<Long, Throwable> m_allocatedStuff = new NonBlockingHashMap<Long, Throwable>();
-#endif
-
-    /*
-     * Delete a char array that was allocated on the native heap
-     *
-     * If you want to debug issues with double free, uncomment m_deletedStuff
-     * and the code that populates it and comment out the call to nativeDeleteCharArrayMemory
-     * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
-     */
-    private static void deleteCharArrayMemory(long pointer) {
-#ifdef MEMCHECK_FULL
-        if (!m_allocatedStuff.containsKey(pointer)) {
-            Long closest = Long.MAX_VALUE;
-            for (Long l : m_allocatedStuff.keySet()) {
-                long delta = pointer - l;
-                if (delta < 0) continue;
-                if (delta < pointer - closest) closest = l;
-            }
-            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted a pointer that was never allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis());
-            t.printStackTrace();
-            if (!closest.equals(Long.MAX_VALUE)) {
-                System.err.println("Closest known allocation is:");
-                m_allocatedStuff.get(closest).printStackTrace();
-            }
-            HOST.fatal("Deleted address that was never allocated", t);
-            if (!closest.equals(Long.MAX_VALUE)) HOST.fatal("Closest known allocation was:", m_allocatedStuff.get(closest));
-            System.exit(-1);
-        }
-        m_allocatedStuff.remove(pointer);
-        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis())) != null) {
-            m_deletedStuff.get(pointer).printStackTrace();
-            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis());
-            HOST.fatal("Original:", m_deletedStuff.get(pointer));
-            HOST.fatal("Second:", t);
-            System.exit(-1);
-        }
-#else
-        nativeDeleteCharArrayMemory(pointer);
-#endif
-    }
-
     private static native void nativeDeleteCharArrayMemory(long pointer);
-
-    public static BBContainer allocateUnsafeByteBuffer(long size) {
-        final BBContainer retcont = new NDBBWrapperContainer(nativeAllocateUnsafeByteBuffer(size));
-#ifdef MEMCHECK_FULL
-        final long pointer = retcont.address();
-        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
-        m_deletedStuff.remove(pointer);
-#endif
-        return retcont;
-    }
 
     /*
      * Allocate a direct byte buffer that bypasses all GC and Java limits
      * and requires manual memory management. The memory will not be zeroed
-     * and will come from the new/delete in C++. The pointer can be freed
-     * using deleteCharArrayMemory.
+     * and will come from the new/delete in C++. The returned {@link BBContainer}
+     * * ensures correct release using nativeDeleteCharArrayMemory.
      */
+    public static BBContainer allocateUnsafeByteBuffer(long size) {
+        return new NDBBWrapperContainer(nativeAllocateUnsafeByteBuffer(size));
+    }
+
     private static native ByteBuffer nativeAllocateUnsafeByteBuffer(long size);
 
     /*
-     * For managed buffers runs the cleaner, if there is no cleaner,
-     * called deleteCharArrayMemory on the address
+     * Run the cleaner on managed direct buffers
      */
     private static void cleanByteBuffer(ByteBuffer buf) {
         if (buf == null || !buf.isDirect()) {
             return;
         }
-        final DirectBuffer dbuf = (DirectBuffer) buf;
-        if (!VoltUnsafe.cleanDirectBuffer(buf)) {
-            deleteCharArrayMemory(dbuf.address());
-        }
+        VoltUnsafe.cleanDirectBuffer(buf);
     }
 }

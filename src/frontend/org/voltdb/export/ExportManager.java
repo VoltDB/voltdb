@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +34,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -669,21 +668,19 @@ public class ExportManager
             long tupleCount,
             long uniqueId,
             long bufferPtr,
-            ByteBuffer buffer,
+            BBContainer cont,
             boolean sync) {
-        //For validating that the memory is released
-        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
             ExportGeneration generation = instance.m_generation.get();
             if (generation == null) {
-                if (buffer != null) {
-                    DBBPool.wrapBB(buffer).discard();
+                if (cont != null) {
+                    cont.discard();
                 }
                 return;
             }
             generation.pushExportBuffer(partitionId, tableName, startSequenceNumber,
-                    (int)tupleCount, uniqueId, buffer, sync);
+                    (int)tupleCount, uniqueId, cont, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);

@@ -17,8 +17,6 @@
 
 package org.voltcore.utils;
 
-import sun.misc.Unsafe;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -26,6 +24,8 @@ import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+
+import sun.misc.Unsafe;
 
 /*
  * <p>Wrapper for {@link sun.misc.Unsafe} class.</p>
@@ -62,10 +62,9 @@ public abstract class VoltUnsafe {
      *
      * @param buf Direct buffer.
      */
-    public static boolean cleanDirectBuffer(ByteBuffer buf) {
+    public static void cleanDirectBuffer(ByteBuffer buf) {
         assert buf.isDirect();
-
-        return DIRECT_BYTE_BUFFER_CLEANER.clean(buf);
+        DIRECT_BYTE_BUFFER_CLEANER.clean(buf);
     }
 
 
