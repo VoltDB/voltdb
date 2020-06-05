@@ -78,12 +78,6 @@ namespace voltdb {
         receivedExportBuffer = true;
     }
 
-    void DummyTopend::pushEndOfStream(int32_t partitionId, std::string signature) {
-        partitionIds.push(partitionId);
-        signatures.push(signature);
-        receivedExportBuffer = true;
-    }
-
     // only used for EE Test, ignore the committedSpHandle for now
     int64_t DummyTopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         receivedDRBuffer = true;

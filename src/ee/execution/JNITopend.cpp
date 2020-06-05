@@ -176,15 +176,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         vassert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
-    m_pushExportEOFMID = m_jniEnv->GetStaticMethodID(
-            m_exportManagerClass,
-            "pushEndOfStream",
-            "(ILjava/lang/String;)V");
-    if (m_pushExportEOFMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        vassert(m_pushExportEOFMID != NULL);
-        throw std::exception();
-    }
 
     m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
     if (m_partitionDRGatewayClass == NULL) {
@@ -626,23 +617,6 @@ void JNITopend::pushExportBuffer(
                 NULL,
                 NULL);
     }
-    m_jniEnv->DeleteLocalRef(tableNameString);
-    if (m_jniEnv->ExceptionCheck()) {
-        m_jniEnv->ExceptionDescribe();
-        throw std::exception();
-    }
-}
-
-void JNITopend::pushEndOfStream(
-        int32_t partitionId,
-        string tableName) {
-    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
-    //std::cout << "Block is null" << std::endl;
-    m_jniEnv->CallStaticVoidMethod(
-                    m_exportManagerClass,
-                    m_pushExportEOFMID,
-                    partitionId,
-                    tableNameString);
     m_jniEnv->DeleteLocalRef(tableNameString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();

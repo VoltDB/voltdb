@@ -49,9 +49,6 @@ public:
             int32_t partitionId,
             std::string signature,
             ExportStreamBlock *block);
-    void pushEndOfStream(
-            int32_t partitionId,
-            std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
@@ -97,7 +94,6 @@ private:
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
-    jmethodID m_pushExportEOFMID;
     jmethodID m_pushDRBufferMID;
     jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;

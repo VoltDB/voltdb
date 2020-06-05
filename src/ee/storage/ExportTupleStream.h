@@ -86,7 +86,6 @@ public:
     }
 
     void pushStreamBuffer(ExportStreamBlock *block);
-    void pushEndOfStream();
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(
