@@ -371,15 +371,6 @@ public class AsyncExportClient
             // likewise for the migrate task
             migrateTimer.cancel();
             clientRef.get().drain();
-            int tries = 0;
-            // Give some time for inflight transactions to be completed
-            while ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 && tries < 5) {
-                Thread.sleep(20000);
-                tries++;
-            }
-            if ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 ) {
-                log.info("WARNING Tracking results total doesn't match final sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
-            }
 
             if (config.migrateWithoutTTL) {
                 for (String t : TABLES) {
