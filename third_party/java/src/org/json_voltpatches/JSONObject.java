@@ -384,7 +384,7 @@ public class JSONObject {
             return "null";
         }
 
-// Shave off trailing zeros and decimal point, if possible.
+        // Shave off trailing zeros and decimal point, if possible.
 
         String s = Double.toString(d);
         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
@@ -696,7 +696,7 @@ public class JSONObject {
         }
         testValidity(n);
 
-// Shave off trailing zeros and decimal point, if possible.
+        // Shave off trailing zeros and decimal point, if possible.
 
         String s = n.toString();
         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
@@ -915,7 +915,7 @@ public class JSONObject {
     private void populateMap(Object bean) {
         Class<? extends Object> klass = bean.getClass();
 
-// If klass is a System class then set includeSuperClass to false.
+        // If klass is a System class then set includeSuperClass to false.
 
         boolean includeSuperClass = klass.getClassLoader() != null;
 
@@ -1368,11 +1368,11 @@ public class JSONObject {
             StringBuffer sb = new StringBuffer();
             // This prefix value applies to the first key only
             String keyprefix = "{\"";
-            for (String key : m_map.keySet()) {
+            for (Map.Entry<String, Object> entry : m_map.entrySet()) {
                 sb.append(keyprefix);
-                sb.append(quotable(key));
+                sb.append(quotable(entry.getKey()));
                 sb.append("\":");
-                sb.append(valueToString(m_map.get(key)));
+                sb.append(valueToString(entry.getValue()));
                 // This prefix value applies to all subsequent keys
                 keyprefix = ",\"";
             }
