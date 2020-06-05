@@ -229,8 +229,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotReq
     }
 
     // The truncation snapshot will always have all the tables regardless of what tables are requested
-    // in the stream snapshot. Passing null to the JSON config below will cause the
-    // NativeSnapshotWritePlan to include all tables.
+    // in the stream snapshot. Recreating the SnapshotRequestConfig with no tables specified will do that
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String pathType, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
                                                              SystemProcedureExecutionContext context,
@@ -240,10 +239,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan<StreamSnapshotReq
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp)
     {
+        // Create new config which includes all tables
+        SnapshotRequestConfig nativeConfig = new SnapshotRequestConfig(m_config.newPartitionCount,
+                context.getDatabase());
+        context.getSiteSnapshotConnection().populateSnapshotSchemas(nativeConfig);
+
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
-        final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, m_config,
-                        context, result, extraSnapshotData, tracker, hashinatorData, timestamp);
+        final Callable<Boolean> deferredTruncationSetup = plan.createSetupInternal(file_path, pathType, file_nonce,
+                txnId, partitionTransactionIds, nativeConfig, context, result, extraSnapshotData, tracker,
+                hashinatorData, timestamp);
+
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {
