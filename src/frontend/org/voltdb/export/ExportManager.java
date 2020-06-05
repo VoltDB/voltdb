@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +35,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -557,13 +556,11 @@ public class ExportManager implements ExportManagerInterface
             long tupleCount,
             long uniqueId,
             long bufferPtr,
-            ByteBuffer buffer) {
-        //For validating that the memory is released
-        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
-        ExportManagerInterface instance = ExportManagerInterface.instance();
+            BBContainer container) {
+                ExportManagerInterface instance = ExportManagerInterface.instance();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, buffer);
+                tupleCount, uniqueId, container);
     }
 
     @Override
@@ -574,19 +571,19 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            ByteBuffer buffer) {
+            BBContainer container) {
 
         try {
             Generation generation = getGeneration();
             if (generation == null) {
-                if (buffer != null) {
-                    DBBPool.wrapBB(buffer).discard();
+                if (container != null) {
+                    container.discard();
                 }
                 return;
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, buffer);
+                    (int)tupleCount, uniqueId, container);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
