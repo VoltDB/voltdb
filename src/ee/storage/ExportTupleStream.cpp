@@ -18,6 +18,7 @@
 #include "storage/ExportTupleStream.h"
 #include "execution/VoltDBEngine.h"
 #include "common/TupleSchema.h"
+#include "common/TxnEgo.h"
 #include "common/UniqueId.hpp"
 
 #include <cstdio>
@@ -119,7 +120,8 @@ size_t ExportTupleStream::appendTuple(
     io.writeLong(txnId);
     io.writeLong(UniqueId::ts(uniqueId));
     io.writeLong(seqNo);
-    io.writeLong(m_partitionId);
+    // Report the TxnId partition ID
+    io.writeLong(TxnEgo::getPartitionId(txnId));
     io.writeLong(m_siteId);
     // use 1 for INSERT EXPORT op
     io.writeByte(static_cast<int8_t>(type));
