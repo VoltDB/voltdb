@@ -714,8 +714,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_closed) {
+            m_bufferPushPermits.release();
             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                     EstTime.currentTimeMillis());
+            if (cont != null) {
+                cont.discard();
+            }
             return;
         }
         try {
@@ -729,6 +733,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         } else {
                             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                                     EstTime.currentTimeMillis());
+                            if (cont != null) {
+                                cont.discard();
+                            }
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -742,6 +749,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //We are shutting down very much rolling generation so dont passup for error reporting.
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Export buffer rejected by data source executor: ", rej);
+            }
+            if (cont != null) {
+                cont.discard();
             }
         }
     }
