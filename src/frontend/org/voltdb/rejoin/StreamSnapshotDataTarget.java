@@ -330,7 +330,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             if (m_closed.get()) {
                 return;
             }
-
+            boolean watchAgain = true;
             long bytesWritten = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
@@ -347,16 +347,16 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 } else if (TimeUnit.MINUTES.convert((System.nanoTime() - m_lastDataSent), TimeUnit.NANOSECONDS) > 1) {
                     // No data sent for one long minute and destination host is not alive, stop watching
                     Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
-                        m_closed.set(true);
-                    }
+                    watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
                 }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
             } finally {
                 // schedule to run again
-                if (!m_closed.get()) {
+                if (watchAgain) {
                     VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                } else {
+                    rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
                 }
             }
         }
