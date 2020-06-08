@@ -557,7 +557,10 @@ public class ExportManager implements ExportManagerInterface
             long uniqueId,
             long bufferPtr,
             BBContainer container) {
-                ExportManagerInterface instance = ExportManagerInterface.instance();
+        if (container != null) {
+            container.tag("pushExportBuffer");
+        }
+        ExportManagerInterface instance = ExportManagerInterface.instance();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
                 tupleCount, uniqueId, container);
