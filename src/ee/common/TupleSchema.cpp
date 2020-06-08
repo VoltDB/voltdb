@@ -377,14 +377,19 @@ std::string TupleSchema::debug() const {
     return ret;
 }
 
-bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const {
+bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other, const bool includeHidden) const {
     if (this == other) {
         return true;
     }
-    if (other->m_columnCount != m_columnCount ||
-        other->m_hiddenColumnCount != m_hiddenColumnCount ||
-        other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
-        other->tupleLength() != tupleLength()) {
+    if (other->m_columnCount != m_columnCount || other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount) {
+        return false;
+    }
+
+    if (includeHidden) {
+        if (other->m_hiddenColumnCount != m_hiddenColumnCount || other->tupleLength() != tupleLength()) {
+            return false;
+        }
+    } else if (other->visibleTupleLength() != visibleTupleLength()) {
         return false;
     }
 
@@ -398,12 +403,14 @@ bool TupleSchema::isCompatibleForMemcpy(const TupleSchema *other) const {
         }
     }
 
-    for (int ii = 0; ii < hiddenColumnCount(); ii++) {
-        const HiddenColumnInfo *columnInfo = getHiddenColumnInfo(ii);
-        const HiddenColumnInfo *ocolumnInfo = other->getHiddenColumnInfo(ii);
-        if (columnInfo->offset != ocolumnInfo->offset ||
-                columnInfo->type != ocolumnInfo->type) {
-            return false;
+    if (includeHidden) {
+        for (int ii = 0; ii < hiddenColumnCount(); ii++) {
+            const HiddenColumnInfo *columnInfo = getHiddenColumnInfo(ii);
+            const HiddenColumnInfo *ocolumnInfo = other->getHiddenColumnInfo(ii);
+            if (columnInfo->offset != ocolumnInfo->offset ||
+                    columnInfo->type != ocolumnInfo->type) {
+                return false;
+            }
         }
     }
 

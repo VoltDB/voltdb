@@ -516,7 +516,7 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public CatalogContext catalogUpdate(String diffCommands,
-            int expectedCatalogVersion, long genId,
+            int expectedCatalogVersion, int nextCatalogVersion, long genId,
             boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange, boolean requiresNewExportGeneration,  boolean hasSecurityUserChange)
     {

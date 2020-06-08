@@ -550,6 +550,29 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         assertContentOfTable(new Object[][]{{"A", 2, null}, {"B", null, 4}}, parameterizedResults);
     }
 
+    public void testEng19702() throws IOException, ProcCallException {
+        // ignore the hsql backend for this test case, since the decode function is not implemented in hsql
+        if (isHSQL()) {
+            return;
+        }
+        final Client client = getClient();
+        client.callProcedure("@AdHoc", "INSERT INTO Eng19702_Balance VALUES ('asi', 'abi', '2020-06-09')");
+        client.callProcedure("@AdHoc", "INSERT INTO Eng19702_BalanceValue VALUES ('asi', 'abi', 1000.0, '2020-05-01')");
+        assertContentOfTable(new Object[][]{{new BigDecimal("1000.0")}},
+                client.callProcedure("@AdHoc",
+                        "SELECT Checksum from (\n" +
+                                "   SELECT B.SubscriberId, B.BalanceId,\n" +
+                                "      B.ExpiryDate,\n" +
+                                "      SUM(BV.BalanceValue) AS BalanceValue,\n" +
+                                "      MIN(LastUpdated)     AS MinLastUpdated,\n" +
+                                "      COALESCE(MAX(DECODE(B.BalanceId, 'abi', LastUpdated, NULL)), MAX(LastUpdated)) AS LastUpdated,\n" +
+                                "      MAX(DECODE(B.BalanceId, 'abi', BV.BalanceValue, 0)) AS Checksum\n" +
+                                "   FROM Eng19702_Balance B JOIN Eng19702_BalanceValue BV\n" +
+                                "   ON B.SubscriberId = BV.SubscriberId AND B.SubscriberId = 'asi' AND B.BalanceId = BV.BalanceId\n" +
+                                "   GROUP BY B.SubscriberId, B.BalanceId) subquery")
+                        .getResults()[0]);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

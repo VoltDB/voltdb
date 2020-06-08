@@ -18,11 +18,11 @@
 package org.voltdb.export;
 
 import java.lang.reflect.Constructor;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -204,7 +204,7 @@ public interface ExportManagerInterface {
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            ByteBuffer buffer);
+            BBContainer buffer);
 
     public void sync();
 

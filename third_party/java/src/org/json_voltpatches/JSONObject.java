@@ -30,11 +30,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -133,8 +133,11 @@ public class JSONObject {
 
     /**
      * The map where the JSONObject's properties are kept.
+     * <p>
+     * This uses a tree map so that the order of iteration is the same when the keys are all the same regardless of
+     * order of insertion.
      */
-    private final Map<String, Object> m_map = new HashMap<>();
+    private final Map<String, Object> m_map = new TreeMap<>();
 
 
     /**
@@ -381,7 +384,7 @@ public class JSONObject {
             return "null";
         }
 
-// Shave off trailing zeros and decimal point, if possible.
+        // Shave off trailing zeros and decimal point, if possible.
 
         String s = Double.toString(d);
         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
@@ -693,7 +696,7 @@ public class JSONObject {
         }
         testValidity(n);
 
-// Shave off trailing zeros and decimal point, if possible.
+        // Shave off trailing zeros and decimal point, if possible.
 
         String s = n.toString();
         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
@@ -912,7 +915,7 @@ public class JSONObject {
     private void populateMap(Object bean) {
         Class<? extends Object> klass = bean.getClass();
 
-// If klass is a System class then set includeSuperClass to false.
+        // If klass is a System class then set includeSuperClass to false.
 
         boolean includeSuperClass = klass.getClassLoader() != null;
 
@@ -1365,11 +1368,11 @@ public class JSONObject {
             StringBuffer sb = new StringBuffer();
             // This prefix value applies to the first key only
             String keyprefix = "{\"";
-            for (String key : m_map.keySet()) {
+            for (Map.Entry<String, Object> entry : m_map.entrySet()) {
                 sb.append(keyprefix);
-                sb.append(quotable(key));
+                sb.append(quotable(entry.getKey()));
                 sb.append("\":");
-                sb.append(valueToString(m_map.get(key)));
+                sb.append(valueToString(entry.getValue()));
                 // This prefix value applies to all subsequent keys
                 keyprefix = ",\"";
             }

@@ -105,6 +105,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
+    private long m_lastDataSent;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
             byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
@@ -333,18 +334,30 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
+                long bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOS_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
                 }
+                if (bytesSentSinceLastCheck > 0) {
+                    m_lastDataSent = System.nanoTime();
+                } else if (TimeUnit.MINUTES.convert((System.nanoTime() - m_lastDataSent), TimeUnit.NANOSECONDS) > 1) {
+                    // No data sent for one long minute and destination host is not alive, stop watching
+                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                    if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
+                        m_closed.set(true);
+                    }
+                }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
             } finally {
                 // schedule to run again
-                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                if (!m_closed.get()) {
+                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                }
             }
         }
     }

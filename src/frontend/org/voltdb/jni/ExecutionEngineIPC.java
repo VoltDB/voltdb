@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
@@ -558,6 +559,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
+                    ByteBuffer buffer = length == 0 ? null : getBytes(length);
                     ExportManager.pushExportBuffer(
                             partitionId,
                             signature,
@@ -566,7 +568,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             tupleCount,
                             uniqueId,
                             0,
-                            length == 0 ? null : getBytes(length));
+                            buffer == null ? null : DBBPool.wrapBB(buffer));
                 }
                 else if (status == kErrorCode_pushEndOfStream) {
                     ByteBuffer header = ByteBuffer.allocate(8);

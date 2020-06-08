@@ -22,13 +22,20 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
+-- NOT MIGRATING index is not required but will boost performance. Without the index
+-- execution engine will go through all rows to verify if they have been migrated or not
+-- With the index, migrated rows are skipped with the index lookup.
 %%TABLE name=export_partitioned_table_kafka, migrate_target=kafka_target, partition_key=rowid
+CREATE INDEX export_partitioned_table_kafka_idx ON export_partitioned_table_kafka(type_not_null_timestamp) where not migrating;
 
 %%TABLE name=export_partitioned_table_rabbit, migrate_target=rabbit_target, partition_key=rowid
+CREATE INDEX export_partitioned_table_rabbit_idx ON export_partitioned_table_rabbit(type_not_null_timestamp) where not migrating;
 
 %%TABLE name=export_partitioned_table_file, migrate_target=file_target, partition_key=rowid
+CREATE INDEX export_partitioned_table_file_idx ON export_partitioned_table_file(type_not_null_timestamp) where not migrating;
 
 %%TABLE name=export_partitioned_table_jdbc, migrate_target=jdbc_target, partition_key=rowid
+CREATE INDEX export_partitioned_table_jdbc_idx ON export_partitioned_table_jdbc(type_not_null_timestamp) where not migrating;
 
 %%TABLE name=export_mirror_partitioned_table, partition_key=rowid
 

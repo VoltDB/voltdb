@@ -47,7 +47,6 @@ import java.util.regex.Pattern;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.NativeLibraryLoader;
-import org.voltdb.RealVoltDB;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -607,6 +606,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     private void startLocalServer(int hostId, boolean clearLocalDataDirectories, StartAction action) {
+        // make sure the local server has the same environment properties as separate process
+        m_additionalProcessEnv.forEach(System::setProperty);
+
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         if (!isNewCli) {
