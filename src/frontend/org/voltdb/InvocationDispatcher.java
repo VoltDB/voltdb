@@ -836,8 +836,9 @@ public final class InvocationDispatcher {
 
        String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
        if (reason != null) {
-           return gracefulFailureResponse(
-                   "@PrepareStopNode:" + reason, task.clientHandle);
+           String msg = "@PrepareStopNode: " + reason;
+           hostLog.warn(msg);
+           return gracefulFailureResponse(msg, task.clientHandle);
        }
 
        // The host has partition masters, go ahead to move them
