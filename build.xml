@@ -954,7 +954,7 @@ CLEANING
 <target name='clean'
     description="Remove all compiled and generated files."
     depends="cleantmp, clean_client, clean_deployment_gen,
-             clean_bindoc, clean_other_gen, clean_kafkaloader">
+             clean_bindoc, clean_other_gen, clean_kafkaloader, clean_pro">
   <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -1460,6 +1460,10 @@ JAVA COMPILATION
 <!-- This task only executes if the voltpro.flavor property is set. -->
 <target name="compile_pro" if="voltpro.flavor">
   <antcall target="voltpro.compile"/>
+</target>
+
+<target name="clean_pro" if="voltpro.flavor">
+  <antcall target="voltpro.clean"/>
 </target>
 
 <target name="copy_pro_bin" if="voltpro.flavor">
