@@ -138,7 +138,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite?" [Lowest Site]":"")));
 
         // start a periodic task to look for timed out connections
-        VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout, System.currentTimeMillis()), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+        VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout, System.currentTimeMillis()), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
 
         if (hashinatorConfig != null) {
             // Send the hashinator config as  the first block
@@ -346,7 +346,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 }
                 // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
                 final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout && m_writeFailed.get() != null) {
+                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
                     Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                     watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
                 }
