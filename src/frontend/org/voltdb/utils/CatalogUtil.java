@@ -3208,10 +3208,9 @@ public abstract class CatalogUtil {
     }
 
     public static void copyUACParameters(StoredProcedureInvocation invocation, Object[] params) {
-        int catalogVersion = (int)params[1];
         CatalogAndDeployment cad = null;
         try {
-            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion + 1);
+            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), (int) params[2]);
         } catch (KeeperException | InterruptedException e) {
             VoltDB.crashLocalVoltDB("Fail to get catalog bytes while processing catalog update", true, null);
         }

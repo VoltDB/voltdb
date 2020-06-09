@@ -415,7 +415,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                 callNTProcedureOnAllHosts(procedureName, ccr.encodedDiffCommands,
-                        ccr.expectedCatalogVersion);
+                        ccr.nextCatalogVersion);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
