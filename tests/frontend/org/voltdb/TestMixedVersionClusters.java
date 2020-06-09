@@ -96,7 +96,7 @@ public class TestMixedVersionClusters extends JUnit4LocalClusterTest {
                 m_cluster.setOverridesForHotfix(new String[] {"", "", version},
                                                 new String[] {"", "", regexMatcher},
                                                 new String[] {"", "", buildString});
-                return m_cluster.recoverOne(2, 0, "");
+                return m_cluster.recoverOne(2, 0);
             }
             catch (Exception e) {
                 e.printStackTrace();
@@ -110,7 +110,7 @@ public class TestMixedVersionClusters extends JUnit4LocalClusterTest {
                 // just set the override for the last host
                 m_cluster.setOverridesForHotfix(new String[] {"", "", version},
                                                 new String[] {"", "", regexMatcher});
-                return m_cluster.recoverOne(2, 0, "");
+                return m_cluster.recoverOne(2, 0);
             }
             catch (Exception e) {
                 e.printStackTrace();

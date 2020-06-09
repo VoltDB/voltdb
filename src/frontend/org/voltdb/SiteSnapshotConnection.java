@@ -22,6 +22,7 @@ import java.util.Deque;
 import java.util.HashSet;
 
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 
 /**
  * Defines the interface between a site and the snapshot
@@ -39,4 +40,16 @@ public interface SiteSnapshotConnection
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
+
+    public default void populateSnapshotSchemas(SnapshotRequestConfig config) {
+        for (SnapshotTableInfo table : config.tables) {
+            populateSnapshotSchema(table, config.getHiddenColumnFilter());
+        }
+    }
+
+    public default void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter) {
+        populateSnapshotSchema(table, filter, false);
+    }
+
+    public void populateSnapshotSchema(SnapshotTableInfo table, HiddenColumnFilter filter, boolean forceLive);
 }

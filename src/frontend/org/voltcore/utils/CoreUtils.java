@@ -43,13 +43,16 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
@@ -58,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -412,6 +416,70 @@ public class CoreUtils {
         @Override
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
+
+    /**
+     * Extension of ScheduledThreadPoolExecutor that handles errors from
+     * the threads executing the tasks. Cancellation exceptions are considered normal
+     * and only logs at <code>DEBUG</code> level.
+     * <p>
+     * Default behaviour is to log errors to the <code>HOST</code> logger. Users of the class can provide
+     * their own action on errors by setting their own consumers of the errors.
+     */
+    public static class ErrorHandlingScheduledThreadPool extends  ScheduledThreadPoolExecutor {
+        private static final VoltLogger s_logger = new VoltLogger("HOST");
+        private volatile Consumer<Throwable> m_consumer;
+
+        public ErrorHandlingScheduledThreadPool(int corePoolSize) {
+            super(corePoolSize);
+        }
+
+        public ErrorHandlingScheduledThreadPool(int corePoolSize, RejectedExecutionHandler handler) {
+            super(corePoolSize, handler);
+        }
+
+        public ErrorHandlingScheduledThreadPool(int corePoolSize, ThreadFactory threadFactory) {
+            super(corePoolSize, threadFactory);
+        }
+
+        public ErrorHandlingScheduledThreadPool(int corePoolSize, ThreadFactory threadFactory,
+                RejectedExecutionHandler handler) {
+            super(corePoolSize, threadFactory, handler);
+        }
+
+        public ErrorHandlingScheduledThreadPool setConsumer(Consumer<Throwable> consumer) {
+            m_consumer = consumer;
+            return this;
+        }
+
+        @Override
+        protected void afterExecute(Runnable runnable, Throwable throwable) {
+            super.afterExecute(runnable, throwable);
+            assert(throwable == null); // ScheduledThreadPoolExecutor always creates a ScheduledFuture with the task,
+                                       // so we will never get the throwable here
+            assert(runnable instanceof ScheduledFuture);
+
+            // get error, if any
+            try {
+                ((Future<?>) runnable).get();
+            } catch (CancellationException ce) { // If the task got cancelled, assume that was intentional
+                if (s_logger.isDebugEnabled()) {
+                    s_logger.debug("Task Cancelled: ", ce);
+                }
+            } catch (ExecutionException ee) {
+                throwable = ee.getCause();
+            } catch (InterruptedException ie) {
+                throwable = ie;
+            }
+
+            if (throwable != null) {
+                if (m_consumer == null) {
+                    s_logger.error("Error from ErrorHandlingScheduledThreadPool thread", throwable);
+                } else {
+                    m_consumer.accept(throwable);
+                }
+            }
+        }
+    }
 
     public static final Runnable EMPTY_RUNNABLE = new Runnable() {
         @Override

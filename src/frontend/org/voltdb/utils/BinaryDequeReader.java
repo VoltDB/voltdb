@@ -28,6 +28,30 @@ import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
  * each of them maintaining their own read location within the deque.
  */
 public interface BinaryDequeReader<M> {
+    public enum SeekErrorRule {
+        THROW,
+        SEEK_AFTER,
+        SEEK_BEFORE;
+    }
+
+    public class NoSuchOffsetException extends Exception {
+
+        private static final long serialVersionUID = -1717317350763722360L;
+
+        public NoSuchOffsetException(String msg) {
+            super(msg);
+        }
+
+    }
+
+    /**
+     * Move the reader to the segment containing the id available after the input id.
+     * This call will position the reader after the input id only if the id is the end id of a segment.
+     * Otherwise, the reader will be moved to the segment containing the next id after the input id.
+     * If it is in the current segment, the reader will not be repositioned at all.
+     */
+    public void skipPast(long id) throws IOException;
+
     /**
      * Read and return the object at the current read position of this reader.
      * The entry will be removed once all active readers have read the entry.
@@ -47,6 +71,32 @@ public interface BinaryDequeReader<M> {
      * @throws IOException
      */
     public Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException;
+
+    /**
+     * Use this to position the reader to the beginning of the segment that contains the given entry id.
+     * This method can only be used on BinaryDeque instances that are storing the start and end ids
+     * in the segment headers.
+     * <p>
+     * After this operation, the reader should be positioned at the beginning of the segment with
+     * <code>startId >= entryId >= endId</code>. However, if the given <code>entryId</code> does not exist in the BinaryDeque,
+     * either because the entry is in a gap in the data, or because the entry is before the first entry currently
+     * available, or because the entry is after the last entry currently available, the behavior depends on
+     * {@link SeekErrorRule} specified.
+     * <ul>
+     * <li>{@link SeekErrorRule#THROW} - throws {@link NoSuchOffsetException} if the entry id is not found</li>
+     * <li>{@link SeekErrorRule#SEEK_AFTER} - the reader will be positioned at the lowest segment such that
+     * <code>startId > entryId</code>. If the highest available entry in the BinaryDeque is less than the specified entry,
+     * {@link NoSuchOffsetException} will be thrown.</li>
+     * <li>{@link SeekErrorRule#SEEK_BEFORE} - the reader will be positioned at the highest segment such that <code>endId < entryId</code>.
+     * If the first entry available in the BinaryDeque is higher than the specified entry, {@link NoSuchOffsetException} will be thrown.</li>
+     * </ul>
+     * @param entryId the id of the entry we are looking for
+     * @param errorRule specifies the behavior when the <code>entryId</code> cannot be found
+     * @throws IllegalStateException if this BinaryDeque is not storing ids in its segment header
+     * @throws NoSuchOffsetException if the entry id cannot be found and based on the {@link SeekErrorRule} specified
+     * @throws IOException if an IO error occurs trying to read the data
+     */
+    public void seekToSegment(long entryId, SeekErrorRule errorRule) throws NoSuchOffsetException, IOException;
 
     /**
      * Number of bytes left to read for this reader.
@@ -70,11 +120,51 @@ public interface BinaryDequeReader<M> {
     public boolean isEmpty() throws IOException;
 
     /**
+     * Returns true if the reader is open, false it has been closed.
+     * @return true if the reader is open, false otherwise.
+     */
+    public boolean isOpen();
+
+    /**
      * Entry class to hold all metadata and data associated with an entry in a {@link BinaryDeque}
      *
      * @param <M> Type of extra header metadata
      */
     public interface Entry<M> {
+        /**
+         * Wrap a basic {@link BBContainer} in the {@link Entry} interface. When using this wrapper {@link #free()} is
+         * equivalent to {@link #release()}
+         * <p>
+         * This wrapper should only be used to wrap {@link BBContainers} whose discard only free the memory and have no
+         * BinaryDeque related side effects.
+         *
+         * @param <M>       Type of metadata
+         * @param container to wrap
+         * @return {@link Entry} instance which wraps {@code container}
+         */
+        static <M> Entry<M> wrap(BBContainer container) {
+            return new Entry<M>() {
+                @Override
+                public M getExtraHeader() {
+                    return null;
+                }
+
+                @Override
+                public ByteBuffer getData() {
+                    return container.b();
+                }
+
+                @Override
+                public void release() {
+                    free();
+                }
+
+                @Override
+                public void free() {
+                    container.discard();
+                }
+            };
+        }
         /**
          * @return any associated extra header metadata. May return {@code null} if there was none
          */
@@ -90,5 +180,10 @@ public interface BinaryDequeReader<M> {
          * {@link BinaryDequeReader} which returned this entry.
          */
         void release();
+
+        /**
+         * Free the memory being held by this entry but it is not eligible for deletion
+         */
+        void free();
     }
 }

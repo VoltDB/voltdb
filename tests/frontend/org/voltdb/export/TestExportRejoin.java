@@ -91,7 +91,7 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         // the buffer could be dropped by both hosts that are being killed.
         client.callProcedure("@Quiesce");
 
-        ((LocalCluster) m_config).recoverOne(1, null, "");
+        ((LocalCluster) m_config).recoverOne(1, null);
         Thread.sleep(500);
 
         ((LocalCluster) m_config).killSingleHost(2);
@@ -106,7 +106,7 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         }
         client.drain();
 
-        ((LocalCluster) m_config).recoverOne(2, null, "");
+        ((LocalCluster) m_config).recoverOne(2, null);
         Thread.sleep(500);
         client = getClientToSubsetHosts(new int[] {0, 1, 2});
 

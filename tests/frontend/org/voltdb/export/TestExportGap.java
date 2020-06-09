@@ -24,9 +24,7 @@ package org.voltdb.export;
 
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map.Entry;
 
 import org.junit.After;
@@ -41,7 +39,7 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 
-import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *
@@ -61,7 +59,6 @@ public class TestExportGap extends ExportLocalClusterBase {
     private Client m_client;
     private int m_count = 10;
     private int m_batch = 100;
-    String m_logPattern = "fills gap";
 
     @Rule
     public final TestName m_name = new TestName();
@@ -76,6 +73,7 @@ public class TestExportGap extends ExportLocalClusterBase {
                 ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                 createSocketExportProperties("s1", false /* is replicated stream? */),
                 "s1_target");
+        m_builder.setFlushIntervals(250, 1000, 250);
 
         int sph = 4;
         int hostCount = 2;
@@ -84,11 +82,6 @@ public class TestExportGap extends ExportLocalClusterBase {
         m_cluster.setHasLocalServer(false);
         m_cluster.overrideAnyRequestForValgrind();
         assertTrue(m_cluster.compile(m_builder));
-
-        // Set up log message pattern
-        List<String> patterns = Lists.newArrayList();
-        patterns.add(m_logPattern);
-        m_cluster.setLogSearchPatterns(patterns);
 
         // Start cluster and socket listener
         m_cluster.startUp(true);
@@ -108,7 +101,7 @@ public class TestExportGap extends ExportLocalClusterBase {
 
     @Test(timeout = 90_000)
     public void runTest() throws Exception {
-
+        String stream = "s1";
         int rowCount = 0;
 
         // MUST CALL getClient because verifier requires
@@ -120,7 +113,7 @@ public class TestExportGap extends ExportLocalClusterBase {
         Arrays.fill(data, 1);
 
         for (int i = 0; i < m_count; i++) {
-            insertToStream("s1", rowCount, m_batch, m_client, data);
+            insertToStream(stream, rowCount, m_batch, m_client, data);
             rowCount += m_batch;
         }
         m_client.drain();
@@ -132,19 +125,19 @@ public class TestExportGap extends ExportLocalClusterBase {
 
         // Insert more data into surviving host
         for (int i = 0; i < m_count; i++) {
-            insertToStream("s1", rowCount, m_batch, m_client, data);
+            insertToStream(stream, rowCount, m_batch, m_client, data);
             rowCount += m_batch;
         }
         m_client.drain();
 
         // Recover host 0 and reopen client
-        m_cluster.recoverOne(0, null, "");
+        m_cluster.recoverOne(0, null);
         Thread.sleep(500);
         m_client = getClient(m_cluster);
 
         // Insert more data into both hosts
         for (int i = 0; i < m_count; i++) {
-            insertToStream("s1", rowCount, m_batch, m_client, data);
+            insertToStream(stream, rowCount, m_batch, m_client, data);
             rowCount += m_batch;
         }
         m_client.drain();
@@ -156,19 +149,19 @@ public class TestExportGap extends ExportLocalClusterBase {
 
         // Insert more data into surviving host
         for (int i = 0; i < m_count; i++) {
-            insertToStream("s1", rowCount, m_batch, m_client, data);
+            insertToStream(stream, rowCount, m_batch, m_client, data);
             rowCount += m_batch;
         }
         m_client.drain();
 
         // Recover host 1 and reopen client
-        m_cluster.recoverOne(1, null, "");
+        m_cluster.recoverOne(1, null);
         Thread.sleep(500);
         m_client = getClient(m_cluster);
 
         // Insert more data into both hosts
         for (int i = 0; i < m_count; i++) {
-            insertToStream("s1", rowCount, m_batch, m_client, data);
+            insertToStream(stream, rowCount, m_batch, m_client, data);
             rowCount += m_batch;
         }
         m_client.drain();
@@ -177,23 +170,15 @@ public class TestExportGap extends ExportLocalClusterBase {
         m_builder.clearExports();
         m_builder.addExport(true /* enabled */,
                 ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
-                createSocketExportProperties("s1", false /* is replicated stream? */),
+                createSocketExportProperties(stream, false /* is replicated stream? */),
                 "s1_target");
         m_cluster.updateCatalog(m_builder);
 
+        // Sleep for the export flush interval
+        Thread.sleep(250);
         // Wait for exports to drain
-        List<String> list = new ArrayList<>(1);
-        list.add("s1");
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, ImmutableList.of(stream));
 
-        // Verify at least one host had to fill a gap
-        assertTrue(m_cluster.verifyLogMessage(0, m_logPattern)
-                || m_cluster.verifyLogMessage(1, m_logPattern));
-
-        // I noticed there were a small number of rows missing intermittently.
-        // HACK The more rows inserted, the more we need to wait for the sockets to drain?
-        System.out.println("Sleep 10 before verifying... ");
-        Thread.sleep(10_000);
         m_verifier.verifyRows();
     }
 

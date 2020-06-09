@@ -45,11 +45,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -66,6 +64,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientResponseWithPartitionKey;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
@@ -73,7 +72,9 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 
 public class AsyncExportClient
@@ -211,6 +212,11 @@ public class AsyncExportClient
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
 
+    private static String[] TABLES = { "EXPORT_PARTITIONED_TABLE_JDBC",
+                                       "EXPORT_REPLICATED_TABLE_JDBC",
+                                       "EXPORT_PARTITIONED_TABLE_KAFKA",
+                                       "EXPORT_REPLICATED_TABLE_KAFKA"};
+
     static {
         VoltDB.setDefaultTimezone();
     }
@@ -306,7 +312,6 @@ public class AsyncExportClient
 
             benchmarkStartTS = System.currentTimeMillis();
             AtomicLong rowId = new AtomicLong(0);
-
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
             Random r = new Random();
@@ -352,9 +357,9 @@ public class AsyncExportClient
                                                       0);
                     }
                     catch (Exception e) {
-                        log.fatal("Exception: " + e);
+                        log.info("Exception: " + e);
                         e.printStackTrace();
-                        System.exit(-1);
+                        // System.exit(-1);
                     }
                 }
             }
@@ -365,22 +370,20 @@ public class AsyncExportClient
             timer.cancel();
             // likewise for the migrate task
             migrateTimer.cancel();
-            if (config.migrateWithoutTTL) {
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+            clientRef.get().drain();
 
+            if (config.migrateWithoutTTL) {
+                for (String t : TABLES) {
+                    log_migrating_counts(t);
+                }
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
                 log.info("triggering final migrate");
                 trigger_migrate(0);
                 Thread.sleep(7500);
-
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                for (String t : TABLES) {
+                    log_migrating_counts(t);
+                }
             }
 
             shutdown.compareAndSet(false, true);
@@ -527,13 +530,22 @@ public class AsyncExportClient
         try {
             VoltTable[] results;
             if (config.procedure.equals("JiggleExportGroupSinglePartition")) {
-                results = clientRef.get().callProcedure("MigratePartitionedExport", time_window).getResults();
-                log.info("Partitioned Migrate - window: " + time_window + " seconds" +
-                         ", kafka: " + results[0].asScalarLong() +
-                         ", rabbit: " + results[1].asScalarLong() +
-                         ", file: " + results[2].asScalarLong() +
-                         ", jdbc: " + results[3].asScalarLong()
-                         );
+                ClientResponseWithPartitionKey[] responses  = clientRef.get().callAllPartitionProcedure("MigratePartitionedExport",
+                        time_window);
+                for (ClientResponseWithPartitionKey resp : responses) {
+                    if (ClientResponse.SUCCESS == resp.response.getStatus()){
+                        VoltTable res = resp.response.getResults()[0];
+                        log.info("Partitioned Migrate - window: " + time_window + " seconds" +
+                                ", kafka: " + res.asScalarLong() +
+                                ", rabbit: " + res.asScalarLong() +
+                                ", file: " + res.asScalarLong() +
+                                ", jdbc: " + res.asScalarLong() +
+                                ", on partition " + resp.partitionKey
+                                );
+                    } else {
+                        log.info("WARNING: fail to migrate on partition:" + resp.partitionKey);
+                    }
+                }
             } else {
                 results = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults();
                 log.info("Replicated Migrate - window: " + time_window + " seconds" +
@@ -544,13 +556,21 @@ public class AsyncExportClient
                          );
             }
         }
+        catch (ProcCallException e1) {
+            if (e1.getMessage().contains("was lost before a response was received")) {
+                log.warn("Possible problem executing " + config.procedure + ", procedure may not have completed");
+            } else {
+                log.fatal("Exception: " + e1);
+                e1.printStackTrace();
+                System.exit(-1);
+            }
+        }
         catch (Exception e) {
             log.fatal("Exception: " + e);
             e.printStackTrace();
             System.exit(-1);
         }
     }
-
 
     private static long get_table_count(String sqlTable) {
         long count = 0;

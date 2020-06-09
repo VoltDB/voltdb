@@ -312,7 +312,7 @@ public:
     // ------------------------------------------------------------------
     // PERSISTENT TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void insertPersistentTuple(TableTuple const& source,
+    TableTuple insertPersistentTuple(TableTuple const& source,
             bool fallible, bool ignoreTupleLimit = false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.

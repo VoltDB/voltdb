@@ -257,30 +257,40 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
     }
 
     /**
-     * Find first gap after or including a sequence number if it exists
+     * Find first gap after or including a sequence number if it exists. If map is empty a range of everything is
+     * returned. If {@code afterSeqNo >= INFINITE_SEQNO} {@code null} is returned.
      *
      * @param afterSeqNo find first gap after (or including) this seqNo
      * @return
      */
     public Pair<Long, Long> getFirstGap(long afterSeqNo) {
-        if (m_map.isEmpty()) {
+        // Cannot have a gap past infinity
+        if (afterSeqNo >= INFINITE_SEQNO) {
             return null;
         }
 
+        if (m_map.isEmpty()) {
+            return Pair.of(MIN_SEQNO, INFINITE_SEQNO);
+        }
+
         // Handle corner cases
-        if (afterSeqNo < getFirstSeqNo()) {
+        long firstSeqNo = getFirstSeqNo();
+        if (afterSeqNo < firstSeqNo) {
             // Initial gap
-            return new Pair<Long, Long>(MIN_SEQNO, getFirstSeqNo() - 1);
+            return new Pair<Long, Long>(MIN_SEQNO, firstSeqNo - 1);
         }
-        else if (getLastSeqNo() < afterSeqNo) {
+
+        long lastSeqNo = getLastSeqNo();
+        if (lastSeqNo < afterSeqNo) {
             // Trailing gap
-            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+            return new Pair<Long, Long>(lastSeqNo + 1, INFINITE_SEQNO);
         }
-        else if (size() < 2) {
+
+        if (size() == 1) {
             // Only one segment
-            if (getLastSeqNo() < INFINITE_SEQNO) {
+            if (lastSeqNo < INFINITE_SEQNO) {
                 // Next gap will be trailing
-                return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+                return new Pair<Long, Long>(lastSeqNo + 1, INFINITE_SEQNO);
             }
             // No gaps
             return null;
@@ -301,9 +311,9 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             }
             return new Pair<Long, Long>(start, end);
         }
-        if (getLastSeqNo() < INFINITE_SEQNO) {
+        if (lastSeqNo < INFINITE_SEQNO) {
             // Next gap will be trailing
-            return new Pair<Long, Long>(getLastSeqNo() + 1, INFINITE_SEQNO);
+            return new Pair<Long, Long>(lastSeqNo + 1, INFINITE_SEQNO);
         }
         return null;
     }
@@ -328,17 +338,33 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
      * Get total number of sequence from the tracker.
      * @return
      */
-    public int sizeInSequence() {
-        int sequence = 0;
-        if (m_map.isEmpty()) {
-            return sequence;
-        }
-        final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-        while (iter.hasNext()) {
-            Range<Long> range = iter.next();
-            sequence += end(range) - start(range) + 1;
-        }
-        return sequence;
+    public long sizeInSequence() {
+        return sizeInSequence(m_map);
+    }
+
+    /**
+     * Calculate the size of the ranges of the intersection of this tracker and {@code other}
+     *
+     * @param other tracker to calculate overlap size with
+     * @return size of intersection
+     *
+     * @see ExportSequenceNumberTracker#sizeInSequence()
+     */
+    public long intersectionSizeInSequences(ExportSequenceNumberTracker other) {
+        // This isn't the most efficient way to do this but it is easy
+        TreeRangeSet<Long> intersection = TreeRangeSet.create(m_map);
+        intersection.removeAll(other.m_map.complement());
+        return sizeInSequence(intersection);
+    }
+
+    /**
+     * Test if all sequences in {@code other} are also in this tracker
+     *
+     * @param other {@link ExportSequenceNumberTracker}
+     * @return {@code true} if all sequences in {@code other} are in {@code this}
+     */
+    public boolean containsAllSequencesIn(ExportSequenceNumberTracker other) {
+        return m_map.enclosesAll(other.m_map);
     }
 
     public String toShortString() {
@@ -421,5 +447,18 @@ public class ExportSequenceNumberTracker implements DeferredSerialization {
             tracker.append(start(entry), end(entry));
         }
         return tracker;
+    }
+
+    private static long sizeInSequence(RangeSet<Long> ranges) {
+        long sequence = 0;
+        if (ranges.isEmpty()) {
+            return sequence;
+        }
+        final Iterator<Range<Long>> iter = ranges.asRanges().iterator();
+        while (iter.hasNext()) {
+            Range<Long> range = iter.next();
+            sequence += end(range) - start(range) + 1;
+        }
+        return sequence;
     }
 }

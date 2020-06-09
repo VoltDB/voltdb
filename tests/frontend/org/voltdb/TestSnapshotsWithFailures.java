@@ -50,6 +50,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
@@ -82,7 +83,9 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
     @Test
     public void testTruncationSnapshotWithDataFailure() throws Exception {
-        if (!MiscUtils.isPro()) return;
+        if (!MiscUtils.isPro()) {
+            return;
+        }
 
         System.out.println("Starting testTruncationSnapshotWithDataFailure");
         try {
@@ -110,7 +113,9 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
     @Test
     public void testTruncationSnapshotWithHeaderFailure() throws Exception {
-        if (!MiscUtils.isPro()) return;
+        if (!MiscUtils.isPro()) {
+            return;
+        }
 
         System.out.println("Starting testTruncationSnapshotWithHeaderFailure");
         try {
@@ -226,8 +231,9 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             }
             boolean deleted = f.delete();
             if (!deleted) {
-                if (!f.exists())
+                if (!f.exists()) {
                     return;
+                }
                 System.err.println("Couldn't delete " + f.getPath());
                 System.err.println("Remaining files are:");
                 for (File f2 : f.listFiles()) {
@@ -239,8 +245,9 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         } else {
             boolean deleted = f.delete();
             if (!deleted) {
-                if (!f.exists())
+                if (!f.exists()) {
                     return;
+                }
                 System.err.println("Couldn't delete " + f.getPath());
             }
             assertTrue(deleted);
@@ -325,16 +332,17 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         }
     }
 
-    private void verifySnapshotStatus(Client client, String expectedType, int expectedHostCount, boolean checkVoltDBCrashed) throws Exception {
+    private void verifySnapshotStatus(Client client, String expectedType, int hostCount, boolean checkVoltDBCrashed)
+            throws Exception {
         boolean success = true;
-        int cnt = 0;
+        int cnt;
         VoltTable rslt = null;
-        int hostCount = 0;
+        int snapshotFiles = 0;
         // For command log snapshot there is a gather period of 10 seconds between
         // scheduling and actual initiation, so 60 seconds should be a very safe timeout
         // For manual snapshot, most of the time it will get failure on the first try
         // so it's not a problem
-        while (cnt < 600) {
+        for (cnt = 0; cnt < 600; ++cnt) {
             rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
             TreeSet<Long> interestedSnapshotTxnIds = new TreeSet<>();
             long interestedSnapshotTxnId;
@@ -348,7 +356,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                 // the first truncation snapshot is an empty snapshot that always succeeds.
                 if (interestedSnapshotTxnIds.size() < 2) {
                     Thread.sleep(100);
-                    ++cnt;
                     continue;
                 }
                 interestedSnapshotTxnIds.pollFirst();
@@ -358,25 +365,25 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                 // For MANUAL there will be only one manual snapshot requested.
                 if (interestedSnapshotTxnIds.isEmpty()) {
                     Thread.sleep(100);
-                    ++cnt;
                     continue;
                 }
                 interestedSnapshotTxnId = interestedSnapshotTxnIds.pollFirst();
             }
             rslt.resetRowPosition();
-            hostCount = 0;
+            snapshotFiles = 0;
             while (rslt.advanceRow()) {
                 if (rslt.getLong("TXNID") == interestedSnapshotTxnId) {
-                    hostCount++;
+                    snapshotFiles++;
                     success &= rslt.getString("RESULT").equals("SUCCESS");
                 }
             }
-            if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) break;
+            if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) {
+                break;
+            }
             Thread.sleep(100);
-            ++cnt;
         }
-        assert (cnt < 600);
-        assertEquals(expectedHostCount, hostCount);
+        assertTrue(cnt < 600);
+        assertEquals(hostCount * (1 + SystemTable.values().length), snapshotFiles);
     }
 
     private void validateSnapshot(String ssPath, String nonce, boolean checkCorrupted) {

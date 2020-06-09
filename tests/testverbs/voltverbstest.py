@@ -88,6 +88,7 @@ replica = Opt('replica', 'replica', None, 1)
 # 'blocking' is only for rejoin, does not have corresponding java optional
 # name, change verb 'live rejoin' to 'rejoin'
 blocking = Opt('blocking', '', None, 1)
+topicsport = Opt('topicsport', 'topicsHostPort', str, 1)
 
 # for newcli only
 mesh = Opt('host', 'mesh', str, 2)
@@ -121,7 +122,8 @@ volt_opts = {'create': [admin,
                         host,
                         licensefile,
                         pause,
-                        replica],
+                        replica,
+                        topicsport],
 
              'recover': [admin,
                          client,
@@ -138,7 +140,8 @@ volt_opts = {'create': [admin,
                          host,
                          licensefile,
                          pause,
-                         replica],
+                         replica,
+                         topicsport],
 
              'rejoin': [admin,
                         client,
@@ -152,7 +155,8 @@ volt_opts = {'create': [admin,
                         zookeeper,
                         deployment,
                         placementgroup,
-                        licensefile],
+                        licensefile,
+                        topicsport],
 
              'add': [admin,
                      client,
@@ -166,13 +170,15 @@ volt_opts = {'create': [admin,
                      zookeeper,
                      deployment,
                      placementgroup,
-                     licensefile],
+                     licensefile,
+                     topicsport],
 
              'init': [config,
                       voltdbroot,
                       force,
                       schema,
-                      classes],
+                      classes,
+                      licensefile],
 
              'start': [admin,
                        client,
@@ -192,7 +198,8 @@ volt_opts = {'create': [admin,
                        missing,
                        pause,
                        replica,
-                       add],
+                       add,
+                       topicsport],
              }
 
 volt_opts_mandatory = {'create': [],

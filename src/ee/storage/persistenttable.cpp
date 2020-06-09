@@ -108,7 +108,11 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_tableType(tableType)
     , m_shadowStream(nullptr)
 {
-    ::memcpy(&m_signature, signature, 20);
+    if (signature) {
+        ::memcpy(&m_signature, signature, 20);
+    } else {
+        ::memset(&m_signature, 0, sizeof(m_signature));
+    }
 }
 
 void PersistentTable::initializeWithColumns(TupleSchema* schema,
@@ -702,7 +706,7 @@ bool PersistentTable::insertTuple(TableTuple const& source) {
     return true;
 }
 
-void PersistentTable::insertPersistentTuple(TableTuple const& source, bool fallible, bool ignoreTupleLimit) {
+TableTuple PersistentTable::insertPersistentTuple(TableTuple const& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
         std::ostringstream str;
         str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
@@ -719,6 +723,8 @@ void PersistentTable::insertPersistentTuple(TableTuple const& source, bool falli
         deleteTailTupleStorage(target); // also frees object columns
         throw;
     }
+
+    return target;
 }
 
 void PersistentTable::insertTupleCommon(TableTuple const& source, TableTuple& target,

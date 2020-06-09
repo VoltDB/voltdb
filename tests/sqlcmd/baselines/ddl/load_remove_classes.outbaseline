@@ -93,7 +93,7 @@ primary key (ID));
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -126,6 +126,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -140,7 +141,7 @@ create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -173,6 +174,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -255,7 +257,7 @@ drop procedure InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -288,6 +290,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -316,7 +319,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -349,6 +352,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -363,7 +367,7 @@ create procedure from class sqlcmdtest.BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -396,6 +400,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -484,7 +489,7 @@ drop procedure BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -517,6 +522,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 

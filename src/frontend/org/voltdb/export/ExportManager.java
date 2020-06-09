@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +35,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -54,7 +53,6 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -129,7 +127,7 @@ public class ExportManager implements ExportManagerInterface
 
     // Track the data sources being closed, and a lock allowing {@code canUpdateCatalog()}
     // to wait for all closed sources.
-    private HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
+    private final HashMultimap<String, Integer> m_dataSourcesClosing = HashMultimap.create();
     private final Semaphore m_allowCatalogUpdate = new Semaphore(1);
     private final long UPDATE_CORE_TIMEOUT_SECONDS = 30;
 
@@ -148,6 +146,7 @@ public class ExportManager implements ExportManagerInterface
      */
     public ExportManager(
             int myHostId,
+            VoltDB.Configuration configuration,
             CatalogContext catalogContext,
             HostMessenger messenger)
     throws ExportManager.SetupException
@@ -232,11 +231,11 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public void clearOverflowData() throws ExportManagerInterface.SetupException {
-        String overflowDir = VoltDB.instance().getExportOverflowPath();
+        File overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
                 String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
-            VoltFile.recursivelyDelete(new File(overflowDir), false);
+            VoltFile.recursivelyDelete(overflowDir, false);
         } catch(IOException e) {
             String msg = String.format("Error cleaning out export overflow directory %s: %s",
                     overflowDir, e.getMessage());
@@ -324,7 +323,8 @@ public class ExportManager implements ExportManagerInterface
 
     /** Creates the initial export processor if export is enabled */
     @Override
-    public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+    public void initialize(CatalogContext catalogContext,
+            Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin) {
         try {
             CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
@@ -342,7 +342,7 @@ public class ExportManager implements ExportManagerInterface
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
-            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            File exportOverflowDirectory = VoltDB.instance().getExportOverflowPath();
             ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, m_messenger);
             generation.initialize(m_hostId, catalogContext,
                     connectors, newProcessor, localPartitionsToSites, exportOverflowDirectory);
@@ -363,7 +363,7 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
+            boolean requiresNewExportGeneration, Map<Integer, Integer> localPartitionsToSites)
     {
         final CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
 
@@ -396,7 +396,7 @@ public class ExportManager implements ExportManagerInterface
             return;
         }
         if (m_generation.get() == null) {
-            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            File exportOverflowDirectory = VoltDB.instance().getExportOverflowPath();
             try {
                 ExportGeneration gen = new ExportGeneration(exportOverflowDirectory, m_messenger);
                 m_generation.set(gen);
@@ -463,7 +463,7 @@ public class ExportManager implements ExportManagerInterface
             final CatalogContext catalogContext,
             ExportGeneration generation,
             CatalogMap<Connector> connectors,
-            List<Pair<Integer, Integer>> partitions,
+            Map<Integer, Integer> partitions,
             Map<String, Pair<Properties, Set<String>>> config)
     {
         ExportDataProcessor oldProcessor = m_processor.get();
@@ -483,8 +483,8 @@ public class ExportManager implements ExportManagerInterface
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
                     m_hostId, partitions, true);
-            for (Pair<Integer, Integer> partition : partitions) {
-                generation.updateAckMailboxes(partition.getFirst(), null);
+            for (int partition : partitions.keySet()) {
+                generation.updateAckMailboxes(partition, null);
             }
             //We create processor even if we dont have any streams.
             newProcessor.setExportGeneration(generation);
@@ -557,13 +557,11 @@ public class ExportManager implements ExportManagerInterface
             long tupleCount,
             long uniqueId,
             long bufferPtr,
-            ByteBuffer buffer) {
-        //For validating that the memory is released
-        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
-        ExportManagerInterface instance = ExportManagerInterface.instance();
+            BBContainer container) {
+        ExportManagerInterface instance = VoltDB.getExportManager();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, buffer);
+                tupleCount, uniqueId, container);
     }
 
     @Override
@@ -574,19 +572,19 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            ByteBuffer buffer) {
+            BBContainer container) {
 
         try {
             Generation generation = getGeneration();
             if (generation == null) {
-                if (buffer != null) {
-                    DBBPool.wrapBB(buffer).discard();
+                if (container != null) {
+                    container.discard();
                 }
                 return;
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, buffer);
+                    (int)tupleCount, uniqueId, container);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
@@ -626,7 +624,7 @@ public class ExportManager implements ExportManagerInterface
 
     private static void syncSources() {
 
-        Generation generation = ExportManagerInterface.instance().getGeneration();
+        Generation generation = VoltDB.getExportManager().getGeneration();
         if (generation != null) {
             generation.sync();
         }
@@ -643,7 +641,7 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
+    public void processExportControl(String exportStream, List<String> exportTargets, StreamControlOperation operation, VoltTable results) {
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
         }

@@ -103,15 +103,18 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
 
         public void closeClient() {
-            for (ClientConnectionHandler s : m_clients) {
-                s.stopClient();
+            m_close = true;
+            synchronized (m_clients) {
+                for (ClientConnectionHandler s : m_clients) {
+                    s.stopClient();
+                }
             }
             m_clients.clear();
         }
 
         public void close() throws IOException {
-            ssocket.close();
             m_close = true;
+            ssocket.close();
             try {
                 this.join();
             }
@@ -128,6 +131,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     Socket clientSocket = ssocket.accept();
                     ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
                     m_clients.add(ch);
+                    if (m_close) {
+                        ch.stopClient();
+                        break;
+                    }
                     ch.start();
                     System.out.println("Client :" + m_port + " # of connections: " + m_clients.size());
                 } catch (IOException ex) {

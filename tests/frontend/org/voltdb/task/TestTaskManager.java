@@ -57,6 +57,7 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 import org.voltdb.AuthSystem;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.AuthSystem.InternalAdminUser;
 import org.voltdb.ClientInterface;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.InternalConnectionHandler;
@@ -115,6 +116,7 @@ public class TestTaskManager {
 
         m_authSystem = mock(AuthSystem.class);
         when(m_authSystem.getUser(anyString())).then(m -> mock(AuthUser.class));
+        when(m_authSystem.getInternalAdminUser()).then(m -> mock(InternalAdminUser.class));
 
         m_internalConnectionHandler = mock(InternalConnectionHandler.class);
 
@@ -827,6 +829,38 @@ public class TestTaskManager {
                 fail("Unknown task: " + name);
             }
         });
+    }
+
+    /*
+     * Test that system tasks can be created and are not affected by catalog updates
+     */
+    @Test
+    public void systemTask() throws Exception {
+        m_taskManager.addSystemTask(m_name.getMethodName(), TaskScope.PARTITIONS, h -> new TestActionScheduler()).get();
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+
+        startSync(ImmutableMap.of());
+        assertEquals(0, s_firstActionSchedulerCallCount.get());
+
+        promotedPartitionsSync(0, 1, 2, 3);
+
+        // Long sleep because it sometimes takes a while for the first execution
+        Thread.sleep(50);
+        assertEquals(4, s_firstActionSchedulerCallCount.get());
+        int postRunActionSchedulerCallCount = s_postRunActionSchedulerCallCount.get();
+        assertTrue("ActionScheduler should have been called at least once: " + postRunActionSchedulerCallCount,
+                postRunActionSchedulerCallCount > 0);
+
+        // Update of no tasks does not affect system tasks
+        processUpdateSync(ImmutableMap.of());
+        Thread.sleep(5);
+        assertTrue("postRunActionSchedulerCallCount should have increased: " + postRunActionSchedulerCallCount,
+                postRunActionSchedulerCallCount < s_postRunActionSchedulerCallCount.get());
+
+        assertTrue(m_taskManager.removeSystemTask(m_name.getMethodName()).get());
+        assertCountsAfterScheduleCanceled(4, 0);
+
+        assertFalse(m_taskManager.removeSystemTask(m_name.getMethodName()).get());
     }
 
     private void dropScheduleAndAssertCounts() throws Exception {

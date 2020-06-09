@@ -55,7 +55,10 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             boolean success = cluster.compile(builder);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-            cluster.setHasLocalServer(false);
+
+            // WARNING: This may never be set to true or it will trigger an assert in StreamSnapshotDataTarget
+            final boolean DONT_USE_LOCAL_SERVER_THREAD = false;
+            cluster.setHasLocalServer(DONT_USE_LOCAL_SERVER_THREAD);
 
             cluster.startUp();
 
@@ -72,7 +75,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             // try to rejoin, but expect this to fail after 10-15 seconds
             // because the "rejoindeathtest" property is set and that will
             // disable acking of streamed snapshots
-            cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+            cluster.recoverOne(1, 0, MiscUtils.isPro());
 
             // try to snapshot to make sure it still works
             client.callProcedure("@SnapshotSave", "{uripath:\"file:///tmp\",nonce:\"mydb\",block:true,format:\"csv\"}");
@@ -82,7 +85,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             if (MiscUtils.isPro()) {
                 assertEquals(1, cluster.getLiveNodeCount());
 
-                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+                cluster.recoverOne(1, 0, MiscUtils.isPro());
 
                 assertEquals(2, cluster.getLiveNodeCount());
 
@@ -90,13 +93,13 @@ public class TestMidRejoinDeath extends RejoinTestBase {
 
                 cluster.setJavaProperty("rejoindeathtestonrejoinside", null);
 
-                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+                cluster.recoverOne(1, 0, MiscUtils.isPro());
 
                 assertEquals(1, cluster.getLiveNodeCount());
 
                 cluster.setJavaProperty("rejoindeathtestcancel", null);
 
-                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+                cluster.recoverOne(1, 0, MiscUtils.isPro());
 
                 assertEquals(2, cluster.getLiveNodeCount());
             }

@@ -206,7 +206,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -268,7 +268,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -343,7 +343,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 int schemaSize = bb.getInt();
                 ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
                 bb.getInt(); // row size
-                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -396,7 +396,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 int schemaSize = bb.getInt();
                 ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
                 bb.getInt(); // row size
-                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -450,7 +450,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 int schemaSize = bb.getInt();
                 ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
                 bb.getInt(); // row size
-                ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+                ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -492,7 +492,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -550,7 +550,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -607,7 +607,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -656,7 +656,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         int schemaSize = bb.getInt();
         ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
         bb.getInt(); // row size
-        ExportRow row = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
+        ExportRow row = ExportRow.decodeRow(schemaRow, 0, bb);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);

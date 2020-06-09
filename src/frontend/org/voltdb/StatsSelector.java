@@ -38,6 +38,7 @@ public enum StatsSelector {
     CPU,            // return CPU Stats
     MANAGEMENT(MEMORY, INITIATOR, PROCEDURE, IOSTATS, TABLE, INDEX, STARVATION, QUEUE, CPU), // Returns pretty much everything
     SNAPSHOTSTATUS(false),
+    SNAPSHOTSUMMARY(false),
     PROCEDUREPROFILE(PROCEDURE), // performs an aggregation of the procedure statistics
     PROCEDUREINPUT(PROCEDURE),
     PROCEDUREOUTPUT(PROCEDURE),
@@ -68,9 +69,11 @@ public enum StatsSelector {
     IMPORTER,       // synonym as IMPORT for backward compatibility
     IMPORT(IMPORTER),
     EXPORT,
+    TOPIC,
     TASK(false),
-    TASK_SCHEDULER(TASK),
-    TASK_PROCEDURE(TASK);
+    TASK_SCHEDULER(false, TASK),
+    TASK_PROCEDURE(false, TASK),
+    SYSTEM_TASK(false);
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

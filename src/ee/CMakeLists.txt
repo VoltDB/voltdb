@@ -210,6 +210,14 @@ SET (VOLTDB_SRC
   indexes/IndexStats.cpp
   indexes/tableindex.cpp
   indexes/tableindexfactory.cpp
+  kipling/GroupStore.cpp
+  kipling/messages/OffsetCommit.cpp
+  kipling/messages/OffsetFetch.cpp
+  kipling/orm/Group.cpp
+  kipling/orm/GroupOffset.cpp
+  kipling/orm/GroupMember.cpp
+  kipling/orm/GroupOrmBase.cpp
+  kipling/TableFactory.cpp
   logging/JNILogProxy.cpp
   logging/LogManager.cpp
   plannodes/SchemaColumn.cpp
@@ -274,6 +282,7 @@ SET (VOLTDB_SRC
   storage/TupleBlock.cpp
   storage/constraintutil.cpp
   storage/persistenttable.cpp
+  storage/SystemTableFactory.cpp
   storage/streamedtable.cpp
   storage/table.cpp
   storage/tablefactory.cpp

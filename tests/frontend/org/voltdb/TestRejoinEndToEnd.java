@@ -47,7 +47,6 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.exportclient.SocketExporter;
-import org.voltdb.exportclient.SocketExporterLegacy;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -346,7 +345,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         cluster.killSingleHost(0);
-        cluster.recoverOne( 0, 1, "");
+        cluster.recoverOne( 0, 1);
 
         cluster.shutDown();
     }
@@ -763,7 +762,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         // shutdown and rejoin a node
         cluster.killSingleHost(1);
-        assertTrue(cluster.recoverOne(1, 0, ""));
+        assertTrue(cluster.recoverOne(1, 0));
 
         // reuse the previous client to do a snapshot save
         response = client.callProcedure("@SnapshotSave", snapshotDir, "testnonce", (byte) 1);
@@ -991,7 +990,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_coordinators = cluster.coordinators(1);
         config.m_isRejoinTest = true;
         cluster.setPortsFromConfig(0, config);
-        cluster.recoverOne(0, 1, "");
+        cluster.recoverOne(0, 1);
 
         while (VoltDB.instance().rejoining()) {
             Thread.sleep(100);
@@ -1087,7 +1086,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         config.m_isRejoinTest = true;
         cluster.setPortsFromConfig(0, config);
 
-        cluster.recoverOne(0, 1, "");
+        cluster.recoverOne(0, 1);
 
         while (VoltDB.instance().rejoining()) {
             Thread.sleep(100);
@@ -1120,11 +1119,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         testRejoinWithOnlyAStreamCommon(SocketExporter.class.getName());
     }
 
-    @Test(timeout = 120_000)
-    public void testRejoinWithOnlyAStreamLegacy() throws Exception {
-        testRejoinWithOnlyAStreamCommon(SocketExporterLegacy.class.getName());
-    }
-
     private void testRejoinWithOnlyAStreamCommon(String exportClassName) throws Exception {
         SocketExportTestServer socketServer = new SocketExportTestServer(5001);
 
@@ -1150,7 +1144,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             }
             for (int i = 0; i < 2; ++i) {
                 lc.killSingleHost(i);
-                lc.recoverOne(i, (i + 1) % 2, "");
+                lc.recoverOne(i, (i + 1) % 2);
             }
 
             client.close();
@@ -1191,7 +1185,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             Client client = lc.createClient(new ClientConfig());
             client.callProcedure("@SnapshotSave", "{nonce:\"mydb\",block:true,format:\"csv\"}");
 
-            assertFalse(lc.recoverOne(1, 0, ""));
+            assertFalse(lc.recoverOne(1, 0));
         } finally {
             lc.shutDown();
         }

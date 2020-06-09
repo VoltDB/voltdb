@@ -24,9 +24,9 @@
 package org.voltdb.exportclient;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.mockito.Mockito;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
@@ -85,19 +85,16 @@ public class ExportClientTestBase {
             col_names.add(COLUMN_NAMES[i]);
             col_types.add(COLUMN_TYPES[i]);
         }
-        String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, tableName,
-                partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
-                AdvertisedDataSource.ExportFormat.SEVENDOTX);
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, tableName);
         return source;
     }
 
     protected void setup() {
         ExportManagerInterface mockEM = Mockito.mock(ExportManagerInterface.class);
         Mockito.when(mockEM.getExportMode()).thenReturn(ExportMode.BASIC);
-        ExportManagerInterface.setInstanceForTest(mockEM);
+        VoltDB.setExportManagerInstance(mockEM);
         vtable.clearRowData();
     }
 }

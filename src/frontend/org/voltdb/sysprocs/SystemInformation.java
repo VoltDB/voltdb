@@ -516,7 +516,7 @@ public class SystemInformation extends VoltSystemProcedure
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath());
+                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath().getPath());
                 break;
             }
         }
@@ -649,6 +649,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("FEATURES_TRIAL", Boolean.toString(licenseApi.isAnyKindOfTrial()));
         results.addRow("FEATURES_UNRESTRICTED", Boolean.toString(licenseApi.isUnrestricted()));
         results.addRow("FEATURES_COMMANDLOGGING", Boolean.toString(licenseApi.isCommandLoggingAllowed()));
+        results.addRow("FEATURES_DRREPLICATION", Boolean.toString(licenseApi.isDrReplicationAllowed()));
         results.addRow("FEATURES_DRACTIVEACTIVE", Boolean.toString(licenseApi.isDrActiveActiveAllowed()));
 
         if(licenseApi.note() != null)

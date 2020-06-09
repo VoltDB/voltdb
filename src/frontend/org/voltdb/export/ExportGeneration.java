@@ -32,7 +32,6 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -47,7 +46,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
@@ -68,7 +67,6 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.PbdSegmentName;
 import org.voltdb.utils.PbdSegmentName.Result;
@@ -145,7 +143,7 @@ public class ExportGeneration implements Generation {
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             File exportOverflowDirectory)
     {
         File files[] = exportOverflowDirectory.listFiles();
@@ -168,7 +166,8 @@ public class ExportGeneration implements Generation {
      */
     private void initializeGenerationFromDisk(final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
-            File[] files, List<Pair<Integer, Integer>> localPartitionsToSites,
+            File[] files,
+            Map<Integer, Integer> localPartitionsToSites,
             long genId) {
 
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
@@ -222,9 +221,7 @@ public class ExportGeneration implements Generation {
         }
 
         // Count unique partitions only
-        Set<Integer> allLocalPartitions = localPartitionsToSites.stream()
-                .map(p -> p.getFirst())
-                .collect(Collectors.toSet());
+        Set<Integer> allLocalPartitions = localPartitionsToSites.keySet();
         Set<Integer> onDIskPartitionsSet = new HashSet<Integer>(onDiskPartitions);
         onDIskPartitionsSet.removeAll(allLocalPartitions);
         // One export mailbox per node, since we only keep one generation
@@ -251,7 +248,7 @@ public class ExportGeneration implements Generation {
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
             int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             boolean isCatalogUpdate)
     {
         // Update catalog version so that datasources use this version when propagating acks
@@ -275,8 +272,7 @@ public class ExportGeneration implements Generation {
         // Now create datasources based on the catalog (if already present will not be re-created).
         // Note that we create sources on disabled connectors.
 
-        Set<Integer> partitionsInUse =
-                localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet());
+        Set<Integer> partitionsInUse = localPartitionsToSites.keySet();
 
         boolean createdSources = false;
         NavigableSet<Table> streams = CatalogUtil.getExportTablesExcludeViewOnly(connectors);
@@ -473,7 +469,9 @@ public class ExportGeneration implements Generation {
                     ImmutableList.Builder<Long> mailboxes = ImmutableList.builder();
 
                     for (String child : children) {
-                        if (child.equals(Long.toString(m_mbox.getHSId()))) continue;
+                        if (child.equals(Long.toString(m_mbox.getHSId()))) {
+                            continue;
+                        }
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
@@ -598,8 +596,9 @@ public class ExportGeneration implements Generation {
         for (Map<String, ExportDataSource> dataSources : dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
                 ListenableFuture<ExportStatsRow> syncFuture = source.getImmutableStatsRow(interval);
-                if (syncFuture != null)
+                if (syncFuture != null) {
                     tasks.add(syncFuture);
+                }
             }
         }
 
@@ -617,7 +616,7 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             List<Integer> adFilePartitions,
             final ExportDataProcessor processor,
             final long genId) throws IOException {
@@ -659,20 +658,20 @@ public class ExportGeneration implements Generation {
      * @param processor
      */
     private void addDataSources(Table table, int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites,
+            Map<Integer, Integer> localPartitionsToSites,
             Set<Integer> partitionsInUse,
             final ExportDataProcessor processor,
             final long genId,
             boolean isCatalogUpdate)
     {
-        for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
+        for (Map.Entry<Integer, Integer> partitionAndSiteId : localPartitionsToSites.entrySet()) {
 
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
              */
-            int partition = partitionAndSiteId.getFirst();
-            int siteId = partitionAndSiteId.getSecond();
+            int partition = partitionAndSiteId.getKey();
+            int siteId = partitionAndSiteId.getValue();
             synchronized(m_dataSourcesByPartition) {
                 try {
                     Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
@@ -685,7 +684,6 @@ public class ExportGeneration implements Generation {
                         // Create a new EDS, discarding any pre-existing data
                         ExportDataSource exportDataSource = new ExportDataSource(this,
                                 processor,
-                                "database",
                                 key,
                                 partition,
                                 siteId,
@@ -766,7 +764,7 @@ public class ExportGeneration implements Generation {
         //Do closings outside the synchronized block
         for (ExportDataSource source : doneSources) {
             exportLog.info("Finished processing " + source);
-            ExportManagerInterface.instance().onClosingSource(source.getTableName(), source.getPartitionId());
+            VoltDB.getExportManager().onClosingSource(source.getTableName(), source.getPartitionId());
             source.closeAndDelete();
         }
     }
@@ -805,7 +803,7 @@ public class ExportGeneration implements Generation {
         }
 
         //Do closing outside the synchronized block.
-        ExportManagerInterface.instance().onClosingSource(tableName, partitionId);
+        VoltDB.getExportManager().onClosingSource(tableName, partitionId);
         source.closeAndDelete();
 
     }
@@ -814,7 +812,7 @@ public class ExportGeneration implements Generation {
     @Override
     public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, long committedSequenceNumber,
-            int tupleCount, long uniqueId, ByteBuffer buffer) {
+            int tupleCount, long uniqueId, BBContainer container) {
 
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
@@ -824,8 +822,8 @@ public class ExportGeneration implements Generation {
                 exportLog.error("PUSH Could not find export data sources for partition "
                         + partitionId + ". The export data is being discarded.");
             }
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (container != null) {
+                container.discard();
             }
             return;
         }
@@ -841,14 +839,14 @@ public class ExportGeneration implements Generation {
                     + ") is being discarded.",
                     EstTime.currentTimeMillis());
 
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (container != null) {
+                container.discard();
             }
             return;
         }
 
         source.pushExportBuffer(startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, buffer);
+                tupleCount, uniqueId, container);
     }
 
     private void cleanup() {
@@ -957,15 +955,17 @@ public class ExportGeneration implements Generation {
             for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : dataSources.values()) {
                     ListenableFuture<?> syncFuture = source.sync();
-                    if (syncFuture != null)
+                    if (syncFuture != null) {
                         tasks.add(syncFuture);
+                    }
                 }
             }
         }
 
         try {
-            if (!tasks.isEmpty())
+            if (!tasks.isEmpty()) {
                 Futures.allAsList(tasks).get();
+            }
         } catch (Exception e) {
             exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
         }
@@ -982,8 +982,9 @@ public class ExportGeneration implements Generation {
             }
         }
         try {
-            if (!tasks.isEmpty())
+            if (!tasks.isEmpty()) {
                 Futures.allAsList(tasks).get();
+            }
         } catch (Exception e) {
             exportLog.error("Unexpected exception shutting down export data.", e);
         }
@@ -1035,7 +1036,7 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
+    public void processStreamControl(String exportSource, List<String> exportTargets, StreamControlOperation operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         TreeSet<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         targets.addAll(exportTargets);

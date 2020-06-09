@@ -26,7 +26,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.exceptions.ValidationError;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 
@@ -42,13 +41,10 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     public enum Members {
         SUBQUERY_ID,
-        SUBQUERY_ROOT_NODE_ID,
         PARAM_IDX;
     }
     // subquery unique id
     protected int m_subqueryId;
-    // subquery root plan node id
-    protected int m_subqueryNodeId = -1;
     // subquery root plan node
     protected AbstractPlanNode m_subqueryNode = null;
     // List of correlated parameter indexes that originate at the immediate parent's level
@@ -65,7 +61,8 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     }
 
     public int getSubqueryNodeId() {
-        return (m_subqueryNode != null) ? m_subqueryNode.getPlanNodeId() : m_subqueryNodeId;
+        // -1 is used to indicate there is no subquery node
+        return (m_subqueryNode != null) ? m_subqueryNode.getPlanNodeId() : -1;
     }
 
     public AbstractPlanNode getSubqueryNode() {
@@ -75,12 +72,6 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
         m_subqueryNode = subqueryNode;
-        resetSubqueryNodeId();
-    }
-
-    public void resetSubqueryNodeId() {
-        assert(m_subqueryNode != null);
-        m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
     }
 
     public List<Integer> getParameterIdxList() {
@@ -103,9 +94,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     public  int overrideSubqueryNodeIds(int newId) {
         assert(m_subqueryNode != null);
-        newId =  m_subqueryNode.resetPlanNodeIds(newId);
-        resetSubqueryNodeId();
-        return newId;
+        return m_subqueryNode.resetPlanNodeIds(newId);
     }
 
     @Override
@@ -120,9 +109,6 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         super.validate();
 
         if (m_subqueryNode != null) {
-            if (m_subqueryNode.getPlanNodeId() != m_subqueryNodeId) {
-                throw new ValidationError("A subquery plan node id mismatch");
-            }
             m_subqueryNode.validate();
         }
     }
@@ -149,7 +135,6 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.SUBQUERY_ID.name(), m_subqueryId);
-        stringer.keySymbolValuePair(Members.SUBQUERY_ROOT_NODE_ID.name(), m_subqueryNodeId);
         // Output the correlated parameter ids that originates at this subquery immediate
         // parent and need to be set before the evaluation
         if (!m_parameterIdxList.isEmpty()) {
@@ -164,7 +149,6 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
-        m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
         if (obj.has(AbstractExpression.Members.VALUE_TYPE)) {
             m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE));
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();

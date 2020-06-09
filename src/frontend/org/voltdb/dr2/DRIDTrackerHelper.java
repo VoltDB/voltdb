@@ -22,85 +22,122 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.iv2.MpInitiator;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class DRIDTrackerHelper {
-
     /**
-     * Serialize the cluster trackers into JSON.
-     *
-     * @param lastConsumerUniqueIds UniqueIDs recorded on each consumer partition.
-     * @param allProducerTrackers   All producer cluster trackers retrieved from each consumer partition.
-     * @return A JSON string containing all information in the parameters.
-     * @throws JSONException
+     * @param clusterId    ID of the cluster which is part of the filter
+     * @param partitionIds {@link Collection} of partition IDs in the filter. May be {@code null}
+     * @return size of this filter when serialized
      */
-    public static String jsonifyClusterTrackers(Pair<Long, Long> lastConsumerUniqueIds,
-                                                Map<Integer, Map<Integer, DRSiteDrIdTracker>> allProducerTrackers)
-    throws JSONException {
-        JSONStringer stringer = new JSONStringer();
-        stringer.object();
-        stringer.keySymbolValuePair("lastConsumerSpUniqueId", lastConsumerUniqueIds.getFirst());
-        stringer.keySymbolValuePair("lastConsumerMpUniqueId", lastConsumerUniqueIds.getSecond());
-        stringer.key("trackers").object();
-        if (allProducerTrackers != null) {
-            for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
-                stringer.key(Integer.toString(clusterTrackers.getKey())).object();
-                for (Map.Entry<Integer, DRSiteDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.value(e.getValue().toJSON());
-                }
-                stringer.endObject();
-            }
-        }
-        stringer.endObject();
-        stringer.endObject();
-        return stringer.toString();
+    public static int serializeTrackerFilterSize(int clusterId, Collection<Integer> partitionIds) {
+        return Byte.BYTES + Character.BYTES + (partitionIds == null ? 0 : partitionIds.size() * Integer.BYTES);
     }
 
     /**
-     * Deserialize the trackers retrieved from each consumer partitions.
-     *
-     * @param jsonData Tracker data retrieved from each consumer partition.
-     * @param partitionsMissingTracker
-     * @return A map of producer cluster ID to tracker for each producer
-     * partition. If no tracker information is found, the map will be empty.
-     * @throws JSONException
+     * @param buffer       where the filter should be serialized
+     * @param clusterId    ID of the cluster which is part of the filter
+     * @param partitionIds {@link Collection} of partition IDs in the filter. May be {@code null}
      */
-    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData, boolean resetLastReceivedLogIds)
-    throws JSONException
-    {
-        Map<Integer, Map<Integer, DRSiteDrIdTracker>> producerTrackers = new HashMap<>();
+    public static void serializeTrackerFilter(ByteBuffer buffer, int clusterId, Collection<Integer> partitionIds) {
+        buffer.put((byte) clusterId);
+        if (partitionIds == null) {
+            buffer.putChar((char) -1);
+        } else {
+            buffer.putChar((char) partitionIds.size());
+            partitionIds.forEach(buffer::putInt);
+        }
+    }
 
-        JSONObject clusterData = new JSONObject(jsonData);
-        final JSONObject trackers = clusterData.getJSONObject("trackers");
-        Iterator<String> clusterIdKeys = trackers.keys();
-        while (clusterIdKeys.hasNext()) {
-            final String clusterIdStr = clusterIdKeys.next();
-            final int clusterId = Integer.parseInt(clusterIdStr);
-            final JSONObject trackerData = trackers.getJSONObject(clusterIdStr);
-            Iterator<String> srcPidKeys = trackerData.keys();
-            while (srcPidKeys.hasNext()) {
-                final String srcPidStr = srcPidKeys.next();
-                final int srcPid = Integer.valueOf(srcPidStr);
-                final JSONObject ids = trackerData.getJSONObject(srcPidStr);
-                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids, resetLastReceivedLogIds);
-
-                Map<Integer, DRSiteDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
-                clusterTrackers.put(srcPid, tracker);
+    /**
+     * Serialize lastConsumerUniqueIds and trackers using {@code filter} to select desired trackers
+     *
+     * @param lastConsumerUniqueIds last mp and sp unique IDs which were consumed
+     * @param allProducerTrackers   All of the trackers
+     * @param filter                to apply to {@code allProducerTrackers}
+     * @return serialized trackers
+     */
+    public static ByteBuf serializeClustersTrackers(Pair<Long, Long> lastConsumerUniqueIds,
+            Map<Integer, Map<Integer, DRSiteDrIdTracker>> allProducerTrackers, ByteBuffer filter) {
+        int clusterId = -1;
+        Set<Integer> producerPartitionIds = null;
+        if (filter != null && filter.hasRemaining()) {
+            clusterId = filter.get();
+            int partitionCount = filter.getChar();
+            if (partitionCount >= 0) {
+                producerPartitionIds = new HashSet<>();
+                for (int i = 0; i < partitionCount; ++i) {
+                    producerPartitionIds.add(filter.getInt());
+                }
             }
         }
 
-        return producerTrackers;
+        ByteBuf data = Unpooled.buffer();
+        data.writeLong(lastConsumerUniqueIds.getFirst()).writeLong(lastConsumerUniqueIds.getSecond());
+
+        if (allProducerTrackers == null) {
+            data.writeByte(0);
+        } else {
+            if (clusterId < 0) {
+                data.writeByte(allProducerTrackers.size());
+                for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> entry : allProducerTrackers.entrySet()) {
+                    serializeClusterTrackers(data, entry.getKey(), entry.getValue(), producerPartitionIds);
+                }
+            } else {
+                Map<Integer, DRSiteDrIdTracker> clusterTrackers = allProducerTrackers.get(clusterId);
+                if (clusterTrackers == null) {
+                    data.writeByte(0);
+                } else {
+                    data.writeByte(1);
+                    serializeClusterTrackers(data, clusterId, clusterTrackers, producerPartitionIds);
+                }
+            }
+        }
+
+        return data;
+    }
+
+    private static void serializeClusterTrackers(ByteBuf data, int clusterId,
+            Map<Integer, DRSiteDrIdTracker> clusterTrackers, Set<Integer> producerPartitionIds) {
+        data.writeByte(clusterId);
+        data.writeChar(clusterTrackers.size() - (clusterTrackers.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0));
+        if (producerPartitionIds == null) {
+            data.writeChar(clusterTrackers.size());
+            for (Map.Entry<Integer, DRSiteDrIdTracker> e : clusterTrackers.entrySet()) {
+                serializePartitionTracker(data, e.getKey(), e.getValue());
+            }
+        } else {
+            int countPosition = data.writerIndex();
+            data.writerIndex(countPosition + Character.BYTES);
+            char count = 0;
+            for (Integer producerPartitionId : producerPartitionIds) {
+                DRSiteDrIdTracker tracker = clusterTrackers.get(producerPartitionId);
+                if (tracker != null) {
+                    serializePartitionTracker(data, producerPartitionId, tracker);
+                    ++count;
+                }
+            }
+            data.setChar(countPosition, count);
+        }
+    }
+
+    private static void serializePartitionTracker(ByteBuf data, Integer producerPartitionId,
+            DRSiteDrIdTracker tracker) {
+        data.writeInt(producerPartitionId);
+        tracker.serialize(data);
     }
 
     /**

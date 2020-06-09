@@ -54,10 +54,12 @@ public class TestGeographyPointValue extends TestCase {
 
         // Make sure that it's not possible to create points
         // with bogus latitude or longitude.
-        assertConstructorThrows("Latitude out of range",   100,  -91.0);
-        assertConstructorThrows("Latitude out of range",   100,   91.0);
-        assertConstructorThrows("Longitude out of range",  181.0, 45.0);
-        assertConstructorThrows("Longitude out of range", -181.0, 45.0);
+        assertConstructorThrows("Latitude out of bounds", 100, -91.0);
+        assertConstructorThrows("Latitude out of bounds", 100, 91.0);
+        assertConstructorThrows("Latitude out of bounds", 100, Double.NaN);
+        assertConstructorThrows("Longitude out of bounds", 181.0, 45.0);
+        assertConstructorThrows("Longitude out of bounds", -181.0, 45.0);
+        assertConstructorThrows("Longitude out of bounds", Double.NaN, 45.0);
     }
 
     public void testPointEquals() {
@@ -203,24 +205,24 @@ public class TestGeographyPointValue extends TestCase {
         testOnePointFromFactory("  point  (-10.333   -20.666)    ",            -20.666,        -10.333,        EPSILON, null);
         testOnePointFromFactory("point(10 10)",                                 10.0,           10.0,          EPSILON, null);
         // Test latitude/longitude ranges.
-        testOnePointFromFactory("point( 100.0   100.0)", 100.0, 100.0, EPSILON, "Latitude \"100.0+\" out of bounds.");
-        testOnePointFromFactory("point( 360.0    45.0)", 360.0,  45.0, EPSILON, "Longitude \"360.0+\" out of bounds.");
-        testOnePointFromFactory("point( 270.0    45.0)", 360.0,  45.0, EPSILON, "Longitude \"270.0+\" out of bounds.");
+        testOnePointFromFactory("point( 100.0   100.0)", 100.0, 100.0, EPSILON, "Latitude out of bounds: 100.0");
+        testOnePointFromFactory("point( 360.0    45.0)", 360.0, 45.0, EPSILON, "Longitude out of bounds: 360.0");
+        testOnePointFromFactory("point( 270.0    45.0)", 360.0, 45.0, EPSILON, "Longitude out of bounds: 270.0");
         testOnePointFromFactory("point(-100.0  -100.0)",
                                 -100.0,
                                 -100.0,
                                 EPSILON,
-                                "Latitude \"-100.0+\" out of bounds.");
+                                "Latitude out of bounds: -100.0");
         testOnePointFromFactory("point(-360.0  -45.0)",
                                 -45.0,
                                 -360.0,
                                 EPSILON,
-                                "Longitude \"-360.0+\" out of bounds.");
+                                "Longitude out of bounds: -360.0");
         testOnePointFromFactory("point(-270.0  -45.0)",
                                 -45.0,
                                 -360.0,
                                 EPSILON,
-                                "Longitude \"-270.0+\" out of bounds.");
+                                "Longitude out of bounds: -270.0");
         // Syntax errors
         //   Comma separating the coordinates.
         testOnePointFromFactory("point(0.0, 0.0)",

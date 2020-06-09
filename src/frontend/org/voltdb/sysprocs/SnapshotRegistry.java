@@ -17,10 +17,14 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.TreeSet;
 
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotStatus.SnapshotResult;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
@@ -52,24 +56,27 @@ public class SnapshotRegistry {
 
         public final long bytesWritten;
 
+        public int finishedTasks = 0;
+        public int totalTasks = 0;
+
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
         private Snapshot(long txnId, long timeStarted, int hostId, String path, String nonce,
-                SnapshotFormat format, org.voltdb.catalog.Table tables[]) {
+                SnapshotFormat format, List<SnapshotTableInfo> tables) {
             this.txnId = txnId;
             this.timeStarted = timeStarted;
             this.path = path;
             this.nonce = nonce;
             timeFinished = 0;
             synchronized (this.tables) {
-                for (org.voltdb.catalog.Table table : tables) {
+                for (SnapshotTableInfo table : tables) {
                     String filename =
                         SnapshotUtil.constructFilenameForTable(
                                 table,
                                 nonce,
                                 format,
                                 hostId);
-                    this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
+                    this.tables.put(table.getName(), new Table(table.getName(), filename));
                 }
             }
             result = false;
@@ -81,6 +88,8 @@ public class SnapshotRegistry {
             timeStarted = incomplete.timeStarted;
             path = incomplete.path;
             nonce = incomplete.nonce;
+            totalTasks = incomplete.totalTasks;
+            finishedTasks = incomplete.finishedTasks;
             this.timeFinished = timeFinished;
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
@@ -97,20 +106,51 @@ public class SnapshotRegistry {
             this.result = result;
         }
 
+        public void setTotalTasks(int total) {
+            totalTasks = total;
+        }
+
+        public synchronized void taskFinished() {
+            finishedTasks++;
+        }
+
+        public double progress() {
+            return totalTasks == 0 ? 100 : (finishedTasks * 100.0) / totalTasks;
+        }
+
         public interface TableUpdater {
             public Table update(Table t);
         }
 
-        public interface TableIterator {
-            public void next(Table t);
+        public interface SnapshotScanner<T> {
+            public List<T> flatten(Snapshot s);
         }
 
-        public void iterateTables(TableIterator ti) {
+        public List<Table> iterateTables() {
+            List<Table> snapshotTables = new ArrayList<>();
             synchronized (tables) {
-                for (Table t : tables.values()) {
-                    ti.next(t);
-                }
+                snapshotTables.addAll(tables.values());
             }
+            return snapshotTables;
+        }
+
+        public List<SnapshotResult> iterateTableErrors() {
+            List<SnapshotResult> snapshotError  = new ArrayList<>();
+            synchronized (tables) {
+                if (tables.isEmpty()) {
+                    return snapshotError;
+                }
+                SnapshotResult sr;
+                if (tables.values().stream().allMatch(t -> t.error == null && t.size != 0)) {
+                    sr = SnapshotResult.SUCCESS;
+                } else if (tables.values().stream().anyMatch(t -> t.error != null && t.size != 0)) {
+                    sr = SnapshotResult.FAILURE;
+                } else {
+                    sr = SnapshotResult.IN_PROGRESS;
+                }
+                snapshotError.add(sr);
+            }
+            return snapshotError;
         }
 
         public void updateTable(String name, TableUpdater tu) {
@@ -154,7 +194,7 @@ public class SnapshotRegistry {
             String path,
             String nonce,
             SnapshotFormat format,
-            org.voltdb.catalog.Table tables[]) {
+            List<SnapshotTableInfo> tables) {
         final Snapshot s = new Snapshot(txnId, System.currentTimeMillis(),
                 hostId, path, nonce, format, tables);
 

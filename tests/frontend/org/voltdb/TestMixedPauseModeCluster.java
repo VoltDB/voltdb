@@ -77,7 +77,7 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
             // Rejoin does not support paused so clear it
             m_cluster.clearOverridesForModes();
             m_cluster.killSingleHost(node);
-            return m_cluster.recoverOne(node, 0, "");
+            return m_cluster.recoverOne(node, 0);
         }
 
         void shutdown() throws InterruptedException {

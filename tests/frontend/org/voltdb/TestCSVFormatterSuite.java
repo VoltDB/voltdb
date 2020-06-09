@@ -253,7 +253,7 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
 
         LocalCluster config = new LocalCluster("import-ddl-cluster-rep.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
-        config.setHasLocalServer(false);
+        config.setHasLocalServer(true);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);

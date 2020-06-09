@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -42,6 +44,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotTableInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
@@ -75,12 +78,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final static int DATA_HEADER_BYTES = contentOffset + 4 + 4;
 
     // schemas for all the tables on this partition
-    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas = new HashMap<>();
+    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas;
     // HSId of the destination mailbox
     private final long m_destHSId;
     private long m_sourceHSId = -1;
     private final Set<Long> m_otherDestHostHSIds;
-    private boolean m_replicatedTableTarget;
+    private final boolean m_replicatedTableTarget;
     // input and output threads
     private final SnapshotSender m_sender;
     private final StreamSnapshotAckReceiver m_ackReceiver;
@@ -100,31 +103,37 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
+    private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
+    private long m_lastDataSent;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
-                                    SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+            byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver)
     {
-        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, tables, DEFAULT_WRITE_TIMEOUT_MS, sender,
+                ackReceiver);
     }
 
     public StreamSnapshotDataTarget(long sourceHsid, long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-            byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
-            SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
-    {
-        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+            byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver) {
+        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, tables, DEFAULT_WRITE_TIMEOUT_MS, sender,
+                ackReceiver);
         m_sourceHSId = sourceHsid;
     }
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
-                                    long writeTimeout, SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+            byte[] hashinatorConfig, List<SnapshotTableInfo> tables, long writeTimeout, SnapshotSender sender,
+            StreamSnapshotAckReceiver ackReceiver)
     {
         super();
+        // A unit test should never set a static test variable because it will bleed into other tests
+        assert(VoltDB.instanceOnServerThread() ? !m_rejoinDeathTestMode : true);
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
-        m_schemas.putAll(schemas);
+        m_schemas = tables.stream().collect(
+                Collectors.toMap(SnapshotTableInfo::getTableId, t -> Pair.of(t.isReplicated(), t.getSchema())));
         m_destHSId = HSId;
         m_replicatedTableTarget = lowestDestSite;
         m_otherDestHostHSIds = new HashSet<>(allDestHostHSIds);
@@ -334,19 +343,31 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-                rejoinLog.info(String.format("While sending rejoin data%s to site %s, %d bytes have been sent in the past %s seconds.",
-                        m_sourceHSId != -1 ? (" from " + CoreUtils.hsIdToString(m_sourceHSId)) : " ",
-                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+                long bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
+                rejoinLog.info(String.format("While sending rejoin data %s site %s, %d bytes have been sent in the past %s seconds.",
+                        m_sourceHSId != -1 ? ("from" + CoreUtils.hsIdToString(m_sourceHSId)) : "to",
+                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOS_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
                 }
+                if (bytesSentSinceLastCheck > 0) {
+                    m_lastDataSent = System.nanoTime();
+                } else if (TimeUnit.MINUTES.convert((System.nanoTime() - m_lastDataSent), TimeUnit.NANOSECONDS) > 1) {
+                    // No data sent for one long minute and destination host is not alive, stop watching
+                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                    if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
+                        m_closed.set(true);
+                    }
+                }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
             } finally {
                 // schedule to run again
-                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                if (!m_closed.get()) {
+                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                }
             }
         }
     }
@@ -522,6 +543,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     chunkC = tupleData.call();
                     chunk = chunkC.b();
                 } catch (Exception e) {
+                    setWriteFailed(e);
                     return Futures.immediateFailedFuture(e);
                 }
 
@@ -762,5 +784,23 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (m_writeFailed.compareAndSet(null, exception)) {
             notifyAll();
         }
+    }
+
+    /**
+     * @param tableId ID of table
+     * @return serialized schema for {@code tableId} or {@code null} if the schema has already been sent
+     */
+    protected byte[] getSchema(int tableId) {
+        return m_schemas.get(tableId).getSecond();
+    }
+
+    @Override
+    public void setInProgressHandler(Runnable handler) {
+        m_progressHandler = handler;
+    }
+
+    @Override
+    public void trackProgress() {
+        m_progressHandler.run();
     }
 }

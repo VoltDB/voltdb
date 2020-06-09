@@ -40,6 +40,7 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
@@ -125,20 +126,26 @@ public class JDBCExportClient extends ExportClientBase {
         }
         @Override
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             RefCountedDS other = (RefCountedDS) obj;
             if (ds == null) {
-                if (other.ds != null)
+                if (other.ds != null) {
                     return false;
-            } else if (!ds.equals(other.ds))
+                }
+            } else if (!ds.equals(other.ds)) {
                 return false;
-            if (refCount != other.refCount)
+            }
+            if (refCount != other.refCount) {
                 return false;
+            }
             return true;
         }
         @Override
@@ -183,9 +190,9 @@ public class JDBCExportClient extends ExportClientBase {
         public JDBCDecoder(AdvertisedDataSource source, RefCountedDS ds) {
             super(source);
 
-            m_curGenId = source.m_generation;
+            m_curGenId = -1;
             m_ds = ds;
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 m_es =
                         CoreUtils.getListeningSingleThreadExecutor(
                                 "JDBC Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
@@ -912,10 +919,11 @@ public class JDBCExportClient extends ExportClientBase {
                 + maxStatementsCachedVal + ")");
 
         m_poolProperties.setTestOnBorrow(true);
-        if (url.startsWith("jdbc:oracle"))
+        if (url.startsWith("jdbc:oracle")) {
             m_poolProperties.setValidationQuery("SELECT 1 FROM DUAL");
-        else
+        } else {
             m_poolProperties.setValidationQuery("SELECT 1");
+        }
 
         /*
          * If the user didn't specify a jdbcdriver class name, set it to

@@ -26,8 +26,7 @@ package org.voltdb;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.junit.contrib.java.lang.system.ExpectedSystemExit;
-import org.junit.contrib.java.lang.system.internal.CheckExitCalled;
+import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -38,8 +37,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
+import org.junit.contrib.java.lang.system.internal.CheckExitCalled;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -50,7 +49,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotComparer;
-import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
 
 public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
     private static String snapshotDir = "/tmp/voltdb/backup/";
@@ -133,7 +131,9 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                         for (int ii = 0; ii < 1000 && m_shouldContinue.get(); ii++) {
                             m_rateLimit.acquire();
                             final int updateKey = m_rand.nextInt(m_numTuples + addedTuples);
-                            if (m_deletedValues.contains(updateKey)) continue;
+                            if (m_deletedValues.contains(updateKey)) {
+                                continue;
+                            }
                             final int action = m_rand.nextInt(4);
                             if (action == 0) {
                                 m_deletedValues.add(updateKey);
@@ -291,9 +291,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
 
     }
 
-    @Rule
-    public final ExpectedSystemExit exit = ExpectedSystemExit.none();
-
     @Before
     public void setUp() throws Exception {
         deleteTestFiles(snapshotNonce);
@@ -341,7 +338,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                         rejoinFailed.set(true);
                         break;
                     }
-                    if (cluster.recoverOne(1, 0, "")) {
+                    if (cluster.recoverOne(1, 0)) {
                         break;
                     }
                     attempts++;
@@ -385,7 +382,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
         finally {
             client.close();
             cluster.shutDown();
-            exit.expectSystemExitWithStatus(STATUS_OK);
         }
     }
 
@@ -427,7 +423,7 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
                         rejoinFailed.set(true);
                         break;
                     }
-                    if (cluster.recoverOne(1, 0, "")) {
+                    if (cluster.recoverOne(1, 0)) {
                         break;
                     }
                     attempts++;
@@ -470,7 +466,6 @@ public class TestRejoinDeterministicRowOrder extends RejoinTestBase {
         finally {
             client.close();
             cluster.shutDown();
-            exit.expectSystemExitWithStatus(STATUS_OK);
         }
     }
 

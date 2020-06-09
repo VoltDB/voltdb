@@ -1221,6 +1221,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
         Procedures.put("@UpdateLogging",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@UpdateLicense",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Ping",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
         Procedures.put("@Promote",
@@ -1234,7 +1236,7 @@ public class SQLCommand {
         Procedures.put("@ExplainView",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ElasticRemoveNT",
-                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("tinyint", "varchar", "varchar")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("tinyint", "varchar", "varchar", "bigint")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",

@@ -25,14 +25,9 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -45,7 +40,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.TestCatalogDiffs;
 import org.voltdb.catalog.User;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -1375,117 +1369,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(catalog.getClusters().get("cluster").getDrproducerport() == 100);
     }
 
-    public void testDRTableSignatureCrc() throws IOException
-    {
-        // No DR tables, CRC should be 0
-        assertEquals(Pair.of(0l, ""), CatalogUtil.calculateDrTableSignatureAndCrc(catalog_db));
-
-        // Replicated tables cannot be DRed for now, so they are always skipped in the catalog compilation.
-        // Add replicated tables to the test once we start supporting them.
-
-        // Different order should match
-        verifyDrTableSignature(true,
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
-                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B; DR TABLE C;\n");
-
-        // Missing one table
-        verifyDrTableSignature(false,
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B;\n");
-
-        // Different column type
-        verifyDrTableSignature(false,
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 FLOAT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
-                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                               "DR TABLE A; DR TABLE B; DR TABLE C;\n");
-    }
-
-    @SafeVarargs
-    private final void verifyDeserializedDRTableSignature(String schema, Pair<String, String>... signatures) throws IOException
-    {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        final File file = VoltFile.createTempFile("deserializeCat", ".jar", new File(testDir));
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schema);
-        builder.compile(file.getPath());
-        Catalog cat = TestCatalogDiffs.catalogForJar(file.getPath());
-
-        file.delete();
-
-        final Map<String, String> sig = CatalogUtil.deserializeCatalogSignature(CatalogUtil.calculateDrTableSignatureAndCrc(
-            cat.getClusters().get("cluster").getDatabases().get("database")).getSecond());
-
-        assertEquals(signatures.length, sig.size());
-        for (Pair<String, String> expected : signatures) {
-            assertEquals(expected.getSecond(), sig.get(expected.getFirst()));
-        }
-    }
-
-    private void verifyDrTableSignature(boolean shouldEqual, String schemaA, String schemaB) throws IOException
-    {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        final File fileA = VoltFile.createTempFile("catA", ".jar", new File(testDir));
-        final File fileB = VoltFile.createTempFile("catB", ".jar", new File(testDir));
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schemaA);
-        builder.compile(fileA.getPath());
-        Catalog catA = TestCatalogDiffs.catalogForJar(fileA.getPath());
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schemaB);
-        builder.compile(fileB.getPath());
-        Catalog catB = TestCatalogDiffs.catalogForJar(fileB.getPath());
-
-        fileA.delete();
-        fileB.delete();
-
-        final Pair<Long, String> sigA = CatalogUtil.calculateDrTableSignatureAndCrc(catA.getClusters().get("cluster").getDatabases().get("database"));
-        final Pair<Long, String> sigB = CatalogUtil.calculateDrTableSignatureAndCrc(catB.getClusters().get("cluster").getDatabases().get("database"));
-
-        assertFalse(sigA.getFirst() == 0);
-        assertFalse(sigA.getSecond().isEmpty());
-        assertEquals(shouldEqual, sigA.equals(sigB));
-    }
-
-    public void testDRTableSignatureDeserialization() throws IOException
-    {
-        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n");
-
-        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                                           "DR TABLE B;\n",
-                                           Pair.of("B", "bs"));
-
-        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
-                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                                           "DR TABLE A; DR TABLE B; DR TABLE C;\n",
-                                           Pair.of("A", "ip"),
-                                           Pair.of("B", "bs"),
-                                           Pair.of("C", "tv"));
-    }
-
     public void testJSONAPIFlag() throws Exception
     {
         final String noHTTPElement =
@@ -1599,53 +1482,6 @@ public class TestCatalogUtil extends TestCase {
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
         assertTrue(msg.contains("Invalid value"));
-    }
-
-    public void testGetNormalTableNamesFromInMemoryJar() throws Exception {
-        String schema = "CREATE TABLE NORMAL_A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL);\n" +
-                        "CREATE TABLE NORMAL_B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
-                        // NORMAL_C is partitioned on C1.
-                        "CREATE TABLE NORMAL_C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
-                        "CREATE VIEW VIEW_A (TOTAL_ROWS) AS SELECT COUNT(*) FROM NORMAL_A;\n" +
-                        // VIEW_C1 is an explicitly partitioned persistent table view (included in the snapshot).
-                        "CREATE VIEW VIEW_C1 AS SELECT C1, COUNT(*) FROM NORMAL_C GROUP BY C1;\n" +
-                        // VIEW_C2 is an implicitly partitioned persistent table view (not included in the snapshot).
-                        "CREATE VIEW VIEW_C2 AS SELECT C2, COUNT(*) FROM NORMAL_C GROUP BY C2;\n" +
-                        // EXPORT_A is partitioned on C1.
-                        "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
-                        // VIEW_E1 contains the partition column of its source streamed table (included in the snapshot).
-                        "CREATE VIEW VIEW_E1 AS SELECT C1, COUNT(*) FROM EXPORT_A GROUP BY C1;\n";
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        final File file = VoltFile.createTempFile("testGetNormalTableNamesFromInMemoryJar", ".jar", new File(testDir));
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schema);
-        builder.addPartitionInfo("NORMAL_C", "C1");
-        builder.addPartitionInfo("EXPORT_A", "C1");
-
-        builder.compile(file.getPath());
-        byte[] bytes = MiscUtils.fileToBytes(file);
-        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
-        file.delete();
-
-        Set<String> definedFullTableNames = new HashSet<>();
-        definedFullTableNames.add("NORMAL_A");
-        definedFullTableNames.add("VIEW_A");
-        definedFullTableNames.add("NORMAL_B");
-        definedFullTableNames.add("NORMAL_C");
-        definedFullTableNames.add("VIEW_C1");
-        definedFullTableNames.add("VIEW_E1");
-        // The two views below may or may not be in the snapshot for restore - they do not impact
-        // the completeness of the snapshot.
-        Set<String> definedOptionalTableNames = new HashSet<>();
-        definedOptionalTableNames.add("VIEW_A");
-        definedOptionalTableNames.add("VIEW_C1");
-        Pair<Set<String>, Set<String>> ret =
-                CatalogUtil.getSnapshotableTableNamesFromInMemoryJar(jarfile);
-        Set<String> returnedFullTableNames = ret.getFirst();
-        Set<String> returnedOptionalTableNames = ret.getSecond();
-        assertEquals(definedFullTableNames, returnedFullTableNames);
-        assertEquals(definedOptionalTableNames, returnedOptionalTableNames);
     }
 
     public void testExportTargetDuplicate() {

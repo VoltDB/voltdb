@@ -50,7 +50,7 @@ public class MigrateRowsDeleter {
                     }
                 }
             };
-            ExportManagerInterface.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, deletableTxnId, cb);
+            VoltDB.getExportManager().invokeMigrateRowsDelete(m_partitionId, m_tableName, deletableTxnId, cb);
         } catch (Exception e) {
             logger.error("Error deleting migrated rows", e);
         } catch (Error e) {

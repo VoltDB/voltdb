@@ -36,7 +36,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -315,8 +314,9 @@ public class MpScheduler extends Scheduler
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
 
         // Handle every-site system procedures (at the MPI)
-        final Config sysprocConfig = SystemProcedureCatalog.listing.get(procedureName);
-        if (sysprocConfig != null &&  sysprocConfig.getEverysite()) {
+        if (message.isEveryPartition()) {
+            assert(SystemProcedureCatalog.listing.get(procedureName) != null &&
+                    SystemProcedureCatalog.listing.get(procedureName).getEverysite());
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
@@ -327,6 +327,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    true, // isEveryPartition
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -356,6 +357,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    false,
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -456,6 +458,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    message.isEveryPartition(),
                     null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
@@ -539,14 +542,11 @@ public class MpScheduler extends Scheduler
             if (txn == null) {
                 // The thread (updateReplicas) could wipe out duplicate counters for run-everywhere system procedures
                 // if the duplicate counters contain only the partition masters from failed hosts.
-                // If a response from a failed partition master get here after the transaction has been declared completed, ignore it.
-                final Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                if (liveHosts.contains(CoreUtils.getHostIdFromHSId(message.m_sourceHSId))) {
-                    // This should not happen
-                    tmLog.warn("Received InitiateResponseMessage after the transaction is completed from " + CoreUtils.hsIdToString(message.m_sourceHSId));
-                    assert(false);
-                }
-                // Message is from a dead host
+                // A response could get here after the transaction has been declared completed from a failed partition master could get here or
+                // from a previous partition master which handles the transaction upon leader migration:
+                // partition master has been moved to a host but the host fails.
+                tmLog.info(String.format("Received InitiateResponseMessage after the transaction %s is completed from %s",
+                        TxnEgo.txnIdToString(message.getTxnId()), CoreUtils.hsIdToString(message.m_sourceHSId)));
                 return;
             }
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.

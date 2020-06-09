@@ -65,6 +65,7 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -291,7 +292,7 @@ public class LocalCluster extends VoltServerConfig {
         assert siteCount > 0 : "site count is less than 1";
         assert hostCount > 0 : "host count is less than 1";
 
-        numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        numberOfCoordinators = Math.max(kfactor + 1, Math.min(hostCount, 3));
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         m_additionalProcessEnv = env == null ? new HashMap<>() : env;
@@ -488,6 +489,9 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+            if (builder.getKiplingConfiguration().isEnabled()) {
+                templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
+            }
         }
         return m_compiled;
     }
@@ -602,6 +606,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     private void startLocalServer(int hostId, int leaderPort, boolean clearLocalDataDirectories, StartAction action) {
+        // make sure the local server has the same environment properties as separate process
+        m_additionalProcessEnv.forEach(System::setProperty);
+
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         if (!isNewCli) {
@@ -657,6 +664,10 @@ public class LocalCluster extends VoltServerConfig {
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
+        if (cmdln.m_topicsHostPort != null) {
+            cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
+        }
+
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
@@ -679,9 +690,11 @@ public class LocalCluster extends VoltServerConfig {
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
-        m_cluster.add(null);
-        m_pipes.add(null);
-        m_cmdLines.add(cmdln);
+        synchronized(this) {
+            m_cluster.add(null);
+            m_pipes.add(null);
+            m_cmdLines.add(cmdln);
+        }
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(action == StartAction.JOIN);
@@ -1170,6 +1183,10 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.enableAdd(true);
             }
 
+            if (cmdln.m_topicsHostPort != null) {
+                cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
+            }
+
             // If local directories are being cleared
             // generate a new subroot, otherwise reuse the existing directory
             File subroot = null;
@@ -1241,7 +1258,9 @@ public class LocalCluster extends VoltServerConfig {
                 }
             }
             Process proc = m_procBuilder.start();
-            m_cluster.add(proc);
+            synchronized(this) {
+                m_cluster.add(proc);
+            }
             String fileName = testoutputdir
                     + File.separator
                     + "LC-"
@@ -1314,9 +1333,9 @@ public class LocalCluster extends VoltServerConfig {
         }
     }
 
-    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
+    public boolean recoverOne(int hostId, Integer portOffset, boolean liveRejoin) {
         StartAction startAction = isNewCli ? StartAction.PROBE : (liveRejoin ? StartAction.LIVE_REJOIN : StartAction.REJOIN);
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, startAction);
+        return recoverOne(false, 0, hostId, portOffset, startAction);
     }
 
     public void joinOne(int hostId) {
@@ -1409,30 +1428,30 @@ public class LocalCluster extends VoltServerConfig {
         m_removedHosts = removeHosts;
     }
 
-    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, StartAction.REJOIN);
+    public boolean recoverOne(int hostId, Integer leaderHostId) {
+        return recoverOne(false, 0, hostId, leaderHostId, StartAction.REJOIN);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
+        return recoverOne( logtime, startTime, hostId, null, StartAction.REJOIN);
     }
 
     // Re-start a (dead) process. HostId is the enumeration of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
-    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
-                               String rejoinHost, StartAction startAction) {
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer leaderHostId,
+                               StartAction startAction) {
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
         // based on other state in this class except to say that whoever wrote
         // it this way originally probably eats kittens and hates cake.
-        if (rejoinHostId == null || (m_hasLocalServer && hostId != 0)) {
-            rejoinHostId = 0;
+        if (leaderHostId == null || (m_hasLocalServer && hostId != 0)) {
+            leaderHostId = 0;
         }
         if (isNewCli) {
             //If this is new CLI we use probe
             startAction = StartAction.PROBE;
         }
-        int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+        int portNoToRejoin = m_cmdLines.get(leaderHostId).internalPort();
 
         if (hostId == 0 && m_hasLocalServer) {
             startLocalServer(hostId, portNoToRejoin, false, startAction);
@@ -1443,7 +1462,7 @@ public class LocalCluster extends VoltServerConfig {
         // For some mythical reason rejoinHostId is not actually used for the newly created host,
         // hostNum is used by default (in fact hostNum should equal to hostId, otherwise some tests
         // may fail)
-        log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
+        log.info("Rejoining " + hostId + " to hostID: " + leaderHostId);
 
         // rebuild the EE proc set.
         if (templateCmdLine.target().isIPC && m_eeProcs.size() < hostId) {
@@ -1479,7 +1498,7 @@ public class LocalCluster extends VoltServerConfig {
             if (m_debug) {
                 rejoinCmdLn.debugPort(portGenerator.next());
             }
-            rejoinCmdLn.leader(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            rejoinCmdLn.leader(":" + String.valueOf(portNoToRejoin));
 
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
@@ -1725,11 +1744,27 @@ public class LocalCluster extends VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public void waitForNodesToShutdown() {
-        if (m_cluster != null) {
+    private synchronized boolean buildSafeClusterMemberList(ArrayList<Process> members) {
+        int previousMemberCount = members.size();
+        if (m_cluster != null && m_cluster.size() > previousMemberCount) {
+            members.clear();
+            for (int ii = 0; ii < previousMemberCount; ii++) {
+                members.add(null);
+            }
+            members.addAll(m_cluster.subList(previousMemberCount, m_cluster.size()));
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
 
+    public void waitForNodesToShutdown() {
+        ArrayList<Process> members = new ArrayList<>();
+        while (buildSafeClusterMemberList(members)) {
+            // It is possible to have a ConcurrentModificationException here so make a copy to be safe
             // join on all procs
-            for (Process proc : m_cluster) {
+            for (Process proc : members) {
                 if (proc == null) {
                     continue;
                 }
@@ -1768,9 +1803,10 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public synchronized void shutDownExternal(boolean forceKillEEProcs) {
-        if (m_cluster != null) {
+        ArrayList<Process> members = new ArrayList<>();
+        while (buildSafeClusterMemberList(members)) {
             // kill all procs
-            for (Process proc : m_cluster) {
+            for (Process proc : members) {
                 if (proc == null) {
                     continue;
                 }
@@ -1816,10 +1852,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
-        return getListenerAddresses(false);
+        return getListenerAddresses(ListenerPort.SQL);
     }
 
-    public List<String> getListenerAddresses(boolean useAdmin) {
+    public List<String> getListenerAddresses(ListenerPort port) {
         if (!m_running) {
             return null;
         }
@@ -1829,7 +1865,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
+                listeners.add("localhost:" + port.getPort(cl));
             }
         }
         return listeners;
@@ -1881,7 +1917,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public boolean areAllNonLocalProcessesDead() {
-        for (Process proc : m_cluster){
+        ArrayList<Process> members = new ArrayList<>();
+        buildSafeClusterMemberList(members);
+        for (Process proc : members){
             try {
                 if (proc != null) {
                     proc.exitValue();
@@ -1899,8 +1937,9 @@ public class LocalCluster extends VoltServerConfig {
             count++;
         }
 
-        if (m_cluster != null) {
-            for (Process proc : m_cluster) {
+        ArrayList<Process> members = new ArrayList<>();
+        if (buildSafeClusterMemberList(members)) {
+            for (Process proc : members) {
                 try {
                     if (proc != null) {
                         proc.exitValue();
@@ -2340,7 +2379,7 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        for (String address : getListenerAddresses(true)) {
+        for (String address : getListenerAddresses(ListenerPort.ADMIN)) {
             client.createConnection(address);
         }
         return client;
@@ -2419,5 +2458,28 @@ public class LocalCluster extends VoltServerConfig {
     private void resetLogMessageMatchResults(int hostId) {
         assertTrue(m_logMessageMatchResults.containsKey(hostId));
         m_logMessageMatchResults.get(hostId).clear();
+    }
+
+    public enum ListenerPort {
+        SQL {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_port;
+            }
+        },
+        ADMIN {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_adminPort;
+            }
+        },
+        KIPLING {
+            @Override
+            int getPort(CommandLine cl) {
+                return cl.m_topicsHostPort.getPort();
+            }
+        };
+
+        abstract int getPort(CommandLine cl);
     }
 }

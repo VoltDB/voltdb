@@ -452,13 +452,19 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
 }
 
 /**
- * This method is called to initially load table data.
+ * This method is called to initially load table data from a heap array
  * @param pointer the VoltDBEngine pointer
  * @param table_id catalog ID of the table
  * @param serialized_table the table data to be loaded
+ * @param txnId ID of current transaction
+ * @param spHandle for this sp transaction
+ * @param lastCommittedSpHandle spHandle which was most recently committed
+ * @param uniqueId for this transaction
+ * @param undoToken for this transaction
+ * @param callerId ID for LoadTableCaller enum
 */
 SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable__JI_3BJJJJJB (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
     jlong uniqueId, jlong undoToken, jbyte callerId)
@@ -494,6 +500,58 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
             engine->resetReusedResultOutputBuffer();
             e.serialize(engine->getExceptionOutputSerializer());
         }
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+
+    return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+}
+
+/**
+ * This method is called to initially load table data from a direct byte buffer
+ * @param engine_ptr the VoltDBEngine pointer
+ * @param table_id catalog ID of the table
+ * @param serialized_table the table data to be loaded as a direct byte buffer
+ * @param txnId ID of current transaction
+ * @param spHandle for this sp transaction
+ * @param lastCommittedSpHandle spHandle which was most recently committed
+ * @param uniqueId for this transaction
+ * @param undoToken for this transaction
+ * @param callerId ID for LoadTableCaller enum
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable__JILjava_nio_ByteBuffer_2JJJJJB (
+    JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
+    jobject serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
+    jlong uniqueId, jlong undoToken, jbyte callerId)
+{
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+
+    engine->resetReusedResultOutputBuffer();
+
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+    VOLT_DEBUG("loading table %d in C++ on thread %d", table_id, ThreadLocalPool::getThreadPartitionId());
+
+    char *bytes = static_cast<char *>(env->GetDirectBufferAddress(serialized_table));
+    jlong length = env->GetDirectBufferCapacity(serialized_table);
+    VOLT_DEBUG("deserializing %d bytes on thread %d", (int) length, ThreadLocalPool::getThreadPartitionId());
+    ReferenceSerializeInputBE serialize_in(bytes, length);
+
+    try {
+        bool success = engine->loadTable(table_id, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                undoToken, LoadTableCaller::get(static_cast<LoadTableCaller::Id>(callerId)));
+        VOLT_DEBUG("deserialized table");
+
+        if (success)
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    } catch (const SerializableEEException &e) {
+        engine->resetReusedResultOutputBuffer();
+        e.serialize(engine->getExceptionOutputSerializer());
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -990,6 +1048,19 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeGetSnapshotSchema
+ * Signature: (JIBZ)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetSnapshotSchema(
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jbyte schemaFilterType, jboolean forceLive)
+{
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    voltdb::HiddenColumnFilter::Type hiddenColumnFilter = static_cast<voltdb::HiddenColumnFilter::Type>(schemaFilterType);
+    return engine->getSnapshotSchema(tableId, hiddenColumnFilter, forceLive);
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeActivateTableStream
  * Signature: (JIIIJ[B)Z
  */
@@ -1129,7 +1200,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeExportAction
+ * Method:    nativeSetExportStreamPositions
  *
  * @param ackAction  true if this call contains an ack
  * @param pollAction true if this call requests a poll
@@ -1137,16 +1208,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * @param ackOffset  if acking, the universal stream offset being acked/released
  * @param streamName    Name of the stream to which the Export action applies
  *
- * @return the universal stream offset for the last octet in any
- * returned poll results (returned via the query results buffer).  On
- * any error this will be less than 0.  For any call with no
- * pollAction, any value >= 0 may be ignored.
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExportAction
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetExportStreamPositions
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
-   jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
    jlong genId,
@@ -1160,8 +1226,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->exportAction(syncAction,
-                                        static_cast<int64_t>(ackOffset),
+            engine->setExportStreamPositions(static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
                                         static_cast<int64_t>(genId),
                                         streamNameStr);
@@ -1171,7 +1236,6 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
-    return 0;
 }
 
 /**
@@ -1220,7 +1284,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeD
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetUSOForExportTable
- * Signature: (JLjava/lang/String;)[J
+ * Signature: (J[B)[J
  */
 SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
   (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray streamName) {
@@ -1573,4 +1637,132 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeE
     return engine->externalStreamsEnabled();
 }
 
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeStoreKiplingGroup
+ * Signature: (JJ)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeStoreKiplingGroup
+  (JNIEnv *env, jclass clazz, jlong pointer, jlong undoQuantum) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+    try {
+        return engine->storeKiplingGroup(undoQuantum, in);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeDeleteKiplingGroup
+ * Signature: (JJ[B)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteKiplingGroup
+  (JNIEnv *env, jclass clazz, jlong pointer, jlong undoQuantum, jbyteArray groupIdIn) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte* groupIdBytes = env->GetByteArrayElements(groupIdIn, nullptr);
+    NValue groupId = ValueFactory::getTempStringValue(reinterpret_cast<char*>(groupIdBytes),
+            env->GetArrayLength(groupIdIn));
+    env->ReleaseByteArrayElements(groupIdIn, groupIdBytes, JNI_ABORT);
+    try {
+        return engine->deleteKiplingGroup(undoQuantum, groupId);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeFetchKiplingGroups
+ * Signature: (JI)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchKiplingGroups
+  (JNIEnv *env, jclass clazz, jlong pointer, jint maxReultSize, jbyteArray startGroupIdIn) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    NValue groupId;
+    if (startGroupIdIn == nullptr) {
+        groupId = ValueFactory::getNullStringValue();
+    } else {
+        jbyte* groupIdBytes = env->GetByteArrayElements(startGroupIdIn, nullptr);
+        groupId = ValueFactory::getTempStringValue(reinterpret_cast<char*>(groupIdBytes),
+                env->GetArrayLength(startGroupIdIn));
+        env->ReleaseByteArrayElements(startGroupIdIn, groupIdBytes, JNI_ABORT);
+    }
+    try {
+        return engine->fetchKiplingGroups(maxReultSize, groupId);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return -1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeCommitKiplingGroupOffsets
+ * Signature: (JJJS[B)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCommitKiplingGroupOffsets
+  (JNIEnv *env, jclass clazz, jlong pointer, jlong spUniqueId, jlong undoQuantum, jshort requestVersion,
+          jbyteArray groupIdIn) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte* groupIdBytes = env->GetByteArrayElements(groupIdIn, nullptr);
+    NValue groupId = ValueFactory::getTempStringValue(reinterpret_cast<char*>(groupIdBytes),
+            env->GetArrayLength(groupIdIn));
+    env->ReleaseByteArrayElements(groupIdIn, groupIdBytes, JNI_ABORT);
+    ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+    try {
+        in.limit(in.readInt());
+        return engine->commitKiplingGroupOffsets(spUniqueId, undoQuantum, requestVersion, groupId, in);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeFetchKiplingGroupOffsets
+ * Signature: (JS[B)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchKiplingGroupOffsets
+  (JNIEnv *env, jclass clazz, jlong pointer, jshort requestVersion, jbyteArray groupIdIn) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte* groupIdBytes = env->GetByteArrayElements(groupIdIn, nullptr);
+    NValue groupId = ValueFactory::getTempStringValue(reinterpret_cast<char*>(groupIdBytes),
+            env->GetArrayLength(groupIdIn));
+    env->ReleaseByteArrayElements(groupIdIn, groupIdBytes, JNI_ABORT);
+    ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+    try {
+        in.limit(in.readInt());
+        return engine->fetchKiplingGroupOffsets(requestVersion, groupId, in);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeDeleteExpiredKiplingOffsets
+ * Signature: (JJJ)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteExpiredKiplingOffsets
+  (JNIEnv *env, jclass clazz, jlong pointer, jlong undoToken, jlong deleteOlderThan) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        return engine->deleteExpiredKiplingOffsets(undoToken, deleteOlderThan);
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
 /** @} */ // end of JNI doxygen group

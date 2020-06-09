@@ -28,7 +28,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 import org.voltdb.exportclient.ExportRowSchema;
-import org.voltdb.exportclient.ExportRowSchemaSerializer;
+import org.voltdb.exportclient.PersistedMetadata;
+import org.voltdb.exportclient.PersistedMetadataSerializer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
@@ -89,7 +90,7 @@ public class StreamBlockQueue {
     /**
      * A deque for persisting data to disk both for persistence and as a means of overflowing storage
      */
-    private BinaryDeque<ExportRowSchema> m_persistentDeque;
+    private BinaryDeque<PersistedMetadata> m_persistentDeque;
 
     private final String m_nonce;
     private final String m_path;
@@ -97,7 +98,7 @@ public class StreamBlockQueue {
     private final String m_streamName;
     // The initial generation id of the stream that SBQ currently represents.
     private long m_initialGenerationId;
-    private BinaryDequeReader<ExportRowSchema> m_reader;
+    private BinaryDequeReader<PersistedMetadata> m_reader;
 
     public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId)
             throws java.io.IOException {
@@ -141,24 +142,12 @@ public class StreamBlockQueue {
      */
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
 
-        BinaryDequeReader.Entry<ExportRowSchema> entry = null;
+        BinaryDequeReader.Entry<PersistedMetadata> entry = null;
         StreamBlock block = null;
         try {
             entry = m_reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             if (entry != null) {
-                ByteBuffer b = entry.getData();
-                b.order(ByteOrder.LITTLE_ENDIAN);
-                long seqNo = b.getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
-                long committedSeqNo = b.getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
-                int tupleCount = b.getInt(StreamBlock.ROW_NUMBER_OFFSET);
-                long uniqueId = b.getLong(StreamBlock.UNIQUE_ID_OFFSET);
-
-                block = new StreamBlock(entry,
-                        seqNo,
-                        committedSeqNo,
-                        tupleCount,
-                        uniqueId,
-                        true);
+                block = StreamBlock.from(entry);
 
                 // Optionally store a reference to the block in the in memory deque
                 // Note that any in-memory block must have a schema
@@ -257,8 +246,8 @@ public class StreamBlockQueue {
         }
     }
 
-    public void updateSchema(ExportRowSchema schema) throws IOException {
-        m_persistentDeque.updateExtraHeader(schema);
+    public void updateSchema(PersistedMetadata metadata) throws IOException {
+        m_persistentDeque.updateExtraHeader(metadata);
     }
 
     /*
@@ -321,11 +310,11 @@ public class StreamBlockQueue {
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 try {
                     final long startSequenceNumber = b.getLong();
-                    // If after the truncation point is the first row in the block, the entire block is to be discarded
+                    // If the truncation is before the first row in the block, the entire block is to be discarded
                     if (startSequenceNumber > truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
-                    final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
+                    b.getLong(); // committedSequenceNumber
                     final int tupleCountPos = b.position();
                     final int tupleCount = b.getInt();
                     // There is nothing to do with this buffer
@@ -346,7 +335,7 @@ public class StreamBlockQueue {
                             // Indicate this is the end of the interesting data.
                             b.limit(b.position());
                             // update tuple count in the header
-                            b.putInt(tupleCountPos, offset - 1);
+                            b.putInt(tupleCountPos, offset);
                             b.position(0);
                             return new ByteBufferTruncatorResponse(b);
                         }
@@ -373,15 +362,17 @@ public class StreamBlockQueue {
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
         m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
-            public void scan(BBContainer bbc) {
+            public long scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
-                final long committedSequenceNumber = b.getLong();
+                b.getLong(); // committed sequence number
                 final int tupleCount = b.getInt();
+                final long endSequenceNumber = startSequenceNumber + tupleCount - 1;
                 b.order(endianness);
-                tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
+                tracker.addRange(startSequenceNumber, endSequenceNumber);
+                return endSequenceNumber;
             }
 
         });
@@ -389,16 +380,16 @@ public class StreamBlockQueue {
     }
 
     public boolean deleteStaleBlocks(long generationId) throws IOException {
-        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
+        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<PersistedMetadata>() {
 
             @Override
-            public boolean isStale(ExportRowSchema extraHeader) {
-                assert (extraHeader != null);
-                boolean fromOlderGeneration = extraHeader.initialGenerationId < generationId;
+            public boolean isStale(PersistedMetadata metadata) {
+                assert (metadata != null);
+                ExportRowSchema schema = metadata.getSchema();
+                boolean fromOlderGeneration = schema.initialGenerationId < generationId;
                 if (exportLog.isDebugEnabled() && fromOlderGeneration) {
-                    exportLog.debug("Delete PBD segments of " +
-                            (extraHeader.tableName + "_" + extraHeader.partitionId) +
-                            " from older generation " + extraHeader.initialGenerationId);
+                    exportLog.debug("Delete PBD segments of " + schema.tableName + "_" + schema.partitionId
+                            + " from older generation " + schema.initialGenerationId);
                 }
                 return fromOlderGeneration;
             }
@@ -426,32 +417,15 @@ public class StreamBlockQueue {
     private void constructPBD(long genId, boolean deleteExisting) throws IOException {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
+        PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, m_initialGenerationId, genId);
+        PersistedMetadataSerializer serializer = new PersistedMetadataSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
+                .initialExtraHeader(metadata, serializer)
                 .compression(!DISABLE_COMPRESSION)
                 .deleteExisting(deleteExisting)
                 .build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
-    }
-
-    @Override
-    public void finalize() {
-        try {
-            int nonEmptyCnt = 0;
-            nonEmptyCnt = m_memoryDeque.stream().filter((block) -> (!block.isPersisted())).map((_item) -> 1).reduce(nonEmptyCnt, Integer::sum);
-            if (nonEmptyCnt > 0) {
-                exportLog.error("Finalized StreamBlockQueue with " + nonEmptyCnt + " items in the memory deque that are not persisted. Path: " + m_path + " Nonce: " + m_nonce);
-            }
-        } finally {
-            try {
-                super.finalize();
-            } catch (Throwable ex) {
-               ;
-            }
-        }
     }
 }
