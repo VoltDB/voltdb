@@ -71,7 +71,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     // shortened when in test mode
     public final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : Long.getLong("REJOIN_WRITE_TIMEOUT_MS", 60000);
-    final static long WATCHDOG_PERIOS_S = 5;
+    final static long WATCHDOG_PERIOD_S = 5;
 
     // Number of bytes in the fixed header of a table data Block Type(1) + BlockIndex(4) + TableId(4) + partition id(4) + row count(4)
     final static int ROW_COUNT_OFFSET = contentOffset + 4;
@@ -319,7 +319,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         final long m_bytesWrittenSinceConstruction;
         final long m_writeTimeout;
 
-        // Last time aata written to destination
+        // Last time data written to destination
         final long m_lastDataWrite;
         Watchdog(long bytesWritten, long writeTimout, long lastDataWrite) {
             m_bytesWrittenSinceConstruction = bytesWritten;
@@ -338,7 +338,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 long bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOS_S));
+                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
@@ -356,7 +356,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 // schedule to run again
                 if (watchAgain) {
                     VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesWritten > 0 ? System.currentTimeMillis() : m_lastDataWrite),
-                            WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                            WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
                 } else {
                     rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
                 }
