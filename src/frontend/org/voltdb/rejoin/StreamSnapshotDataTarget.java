@@ -334,9 +334,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
             boolean watchAgain = true;
             long bytesWritten = 0;
+            long bytesSentSinceLastCheck = 0;
             try {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-                long bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
+                bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
                         CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
 
@@ -355,7 +356,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             } finally {
                 // schedule to run again
                 if (watchAgain) {
-                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesWritten > 0 ? System.currentTimeMillis() : m_lastDataWrite),
+                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesSentSinceLastCheck > 0 ? System.currentTimeMillis() : m_lastDataWrite),
                             WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
                 } else {
                     rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
