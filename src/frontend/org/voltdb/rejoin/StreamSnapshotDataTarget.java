@@ -346,7 +346,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 }
                 // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
                 final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesWritten == 0 && delta > m_writeTimeout && m_writeFailed.get() != null) {
+                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout && m_writeFailed.get() != null) {
                     Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                     watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
                 }
