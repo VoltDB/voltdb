@@ -103,31 +103,6 @@ public:
      * Return true if this response is an error response
      */
     virtual bool isError() const { return false; }
-
-protected:
-    /**
-     * Return the first version at which this message supported throttle time
-     */
-    virtual int16_t minThrottleVersion() const = 0;
-
-    /**
-     * Wirtes out the throttle time if the version of the message supports it
-     */
-    void writeThrottleTime(int16_t version, SerializeOutput &out) const {
-        if (minThrottleVersion() <= version) {
-            // EE doesn't throttle so this is always 0 here
-            out.writeInt(0);
-        }
-    }
-
-    /**
-     * Reads the throttle time if the version of the message supports it
-     */
-    void readThrottleTime(int16_t version, CheckedSerializeInput& in) {
-        if (minThrottleVersion() <= version) {
-            in.readInt();
-        }
-    }
 };
 
 } }
