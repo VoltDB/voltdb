@@ -222,7 +222,7 @@ namespace voltdb {
             ChunkHolder(ChunkHolder const&) = delete;  // non-copyable, non-assignable, non-moveable
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
-            bool validate(bool compact) const noexcept;
+            bool valid(bool compact) const noexcept;
         public:
             constexpr static allocator_enum_type const enum_type = T;
             ChunkHolder(id_type id, size_t tupleSize, size_t chunkSize);
@@ -519,7 +519,7 @@ namespace voltdb {
          */
         class CompactingChunks;
         class position_type {                          // TODO: more book keepings needed?
-            id_type const m_chunkId = 0;               // default constructible due to FrozenTxnBoundary ctor needing to pre-validate
+            id_type const m_chunkId = 0;               // default constructible due to FrozenTxnBoundaries ctor needing to pre-validate
             void const* m_beg = nullptr;
             void const* m_end = nullptr;
             void const* m_left = nullptr;
