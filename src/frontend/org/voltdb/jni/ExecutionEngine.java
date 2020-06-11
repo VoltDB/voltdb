@@ -76,7 +76,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         GET_DR_TUPLESTREAM_STATE(1),
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
-        SP_JAVA_GET_DRID_TRACKER(4),
+        JAVA_GET_DRID_TRACKER(4),
         GENERATE_DR_EVENT(5),
         RESET_DR_APPLIED_TRACKER(6),
         SET_MERGED_DRID_TRACKER(7),

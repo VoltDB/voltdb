@@ -25,6 +25,7 @@ import java.util.TreeMap;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
 
 /**
  * A hacky singleton which provides simple coordinated registration of ShutdownHooks within Volt.
@@ -54,9 +55,6 @@ public class ShutdownHooks
         }
     }
 
-    private static final ShutdownHooks m_instance = new ShutdownHooks();
-    private static boolean m_crashMessage = false;
-
     /**
      * Register an action to be run when the JVM exits.
      * @param priority The priority level at which this action should be run.  Lower values will run earlier.
@@ -66,9 +64,9 @@ public class ShutdownHooks
      */
     public static void registerShutdownHook(int priority, boolean runOnCrash, Runnable action)
     {
-        m_instance.addHook(priority, runOnCrash, action);
+        VoltDB.getShutdownHooks().addHook(priority, runOnCrash, action);
         //Any hook registered lets print crash messsage.
-        ShutdownHooks.m_crashMessage = true;
+        VoltDB.getShutdownHooks().m_crashMessage = true;
     }
 
     /**
@@ -78,7 +76,7 @@ public class ShutdownHooks
     public static void registerFinalShutdownAction(Runnable action)
     {
         // There should be only one -- otherwise, the last one to register wins.
-        m_instance.m_finalAction = action;
+        VoltDB.getShutdownHooks().m_finalAction = action;
     }
 
     /**
@@ -90,7 +88,7 @@ public class ShutdownHooks
      */
     public static void enableServerStopLogging()
     {
-        m_instance.youAreNowAServer();
+        VoltDB.getShutdownHooks().youAreNowAServer();
     }
 
     /**
@@ -98,7 +96,7 @@ public class ShutdownHooks
      */
     public static void useOnlyCrashHooks()
     {
-        m_instance.crashing();
+        VoltDB.getShutdownHooks().crashing();
     }
 
     private Thread m_globalHook = new Thread() {
@@ -111,8 +109,9 @@ public class ShutdownHooks
     private SortedMap<Integer, List<ShutdownTask>> m_shutdownTasks;
     private boolean m_crashing = false;
     private boolean m_iAmAServer = false;
+    private boolean m_crashMessage = false;
 
-    private ShutdownHooks() {
+    public ShutdownHooks() {
         m_shutdownTasks = new TreeMap<Integer, List<ShutdownTask>>();
         Runtime.getRuntime().addShutdownHook(m_globalHook);
     }
@@ -129,7 +128,7 @@ public class ShutdownHooks
 
     private synchronized void runHooks()
     {
-        if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
+        if (m_iAmAServer && !m_crashing && VoltDB.getShutdownHooks().m_crashMessage) {
             VoltLogger voltLogger = new VoltLogger("CONSOLE");
             String msg = "The VoltDB server will shut down due to a control-C or other JVM exit.";
             CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);

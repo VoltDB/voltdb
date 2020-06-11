@@ -1106,6 +1106,92 @@ public:
         ASSERT_EQ(expected,activated);
     }
 
+    void deleteBlockPendingSnapshot(int nBlocks, int dirtyBlock) {
+        // Re-create conditions of ENG-19517 where block pending snapshot is removed
+        initTable(1, 0);
+
+        ASSERT_TRUE(nBlocks >= 3 && dirtyBlock >= 0 && dirtyBlock < nBlocks);
+        int tuplesPerBlock = m_table->getTuplesPerBlock();
+        int tupleCount = nBlocks * tuplesPerBlock;
+        addRandomUniqueTuples( m_table, tupleCount);
+        // cout << "Added " << tupleCount << " to table with " << tuplesPerBlock << " tuples/block" << endl;
+
+        voltdb::TableIterator iterator = m_table->iterator();
+
+        TBMap blocks(getTableData());
+        // cout << "Table has " << blocks.size() << " blocks" << endl;
+
+        // Delete all rows from dirty block, EXCEPT THE LAST ONE, and memorize this last one
+        // as the tuple we're going to dirty and delete after COW streamer started.
+        TableTuple tuple(m_table->schema());
+        int deliter = 0;
+        int minDel = dirtyBlock * tuplesPerBlock;
+        int maxDel = minDel + tuplesPerBlock;
+        while (deliter < maxDel) {
+            ASSERT_TRUE(iterator.next(tuple));
+            if (deliter == maxDel - 1) {
+                break;
+            }
+            else if (deliter >= minDel) {
+                m_table->deleteTuple(tuple, true);
+            }
+            deliter++;
+        }
+        // cout << "min " << minDel << ", max " << maxDel << ", dirty " << deliter << endl;
+        TableTuple dirtyTuple = tuple;
+        // cout << "Table has " << getTableData().size() << " blocks after deletion" << endl;
+        ASSERT_EQ(getTableData().size(), nBlocks);
+
+        // Memorize table value set before starting snapshot
+        T_ValueSet originalTuples;
+        getTableValueSet(originalTuples);
+
+        // Activate a snapshot with dirty block with 1 tuple and other blocks full
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInputBE input(config, 4);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
+
+        // Modify and delete the dirty tuple, verify the block was freed
+        updateSpecificTuple(m_table, dirtyTuple);
+        m_table->deleteTuple(dirtyTuple, true);
+        // cout << "Table has " << getTableData().size() << " blocks after dirty tuple deletion" << endl;
+        ASSERT_EQ(getTableData().size(), nBlocks - 1);
+
+        // Verify COW iteration is correct
+        T_ValueSet COWTuples;
+        char serializationBuffer[BUFFER_SIZE];
+        while (true) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            std::vector<int> retPositions;
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
+            const size_t serialized = outputStream.position();
+            if (serialized == 0) {
+                break;
+            }
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int64_t) <= serialized;
+                 ii += m_tupleWidth + sizeof(int32_t)) {
+                int32_t values[2];
+                values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
+                if (!inserted) {
+                    printf("Failed, with values %d and %d\n", values[0], values[1]);
+                }
+                ASSERT_TRUE(inserted);
+            }
+        }
+        checkTuples((nBlocks - 1) * tuplesPerBlock, originalTuples, COWTuples);
+    }
+
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;
@@ -1602,6 +1688,21 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     // serialization finishes cleanly.
     size_t curPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     ASSERT_EQ(origPendingCount, curPendingCount);
+}
+
+// Test reproducing ENG-19517, delete middle block pending snapshot
+TEST_F(CopyOnWriteTest, DeleteBlock_ENG_19517_middle) {
+    deleteBlockPendingSnapshot(5, 2);
+}
+
+// Test reproducing ENG-19517, delete first block pending snapshot
+TEST_F(CopyOnWriteTest, DeleteBlock_ENG_19517_first) {
+    deleteBlockPendingSnapshot(5, 0);
+}
+
+// Test reproducing ENG-19517, delete last block pending snapshot
+TEST_F(CopyOnWriteTest, DeleteBlock_ENG_19517_last) {
+    deleteBlockPendingSnapshot(5, 4);
 }
 
 /**

@@ -3208,28 +3208,28 @@ public abstract class CatalogUtil {
     }
 
     public static void copyUACParameters(StoredProcedureInvocation invocation, Object[] params) {
-        int catalogVersion = (int)params[1];
         CatalogAndDeployment cad = null;
         try {
-            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), catalogVersion + 1);
+            cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(), (int) params[2]);
         } catch (KeeperException | InterruptedException e) {
             VoltDB.crashLocalVoltDB("Fail to get catalog bytes while processing catalog update", true, null);
         }
         invocation.setParams(params[0],             // diff commands
                              params[1],             // expected catalog version
-                             params[2],             // gen id
+                             params[2],             // next catalog version
+                             params[3],             // gen id
                              cad.catalogBytes,
-                             params[3],             // catalog hash
+                             params[4],             // catalog hash
                              cad.deploymentBytes,
-                             params[4],             // deployment hash
-                             params[5],             // work with elastic
-                             params[6],             // tables must be empty
-                             params[7],             // reasons for empty tables
-                             params[8],             // requiresSnapshotIsolation
-                             params[9],             // requireCatalogDiffCmdsApplyToEE
-                             params[10],            // hasSchemaChange
-                             params[11],            // requiresNewExportGeneration
-                             params[12]);           // hasSecurityUserChange
+                             params[5],             // deployment hash
+                             params[6],             // work with elastic
+                             params[7],             // tables must be empty
+                             params[8],             // reasons for empty tables
+                             params[9],             // requiresSnapshotIsolation
+                             params[10],             // requireCatalogDiffCmdsApplyToEE
+                             params[11],            // hasSchemaChange
+                             params[12],            // requiresNewExportGeneration
+                             params[13]);           // hasSecurityUserChange
     }
 
     public static int getZKCatalogVersion(ZooKeeper zk, long txnId) {

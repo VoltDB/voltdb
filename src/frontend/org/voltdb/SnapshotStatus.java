@@ -23,59 +23,76 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
+import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
-import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
 
-    enum SNAPSHOT_TYPE {
+    // Item order matters, SnapshotSummary manipulates the result by checking the ordinal
+    public enum SnapshotResult {
+        FAILURE,
+        IN_PROGRESS,
+        SUCCESS;
+    }
+
+    enum SnapshotType {
         AUTO,
         MANUAL,
-        COMMANDLOG
+        COMMANDLOG,
+        REJOIN,
+        ELASTIC;
     };
 
-    private File m_truncationSnapshotPath = null;
-    private File m_autoSnapshotPath = null;
+    static class SnapshotTypeChecker {
+        File m_truncationSnapshotPath = null;
+        File m_autoSnapshotPath = null;
 
-    public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
-        m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
-        m_autoSnapshotPath = new File(autoSnapshotPathStr);
-    }
+        public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
+            m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
+            m_autoSnapshotPath = new File(autoSnapshotPathStr);
+        }
 
-    private String getSnapshotType(String path) {
-        File thisSnapshotPath = new File(path);
-        if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.COMMANDLOG.name();
+        SnapshotType getSnapshotType(String path, String nonce) {
+            File thisSnapshotPath = new File(path);
+            if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
+                if (nonce.startsWith("JOIN")) {
+                    return SnapshotType.ELASTIC;
+                } else {
+                    return SnapshotType.COMMANDLOG;
+                }
+            } else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
+                return SnapshotType.AUTO;
+            } else if (path.equals("") && nonce.startsWith("Rejoin")) {
+                return SnapshotType.REJOIN;
+            }
+            return SnapshotType.MANUAL;
         }
-        else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
-            return SNAPSHOT_TYPE.AUTO.name();
-        }
-        return SNAPSHOT_TYPE.MANUAL.name();
     }
+    SnapshotTypeChecker m_typeChecker = new SnapshotTypeChecker();
+
 
     /**
      * Since there are multiple tables inside a Snapshot object, and we cannot
      * get a copy of the tables directly, flattens the tables in a Snapshot
      * object into a flat list.
      */
-    private class StatusIterator implements Iterator<Object> {
-        private final List<Pair<Snapshot, Table>> m_snapshots;
-        private final Iterator<Pair<Snapshot, Table>> m_iter;
+    static class StatusIterator<T> implements Iterator<Object> {
+        private final List<Pair<Snapshot, T>> m_snapshots;
+        private final Iterator<Pair<Snapshot, T>> m_iter;
 
-        private StatusIterator(Iterator<Snapshot> i) {
-            m_snapshots = new LinkedList<Pair<Snapshot, Table>>();
+        public StatusIterator(Iterator<Snapshot> i, SnapshotScanner<T> sc) {
+            m_snapshots = new LinkedList<Pair<Snapshot, T>>();
 
             while (i.hasNext()) {
                 final Snapshot s = i.next();
-                s.iterateTables(new Snapshot.TableIterator() {
-                    @Override
-                    public void next(Table t) {
-                        m_snapshots.add(Pair.of(s, t));
-                    }
-                });
+                List<T> objs = sc.flatten(s);
+                for (T t : objs) {
+                    m_snapshots.add(Pair.of(s, t));
+                }
             }
 
             m_iter = m_snapshots.iterator();
@@ -97,8 +114,9 @@ public class SnapshotStatus extends StatsSource {
         }
     }
 
-    public SnapshotStatus() {
+    public SnapshotStatus(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
         super(false);
+        m_typeChecker.setSnapshotPath(truncationSnapshotPathStr, autoSnapshotPathStr);
     }
 
     @Override
@@ -143,14 +161,27 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("SIZE")] = t.size;
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
-        rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
-        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
+        String result;
+        if (t.error == null && t.size == 0) {
+            // still in progress
+            result = SnapshotResult.IN_PROGRESS.toString();
+        } else {
+            result = t.error == null ? SnapshotResult.SUCCESS.toString() : SnapshotResult.FAILURE.toString();
+        }
+        rowValues[columnNameToIndex.get("RESULT")] = result;
+        rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path, s.nonce).name();
         super.updateStatsRow(rowKey, rowValues);
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new StatusIterator(SnapshotRegistry.getSnapshotHistory().iterator());
+        return new StatusIterator<Table>(
+                SnapshotRegistry.getSnapshotHistory().iterator(),
+                new SnapshotScanner<Table>() {
+                    public List<Table> flatten(Snapshot s) {
+                        return s.iterateTables();
+                    }
+                });
     }
 
 }

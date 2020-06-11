@@ -37,7 +37,7 @@ public class MigratePartitionedExport extends VoltProcedure {
     public final SQLStmt migrate_file = new SQLStmt("MIGRATE FROM export_partitioned_table_file WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
     public final SQLStmt migrate_jdbc = new SQLStmt("MIGRATE FROM export_partitioned_table_jdbc WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
 
-    public VoltTable[] run(int seconds)
+    public VoltTable[] run(int key, int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
         voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);

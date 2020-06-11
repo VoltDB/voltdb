@@ -42,17 +42,36 @@ import org.voltdb.VoltType;
  */
 public class Shutdown extends VoltSystemProcedure {
 
+    static void shutdownWork() {
+        VoltLogger voltLogger = new VoltLogger("HOST");
+        String msg = "VoltDB shutting down as requested by @Shutdown command.";
+        CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
+        if (VoltDB.instanceOnServerThread()) {
+            // Using shutdown from the localServerThread requires
+            // the statics to be reinitialized for their next use
+            m_failsafeArmed = new AtomicBoolean(false);
+            m_failsafe = new Thread() {
+                @Override
+                public void run() {
+                    delayedShutdownWork();
+                }
+            };
+        }
+        System.exit(0);
+    }
+
+    static void delayedShutdownWork() {
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {}
+        shutdownWork();
+    }
+
     private static AtomicBoolean m_failsafeArmed = new AtomicBoolean(false);
     private static Thread m_failsafe = new Thread() {
         @Override
         public void run() {
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {}
-            VoltLogger voltLogger = new VoltLogger("HOST");
-            String msg = "VoltDB shutting down as requested by @Shutdown command.";
-            CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
-            System.exit(0);
+            delayedShutdownWork();
         }
     };
 
@@ -74,6 +93,7 @@ public class Shutdown extends VoltSystemProcedure {
     {
         if (fragmentId == SysProcFragmentId.PF_shutdownSync) {
             VoltDB.instance().getHostMessenger().prepareForShutdown();
+            // If this is executed on the LocalServerThread, the static will cause problems for subsequent tests.
             if (!m_failsafeArmed.getAndSet(true)) {
                 m_failsafe.start();
                 VoltLogger voltLogger = new VoltLogger("HOST");
@@ -100,10 +120,7 @@ public class Shutdown extends VoltSystemProcedure {
                                 e);
                     }
                     if (die) {
-                        VoltLogger voltLogger = new VoltLogger("HOST");
-                        String msg = "VoltDB shutting down as requested by @Shutdown command.";
-                        CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
-                        System.exit(0);
+                        shutdownWork();
                     }
                     else {
                         try {

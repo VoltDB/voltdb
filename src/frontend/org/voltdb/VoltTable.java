@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.zip.CRC32;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -33,7 +34,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -1900,29 +1900,59 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             return true;
         }
 
-        int mypos = m_buffer.position();
-        int theirpos = other.m_buffer.position();
-        if (mypos != theirpos) {
+        if (m_buffer.position() != other.m_buffer.position()) {
             return false;
         }
-        long checksum1, checksum2;
         if (ignoreOrder) {
-            checksum1 = ClientUtils.cheesyBufferCheckSum(m_buffer);
-            checksum2 = ClientUtils.cheesyBufferCheckSum(other.m_buffer);
+            return getTableCheckSum(true) == other.getTableCheckSum(true);
         } else {
-            checksum1 = ClientUtils.cheesyBufferCheckSumWithOrder(m_buffer);
-            checksum2 = ClientUtils.cheesyBufferCheckSumWithOrder(other.m_buffer);
+            ByteBuffer thisBuffer = m_buffer.duplicate();
+            thisBuffer.limit(thisBuffer.position()).rewind();
+            ByteBuffer otherBuffer = other.m_buffer.duplicate();
+            otherBuffer.limit(otherBuffer.position()).rewind();
+            return thisBuffer.equals(otherBuffer);
         }
-        boolean checksum = (checksum1 == checksum2);
-        assert(verifyTableInvariants());
-        return checksum;
     }
 
-    public long updateCheckSum(long preCheckSum) {
-        assert(verifyTableInvariants());
-        preCheckSum += ClientUtils.cheesyBufferCheckSum(m_buffer);
-        assert(verifyTableInvariants());
-        return preCheckSum;
+    /**
+     * Calculate a rudimentary checksum of the table. The result of this method will be the same for two tables with the
+     * same rows but not necessarily in the same order.
+     * <p>
+     * When {@code includeHeader} is {@code false} the result of this checksum can be added to the result from another
+     * table to affectively concatenate the hash from this table with another to compare across tables.
+     *
+     * @param includeHeader If {@code true} the table header will be included in the checksum
+     * @return checksum of table
+     */
+    public long getTableCheckSum(boolean includeHeader) {
+        ByteBuffer buffer = m_buffer.asReadOnlyBuffer();
+        int limit = buffer.position();
+        long hash = 0;
+        // Better off using native since the most common user uses direct byte buffers
+        CRC32 crc = new CRC32();
+
+        if (includeHeader) {
+            buffer.rewind().limit(m_rowStart + Integer.BYTES);
+            crc.update(buffer);
+            hash = crc.getValue();
+        } else {
+            buffer.position(m_rowStart + Integer.BYTES);
+        }
+
+        int position = buffer.position();
+        for (int i = 0; i < m_rowCount; ++i) {
+            buffer.limit(limit);
+            int length = buffer.getInt(position) + Integer.BYTES;
+            buffer.limit(position + length);
+            crc.reset();
+            crc.update(buffer);
+            hash += crc.getValue();
+            position += length;
+            assert position == buffer.position();
+        }
+
+        assert limit == position && buffer.limit() == limit;
+        return hash;
     }
 
     /**

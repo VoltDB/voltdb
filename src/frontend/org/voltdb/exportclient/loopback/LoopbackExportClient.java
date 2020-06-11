@@ -190,7 +190,7 @@ public class LoopbackExportClient extends ExportClientBase {
                 .skipInternalFields(m_skipInternals)
             ;
             m_csvWriterDecoder = builder.build();
-            if (ExportManagerInterface.instance().getExportMode() == ExportMode.BASIC) {
+            if (VoltDB.getExportManager().getExportMode() == ExportMode.BASIC) {
                 m_es = CoreUtils.getListeningSingleThreadExecutor(
                         "Loopback Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
             } else {

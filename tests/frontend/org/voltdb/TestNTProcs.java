@@ -40,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -184,7 +185,6 @@ public class TestNTProcs extends TestCase {
             System.out.flush();
 
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
-            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
             System.out.println("Did it NT2!");
             ClientResponseImpl cr = (ClientResponseImpl) response;
@@ -228,8 +228,8 @@ public class TestNTProcs extends TestCase {
             System.out.printf("NTProcWithBadTypeFuture.secondPart running in thread: %s\n", Thread.currentThread().getName());
             System.out.flush();
 
-            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
-            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
+            String threadName = Thread.currentThread().getName();
+            assertTrue(threadName.startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
             System.out.println("Did it NT2!");
             return "This is spinal tap!";
@@ -389,28 +389,32 @@ public class TestNTProcs extends TestCase {
 
             ClientResponseWithPartitionKey[] crs = pf.get();
 
+            final AtomicReference<String> throwIntentionalAssertion = new AtomicReference<>(new String(""));
             try {
                 Arrays.stream(crs)
                     .forEach(crwp -> {
-                        if (crwp.response.getStatus() != expectedCode) {
-                            if (crwp.response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+                        short status = crwp.response.getStatus();
+                        if (status != expectedCode) {
+                            if (status == ClientResponse.RESPONSE_UNKNOWN
+                                || status == ClientResponse.SERVER_UNAVAILABLE) {
                                 // nothing to do here I guess
                             }
                             else {
                                 ClientResponseImpl cri = (ClientResponseImpl) crwp.response;
-                                System.err.println(cri.toJSONString());
-                                System.err.flush();
-                                //System.exit(-1);
-
-                                throw new AssertionFailedError(cri.toJSONString());
-
-                                //assertEquals(expectedCode, crwp.response.getStatus(), cri.toJSONString());
+                                if (mode != CALL_MISSING_PROC) {
+                                    System.err.println(cri.toJSONString());
+                                    System.err.flush();
+                                    System.exit(-1);
+                                }
+                                else {
+                                    throwIntentionalAssertion.set(cri.toJSONString());
+                                }
                             }
                         }
-
-
-                        assertEquals(expectedCode, crwp.response.getStatus());
                     });
+                if (!throwIntentionalAssertion.get().isEmpty()) {
+                    throw new AssertionFailedError(throwIntentionalAssertion.get());
+                }
                 System.out.println("Got responses!");
             }
             catch (Exception e) {

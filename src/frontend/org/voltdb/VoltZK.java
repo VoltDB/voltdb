@@ -55,13 +55,14 @@ import com.google_voltpatches.common.collect.Sets;
 public class VoltZK {
 
     static final VoltLogger tmLog = new VoltLogger("TM");
-    private final static String ERROR_DECOMMISSION = "while decommissioning replicas is progress";
+    private final static String ERROR_DECOMMISSION = "while decommissioning replicas is in progress";
     private final static String ERROR_REDUCEDCLUSTERSAFETY = "while cluster is in reduced safety mode";
-    private final static String ERROR_REJOIN = "while node rejoin is progress";
-    private final static String ERROR_LEADER_MIGRATION = "while leader migration is progress";
-    private final static String ERROR_CATALOG_UPDATE = "while catalog update is progress";
-    private final static String ERROR_ELASTIC_OPERATION = "while elastic operation is progress";
+    private final static String ERROR_REJOIN = "while node rejoin is in progress";
+    private final static String ERROR_LEADER_MIGRATION = "while leader migration is in progress";
+    private final static String ERROR_CATALOG_UPDATE = "while catalog update is in progress";
+    private final static String ERROR_ELASTIC_OPERATION = "while elastic operation is in progress";
     private final static String ERROR_MP_REPAIR = "while leader promotion or transaction repair are in progress";
+    private final static String ERROR_LICENSE_UPDATE = "while live license update is in progress";
 
     public static final String root = "/db";
 
@@ -206,6 +207,9 @@ public class VoltZK {
     public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
     private static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
     public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
+
+    private static final String leafNodeLicenseUpdateInProgress = "license_update_blocker";
+    public static final String licenseUpdateInProgress = actionBlockers + "/" + leafNodeLicenseUpdateInProgress;
 
     //register partition while the partition elects a new leader upon node failure
     private static final String mpRepairBlocker = "mp_repair_blocker";
@@ -512,6 +516,8 @@ public class VoltZK {
                     errorMsg = ERROR_DECOMMISSION;
                 } else if (blockers.contains(leafReducedClusterSafety)){
                     errorMsg = ERROR_REDUCEDCLUSTERSAFETY;
+                } else if (blockers.contains(leafNodeLicenseUpdateInProgress)) {
+                    errorMsg = ERROR_LICENSE_UPDATE;
                 }
                 break;
             case elasticOperationInProgress:
@@ -566,6 +572,11 @@ public class VoltZK {
             case snapshotSetupInProgress:
                 if (blockers.contains(decommissionReplicas)) {
                     errorMsg = ERROR_DECOMMISSION;
+                }
+                break;
+            case licenseUpdateInProgress:
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = ERROR_REJOIN;
                 }
                 break;
             default:

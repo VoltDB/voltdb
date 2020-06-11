@@ -390,7 +390,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testLastWriteDelta() throws Exception {
-        EstTimeUpdater.pause = true;
+        EstTimeUpdater.s_pause = true;
         Thread.sleep(10);
         try {
             final MockChannel channel = new MockChannel(MockChannel.SINK, 0);
@@ -424,7 +424,7 @@ public class TestNIOWriteStream extends TestCase {
             assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
             wstream.shutdown();
         } finally {
-            EstTimeUpdater.pause = false;
+            EstTimeUpdater.s_pause = false;
         }
     }
 

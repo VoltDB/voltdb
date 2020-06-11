@@ -900,24 +900,9 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple const& lhs, int begi
  */
 template<class POOL>
 inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool) {
-    vassert(m_schema);
-    vassert(source.m_schema);
-    vassert(source.m_data);
-    vassert(m_data);
+    copy(source);
 
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
-
-#ifndef NDEBUG
-    if(! m_schema->isCompatibleForMemcpy(source.m_schema)) {
-        std::ostringstream message;
-        message << "src  tuple: " << source.debug("") << std::endl;
-        message << "src schema: " << source.m_schema->debug() << std::endl;
-        message << "dest schema: " << m_schema->debug() << std::endl;
-        throwFatalException("%s", message.str().c_str());
-    }
-#endif
-    // copy the data AND the isActive flag
-    ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
     if (uninlineableObjectColumnCount > 0) {
 
         /*
@@ -1024,7 +1009,7 @@ inline void TableTuple::copy(const TableTuple &source) {
     vassert(m_data);
 
 #ifndef NDEBUG
-    if(! m_schema->isCompatibleForMemcpy(source.m_schema)) {
+    if(! m_schema->isCompatibleForMemcpy(source.m_schema, false)) {
         std::ostringstream message;
         message << "src  tuple: " << source.debug("") << std::endl;
         message << "src schema: " << source.m_schema->debug() << std::endl;
@@ -1032,8 +1017,23 @@ inline void TableTuple::copy(const TableTuple &source) {
         throwFatalException("%s", message.str().c_str());
     }
 #endif
-    // copy the data AND the isActive flag
-    ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+    if (m_schema == source.m_schema) {
+        // identical schema so do full raw copy
+        ::memcpy(m_data, source.m_data, tupleLength());
+    } else {
+        // copy the visible data AND the isActive flag
+        ::memcpy(m_data, source.m_data, m_schema->visibleTupleLength() + TUPLE_HEADER_SIZE);
+
+        // copy or initialize the hidden columns
+        for (int i = 0; i < m_schema->hiddenColumnCount(); ++i) {
+            HiddenColumn::Type type = m_schema->getHiddenColumnInfo(i)->columnType;
+            uint8_t index = source.m_schema->getHiddenColumnIndex(type);
+            NValue value =
+                    index == TupleSchema::UNSET_HIDDEN_COLUMN ?
+                            HiddenColumn::getDefaultValue(type) : source.getHiddenNValue(index);
+            setHiddenNValue(i, value);
+        }
+    }
 }
 
 inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool,

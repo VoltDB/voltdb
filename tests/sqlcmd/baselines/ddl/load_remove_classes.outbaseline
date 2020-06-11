@@ -126,6 +126,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -173,6 +174,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -288,6 +290,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -349,6 +352,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -396,6 +400,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
@@ -517,6 +522,7 @@ Command succeeded.
 @Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 

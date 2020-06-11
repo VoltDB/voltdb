@@ -74,8 +74,12 @@ public class RandomTestRule extends Random implements TestRule {
 
     @Override
     public Statement apply(Statement base, Description description) {
-        m_name = description.getDisplayName();
+        setMethodName(description.getDisplayName());
         return base;
+    }
+
+    public void setMethodName(String name) {
+        m_name = name;
     }
 
     @Override

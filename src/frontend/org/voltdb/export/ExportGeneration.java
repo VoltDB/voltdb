@@ -46,7 +46,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
@@ -764,7 +764,7 @@ public class ExportGeneration implements Generation {
         //Do closings outside the synchronized block
         for (ExportDataSource source : doneSources) {
             exportLog.info("Finished processing " + source);
-            ExportManagerInterface.instance().onClosingSource(source.getTableName(), source.getPartitionId());
+            VoltDB.getExportManager().onClosingSource(source.getTableName(), source.getPartitionId());
             source.closeAndDelete();
         }
     }
@@ -803,7 +803,7 @@ public class ExportGeneration implements Generation {
         }
 
         //Do closing outside the synchronized block.
-        ExportManagerInterface.instance().onClosingSource(tableName, partitionId);
+        VoltDB.getExportManager().onClosingSource(tableName, partitionId);
         source.closeAndDelete();
 
     }
@@ -812,7 +812,7 @@ public class ExportGeneration implements Generation {
     @Override
     public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, long committedSequenceNumber,
-            int tupleCount, long uniqueId, ByteBuffer buffer) {
+            int tupleCount, long uniqueId, BBContainer container) {
 
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
@@ -822,8 +822,8 @@ public class ExportGeneration implements Generation {
                 exportLog.error("PUSH Could not find export data sources for partition "
                         + partitionId + ". The export data is being discarded.");
             }
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (container != null) {
+                container.discard();
             }
             return;
         }
@@ -839,14 +839,14 @@ public class ExportGeneration implements Generation {
                     + ") is being discarded.",
                     EstTime.currentTimeMillis());
 
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (container != null) {
+                container.discard();
             }
             return;
         }
 
         source.pushExportBuffer(startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, buffer);
+                tupleCount, uniqueId, container);
     }
 
     private void cleanup() {

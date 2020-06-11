@@ -256,7 +256,7 @@ public class ProcedureRunnerNT {
 
         final Iv2InitiateTaskMessage workRequest = new Iv2InitiateTaskMessage(
                 m_mailbox.getHSId(), m_mailbox.getHSId(), TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE,
-                m_id, m_id, true, false, invocation, m_id, ClientInterface.NT_REMOTE_PROC_CID,
+                m_id, m_id, true, false, false, invocation, m_id, ClientInterface.NT_REMOTE_PROC_CID,
                 false);
 
         m_allHostFut = new CompletableFuture<>();

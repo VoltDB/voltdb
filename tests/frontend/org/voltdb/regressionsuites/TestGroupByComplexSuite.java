@@ -1019,11 +1019,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         config = new LocalCluster("groupByComplex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);
-
-        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
+        // NOTE: remove test for HSQL_BACKEND
         // Cluster
         config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));

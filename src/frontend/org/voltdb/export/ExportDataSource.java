@@ -44,7 +44,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
@@ -626,18 +625,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             long committedSequenceNumber,
             int tupleCount,
             long uniqueId,
-            ByteBuffer buffer,
+            BBContainer cont,
             boolean poll) throws Exception {
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
                     lastSequenceNumber + "], poll=" + poll);
         }
-        if (buffer != null) {
+        if (cont != null) {
+            ByteBuffer buffer = cont.b();
             // header space along is 8 bytes
             assert (buffer.capacity() > StreamBlock.HEADER_SIZE);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
-            final BBContainer cont = DBBPool.wrapBB(buffer);
 
             // We should never try to push data on a source that is not in catalog
             if (!inCatalog()) {
@@ -707,7 +706,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final long committedSequenceNumber,
             final int tupleCount,
             final long uniqueId,
-            final ByteBuffer buffer) {
+            final BBContainer cont) {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
@@ -715,8 +714,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_closed) {
+            m_bufferPushPermits.release();
             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                     EstTime.currentTimeMillis());
+            if (cont != null) {
+                cont.discard();
+            }
             return;
         }
         try {
@@ -726,10 +729,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     try {
                         if (!m_closed) {
                             pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
-                                    tupleCount, uniqueId, buffer, m_readyForPolling);
+                                    tupleCount, uniqueId, cont, m_readyForPolling);
                         } else {
                             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                                     EstTime.currentTimeMillis());
+                            if (cont != null) {
+                                cont.discard();
+                            }
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -743,6 +749,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //We are shutting down very much rolling generation so dont passup for error reporting.
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Export buffer rejected by data source executor: ", rej);
+            }
+            if (cont != null) {
+                cont.discard();
             }
         }
     }
@@ -905,7 +914,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Shutdown executor");
         }
         m_es.shutdown();
-        ExportManagerInterface.instance().onClosedSource(m_tableName, m_partitionId);
+        VoltDB.getExportManager().onClosedSource(m_tableName, m_partitionId);
     }
 
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.

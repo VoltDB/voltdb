@@ -158,6 +158,9 @@ public:
         return m_isHeaderless;
     }
 
+    /** Return the number of bytes used by the visible portion of the tuple */
+    inline uint32_t visibleTupleLength() const;
+
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
@@ -191,8 +194,8 @@ public:
     bool equals(const TupleSchema *other) const;
 
     /* Returns true if number of columns and their data types are the
-     * same.  Includes hidden columns. */
-    bool isCompatibleForMemcpy(const TupleSchema *other) const;
+     * same.  Includes hidden columns if includeHidden is true. */
+    bool isCompatibleForMemcpy(const TupleSchema *other, bool includeHidden=true) const;
 
     /** Returns column info object for columnIndex-th (visible) column.  */
     const ColumnInfo* getColumnInfo(int columnIndex) const;
@@ -335,6 +338,11 @@ inline uint16_t TupleSchema::totalColumnCount() const {
     return static_cast<uint16_t>(m_columnCount + m_hiddenColumnCount);
 }
 
+inline uint32_t TupleSchema::visibleTupleLength() const {
+    // index "m_columnCount" has the offset for the end of the visible portion of the tuple
+    return getColumnInfoPrivate(m_columnCount)->offset;
+}
+
 inline uint32_t TupleSchema::tupleLength() const {
     // index "m_columnCount + m_hiddenColumnCount" has the offset for the end of the tuple
     // index "m_columnCount + m_hiddenColumnCount - 1" has the offset for the last hidden column
@@ -348,7 +356,6 @@ inline size_t TupleSchema::offsetOfHiddenColumns() const {
 }
 
 inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
-    vassert(hiddenColumnCount() > 0);
     return tupleLength() - offsetOfHiddenColumns();
 }
 
