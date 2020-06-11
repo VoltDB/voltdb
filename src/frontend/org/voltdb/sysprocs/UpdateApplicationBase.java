@@ -236,7 +236,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval);
+            if (!VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval)) {
+                return retval;
+            }
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
@@ -413,7 +415,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                 callNTProcedureOnAllHosts(procedureName, ccr.encodedDiffCommands,
-                        ccr.expectedCatalogVersion);
+                        ccr.nextCatalogVersion);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;

@@ -197,8 +197,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
             long lastMpUniqueId,
             int eventType,
             BBContainer cont) {
+        cont.tag("pushDRBuffer");
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
+            cont.discard();
             return -1;
         }
         return pdrg.onBinaryDR(lastCommittedSpHandle, partitionId, startSequenceNumber, lastSequenceNumber,
@@ -206,8 +208,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
     }
 
     public static void pushPoisonPill(int partitionId, String reason, BBContainer failedBufContainer) {
+        failedBufContainer.tag("pushPoisonPill");
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
+            failedBufContainer.discard();
             return;
         }
         pdrg.onPoisonPill(partitionId, reason, failedBufContainer);

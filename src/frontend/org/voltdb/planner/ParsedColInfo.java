@@ -19,10 +19,13 @@ package org.voltdb.planner;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
+
+import com.google_voltpatches.common.base.MoreObjects;
 
 /**
  * This class represents an instance of a column in a parsed statement.
@@ -160,6 +163,20 @@ public class ParsedColInfo implements Cloneable {
             orderCol.m_alias = tve.getColumnAlias();
         }
         else {
+            switch (orderCol.m_expression.getExpressionType()) {
+            case VALUE_CONSTANT:
+                throw new PlanningErrorException(
+                        "ORDER BY cannot contain constant values: " + child.attributes.get("value"), 0);
+            case VALUE_PARAMETER:
+                String table = MoreObjects.firstNonNull(child.attributes.get("tablealias"),
+                        child.attributes.get("table"));
+                throw new PlanningErrorException(
+                        "ORDER BY cannot contain references to columns or values which are not involved in the current select: "
+                                + table + '.' + child.attributes.get("column"),
+                        0);
+            default:
+            }
+
             String alias = child.attributes.get("alias");
             orderCol.m_alias = alias;
             orderCol.m_tableName = AbstractParsedStmt.TEMP_TABLE_NAME;
