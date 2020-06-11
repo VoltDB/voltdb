@@ -78,7 +78,7 @@ public class PauseActivityStats extends StatsSource {
      * used by 'voltadmin pause --wait'.
      */
     private static final ActivityHelper.Type[] statsList = {
-        ActivityHelper.Type.EXPORT, ActivityHelper.Type.DRPROD,
+        ActivityHelper.Type.EXPORT, ActivityHelper.Type.DRPROD_ACT,
     };
 
     @Override

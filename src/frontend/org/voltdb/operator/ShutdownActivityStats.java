@@ -105,8 +105,8 @@ public class ShutdownActivityStats extends StatsSource {
 
     private static final ActivityHelper.Type[] statsWithoutCmdLog = {
         ActivityHelper.Type.CLIENT, ActivityHelper.Type.IMPORT,
-        ActivityHelper.Type.DRCONS, ActivityHelper.Type.EXPORT,
-        ActivityHelper.Type.DRPROD,
+        ActivityHelper.Type.DRCONS_ACT, ActivityHelper.Type.EXPORT,
+        ActivityHelper.Type.DRPROD_ACT,
     };
 
     @Override

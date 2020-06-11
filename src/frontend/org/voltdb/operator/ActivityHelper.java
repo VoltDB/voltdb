@@ -21,19 +21,20 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.CommandLog;
 import org.voltdb.DRConsumerStatsBase;
 import org.voltdb.DRProducerStatsBase;
+import org.voltdb.DRRoleStats;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.Cartographer;
-import org.voltdb.export.ExportManagerInterface;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 
 /**
  * Activity stats helper class. This holds methods that collect
@@ -63,8 +64,11 @@ class ActivityHelper {
         IMPORT,
         EXPORT,
         EXMAST,
-        DRCONS,
-        DRPROD,
+        DRCONS_ACT, // check activity columns
+        DRCONS_RDY, // check readiness columns
+        DRPROD_ACT, // check activity columns
+        DRPROD_RDY, // check readiness columns
+        DRROLE,
     }
 
     /*
@@ -81,6 +85,15 @@ class ActivityHelper {
     long exportMasters;
     long drconsPend;
     long drprodBytesPend, drprodRowsPend;
+
+    // Readiness check
+    String drroleState;
+    String drprodState;
+    boolean drprodIsSynced = true;
+    String drprodCStatus = "UP";
+    String drconsState;
+    boolean drconsIsCovered = true;
+    boolean drconsIsPaused = false;
 
     /*
      * Main stats collection method. Stats values
@@ -111,11 +124,20 @@ class ActivityHelper {
             case EXMAST:
                 active |= checkExportMastership();
                 break;
-            case DRCONS:
-                active |= checkDrConsumer();
+            case DRCONS_ACT:
+                active |= checkDrConsumerActivity();
                 break;
-            case DRPROD:
-                active |= checkDrProducer();
+            case DRCONS_RDY:
+                active |= checkDrConsumerReadiness();
+                break;
+            case DRPROD_ACT:
+                active |= checkDrProducerActivity();
+                break;
+            case DRPROD_RDY:
+                active |= checkDrProducerReadiness();
+                break;
+            case DRROLE:
+                active |= checkDrRole();
                 break;
             }
         }
@@ -264,7 +286,7 @@ class ActivityHelper {
      * Counts outstanding data, expressed in bytes and table rows,
      * summed across all partitions.
      */
-    private boolean checkDrProducer() {
+    private boolean checkDrProducerActivity() {
         long bytesPend = 0, rowsPend = 0;
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
@@ -284,7 +306,7 @@ class ActivityHelper {
             }
         }
         catch (Exception ex) {
-            warn("checkDrProducer", ex);
+            warn("checkDrProducerActivity", ex);
         }
         drprodBytesPend = bytesPend;
         drprodRowsPend = rowsPend;
@@ -296,7 +318,7 @@ class ActivityHelper {
      * Counts partitions for which there is data not yet
      * successfully applied.
      */
-    private boolean checkDrConsumer() {
+    private boolean checkDrConsumerActivity() {
         long pend = 0;
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
@@ -313,10 +335,91 @@ class ActivityHelper {
             }
         }
         catch (Exception ex) {
-            warn("checkDrConsumer", ex);
+            warn("checkDrConsumerActivity", ex);
         }
         drconsPend = pend;
         return isActive("DR consumer: %d partitions with pending data", pend);
+    }
+
+    /*
+     * XDCR drconsumer readiness check
+     */
+    private boolean checkDrConsumerReadiness() {
+        try {
+            StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERNODE);
+            if (ss != null) {
+                int idxState = getIndex(ss, DRConsumerStatsBase.Columns.STATE);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                    drconsState = String.valueOf(row[idxState]);
+                }
+            }
+            ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
+            if (ss != null) {
+                int idxIsCovered = getIndex(ss, DRConsumerStatsBase.Columns.IS_COVERED);
+                int idxIsPaused = getIndex(ss, DRConsumerStatsBase.Columns.IS_PAUSED);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    boolean isCovered = asBoolean(row[idxIsCovered]);
+                    boolean isPaused = asBoolean(row[idxIsPaused]);
+                    if (!isCovered) { drconsIsCovered = false; } // if any partition isn't covered.
+                    if (isPaused) { drconsIsPaused = true; } // if any partition is paused
+                }
+            }
+        }
+        catch (Exception ex) {
+            warn("checkDrConsumerReadiness", ex);
+        }
+        // Ready - in "RECEIVE" state, every partition is covered and no one is paused.
+        return (drconsState != null && !drconsState.equalsIgnoreCase("RECEIVE")) ||
+                !drconsIsCovered || drconsIsPaused;
+    }
+
+    /*
+     * XDCR drproducer readiness check
+     */
+    private boolean checkDrProducerReadiness() {
+        try {
+            StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERNODE);
+            if (ss != null) {
+                int idxState = getIndex(ss, DRProducerStatsBase.Columns.STATE);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                    drprodState = String.valueOf(row[idxState]);
+                }
+            }
+            ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
+            if (ss != null) {
+                int idxIsSynced = getIndex(ss, DRProducerStatsBase.Columns.IS_SYNCED);
+                int idxCStatus = getIndex(ss, DRProducerStatsBase.Columns.CONNECTION_STATUS);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    boolean isSynced = asBoolean(row[idxIsSynced]);
+                    String conStatus = String.valueOf(row[idxCStatus]);
+                    if (!isSynced) { drprodIsSynced = false; } // if any partition isn't sync'ed.
+                    if (conStatus.equalsIgnoreCase("DOWN")) { drprodCStatus = "DOWN"; } // if any connection is down
+                }
+            }
+        }
+        catch (Exception ex) {
+            warn("checkDrProducerReadiness", ex);
+        }
+        // Ready - in "ACTIVE" state, every partition is sync'ed and every connection is up.
+        return (drprodState != null && !drprodState.equalsIgnoreCase("ACTIVE")) ||
+                !drprodIsSynced || (drprodCStatus != null && !drprodCStatus.equalsIgnoreCase("UP"));
+    }
+
+    private boolean checkDrRole() {
+        try {
+            StatsSource ss = getStatsSource(StatsSelector.DRROLE);
+            if (ss != null) {
+                int idxState = getIndex(ss, DRRoleStats.CN_STATE);
+                for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                    drroleState = String.valueOf(row[idxState]);
+                }
+            }
+        }
+        catch (Exception ex) {
+            warn("checkDrRole", ex);
+        }
+        // Ready - in "ACTIVE" state.
+        return drroleState != null && !drroleState.equalsIgnoreCase("ACTIVE");
     }
 
     /*
@@ -324,6 +427,13 @@ class ActivityHelper {
      */
     private static long asLong(Object obj) {
         return ((Long)obj).longValue();
+    }
+
+    /*
+     * Convert object in stats row to boolean.
+     */
+    private static boolean asBoolean(Object obj) {
+        return String.valueOf(obj).equalsIgnoreCase("true") ? true : false;
     }
 
     /*
