@@ -19,9 +19,16 @@ package org.voltdb.operator;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.DRConsumerStatsBase;
+import org.voltdb.DRProducerStatsBase;
+import org.voltdb.DRRoleStats;
+import org.voltdb.StatsAgent;
+import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
@@ -39,18 +46,151 @@ public class XDCRReadinessStats extends StatsSource {
     private static final VoltLogger logger = new VoltLogger("HOST");
 
     private enum ColumnName {
-        READY, // 0 if all other gauges are in desired state, which happen to be the lowest display priority. Otherwise 1.
-        DRROLE_STATE,    // display priority (same as below): "DISABLED" > "PENDING" > "STOPPED" > "ACTIVE"
-        DRPROD_STATE,    // aggregated for all hosts, "OFF" > "PENDING" > "ACTIVE"
-        DRPROD_ISSYNCED, // aggregated for all partitions, "false" > "true"
-        DRPROD_CSTATUS,  // connection status, aggregated for all connections, "DOWN" > "UP"
-        DRCONS_STATE,    // aggregated for all hosts, "UNINITIALIZED" > "INITIALIZE" > "DISABLE" > "SYNC" > "RECEIVE"
-        DRCONS_ISCOVERED, // aggregated for all partitions, "false" > "true"
-        DRCONS_ISPAUSED,  // aggregated for all partitions, "true" > "false"
+        IS_READY,         // Quick summary of XDCR readiness, true if
+                          //      1) DRROLE_STATE == "ACTIVE",
+                          //      2) DRPROD_STATE == "ACTIVE",
+                          //      3) DRPROD_ISSYNCED == true,
+                          //      4) DRPROD_CNXSTS == "UP",
+                          //      5) DRCONS_STATE == "RECEIVE",
+                          //      6) DRCONS_ISCOVERED == true,
+                          //      7) DRCONS_ISPAUSED == false.
+        DRROLE_STATE,     // "DISABLED", "PENDING", "STOPPED", "ACTIVE"
+        DRPROD_STATE,     // "OFF", "PENDING", "ACTIVE"
+        DRPROD_ISSYNCED,  // aggregated for all partitions, false if any partition is out of sync.
+        DRPROD_CNXSTS,    // connection status, aggregated for all connections, "DOWN" if any connection is down, else "UP".
+        DRCONS_STATE,     // "UNINITIALIZED", "INITIALIZE", "DISABLE", "SYNC", "RECEIVE"
+        DRCONS_ISCOVERED, // aggregated for all partitions, false if any partition isn't covered.
+        DRCONS_ISPAUSED,  // aggregated for all partitions, true if any partition is paused.
     };
 
     public XDCRReadinessStats() {
         super(false);
+    }
+
+    private class ReadinessHelper {
+        // Readiness check
+        String ready;
+        String drroleState;
+        String drprodState;
+        boolean drprodIsSynced;
+        boolean drprodIsCxnUp;
+        String drconsState;
+        boolean drconsIsCovered;
+        boolean drconsIsPaused;
+        /*
+         * Main stats collection method. Stats values
+         * are saved as member variables.
+         *
+         * @param types  ordered list of stats types
+         * @return active/inactive summary flag
+         */
+        void collect() {
+            boolean ready = true;
+            ready &= checkDrConsumerReadiness();
+            ready &= checkDrProducerReadiness();
+            ready &= checkDrRole();
+            this.ready = ready ? "true" : "false";
+        }
+
+        /*
+         * XDCR drconsumer readiness check
+         */
+        private boolean checkDrConsumerReadiness() {
+            try {
+                StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERNODE);
+                if (ss != null) {
+                    int idxState = getIndex(ss, DRConsumerStatsBase.Columns.STATE);
+                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                        drconsState = String.valueOf(row[idxState]);
+                    }
+                }
+                ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
+                if (ss != null) {
+                    int idxIsCovered = getIndex(ss, DRConsumerStatsBase.Columns.IS_COVERED);
+                    int idxIsPaused = getIndex(ss, DRConsumerStatsBase.Columns.IS_PAUSED);
+                    boolean isCovered = true;
+                    boolean isPaused = false;
+                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                        isCovered &= asBoolean(row[idxIsCovered]); // false if any partition isn't covered.
+                        isPaused |= asBoolean(row[idxIsPaused]);   // true if any partition is paused
+                    }
+                    drconsIsCovered = isCovered;
+                    drconsIsPaused = isPaused;
+                }
+            }
+            catch (Exception ex) {
+                logger.warn("Unexpected exception in checking DRConsumer Statistics", ex);
+            }
+            // Ready - in "RECEIVE" state, every partition is covered and no one is paused.
+            return drconsState != null && drconsState.equalsIgnoreCase("RECEIVE") && drconsIsCovered && !drconsIsPaused;
+        }
+
+        /*
+         * XDCR drproducer readiness check
+         */
+        private boolean checkDrProducerReadiness() {
+            try {
+                StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERNODE);
+                if (ss != null) {
+                    int idxState = getIndex(ss, DRProducerStatsBase.Columns.STATE);
+                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                        drprodState = String.valueOf(row[idxState]);
+                    }
+                }
+                ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
+                if (ss != null) {
+                    int idxIsSynced = getIndex(ss, DRProducerStatsBase.Columns.IS_SYNCED);
+                    int idxCStatus = getIndex(ss, DRProducerStatsBase.Columns.CONNECTION_STATUS);
+                    boolean isSynced = true;
+                    boolean isUp = true;
+                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                        isSynced &= asBoolean(row[idxIsSynced]); // false if any partition isn't sync'ed.
+                        isUp &= String.valueOf(row[idxCStatus]).equalsIgnoreCase("UP"); // false if any connection is down
+                    }
+                    drprodIsSynced = isSynced;
+                    drprodIsCxnUp = isUp;
+                }
+            }
+            catch (Exception ex) {
+                logger.warn("Unexpected exception in checking DRProducer Statistics", ex);
+            }
+            // Ready - in "ACTIVE" state, every partition is sync'ed and every connection is up.
+            return drprodState != null && drprodState.equalsIgnoreCase("ACTIVE") &&
+                    drprodIsSynced && drprodIsCxnUp;
+        }
+
+        private boolean checkDrRole() {
+            try {
+                StatsSource ss = getStatsSource(StatsSelector.DRROLE);
+                if (ss != null) {
+                    int idxState = getIndex(ss, DRRoleStats.CN_STATE);
+                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) { // only one row
+                        drroleState = String.valueOf(row[idxState]);
+                    }
+                }
+            }
+            catch (Exception ex) {
+                logger.warn("Unexpected exception in checking DRRole Statistics", ex);
+            }
+            // Ready - in "ACTIVE" state.
+            return drroleState != null && drroleState.equalsIgnoreCase("ACTIVE");
+        }
+
+        /*
+         * Find source for someone else's stats
+         */
+        private StatsSource getStatsSource(StatsSelector selector) {
+            StatsSource ss = null;
+            StatsAgent sa = VoltDB.instance().getStatsAgent();
+            if (sa != null) {
+                Set<StatsSource> sss = sa.lookupStatsSource(selector, 0);
+                if (sss != null && !sss.isEmpty()) {
+                    assert sss.size() == 1;
+                    ss = sss.iterator().next();
+                }
+            }
+            return ss;
+        }
     }
 
     /*
@@ -61,8 +201,7 @@ public class XDCRReadinessStats extends StatsSource {
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         for (ColumnName col : ColumnName.values()) {
-            VoltType type = (col == ColumnName.READY ? VoltType.TINYINT : VoltType.STRING);
-            columns.add(new ColumnInfo(col.name(), type));
+            columns.add(new ColumnInfo(col.name(), VoltType.STRING));
         }
     }
 
@@ -74,32 +213,23 @@ public class XDCRReadinessStats extends StatsSource {
         return new ActivityHelper.OneShotIterator();
     }
 
-    /*
-     * Main stats collection. We return a single row, and
-     * the key is irrelevant.
-     */
-    private static final ActivityHelper.Type[] statsList = {
-        ActivityHelper.Type.DRROLE, ActivityHelper.Type.DRPROD_RDY, ActivityHelper.Type.DRCONS_RDY
-    };
-
     @Override
     protected void updateStatsRow(Object key, Object[] row) {
-        boolean notReady = false;
         try {
-            ActivityHelper helper = new ActivityHelper();
-            notReady = helper.collect(statsList);
+            ReadinessHelper helper = new ReadinessHelper();
+            helper.collect();
+            setValue(row, ColumnName.IS_READY, helper.ready);
             setValue(row, ColumnName.DRROLE_STATE, helper.drroleState);
             setValue(row, ColumnName.DRPROD_STATE, helper.drprodState);
             setValue(row, ColumnName.DRPROD_ISSYNCED, helper.drprodIsSynced ? "true" : "false"); // unfortunately volt table doesn't support boolean column
-            setValue(row, ColumnName.DRPROD_CSTATUS, helper.drprodCStatus);
+            setValue(row, ColumnName.DRPROD_CNXSTS, helper.drprodIsCxnUp ? "UP" : "DOWN");
             setValue(row, ColumnName.DRCONS_STATE, helper.drconsState);
             setValue(row, ColumnName.DRCONS_ISCOVERED, helper.drconsIsCovered ? "true" : "false");
             setValue(row, ColumnName.DRCONS_ISPAUSED, helper.drconsIsPaused ? "true" : "false");
         }
         catch (Exception ex) {
-            logger.error("Unhandled exception in XDCRReadinessStats: " + ex);
+            logger.error("Unexpected exception in XDCR_READINESS Stats: " + ex);
         }
-        setValue(row, ColumnName.READY, notReady);
         super.updateStatsRow(key, row);
     }
 
@@ -110,7 +240,17 @@ public class XDCRReadinessStats extends StatsSource {
         row[columnNameToIndex.get(col.name())] = val;
     }
 
-    private void setValue(Object[] row, ColumnName col, boolean val) {
-        row[columnNameToIndex.get(col.name())] = (val ? 1 : 0);  // Align with other activity checks, ready - 0
+    /*
+     * Get index for a column in someone else's stats table.
+     */
+    private static int getIndex(StatsSource ss, String name) {
+        return ss.getStatsColumnIndex(name);
+    }
+
+    /*
+     * Convert object in stats row to boolean.
+     */
+    private static boolean asBoolean(Object obj) {
+        return String.valueOf(obj).equalsIgnoreCase("true");
     }
 }
