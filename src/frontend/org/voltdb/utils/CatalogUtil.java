@@ -3107,10 +3107,12 @@ public abstract class CatalogUtil {
         // updateCatalogToZK may delete the zk nodes while load catalog
         // spin loop reading it during initialization.
         if (catalogNodes.isEmpty()) {
+            hostLog.info("No catalog data nodes found for path " + catalogPath);
             return null;
         }
         Collections.sort(catalogNodes);
         if (expectedCount != catalogNodes.size()) {
+            hostLog.info("For " + catalogPath + " expected " + expectedCount + " catalog data nodes. Found " + catalogNodes.size());
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("expected zk catalog node count: " + expectedCount +
                         ", actual: " + catalogNodes.size());
@@ -3190,11 +3192,13 @@ public abstract class CatalogUtil {
         try {
             data = zk.getData(catalogPath, false, null);
         } catch (KeeperException.NoNodeException e) {
+            hostLog.info("NoNodeException trying to get staging catalog for version " + catalogVersion);
             return null;
         }
         ByteBuffer buffer = ByteBuffer.wrap(data);
         byte flag = buffer.get();
         if (flag != (byte)ZKUtil.ZKCatalogStatus.PENDING.ordinal()) {
+            hostLog.info("Flag != PENDING trying to get staging catalog for version " + catalogVersion);
             return null;
         }
         int catalogSegmentCount = buffer.getInt();
