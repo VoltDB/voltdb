@@ -125,7 +125,7 @@ public class XDCRReadinessStats extends StatsSource {
                 logger.warn("Unexpected exception in checking DRConsumer Statistics", ex);
             }
             // Ready - in "RECEIVE" state, every partition is covered and no one is paused.
-            return "RECEIVE".equalsIgnoreCase(drconsState) &&
+            return drconsState != null && drconsState.equalsIgnoreCase("RECEIVE") &&
                     drconsIsCovered != null && drconsIsCovered.equalsIgnoreCase("true") &&
                     drconsIsPaused != null && drconsIsPaused.equalsIgnoreCase("false");
         }
