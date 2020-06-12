@@ -279,11 +279,29 @@ public abstract class RateLimiter {
    *
    * @return time in microseconds to wait until the resource can be acquired, never negative
    */
-  final long reserve(int permits) {
+  public final long reserve(int permits) {
     checkPermits(permits);
     synchronized (mutex()) {
       return reserveAndGetWaitLength(permits, stopwatch.readMicros());
     }
+  }
+
+  /**
+   * Try to acquire the given number of permits. If the permits can be acquired immediately {@code 0} is returned
+   * otherwise the amount of time in microseconds until permits are available is returned
+   *
+   * @param permits the number of permits to acquire
+   * @return time in microseconds to wait until the resource can be acquired, never negative
+   */
+  public final long tryAcquireWaitTime(int permits) {
+      checkPermits(permits);
+      synchronized (mutex()) {
+          long nowMicros = stopwatch.readMicros();
+          if (canAcquire(nowMicros, 0)) {
+              return reserve(permits);
+          }
+          return queryEarliestAvailable(nowMicros) - nowMicros;
+      }
   }
 
   /**
