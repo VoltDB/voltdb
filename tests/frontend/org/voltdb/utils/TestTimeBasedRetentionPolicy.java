@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Before;
@@ -257,6 +258,48 @@ public class TestTimeBasedRetentionPolicy {
         gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), 701, 800, System.currentTimeMillis());
         gapWriter.close();
         assertEquals(4, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+    }
+
+    @Test(timeout = 30_000)
+    public void testRetentionFrequency() throws Exception {
+        // retention of 2 minutes
+        m_pbd.close();
+        long retention = 120 *1000;
+        m_pbd = PersistentBinaryDeque.builder(m_name.getMethodName(), TestPersistentBinaryDeque.TEST_DIR, s_logger)
+                        .compression(true)
+                        .requiresId(true)
+                        .initialExtraHeader(null, TestPersistentBinaryDeque.SERIALIZER).build();
+        AtomicInteger callCount = new AtomicInteger(0);
+        m_pbd.registerDeferredDeleter((r) -> { callCount.getAndIncrement(); r.run(); } );
+        m_pbd.setRetentionPolicy(BinaryDeque.RetentionPolicyType.TIME_MS, Long.valueOf(retention));
+
+        // write a few PBD segments
+        long time = System.currentTimeMillis() - 120*1000;
+        long startId = 1;
+        int numSegments = 2;
+
+        // Write 2 segments with lower time for retention to delete 2 segments
+        for (int i=0; i<numSegments; i++) {
+            if (i > 0) {
+                m_pbd.updateExtraHeader(null);
+            }
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startId, startId+100-1, time);
+            startId += 100;
+            time += 100;
+        }
+        m_pbd.startRetentionPolicyEnforcement();
+
+        // More segments with current time
+        for (int i=0; i<numSegments; i++) {
+            m_pbd.updateExtraHeader(null);
+            m_pbd.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), startId, startId+100-1, System.currentTimeMillis());
+            startId += 100;
+            time += 100;
+        }
+
+        // wait for a few seconds. There should have been only be 2 retentions
+        Thread.sleep(5000);
+        assertEquals(2, callCount.intValue());
     }
 
     private void readBuffers(BinaryDequeReader<ExtraHeaderMetadata> reader, int numBuffers) throws Exception {

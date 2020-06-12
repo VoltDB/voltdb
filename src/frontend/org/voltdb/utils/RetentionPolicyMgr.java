@@ -301,7 +301,7 @@ public class RetentionPolicyMgr {
                             "Scheduling time-based retention for %s in %d milliseconds",
                             m_pbd.getNonce(), Math.max(timerDelay,  MIN_DELAY));
                 }
-                scheduleRetentionTask(MIN_DELAY);
+                scheduleRetentionTask(Math.max(timerDelay,  MIN_DELAY));
             }
         }
 
