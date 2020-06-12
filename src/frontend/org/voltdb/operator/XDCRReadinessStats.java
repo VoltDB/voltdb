@@ -72,11 +72,11 @@ public class XDCRReadinessStats extends StatsSource {
         String ready;
         String drroleState;
         String drprodState;
-        boolean drprodIsSynced;
-        boolean drprodIsCxnUp;
+        String drprodIsSynced;
+        String drprodIsCxnUp;
         String drconsState;
-        boolean drconsIsCovered;
-        boolean drconsIsPaused;
+        String drconsIsCovered;
+        String drconsIsPaused;
         /*
          * Main stats collection method. Stats values
          * are saved as member variables.
@@ -110,19 +110,24 @@ public class XDCRReadinessStats extends StatsSource {
                     int idxIsPaused = getIndex(ss, DRConsumerStatsBase.Columns.IS_PAUSED);
                     boolean isCovered = true;
                     boolean isPaused = false;
-                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    Object[][] rows = ss.getStatsRows(false, System.currentTimeMillis());
+                    for (Object[] row : rows) {
                         isCovered &= asBoolean(row[idxIsCovered]); // false if any partition isn't covered.
                         isPaused |= asBoolean(row[idxIsPaused]);   // true if any partition is paused
                     }
-                    drconsIsCovered = isCovered;
-                    drconsIsPaused = isPaused;
+                    if (rows.length != 0) {
+                        drconsIsCovered = String.valueOf(isCovered);
+                        drconsIsPaused = String.valueOf(isPaused);
+                    }
                 }
             }
             catch (Exception ex) {
                 logger.warn("Unexpected exception in checking DRConsumer Statistics", ex);
             }
             // Ready - in "RECEIVE" state, every partition is covered and no one is paused.
-            return drconsState != null && drconsState.equalsIgnoreCase("RECEIVE") && drconsIsCovered && !drconsIsPaused;
+            return drconsState != null && drconsState.equalsIgnoreCase("RECEIVE") &&
+                    drconsIsCovered != null && drconsIsCovered.equalsIgnoreCase("true") &&
+                    drconsIsPaused != null && drconsIsPaused.equalsIgnoreCase("false");
         }
 
         /*
@@ -143,12 +148,15 @@ public class XDCRReadinessStats extends StatsSource {
                     int idxCStatus = getIndex(ss, DRProducerStatsBase.Columns.CONNECTION_STATUS);
                     boolean isSynced = true;
                     boolean isUp = true;
-                    for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
+                    Object[][] rows = ss.getStatsRows(false, System.currentTimeMillis());
+                    for (Object[] row : rows) {
                         isSynced &= asBoolean(row[idxIsSynced]); // false if any partition isn't sync'ed.
                         isUp &= String.valueOf(row[idxCStatus]).equalsIgnoreCase("UP"); // false if any connection is down
                     }
-                    drprodIsSynced = isSynced;
-                    drprodIsCxnUp = isUp;
+                    if (rows.length != 0) {
+                        drprodIsSynced = String.valueOf(isSynced);
+                        drprodIsCxnUp = isUp ? "UP" : "DOWN";
+                    }
                 }
             }
             catch (Exception ex) {
@@ -156,7 +164,8 @@ public class XDCRReadinessStats extends StatsSource {
             }
             // Ready - in "ACTIVE" state, every partition is sync'ed and every connection is up.
             return drprodState != null && drprodState.equalsIgnoreCase("ACTIVE") &&
-                    drprodIsSynced && drprodIsCxnUp;
+                    drprodIsSynced != null && drprodIsSynced.equalsIgnoreCase("true") &&
+                    drprodIsCxnUp != null && drprodIsCxnUp.equalsIgnoreCase("UP");
         }
 
         private boolean checkDrRole() {
@@ -221,11 +230,11 @@ public class XDCRReadinessStats extends StatsSource {
             setValue(row, ColumnName.IS_READY, helper.ready);
             setValue(row, ColumnName.DRROLE_STATE, helper.drroleState);
             setValue(row, ColumnName.DRPROD_STATE, helper.drprodState);
-            setValue(row, ColumnName.DRPROD_ISSYNCED, helper.drprodIsSynced ? "true" : "false"); // unfortunately volt table doesn't support boolean column
-            setValue(row, ColumnName.DRPROD_CNXSTS, helper.drprodIsCxnUp ? "UP" : "DOWN");
+            setValue(row, ColumnName.DRPROD_ISSYNCED, helper.drprodIsSynced); // unfortunately volt table doesn't support boolean column
+            setValue(row, ColumnName.DRPROD_CNXSTS, helper.drprodIsCxnUp);
             setValue(row, ColumnName.DRCONS_STATE, helper.drconsState);
-            setValue(row, ColumnName.DRCONS_ISCOVERED, helper.drconsIsCovered ? "true" : "false");
-            setValue(row, ColumnName.DRCONS_ISPAUSED, helper.drconsIsPaused ? "true" : "false");
+            setValue(row, ColumnName.DRCONS_ISCOVERED, helper.drconsIsCovered);
+            setValue(row, ColumnName.DRCONS_ISPAUSED, helper.drconsIsPaused);
         }
         catch (Exception ex) {
             logger.error("Unexpected exception in XDCR_READINESS Stats: " + ex);
