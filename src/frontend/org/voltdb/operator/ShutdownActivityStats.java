@@ -19,15 +19,13 @@ package org.voltdb.operator;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Set;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CommandLog;
-import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * The ShutdownActivityStats statistics provide a summary of
@@ -105,8 +103,8 @@ public class ShutdownActivityStats extends StatsSource {
 
     private static final ActivityHelper.Type[] statsWithoutCmdLog = {
         ActivityHelper.Type.CLIENT, ActivityHelper.Type.IMPORT,
-        ActivityHelper.Type.DRCONS_ACT, ActivityHelper.Type.EXPORT,
-        ActivityHelper.Type.DRPROD_ACT,
+        ActivityHelper.Type.DRCONS, ActivityHelper.Type.EXPORT,
+        ActivityHelper.Type.DRPROD,
     };
 
     @Override
