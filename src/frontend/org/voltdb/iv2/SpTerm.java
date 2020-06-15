@@ -83,6 +83,9 @@ public class SpTerm implements Term
             // (see explanation at SpInitiator, m_leadersChangeHandler handler),
             // ask non-leader (from scheduler perspective) to ignore replica list change.
             if (!m_promoting && !m_mailbox.m_scheduler.isLeader()) {
+                if (replicas.size() != m_replicas.size()) {
+                    m_mailbox.updateReplicas(replicas, null);
+                }
                 m_replicas = ImmutableList.copyOf(replicas);
                 return;
             }
