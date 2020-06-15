@@ -284,7 +284,7 @@ class ActivityHelper {
             }
         }
         catch (Exception ex) {
-            warn("checkDrProducerActivity", ex);
+            warn("checkDrProducer", ex);
         }
         drprodBytesPend = bytesPend;
         drprodRowsPend = rowsPend;
@@ -313,7 +313,7 @@ class ActivityHelper {
             }
         }
         catch (Exception ex) {
-            warn("checkDrConsumerActivity", ex);
+            warn("checkDrConsumer", ex);
         }
         drconsPend = pend;
         return isActive("DR consumer: %d partitions with pending data", pend);
