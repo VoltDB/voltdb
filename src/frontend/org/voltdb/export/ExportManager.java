@@ -558,6 +558,9 @@ public class ExportManager implements ExportManagerInterface
             long uniqueId,
             long bufferPtr,
             BBContainer container) {
+        if (container != null) {
+            container.tag("pushExportBuffer");
+        }
         ExportManagerInterface instance = VoltDB.getExportManager();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
