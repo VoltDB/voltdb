@@ -184,6 +184,7 @@ import org.voltdb.operator.PauseActivityStats;
 import org.voltdb.operator.ShutdownActivityStats;
 import org.voltdb.operator.StatusListener;
 import org.voltdb.operator.StopActivityStats;
+import org.voltdb.operator.XDCRReadinessStats;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
@@ -1614,6 +1615,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             sa.registerStatsSource(StatsSelector.SHUTDOWN_CHECK, 0, new ShutdownActivityStats());
             sa.registerStatsSource(StatsSelector.STOP_CHECK, 0, new StopActivityStats());
             sa.registerStatsSource(StatsSelector.PAUSE_CHECK, 0, new PauseActivityStats());
+            sa.registerStatsSource(StatsSelector.XDCR_READINESS, 0, new XDCRReadinessStats());
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2

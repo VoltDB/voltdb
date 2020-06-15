@@ -21,6 +21,8 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.CommandLog;
 import org.voltdb.DRConsumerStatsBase;
@@ -29,11 +31,9 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.Cartographer;
-import org.voltdb.export.ExportManagerInterface;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 
 /**
  * Activity stats helper class. This holds methods that collect

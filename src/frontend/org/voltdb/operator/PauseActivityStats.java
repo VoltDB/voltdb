@@ -19,13 +19,11 @@ package org.voltdb.operator;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Set;
 
-import org.voltdb.StatsSelector;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * The PauseActivityStats statistics provide a summary of current

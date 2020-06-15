@@ -78,7 +78,8 @@ public enum StatsSelector {
     // Activity summary for use by 'operator' functions
     SHUTDOWN_CHECK,
     STOP_CHECK,
-    PAUSE_CHECK;
+    PAUSE_CHECK,
+    XDCR_READINESS;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;
