@@ -693,12 +693,7 @@ public class JDBCExportClient extends ExportClientBase {
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            m_es.shutdown();
-            try {
-                m_es.awaitTermination(356, TimeUnit.DAYS);
-            } catch (InterruptedException e) {
-                Throwables.propagate(e);
-            }
+            m_es.shutdownNow();
             closeConnection();
         }
     }
