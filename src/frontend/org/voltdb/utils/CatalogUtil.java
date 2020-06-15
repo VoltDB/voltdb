@@ -1444,7 +1444,7 @@ public abstract class CatalogUtil {
         TopicsType topics = deployment.getTopics();
         if (topics == null) {
             topics = new TopicsType();
-            topics.setEnabled(false);
+            topics.setEnabled(true);
             deployment.setTopics(topics);
         }
         TopicProfilesType profiles = deployment.getTopics().getProfiles();
