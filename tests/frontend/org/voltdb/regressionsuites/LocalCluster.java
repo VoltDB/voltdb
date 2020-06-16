@@ -2366,7 +2366,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // verify the presence of messages in the log from specified host
-    private boolean logMessageContains(int hostId, List<String> patterns) {
+    public boolean logMessageContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 
