@@ -135,6 +135,9 @@ public class KafkaClientVerifier {
 
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
+        
+        @Option(desc = "Filename to write periodic stat infomation in CSV format")
+        Integer loop = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
         Integer timeout = 60;
@@ -512,21 +515,23 @@ public class KafkaClientVerifier {
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
         Boolean metadata = config.metadata;
-        try {
-            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
-                config.partitionfield, config.usetableexport, metadata, config.count);
-        } catch (IOException e) {
-            log.error(e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
-        } catch (ValidationErr e) {
-            log.error("in Validation: " + e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
-        } catch (Exception e) {
-            log.error("in Application: " + e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
+        for (int i = config.loop; i < 0; i--) {
+            try {
+                verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
+                        config.partitionfield, config.usetableexport, metadata, config.count);
+            } catch (IOException e) {
+                log.error(e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            } catch (ValidationErr e) {
+                log.error("in Validation: " + e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            } catch (Exception e) {
+                log.error("in Application: " + e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            }
         }
 
         if (verifier.testGood.get()) {
