@@ -343,6 +343,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         if (!MiscUtils.isPro()) {
             return;
         }
+        deleteTestFiles(TESTNONCE);
         createCluster("testSnapshotSaveRestoreWithoutCL", 2, 3, 18);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
@@ -365,13 +366,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 client.callProcedure("mp.insert",i,i);
             }
             client.drain();
-
-            File tempDir = new File(TMPDIR);
-            if (!tempDir.exists()) {
-                assertTrue(tempDir.mkdirs());
-            }
-            deleteTestFiles(TESTNONCE);
-
             System.out.println("Saving snapshot...");
             ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
             vt = resp.getResults()[0];
