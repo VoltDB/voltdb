@@ -95,47 +95,36 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     /** Verify that non-latin-1 characters can be stored and retrieved */
-    public void testUTF8() throws IOException {
+    public void testUTF8() throws Exception {
         Client client = getClient();
         final String testString = "並丧";
-        try {
-            client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
-            VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
+        client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
+        VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
-            assertEquals(5, results.length);
+        assertEquals(5, results.length);
 
-            // get the order line table
-            VoltTable table = results[2];
-            assertEquals(table.getColumnName(0), "OL_O_ID");
-            assertTrue(table.getRowCount() == 1);
-            VoltTableRow row = table.fetchRow(0);
-            String resultString = row.getString("OL_DIST_INFO");
-            assertEquals(testString, resultString);
+        // get the order line table
+        VoltTable table = results[2];
+        assertEquals(table.getColumnName(0), "OL_O_ID");
+        assertTrue(table.getRowCount() == 1);
+        VoltTableRow row = table.fetchRow(0);
+        String resultString = row.getString("OL_DIST_INFO");
+        assertEquals(testString, resultString);
 
-            // reset
-            client.callProcedure("@AdHoc", "delete from ORDER_LINE;");
+        // reset
+        client.callProcedure("@AdHoc", "delete from ORDER_LINE;");
 
-            // Intentionally using a one byte string to make sure length preceded strings are handled correctly in the EE.
-            client.callProcedure("ORDER_LINE.insert", 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1.5, "a");
-            client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
-            client.callProcedure("ORDER_LINE.insert", 3L, 1L, 1L, 3L, 3L, 3L, 3L, 3L, 1.5, "def");
-            results = client.callProcedure("SelectOrderLineByDistInfo", testString).getResults();
-            assertEquals(1, results.length);
-            table = results[0];
-            assertTrue(table.getRowCount() == 1);
-            row = table.fetchRow(0);
-            resultString = row.getString("OL_DIST_INFO");
-            assertEquals(testString, resultString);
-
-        }
-        catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
+        // Intentionally using a one byte string to make sure length preceded strings are handled correctly in the EE.
+        client.callProcedure("ORDER_LINE.insert", 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1.5, "a");
+        client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
+        client.callProcedure("ORDER_LINE.insert", 3L, 1L, 1L, 3L, 3L, 3L, 3L, 3L, 1.5, "def");
+        results = client.callProcedure("SelectOrderLineByDistInfo", testString).getResults();
+        assertEquals(1, results.length);
+        table = results[0];
+        assertTrue(table.getRowCount() == 1);
+        row = table.fetchRow(0);
+        resultString = row.getString("OL_DIST_INFO");
+        assertEquals(testString, resultString);
     }
 
     public void testBatchedMultipartitionTxns() throws IOException, ProcCallException {
@@ -150,25 +139,21 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(1, results[4].getRowCount());
     }
 
-    public void testLongStringUsage() throws IOException {
+    public void testLongStringUsage() throws Exception {
         final int STRLEN = 5000;
 
         Client client = getClient();
 
         String longStringPart = "volt!";
         StringBuilder sb = new StringBuilder();
-        while(sb.length() < STRLEN)
+        while(sb.length() < STRLEN) {
             sb.append(longStringPart);
+        }
         String longString = sb.toString();
         assertEquals(STRLEN, longString.length());
 
         VoltTable[] results = null;
-        try {
-            results = client.callProcedure("WorkWithBigString", 1, longString).getResults();
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        }
+        results = client.callProcedure("WorkWithBigString", 1, longString).getResults();
         assertEquals(1, results.length);
         VoltTableRow row = results[0].fetchRow(0);
 
@@ -183,8 +168,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         String longStringPart = "volt!";
         StringBuilder sb = new StringBuilder();
-        while(sb.length() < STRLEN)
+        while(sb.length() < STRLEN) {
             sb.append(longStringPart);
+        }
         String longString = sb.toString();
         assertEquals(STRLEN, longString.length());
 
@@ -345,31 +331,15 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
-        boolean caught;
-
-        caught = false;
-        try {
-            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) UNION (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
-        } catch (ProcCallException e) {
-            caught = true;
-        }
-        assertTrue(caught);
-
-        caught = false;
-        try {
-            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) INTERSECT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
-        } catch (ProcCallException e) {
-            caught = true;
-        }
-        assertTrue(caught);
-
-        caught = false;
-        try {
-            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) EXCEPT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
-        } catch (ProcCallException e) {
-            caught = true;
-        }
-        assertTrue(caught);
+        executeBadSql(client,
+                "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) UNION (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);",
+                "Statements are too complex in set operation using multiple partitioned tables");
+        executeBadSql(client,
+                "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) INTERSECT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);",
+                "Statements are too complex in set operation using multiple partitioned tables");
+        executeBadSql(client,
+                "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) EXCEPT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);",
+                "Statements are too complex in set operation using multiple partitioned tables");
     }
 
     public void testMultiStmtProc() throws Exception {
@@ -419,6 +389,32 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{2, "updated"}}, vt[0]);
     }
 
+    /*
+     * Test that order by statements can not contain constants or references to values other than columns which are part
+     * of the select
+     */
+    public void testInvalidOrderByTypes() throws Exception {
+        Client client = getClient();
+        executeBadSql(client, "SELECT * FROM ITEM ORDER BY -1;", "ORDER BY cannot contain constant values");
+        executeBadSql(client, "SELECT * FROM ITEM A WHERE A.I_ID = (SELECT NO_O_ID FROM NEW_ORDER ORDER BY A.I_ID)",
+                "ORDER BY cannot contain references to columns or values which are not involved in the current select");
+    }
+
+    /*
+     * Assert that statement encounters an error and that the error is the expected error
+     */
+    private void executeBadSql(Client client, String statement, String errorMsg) throws IOException {
+        try {
+            client.callProcedure("@AdHoc", statement);
+            fail("Should have thrown ProcCallException: " + statement);
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(
+                    "Expected error message to contain: " + errorMsg + " but it was: "
+                            + e.getClientResponse().getStatusString(),
+                    e.getClientResponse().getStatusString().contains(errorMsg));
+        }
+    }
     // procedures used by these tests
     static final Class<?>[] MP_PROCEDURES = {
         FeaturesSelectAll.class, SelectOrderLineByDistInfo.class,
