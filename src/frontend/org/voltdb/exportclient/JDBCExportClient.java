@@ -71,6 +71,7 @@ public class JDBCExportClient extends ExportClientBase {
             new AtomicReference<Map<URI,RefCountedDS>>(ImmutableMap.<URI,RefCountedDS>of());
 
     private static final String SQLSTATE_UNIQUE_VIOLATION = "23505";
+    private final static int SHUTDOWN_TIMEOUT_S = 60;
 
     private static enum DatabaseType {
         POSTGRES
@@ -695,11 +696,29 @@ public class JDBCExportClient extends ExportClientBase {
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             m_es.shutdown();
             try {
-                m_es.awaitTermination(356, TimeUnit.DAYS);
+                if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_S, TimeUnit.SECONDS)) {
+                    // In case that jdbc connection is not responsive, force out
+                    forceExecutorShutdown();
+                    return;
+                }
             } catch (InterruptedException e) {
-                Throwables.propagate(e);
+                // We are in the UAC path and don't want to throw exception for this condition;
+                // just force the shutdown.
+                m_logger.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
+                forceExecutorShutdown();
+                return;
             }
             closeConnection();
+        }
+
+        private void forceExecutorShutdown() {
+            m_logger.warn("Forcing executor shutdown on source: " + m_source);
+            closeConnection();
+            try {
+                m_es.shutdownNow();
+            } catch (Exception e) {
+                m_logger.error("Failed to force executor shutdown on source: " + m_source, e);
+            }
         }
     }
 
