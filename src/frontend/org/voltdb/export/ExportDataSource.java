@@ -793,6 +793,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_closed) {
             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                     EstTime.currentTimeMillis());
+            if (cont != null) {
+                cont.discard();
+            }
             return;
         }
 
@@ -835,6 +838,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //We are shutting down very much rolling generation so dont passup for error reporting.
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Export buffer rejected by data source executor: ", rej);
+            }
+            if (cont != null) {
+                cont.discard();
             }
         }
     }

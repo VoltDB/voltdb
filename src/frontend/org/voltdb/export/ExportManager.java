@@ -670,6 +670,9 @@ public class ExportManager
             long bufferPtr,
             BBContainer cont,
             boolean sync) {
+        if (cont != null) {
+            cont.tag("pushExportBuffer");
+        }
         ExportManager instance = instance();
         try {
             ExportGeneration generation = instance.m_generation.get();
