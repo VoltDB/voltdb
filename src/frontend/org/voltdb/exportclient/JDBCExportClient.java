@@ -825,18 +825,21 @@ public class JDBCExportClient extends ExportClientBase {
                 if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_S, TimeUnit.SECONDS)) {
                     // In case that jdbc connection is not responsive, force out
                     forceExecutorShutdown();
+                    return;
                 }
             } catch (InterruptedException e) {
                 // We are in the UAC path and don't want to throw exception for this condition;
                 // just force the shutdown.
                 m_logger.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
                 forceExecutorShutdown();
+                return;
             }
             closeConnection();
         }
 
         private void forceExecutorShutdown() {
             m_logger.warn("Forcing executor shutdown on source: " + m_source);
+            closeConnection();
             try {
                 m_es.shutdownNow();
             } catch (Exception e) {
