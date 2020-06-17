@@ -98,7 +98,7 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
         CatalogAndDeployment cad = null;
         try {
             cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(),
-                    nextCatalogVersion + 1);
+                    nextCatalogVersion);
         } catch (KeeperException | InterruptedException e) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
                     "unexpected error reading staging catalog from zookeeper: " + e);
