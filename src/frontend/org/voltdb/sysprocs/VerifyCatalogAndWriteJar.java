@@ -88,7 +88,7 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     public final static long TIMEOUT = getTimeoutValue();
 
 
-    public CompletableFuture<ClientResponse> run(String encodedDiffCommands, int expectedCatalogVersion)
+    public CompletableFuture<ClientResponse> run(String encodedDiffCommands, int nextCatalogVersion)
     {
         // This should only be called once on each host
         String diffCommands = CompressionService.decodeBase64AndDecompress(encodedDiffCommands);
@@ -98,7 +98,7 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
         CatalogAndDeployment cad = null;
         try {
             cad = CatalogUtil.getStagingCatalogFromZK(VoltDB.instance().getHostMessenger().getZK(),
-                    expectedCatalogVersion + 1);
+                    nextCatalogVersion + 1);
         } catch (KeeperException | InterruptedException e) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
                     "unexpected error reading staging catalog from zookeeper: " + e);
