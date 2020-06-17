@@ -1373,7 +1373,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader && msg.requireAck()) {
+        if (!m_isLeader && msg.requireAck() && msg.getSPIHSId() != m_mailbox.getHSId()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
