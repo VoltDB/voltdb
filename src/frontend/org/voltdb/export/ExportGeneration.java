@@ -46,7 +46,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
@@ -736,14 +736,14 @@ public class ExportGeneration {
 
     public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, int tupleCount, long uniqueId,
-            ByteBuffer buffer, boolean sync) {
+            BBContainer cont, boolean sync) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
             exportLog.error("PUSH Could not find export data sources for partition "
                     + partitionId + ". The export data is being discarded.");
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (cont != null) {
+                cont.discard();
             }
             return;
         }
@@ -758,13 +758,13 @@ public class ExportGeneration {
                     "seq: " + startSequenceNumber + ", count: " + tupleCount +
                     ") is being discarded.",
                     EstTime.currentTimeMillis());
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
+            if (cont != null) {
+                cont.discard();
             }
             return;
         }
 
-        source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);
+        source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, cont, sync);
     }
 
     private void cleanup() {

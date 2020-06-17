@@ -45,7 +45,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
@@ -710,7 +709,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             long startSequenceNumber,
             int tupleCount,
             long uniqueId,
-            ByteBuffer buffer,
+            BBContainer cont,
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
@@ -718,11 +717,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("pushExportBufferImpl [" + startSequenceNumber + "," +
                     lastSequenceNumber + "], poll=" + poll + " m_tupleCount=" + m_tupleCount);
         }
-        if (buffer != null) {
+        if (cont != null) {
             // header space along is 8 bytes
-            assert (buffer.capacity() > StreamBlock.HEADER_SIZE);
-            buffer.order(ByteOrder.LITTLE_ENDIAN);
-            final BBContainer cont = DBBPool.wrapBB(buffer);
+            assert (cont.b().capacity() > StreamBlock.HEADER_SIZE);
+            cont.b().order(ByteOrder.LITTLE_ENDIAN);
 
             // Count the tuples even if already acked by another replica
             assert(lastSequenceNumber > m_tupleCount);
@@ -750,7 +748,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             try {
                 StreamBlock sb = new StreamBlock(
-                        new BBContainer(buffer) {
+                        new BBContainer(cont.b()) {
                             @Override
                             public void discard() {
                                 checkDoubleFree();
@@ -790,7 +788,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final long startSequenceNumber,
             final int tupleCount,
             final long uniqueId,
-            final ByteBuffer buffer,
+            final BBContainer cont,
             final boolean sync) {
         if (m_closed) {
             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
@@ -810,7 +808,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_closed) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, cont, m_readyForPolling);
                         } else {
                             exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
                                     EstTime.currentTimeMillis());

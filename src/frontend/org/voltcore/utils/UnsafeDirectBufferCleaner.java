@@ -16,10 +16,10 @@
  */
 
 package org.voltcore.utils;
-import sun.misc.Unsafe;
-
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+
+import sun.misc.Unsafe;
 
 /**
  * {@link DirectBufferCleaner} implementation based on {@code Unsafe.invokeCleaner} method.
@@ -40,8 +40,7 @@ public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
     }
 
     @Override
-    public boolean clean(ByteBuffer buf) {
+    public void clean(ByteBuffer buf) {
         VoltUnsafe.invoke(invokeCleanerMtd, buf);
-        return true;
     }
 }

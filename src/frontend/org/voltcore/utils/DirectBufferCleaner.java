@@ -27,5 +27,5 @@ public interface DirectBufferCleaner {
      *
      * @param buf direct buffer.
      */
-    public boolean clean(ByteBuffer buf);
+    public void clean(ByteBuffer buf);
 }

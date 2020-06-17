@@ -22,14 +22,13 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionCommitInterest;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Stub class that provides a gateway to the DRProducer when
@@ -176,17 +175,13 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
     public void onSuccessfulProcedureCall(StoredProcedureInvocation spi) {}
     public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
     public long onBinaryDR(long lastCommittedSpHandle, int partitionId, long startSequenceNumber, long lastSequenceNumber,
-                           long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
-        final BBContainer cont = DBBPool.wrapBB(buf);
-        DBBPool.registerUnsafeMemory(cont.address());
+                           long lastSpUniqueId, long lastMpUniqueId, EventType eventType, BBContainer cont) {
         cont.discard();
         return -1;
     }
 
-    public void onPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+    public void onPoisonPill(int partitionId, String reason, BBContainer cont) {
         m_debugDetectedPoisonPill = true;
-        final BBContainer cont = DBBPool.wrapBB(failedBuf);
-        DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
     }
 
@@ -201,21 +196,21 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
             long lastSpUniqueId,
             long lastMpUniqueId,
             int eventType,
-            ByteBuffer buf) {
+            BBContainer cont) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             return -1;
         }
         return pdrg.onBinaryDR(lastCommittedSpHandle, partitionId, startSequenceNumber, lastSequenceNumber,
-                lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
+                lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], cont);
     }
 
-    public static void pushPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+    public static void pushPoisonPill(int partitionId, String reason, BBContainer cont) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             return;
         }
-        pdrg.onPoisonPill(partitionId, reason, failedBuf);
+        pdrg.onPoisonPill(partitionId, reason, cont);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

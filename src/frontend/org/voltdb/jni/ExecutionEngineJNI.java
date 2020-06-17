@@ -129,7 +129,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /*
      * For large result sets the EE will allocate new memory for the results
-     * and invoke a callback to set the allocated memory here.
+     * and invoke a callback to set the allocated memory here. This buffer will
+     * be deallocated by EE as well.
      */
     private ByteBuffer m_fallbackBuffer = null;
 
@@ -758,7 +759,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /*
      * Instead of using the reusable output buffer to get results for the next batch,
-     * use this buffer allocated by the EE. This is for one time use.
+     * use this buffer allocated by the EE. This is for one time use and is deallocated by EE.
      */
     public void fallbackToEEAllocatedBuffer(ByteBuffer buffer) {
         assert(buffer != null);

@@ -16,10 +16,10 @@
  */
 package org.voltdb.export;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
@@ -37,7 +37,7 @@ public interface Generation {
     public void onSourceDone(int partitionId, String signature);
 
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
-                                 long uniqueId, ByteBuffer buffer, boolean sync);
+                                 long uniqueId, BBContainer cont, boolean sync);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 StreamStartAction action,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition);
