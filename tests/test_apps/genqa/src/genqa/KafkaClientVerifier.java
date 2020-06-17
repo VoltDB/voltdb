@@ -137,7 +137,7 @@ public class KafkaClientVerifier {
         String csvfile = "";
         
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
-        Integer loop = 1;
+        Integer loops = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
         Integer timeout = 60;
@@ -515,7 +515,8 @@ public class KafkaClientVerifier {
         final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
         Boolean metadata = config.metadata;
-        for (int i = config.loop; i < 0; i--) {
+        for (int i = config.loops; i > 0; i--) {
+            log.info("+++ Loops: " + i);
             try {
                 verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
                         config.partitionfield, config.usetableexport, metadata, config.count);
