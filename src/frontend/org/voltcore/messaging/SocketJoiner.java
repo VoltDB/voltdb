@@ -99,7 +99,7 @@ public class SocketJoiner {
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
     private static final int NAME_LOOKUP_RETRY_MS = 1000;
-    private static final int SOCKET_CONNECT_RETRY_MS = 1000;
+    private static final int SOCKET_CONNECT_RETRY_MS = 250;
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
 
@@ -277,7 +277,7 @@ public class SocketJoiner {
             try {
                 leaderAddr = addressFromHost(leader); // may throw for unresolved host name
                 if (leaderAddr.getPort() == m_internalPort) {
-                    hostLog.info("Attempting to bind to leader ip " + leaderAddr.getAddress());
+                    hostLog.info("Attempting to bind to leader ip " + leaderAddr.getAddress().getHostAddress());
                     ServerSocketChannel listenerSocket = ServerSocketChannel.open();
                     listenerSocket.socket().bind(leaderAddr);
                     listenerSocket.socket().setPerformancePreferences(0, 2, 1);
@@ -585,6 +585,7 @@ public class SocketJoiner {
         SocketChannel sc = null;
         while ((sc = ssc.accept()) != null) {
             boolean success = false;
+            boolean active = false;
             try {
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
@@ -611,6 +612,7 @@ public class SocketJoiner {
                     jsObj = readJSONObjFromWire(messagingChannel);
                 }
 
+                active = true;  // we've got a live one
                 LOG.info(jsObj.toString(2));
 
                 // get the connecting node's version string
@@ -669,10 +671,12 @@ public class SocketJoiner {
                 }
                 success = true;
             } catch (IOException e) {
-                LOG.info("IOException occurred while handling new client connection " + sc
-                        + ". Client will most likely retry: " + e);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("", e);
+                String msg = "IOException occurred while handling new client connection " + sc
+                    + ". Client will most likely retry: " + e;
+                if (active) {
+                    LOG.info(msg);
+                } else { // skip info logging if connection never really got started
+                    LOG.debug(msg);
                 }
             } finally {
                 // do not leak sockets when exception happens
