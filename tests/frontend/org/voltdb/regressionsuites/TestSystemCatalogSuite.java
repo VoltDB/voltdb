@@ -29,8 +29,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import junit.framework.Test;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
@@ -39,6 +37,8 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestSystemCatalogSuite extends RegressionSuite {
 
@@ -72,17 +72,24 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         // is backed by java.util.TreeMap
         results.advanceRow();
         assertEquals("AA_T", results.get("TABLE_NAME", VoltType.STRING));
-        assertEquals("{\"partitionColumn\":\"A1\",\"drEnabled\":\"true\"}", results.get("REMARKS", VoltType.STRING));
+        JSONObject json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
+        assertTrue(json != null && json.length() == 2 &&
+                json.get("drEnabled").equals("true") &&
+                json.get("partitionColumn").equals("A1"));
 
         results.advanceRow();
         assertEquals("BB_V", results.get("TABLE_NAME", VoltType.STRING));
-        assertEquals(new JSONObject("{\"partitionColumn\":\"A1\",\"sourceTable\":\"AA_T\"}").toString(), results.get("REMARKS", VoltType.STRING));
+        json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
+        assertTrue(json != null && json.length() == 2 &&
+                json.get("partitionColumn").equals("A1") &&
+                json.get("sourceTable").equals("AA_T"));
 
         results.advanceRow();
         assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
-        assertEquals("{\"partitionColumn\":\"A1\","
-                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;\"}",
-                results.get("REMARKS", VoltType.STRING));
+        json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
+        assertTrue(json != null && json.length() == 2 &&
+                json.get("limitPartitionRowsDeleteStmt").equals("DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;") &&
+                json.get("partitionColumn").equals("A1"));
 
         assertEquals(false, results.advanceRow());
     }
