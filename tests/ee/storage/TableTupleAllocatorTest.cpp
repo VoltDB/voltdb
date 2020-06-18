@@ -910,6 +910,46 @@ void testHookedCompactingChunksBatchRemove_multi2() {
     alloc.template thaw<truth>();
 }
 
+/**
+ * Prior to freezing, allocate a non-full chunk, then freeze and
+ * remove all allocated tuples; allocate again, and verify both
+ * views.
+ */
+template<typename Chunk, gc_policy pol>
+void testHookedCompactingChunksBatchRemove_multi3() {
+    using HookAlloc = NonCompactingChunks<Chunk>;
+    using Hook = TxnPreHook<HookAlloc, HistoryRetainTrait<pol>>;
+    using Alloc = HookedCompactingChunks<Hook>;
+    using Gen = StringGen<TupleSize>;
+    Gen gen;
+    Alloc alloc(TupleSize);
+    varray<AllocsPerChunk * 3> addresses;
+    size_t i;
+    for(i = 0; i < AllocsPerChunk / 2; ++i) {
+        memcpy(const_cast<void*>(addresses[i] = alloc.allocate()), gen.get(), TupleSize);
+    }
+    auto const& iter = alloc.template freeze<truth>();
+    remove_multiple(alloc, addresses.cbegin(), next(addresses.cbegin(), AllocsPerChunk / 2));
+    assert(alloc.empty());
+    for (; i < AllocsPerChunk * 3; ++i) {
+        memcpy(const_cast<void*>(addresses[i] = alloc.allocate()), gen.get(), TupleSize);
+    }
+    // verify snapshot view
+    i = 0;
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_hooked_iterator>(
+            static_cast<const Alloc&>(alloc), [&i](void const* p) { assert(Gen::same(p, i++)); });
+    assert(i == AllocsPerChunk / 2);
+    // verify txn view
+    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+            static_cast<const Alloc&>(alloc), [&i](void const* p) { assert(Gen::same(p, i++)); });
+    assert(i == AllocsPerChunk * 3);
+    // clear again before thaw
+    remove_multiple(alloc, next(addresses.cbegin(), AllocsPerChunk / 2), addresses.cend());
+    assert(alloc.empty());
+    alloc.template thaw<truth>();
+    assert(alloc.empty());
+}
+
 template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
     inline void operator()() const {
         testHookedCompactingChunks<Chunk, pol>();
@@ -921,6 +961,7 @@ template<typename Chunk, gc_policy pol> struct TestHookedCompactingChunks2 {
         testHookedCompactingChunksBatchRemove_single4<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi1<Chunk, pol>();
         testHookedCompactingChunksBatchRemove_multi2<Chunk, pol>();
+        testHookedCompactingChunksBatchRemove_multi3<Chunk, pol>();
     }
 };
 template<typename Chunk> struct TestHookedCompactingChunks1 {

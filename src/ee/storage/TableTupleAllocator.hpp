@@ -222,7 +222,6 @@ namespace voltdb {
             ChunkHolder(ChunkHolder const&) = delete;  // non-copyable, non-assignable, non-moveable
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
-            bool valid(bool compact) const noexcept;
         public:
             constexpr static allocator_enum_type const enum_type = T;
             ChunkHolder(id_type id, size_t tupleSize, size_t chunkSize);
@@ -237,8 +236,7 @@ namespace voltdb {
             void*const range_right() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
-            allocator_type<T>& get_allocator() noexcept;               // TODO: needed?
-            allocator_type<T> const& get_allocator() const noexcept;
+            bool valid(bool compact) const noexcept;
         };
 
         /**
@@ -518,7 +516,7 @@ namespace voltdb {
          * A state abstraction of a ChunkHolder.
          */
         class CompactingChunks;
-        class position_type {                          // TODO: more book keepings needed?
+        class position_type {
             id_type const m_chunkId = 0;               // default constructible due to FrozenTxnBoundaries ctor needing to pre-validate
             void const* m_beg = nullptr;
             void const* m_end = nullptr;
