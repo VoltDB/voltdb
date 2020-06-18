@@ -742,7 +742,6 @@ public class SnapshotSiteProcessor {
                                         exp = e;
                                     }
                                     continue;
-//                                    throw new RuntimeException(e);
                                 }
                             }
                             if (!snapshotSucceeded) {
