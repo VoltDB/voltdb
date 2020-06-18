@@ -166,14 +166,14 @@ public final class DBBPool {
 
         public final void tag(final String tag) {
 #ifndef NO_MEMCHECK
-            StringBuilder sb = new StringBuilder(1024);
-            sb.append("<<TAG:").append(m_tags.size()).append(">> ");
-            sb.append(tag).append("\n");
-            sb.append(CoreUtils.throwableToString(new Throwable()));
             synchronized(this) {
                 if (m_tags == null) {
                     m_tags = new ArrayList<String>();
                 }
+                StringBuilder sb = new StringBuilder(1024);
+                sb.append("<<TAG:").append(m_tags.size()).append(">> ");
+                sb.append(tag).append("\n");
+                sb.append(CoreUtils.throwableToString(new Throwable()));
                 m_tags.add(sb.toString());
             }
 #endif
