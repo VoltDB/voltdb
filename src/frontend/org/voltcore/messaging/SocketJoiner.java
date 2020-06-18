@@ -99,6 +99,7 @@ public class SocketJoiner {
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
     private static final int NAME_LOOKUP_RETRY_MS = 1000;
+    private static final int NAME_LOOKUP_RETRY_LIMIT = 10;
     private static final int SOCKET_CONNECT_RETRY_MS = 250;
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
@@ -218,6 +219,7 @@ public class SocketJoiner {
              * the code will retry.
              */
             long retryInterval = RETRY_INTERVAL;
+            int nameRetries = NAME_LOOKUP_RETRY_LIMIT;
             final Random salt = new Random();
             while (true) {
                 InetSocketAddress primary = null;
@@ -227,6 +229,10 @@ public class SocketJoiner {
                     // m_coordIp is now filled in
                     break;
                 } catch (UnknownHostException e) {
+                    if (--nameRetries <= 0) {
+                        warnInfrequently("Unknown host name '%s', no more retries", coordHost);
+                        break; // no more retries; move on to next potential coordinator
+                    }
                     warnInfrequently("Unknown host name '%s', retrying", coordHost);
                     safeSleep(NAME_LOOKUP_RETRY_MS);
                 } catch (SocketRetryException e) {
@@ -780,8 +786,9 @@ public class SocketJoiner {
     private SocketChannel createLeaderSocket(SocketAddress hostAddr)
         throws IOException, SocketRetryException {
 
+        SocketChannel socket = null;
         try {
-            SocketChannel socket = SocketChannel.open();
+            socket = SocketChannel.open();
             socket.socket().connect(hostAddr, 5000);
             return socket;
         }
@@ -790,7 +797,12 @@ public class SocketJoiner {
                | java.net.UnknownHostException
                | java.net.NoRouteToHostException
                | java.net.PortUnreachableException ex) {
+            safeClose(socket);
             throw new SocketRetryException(ex);
+        }
+        catch (Exception ex) {
+            safeClose(socket);
+            throw ex;
         }
     }
 
@@ -969,7 +981,7 @@ public class SocketJoiner {
             // check if the membership request is accepted
             JSONObject responseBody = response.getResponseBody();
             if (!responseBody.optBoolean(ACCEPTED, true)) {
-                socket.close();
+                safeClose(socket);
                 if (!responseBody.optBoolean(MAY_RETRY, false)) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Request to join cluster is rejected: "
