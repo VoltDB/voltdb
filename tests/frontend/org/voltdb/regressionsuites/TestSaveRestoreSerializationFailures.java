@@ -58,7 +58,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SnapshotVerifier;
@@ -67,8 +66,6 @@ import org.voltdb.utils.SnapshotVerifier;
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
 public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
-    private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 11 + SystemTable.values().length; // Must match schema used.
 
     public TestSaveRestoreSerializationFailures(String name) {
         super(name);
@@ -429,7 +426,7 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, "first", null, "SUCCESS", TABLE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, "first", null, "FAILURE", 1 /*first*/);
         }
         catch (Exception ex)
         {

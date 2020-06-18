@@ -52,7 +52,7 @@ public class SnapshotRegistry {
 
         public final String path;
         public final String nonce;
-        public final boolean result; //true success, false failure
+        public SnapshotResult result;
 
         public final long bytesWritten;
 
@@ -79,7 +79,7 @@ public class SnapshotRegistry {
                     this.tables.put(table.getName(), new Table(table.getName(), filename));
                 }
             }
-            result = false;
+            result = SnapshotResult.IN_PROGRESS;
             bytesWritten = 0;
         }
 
@@ -95,15 +95,15 @@ public class SnapshotRegistry {
                 tables.putAll(incomplete.tables);
             }
             long bytesWritten = 0;
-            boolean result = true;
+            boolean success = true;
             for (Table t : tables.values()) {
                 bytesWritten += t.size;
-                if (t.error != null) {
-                    result = false;
+                if (t.writeExp != null || t.serializationExp != null) {
+                    success = false;
                 }
             }
             this.bytesWritten = bytesWritten;
-            this.result = result;
+            this.result = success ? SnapshotResult.SUCCESS : SnapshotResult.FAILURE;
         }
 
         public void setTotalTasks(int total) {
@@ -134,25 +134,6 @@ public class SnapshotRegistry {
             return snapshotTables;
         }
 
-        public List<SnapshotResult> iterateTableErrors() {
-            List<SnapshotResult> snapshotError  = new ArrayList<>();
-            synchronized (tables) {
-                if (tables.isEmpty()) {
-                    return snapshotError;
-                }
-                SnapshotResult sr;
-                if (tables.values().stream().allMatch(t -> t.error == null && t.size != 0)) {
-                    sr = SnapshotResult.SUCCESS;
-                } else if (tables.values().stream().anyMatch(t -> t.error != null && t.size != 0)) {
-                    sr = SnapshotResult.FAILURE;
-                } else {
-                    sr = SnapshotResult.IN_PROGRESS;
-                }
-                snapshotError.add(sr);
-            }
-            return snapshotError;
-        }
-
         public void updateTable(String name, TableUpdater tu) {
             synchronized (tables) {
                 assert(tables.get(name) != null);
@@ -170,20 +151,23 @@ public class SnapshotRegistry {
             public final String name;
             public final String filename;
             public final long size;
-            public final Throwable error;
+            public final Throwable writeExp;
+            public final Throwable serializationExp;
 
             private Table(String name, String filename) {
                 this.name = name;
                 this.filename = filename;
                 size = 0;
-                error = null;
+                writeExp = null;
+                serializationExp = null;
             }
 
-            public Table(Table t, long size, Throwable error) {
+            public Table(Table t, long size, Throwable writeExp, Throwable serializationExp) {
                 this.name = t.name;
                 this.filename = t.filename;
                 this.size = size;
-                this.error = error;
+                this.writeExp = writeExp;
+                this.serializationExp = serializationExp;
             }
         }
     }

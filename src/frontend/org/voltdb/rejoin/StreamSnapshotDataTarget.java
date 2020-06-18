@@ -634,6 +634,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
+    public Throwable getSerializationException() {
+        return m_reportedSerializationFailure;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         // Streamed snapshot targets always need to be closed by the last site

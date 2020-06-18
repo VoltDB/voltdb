@@ -48,6 +48,11 @@ public interface SnapshotDataTarget {
     public void reportSerializationFailure(IOException ex);
 
     /**
+     * Get the first exception that occurred during serialization
+     */
+    public Throwable getSerializationException();
+
+    /**
      * Does this target need to be closed by the last site to finish snapshotting?
      */
     public boolean needsFinalClose();

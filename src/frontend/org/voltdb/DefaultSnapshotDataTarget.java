@@ -590,6 +590,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return SnapshotFormat.NATIVE;
     }
 
+    @Override
+    public IOException getSerializationException() {
+        return m_reportedSerializationFailure;
+    }
+
     /**
      * Get the row count if any, of the content wrapped in the given {@link BBContainer}
      * @param tupleData
