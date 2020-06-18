@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -103,6 +104,9 @@ public class Collector {
 
         @Option(desc = "overwrite output file if it exists")
         boolean force= false;
+
+        @Option(desc = "redirect the binary content of collected files to console")
+        boolean stdout = false;
 
         @Option
         String libPathForTest = "";
@@ -481,7 +485,6 @@ public class Collector {
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
                     String zipPath = folderPath + entryPath;
-                    System.out.println(zipPath + "...");
                     if (pathCounter.containsKey(zipPath)) {
                         Integer pathCount = pathCounter.get(zipPath);
                         pathCounter.put(zipPath, pathCount + 1);
@@ -566,9 +569,24 @@ public class Collector {
 
             zipStream.close();
 
-            long sizeInByte = new File(collectionFilePath).length();
+            File zipFile = new File(collectionFilePath);
+            long sizeInByte = zipFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
-            System.out.println("\nCollection file created in " + collectionFilePath + "; file size: " + sizeStringInKB + " KB");
+            if (m_config.stdout) {
+                InputStream input = new BufferedInputStream(new FileInputStream(collectionFilePath));
+                byte[] buffer = new byte[8192];
+                try {
+                    for (int length = 0; (length = input.read(buffer)) != -1;) {
+                        System.out.write(buffer, 0, length);
+                    }
+                } finally {
+                    input.close();
+                }
+                // Delete the collection file in 'stdout' mode.
+                zipFile.delete();
+            } else {
+                System.out.println("\nCollection file created in " + collectionFilePath + "; file size: " + sizeStringInKB + " KB");
+            }
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -576,7 +594,6 @@ public class Collector {
 
     private static void cmd(ZipOutputStream zipStream, String[] command, String folderPath, String resFilename)
             throws IOException, ZipException {
-        System.out.println(folderPath + resFilename + "...");
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
 
