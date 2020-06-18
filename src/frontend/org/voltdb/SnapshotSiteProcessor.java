@@ -566,13 +566,11 @@ public class SnapshotSiteProcessor {
                         @Override
                         public void run() {
                             try {
-                                SNAP_LOG.info("Attempting to close replicated data target " + tableTask.m_target);
                                 tableTask.m_target.close();
                             } catch (IOException | InterruptedException e) {
                                 m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
-
                         }
                     };
                 m_snapshotTargetTerminators.add(terminatorThread);
@@ -736,15 +734,14 @@ public class SnapshotSiteProcessor {
                             Exception exp = null;
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
-                                    SNAP_LOG.info("Attempting to close data target " + t);
                                     t.close();
                                 } catch (IOException | InterruptedException e) {
                                     snapshotSucceeded = false;
                                     if (exp == null) {
                                         exp = e;
                                     }
+                                    // Ensure all targets get a chance to close.
                                     continue;
-//                                    throw new RuntimeException(e);
                                 }
                             }
                             if (!snapshotSucceeded) {
