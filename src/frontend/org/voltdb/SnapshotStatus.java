@@ -163,10 +163,10 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
         String result;
         if (t.writeExp == null && t.serializationExp == null) {
-            if (t.size == 0) {
-                result = SnapshotResult.IN_PROGRESS.toString();
-            } else {
+            if (s.result == SnapshotResult.SUCCESS) {
                 result = SnapshotResult.SUCCESS.toString();
+            } else {
+                result = SnapshotResult.IN_PROGRESS.toString();
             }
         } else {
             result = SnapshotResult.FAILURE.toString();
