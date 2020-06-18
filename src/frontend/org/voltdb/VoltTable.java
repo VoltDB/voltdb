@@ -1585,7 +1585,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public String toFormattedString(boolean includeColumnNames) {
 
-        final int MAX_PRINTABLE_CHARS = 30;
+        final int MAX_PRINTABLE_CHARS = 90;
         // chose print width for geography column such that it can print polygon in
         // aligned manner with geography column for a polygon up to:
         // a polygon composed of 4 vertices + 1 repeat vertex,
