@@ -172,6 +172,11 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public Throwable getSerializationException() {
+        return m_reportedSerializationFailure;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return m_needsFinalClose;

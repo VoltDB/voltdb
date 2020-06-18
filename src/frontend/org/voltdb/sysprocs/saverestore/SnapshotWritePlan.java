@@ -36,6 +36,7 @@ import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotStatus.SnapshotResult;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
@@ -108,7 +109,8 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
                             return m_snapshotRecord.new Table(
                                 registryTable,
                                 m_sdt.getBytesWritten(), /* Bytes written is shared between multiple stream snapshot tables */
-                                m_sdt.getLastWriteException());
+                                m_sdt.getLastWriteException(),
+                                m_sdt.getSerializationException());
                             }
                     });
                 int tablesLeft = m_numTables.decrementAndGet();
@@ -116,12 +118,17 @@ public abstract class SnapshotWritePlan<C extends SnapshotRequestConfig>
                 if (tablesLeft == 0) {
                     final SnapshotRegistry.Snapshot completed =
                         SnapshotRegistry.finishSnapshot(m_snapshotRecord);
-                    final double duration =
-                        (completed.timeFinished - completed.timeStarted) / 1000.0;
-                    SNAP_LOG.info(
-                            "Snapshot " + m_snapshotRecord.nonce + " finished at " +
-                            completed.timeFinished + " and took " + duration
-                            + " seconds ");
+                    if (completed.result == SnapshotResult.SUCCESS) {
+                        final double duration =
+                            (completed.timeFinished - completed.timeStarted) / 1000.0;
+                        SNAP_LOG.info(
+                                "Snapshot " + m_snapshotRecord.nonce + " finished at " +
+                                completed.timeFinished + " and took " + duration
+                                + " seconds ");
+                    } else {
+                        SNAP_LOG.info(
+                                "Failed to take snapshot " + m_snapshotRecord.nonce);
+                    }
                 }
             }
         }

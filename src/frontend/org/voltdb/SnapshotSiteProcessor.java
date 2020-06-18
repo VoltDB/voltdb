@@ -568,10 +568,7 @@ public class SnapshotSiteProcessor {
                             try {
                                 SNAP_LOG.info("Attempting to close replicated data target " + tableTask.m_target);
                                 tableTask.m_target.close();
-                            } catch (IOException e) {
-                                m_perSiteLastSnapshotSucceded = false;
-                                throw new RuntimeException(e);
-                            } catch (InterruptedException e) {
+                            } catch (IOException | InterruptedException e) {
                                 m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
@@ -736,14 +733,22 @@ public class SnapshotSiteProcessor {
                                     return;
                                 }
                             }
+                            Exception exp = null;
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
                                     SNAP_LOG.info("Attempting to close data target " + t);
                                     t.close();
                                 } catch (IOException | InterruptedException e) {
                                     snapshotSucceeded = false;
-                                    throw new RuntimeException(e);
+                                    if (exp == null) {
+                                        exp = e;
+                                    }
+                                    continue;
+//                                    throw new RuntimeException(e);
                                 }
+                            }
+                            if (!snapshotSucceeded) {
+                                throw new RuntimeException(exp);
                             }
 
                             Runnable r = null;

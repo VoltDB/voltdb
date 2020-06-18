@@ -167,11 +167,13 @@ public class SnapshotSummary extends StatsSource {
                 new SnapshotScanner<SnapshotResult>() {
                     public List<SnapshotResult> flatten(Snapshot s) {
                         // Ignore join and index snapshot
+                        List<SnapshotResult> result  = new ArrayList<>();
                         SnapshotType type = m_typeChecker.getSnapshotType(s.path, s.nonce);
                         if (type == SnapshotType.ELASTIC) {
-                            return new ArrayList<>();
+                            return result;
                         }
-                        return s.iterateTableErrors();
+                        result.add(s.result);
+                        return result;
                     }
                 });
     }

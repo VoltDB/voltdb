@@ -63,6 +63,11 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public Throwable getSerializationException() {
+        return m_reportedSerializationFailure;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return true;
