@@ -135,7 +135,7 @@ public class KafkaClientVerifier {
 
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
-        
+
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         Integer loops = 1;
 
@@ -367,6 +367,7 @@ public class KafkaClientVerifier {
             Integer partitionFieldNum, Boolean usetableexport, Boolean metadata, Integer count) throws Exception {
 
         List<String> topics = new ArrayList<String>();
+        consumedRows.set(0);
         topics.add(topic);
 
         ExecutorService executor = Executors.newFixedThreadPool(consumerGroup.size());
@@ -389,6 +390,7 @@ public class KafkaClientVerifier {
         long wtime = System.currentTimeMillis();
         while (true) {
             cnt = consumedRows.get();
+            log.info("Consumed cnt rows: " + cnt);
             Thread.sleep(5000);
             if (cnt != consumedRows.get()) {
                 long delta = consumedRows.get() - cnt;
@@ -512,10 +514,11 @@ public class KafkaClientVerifier {
         VoltLogger log = new VoltLogger("KafkaClientVerifier.main");
         VerifierCliConfig config = new VerifierCliConfig();
         config.parse(KafkaClientVerifier.class.getName(), args);
-        final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
+        KafkaClientVerifier verifier = null;
+        for (int i = config.loops; i > 0; i--) {
+        verifier = new KafkaClientVerifier(config);
         String fulltopic = config.topicprefix + config.topic;
         Boolean metadata = config.metadata;
-        for (int i = config.loops; i > 0; i--) {
             log.info("+++ Loops: " + i);
             try {
                 verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
