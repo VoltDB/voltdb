@@ -35,7 +35,7 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 
 public class SnapshotSummary extends StatsSource {
 
-    private enum ColumnName {
+    public enum ColumnName {
         NONCE,
         TXNID,
         START_TIME,
