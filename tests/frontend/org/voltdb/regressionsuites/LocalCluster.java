@@ -489,7 +489,7 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
-            if (builder.getKiplingConfiguration().isEnabled()) {
+            if (builder.isKiplingEnabled()) {
                 templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
             }
         }
