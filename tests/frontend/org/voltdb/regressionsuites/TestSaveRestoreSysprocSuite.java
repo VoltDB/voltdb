@@ -3806,6 +3806,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 client.close();
             }
 
+            // Give voltdb 1s to get @SnapshotSave done.
+            Thread.sleep(2000);
+
             // Connect to each host and check @SnapshotStatus.
             // Only one host should say it saved the replicated table we're watching.
             Set<Long> hostIds = new HashSet<>();
