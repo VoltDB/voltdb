@@ -42,7 +42,10 @@ output_help = ('file name to store collect data in compressed format. The defaul
                            'number of days of files to collect (files included are log, crash files), Current day value is 1.',
                            default = 7),
         VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=''),
-        VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False)
+        VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False),
+        VOLT.BooleanOption(None, '--stdout', 'stdout',
+                           'redirect the binary content of collected files to console.',
+                           default = False)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path. (Deprecated. Please use --dir).', absolute = True, optional=True, default=None)
@@ -57,7 +60,8 @@ def collect(runner):
     process_outputfile_args(runner)
 
     runner.args.extend(['--dryrun=' + str(runner.opts.dryrun), '--skipheapdump=' + str(runner.opts.skipheapdump),
-                        '--days=' + str(runner.opts.days), '--force=' + str(runner.opts.force)])
+                        '--days=' + str(runner.opts.days), '--force=' + str(runner.opts.force),
+                        '--stdout=' + str(runner.opts.stdout)])
     runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)
 
 
