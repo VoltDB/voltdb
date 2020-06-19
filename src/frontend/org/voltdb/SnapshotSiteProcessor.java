@@ -183,7 +183,7 @@ public class SnapshotSiteProcessor {
     private final int m_snapshotPriority;
 
     private boolean m_isTruncation;
-    private boolean m_perSiteLastSnapshotSucceded = true;
+    private boolean m_perSiteLastSnapshotSucceeded = true;
 
     /**
      * List of threads to join to block on snapshot completion
@@ -420,7 +420,7 @@ public class SnapshotSiteProcessor {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
-        m_perSiteLastSnapshotSucceded = true;
+        m_perSiteLastSnapshotSucceeded = true;
         m_lastSnapshotTxnId = txnId;
         m_isTruncation = isTruncation;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
@@ -568,7 +568,7 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException | InterruptedException e) {
-                                m_perSiteLastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceeded = false;
                                 throw new RuntimeException(e);
                             }
 
@@ -636,7 +636,7 @@ public class SnapshotSiteProcessor {
                         try {
                             writeFutures.get();
                         } catch (Throwable t) {
-                            if (m_perSiteLastSnapshotSucceded) {
+                            if (m_perSiteLastSnapshotSucceeded) {
                                 if (t instanceof StreamSnapshotTimeoutException ||
                                         t.getCause() instanceof StreamSnapshotTimeoutException) {
                                     //This error is already logged by the watchdog when it generates the exception
@@ -647,7 +647,7 @@ public class SnapshotSiteProcessor {
                                     }
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
                                 }
-                                m_perSiteLastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceeded = false;
                             }
                         }
                     }
