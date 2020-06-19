@@ -149,7 +149,6 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
-import org.voltdb.compiler.deploymentfile.TopicProfilesType;
 import org.voltdb.compiler.deploymentfile.TopicRetentionType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -1244,8 +1243,6 @@ public abstract class CatalogUtil {
         if (fi.getDr() == null) {
             fi.setDr(new FlushIntervalType.Dr());
         }
-        // Kipling topics
-        setTopicDefaults(deployment);
     }
 
     /**
@@ -1364,7 +1361,6 @@ public abstract class CatalogUtil {
 
     private static void validateTopics(Catalog catalog, DeploymentType deployment) {
         CompoundErrors errors = new CompoundErrors();
-        setTopicDefaults(deployment);
 
         // If topics have a threadpool name, validate it exists
         TopicsType topicsType = deployment.getTopics();
@@ -1435,22 +1431,6 @@ public abstract class CatalogUtil {
         }
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
-        }
-    }
-
-    // Set the profile default values
-    private static void setTopicDefaults(DeploymentType deployment) {
-        // Ensure deployment has a default profile with default values
-        TopicsType topics = deployment.getTopics();
-        if (topics == null) {
-            topics = new TopicsType();
-            topics.setEnabled(false);
-            deployment.setTopics(topics);
-        }
-        TopicProfilesType profiles = deployment.getTopics().getProfiles();
-        if (profiles == null) {
-            profiles = new TopicProfilesType();
-            deployment.getTopics().setProfiles(profiles);
         }
     }
 
