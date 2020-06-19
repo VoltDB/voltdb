@@ -634,7 +634,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public Throwable getSerializationException() {
+    public Exception getSerializationException() {
         return m_reportedSerializationFailure;
     }
 
@@ -747,7 +747,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public synchronized Throwable getLastWriteException() {
+    public synchronized Exception getLastWriteException() {
         Exception exception = m_sender.m_lastException;
         if (exception != null) {
             return exception;

@@ -63,7 +63,7 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Throwable getSerializationException() {
+    public Exception getSerializationException() {
         return m_reportedSerializationFailure;
     }
 
@@ -96,7 +96,7 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Throwable getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_lastWriteException;
     }
 

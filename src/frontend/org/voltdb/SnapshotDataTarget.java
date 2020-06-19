@@ -50,7 +50,7 @@ public interface SnapshotDataTarget {
     /**
      * Get the first exception that occurred during serialization
      */
-    public Throwable getSerializationException();
+    public Exception getSerializationException();
 
     /**
      * Does this target need to be closed by the last site to finish snapshotting?
@@ -72,7 +72,7 @@ public interface SnapshotDataTarget {
     /**
      * Get last cached exception that occurred during writes
      */
-    public Throwable getLastWriteException();
+    public Exception getLastWriteException();
 
     /**
      * Get the snapshot format this target uses

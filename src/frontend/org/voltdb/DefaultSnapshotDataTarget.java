@@ -581,7 +581,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public IOException getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_writeException;
     }
 
@@ -591,7 +591,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public IOException getSerializationException() {
+    public Exception getSerializationException() {
         return m_reportedSerializationFailure;
     }
 

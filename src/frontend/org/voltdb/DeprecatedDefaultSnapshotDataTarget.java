@@ -258,7 +258,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Throwable getSerializationException() {
+    public Exception getSerializationException() {
         return m_reportedSerializationFailure;
     }
 
@@ -390,7 +390,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public IOException getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_writeException;
     }
 
