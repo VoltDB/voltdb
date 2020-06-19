@@ -162,11 +162,14 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
         String result;
-        if (t.error == null && t.size == 0) {
-            // still in progress
-            result = SnapshotResult.IN_PROGRESS.toString();
+        if (t.writeExp == null && t.serializationExp == null) {
+            if (s.result == SnapshotResult.SUCCESS) {
+                result = SnapshotResult.SUCCESS.toString();
+            } else {
+                result = SnapshotResult.IN_PROGRESS.toString();
+            }
         } else {
-            result = t.error == null ? SnapshotResult.SUCCESS.toString() : SnapshotResult.FAILURE.toString();
+            result = SnapshotResult.FAILURE.toString();
         }
         rowValues[columnNameToIndex.get("RESULT")] = result;
         rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path, s.nonce).name();

@@ -258,6 +258,11 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public Exception getSerializationException() {
+        return m_reportedSerializationFailure;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return m_needsFinalClose;
@@ -385,7 +390,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public IOException getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_writeException;
     }
 
