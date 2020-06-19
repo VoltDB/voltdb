@@ -448,7 +448,7 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", TABLE_COUNT * SITE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", 2 /* first and second */);
         }
         catch (Exception ex)
         {
