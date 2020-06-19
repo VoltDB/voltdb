@@ -47,7 +47,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.RealVoltDB;
-import org.voltdb.SnapshotSummary;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -574,7 +573,6 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
         VoltTable statusResults[] = client.callProcedure("@Statistics", "SnapshotSummary", 0).getResults();
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
-        assertEquals( SnapshotSummary.ColumnName.values().length, statusResults[0].getColumnCount());
 
         // Validate row count if requested.
         Integer resultRowCount = statusResults[0].getRowCount();
