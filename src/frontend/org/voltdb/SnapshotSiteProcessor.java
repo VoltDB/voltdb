@@ -571,7 +571,6 @@ public class SnapshotSiteProcessor {
                                 m_perSiteLastSnapshotSucceeded = false;
                                 throw new RuntimeException(e);
                             }
-
                         }
                     };
                 m_snapshotTargetTerminators.add(terminatorThread);

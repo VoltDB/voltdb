@@ -448,7 +448,7 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", 2 /*first and second*/);
+            checkSnapshotStatus(client, TMPDIR, "second", null, "SUCCESS", 2 /* first and second */);
         }
         catch (Exception ex)
         {
@@ -587,11 +587,15 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
             results[i] = new SnapshotResult();
             results[i].nonce = statusResults[0].getString("NONCE");
             results[i].txnID = statusResults[0].getLong("TXNID");
+            results[i].path = statusResults[0].getString("PATH");
             results[i].endTime = statusResults[0].getLong("END_TIME");
             results[i].result = statusResults[0].getString("RESULT");
 
             if (nonce.equals(results[i].nonce)) {
                 // Perform requested validation.
+                if (path != null) {
+                    assertEquals(path, results[i].path);
+                }
                 if (endTime != null) {
                     assertEquals(endTime, results[i].endTime);
                 }
