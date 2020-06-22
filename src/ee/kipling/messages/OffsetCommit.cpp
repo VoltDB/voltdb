@@ -41,7 +41,6 @@ void OffsetCommitResponseTopic::write(const int16_t version, SerializeOutput& ou
 }
 
 void OffsetCommitResponse::write(const int16_t version, SerializeOutput& out) const {
-    writeThrottleTime(version, out);
     writeResponses(m_topics, version, out);
 }
 

@@ -38,12 +38,13 @@ public class SnapshotSummary extends StatsSource {
     private enum ColumnName {
         NONCE,
         TXNID,
+        TYPE,
+        PATH,
         START_TIME,
         END_TIME,
         DURATION,
         PROGRESS_PCT,
-        RESULT,
-        TYPE;
+        RESULT;
     }
 
     private static class StatsRow {
@@ -75,11 +76,12 @@ public class SnapshotSummary extends StatsSource {
         while (perHostStats.advanceRow()) {
             String nonce = perHostStats.getString(ColumnName.NONCE.name());
             String result = perHostStats.getString(ColumnName.RESULT.name());
+            String path = perHostStats.getString(ColumnName.PATH.name());
             float progressPct = (float)perHostStats.getDouble(ColumnName.PROGRESS_PCT.name());
-            List<StatsRow> statsRows = snapshotMap.get(nonce);
+            List<StatsRow> statsRows = snapshotMap.get(nonce + path);
             if (statsRows == null) {
                 statsRows = new ArrayList<StatsRow>();
-                snapshotMap.put(nonce, statsRows);
+                snapshotMap.put(nonce + path, statsRows);
             }
             StatsRow row = new StatsRow(perHostStats.cloneRow(), result, progressPct);
             statsRows.add(row);
@@ -116,6 +118,7 @@ public class SnapshotSummary extends StatsSource {
             resultTable.addRow(lastRow.statsRow.getString(ColumnName.NONCE.name()),
                     lastRow.statsRow.getLong(ColumnName.TXNID.name()),
                     lastRow.statsRow.getString(ColumnName.TYPE.name()),
+                    lastRow.statsRow.getString(ColumnName.PATH.name()),
                     startTime,
                     endTime,
                     duration,
@@ -130,6 +133,7 @@ public class SnapshotSummary extends StatsSource {
         columns.add(new ColumnInfo(ColumnName.NONCE.name(), VoltType.STRING));
         columns.add(new ColumnInfo(ColumnName.TXNID.name(), VoltType.BIGINT));
         columns.add(new ColumnInfo(ColumnName.TYPE.name(), VoltType.STRING));
+        columns.add(new ColumnInfo(ColumnName.PATH.name(), VoltType.STRING));
         columns.add(new ColumnInfo(ColumnName.START_TIME.name(), VoltType.BIGINT));
         columns.add(new ColumnInfo(ColumnName.END_TIME.name(), VoltType.BIGINT));
         columns.add(new ColumnInfo(ColumnName.DURATION.name(), VoltType.BIGINT));
@@ -148,6 +152,7 @@ public class SnapshotSummary extends StatsSource {
         rowValues[columnNameToIndex.get(ColumnName.NONCE.name())] = s.nonce;
         rowValues[columnNameToIndex.get(ColumnName.TXNID.name())] = s.txnId;
         rowValues[columnNameToIndex.get(ColumnName.TYPE.name())] = type.name();
+        rowValues[columnNameToIndex.get(ColumnName.PATH.name())] = s.path;
         rowValues[columnNameToIndex.get(ColumnName.START_TIME.name())] = s.timeStarted;
         rowValues[columnNameToIndex.get(ColumnName.END_TIME.name())] = s.timeFinished;
         rowValues[columnNameToIndex.get(ColumnName.PROGRESS_PCT.name())] = (float)s.progress();
@@ -162,11 +167,13 @@ public class SnapshotSummary extends StatsSource {
                 new SnapshotScanner<SnapshotResult>() {
                     public List<SnapshotResult> flatten(Snapshot s) {
                         // Ignore join and index snapshot
+                        List<SnapshotResult> result  = new ArrayList<>();
                         SnapshotType type = m_typeChecker.getSnapshotType(s.path, s.nonce);
                         if (type == SnapshotType.ELASTIC) {
-                            return new ArrayList<>();
+                            return result;
                         }
-                        return s.iterateTableErrors();
+                        result.add(s.result);
+                        return result;
                     }
                 });
     }

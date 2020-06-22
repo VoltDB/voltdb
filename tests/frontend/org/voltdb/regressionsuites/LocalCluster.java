@@ -489,7 +489,7 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
-            if (builder.getKiplingConfiguration().isEnabled()) {
+            if (builder.isKiplingEnabled()) {
                 templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
             }
         }
@@ -2405,7 +2405,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // verify the presence of messages in the log from specified host
-    private boolean logMessageContains(int hostId, List<String> patterns) {
+    public boolean logMessageContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 

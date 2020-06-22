@@ -352,7 +352,6 @@ public class VoltTableUtil {
      */
     public static ByteBuf joinLargeBuffer(VoltTable table) {
         ByteBuf buf;
-        table.resetRowPosition();
         if (table.getRowCount() == 1) {
             boolean hasRow = table.advanceToRow(0);
             assert hasRow;
@@ -360,11 +359,22 @@ public class VoltTableUtil {
         } else {
             CompositeByteBuf compositeBuf = Unpooled.compositeBuffer(table.getRowCount());
             buf = compositeBuf;
-            while (table.advanceRow()) {
-                compositeBuf.addComponent(true, Unpooled.wrappedBuffer(table.getVarbinary(0)));
-            }
+            joinLargeBuffer(table, compositeBuf);
         }
         return buf;
+    }
+
+    /**
+     * Rejoin multiple rows split by {@link #splitLargeBuffer(ByteBuf)} back into a single {@link CompositeByteBuf}
+     *
+     * @param table        With the data in it
+     * @param compositeBuf {@link CompositeByteBuf} to rebuild the buffer in
+     */
+    public static void joinLargeBuffer(VoltTable table, CompositeByteBuf compositeBuf) {
+        table.resetRowPosition();
+        while (table.advanceRow()) {
+            compositeBuf.addComponent(true, Unpooled.wrappedBuffer(table.getVarbinary(0)));
+        }
     }
 
     /**

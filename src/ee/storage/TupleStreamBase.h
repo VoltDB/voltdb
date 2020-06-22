@@ -125,16 +125,16 @@ protected:
     /** Blocks not yet committed and pushed to the top-end */
     std::deque<SB*> m_pendingBlocks;
 
-    /** transaction id of the current (possibly uncommitted) transaction */
-    int64_t m_openSpHandle;
+    /** transaction id of the current (possibly uncommitted) transaction. Could be either TxnId or SpHandle */
+    int64_t m_openTxnId;
 
     int64_t m_openUniqueId;
 
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
-    /** last committed transaction id */
-    int64_t m_committedSpHandle;
+    /** last committed transaction id. Could be either TxnId or SpHandle*/
+    int64_t m_committedTxnId;
 
     /** current committed uso */
     size_t m_committedUso;
@@ -157,10 +157,10 @@ TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
       // this allows initial ticks to succeed after rejoins
-      m_openSpHandle(0),
+      m_openTxnId(0),
       m_openUniqueId(0),
       m_openTransactionUso(0),
-      m_committedSpHandle(0),
+      m_committedTxnId(0),
       m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
@@ -170,8 +170,8 @@ template <class SB>
 void TupleStreamBase<SB>::setDefaultCapacityForTest(size_t capacity)
 {
     vassert(capacity > 0);
-    if (m_uso != 0 || m_openSpHandle != 0 ||
-        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    if (m_uso != 0 || m_openTxnId != 0 ||
+        m_openTransactionUso != 0 || m_committedTxnId != 0)
     {
         throwFatalException("setDefaultCapacity only callable before "
                             "TupleStreamBase is used");
@@ -239,7 +239,7 @@ void TupleStreamBase<SB>::rollbackBlockTo(size_t mark)
                             (intmax_t)mark, (intmax_t)m_uso);
     } else if (mark < m_committedUso) {
         throwFatalException("Truncating committed tuple data: mark %jd, committed USO %jd, current USO %jd, open spHandle %jd, committed spHandle %jd.",
-                            (intmax_t)mark, (intmax_t)m_committedUso, (intmax_t)m_uso, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+                            (intmax_t)mark, (intmax_t)m_committedUso, (intmax_t)m_uso, (intmax_t)m_openTxnId, (intmax_t)m_committedTxnId);
     }
 
     // back up the universal stream counter
@@ -269,7 +269,7 @@ void TupleStreamBase<SB>::rollbackBlockTo(size_t mark)
             }
         }
         if (m_uso == m_committedUso) {
-            m_openSpHandle = m_committedSpHandle;
+            m_openTxnId = m_committedTxnId;
             m_openUniqueId = m_committedUniqueId;
         }
     }
