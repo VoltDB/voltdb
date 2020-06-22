@@ -51,7 +51,6 @@ void OffsetFetchResponseTopic::write(const int16_t version, SerializeOutput& out
 }
 
 OffsetFetchResponse::OffsetFetchResponse(int16_t version, CheckedSerializeInput& in) {
-    readThrottleTime(version, in);
     in.readComponents(version, m_topics);
     if (version >= 2) {
         int16_t error = in.readShort();
@@ -60,7 +59,6 @@ OffsetFetchResponse::OffsetFetchResponse(int16_t version, CheckedSerializeInput&
 }
 
 void OffsetFetchResponse::write(const int16_t version, SerializeOutput& out) const {
-    writeThrottleTime(version, out);
     writeResponses(m_topics, version, out);
     if (version >= 2) {
         writeError(out);

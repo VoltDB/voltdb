@@ -147,9 +147,6 @@ public:
 
     void write(const int16_t version, SerializeOutput& out) const override;
 
-protected:
-    int16_t minThrottleVersion() const override { return 3; }
-
 private:
     // Per topic responses
     std::vector<OffsetCommitResponseTopic> m_topics;
