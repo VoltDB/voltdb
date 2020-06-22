@@ -336,7 +336,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
 
                         // Extract the sp handle of the last committed row in the block, if present
-                        long committedSpHandle = 0L;
+                        long committedTxnId = 0L;
 
                         /*
                          * If there is an error processing the block the decoder thinks is recoverable
@@ -385,8 +385,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                         firstRowOfBlock = false;
                                     }
                                     edb.processRow(row);
-                                    if (committedSpHandle == 0) {
-                                        committedSpHandle = extractCommittedSpHandle(row, cont.getCommittedSeqNo());
+                                    if (committedTxnId == 0) {
+                                        committedTxnId = extractCommittedTxnId(row, cont.getCommittedSeqNo());
                                     }
                                 }
                                 if (row != null) {
@@ -407,10 +407,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 // that container isn't fully consumed. Discard the buffer prematurely
                                 // would cause missing rows in export stream.
                                 if (!m_shutdown && cont != null) {
-                                    if (committedSpHandle != 0) {
+                                    if (committedTxnId != 0) {
                                         // We came across the last committed row in the buffer,
                                         // record its sp handle
-                                        cont.setCommittedSpHandle(committedSpHandle);
+                                        cont.setCommittedTxnId(committedTxnId);
                                     }
                                     cont.discard();
                                     cont = null;
@@ -479,7 +479,7 @@ public class GuestProcessor implements ExportDataProcessor {
      * @param committedSeqNo the sequence number of the last committed row
      * @return
      */
-    private long extractCommittedSpHandle(ExportRow row, long committedSeqNo) {
+    private long extractCommittedTxnId(ExportRow row, long committedSeqNo) {
         long ret = 0;
         if (committedSeqNo == ExportDataSource.NULL_COMMITTED_SEQNO) {
             return ret;

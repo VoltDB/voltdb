@@ -314,12 +314,11 @@ public class SocketJoiner {
                         !m_internalInterface.equals(testAddr.getCanonicalHostName()) &&
                         !m_internalInterface.equals(testAddr.getHostAddress())) {
                         String msg = String.format("The provided internal interface (%s) does not match the "
-                                                   + "specified leader address (%s, %s, %s). "
+                                                   + "specified leader address (%s, %s). "
                                                    + "This will result in either a cluster which fails to start or an unintended network topology. "
                                                    + "The leader will now exit; correct your specified leader and interface and try restarting.",
                                                    m_internalInterface,
                                                    ReverseDNSCache.hostnameOrAddress(testAddr),
-                                                   testAddr.getCanonicalHostName(),
                                                    testAddr.getHostAddress());
                         org.voltdb.VoltDB.crashLocalVoltDB(msg, false, null);
                     }

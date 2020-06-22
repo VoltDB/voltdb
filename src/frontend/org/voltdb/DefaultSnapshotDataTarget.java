@@ -581,13 +581,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public IOException getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_writeException;
     }
 
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.NATIVE;
+    }
+
+    @Override
+    public Exception getSerializationException() {
+        return m_reportedSerializationFailure;
     }
 
     /**

@@ -18,6 +18,7 @@
 #include "storage/ExportTupleStream.h"
 #include "execution/VoltDBEngine.h"
 #include "common/TupleSchema.h"
+#include "common/TxnEgo.h"
 #include "common/UniqueId.hpp"
 
 #include <cstdio>
@@ -65,7 +66,7 @@ void ExportTupleStream::setGenerationIdCreated(int64_t generation) {
  */
 size_t ExportTupleStream::appendTuple(
         VoltDBEngine* engine,
-        int64_t spHandle,
+        int64_t txnId,
         int64_t seqNo,
         int64_t uniqueId,
         const TableTuple &tuple,
@@ -77,14 +78,13 @@ size_t ExportTupleStream::appendTuple(
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
+    if (txnId < m_openTxnId)
     {
         throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
+                "Active transactions moving backwards: openTxnId is %jd, while the append txnId is %jd",
+                (intmax_t)m_openTxnId, (intmax_t)txnId);
     }
-    m_openSpHandle = spHandle;
+    m_openTxnId = txnId;
     m_openUniqueId = uniqueId;
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -116,10 +116,11 @@ size_t ExportTupleStream::appendTuple(
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + streamHeaderSz, m_currBlock->remaining() - streamHeaderSz);
 
     // write metadata columns - data we always write this.
-    io.writeLong(spHandle);
+    io.writeLong(txnId);
     io.writeLong(UniqueId::ts(uniqueId));
     io.writeLong(seqNo);
-    io.writeLong(m_partitionId);
+    // Report the TxnId partition ID
+    io.writeLong(TxnEgo::getPartitionId(txnId));
     io.writeLong(m_siteId);
     // use 1 for INSERT EXPORT op
     io.writeByte(static_cast<int8_t>(type));
@@ -230,15 +231,15 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
 /*
  * Handoff fully committed blocks to the top end.
  */
-void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId)
+void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentTxnId, int64_t uniqueId)
 {
-    vassert(currentSpHandle == m_openSpHandle && uniqueId == m_openUniqueId);
+    vassert(currentTxnId == m_openTxnId && uniqueId == m_openUniqueId);
 
     if (m_uso != m_committedUso) {
         m_committedUso = m_uso;
         m_committedUniqueId = m_openUniqueId;
         // Advance the tip to the new transaction.
-        m_committedSpHandle = m_openSpHandle;
+        m_committedTxnId = m_openTxnId;
         if (m_currBlock->startSequenceNumber() > m_committedSequenceNumber) {
             // Started a new block so reset the flush timeout
             m_lastFlush = UniqueId::tsInMillis(m_committedUniqueId);
@@ -284,19 +285,13 @@ void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block) {
                     block);
 }
 
-void ExportTupleStream::pushEndOfStream() {
-    ExecutorContext::getPhysicalTopend()->pushEndOfStream(
-                    m_partitionId,
-                    m_tableName);
-}
-
 /*
  * Create a new buffer and flush all pending committed data.
  * Creating a new buffer will push all queued data into the
  * pending list for commit to operate against.
  */
 bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
-                                      int64_t lastCommittedSpHandle)
+                                      int64_t lastCommittedTxnId)
 {
     // negative timeInMillis instructs a mandatory flush
     vassert(timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));

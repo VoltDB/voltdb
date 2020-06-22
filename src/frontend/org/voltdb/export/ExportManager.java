@@ -539,14 +539,6 @@ public class ExportManager implements ExportManagerInterface
     }
 
     /*
-     * End of stream indicates that no more data is coming from this source
-     * for this generation.
-     */
-    public static void pushEndOfStream(
-            int partitionId,
-            String tableName) {
-    }
-    /*
      * Push an export buffer
      */
     public static void pushExportBuffer(

@@ -332,7 +332,7 @@ void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
     vassert(m_drStream != NULL);
     vassert(drStream != NULL);
     vassert(m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
-    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openSpHandle);
+    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openTxnId);
     m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
     m_drStream = drStream;
@@ -345,7 +345,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
         return;
     }
     vassert(m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
-    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
+    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openTxnId);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
     m_drReplicatedStream = drReplicatedStream;
