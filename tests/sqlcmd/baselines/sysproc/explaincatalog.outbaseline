@@ -7,8 +7,8 @@ CREATE TABLE EMPLOYEES (
 Command succeeded.
 
 explaincatalog;
-CATALOG                        
--------------------------------
+CATALOG                                                                                    
+-------------------------------------------------------------------------------------------
 add / clusters cluster
 set /clusters#cluster localepoch 1199145600
 set $PREV securityEnabled false
