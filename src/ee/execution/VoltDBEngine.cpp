@@ -245,14 +245,15 @@ VoltDBEngine::~VoltDBEngine() {
             auto eraseThis = tcdIter;
             tcdIter++;
             auto table = eraseThis->second->getPersistentTable();
+            auto stream = eraseThis->second->getStreamedTable();
             bool deleteWithMpPool = false;
-            if (!table) {
+            if (!table && !stream) {
                 VOLT_DEBUG("Partition %d Deallocating %s table", m_partitionId, eraseThis->second->getTable()->name().c_str());
-            } else if(!table->isReplicatedTable()) {
-                VOLT_DEBUG("Partition %d Deallocating partitioned table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
-            } else {
+            } else if((table && table->isReplicatedTable()) || (stream && stream->isReplicatedTable())) {
                 deleteWithMpPool = true;
                 VOLT_DEBUG("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
+            } else {
+                VOLT_DEBUG("Partition %d Deallocating partitioned table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
 
             if (deleteWithMpPool) {
@@ -1371,7 +1372,6 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                         currEngine->m_delegatesByName[tableName] = tcd;
                     }
                 }
-                vassert(tcd->getStreamedTable() == NULL);
             } else {
                 tcd = new TableCatalogDelegate(catalogTable->signature(), m_compactionThreshold, this);
                 // use the delegate to init the table and create indexes n' stuff
@@ -1401,8 +1401,6 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                     streamedTable->setWrapper(NULL);
                     streamedTable->setExportStreamPositions(0, 0, 0);
                 }
-
-
             }
         } else {
             //////////////////////////////////////////////
@@ -1921,21 +1919,23 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         }
         vassert(m_database);
         auto catTable = m_database->tables().get(localTable->name());
+        if (catTable->isreplicated() != updateReplicated) {
+            continue;
+        }
+
         int32_t relativeIndexOfTable = catTable->relativeIndex();
         const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
-            if (updateReplicated) {
-                // This engine is responsible for updating the catalog table maps for all sites.
-                ExecuteWithAllSitesMemory execAllSites;
-                for (auto engineIt : execAllSites) {
-                    EngineLocals& curr = engineIt.second;
-                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                    currEngine->m_tables[relativeIndexOfTable] = localTable;
-                    currEngine->m_tablesByName[tableName] = localTable;
-                }
+            // This engine is responsible for updating the catalog table maps for all sites.
+            ExecuteWithAllSitesMemory execAllSites;
+            for (auto engineIt : execAllSites) {
+                EngineLocals& curr = engineIt.second;
+                VoltDBEngine* currEngine = curr.context->getContextEngine();
+                SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                currEngine->m_tables[relativeIndexOfTable] = localTable;
+                currEngine->m_tablesByName[tableName] = localTable;
             }
-        } else if (! updateReplicated) {
+        } else {
             m_tables[relativeIndexOfTable] = localTable;
             m_tablesByName[tableName] = localTable;
         }
@@ -1947,16 +1947,14 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             if (! tcd->materialized()) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 if (catTable->isreplicated()) {
-                    if (updateReplicated) {
-                        ExecuteWithAllSitesMemory execAllSites;
-                        for (auto engineIt : execAllSites) {
-                            EngineLocals& curr = engineIt.second;
-                            VoltDBEngine* currEngine = curr.context->getContextEngine();
-                            SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                            currEngine->m_tablesBySignatureHash[hash] = persistentTable;
-                        }
+                    ExecuteWithAllSitesMemory execAllSites;
+                    for (auto engineIt : execAllSites) {
+                        EngineLocals& curr = engineIt.second;
+                        VoltDBEngine* currEngine = curr.context->getContextEngine();
+                        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                        currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                     }
-                } else if (! updateReplicated) {
+                } else {
                     m_tablesBySignatureHash[hash] = persistentTable;
                 }
             }
@@ -1964,28 +1962,26 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             // add all of the indexes to the stats source
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
             if (catTable->isreplicated()) {
-                if (updateReplicated) {
-                    ExecuteWithAllSitesMemory execAllSites;
-                    for (auto engineIt : execAllSites) {
-                        EngineLocals& curr = engineIt.second;
-                        VoltDBEngine* currEngine = curr.context->getContextEngine();
-                        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                        if (! fromScratch) {
-                            // This is a swap or truncate and we need to clear the old index stats sources for this table
-                            currEngine->getStatsManager().unregisterStatsSource(
-                                    STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable);
-                            currEngine->getStatsManager().unregisterStatsSource(
-                                    STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable);
-                        }
-                        for (auto index : tindexes) {
-                            currEngine->getStatsManager().registerStatsSource(
-                                    STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable, index->getIndexStats());
-                        }
-                        currEngine->getStatsManager().registerStatsSource(
-                                STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable, stats);
+                ExecuteWithAllSitesMemory execAllSites;
+                for (auto engineIt : execAllSites) {
+                    EngineLocals& curr = engineIt.second;
+                    VoltDBEngine* currEngine = curr.context->getContextEngine();
+                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                    if (! fromScratch) {
+                        // This is a swap or truncate and we need to clear the old index stats sources for this table
+                        currEngine->getStatsManager().unregisterStatsSource(
+                                STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable);
+                        currEngine->getStatsManager().unregisterStatsSource(
+                                STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable);
                     }
+                    for (auto index : tindexes) {
+                        currEngine->getStatsManager().registerStatsSource(
+                                STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable, index->getIndexStats());
+                    }
+                    currEngine->getStatsManager().registerStatsSource(
+                            STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable, stats);
                 }
-            } else if (! updateReplicated) {
+            } else {
                 if (! fromScratch) {
                     // This is a swap or truncate and we need to clear the old index stats sources for this table
                     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable);
@@ -1999,15 +1995,24 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                         relativeIndexOfTable, stats);
             }
         } else {
-            // Streamed tables are all partitioned.
-            if (updateReplicated) {
-                continue;
-            }
             // Streamed tables could not be truncated or swapped, so we will never change this
             // table stats map in a not-from-scratch mode.
             // Before this rebuildTableCollections() is called, pre-built DR conflict tables
             // (which are also streamed tables) should have already been instantiated.
-            else if (fromScratch) {
+            if (!fromScratch) {
+                return;
+            }
+            if (catTable->isreplicated()) {
+                ExecuteWithAllSitesMemory execAllSites;
+                for (auto engineIt : execAllSites) {
+                    EngineLocals& curr = engineIt.second;
+                    VoltDBEngine* currEngine = curr.context->getContextEngine();
+                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                    currEngine->getStatsManager().registerStatsSource(
+                            STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable, stats);
+                }
+            }
+            else {
                 stats = tcd->getStreamedTable()->getTableStats();
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                         relativeIndexOfTable, stats);

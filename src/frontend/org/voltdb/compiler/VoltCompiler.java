@@ -1372,11 +1372,6 @@ public class VoltCompiler {
             compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
-        } else if (tableref.getIsreplicated() && !TableType.needsShadowStream(tableref.getTabletype())) {
-            // if you don't specify partition columns, make
-            // export tables partitioned, but on no specific column (iffy)
-            tableref.setIsreplicated(false);
-            tableref.setPartitioncolumn(null);
         }
         org.voltdb.catalog.ConnectorTableInfo connTableInfo =
                 catconn.getTableinfo().getIgnoreCase(tableName);

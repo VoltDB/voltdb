@@ -1459,7 +1459,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestSQLTypesSuite.class);
 
@@ -1492,7 +1491,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         boolean success;
 
         // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
