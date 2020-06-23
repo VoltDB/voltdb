@@ -344,12 +344,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
-                }
-                // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
-                final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
-                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
+                    // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
+                    final long delta = System.currentTimeMillis() - m_lastDataWrite;
+                    if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
+                        Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                        watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
+                    }
                 }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
