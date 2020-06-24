@@ -267,7 +267,7 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool fallible = true);
 
     void swapTable
            (PersistentTable* otherTable,
@@ -471,7 +471,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
-    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable, bool replicatedTableAction);
+    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
 
     void truncateTableRelease(PersistentTable* originalTable);
 
