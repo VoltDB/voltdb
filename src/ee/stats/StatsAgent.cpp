@@ -110,7 +110,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
-    statsTable->deleteAllTempTuples();
+    statsTable->deleteAllTuples();
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
         multimap<CatalogId, StatsSource*>::const_iterator iter;
