@@ -324,7 +324,7 @@ bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
-        PersistentTable* originalTable, bool replicatedTableAction) {
+        PersistentTable* originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
     if (originalTable->m_tableStreamer != NULL) {
@@ -348,12 +348,13 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
         // update the view table pointer with the original view
         targetTcd->setTable(destTable);
     }
-    decrementRefcount();
 
     // reset base table pointer
     tcd->setTable(originalTable);
 
-    engine->rebuildTableCollections(replicatedTableAction, false);
+    engine->rebuildTableCollections(isReplicatedTable(), false);
+
+    decrementRefcount();
 }
 
 // Decrement each view-based table's reference count.
@@ -403,7 +404,7 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
     return destEmptyTable;
 }
 
-void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, bool fallible) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     if (isPersistentTableEmpty()) {
         // Always log the the truncate if dr is enabled, see ENG-14528.
         drLogTruncate(m_executorContext, fallible);
@@ -536,7 +537,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         engine->setStreamTableByName(m_name, emptyTable->m_shadowStream);
     }
 
-    engine->rebuildTableCollections(replicatedTable, false);
+    engine->rebuildTableCollections(isReplicatedTable(), false);
 
     drLogTruncate(m_executorContext, fallible);
 
@@ -550,7 +551,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
+        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable);
         SynchronizedThreadLock::addTruncateUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
     else {
