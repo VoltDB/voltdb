@@ -23,29 +23,32 @@
 
 package org.voltdb.utils;
 
-import org.junit.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.voltdb.utils.SnapshotComparer.STATUS_INVALID_INPUT;
+import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
+
+import java.io.File;
+import java.io.FilenameFilter;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Random;
+
+import org.junit.After;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Random;
-
-import static org.junit.Assert.*;
-import static org.voltdb.utils.SnapshotComparer.STATUS_INVALID_INPUT;
-import static org.voltdb.utils.SnapshotComparer.STATUS_OK;
 
 public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     protected static final String TMPDIR = "/tmp/Backup";
@@ -76,8 +79,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
         deleteTestFiles(TESTNONCE);
     }
 
-    @Before
-    public void setUp() throws Exception {
+    public void startCluster() throws Exception {
         m_server.startUp();
         m_client = ClientFactory.createClient();
         for (String s : m_server.getListenerAddresses()) {
@@ -114,10 +116,11 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     // positive test
     // Cluster with no rejoin/snapshot should always has same row order
     @Test
-    public void testSimpleSuccess() throws IOException, ProcCallException {
-        if (!MiscUtils.isPro()) {
+    public void testSimpleSuccess() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
             return;
         }
+        startCluster();
         exit.expectSystemExitWithStatus(STATUS_OK);
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
