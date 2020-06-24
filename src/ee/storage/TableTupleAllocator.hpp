@@ -215,13 +215,13 @@ namespace voltdb {
         class ChunkHolder : private allocator_type<T> {
             id_type const m_id;                        // chunk id
             size_t const m_tupleSize;                  // size of a table tuple per allocation
-            void*const m_end;                          // indication of chunk capacity
+            void *const m_end;                         // indication of chunk capacity
         protected:
-            void* m_next;                              // tail of allocation
+            void *m_left, *m_right;                    // left/right boundaries
+            friend class CompactingChunks;             // free(from_tail)
             ChunkHolder(ChunkHolder const&) = delete;  // non-copyable, non-assignable, non-moveable
             ChunkHolder& operator=(ChunkHolder const&) = delete;
             ChunkHolder(ChunkHolder&&) = delete;
-            friend class CompactingChunks;              // for batch free
         public:
             constexpr static allocator_enum_type const enum_type = T;
             ChunkHolder(id_type id, size_t tupleSize, size_t chunkSize);
@@ -232,11 +232,11 @@ namespace voltdb {
             bool empty() const noexcept;
             void*const range_begin() const noexcept;
             void*const range_end() const noexcept;
-            void*const range_next() const noexcept;
+            void*const range_left() const noexcept;
+            void*const range_right() const noexcept;
             size_t tupleSize() const noexcept;
             id_type id() const noexcept;
-            allocator_type<T>& get_allocator() noexcept;
-            allocator_type<T> const& get_allocator() const noexcept;
+            bool valid(bool compact) const noexcept;
         };
 
         /**
@@ -245,6 +245,10 @@ namespace voltdb {
          * locations for future allocations.
          * Since we are keeping a free list of hole spaces, it is
          * only economic to use when tupleSize is large.
+         *
+         * Note also that non-compacting chunks do not alter the
+         * range_left of the chunk; that is only affected by
+         * a compacting chunk.
          */
         class EagerNonCompactingChunk final: public ChunkHolder<> {
             using super = ChunkHolder<>;
@@ -509,31 +513,30 @@ namespace voltdb {
     namespace storage {
 
         /**
-         * Communication channel between TxnPreHook and
-         * HookedCompactingChunks
+         * A state abstraction of a ChunkHolder.
          */
         class CompactingChunks;
         class position_type {
-            id_type const m_chunkId = 0;
-            void const* m_addr = nullptr;
+            id_type const m_chunkId = 0;               // default constructible due to FrozenTxnBoundaries ctor needing to pre-validate
+            void const* m_beg = nullptr;
+            void const* m_end = nullptr;
+            void const* m_left = nullptr;
+            void const* m_right = nullptr;
         public:
-            struct less_address {                      // special comparator on m_addr only
-                bool operator()(position_type const& lhs, position_type const& rhs) const noexcept {
-                    return lhs.address() < rhs.address();
-                }
-            };
-            position_type() noexcept = default;
             position_type(CompactingChunks const&, void const*);
-            position_type(void const*);                // NOTE: only uses this when you know what you are doing
             // NOTE: iterator arg is dereferenced, therefore it
             // *can not* be end().
             template<typename iterator> position_type(void const*, iterator const&);
             position_type(ChunkHolder<> const&) noexcept;
+            position_type() noexcept = default;
             position_type(position_type const&) noexcept = default;
             position_type(position_type&&) noexcept = default;
             position_type& operator=(position_type const&) noexcept;
-            id_type chunkId() const noexcept;
-            void const* address() const noexcept;
+            id_type id() const noexcept;
+            void const* begin() const noexcept;
+            void const* end() const noexcept;
+            void const* left() const noexcept;
+            void const* right() const noexcept;
             bool operator==(position_type const&) const noexcept;
         };
 
@@ -601,22 +604,24 @@ namespace voltdb {
         class CompactingChunks : private ChunkList<CompactingChunk, true_type>, private CompactingStorageTrait {
         public:
             using Compact = true_type;
-            class TxnLeftBoundary final {
+            class BegTxnBoundary final {
                 ChunkList<CompactingChunk, Compact> const& m_chunks;
                 typename ChunkList<CompactingChunk, Compact>::iterator m_iter;
-                void const* m_next;
+                void const* m_left = nullptr;
+                void const* m_right = nullptr;
             public:
-                TxnLeftBoundary(ChunkList<CompactingChunk, Compact>&) noexcept;
+                BegTxnBoundary(ChunkList<CompactingChunk, Compact>&) noexcept;
                 typename ChunkList<CompactingChunk, Compact>::iterator const& iterator() const noexcept;
                 typename ChunkList<CompactingChunk, Compact>::iterator& iterator() noexcept;
                 typename ChunkList<CompactingChunk, Compact>::iterator const&
                     iterator(ChunkList<CompactingChunk, Compact>::iterator const&) noexcept;
-                void const*& range_next() noexcept;
+                void const*& left() noexcept;
+                void const*& right() noexcept;
                 bool empty() const noexcept;
             };
             class FrozenTxnBoundaries final {
-                position_type const m_left{};          // NOTE: need to be empty-constructed, since we need to
-                position_type const m_right{};         // validate ChunkList state before assignment.
+                position_type const m_left;
+                position_type const m_right;
             public:
                 FrozenTxnBoundaries(ChunkList<CompactingChunk, Compact> const&) noexcept;
                 FrozenTxnBoundaries& operator=(FrozenTxnBoundaries const&) noexcept;
@@ -630,8 +635,7 @@ namespace voltdb {
             using list_type = ChunkList<CompactingChunk, Compact>;
             // equivalent to "table id", to ensure injection relation to rw iterator
             id_type const m_id = ChunksIdValidator::instance().id();
-            char const* m_lastFreeFromHead = nullptr;  // arg of previous call to free(from_head, ?)
-            TxnLeftBoundary m_txnFirstChunk;           // (moving) left boundary for txn
+            BegTxnBoundary m_txnFirstChunk;           // (moving) left boundary for txn
             boost::optional<FrozenTxnBoundaries> m_frozenTxnBoundaries{};  // frozen boundaries for txn
             // action before deallocating a tuple from txn (or hook) memory.
             FinalizerAndCopier const m_finalizerAndCopier;
@@ -643,18 +647,18 @@ namespace voltdb {
             typename list_type::iterator releasable();
             void pop_front();
             void pop_back();
-            void pop_finalize(const void*);
+            void pop_finalize(const void*, const void*);
         protected:
             class DelayedRemover {
                 CompactingChunks& m_chunks;
                 class RemovableRegion {
                     using bitset_t = boost::dynamic_bitset<>;
-                    char const* m_beg;
+                    char const* m_left;
                     bitset_t m_mask;
                 public:
-                    RemovableRegion(char const*, size_t, size_t) noexcept;
+                    RemovableRegion(ChunkHolder<> const&, size_t) noexcept;
                     vector<void*> holes(size_t) const noexcept;
-                    char const* range_begin() const noexcept;
+                    char const* left() const noexcept;
                     bitset_t& mask() noexcept;
                     bitset_t const& mask() const noexcept;
                 };
@@ -687,7 +691,6 @@ namespace voltdb {
             } m_batched;
             size_t m_allocs = 0;
             using list_type::last;
-            void pop_frozen();
             template<typename Remove_cb> void clear(Remove_cb const&);
             pair<bool, list_type::iterator> find(void const*, bool) noexcept; // search in txn invisible range, too
             pair<bool, list_type::iterator> find(id_type, bool) noexcept; // search in txn invisible range, too
@@ -712,8 +715,8 @@ namespace voltdb {
             // search in txn memory region (i.e. excludes snapshot-related, front portion of list)
             pair<bool, list_type::iterator> find(void const*) noexcept;
             pair<bool, list_type::iterator> find(id_type) noexcept;
-            TxnLeftBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
-            TxnLeftBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
+            BegTxnBoundary const& beginTxn() const noexcept;   // (moving) txn left boundary
+            BegTxnBoundary& beginTxn() noexcept;               // NOTE: this should really be private. Use it with care!!!
             boost::optional<FrozenTxnBoundaries> const& frozenBoundaries() const noexcept;  // txn boundaries when freezing
             /**
              * Memory operations
@@ -869,8 +872,6 @@ namespace voltdb {
             remove_force(function<void(vector<pair<void*, void const*>> const&)> const&);
             void remove_reset();
             template<typename Tag> void clear();
-            // Debugging aid, only prints in debug build
-            string info(void const*) const;
         };
 
         /**
