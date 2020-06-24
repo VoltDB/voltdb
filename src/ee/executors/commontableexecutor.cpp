@@ -78,7 +78,7 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
         }
 
         // Now prepare for the next iteration...
-        inputTable->deleteAllTempTuples();
+        inputTable->deleteAllTuples();
         inputTable->swapContents(recursiveOutputTable);
 
         // inputTable now has recursive output

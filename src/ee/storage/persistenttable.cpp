@@ -287,7 +287,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     }
 }
 
-void PersistentTable::drLogTruncate(const ExecutorContext* ec, bool fallible) {
+void PersistentTable::drLogTruncate(const ExecutorContext* ec) {
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -296,16 +296,16 @@ void PersistentTable::drLogTruncate(const ExecutorContext* ec, bool fallible) {
                 currentSpHandle, currentUniqueId);
 
         UndoQuantum* uq = ec->getCurrentUndoQuantum();
-        if (uq && fallible) {
+        if (uq) {
             uq->registerUndoAction(
                     new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
         }
     }
 }
 
-void PersistentTable::deleteAllTuples(bool, bool fallible) {
+void PersistentTable::deleteAllTuples() {
     // Instead of recording each tuple deletion, log it as a table truncation DR.
-    drLogTruncate(m_executorContext, fallible);
+    drLogTruncate(m_executorContext);
 
     // Temporarily disable DR binary logging so that it doesn't record the
     // individual deletions below.
@@ -315,7 +315,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
-        deleteTuple(tuple, fallible);
+        deleteTuple(tuple);
     }
 }
 
@@ -404,10 +404,10 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
     return destEmptyTable;
 }
 
-void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
+void PersistentTable::truncateTable(VoltDBEngine* engine) {
     if (isPersistentTableEmpty()) {
         // Always log the the truncate if dr is enabled, see ENG-14528.
-        drLogTruncate(m_executorContext, fallible);
+        drLogTruncate(m_executorContext);
         return;
     }
 
@@ -419,7 +419,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                   << activeTupleCount()
                   << " tuples in " << name() << std::endl;
         // */
-        deleteAllTuples(true, fallible);
+        deleteAllTuples();
         return;
     }
 
@@ -441,7 +441,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                   << activeTupleCount()
                   << " tuples in " << name() << std::endl;
         // */
-        deleteAllTuples(true, fallible);
+        deleteAllTuples();
         return;
     }
 
@@ -475,7 +475,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                       << activeTupleCount()
                       << " tuples in " << name() << std::endl;
             // */
-            deleteAllTuples(true, fallible);
+            deleteAllTuples();
             return;
         }
     }
@@ -521,7 +521,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                                                       engine);
         if (mvHandlerInfo->groupByColumnCount() == 0) {
             // Pre-load a table-wide summary view row.
-            newHandler->catchUpWithExistingData(fallible);
+            newHandler->catchUpWithExistingData(true);
         }
     }
 
@@ -539,15 +539,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     engine->rebuildTableCollections(isReplicatedTable(), false);
 
-    drLogTruncate(m_executorContext, fallible);
+    drLogTruncate(m_executorContext);
 
     UndoQuantum* uq = m_executorContext->getCurrentUndoQuantum();
     if (uq) {
-        if (!fallible) {
-            throwFatalException("Attempted to truncate table %s when there was an "
-                                "active undo quantum, and presumably an active transaction that should be there",
-                                m_name.c_str());
-        }
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
@@ -555,14 +550,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         SynchronizedThreadLock::addTruncateUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
     else {
-        if (fallible) {
-            throwFatalException("Attempted to truncate table %s when there was no "
-                                "active undo quantum even though one was expected", m_name.c_str());
-        }
-
-        //Skip the undo log and "commit" immediately by asking the new emptyTable to perform
-        //the truncate table release work rather then having it invoked by PersistentTableUndoTruncateTableAction
-        emptyTable->truncateTableRelease(this);
+        throwFatalException("Attempted to truncate table %s when there was no "
+                            "active undo quantum even though one was expected", m_name.c_str());
     }
 }
 
