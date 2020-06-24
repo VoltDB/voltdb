@@ -928,7 +928,7 @@ void testHookedCompactingChunksBatchRemove_multi3() {
     for(i = 0; i < AllocsPerChunk / 2; ++i) {
         memcpy(const_cast<void*>(addresses[i] = alloc.allocate()), gen.get(), TupleSize);
     }
-    auto const& iter = alloc.template freeze<truth>();
+    alloc.template freeze<truth>();
     remove_multiple(alloc, addresses.cbegin(), next(addresses.cbegin(), AllocsPerChunk / 2));
     assert(alloc.empty());
     for (; i < AllocsPerChunk * 3; ++i) {
