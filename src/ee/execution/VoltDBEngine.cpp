@@ -1091,8 +1091,9 @@ void VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicate
         if (tcd) {
             Table* table = tcd->getTable();
             PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(table);
-            if (persistenttable &&
-                    updateReplicated != persistenttable->isReplicatedTable()) {
+            StreamedTable* streamedtable = dynamic_cast<StreamedTable*>(table);
+            if ((persistenttable && updateReplicated != persistenttable->isReplicatedTable()) ||
+                (streamedtable && updateReplicated != streamedtable->isReplicatedTable())) {
                 deletions.erase(path);
             }
         }
@@ -1172,27 +1173,44 @@ void VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicate
                     }
                     m_exportingTables.erase(name);
                 }
-            }
-            if (persistenttable && persistenttable->isReplicatedTable()) {
-                isReplicatedTable = true;
-                ExecuteWithAllSitesMemory execAllSites;
-                for (auto engineIt : execAllSites) {
-                    EngineLocals& curr = engineIt.second;
-                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                    currEngine->m_delegatesByName.erase(table->name());
+                if (persistenttable->isReplicatedTable()) {
+                    isReplicatedTable = true;
+                    ExecuteWithAllSitesMemory execAllSites;
+                    for (auto engineIt : execAllSites) {
+                        EngineLocals& curr = engineIt.second;
+                        VoltDBEngine* currEngine = curr.context->getContextEngine();
+                        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                        currEngine->m_delegatesByName.erase(table->name());
+                    }
+                } else {
+                    m_delegatesByName.erase(table->name());
                 }
-            } else {
-                m_delegatesByName.erase(table->name());
             }
-            auto streamedtable = dynamic_cast<StreamedTable*>(table);
+            StreamedTable* streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string& name = streamedtable->name();
-                //Maintain the streams that will go away for which wrapper needs to be cleaned;
-                purgedStreams[name] = streamedtable->getWrapper();
-                //Unset wrapper so it can be deleted after last push.
-                streamedtable->setWrapper(nullptr);
-                m_exportingTables.erase(name);
+                if (streamedtable->isReplicatedTable()) {
+                    isReplicatedTable = true;
+                    ExecuteWithAllSitesMemory execAllSites;
+                    for (auto engineIt : execAllSites) {
+                        EngineLocals& curr = engineIt.second;
+                        VoltDBEngine* currEngine = curr.context->getContextEngine();
+                        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                        currEngine->m_delegatesByName.erase(table->name());
+                        //Maintain the streams that will go away for which wrapper needs to be cleaned;
+                        purgedStreams[name] = streamedtable->getWrapper();
+                        //Unset wrapper so it can be deleted after last push.
+                        streamedtable->setWrapper(nullptr);
+                        currEngine->m_exportingTables.erase(name);
+                    }
+                } else {
+                    m_delegatesByName.erase(table->name());
+                    //Maintain the streams that will go away for which wrapper needs to be cleaned;
+                    purgedStreams[name] = streamedtable->getWrapper();
+                    //Unset wrapper so it can be deleted after last push.
+                    streamedtable->setWrapper(nullptr);
+                    m_exportingTables.erase(name);
+                }
             }
             if (isReplicatedTable) {
                 VOLT_TRACE("delete a REPLICATED table %s", tcd->getTable()->name().c_str());
