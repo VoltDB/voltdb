@@ -31,9 +31,7 @@ import java.util.Map;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -123,30 +121,18 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
                 + " selecting from " + source + ": ";
         final Client client = getClient();
         boolean isReplicatedSource = source.contains("REPL");
-        boolean isReplicatedTarget = exportTarget.contains("REPL");
-        boolean isSinglePartitionProcedure = insertSelectProc.contains("SP");
+        boolean isSinglePartitionProcedure = insertSelectProc.endsWith("SP");
         m_streamNames.clear();
         m_streamNames.add(exportTarget);
 
-        int i = 0;
+         int i = 0;
         int tableRows = 0;
         for (Object[] row : ROWS) {
-            if (isReplicatedTarget && !isReplicatedSource) {
-                long partition = ((ClientImpl) client).getPartitionForParameter(VoltType.typeFromObject(i).getValue(),
-                        i);
-                if (partition != 0) {
-                    // In the case where a partitioned table is streamed to a replicated table, only the stream for
-                    // partition 0 is used so therefore only hosts with partition 0 on the system
-                    i++;
-                    continue;
-                }
-            }
             // Add the row to the set of rows we expect to be seen by export.
-            // For replicated sources, we do the export on partition 0.
-            m_verifier.addRow(client, exportTarget, (isReplicatedSource && isSinglePartitionProcedure) ? 0 : i,
+            m_verifier.addRow(client, exportTarget, !isSinglePartitionProcedure ? 0 : i,
                     convertValsToRow(i, 'I', row));
 
-            // insert into source table
+             // insert into source table
             final Object[] params = convertValsToParams(source, i, row);
             VoltTable vt = client.callProcedure(tableInsertProc, params).getResults()[0];
             assertEquals(diagnosticHeader + "failed to insert into source",
@@ -155,36 +141,36 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             ++i;
         }
 
-        // Now insert into the export table.
+         // Now insert into the export table.
         long numberOfInserts = 0;
         if ((! isReplicatedSource)  && isSinglePartitionProcedure) {
-
-            // Use the run everywhere pattern for a partitioned source
+             // Use the run everywhere pattern for a partitioned source
             // read from a single-partition procedure.
             VoltTable partitionKeys = client.callProcedure("@GetPartitionKeys", "INTEGER")
                     .getResults()[0];
             while (partitionKeys.advanceRow()) {
                 int key = (int)partitionKeys.getLong("PARTITION_KEY");
-                ClientResponse cr = client.callProcedure(insertSelectProc, exportTarget, key);
+                ClientResponse cr = client.callProcedure(insertSelectProc, key);
                 assertEquals(diagnosticHeader + "insert into select proc failed",
                         ClientResponse.SUCCESS, cr.getStatus());
                 numberOfInserts += cr.getResults()[0].asScalarLong();
             }
         }
         else {
-            ClientResponse cr = client.callProcedure(insertSelectProc, exportTarget, 0);
+            ClientResponse cr = client.callProcedure(insertSelectProc, 0);
             assertEquals(diagnosticHeader + "insert into select proc failed",
                     ClientResponse.SUCCESS, cr.getStatus());
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(tableRows, numberOfInserts);
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportAllRowsDelivered(client, m_streamNames, DEFAULT_DELAY_MS, true);
 
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
 
         assertEquals(tableRows, m_verifier.getExportedDataCount());
         quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
     }
+
 
     public void testReadFromStreamInsertIntoSelect() throws Exception {
         System.out.println("\n\n------------------------------------------");
@@ -233,7 +219,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         verifyStmtFails(client,
                 "INSERT INTO " + EXPORT_TARGET_REPL + " "
                 + "SELECT * FROM " + SOURCE_PART + " ORDER BY PKEY",
-                "is an stream with no partitioning column defined.");
+                "may not access partitioned data for insertion into replicated table ");
     }
 
     public void testPartTableToPartStream() throws Exception {
@@ -242,13 +228,11 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         doInsertIntoSelectTest(EXPORT_TARGET_PART, SOURCE_PART, "TableInsertNoNulls", "ExportInsertFromTableSelectSP");
     }
 
-    // Inserting from a replicated table into a replicated stream should be allowed but is rejected with the following error:
-    //[ExportInsertFromTableSelectMP.class]: Failed to plan for statement (i_insert_select_repl) "INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS_REPL;". Error: "The target table for an INSERT INTO ... SELECT statement is an stream with no partitioning column defined.  This is not currently supported.  Please define a partitioning column for this stream to use it with INSERT INTO ... SELECT."
-//    public void testReplTableToReplStream() throws Exception {
-//        System.out.println("\n\n------------------------------------------");
-//        System.out.println("Testing insert from partitioned table to partitioned export stream");
-//        doInsertIntoSelectTest(EXPORT_TARGET_REPL, SOURCE_REPL, "TableInsertNoNullsRepl", "ExportInsertFromTableSelectMP");
-//    }
+    public void testReplTableToReplStream() throws Exception {
+        System.out.println("\n\n------------------------------------------");
+        System.out.println("Testing insert from partitioned table to partitioned export stream");
+        doInsertIntoSelectTest(EXPORT_TARGET_REPL, SOURCE_REPL, "TableInsertNoNullsRepl", "ExportInsertFromTableSelectMP");
+    }
 
     public TestExportInsertIntoSelectSuite(final String name) {
         super(name);

@@ -29,26 +29,12 @@ import org.voltdb.VoltTable;
 
 public class ExportInsertFromTableSelectSP extends VoltProcedure {
 
-    private final SQLStmt i_insert_select_repl = new SQLStmt
-    ("INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS;");
-
     private final SQLStmt i_insert_select_part = new SQLStmt
     ("INSERT INTO S_ALLOW_NULLS SELECT * FROM NO_NULLS;");
 
-    public VoltTable[] run(
-            String targetStream,
-            int pkey
-            )
+    public VoltTable[] run(int pkey)
     {
-        if (targetStream.equals("S_ALLOW_NULLS_REPL")) {
-            voltQueueSQL(i_insert_select_repl);
-        }
-        else if (targetStream.equals("S_ALLOW_NULLS")) {
-            voltQueueSQL(i_insert_select_part);
-        }
-        else {
-            throw new RuntimeException("Don't call this.");
-        }
+        voltQueueSQL(i_insert_select_part);
         return voltExecuteSQL();
     }
 }

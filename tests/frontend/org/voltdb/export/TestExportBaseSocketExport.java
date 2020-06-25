@@ -327,7 +327,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public static final ProcedureInfo[] INSERTSELECT_PROCEDURES = {
             new ProcedureInfo(ExportInsertFromTableSelectSP.class,
-                    new ProcedurePartitionData("NO_NULLS", "PKEY", "1"), new String[] { "proc" }),
+                    new ProcedurePartitionData("NO_NULLS", "PKEY", "0"), new String[] { "proc" }),
             new ProcedureInfo(TableInsertNoNulls.class,
                     new ProcedurePartitionData("NO_NULLS", "PKEY", "1"), new String[] { "proc" })
     };
