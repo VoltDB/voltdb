@@ -29,18 +29,17 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar;
 } 2> /dev/null | paste -sd ':' - )
 
-CLASSPATH=/home/opt/rabbitmq/rabbitmq.jar:/home/test/jdbc/vertica-jdbc.jar:/home/test/jdbc/postgresql-9.4.1207.jar:$CLASSPATH
+CLASSPATH=:/home/test/jdbc/vertica-jdbc.jar:/home/test/jdbc/postgresql-9.4.1207.jar:$CLASSPATH
 echo CLASSPATH $CLASSPATH
 echo VOLTDB_BASE $VOLTDB_BASE
 echo VOLTDB_LIB "$VOLTDB_BASE/lib"
 echo VOLTDB_VOLTDB $VOLTDB_VOLTDB
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
-RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
 VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
 POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
-CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
+CLASSPATH="$CLASSPATH:vertica-jdbc.jar:$MYSQLLIB"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -120,12 +119,6 @@ function server() {
 # run the voltdb server locally with kafka connector
 function server-kafka() {
     startvolt deployment-kafka.xml ddl1.sql sp.jar
-}
-
-function server-rabbitmq() {
-    cp $RBMQ/rabbitmq.jar $VOLTDB_LIB/extension/
-    cp ../../../../export-rabbitmq/voltdb-rabbitmq.jar $VOLTDB_LIB/extension/
-    startvolt deployment-rabbitmq.xml ddl1.sql sp.jar
 }
 
 # run the voltdb server locally with mysql connector
@@ -354,11 +347,6 @@ function jdbc-drop-vertica-tables() {
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
         genqa.ExportKafkaOnServerVerifier kafka2:2181 voltdbexport
-}
-
-function export-rabbitmq-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
-        genqa.ExportRabbitMQVerifier kafka1 test test systest
 }
 
 function set_pgpaths() {
