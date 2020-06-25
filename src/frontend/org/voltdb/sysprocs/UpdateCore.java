@@ -45,6 +45,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
@@ -445,8 +446,11 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
-            throw vae;
+            if (!(vae instanceof TransactionRestartException)) {
+                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
+            } else {
+                assert(!((TransactionRestartException)vae).isMisrouted());
+            }            throw vae;
         }
 
         try {
