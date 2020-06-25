@@ -105,7 +105,7 @@ public:
             ASSERT_TRUE(srcTuples[offset + i++].getNValue(0).op_equals(tuple.getNValue(0)).isTrue());
         }
         // Clean-up
-        m_tempDstTable->deleteAllTempTuples();
+        m_tempDstTable->deleteAllTuples();
     }
 
     char* addPartitionData(std::vector<int>& partitionValues,

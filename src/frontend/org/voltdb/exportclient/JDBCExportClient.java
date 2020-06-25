@@ -609,9 +609,7 @@ public class JDBCExportClient extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
-            if (!ignoreGenerations) {
-                checkSchemas();
-            }
+            checkSchemas();
         }
 
         @Override
@@ -826,6 +824,9 @@ public class JDBCExportClient extends ExportClientBase {
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            if (m_es == null) {
+                return;
+            }
             m_es.shutdown();
             try {
                 if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_S, TimeUnit.SECONDS)) {

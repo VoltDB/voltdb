@@ -92,7 +92,7 @@ class AbstractExecutor {
     inline void cleanupTempOutputTable() {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
-            m_tmpOutputTable->deleteAllTempTuples();
+            m_tmpOutputTable->deleteAllTuples();
         }
     }
 
@@ -184,7 +184,7 @@ inline bool AbstractExecutor::execute(const NValueArray& params) {
             // For simple no-op sequential scan nodes, sometimes the
             // input table and output table are the same table, hence
             // the check above.
-            table->deleteAllTempTuples();
+            table->deleteAllTuples();
         }
     }
 
