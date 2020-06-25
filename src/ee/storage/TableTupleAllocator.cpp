@@ -583,7 +583,7 @@ inline void CompactingStorageTrait::thaw() {
     }
 }
 
-inline bool CompactingStorageTrait::frozen() const noexcept {
+bool CompactingStorageTrait::frozen() const noexcept {
     return m_frozen;
 }
 
@@ -1910,8 +1910,8 @@ template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, T
         auto const iter = m_changes.lower_bound(dst);
         if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
             void* fresh = m_changeStore.allocate();
-            // TODO: invoke deep copier only on updates.
-            m_changes.emplace_hint(iter, dst, m_finalizerAndCopier ?
+            m_changes.emplace_hint(iter, dst,
+                    cause == add_cause::update && m_finalizerAndCopier ?           // deep copy for updates only
                     m_finalizerAndCopier.copy(fresh, dst) :            // deep copy, or
                     memcpy(fresh, dst, m_changeStore.tupleSize()));    // shallow copy
         }
@@ -2036,28 +2036,20 @@ HookedCompactingChunks<Hook, E>::remove_force(
         for_each(CompactingChunks::m_batched.movements().cbegin(),
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void const*> const& entry) {
-                    // we need to register both addresses:
-                    // we need to register tuples to be deleted for sure;
+                    // we need to register tuples to be deleted
                     Hook::add(Hook::add_cause::remove, entry.first,
-                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
-                    // we also need to register tuple that
-                    // compacts to deleted tuple, see
-                    // testHookedCompactingChunksBatchRemove_single2a.
-                    // In most cases, this tuple had already been captured
-                    // in hook memory; but in rare cases, it may not be.
-                    Hook::add(Hook::add_cause::remove, entry.second,
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
         for_each(CompactingChunks::m_batched.removed().cbegin(),
                 CompactingChunks::m_batched.removed().cend(),
                 [this](void const* p) {
-                    Hook::add(Hook::add_cause::remove, p,
-                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                    Hook::add(Hook::add_cause::remove,
+                            p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
     }
     // finalize before memcpy, but after adding to hook memory
     auto const finalized = CompactingChunks::m_batched.finalize();
-    cb(CompactingChunks::m_batched.movements());      // finalize dst, shallow copy and with index update
+    cb(CompactingChunks::m_batched.movements());
     return make_pair(CompactingChunks::m_batched.force(), finalized);
 }
 

@@ -125,7 +125,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // NOTE: we embed m_data pointer immediately after the
     // boundary of TableTuple, so that there is no extra Pool
     // that stores non-inlined tuple data.
-    size_t tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
+    auto const tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         auto const cleaner = [this] (void const* p) {
             checkContext("Cleaning");
@@ -664,26 +664,39 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
 }
 
 void PersistentTable::finalizeRelease() {
-
-    TableTuple destinationTuple(m_schema);
-    TableTuple originalTuple(m_schema);
     allocator().template remove_force<storage::truth>(
-            [this, &destinationTuple, &originalTuple](vector<pair<void*, void const*>> const& tuples) {    // shallow copy
+            [this, frozen = allocator().frozen()] (vector<pair<void*, void const*>> const& tuples) {    // shallow copy when frozen
+        TableTuple destinationTuple(m_schema), originalTuple(m_schema);
         for(auto const& p : tuples) {
             destinationTuple.move(p.first);
             originalTuple.move(const_cast<void*>(p.second));
 
-            decreaseStringMemCount(destinationTuple.getNonInlinedMemorySizeForPersistentTable());
-            destinationTuple.freeObjectColumns();
-            ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
+            if (! frozen) {
+                // finalize dst tuple unless frozen, to save allocator from deep copy
+                decreaseStringMemCount(destinationTuple.getNonInlinedMemorySizeForPersistentTable());
+                destinationTuple.freeObjectColumns();
+            }
+            memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
             vassert(!originalTuple.isPendingDeleteOnUndoRelease());
 
-            BOOST_FOREACH (auto index, m_indexes) {
-                index->replaceEntryNoKeyChange(destinationTuple, originalTuple);
+            // Index handling: not frozen => replace; frozen => add???
+            if (frozen) {
+                TableTuple conflict(destinationTuple.getSchema());
+                for_each(m_indexes.begin(), m_indexes.end(),
+                        [&conflict, &destinationTuple](TableIndex* index) {
+                            // do not delete original index on
+                            // src tuple?
+                            index->addEntry(&destinationTuple, &conflict);
+                        });
+            } else {
+                for_each(m_indexes.begin(), m_indexes.end(),
+                        [&destinationTuple, &originalTuple](TableIndex* index) {
+                            index->replaceEntryNoKeyChange(
+                                    destinationTuple, originalTuple);
+                        });
             }
             if (isTableWithMigrate(m_tableType)) {
-                uint16_t migrateColumnIndex = getMigrateColumnIndex();
-                NValue txnId = originalTuple.getHiddenNValue(migrateColumnIndex);
+                auto const txnId = originalTuple.getHiddenNValue(getMigrateColumnIndex());
                 if (!txnId.isNull()) {
                     migratingSwap(ValuePeeker::peekBigInt(txnId), originalTuple, destinationTuple);
                 }
@@ -691,7 +704,9 @@ void PersistentTable::finalizeRelease() {
            if (m_tableStreamer != NULL) {
                m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
            }
-           originalTuple.setActiveFalse();
+           if (! frozen) {                 // when frozen, the original tuple remains useful
+               originalTuple.setActiveFalse();
+           }
         }
     });
     m_invisibleTuplesPendingDeleteCount = 0;
