@@ -62,10 +62,6 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool, bool) {
-    deleteAllTempTuples();
-}
-
 void TempTable::deleteAllTempTupleDeepCopies() {
     if (m_tupleCount == 0) {
         return;
@@ -77,7 +73,7 @@ void TempTable::deleteAllTempTupleDeepCopies() {
             target.freeObjectColumns();
         }
     }
-    deleteAllTempTuples();
+    deleteAllTuples();
 }
 
 bool TempTable::insertTuple(TableTuple &source) {

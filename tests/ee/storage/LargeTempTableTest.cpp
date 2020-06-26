@@ -155,7 +155,7 @@ TEST_F(LargeTempTableTest, Basic) {
         ASSERT_EQ(pkVals.size(), i);
     }
 
-    ltt->deleteAllTempTuples();
+    ltt->deleteAllTuples();
 
     ASSERT_EQ(0, lttBlockCache.totalBlockCount());
     ASSERT_EQ(0, lttBlockCache.allocatedMemory());
@@ -298,7 +298,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         ASSERT_EQ(500, i);
     }
 
-    ltt->deleteAllTempTuples();
+    ltt->deleteAllTuples();
 
     ASSERT_EQ(0, lttBlockCache.totalBlockCount());
     ASSERT_EQ(0, lttBlockCache.allocatedMemory());
@@ -411,7 +411,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         ASSERT_EQ(NUM_TUPLES, i);
     }
 
-    ltt->deleteAllTempTuples();
+    ltt->deleteAllTuples();
 
     ASSERT_EQ(0, lttBlockCache.totalBlockCount());
     ASSERT_EQ(0, lttBlockCache.allocatedMemory());

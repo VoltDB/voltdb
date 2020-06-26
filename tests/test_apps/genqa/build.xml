@@ -29,9 +29,6 @@
        <fileset dir="${basedir}/../../../lib">
            <include name="*.jar"/>
        </fileset>
-       <fileset dir="/home/opt/rabbitmq">
-           <include name="*.jar"/>
-       </fileset>
     </path>
 
     <target name="client-compile">
