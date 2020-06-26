@@ -792,10 +792,11 @@ public class SocketJoiner {
             return socket;
         }
         catch (java.net.ConnectException
-               | java.nio.channels.UnresolvedAddressException
-               | java.net.UnknownHostException
                | java.net.NoRouteToHostException
-               | java.net.PortUnreachableException ex) {
+               | java.net.PortUnreachableException
+               | java.net.SocketTimeoutException
+               | java.net.UnknownHostException
+               | java.nio.channels.UnresolvedAddressException ex) {
             safeClose(socket);
             throw new SocketRetryException(ex);
         }
