@@ -664,12 +664,14 @@ namespace voltdb {
                 };
                 using map_type = map<id_type, RemovableRegion, less_rolling_type<id_type>>;
                 map_type m_removedRegions{};
+                map<void const*, void const*> m_frozenBoundaries{};
                 vector<void*> m_moved{}, m_removed{};
                 vector<pair<void*, void const*>> m_movements;// (dst, <= src)
                 size_t m_size = 0;
                 void mapping();                        // set up m_movements
                 void shift();                          // adjust txn begin boundary
                 void validate() const;
+                bool finalizable(void const*) const;
             public:
                 explicit DelayedRemover(CompactingChunks&);
                 void reserve(size_t);

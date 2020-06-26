@@ -1825,14 +1825,14 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
         for (i = 0; i < NumTuples; i += 2) {
             alloc.remove_add(const_cast<void*>(addresses[i]));
         }
-        ASSERT_EQ(make_pair(NumTuples / 2, NumTuples / 4),
+        ASSERT_EQ(make_pair(NumTuples / 2, 0lu),
                 alloc.template remove_force<truth>([](vector<pair<void*, void const*>> const& entries) noexcept {
                         for_each(entries.begin(), entries.end(),
                                 [](pair<void*, void const*> const& entry) {
                                     memcpy(entry.first, entry.second, TupleSize);
                                 });
                     }));
-        ASSERT_EQ(NumTuples / 4, verifier.finalized().size());                 // agrees with return value
+        ASSERT_EQ(0, verifier.finalized().size());                 // agrees with return value
         alloc.template thaw<truth>();
         // manually finalize on the compacted subset of the batch
         unsigned char buf[TupleSize];
@@ -1992,8 +1992,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
         copy(addresses.cbegin(), next(addresses.cbegin(), AllocsPerChunk * 3), buf.begin());
         copy(next(addresses.cbegin(), NumTuples), next(addresses.cbegin(), NumTuples + AllocsPerChunk),
                 next(buf.begin(), AllocsPerChunk * 3));
-        ASSERT_EQ(make_pair(AllocsPerChunk * 4, AllocsPerChunk * 3),       // finalize on first 3 chunks
-                remove_multiple(alloc, buf));
+        ASSERT_EQ(make_pair(AllocsPerChunk * 4, 0lu), remove_multiple(alloc, buf));
 
         // check 1st value of txn iterator
         ASSERT_EQ(AllocsPerChunk * 4, Gen::of(reinterpret_cast<unsigned char const*>(
@@ -2005,7 +2004,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
             // trigger any finalization.
             ++*iter;
         }
-        ASSERT_EQ(AllocsPerChunk * 3, verifier.finalized().size());
+        ASSERT_EQ(0, verifier.finalized().size());
         alloc.template thaw<truth>();
         ASSERT_EQ(AllocsPerChunk * 4, verifier.finalized().size());
         // batch removal on first 3 chunks: no compaction
@@ -2045,7 +2044,7 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_bug1) {
         }
         alloc.template freeze<truth>();
         auto const batch_size = NumTuples / 2 + 4;
-        ASSERT_EQ(make_pair(batch_size, 8lu),   // removed subset is twice the # exceeding half
+        ASSERT_EQ(make_pair(batch_size, 0lu),   // removed subset is twice the # exceeding half
                 remove_multiple(alloc, addresses.crbegin(), next(addresses.crbegin(), batch_size)));
         alloc.template thaw<truth>();
         ASSERT_EQ(batch_size, verifier.finalized().size());

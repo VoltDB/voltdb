@@ -347,7 +347,7 @@ inline pair<bool, typename ChunkList<Chunk, Compact, E>::iterator> ChunkList<Chu
     auto iter = mutable_this->m_byAddr.upper_bound(k);
     bool const found = (iter != m_byAddr.end() ||  // found;
             (! m_byAddr.empty() && m_byAddr.crbegin()->first <= k)) &&       // or is the last elm in the list, and
-        --iter != m_byAddr.end() &&                // the prev elm exists (XXX: this comparison seems unnecessary, but must be present?)
+        --iter != m_byAddr.end() &&                // the prev elm exists (NOTE: this comparison seems unnecessary, but must be present?)
         iter->second->range_end() > k;             // and indeed the elm is what we are looking for
     return {found, found ? iter->second : mutable_this->end()};
 }
@@ -1078,6 +1078,26 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
             reinterpret_cast<char const*>(iter->range_left());
         auto chunksTBReleasedFull = n / tuplesPerChunk,
              tuplesTBReleasedPartial = n % tuplesPerChunk;
+        // helper to set up chunk boundaries of frozen chunks
+        auto const frozen = static_cast<bool>(m_chunks.frozenBoundaries());
+        auto const left = frozen ? m_chunks.frozenBoundaries()->left() : position_type{},
+             right = frozen ? m_chunks.frozenBoundaries()->right() : left;
+        auto const updateFrozen = [frozen, &left, &right] (
+                typename ChunkList<CompactingChunk, Compact>::iterator const& iter,
+                map<void const*, void const*>& acc) noexcept {
+            if (frozen) {
+                auto const& id = iter->id();
+                if (id == left.id()) {
+                    acc.emplace(left.left(), left.right());
+                } else if (id == right.id()) {
+                    acc.emplace(right.left(), right.right());
+                } else if (less_rolling(id, right.id())) {
+                    // left of right boundary: whole chunk is finalizable
+                    assert(iter->range_left() < iter->range_right());                      // strictly less
+                    acc.emplace(iter->range_left(), iter->range_right());
+                }   // else outside frozen region
+            }
+        };
         if (tuplesTBReleasedPartial * tupleSize >= offset) {
             ++chunksTBReleasedFull;
             tuplesTBReleasedPartial -= offset / tupleSize;
@@ -1089,6 +1109,7 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
                  *end = reinterpret_cast<char const*>(iter->range_right());
             m_removedRegions.emplace(iter->id(),
                     RemovableRegion{*iter, i == 0 ? (end - beg) / tupleSize : tuplesPerChunk});
+            updateFrozen(iter, m_frozenBoundaries);
             if (++iter == m_chunks.end() && i + 1 == chunksTBReleasedFull && tuplesTBReleasedPartial) {
                 snprintf(buf, sizeof buf,
                         "CompactingChunks::DelayedRemover::reserve(%lu): insufficient space to be reserved", n);
@@ -1104,6 +1125,7 @@ inline void CompactingChunks::DelayedRemover::reserve(size_t n) {
                 throw underflow_error(buf);
             }
             m_removedRegions.emplace(iter->id(), RemovableRegion{*iter, tuplesTBReleasedPartial});
+            updateFrozen(iter, m_frozenBoundaries);
         }
     }
 }
@@ -1160,13 +1182,41 @@ inline void CompactingChunks::DelayedRemover::validate() const {
                 }).first);
 }
 
+// NOTE: call this only if chunks are frozen
+inline bool CompactingChunks::DelayedRemover::finalizable(void const* k) const {
+    assert(m_chunks.frozen());
+    // k should lie outside all boundaries
+    auto iter = m_frozenBoundaries.upper_bound(k);
+    if (iter == m_frozenBoundaries.cend()) {
+        return m_frozenBoundaries.empty() || m_frozenBoundaries.crbegin()->first > k;
+    } else if (iter != m_frozenBoundaries.cbegin()) {
+        --iter;
+        return k < iter->first || k >= iter->second;
+    } else {
+        return true;
+    }
+}
+
 inline size_t CompactingChunks::DelayedRemover::finalize() const {
     if (m_chunks.finalizerAndCopier()) {
-        // removed addresses (without compaction) need to be
-        // finalized right away, irrespective of whether we are frozen.
-        for_each(m_removed.cbegin(), m_removed.cend(),
-                [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
-        return m_removed.size();
+        if (! m_chunks.frozen()) {
+            // removed addresses (without compaction) need to be
+            // finalized right away, unless frozen.
+            for_each(m_removed.cbegin(), m_removed.cend(),
+                    [this](void const* p) { m_chunks.finalizerAndCopier().finalize(p); });
+            return m_removed.size();
+        } else {
+            // when frozen, discriminate which addresss are
+            // outside frozen boundary, and only finalize those.
+            return accumulate(m_removed.cbegin(), m_removed.cend(), 0lu,
+                    [this] (size_t acc, void const* k) {
+                        if (finalizable(k)) {
+                            m_chunks.finalizerAndCopier().finalize(k);
+                            ++acc;
+                        }
+                        return acc;
+                    });
+        }
     } else {
         return 0lu;
     }
@@ -1245,6 +1295,7 @@ inline size_t CompactingChunks::DelayedRemover::clear(bool force) noexcept {
     m_removed.clear();
     m_movements.clear();
     m_removedRegions.clear();
+    m_frozenBoundaries.clear();
     return r;
 }
 
