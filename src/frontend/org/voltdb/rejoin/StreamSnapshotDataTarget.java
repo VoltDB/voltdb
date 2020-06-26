@@ -339,8 +339,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 final int destHostId = CoreUtils.getHostIdFromHSId(m_destHSId);
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
-                rejoinLog.info(String.format("While sending rejoin data to site %d, %d bytes have been sent in the past %s seconds.",
-                        destHostId, bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
+                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
