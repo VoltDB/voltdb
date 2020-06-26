@@ -83,14 +83,14 @@ public class StreamSnapshotAckReceiver implements Runnable {
         try {
             while (true) {
                 if (stopped) {
-                    rejoinLog.debug("Ack reciever thread stopped");
+                    rejoinLog.debug("Ack receiver thread stopped");
                     return;
                 }
 
                 rejoinLog.trace("Blocking on receiving mailbox");
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
                 if (stopped) {
-                    rejoinLog.debug("Ack reciever thread stopped");
+                    rejoinLog.debug("Ack receiver thread stopped");
                     return;
                 }
 
@@ -144,5 +144,9 @@ public class StreamSnapshotAckReceiver implements Runnable {
     private void handleException(String message, Exception exception) {
         rejoinLog.error(message, exception);
         m_callbacks.values().forEach(c -> c.receiveError(exception));
+    }
+
+    public boolean isStopped() {
+        return stopped;
     }
 }

@@ -733,7 +733,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private synchronized void waitForOutstandingWork()
     {
         boolean interrupted = false;
-        while (m_writeFailed.get() == null && (m_outstandingWorkCount.get() > 0)) {
+        while (m_writeFailed.get() == null && (m_outstandingWorkCount.get() > 0) && !m_ackReceiver.isStopped()) {
             try {
                 wait();
             } catch (InterruptedException e) {
