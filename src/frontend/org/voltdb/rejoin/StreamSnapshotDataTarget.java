@@ -336,6 +336,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             long bytesSentSinceLastCheck = 0;
             try {
+                final int destHostId = CoreUtils.getHostIdFromHSId(m_destHSId);
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
@@ -343,13 +344,17 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
-                    clearOutstanding(); // idempotent
-                }
-                // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
-                final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
-                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
+                    clearOutstanding();
+                    watchAgain = false;
+                } else if (bytesSentSinceLastCheck == 0) {
+                    watchAgain = VoltDB.instance().getHostMessenger().getLiveHostIds().contains(destHostId);
+                    if (!watchAgain) {
+                        if(m_writeFailed.get() == null) {
+                            setWriteFailed(new StreamSnapshotTimeoutException(
+                              "A snapshot write task failed after rejoining node is down."));
+                        }
+                        clearOutstanding();
+                    }
                 }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
@@ -359,7 +364,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesSentSinceLastCheck > 0 ? System.currentTimeMillis() : m_lastDataWrite),
                             WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
                 } else {
-                    rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
+                    rejoinLog.info(String.format("Stop watching stream snapshot to site %s", CoreUtils.hsIdToString(m_destHSId)));
                 }
             }
         }
