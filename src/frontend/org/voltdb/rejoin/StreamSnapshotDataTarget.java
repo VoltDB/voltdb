@@ -344,20 +344,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
-                    clearOutstanding(); // idempotent
-                }
-                // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
-                final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
-                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    watchAgain = liveHosts.contains(destHostId);
+                    clearOutstanding();
+                    watchAgain = false;
+                } else if (bytesSentSinceLastCheck == 0) {
+                    watchAgain = VoltDB.instance().getHostMessenger().getLiveHostIds().contains(destHostId);
                     if (!watchAgain) {
                         if(m_writeFailed.get() == null) {
-                            StreamSnapshotTimeoutException exception =
-                                    new StreamSnapshotTimeoutException(
-                                            "A snapshot write task failed after rejoining node is down. Node rejoin may need to be retried."
-                                            );
-                            setWriteFailed(exception);
+                            setWriteFailed(new StreamSnapshotTimeoutException(
+                              "A snapshot write task failed after rejoining node is down."));
                         }
                         clearOutstanding();
                     }
@@ -370,7 +364,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesSentSinceLastCheck > 0 ? System.currentTimeMillis() : m_lastDataWrite),
                             WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
                 } else {
-                    rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
+                    rejoinLog.info(String.format("Stop watching stream snapshot to site %s", CoreUtils.hsIdToString(m_destHSId)));
                 }
             }
         }
