@@ -93,6 +93,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector
         //See if we have any views.
         m_hasStreamView = streamTarget->hasViews();
         m_partitionColumn = streamTarget->partitionColumn();
+        m_replicatedTableOperation = streamTarget->isReplicatedTable();
     }
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
@@ -173,8 +174,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 
     m_persistentTable = m_isStreamed ?
             NULL : static_cast<PersistentTable*>(m_targetTable);
-    vassert((!m_persistentTable && !m_replicatedTableOperation) ||
-            m_replicatedTableOperation == m_persistentTable->isReplicatedTable());
+    vassert(!m_isStreamed || m_replicatedTableOperation == m_persistentTable->isReplicatedTable());
 
     m_upsertTuple = TableTuple(m_targetTable->schema());
 
@@ -188,20 +188,6 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_tmpOutputTable = newOutputTable;
     vassert(m_tmpOutputTable);
     m_count_tuple = m_tmpOutputTable->tempTuple();
-
-    // For export tables with no partition column,
-    // if the data is from a replicated source,
-    // only insert into one partition (0).
-    // Other partitions can just return a 0 modified tuple count.
-    // OTOH, if the data is coming from a (sub)query with
-    // partitioned tables, perform the insert on every partition.
-    if (m_partitionColumn == -1 && m_isStreamed && m_multiPartition &&
-            !m_sourceIsPartitioned && m_engine->getPartitionId() != 0) {
-        m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
-        // put the tuple into the output table
-        m_tmpOutputTable->insertTuple(m_count_tuple);
-        return false;
-    }
     m_templateTuple = m_templateTupleStorage.tuple();
 
     std::vector<int>::iterator it;
@@ -288,16 +274,8 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
                 // belongs.
                 return;
             }
-            // When a streamed table has no views, let an SP insert execute.
-            // This is backward compatible with when there were only export
-            // tables with no views on them.
-            // When there are views, be strict and throw mispartitioned
-            // tuples to force partitioned data to be generated only
-            // where partitioned view rows are maintained.
-            if (!m_isStreamed || m_hasStreamView) {
-                throw ConstraintFailureException(m_targetTable, m_templateTuple,
-                        "Mispartitioned tuple in single-partition insert statement.");
-            }
+            throw ConstraintFailureException(m_targetTable, m_templateTuple,
+                    "Mispartitioned tuple in single-partition insert statement.");
         }
     }
 
