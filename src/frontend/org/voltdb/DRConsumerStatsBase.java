@@ -42,6 +42,8 @@ public class DRConsumerStatsBase {
         public static final String LAST_RECEIVED_TIMESTAMP = "LAST_RECEIVED_TIMESTAMP";
         public static final String LAST_APPLIED_TIMESTAMP = "LAST_APPLIED_TIMESTAMP";
         public static final String IS_PAUSED = "IS_PAUSED";
+        public static final String REMOTE_CREATION_TIMESTMAP = "REMOTE_CREATION_TIMESTMAP";
+        public static final String LAST_FAILURE = "LAST_FAILURE";
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
@@ -57,6 +59,8 @@ public class DRConsumerStatsBase {
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_1M, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_5M, VoltType.BIGINT));
+            columns.add(new ColumnInfo(Columns.REMOTE_CREATION_TIMESTMAP, VoltType.TIMESTAMP));
+            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
         }
 
         @Override
