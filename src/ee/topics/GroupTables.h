@@ -20,7 +20,7 @@
 #include "storage/persistenttable.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 /**
  * Simple interface for a class which has getters for all of group tables

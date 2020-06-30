@@ -106,7 +106,7 @@ class Topend;
 class TheHashinator;
 class ExportTupleStream;
 
-namespace kipling {
+namespace topics {
 class GroupStore;
 }
 
@@ -607,36 +607,36 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool externalStreamsEnabled();
 
         /**
-         * Store a kipling group in the system tables
+         * Store a topics group in the system tables
          */
-        int32_t storeKiplingGroup(int64_t undoToken, SerializeInputBE& in);
+        int32_t storeTopicsGroup(int64_t undoToken, SerializeInputBE& in);
 
         /**
-         * Delete a kipling group and all related metadata
+         * Delete a topics group and all related metadata
          */
-        int32_t deleteKiplingGroup(int64_t undoToken, const NValue& groupId);
+        int32_t deleteTopicsGroup(int64_t undoToken, const NValue& groupId);
 
         /**
-         * Start or continue a fetch of all kipling groups.
+         * Start or continue a fetch of all topics groups.
          * Return 1 if there are more groups to fetch, 0 if there are no more groups or -1 if there was an error
          */
-        int32_t fetchKiplingGroups(int32_t maxResultSize, const NValue& startGroupId);
+        int32_t fetchTopicsGroups(int32_t maxResultSize, const NValue& startGroupId);
 
         /**
-         * Store topic parition offsets for a kipling group
+         * Store topic parition offsets for a topics group
          */
-        int32_t commitKiplingGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
+        int32_t commitTopicsGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
                 const NValue& groupId, SerializeInputBE& in);
 
         /**
-         * Fetch topic parition offsets for a kipling group
+         * Fetch topic parition offsets for a topics group
          */
-        int32_t fetchKiplingGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
+        int32_t fetchTopicsGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
 
         /*
          * Delete expired offsets of standalone groups
          */
-        int32_t deleteExpiredKiplingOffsets(int64_t undoToken, int64_t deleteOlderThan);
+        int32_t deleteExpiredTopicsOffsets(int64_t undoToken, int64_t deleteOlderThan);
 
     private:
         /*
@@ -930,7 +930,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
 
-        std::unique_ptr<kipling::GroupStore> m_groupStore;
+        std::unique_ptr<topics::GroupStore> m_groupStore;
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;

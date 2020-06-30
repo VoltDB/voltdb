@@ -3009,7 +3009,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 shutdownDeployment = true;
             }
             if (deployment.getTopics() != null && deployment.getTopics().isEnabled()) {
-                consoleLog.error("Kipling is not supported in the community edition of VoltDB.");
+                consoleLog.error("Topics feature is not supported in the community edition of VoltDB.");
                 shutdownDeployment = true;
             }
             if (checkForDr && deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {

@@ -24,7 +24,7 @@
 #include "common/ValueFactory.hpp"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 /*
  * Class to wrap a SerializeInputBE and assert that all reads of data from this buffer do not go beyond the bounds of

@@ -20,12 +20,12 @@
 #include <stdint.h>
 
 #include "storage/persistenttable.h"
-#include "kipling/GroupTables.h"
+#include "topics/GroupTables.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 /**
- * High level API for interacting with the kipling system tables. This API allows group and group offsets to be stored,
+ * High level API for interacting with the topics system tables. This API allows group and group offsets to be stored,
  * retrieved and deleted
  */
 class GroupStore : public GroupTables {
@@ -43,7 +43,7 @@ public:
     void initialize(PersistentTable* group, PersistentTable* groupMember, PersistentTable* groupOffset);
 
     /**
-     * Perform an upsert to update the metadata about a kipling group and its members
+     * Perform an upsert to update the metadata about a topics group and its members
      */
     void storeGroup(SerializeInputBE& groupMetadata);
 
@@ -53,7 +53,7 @@ public:
     void deleteGroup(const NValue& groupId);
 
     /**
-     * Fetch kipling groups in a serialized format from the kipling system tables. A fetch is initialized whenever
+     * Fetch topics groups in a serialized format from the topics system tables. A fetch is initialized whenever
      * maxSize is > 0. If maxSize <= 0 then this method will continue fetching groups until all groups have been
      * fetched.
      *
@@ -65,7 +65,7 @@ public:
     bool fetchGroups(int maxResultSize, const NValue& startGroupId, SerializeOutput& out);
 
     /**
-     * Store offsets and associate them with the provided group. Offsets are serialized in the kipling wire format
+     * Store offsets and associate them with the provided group. Offsets are serialized in the topics wire format
      *
      * @param spUniqueId unique ID for this transaction
      * @param requestVersion Version of the commit request message
@@ -78,7 +78,7 @@ public:
 
     /**
      * Fetch offsets for the given group and serialize them to out. If any topics and partitions are specified only
-     * those offsets will be returned. Topic partitions are serialized in the kipling wire format
+     * those offsets will be returned. Topic partitions are serialized in the topics wire format
      *
      * @param requestVersion Version of the fetch request message
      * @param groupId from which to fetch offsets

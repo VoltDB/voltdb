@@ -16,11 +16,11 @@
  */
 
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
-#include "kipling/orm/Group.h"
+#include "topics/TableFactory.h"
+#include "topics/orm/Group.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 void Group::upsert(const GroupTables& tables, SerializeInputBE& groupMetadata) {
     NValue groupId = readString(groupMetadata);
@@ -212,5 +212,5 @@ bool Group::equalDeleted(const GroupOrmBase& other) const {
     return getGroupId() == otherGroup.getGroupId();
 }
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

@@ -14,10 +14,10 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <kipling/orm/GroupOrmBase.h>
+#include <topics/orm/GroupOrmBase.h>
 #include "indexes/tableindex.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 void GroupOrmBase::commit(int64_t timestamp) {
     if (!isDirty()) {

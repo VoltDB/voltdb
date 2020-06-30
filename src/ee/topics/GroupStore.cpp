@@ -18,15 +18,15 @@
 #include "GroupStore.h"
 
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
-#include "kipling/messages/CheckedSerializeInput.h"
-#include "kipling/messages/OffsetCommit.h"
-#include "kipling/messages/OffsetFetch.h"
-#include "kipling/orm/Group.h"
-#include "kipling/orm/GroupMember.h"
-#include "kipling/orm/GroupOffset.h"
+#include "topics/TableFactory.h"
+#include "topics/messages/CheckedSerializeInput.h"
+#include "topics/messages/OffsetCommit.h"
+#include "topics/messages/OffsetFetch.h"
+#include "topics/orm/Group.h"
+#include "topics/orm/GroupMember.h"
+#include "topics/orm/GroupOffset.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 #define DECREMENT_REFCOUNT(t) if (t) t->decrementRefcount()
 
@@ -37,9 +37,9 @@ GroupStore::~GroupStore() {
 }
 
 void GroupStore::initialize(VoltDBEngine *engine) {
-    initialize(engine->getSystemTable(SystemTableId::KIPLING_GROUP),
-            engine->getSystemTable(SystemTableId::KIPLING_GROUP_MEMBER),
-            engine->getSystemTable(SystemTableId::KIPLING_GROUP_OFFSET));
+    initialize(engine->getSystemTable(SystemTableId::TOPICS_GROUP),
+            engine->getSystemTable(SystemTableId::TOPICS_GROUP_MEMBER),
+            engine->getSystemTable(SystemTableId::TOPICS_GROUP_OFFSET));
 }
 
 #define ASSIGN_TABLE(v, t) vassert(t); t->incrementRefcount(); v = t

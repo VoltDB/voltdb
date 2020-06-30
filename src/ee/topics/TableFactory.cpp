@@ -18,18 +18,18 @@
 #include <vector>
 #include <string>
 
-#include "kipling/TableFactory.h"
+#include "topics/TableFactory.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
-const std::string GroupTable::name = "_kipling_group";
+const std::string GroupTable::name = "_topics_group";
 const std::string GroupTable::pkIndexName = GroupTable::name + "_pkey";
 const std::string GroupTable::standaloneGroupIndexName = GroupTable::name + "_standalone_index";
 
-const std::string GroupMemberTable::name = "_kipling_group_member";
+const std::string GroupMemberTable::name = "_topics_group_member";
 const std::string GroupMemberTable::indexName = GroupMemberTable::name + "_index";
 
-const std::string GroupOffsetTable::name = "_kipling_group_offset";
+const std::string GroupOffsetTable::name = "_topics_group_offset";
 const std::string GroupOffsetTable::indexName = GroupOffsetTable::name + "_pkey";
 
 /*
@@ -47,10 +47,10 @@ class GroupTableStandalonePredicate : public AbstractExpression {
 };
 
 /*
- * Create a table for tracking kipling groups equivalent to
- * CREATE TABLE _kipling_group (id VARCHAR(256 BYTES) NOT NULL, generation INTEGER NOT NULL,
+ * Create a table for tracking topics groups equivalent to
+ * CREATE TABLE _topics_group (id VARCHAR(256 BYTES) NOT NULL, generation INTEGER NOT NULL,
  *     leader VARCHAR(36 BYTES) NOT NULL, protocol VARCHAR(256 BYTES) NOT NULL, PRIMARY KEY (id));
- * PARTITION TABLE kipling_group ON COLUMN id;
+ * PARTITION TABLE topics_group ON COLUMN id;
  */
 PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
     std::vector<std::string> columnNames = { "id", "update_timestamp", "generation", "leader", "protocol" };
@@ -72,11 +72,11 @@ PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
 }
 
 /*
- * Create a table for tracking kipling group members equivalent to
- * CREATE TABLE _kipling_group_member (group_id VARCHAR(256 BYTES) NOT NULL, id VARCHAR(36 BYTES) NOT NULL,
+ * Create a table for tracking topics group members equivalent to
+ * CREATE TABLE _topics_group_member (group_id VARCHAR(256 BYTES) NOT NULL, id VARCHAR(36 BYTES) NOT NULL,
  *     session_timeout INTEGER NOT NULL, rebalance_timeout INTEGER NOT NULL, instance_id VARCHAR(256 BYTES),
  *     protocol_metadata VARBINARY(1048576) NOT NULL, assignments VARBINARY(1048576) NOT NULL);
- * PARTITION TABLE kipling_group_member ON COLUMN group_id;
+ * PARTITION TABLE topics_group_member ON COLUMN group_id;
  */
 PersistentTable* TableFactory::createGroupMember(const SystemTableFactory &factory) {
     std::vector<std::string> columnNames = { "group_id", "id", "session_timeout", "rebalance_timeout", "instance_id",
@@ -96,11 +96,11 @@ PersistentTable* TableFactory::createGroupMember(const SystemTableFactory &facto
 }
 
 /*
- * Create a table for tracking persisted offsets for a kipling group equivalent to
- * CREATE TABLE _kipling_group_offset (group_id VARCHAR(256 BYTES) NOT NULL, topic VARCHAR(256 BYTES) NOT NULL,
+ * Create a table for tracking persisted offsets for a topics group equivalent to
+ * CREATE TABLE _topics_group_offset (group_id VARCHAR(256 BYTES) NOT NULL, topic VARCHAR(256 BYTES) NOT NULL,
  *     partition INTEGER NOT NULL, committed_offset BIGINT NOT NULL, expires TIMESTAMP NOT NULL,
  *     leader_epoch INTEGER NOT NULL, metadata VARCHAR(1048576), PRIMARY KEY (group_id, topic, partition));
- * PARTITION TABLE kipling_group_offset ON COLUMN group_id;
+ * PARTITION TABLE topics_group_offset ON COLUMN group_id;
  */
 PersistentTable* TableFactory::createGroupOffset(const SystemTableFactory &factory) {
     std::vector<std::string> columnNames = { "group_id", "topic", "partition", "commit_timestamp", "committed_offset",

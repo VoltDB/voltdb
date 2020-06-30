@@ -18,12 +18,12 @@
 #pragma once
 #include <functional>
 
-#include "kipling/TableFactory.h"
-#include "kipling/orm/GroupOrmBase.h"
+#include "topics/TableFactory.h"
+#include "topics/orm/GroupOrmBase.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 /**
  * Class which represents a row from GroupMemberTable. The row represents a single member of a group
@@ -124,5 +124,5 @@ private:
     const NValue m_memberId;
 };
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

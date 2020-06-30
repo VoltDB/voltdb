@@ -19,11 +19,11 @@
 
 #include <functional>
 
-#include "kipling/messages/OffsetCommit.h"
-#include "kipling/orm/GroupOrmBase.h"
+#include "topics/messages/OffsetCommit.h"
+#include "topics/orm/GroupOrmBase.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 class GroupOffset: public GroupOrmBase {
 public:
@@ -106,5 +106,5 @@ private:
     const int32_t m_partition;
 };
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

@@ -16,11 +16,11 @@
  */
 
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
-#include "kipling/orm/GroupOffset.h"
+#include "topics/TableFactory.h"
+#include "topics/orm/GroupOffset.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 /*
  * Internal visit which visits the tuples of all offsets for the given groupId
@@ -136,5 +136,5 @@ bool GroupOffset::equalDeleted(const GroupOrmBase &other) const {
             && getPartition() == otherOffset.getPartition();
 }
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

@@ -24,16 +24,16 @@
 #include <memory>
 
 #include "harness.h"
-#include "kipling/GroupTestBase.h"
+#include "topics/GroupTestBase.h"
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
-#include "kipling/messages/OffsetCommit.h"
-#include "kipling/orm/Group.h"
-#include "kipling/orm/GroupOffset.h"
+#include "topics/TableFactory.h"
+#include "topics/messages/OffsetCommit.h"
+#include "topics/orm/Group.h"
+#include "topics/orm/GroupOffset.h"
 #include "storage/SystemTableFactory.h"
 
 using namespace voltdb;
-using namespace voltdb::kipling;
+using namespace voltdb::topics;
 
 class GroupOrmTest: public GroupTestBase, public GroupTables {
 public:
@@ -42,9 +42,9 @@ public:
         m_topend = new DummyTopend();
         m_pool = new Pool();
         m_context = new ExecutorContext(0, 0, nullptr, m_topend, m_pool, nullptr, "", 0, NULL, NULL, 0);
-        m_groupTable.reset(kipling::TableFactory::createGroup(m_factory));
-        m_groupMemberTable.reset(kipling::TableFactory::createGroupMember(m_factory));
-        m_groupOffsetTable.reset(kipling::TableFactory::createGroupOffset(m_factory));
+        m_groupTable.reset(topics::TableFactory::createGroup(m_factory));
+        m_groupMemberTable.reset(topics::TableFactory::createGroupMember(m_factory));
+        m_groupOffsetTable.reset(topics::TableFactory::createGroupOffset(m_factory));
     }
 
     virtual ~GroupOrmTest() {
