@@ -516,9 +516,9 @@ public class KafkaClientVerifier {
         config.parse(KafkaClientVerifier.class.getName(), args);
         KafkaClientVerifier verifier = null;
         for (int i = config.loops; i > 0; i--) {
-        verifier = new KafkaClientVerifier(config);
-        String fulltopic = config.topicprefix + config.topic;
-        Boolean metadata = config.metadata;
+            verifier = new KafkaClientVerifier(config);
+            String fulltopic = config.topicprefix + config.topic;
+            Boolean metadata = config.metadata;
             log.info("+++ Loops: " + i);
             try {
                 verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
