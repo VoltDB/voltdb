@@ -747,6 +747,9 @@ CompactingChunks::find(void const* p, bool) noexcept {
     return list_type::find(p);
 }
 
+// NOTE: this must be called whenever any deletion occurs (that
+// triggers at most one chunk deletion in txn view), and *after*
+// adjusting BegTxnBoundary::right() (only if needed).
 inline typename CompactingChunks::list_type::iterator CompactingChunks::releasable() {
     return beginTxn().iterator(CompactingStorageTrait::releasable(beginTxn().iterator()));
 }
@@ -1180,6 +1183,37 @@ inline void CompactingChunks::DelayedRemover::validate() const {
                     ++acc.second;
                     return acc;
                 }).first);
+}
+
+inline pair<bool, void const*> CompactingChunks::free(void* src) {
+    auto const iter = find(src);
+    if (! iter.first) {
+        snprintf(buf, sizeof buf, "CompactingChunk::free(%p): invalid address", src);
+        buf[sizeof buf - 1] = 0;
+        throw range_error(buf);
+    } else {
+        assert(beginTxn().iterator()->valid(Compact::value));
+        auto const& beg = beginTxn().iterator();
+        void const* dst = beg->range_left();
+        bool const finalizable = finalizerAndCopier() &&
+            (! frozenBoundaries() ||     // either not frozen (or without frozen region); or
+             less_rolling(frozenBoundaries()->right().id(), beg->id()) ||       // frozen; but compacted address is
+             (beg->id() == frozenBoundaries()->right().id() &&                  // outside frozen region
+              dst >= frozenBoundaries()->right().right()));
+        if (dst != src) {      // shallow copy needed for compaction
+            memcpy(src, dst, tupleSize());
+        }
+        if (finalizable) {
+            finalizerAndCopier().finalize(dst);
+        }
+        // adjust range_left(); check for need to "drop" head chunk
+        if (beg->range_right() ==
+                (beginTxn().left() = (reinterpret_cast<char*&>(beg->m_left) += tupleSize()))) {
+            releasable();
+        }
+        --m_allocs;
+        return {finalizable, dst == src ? nullptr : dst};
+    }
 }
 
 // NOTE: call this only if chunks are frozen
@@ -2074,8 +2108,15 @@ HookedCompactingChunks<Hook, E>::remove_reserve(size_t n) {
 }
 
 template<typename Hook, typename E> inline void
-HookedCompactingChunks<Hook, E>::remove_reset() {
+HookedCompactingChunks<Hook, E>::remove_reset() noexcept {
     CompactingChunks::m_batched.clear(true);
+}
+
+template<typename Hook, typename E> template<typename Tag> inline pair<bool, void const*>
+HookedCompactingChunks<Hook, E>::remove(void const* p) {
+    Hook::add(Hook::add_cause::remove, p,
+            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+    return CompactingChunks::free(const_cast<void*>(p));
 }
 
 template<typename Hook, typename E>
@@ -2250,6 +2291,8 @@ HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
+template pair<bool, void const*> HookedCompactingChunks<TxnPreHook<alloc,                \
+        HistoryRetainTrait<gc>>, void>::remove<tag>(void const*);                        \
 template pair<size_t, size_t> HookedCompactingChunks<TxnPreHook<alloc,                   \
         HistoryRetainTrait<gc>>, void>::remove_force<tag>(                               \
         function<void(vector<pair<void*, void const*>> const&)> const&);                 \

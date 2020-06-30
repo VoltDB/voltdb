@@ -736,6 +736,14 @@ namespace voltdb {
              */
             void free(remove_direction, void const*);
             /**
+             * Remove a single address.
+             *
+             * Returns whether finalization occurred, and source
+             * address for compaction (if any: NULL otherwise).
+             * Note that compacted address *cannot* be dereferenced.
+             */
+            pair<bool, void const*> free(void*);
+            /**
              * State changes
              */
             void freeze();
@@ -857,6 +865,12 @@ namespace voltdb {
              */
             void remove(remove_direction, void const*);
             /**
+             * Light weight free() operation at arbitrary
+             * position
+             */
+            template<typename Tag>
+            pair<bool, void const*> remove(void const*);
+            /**
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
@@ -872,7 +886,7 @@ namespace voltdb {
              */
             template<typename Tag> pair<size_t, size_t>
             remove_force(function<void(vector<pair<void*, void const*>> const&)> const&);
-            void remove_reset();
+            void remove_reset() noexcept;                // for testing only
             template<typename Tag> void clear();
         };
 

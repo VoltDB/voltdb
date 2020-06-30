@@ -145,18 +145,23 @@ constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHo
 constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in 256 chunks
 
 template<size_t N> using varray = array<void const*, N>;
-template<typename Alloc> void* remove_single(Alloc& alloc, void const* p) {
-    alloc.remove_reserve(1);
-    alloc.remove_add(const_cast<void*>(p));
-    void* r = nullptr;
-    assert(1 ==
-            alloc.template remove_force<truth>([&r](vector<pair<void*, void const*>> const& entries) noexcept {
-                if (! entries.empty()) {
+template<typename Alloc> void const* remove_single(Alloc& alloc, void const* p) {
+    // Probablistically tests 2 APIs
+    if (rand() % 5) {                    // 80% of the time, use the single remove API directly
+        return alloc.template remove<truth>(const_cast<void*>(p)).second;
+    } else {       // 20% of the time, use heavy-weight batch removal API
+        void const* r = nullptr;
+        alloc.remove_reserve(1);
+        alloc.remove_add(const_cast<void*>(p));
+        assert(1 ==
+                alloc.template remove_force<truth>([&r](vector<pair<void*, void const*>> const& entries) noexcept {
+                    if (! entries.empty()) {
                     assert(entries.size() == 1);
                     r = memcpy(entries[0].first, entries[0].second, TupleSize);
-                }
-            }).first);
-    return r;
+                    }
+                    }).first);
+        return r;
+    }
 }
 
 template<typename Alloc> pair<size_t, size_t> remove_multiple(Alloc& alloc, size_t n, ...) {
