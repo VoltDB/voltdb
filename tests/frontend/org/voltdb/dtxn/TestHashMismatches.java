@@ -340,7 +340,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     @Test(timeout = 60_000)
     public void testSnapshotSaveRestoreWithoutCL() throws Exception {
-        if (!MiscUtils.isPro()) {
+        if (!MiscUtils.isPro() || LocalCluster.isMemcheckDefined()) {
             return;
         }
         deleteTestFiles(TESTNONCE);
@@ -447,7 +447,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
 
     @Test(timeout = 180_000)
     public void testShutdownRecoverWithoutCL() throws Exception {
-        if (!MiscUtils.isPro()) {
+        if (!MiscUtils.isPro() || LocalCluster.isMemcheckDefined()) {
             return;
         }
         deleteTestFiles(TESTNONCE);

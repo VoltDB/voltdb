@@ -602,13 +602,12 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     private void startLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
-        startLocalServer(hostId, clearLocalDataDirectories, templateCmdLine.m_startAction);
+        startLocalServer(hostId, templateCmdLine.internalPort(), clearLocalDataDirectories, templateCmdLine.m_startAction);
     }
 
-    private void startLocalServer(int hostId, boolean clearLocalDataDirectories, StartAction action) {
+    private void startLocalServer(int hostId, int leaderPort, boolean clearLocalDataDirectories, StartAction action) {
         // make sure the local server has the same environment properties as separate process
         m_additionalProcessEnv.forEach(System::setProperty);
-
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         if (!isNewCli) {
@@ -630,8 +629,25 @@ public class LocalCluster extends VoltServerConfig {
             }
         }
 
-        // Make the local Configuration object...
-        CommandLine cmdln = (templateCmdLine.makeCopy());
+        CommandLine cmdln;
+        if (hostId >= m_cmdLines.size()) {
+            // Make the local Configuration object...
+            cmdln = (templateCmdLine.makeCopy());
+            cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
+            cmdln.port(portGenerator.nextClient());
+            cmdln.adminPort(portGenerator.nextAdmin());
+            cmdln.zkport(portGenerator.nextZkPort());
+            cmdln.httpPort(portGenerator.nextHttp());
+            // replication port and its two automatic followers.
+            cmdln.drAgentStartPort(m_replicationPort != -1 ? m_replicationPort : portGenerator.nextReplicationPort());
+            setDrPublicInterface(cmdln);
+            portGenerator.nextReplicationPort();
+            portGenerator.nextReplicationPort();
+        }
+        else {
+            cmdln = m_cmdLines.get(hostId);
+        }
+        cmdln.leaderPort(leaderPort);
         cmdln.startCommand(action);
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
@@ -642,16 +658,6 @@ public class LocalCluster extends VoltServerConfig {
         if (!isNewCli) {
             cmdln.voltFilePrefix(subroot.getPath());
         }
-        cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
-        cmdln.port(portGenerator.nextClient());
-        cmdln.adminPort(portGenerator.nextAdmin());
-        cmdln.zkport(portGenerator.nextZkPort());
-        cmdln.httpPort(portGenerator.nextHttp());
-        // replication port and its two automatic followers.
-        cmdln.drAgentStartPort(m_replicationPort != -1 ? m_replicationPort : portGenerator.nextReplicationPort());
-        setDrPublicInterface(cmdln);
-        portGenerator.nextReplicationPort();
-        portGenerator.nextReplicationPort();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             EEProcess proc = m_eeProcs.get(hostId);
             assert(proc != null);
@@ -1447,8 +1453,7 @@ public class LocalCluster extends VoltServerConfig {
         int portNoToRejoin = m_cmdLines.get(leaderHostId).internalPort();
 
         if (hostId == 0 && m_hasLocalServer) {
-            templateCmdLine.leaderPort(portNoToRejoin);
-            startLocalServer(leaderHostId, false, startAction);
+            startLocalServer(hostId, portNoToRejoin, false, startAction);
             m_localServer.waitForRejoin();
             return true;
         }
@@ -1554,14 +1559,14 @@ public class LocalCluster extends VoltServerConfig {
                               ".rejoined.txt";
 
             if (m_logMessageMatchPatterns == null) {
-                ptf = new PipeToFile(filePath, proc.getInputStream(), PipeToFile.m_initToken, false, proc);
+                ptf = new PipeToFile(filePath, proc.getInputStream(), PipeToFile.m_rejoinCompleteToken, false, proc);
             } else {
                 if (m_logMessageMatchResults.containsKey(hostId)) {
                     resetLogMessageMatchResults(hostId);
                 } else {
                     m_logMessageMatchResults.put(hostId, Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 }
-                ptf = new PipeToFile(filePath, proc.getInputStream(), PipeToFile.m_initToken, false,
+                ptf = new PipeToFile(filePath, proc.getInputStream(), PipeToFile.m_rejoinCompleteToken, false,
                         proc, m_logMessageMatchPatterns, m_logMessageMatchResults.get(hostId));
                 ptf.setHostId(hostId);
             }
@@ -2060,7 +2065,7 @@ public class LocalCluster extends VoltServerConfig {
         assert(cl != null);
         cl.m_port = config.m_port;
         cl.m_adminPort = config.m_adminPort;
-        cl.m_zkInterface = config.m_zkInterface;
+        cl.zkport(config.getZKPort());
         cl.m_internalPort = config.m_internalPort;
         cl.m_leader = config.m_leader;
         cl.m_coordinators = ImmutableSortedSet.copyOf(config.m_coordinators);

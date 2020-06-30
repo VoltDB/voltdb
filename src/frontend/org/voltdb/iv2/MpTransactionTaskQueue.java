@@ -42,7 +42,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger tmLog = new VoltLogger("TM");
-
+    public static final String TXN_RESTART_MSG = "Transaction being restarted due to fault recovery or shutdown.";
     // Track the current writes and reads in progress.  If writes contains anything, reads must be empty,
     // and vice versa
     private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
@@ -141,8 +141,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     // Provide a TransactionRestartException which will be converted
                     // into a ClientResponse.RESTART, so that the MpProcedureTask can
                     // detect the restart and take the appropriate actions.
-                    TransactionRestartException restart = new TransactionRestartException(
-                            "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                    TransactionRestartException restart = new TransactionRestartException(TXN_RESTART_MSG, next.getTxnId());
                     restart.setMisrouted(false);
                     poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
                     txn.offerReceivedFragmentResponse(poison);

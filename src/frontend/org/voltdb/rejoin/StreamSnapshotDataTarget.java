@@ -79,7 +79,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     // schemas for all the tables on this partition
     private final Map<Integer, Pair<Boolean, byte[]>> m_schemas;
-    // HSId of the destination mailbox
+    // HSId of the source site mailbox
+    private final long m_srcHSId;
+    // HSId of the destination site mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
     private final boolean m_replicatedTableTarget;
@@ -106,15 +108,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
-    public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
+    public StreamSnapshotDataTarget(long srcHSId, long destHSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
             byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
             StreamSnapshotAckReceiver ackReceiver)
     {
-        this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, tables, DEFAULT_WRITE_TIMEOUT_MS, sender,
+        this(srcHSId, destHSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, tables, DEFAULT_WRITE_TIMEOUT_MS, sender,
                 ackReceiver);
     }
 
-    public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
+    public StreamSnapshotDataTarget(long srcHSId, long destHSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
             byte[] hashinatorConfig, List<SnapshotTableInfo> tables, long writeTimeout, SnapshotSender sender,
             StreamSnapshotAckReceiver ackReceiver)
     {
@@ -124,7 +126,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
         m_schemas = tables.stream().collect(
                 Collectors.toMap(SnapshotTableInfo::getTableId, t -> Pair.of(t.isReplicated(), t.getSchema())));
-        m_destHSId = HSId;
+        m_srcHSId = srcHSId;
+        m_destHSId = destHSId;
         m_replicatedTableTarget = lowestDestSite;
         m_otherDestHostHSIds = new HashSet<>(allDestHostHSIds);
         m_otherDestHostHSIds.remove(m_destHSId);
@@ -134,8 +137,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_ackReceiver.setCallback(m_targetId, this, m_replicatedTableTarget ? allDestHostHSIds.size() : 1);
 
         rejoinLog.debug(String.format("Initializing snapshot stream processor " +
-                "for source site id: %s, and with processorid: %d%s" ,
-                CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite?" [Lowest Site]":"")));
+                "for src site id : %s, dest site id: %s, and with processorid: %d%s" ,
+                CoreUtils.hsIdToString(m_srcHSId), CoreUtils.hsIdToString(m_destHSId),
+                m_targetId, (lowestDestSite?" [Lowest Site]":"")));
 
         // start a periodic task to look for timed out connections
         VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout, System.currentTimeMillis()), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
@@ -278,9 +282,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     m_ackCounter = new AtomicInteger(1);
                     sentBytes = send(mb, msgFactory, m_message);
                 }
-                rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
-                        " expected ackCounter " + m_ackCounter +
-                        " otherDestHSIds " + m_otherDestHSIds);
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
+                            " expected ackCounter " + m_ackCounter +
+                            " otherDestHSIds " + m_otherDestHSIds);
+                }
                 return sentBytes;
             } finally {
                 // Buffers are only discarded after they are acked. Discarding them here would cause the sender to
@@ -336,20 +342,26 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long bytesWritten = 0;
             long bytesSentSinceLastCheck = 0;
             try {
+                final int destHostId = CoreUtils.getHostIdFromHSId(m_destHSId);
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 bytesSentSinceLastCheck = bytesWritten - m_bytesWrittenSinceConstruction;
-                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                        CoreUtils.hsIdToString(m_destHSId), bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
+                rejoinLog.info(String.format("While sending rejoin data from site %s to site %s, %d bytes have been sent in the past %s seconds.",
+                        CoreUtils.hsIdToString(m_srcHSId), CoreUtils.hsIdToString(m_destHSId),
+                        bytesSentSinceLastCheck, WATCHDOG_PERIOD_S));
 
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
-                    clearOutstanding(); // idempotent
-                }
-                // No data sent for more than timeout, if destination host is not available and exception is registered, stop watching
-                final long delta = System.currentTimeMillis() - m_lastDataWrite;
-                if (bytesSentSinceLastCheck == 0 && delta > m_writeTimeout) {
-                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    watchAgain = liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId));
+                    clearOutstanding();
+                    watchAgain = false;
+                } else if (bytesSentSinceLastCheck == 0) {
+                    watchAgain = VoltDB.instance().getHostMessenger().getLiveHostIds().contains(destHostId);
+                    if (!watchAgain) {
+                        if(m_writeFailed.get() == null) {
+                            setWriteFailed(new StreamSnapshotTimeoutException(
+                              "A snapshot write task failed after rejoining node is down."));
+                        }
+                        clearOutstanding();
+                    }
                 }
             } catch (Throwable t) {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
@@ -359,7 +371,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout, bytesSentSinceLastCheck > 0 ? System.currentTimeMillis() : m_lastDataWrite),
                             WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
                 } else {
-                    rejoinLog.info(String.format("Stop watching stream snapshot watch to site %s", CoreUtils.hsIdToString(m_destHSId)));
+                    rejoinLog.info(String.format("Stop watching stream snapshot from site %s to site %s",
+                            CoreUtils.hsIdToString(m_srcHSId),
+                            CoreUtils.hsIdToString(m_destHSId)));
                 }
             }
         }
@@ -377,8 +391,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             if ((now - work.m_ts) > timeoutMs) {
                 StreamSnapshotTimeoutException exception =
                         new StreamSnapshotTimeoutException(String.format(
-                                "A snapshot write task failed after a timeout (currently %d seconds outstanding). " +
+                                "A snapshot write task failed on site %s after a timeout (currently %d seconds outstanding). " +
                                         "Node rejoin may need to be retried",
+                                CoreUtils.hsIdToString(m_srcHSId),
                                 (now - work.m_ts) / 1000));
                 rejoinLog.error(exception.getMessage());
                 setWriteFailed(exception);
@@ -572,9 +587,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     // remove the schema once sent
                     byte[] schema = tableInfo.getSecond();
                     m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
-                    rejoinLog.debug("Sending schema for table " + tableId);
+                    if (rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("Sending schema for table " + tableId);
+                    }
 
-                    rejoinLog.trace("Writing schema as part of this write");
                     send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
                 }
 
@@ -617,7 +633,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         SettableFuture<Boolean> sendFuture = SettableFuture.create();
         if (rejoinLog.isTraceEnabled()) {
             rejoinLog.trace("Sending block " + blockIndex + " of type " + (replicatedTable?"REPLICATED ":"PARTITIONED ") + type.name() +
-                    " from targetId " + m_targetId + " to " + CoreUtils.hsIdToString(m_destHSId) +
+                    " from targetId " + m_targetId + " site " + CoreUtils.hsIdToString(m_srcHSId) +
+                    " to " + CoreUtils.hsIdToString(m_destHSId) +
                     (replicatedTable?", " + CoreUtils.hsIdCollectionToString(m_otherDestHostHSIds):""));
         }
         SendWork sendWork = new SendWork(type, m_targetId, m_destHSId,
@@ -716,7 +733,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private synchronized void waitForOutstandingWork()
     {
         boolean interrupted = false;
-        while (m_writeFailed.get() == null && (m_outstandingWorkCount.get() > 0)) {
+        while (m_writeFailed.get() == null && (m_outstandingWorkCount.get() > 0) && !m_ackReceiver.isStopped()) {
             try {
                 wait();
             } catch (InterruptedException e) {
