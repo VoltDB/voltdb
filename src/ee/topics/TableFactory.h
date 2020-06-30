@@ -19,7 +19,7 @@
 
 #include <storage/SystemTableFactory.h>
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 // Static classes to describe the different system tables
 struct GroupTable {
@@ -65,11 +65,11 @@ struct GroupOffsetTable {
 class TableFactory {
 
 public:
-    /* Create a new PersistentTable for kipling groups */
+    /* Create a new PersistentTable for topics groups */
     static PersistentTable* createGroup(const SystemTableFactory &factory);
-    /* Create a new PersistentTable for kipling group members */
+    /* Create a new PersistentTable for topics group members */
     static PersistentTable* createGroupMember(const SystemTableFactory &factory);
-    /* Create a new PersistentTable for kipling group offsets */
+    /* Create a new PersistentTable for topics group offsets */
     static PersistentTable* createGroupOffset(const SystemTableFactory &factory);
 };
 

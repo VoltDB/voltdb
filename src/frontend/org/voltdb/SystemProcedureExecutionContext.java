@@ -132,5 +132,5 @@ public interface SystemProcedureExecutionContext {
 
     void decommissionSite(boolean remove, boolean promote, int newSitePerHost);
 
-    KiplingSystemTableConnection getKiplingSystemTableConnection();
+    TopicsSystemTableConnection getTopicsSystemTableConnection();
 }

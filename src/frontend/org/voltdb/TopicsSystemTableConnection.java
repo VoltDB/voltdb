@@ -19,18 +19,18 @@ package org.voltdb;
 import org.voltcore.utils.Pair;
 import org.voltdb.types.TimestampType;
 
-public interface KiplingSystemTableConnection {
+public interface TopicsSystemTableConnection {
     /**
-     * Store a kipling group and its members in the system tables
+     * Store a topics group and its members in the system tables
      *
-     * @param serializedGroup kipling group serialized into a byte[]
+     * @param serializedGroup topics group serialized into a byte[]
      */
     void storeGroup(byte[] groupMetadata);
 
     /**
-     * Delete a kiplng group, all members and all offsets
+     * Delete a topics group, all members and all offsets
      *
-     * @param groupId ID of group to be dleted
+     * @param groupId ID of group to be deleted
      */
     void deleteGroup(String groupId);
 
@@ -47,10 +47,10 @@ public interface KiplingSystemTableConnection {
     Pair<Boolean, byte[]> fetchGroups(int maxResultSize, String startGroupId);
 
     /**
-     * Commit topic partition offsets for a kipling group in the system tables
+     * Commit topic partition offsets for a topics group in the system tables
      *
      * @param spHandle       for this transaction
-     * @param requestVersion Version of the kipling message making this request
+     * @param requestVersion Version of the topics message making this request
      * @param groupId        ID of the group
      * @param offsets        serialized offsets to be stored
      * @return response to requester
@@ -58,9 +58,9 @@ public interface KiplingSystemTableConnection {
     byte[] commitGroupOffsets(long spHandle, short requestVersion, String groupId, byte[] offsets);
 
     /**
-     * Fetch topic partition offsets for a kipling group from the system tables
+     * Fetch topic partition offsets for a topics group from the system tables
      *
-     * @param requestVersion version of the kipling message making this request
+     * @param requestVersion version of the topics message making this request
      * @param groupId        IF of group
      * @param offsets        serialized offsets being requested
      * @return response to requester

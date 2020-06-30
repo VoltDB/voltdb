@@ -688,21 +688,21 @@ public class SystemProcedureCatalog {
                         Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         true, false, true, Durability.NOT_DURABLE,
                         false, true, Restartability.RESTARTABLE));
-        builder.put("@StoreKiplingGroup", Builder
-                .createSp("org.voltdb.sysprocs.KiplingProcedures$StoreGroup", VoltType.STRING).commercial().build());
-        builder.put("@DeleteKiplingGroup", Builder
-                .createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteGroup", VoltType.STRING).commercial().build());
-        builder.put("@FetchKiplingGroups",
-                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroups", -1, VoltType.INVALID).commercial()
+        builder.put("@StoreTopicsGroup", Builder
+                .createSp("org.voltdb.sysprocs.TopicsProcedures$StoreGroup", VoltType.STRING).commercial().build());
+        builder.put("@DeleteTopicsGroup", Builder
+                .createSp("org.voltdb.sysprocs.TopicsProcedures$DeleteGroup", VoltType.STRING).commercial().build());
+        builder.put("@FetchTopicsGroups",
+                Builder.createSp("org.voltdb.sysprocs.TopicsProcedures$FetchGroups", -1, VoltType.INVALID).commercial()
                         .readOnly().notDurable().build());
-        builder.put("@CommitKiplingGroupOffsets",
-                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$CommitGroupOffsets", VoltType.STRING)
+        builder.put("@CommitTopicsGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.TopicsProcedures$CommitGroupOffsets", VoltType.STRING)
                         .commercial().build());
-        builder.put("@FetchKiplingGroupOffsets",
-                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$FetchGroupOffsets", VoltType.STRING)
+        builder.put("@FetchTopicsGroupOffsets",
+                Builder.createSp("org.voltdb.sysprocs.TopicsProcedures$FetchGroupOffsets", VoltType.STRING)
                         .commercial().readOnly().build());
-        builder.put("@DeleteExpiredKiplingOffsets",
-                Builder.createSp("org.voltdb.sysprocs.KiplingProcedures$DeleteExpiredOffsets", -1, VoltType.INVALID)
+        builder.put("@DeleteExpiredTopicsOffsets",
+                Builder.createSp("org.voltdb.sysprocs.TopicsProcedures$DeleteExpiredOffsets", -1, VoltType.INVALID)
                         .commercial().build());
         builder.put("@UpdateLicense",
                 Builder.createNp("org.voltdb.sysprocs.UpdateLicense").commercial().allowedInReplica().build());
