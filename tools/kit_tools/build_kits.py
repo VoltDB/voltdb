@@ -86,6 +86,7 @@ def makeReleaseDir(releaseDir):
         shutil.rmtree(releaseDir)
     # create a release dir
     os.makedirs(releaseDir)
+    local("chmod 755 %s" % releaseDir)
     print "Created dir: " + releaseDir
 
 
@@ -178,6 +179,9 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         "%s/voltdb%s-%s.tar.gz" % (releaseDir, typeString, version))
     get("%s/pro/obj/pro/voltdb%s-%s.SHA256SUM" % (builddir, typeString, version),
         "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
+    # make don't allow group memebers to delete the directory, the default
+    # permissions are 664
+    local("chmod 755 %s" % releaseDir)
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),

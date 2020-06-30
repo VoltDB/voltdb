@@ -265,9 +265,9 @@ public:
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool, bool fallible = true);
+    void deleteAllTuples();
 
-    void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine);
 
     void swapTable
            (PersistentTable* otherTable,
@@ -471,7 +471,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
-    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable, bool replicatedTableAction);
+    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
 
     void truncateTableRelease(PersistentTable* originalTable);
 
@@ -657,7 +657,7 @@ private:
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
     // Add truncate operation to dr log stream if dr is enabled and running
-    void drLogTruncate(const ExecutorContext* ec, bool fallible);
+    void drLogTruncate(const ExecutorContext* ec);
 
     void notifyBlockWasCompactedAway(TBPtr block);
 

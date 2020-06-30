@@ -63,7 +63,7 @@ public:
 
     /** Delete all tuples in this table (done when fragment execution
         is complete) */
-    virtual void deleteAllTempTuples() = 0;
+    virtual void deleteAllTuples() = 0;
 
     /** The temp table limits object for this table */
     virtual const TempTableLimits* getTempTableLimits() const = 0;

@@ -89,7 +89,7 @@ TableIterator StreamedTable::iteratorDeletingAsWeGo() {
     throw SerializableEEException("May not iterate a streamed table.");
 }
 
-void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
+void StreamedTable::deleteAllTuples()
 {
     throw SerializableEEException("May not delete all tuples of a streamed table.");
 }
