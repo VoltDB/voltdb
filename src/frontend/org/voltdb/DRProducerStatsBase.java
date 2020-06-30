@@ -37,6 +37,7 @@ public class DRProducerStatsBase {
         public static final String ROWS_IN_SYNC_SNAPSHOT = "ROWSINSYNCSNAPSHOT";
         public static final String ROWS_ACKED_FOR_SYNC_SNAPSHOT = "ROWSACKEDFORSYNCSNAPSHOT";
         public static final String QUEUE_DEPTH = "QUEUEDEPTH";
+        public static final String REMOTE_CREATION_TIMESTAMP = "REMOTECREATIONTIMESTAMP";
 
         // columns for partition-level table
         public static final String STREAM_TYPE = "STREAMTYPE";
@@ -69,6 +70,7 @@ public class DRProducerStatsBase {
             columns.add(new ColumnInfo(Columns.ROWS_IN_SYNC_SNAPSHOT, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.ROWS_ACKED_FOR_SYNC_SNAPSHOT, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.QUEUE_DEPTH, VoltType.BIGINT));
+            columns.add(new ColumnInfo(Columns.REMOTE_CREATION_TIMESTAMP, VoltType.TIMESTAMP));
         }
 
         @Override
