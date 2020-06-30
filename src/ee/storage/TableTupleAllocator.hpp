@@ -742,7 +742,7 @@ namespace voltdb {
              * address for compaction (if any: NULL otherwise).
              * Note that compacted address *cannot* be dereferenced.
              */
-            pair<bool, void const*> free(void*);
+            void const* free(void*, function<void(void const*)> const&&);
             /**
              * State changes
              */
@@ -868,8 +868,8 @@ namespace voltdb {
              * Light weight free() operation at arbitrary
              * position
              */
-            template<typename Tag>
-            pair<bool, void const*> remove(void const*);
+            template<typename Tag> void const*
+            remove(void const*, function<void(void const*)> const&&);
             /**
              * Batch removal using separate calls
              */

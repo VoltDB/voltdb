@@ -127,24 +127,24 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // that stores non-inlined tuple data.
     auto const tupleSize = schema->tupleLength() + TUPLE_HEADER_SIZE;
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
-        auto const cleaner = [this] (void const* p) {
-            checkContext("Cleaning");
-            TableTuple tuple(m_schema);
-            tuple.move(const_cast<void*>(p));
-            decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
-            tuple.freeObjectColumns();
-        };
-        auto const copier = [this] (void* fresh, void const* dest) {
-            checkContext("Copying");
-            TableTuple freshCopy(m_schema);
-            freshCopy.move(fresh);
-            TableTuple source(m_schema);
-            source.move(const_cast<void*>(dest));
-            freshCopy.resetHeader();
-            freshCopy.copyForPersistentInsert(source);
-            return fresh;
-        };
-        m_dataStorage.reset(new Alloc{tupleSize, {cleaner, copier}});
+        m_dataStorage.reset(new Alloc{tupleSize, {
+            [this] (void const* p) {      // finalizer
+                checkContext("Cleaning");
+                TableTuple tuple(m_schema);
+                tuple.move(const_cast<void*>(p));
+                decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
+                tuple.freeObjectColumns();
+            },
+            [this] (void* fresh, void const* dest) {       // copier
+                checkContext("Copying");
+                TableTuple freshCopy(m_schema);
+                freshCopy.move(fresh);
+                TableTuple source(m_schema);
+                source.move(const_cast<void*>(dest));
+                freshCopy.resetHeader();
+                freshCopy.copyForPersistentInsert(source);
+                return fresh;
+            }}});
     } else {
         m_dataStorage.reset(new Alloc{tupleSize});
     }
@@ -156,6 +156,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 
     m_tableAllocationSize = m_dataStorage->chunkSize();
     m_tuplesPerChunk = m_tableAllocationSize / m_tupleLength;
+    m_srcTuple = m_dstTuple = TableTuple(m_schema);
 }
 
 PersistentTable::~PersistentTable() {
@@ -663,51 +664,41 @@ TableTuple PersistentTable::createTuple(TableTuple const &source){
     return target;
 }
 
+void PersistentTable::compact(void* dst, void const* src, bool frozen) {
+    m_dstTuple.move(dst);
+    m_srcTuple.move(const_cast<void*>(src));
+
+    if (! frozen) {
+        // finalize dst tuple unless frozen, to save allocator from deep copy
+        decreaseStringMemCount(m_dstTuple.getNonInlinedMemorySizeForPersistentTable());
+        m_dstTuple.freeObjectColumns();
+    }
+    memcpy(m_dstTuple.address(), m_srcTuple.address(), m_tupleLength);
+    vassert(!m_srcTuple.isPendingDeleteOnUndoRelease());
+
+    for_each(m_indexes.begin(), m_indexes.end(),
+            [this](TableIndex* index) { index->replaceEntryNoKeyChange(m_dstTuple, m_srcTuple); });
+    if (isTableWithMigrate(m_tableType)) {
+        auto const txnId = m_srcTuple.getHiddenNValue(getMigrateColumnIndex());
+        if (!txnId.isNull()) {
+            migratingSwap(ValuePeeker::peekBigInt(txnId), m_srcTuple, m_dstTuple);
+        }
+    }
+    if (m_tableStreamer != nullptr) {
+        m_tableStreamer->notifyTupleMovement(m_srcTuple, m_dstTuple);
+    }
+    if (! frozen) {                 // when frozen, the original tuple remains useful??
+        m_srcTuple.setActiveFalse();
+    }
+}
+
 void PersistentTable::finalizeRelease() {
     allocator().template remove_force<storage::truth>(
-            [this, frozen = allocator().frozen()] (vector<pair<void*, void const*>> const& tuples) {    // shallow copy when frozen
-        TableTuple destinationTuple(m_schema), originalTuple(m_schema);
-        for(auto const& p : tuples) {
-            destinationTuple.move(p.first);
-            originalTuple.move(const_cast<void*>(p.second));
-
-            if (! frozen) {
-                // finalize dst tuple unless frozen, to save allocator from deep copy
-                decreaseStringMemCount(destinationTuple.getNonInlinedMemorySizeForPersistentTable());
-                destinationTuple.freeObjectColumns();
-            }
-            memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
-            vassert(!originalTuple.isPendingDeleteOnUndoRelease());
-
-            // Index handling: not frozen => replace; frozen => add???
-            if (frozen) {
-                TableTuple conflict(destinationTuple.getSchema());
-                for_each(m_indexes.begin(), m_indexes.end(),
-                        [&conflict, &destinationTuple](TableIndex* index) {
-                            // do not delete original index on
-                            // src tuple?
-                            index->addEntry(&destinationTuple, &conflict);
-                        });
-            } else {
-                for_each(m_indexes.begin(), m_indexes.end(),
-                        [&destinationTuple, &originalTuple](TableIndex* index) {
-                            index->replaceEntryNoKeyChange(
-                                    destinationTuple, originalTuple);
-                        });
-            }
-            if (isTableWithMigrate(m_tableType)) {
-                auto const txnId = originalTuple.getHiddenNValue(getMigrateColumnIndex());
-                if (!txnId.isNull()) {
-                    migratingSwap(ValuePeeker::peekBigInt(txnId), originalTuple, destinationTuple);
-                }
-           }
-           if (m_tableStreamer != NULL) {
-               m_tableStreamer->notifyTupleMovement(originalTuple, destinationTuple);
-           }
-           if (! frozen) {                 // when frozen, the original tuple remains useful
-               originalTuple.setActiveFalse();
-           }
-        }
+            [this] (vector<pair<void*, void const*>> const& tuples) {    // shallow copy when frozen
+        for_each(tuples.cbegin(), tuples.cend(),
+                [this, frozen = allocator().frozen()] (pair<void*, void const*> const& tuple) {
+                    compact(tuple.first, tuple.second, frozen);
+                });
     });
     m_invisibleTuplesPendingDeleteCount = 0;
 }
@@ -1263,7 +1254,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     // A snapshot (background scan) in progress can still cause a hold-up.
     // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.
-    if (m_tableStreamer != NULL) {
+    if (m_tableStreamer != nullptr) {
          m_tableStreamer->notifyTupleDelete(target);
     }
 
@@ -1271,6 +1262,14 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     allocator().remove_add(target.address());
     target.setActiveFalse();
     finalizeRelease();
+    // TODO: use single-tuple-removal API
+
+//    target.setActiveFalse();
+//    allocator().template remove<storage::truth>(target.address(),
+//            [this, &target] (void const* src) {
+//                compact(target.address(), src, allocator().frozen());
+//            });
+//    m_invisibleTuplesPendingDeleteCount = 0;
 }
 
 

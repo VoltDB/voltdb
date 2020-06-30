@@ -148,17 +148,17 @@ template<size_t N> using varray = array<void const*, N>;
 template<typename Alloc> void const* remove_single(Alloc& alloc, void const* p) {
     // Probablistically tests 2 APIs
     if (rand() % 5) {                    // 80% of the time, use the single remove API directly
-        return alloc.template remove<truth>(const_cast<void*>(p)).second;
+        return alloc.template remove<truth>(const_cast<void*>(p), [](void const*){});
     } else {       // 20% of the time, use heavy-weight batch removal API
         void const* r = nullptr;
         alloc.remove_reserve(1);
         alloc.remove_add(const_cast<void*>(p));
         assert(1 ==
                 alloc.template remove_force<truth>([&r](vector<pair<void*, void const*>> const& entries) noexcept {
-                    if (! entries.empty()) {
-                    assert(entries.size() == 1);
-                    r = memcpy(entries[0].first, entries[0].second, TupleSize);
-                    }
+                        if (! entries.empty()) {
+                            assert(entries.size() == 1);
+                            r = memcpy(entries[0].first, entries[0].second, TupleSize);
+                        }
                     }).first);
         return r;
     }
