@@ -1989,15 +1989,28 @@ TxnPreHook<Alloc, Trait, E>::TxnPreHook(size_t tupleSize, FinalizerAndCopier con
     m_changeStore(tupleSize), m_finalizerAndCopier(cb) {}
 
 template<typename Alloc, typename Trait, typename E1>
-template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, Trait, E1>::add(
-        add_cause cause, void const* dst, IteratorObserver& obs) {
+template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, Trait, E1>::addForUpdate(
+        void const* dst, IteratorObserver& obs) {
     if (m_recording && ! obs(dst)) {
         auto const iter = m_changes.lower_bound(dst);
         if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
             void* fresh = m_changeStore.allocate();
             m_changes.emplace_hint(iter, dst,
-                    cause == add_cause::update && m_finalizerAndCopier ?           // deep copy for updates only
+                    m_finalizerAndCopier ?        // deep copy for updates only
                     m_finalizerAndCopier.copy(fresh, dst) :            // deep copy, or
+                    memcpy(fresh, dst, m_changeStore.tupleSize()));    // shallow copy
+        }
+    }
+}
+
+template<typename Alloc, typename Trait, typename E1>
+template<typename IteratorObserver, typename E2> inline void TxnPreHook<Alloc, Trait, E1>::addForDelete(
+        void const* dst, IteratorObserver& obs) {
+    if (m_recording && ! obs(dst)) {
+        auto const iter = m_changes.lower_bound(dst);
+        if (iter == m_changes.cend() || iter->first != dst) {   // create a fresh copy
+            void* fresh = m_changeStore.allocate();
+            m_changes.emplace_hint(iter, dst,
                     memcpy(fresh, dst, m_changeStore.tupleSize()));    // shallow copy
         }
     }
@@ -2053,8 +2066,7 @@ template<typename Hook, typename E> inline void* HookedCompactingChunks<Hook, E>
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::clear() {
     CompactingChunks::clear([this] (void const* s) noexcept {
-                Hook::add(Hook::add_cause::remove,
-                        s, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                Hook::addForDelete(s, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
             });
 }
 
@@ -2072,8 +2084,7 @@ HookedCompactingChunks<Hook, E>::remove(typename CompactingChunks::remove_direct
 template<typename Hook, typename E>
 template<typename Tag> inline void HookedCompactingChunks<Hook, E>::update(void* dst) {
     VOLT_TRACE("update(%p)", dst);
-    Hook::add(Hook::add_cause::update, dst,
-            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+    Hook::addForUpdate(dst, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
 }
 
 template<typename Hook, typename E>
@@ -2114,8 +2125,7 @@ HookedCompactingChunks<Hook, E>::remove_reset() noexcept {
 
 template<typename Hook, typename E> template<typename Tag> inline void const*
 HookedCompactingChunks<Hook, E>::remove(void const* p, function<void(void const*)> const&& cb) {
-    Hook::add(Hook::add_cause::remove, p,
-            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+    Hook::addForDelete(p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     return CompactingChunks::free(const_cast<void*>(p), forward<decltype(cb)>(cb));
 }
 
@@ -2129,14 +2139,14 @@ HookedCompactingChunks<Hook, E>::remove_force(
                 CompactingChunks::m_batched.movements().cend(),
                 [this](pair<void*, void const*> const& entry) {
                     // we need to register tuples to be deleted
-                    Hook::add(Hook::add_cause::remove, entry.first,
+                    Hook::addForDelete(entry.first,
                             reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
         for_each(CompactingChunks::m_batched.removed().cbegin(),
                 CompactingChunks::m_batched.removed().cend(),
                 [this](void const* p) {
-                    Hook::add(Hook::add_cause::remove,
-                            p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
+                    Hook::addForDelete(p,
+                            reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
                 });
     }
     // finalize before memcpy, but after adding to hook memory
@@ -2272,10 +2282,12 @@ HookedIteratorCodegen(NthBitChecker<6>); HookedIteratorCodegen(NthBitChecker<7>)
 #undef HookedIteratorCodegen3
 // template member methods
 #define HookedMethods4(tag, alloc, gc, alloc2)                                           \
-template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::add<typename                    \
+template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::addForUpdate<typename           \
         IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(            \
-            TxnPreHook<alloc, HistoryRetainTrait<gc>>::add_cause, void const*,           \
-            typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&)
+            void const*, typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&);              \
+template void TxnPreHook<alloc, HistoryRetainTrait<gc>>::addForDelete<typename           \
+        IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver, void>(            \
+            void const*, typename IterableTableTupleChunks<alloc2, tag, void>::IteratorObserver&)
 #define HookedMethods3(tag, alloc, gc)                                                   \
     HookedMethods4(tag, alloc, gc, __codegen__::t1);                                     \
     HookedMethods4(tag, alloc, gc, __codegen__::t2);                                     \
