@@ -1213,7 +1213,7 @@ inline void CompactingChunks::DelayedRemover::validate() const {
                 }).first);
 }
 
-inline void const* CompactingChunks::free(void* src, function<void(void const*)> const&& cb) {
+inline bool CompactingChunks::free(void* src, function<void(void const*)> const&& cb) {
     auto const iter = find(src);
     if (! iter.first) {
         snprintf(buf, sizeof buf, "CompactingChunk::free(%p): invalid address", src);
@@ -1225,14 +1225,16 @@ inline void const* CompactingChunks::free(void* src, function<void(void const*)>
         assert(beginTxn().iterator()->valid(Compact::value));
         auto const& beg = beginTxn().iterator();
         void const* dst = beg->range_left();
-        cb(dst);
+        if (src != dst) {
+            cb(dst);
+        }
         // adjust range_left(); check for need to "drop" head chunk
         if (beg->range_right() ==
                 (beginTxn().left() = (reinterpret_cast<char*&>(beg->m_left) += tupleSize()))) {
             releasable();
         }
         --m_allocs;
-        return dst == src ? nullptr : dst;
+        return dst != src;
     }
 }
 
@@ -2144,7 +2146,7 @@ HookedCompactingChunks<Hook, E>::remove_reset() noexcept {
     CompactingChunks::m_batched.clear(true);
 }
 
-template<typename Hook, typename E> template<typename Tag> inline void const*
+template<typename Hook, typename E> template<typename Tag> inline bool
 HookedCompactingChunks<Hook, E>::remove(void const* p, function<void(void const*)> const&& cb) {
     Hook::addForDelete(p, reinterpret_cast<observer_type<Tag>&>(m_iterator_observer));
     return CompactingChunks::free(const_cast<void*>(p), move(cb));
@@ -2324,8 +2326,8 @@ HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::freeze<
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::thaw<tag>();              \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::update<tag>(void*);       \
 template void HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::clear<tag>();             \
-template void const* HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>,   \
-    void>::remove<tag>(void const*, function<void(void const*)> const&&);                \
+template bool HookedCompactingChunks<TxnPreHook<alloc, HistoryRetainTrait<gc>>, void>::remove<tag>(              \
+    void const*, function<void(void const*)> const&&);                                   \
 template pair<size_t, size_t> HookedCompactingChunks<TxnPreHook<alloc,                   \
         HistoryRetainTrait<gc>>, void>::remove_force<tag>(                               \
         function<void(vector<pair<void*, void const*>> const&)> const&);                 \

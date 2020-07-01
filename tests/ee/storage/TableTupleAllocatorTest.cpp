@@ -145,15 +145,11 @@ constexpr size_t AllocsPerChunk = 512 / TupleSize;     // 512 comes from ChunkHo
 constexpr size_t NumTuples = 256 * AllocsPerChunk;     // # allocations: fits in 256 chunks
 
 template<size_t N> using varray = array<void const*, N>;
-template<typename Alloc> void const* remove_single(Alloc& alloc, void const* p) {
+template<typename Alloc> bool remove_single(Alloc& alloc, void const* p) {
     // Probablistically tests 2 APIs
     if (rand() % 5) {                    // 80% of the time, use the single remove API directly
         return alloc.template remove<truth>(const_cast<void*>(p),
-                [p](void const* t) {
-                    if (p != t) {
-                        memcpy(const_cast<void*>(p), t, TupleSize);
-                    }
-                });
+                bind(memcpy, const_cast<void*>(p), placeholders::_1, TupleSize));
     } else {       // 20% of the time, use heavy-weight batch removal API
         void const* r = nullptr;
         alloc.remove_reserve(1);
@@ -165,7 +161,7 @@ template<typename Alloc> void const* remove_single(Alloc& alloc, void const* p) 
                             r = memcpy(entries[0].first, entries[0].second, TupleSize);
                         }
                     }).first);
-        return r;
+        return r != p;
     }
 }
 
@@ -1322,7 +1318,7 @@ TEST_F(TableTupleAllocatorTest, TestClearReallocate) {
     Alloc alloc(TupleSize);
     Gen gen;
     void* addr = alloc.allocate();
-    ASSERT_EQ(nullptr, remove_single(alloc, addr));
+    ASSERT_FALSE(remove_single(alloc, addr));
     // empty: reallocate
     memcpy(addr = alloc.allocate(), gen.get(), TupleSize);
     size_t i = 0;

@@ -323,7 +323,7 @@ public:
     }
 
     TableTuple createTuple(TableTuple const &source);
-    void finalizeRelease() override;
+    void finalizeRelease();
     void checkContext(const char* operation);
     /*
      * Lookup the address of the tuple whose values are identical to the specified tuple.

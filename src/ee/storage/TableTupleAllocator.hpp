@@ -738,11 +738,9 @@ namespace voltdb {
             /**
              * Remove a single address.
              *
-             * Returns whether finalization occurred, and source
-             * address for compaction (if any: NULL otherwise).
-             * Note that compacted address *cannot* be dereferenced.
+             * Returns whether compaction (i.e. memory copy) occurred.
              */
-            void const* free(void*, function<void(void const*)> const&&);
+            bool free(void*, function<void(void const*)> const&&);
             /**
              * State changes
              */
@@ -870,7 +868,7 @@ namespace voltdb {
              * Light weight free() operation at arbitrary
              * position
              */
-            template<typename Tag> void const*
+            template<typename Tag> bool
             remove(void const*, function<void(void const*)> const&&);
             /**
              * Batch removal using separate calls

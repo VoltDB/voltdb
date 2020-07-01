@@ -1257,14 +1257,11 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
          m_tableStreamer->notifyTupleDelete(target);
     }
 
-//    target.setActiveFalse();           // TODO: fails CoveringCellIndexTest, compared to above commented block.
-    allocator().template remove<storage::truth>(target.address(),
-            [this, &target](void const* p) {
-                if (p != target.address()) {
-                    target.setActiveFalse();
-                    compact(target.address(), p, allocator().frozen());
-                }
-            });
+    target.setActiveFalse();
+    allocator().template remove<storage::truth>(
+            target.address(),
+            bind(&PersistentTable::compact, this,
+                target.address(), std::placeholders::_1, allocator().frozen()));
     m_invisibleTuplesPendingDeleteCount = 0;
 }
 
