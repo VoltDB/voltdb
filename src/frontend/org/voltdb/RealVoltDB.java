@@ -1020,6 +1020,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info(String.format("Licensed to: %s", licensee));
             }
         }
+
+        // Log some facts about the user account: account name,
+        // home dir, working dir where Java was started
+        hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
+                                   System.getProperty("user.name"),
+                                   System.getProperty("user.home"),
+                                   System.getProperty("user.dir")));
     }
 
     /**
