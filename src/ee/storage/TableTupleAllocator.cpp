@@ -1227,6 +1227,12 @@ inline bool CompactingChunks::free(void* src, function<void(void const*)> const&
         void const* dst = beg->range_left();
         if (src != dst) {
             cb(dst);
+        } else if (finalizerAndCopier() &&   // no compaction, no call back; but could need to finalize:
+                (! frozenBoundaries() ||     // either not frozen (or without frozen region); or
+                 less_rolling(frozenBoundaries()->right().id(), beg->id()) ||       // frozen, but compacted address is
+                 (beg->id() == frozenBoundaries()->right().id() &&                  // outside frozen region
+                  dst >= frozenBoundaries()->right().right()))) {
+            finalizerAndCopier().finalize(dst);
         }
         // adjust range_left(); check for need to "drop" head chunk
         if (beg->range_right() ==
