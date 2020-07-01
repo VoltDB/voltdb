@@ -148,7 +148,12 @@ template<size_t N> using varray = array<void const*, N>;
 template<typename Alloc> void const* remove_single(Alloc& alloc, void const* p) {
     // Probablistically tests 2 APIs
     if (rand() % 5) {                    // 80% of the time, use the single remove API directly
-        return alloc.template remove<truth>(const_cast<void*>(p), [](void const*){});
+        return alloc.template remove<truth>(const_cast<void*>(p),
+                [p](void const* t) {
+                    if (p != t) {
+                        memcpy(const_cast<void*>(p), t, TupleSize);
+                    }
+                });
     } else {       // 20% of the time, use heavy-weight batch removal API
         void const* r = nullptr;
         alloc.remove_reserve(1);
