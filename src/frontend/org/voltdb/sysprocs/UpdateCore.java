@@ -45,6 +45,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.MpTransactionTaskQueue;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -444,7 +446,14 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
+            // Do not remove staged catalog for transaction restart
+            if (vae instanceof TransactionRestartException) {
+                TransactionRestartException tre = (TransactionRestartException)vae;
+                // The exception should not be from re-routing/leader migration.
+                assert(!tre.isMisrouted());
+            } else {
+                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
+            }
             throw vae;
         }
 

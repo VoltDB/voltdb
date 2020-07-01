@@ -25,7 +25,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -80,10 +79,6 @@ public class UpdateSettings extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
             DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                        " reached settings update barrier.");
-            }
             return success;
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrierAggregate) {
