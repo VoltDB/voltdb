@@ -190,6 +190,7 @@ private:
             std::vector<std::string> const& columnNames,
             bool ownsTupleSchema);
     void rollbackIndexChanges(TableTuple* tuple, int upto);
+    void compact(void* dst, void const* src, bool frozen);
 
 public:
     using Hook = storage::TxnPreHook<storage::NonCompactingChunks<storage::LazyNonCompactingChunk>,
@@ -824,6 +825,9 @@ private:
     typedef std::set<void*> MigratingBatch;
     typedef std::map<int64_t, MigratingBatch> MigratingRows;
     MigratingRows m_migratingRows;
+
+    // staging for tuple compaction pairs in batch removal
+    TableTuple m_srcTuple, m_dstTuple;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

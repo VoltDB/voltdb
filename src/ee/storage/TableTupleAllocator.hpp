@@ -664,12 +664,14 @@ namespace voltdb {
                 };
                 using map_type = map<id_type, RemovableRegion, less_rolling_type<id_type>>;
                 map_type m_removedRegions{};
+                map<void const*, void const*> m_frozenBoundaries{};
                 vector<void*> m_moved{}, m_removed{};
                 vector<pair<void*, void const*>> m_movements;// (dst, <= src)
                 size_t m_size = 0;
                 void mapping();                        // set up m_movements
                 void shift();                          // adjust txn begin boundary
                 void validate() const;
+                bool finalizable(void const*) const;
             public:
                 explicit DelayedRemover(CompactingChunks&);
                 void reserve(size_t);
@@ -734,6 +736,12 @@ namespace voltdb {
              */
             void free(remove_direction, void const*);
             /**
+             * Remove a single address.
+             *
+             * Returns whether compaction (i.e. memory copy) occurred.
+             */
+            bool free(void*, function<void(void const*)> const&&);
+            /**
              * State changes
              */
             void freeze();
@@ -794,7 +802,6 @@ namespace voltdb {
             FinalizerAndCopier const& m_finalizerAndCopier;
         public:
             using is_hook = true_type;
-            enum class add_cause : char {remove, update};
             TxnPreHook(size_t);                  // only used by eecheck test, as explicit unit-test of this class
             TxnPreHook(size_t, FinalizerAndCopier const&);
             TxnPreHook(TxnPreHook const&) = delete;
@@ -808,7 +815,10 @@ namespace voltdb {
             // \return whether finalize is called on the addr
             template<typename IteratorObserver,
                 typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
-            void add(add_cause, void const*, IteratorObserver&);
+            void addForUpdate(void const*, IteratorObserver&);
+            template<typename IteratorObserver,
+                typename = typename enable_if<IteratorObserver::is_iterator_observer::value>::type>
+            void addForDelete(void const*, IteratorObserver&);
             void const* operator()(void const*) const;             // revert history at this place!
             void release(void const*);                             // local memory clean-up. Client need to call this upon having done what is needed to record current address in snapshot.
         };
@@ -825,8 +835,8 @@ namespace voltdb {
          */
         template<typename Hook, typename E = typename enable_if<Hook::is_hook::value>::type>
         class HookedCompactingChunks : public CompactingChunks, public Hook {
-            using CompactingChunks::freeze;
-            using Hook::freeze; using Hook::add;
+            using CompactingChunks::freeze; using Hook::freeze;
+            using Hook::addForUpdate; using Hook::addForDelete;
             template<typename Tag> using observer_type = typename
                 IterableTableTupleChunks<HookedCompactingChunks<Hook>, Tag, void>::IteratorObserver;
             observer_type<truth> m_iterator_observer{};
@@ -855,6 +865,12 @@ namespace voltdb {
              */
             void remove(remove_direction, void const*);
             /**
+             * Light weight free() operation at arbitrary
+             * position
+             */
+            template<typename Tag> bool
+            remove(void const*, function<void(void const*)> const&&);
+            /**
              * Batch removal using separate calls
              */
             void remove_reserve(size_t);
@@ -870,7 +886,7 @@ namespace voltdb {
              */
             template<typename Tag> pair<size_t, size_t>
             remove_force(function<void(vector<pair<void*, void const*>> const&)> const&);
-            void remove_reset();
+            void remove_reset() noexcept;                // for testing only
             template<typename Tag> void clear();
         };
 
