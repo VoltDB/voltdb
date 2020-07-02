@@ -415,7 +415,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                 callNTProcedureOnAllHosts(procedureName, ccr.encodedDiffCommands,
-                        ccr.expectedCatalogVersion);
+                        ccr.nextCatalogVersion);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
@@ -498,6 +498,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // Now we holds the UAC blocker lock
         try {
             int nextCataVer = VoltDB.instance().getCatalogContext().catalogVersion + 1;
+            compilerLog.info("Catalog update from version " + VoltDB.instance().getCatalogContext().catalogVersion + " to " + nextCataVer);
             ccr = prepareApplicationCatalogDiff(
                     invocationName, operationBytes, operationString, adhocDDLStmts, sqlNodes,
                     null, isPromotion, getUsername(), nextCataVer);
@@ -543,7 +544,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
-        hostLog.info("About to call @UpdateCore");
+        hostLog.info("About to call @UpdateCore. Staging catalog to version " + ccr.nextCatalogVersion);
         try {
             CatalogUtil.stageCatalogToZK(zk, ccr.nextCatalogVersion, genId, -1,
                     SegmentedCatalog.create(ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes));

@@ -1569,7 +1569,7 @@ public:
     void initialize() {
         m_test.initTable(m_npartitions, static_cast<int>(m_test.m_tupleWidth * (m_tuplesPerBlock + sizeof(int32_t))));
 
-        m_test.m_table->deleteAllTuples(true);
+        m_test.m_table->deleteAllTuples();
         m_test.addRandomUniqueTuples(m_test.m_table, m_numInitial, &m_test.m_initial);
     }
 

@@ -90,14 +90,13 @@ class TempTable : public AbstractTempTable {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple const& tuple);
 
     void deleteAllTempTupleDeepCopies();
 
-    virtual void deleteAllTempTuples();
+    virtual void deleteAllTuples();
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
@@ -211,7 +210,7 @@ inline void TempTable::insertTempTuple(TableTuple const& source) {
     target.setNonInlinedDataIsVolatileFalse();
 }
 
-inline void TempTable::deleteAllTempTuples() {
+inline void TempTable::deleteAllTuples() {
     if (m_tupleCount == 0) {
         return;
     }

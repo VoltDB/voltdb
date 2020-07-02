@@ -1689,6 +1689,35 @@ public class TestPersistentBinaryDeque {
         assertFalse(cursor.isEmpty());
     }
 
+    /*
+     * Test that when a transient reader is closed any segments prior to any other reader are not closed as well.
+     */
+    @Test
+    public void closingTransientReaderDoesNotDelete() throws IOException {
+        BinaryDequeReader<ExtraHeaderMetadata> reader1 = m_pbd.openForRead(CURSOR_ID + 1, true);
+        BinaryDequeReader<ExtraHeaderMetadata> reader2 = m_pbd.openForRead(CURSOR_ID + 2, true);
+
+        final int total = 100;
+
+        // Make sure several files with the appropriate data is created
+        for (int i = 0; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+
+        assertEquals(3, getSortedDirectoryListing().size());
+
+        // Move reader one to the end of the PBD
+        BBContainer bbc;
+        while ((bbc = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
+            bbc.discard();
+        }
+
+        // Close the cursor still at the begning and make sure no segments are deleted
+        m_pbd.closeCursor(CURSOR_ID + 1);
+
+        assertEquals(3, getSortedDirectoryListing().size());
+    }
+
     private int openSegmentReaderCount(String cursorId) {
         return m_pbd.getSegments().values().stream().mapToInt(r -> r.getReader(cursorId) == null ? 0 : 1).sum();
     }

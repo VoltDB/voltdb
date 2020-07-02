@@ -30,7 +30,6 @@
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/ElasticIndex.h"
-#include "storage/table.h"
 #include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
@@ -39,6 +38,7 @@
 #include "storage/TableTupleAllocator.hpp"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
+#include "storage/viewableandreplicabletable.h"
 #include "storage/streamedtable.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
@@ -173,7 +173,7 @@ private:
  * policy because we expect reverting rarely occurs.
  */
 
-class PersistentTable : public Table, public UndoQuantumReleaseInterest {
+class PersistentTable : public ViewableAndReplicableTable<MaterializedViewTriggerForWrite>, public UndoQuantumReleaseInterest {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
     friend class ::CopyOnWriteTest;
@@ -244,9 +244,9 @@ public:
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool, bool fallible = true);
+    void deleteAllTuples();
 
-    void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine);
 
     void swapTable
            (PersistentTable* otherTable,
@@ -361,13 +361,6 @@ public:
     // That would just make the code a little harder to analyze.
     typedef MaterializedViewTriggerForWrite MatViewType;
 
-    /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MaterializedViewTriggerForWrite* view);
-
-    void dropMaterializedView(MaterializedViewTriggerForWrite* targetView);
-
-    std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
-
     TableTuple& copyIntoTempTuple(TableTuple& source) {
         vassert(m_tempTuple.m_data);
         m_tempTuple.copy(source);
@@ -446,15 +439,6 @@ public:
 
     int tupleLimit() const { return m_tupleLimit; }
 
-    bool isReplicatedTable() const {
-#ifndef NDEBUG
-        if (!m_isMaterialized && m_isReplicated != (m_partitionColumn == -1)) {
-            VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name:%s\n", m_name.c_str());
-        }
-#endif
-        return m_isReplicated;
-    }
-
     UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
     UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
 
@@ -488,7 +472,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
-    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable, bool replicatedTableAction);
+    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
 
     void truncateTableRelease(PersistentTable* originalTable);
 
@@ -643,7 +627,7 @@ private:
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
     // Add truncate operation to dr log stream if dr is enabled and running
-    void drLogTruncate(ExecutorContext* ec, bool fallible);
+    void drLogTruncate(const ExecutorContext* ec);
 
     // The source tuple is used to create the ConstraintFailureException if one
     // occurs. In case of exception, target tuple should be released, but the
@@ -688,7 +672,7 @@ private:
 
     TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
-    AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
+    AbstractDRTupleStream* getDRTupleStream(const ExecutorContext* ec) {
         if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         }
@@ -731,15 +715,9 @@ private:
 
     // CONSTRAINTS
     //Is this a materialized view?
-    bool m_isMaterialized;
-
-    // Value reads from catalog table, no matter partition column exists or not
-    bool m_isReplicated;
+    const bool m_isMaterialized;
 
     std::vector<bool> m_allowNulls;
-
-    // partition key
-    const int m_partitionColumn;
 
     // table row count limit
     int m_tupleLimit;
@@ -750,9 +728,6 @@ private:
     // Executor vector to be executed when imminent insert will exceed
     // tuple limit
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
-
-    // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewTriggerForWrite*> m_views;
 
     // STATS
     PersistentTableStats m_stats;

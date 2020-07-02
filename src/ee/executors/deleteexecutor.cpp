@@ -48,6 +48,7 @@
 #include "common/ExecuteWithMpMemory.h"
 
 #include "indexes/tableindex.h"
+#include "storage/persistenttable.h"
 #include "storage/tableutil.h"
 
 namespace voltdb {
@@ -108,7 +109,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            (int)targetTable->allocatedTupleCount());
 
                 // empty the table either by table swap or iteratively deleting tuple-by-tuple
-                targetTable->truncateTable(m_engine, targetTable->isReplicatedTable());
+                targetTable->truncateTable(m_engine);
             } else {
                 vassert(m_inputTable);
                 vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());

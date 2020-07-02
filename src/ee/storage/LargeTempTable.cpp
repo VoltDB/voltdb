@@ -106,7 +106,7 @@ TableIterator LargeTempTable::iteratorDeletingAsWeGo() {
 }
 
 
-void LargeTempTable::deleteAllTempTuples() {
+void LargeTempTable::deleteAllTuples() {
     finishInserts();
 
     LargeTempTableBlockCache& lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
@@ -146,7 +146,7 @@ void LargeTempTable::swapContents(AbstractTempTable* otherTable) {
 }
 
 LargeTempTable::~LargeTempTable() {
-    deleteAllTempTuples();
+    deleteAllTuples();
 }
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {
@@ -491,7 +491,7 @@ void LargeTempTable::sort(ProgressMonitorProxy* pmp,
     if (activeTupleCount() == 0) {
         return;
     } else if (limit == 0 || offset >= activeTupleCount()) {
-        deleteAllTempTuples();
+        deleteAllTuples();
         return;
     }
 

@@ -92,7 +92,7 @@ public class TestStreamSnapshotDataTarget {
         VoltDB.instance().getHostMessenger().removeMailbox(100l);
     }
 
-    private StreamSnapshotDataTarget makeDataTarget(long destHSId, boolean sendHashinator, boolean lowestSite)
+    private StreamSnapshotDataTarget makeDataTarget(long srcHSId, long destHSId, boolean sendHashinator, boolean lowestSite)
     {
         byte[] hashinatorBytes = null;
         if (sendHashinator) {
@@ -102,7 +102,7 @@ public class TestStreamSnapshotDataTarget {
             hashinatorBytes = hashinator.array();
         }
 
-        return new StreamSnapshotDataTarget(destHSId, lowestSite, new HashSet<Long>(Arrays.asList(destHSId)),
+        return new StreamSnapshotDataTarget(srcHSId, destHSId, lowestSite, new HashSet<Long>(Arrays.asList(destHSId)),
                 hashinatorBytes, m_tables, m_sender, m_ack);
     }
 
@@ -206,8 +206,8 @@ public class TestStreamSnapshotDataTarget {
     @Test
     public void testStreamClose() throws IOException, InterruptedException, ExecutionException
     {
-        StreamSnapshotDataTarget dut1 = makeDataTarget(1000, false, true);
-        StreamSnapshotDataTarget dut2 = makeDataTarget(1001, false, false);
+        StreamSnapshotDataTarget dut1 = makeDataTarget(100, 1000, false, true);
+        StreamSnapshotDataTarget dut2 = makeDataTarget(101, 1001, false, false);
 
         closeStream(dut1);
         assertNotNull(VoltDB.instance().getHostMessenger().getMailbox(m_mb.getHSId()));
@@ -226,8 +226,8 @@ public class TestStreamSnapshotDataTarget {
     @Test
     public void testMultiplexing() throws IOException, InterruptedException, ExecutionException
     {
-        StreamSnapshotDataTarget dut1 = makeDataTarget(1000, false, true);
-        StreamSnapshotDataTarget dut2 = makeDataTarget(1001, false, false);
+        StreamSnapshotDataTarget dut1 = makeDataTarget(100, 1000, false, true);
+        StreamSnapshotDataTarget dut2 = makeDataTarget(101, 1001, false, false);
 
         writeAndVerify(/* dataTarget = */ dut1, /* tableId = */ 0, /* hasSchema = */ true);
         writeAndVerify(/* dataTarget = */ dut2, /* tableId = */ 1, /* hasSchema = */ true);
@@ -255,7 +255,7 @@ public class TestStreamSnapshotDataTarget {
     @Test
     public void testSendHashinatorConfig() throws IOException, ExecutionException, InterruptedException
     {
-        StreamSnapshotDataTarget dut = makeDataTarget(1000, true, true);
+        StreamSnapshotDataTarget dut = makeDataTarget(100, 1000, true, true);
 
         assertEquals(1, dut.m_outstandingWorkCount.get());
         while (m_mb.noSentMessages()) {

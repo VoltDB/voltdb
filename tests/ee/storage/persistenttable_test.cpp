@@ -389,10 +389,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     ASSERT_TRUE(added);
-    table->truncateTable(engine, false);
-
-    // Old table wrapper should be null (before the commit which deallocates the old table)
-    ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
+    table->truncateTable(engine);
     commit();
 
 
@@ -408,7 +405,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     ASSERT_TRUE(added);
-    table->truncateTable(engine, true);
+    table->truncateTable(engine);
     // Old table wrapper should be null
     ASSERT_EQ(nullptr, table->getStreamedTable()->getWrapper());
     rollback();
@@ -653,7 +650,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
 
     // X is not a partitioned table.
-    dupTable->truncateTable(engine, false);
+    dupTable->truncateTable(engine);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
 
     ASSERT_NE(NULL, dupTable);
@@ -694,7 +691,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    dupTable->truncateTable(engine, false);
+    dupTable->truncateTable(engine);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 

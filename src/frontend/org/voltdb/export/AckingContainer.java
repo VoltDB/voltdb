@@ -31,7 +31,7 @@ public class AckingContainer extends BBContainer {
     // Note: the schema doesn't need an explicit discard
     ExportRowSchema m_schema;
     long m_startTime = 0;
-    long m_commitSpHandle = 0;
+    long m_commitTxnId = 0;
     private static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     private AckingContainer(ExportDataSource source, BBContainer cont,
@@ -70,8 +70,8 @@ public class AckingContainer extends BBContainer {
         return m_commitSeqNo;
     }
 
-    public void setCommittedSpHandle(long spHandle) {
-        m_commitSpHandle = spHandle;
+    public void setCommittedTxnId(long txnId) {
+        m_commitTxnId = txnId;
     }
 
     long getStartSeqNo() {
@@ -105,7 +105,7 @@ public class AckingContainer extends BBContainer {
         checkDoubleFree();
         internalDiscard(false);
         try {
-            m_source.advance(m_lastSeqNo, m_commitSeqNo, m_commitSpHandle, m_startTime);
+            m_source.advance(m_lastSeqNo, m_commitSeqNo, m_commitTxnId, m_startTime);
         } catch (RejectedExecutionException rej) {
             //Don't expect this to happen outside of test, but in test it's harmless
             if (EXPORT_LOG.isDebugEnabled()) {

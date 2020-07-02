@@ -275,9 +275,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "10.0.beta2";
+    static final String m_defaultVersionString = "10.0.rc1";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0.beta2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0.rc1\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -4612,6 +4612,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.warn("Interrupted shutting down dr replication", e);
             }
             finally {
+                m_globalServiceElector.unregisterService(m_consumerDRGateway);
                 m_consumerDRGateway = null;
             }
         }

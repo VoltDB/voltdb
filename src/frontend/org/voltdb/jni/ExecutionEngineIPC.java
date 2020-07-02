@@ -290,11 +290,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_callJavaUserDefinedFunction = 107;
 
         /**
-         * An error code that can be sent at any time indicating that an export stream is dropped
-         */
-        static final int kErrorCode_pushEndOfStream = 113;
-
-        /**
          * Instruct the Java side to start a user-defined aggregate function.
          */
         static final int kErrorCode_callJavaUserDefinedAggregateStart = 114;
@@ -569,32 +564,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uniqueId,
                             0,
                             buffer == null ? null : DBBPool.wrapBB(buffer));
-                }
-                else if (status == kErrorCode_pushEndOfStream) {
-                    ByteBuffer header = ByteBuffer.allocate(8);
-                    while (header.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(header);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    header.flip();
-
-                    int partitionId = header.getInt();
-                    int signatureLength = header.getInt();
-                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
-                    while (sigbuf.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(sigbuf);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    sigbuf.flip();
-                    byte signatureBytes[] = new byte[signatureLength];
-                    sigbuf.get(signatureBytes);
-                    String signature = new String(signatureBytes, "UTF-8");
-
-                    ExportManager.pushEndOfStream(partitionId, signature);
                 }
                 else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
                     int dataLength = m_connection.readInt();

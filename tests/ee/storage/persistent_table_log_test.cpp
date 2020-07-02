@@ -219,7 +219,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->deleteAllTuples(true);
+    m_table->deleteAllTuples();
     m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;
@@ -264,7 +264,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->deleteAllTuples(true);
+    m_table->deleteAllTuples();
     m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;

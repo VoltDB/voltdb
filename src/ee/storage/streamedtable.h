@@ -20,8 +20,8 @@
 #include <vector>
 
 #include "common/ids.h"
-#include "table.h"
 
+#include "storage/viewableandreplicabletable.h"
 #include "storage/StreamedTableStats.h"
 #include "storage/TableStats.h"
 
@@ -55,13 +55,12 @@ public:
  * are passed through a ExportTupleStream to Export. The table exists
  * only to support Export.
  */
-class StreamedTable : public Table, public UndoQuantumReleaseInterest {
+class StreamedTable : public ViewableAndReplicableTable<MaterializedViewTriggerForStreamInsert>, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class StreamedTableStats;
 
 public:
-    StreamedTable(int partitionColumn = -1);
-    //Used for test
+    StreamedTable(int partitionColumn, bool isReplicated);
     static StreamedTable* createForTest(ExportTupleStream *wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema,
             std::string tableName, std::vector<std::string> & columnNames);
@@ -79,7 +78,7 @@ public:
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
+    virtual void deleteAllTuples();
     void streamTuple(TableTuple const &source,
             ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream = nullptr);
     virtual bool insertTuple(TableTuple const& tuple);
@@ -94,12 +93,6 @@ public:
     // There's no reason to actually use MatViewType in the class definition.
     // That would just make the code a little harder to analyze.
     typedef MaterializedViewTriggerForStreamInsert MatViewType;
-
-    /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MaterializedViewTriggerForStreamInsert* view);
-    void dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView);
-    std::vector<MaterializedViewTriggerForStreamInsert*>& views() { return m_views; }
-    bool hasViews() { return (m_views.size() > 0); }
 
     virtual std::string tableType() const { return "StreamedTable"; }
 
@@ -172,15 +165,8 @@ private:
     virtual void nextFreeTuple(TableTuple *tuple);
 
     voltdb::StreamedTableStats m_stats;
-    ExecutorContext *m_executorContext;
     ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
-
-    // partition key
-    const int m_partitionColumn;
-
-    // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
 
     // Used to prevent migrate transaction from generating >50MB DR binary log
     MigrateTxnSizeGuard m_migrateTxnSizeGuard;

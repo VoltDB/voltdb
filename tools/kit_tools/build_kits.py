@@ -86,6 +86,7 @@ def makeReleaseDir(releaseDir):
         shutil.rmtree(releaseDir)
     # create a release dir
     os.makedirs(releaseDir)
+    local("chmod 755 %s" % releaseDir)
     print "Created dir: " + releaseDir
 
 
@@ -178,6 +179,9 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         "%s/voltdb%s-%s.tar.gz" % (releaseDir, typeString, version))
     get("%s/pro/obj/pro/voltdb%s-%s.SHA256SUM" % (builddir, typeString, version),
         "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
+    # make don't allow group memebers to delete the directory, the default
+    # permissions are 664
+    local("chmod 755 %s" % releaseDir)
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
@@ -264,6 +268,7 @@ if __name__ == "__main__":
     parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
     parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
     parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
+    parser.add_argument('-l','--includelicense', action='store_true', help="Include a trial license in the Enterprise kit")
     args = parser.parse_args()
 
 
@@ -284,10 +289,15 @@ if __name__ == "__main__":
 
     rmNativeLibs()
 
+    #Set a bunch of build_args
+    build_args=""
     try:
         build_args = os.environ['VOLTDB_BUILD_ARGS']
     except:
-        build_args=""
+        pass
+
+    if not args.includelicense:
+        build_args += " -Dtriallicense=false"
 
     print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 

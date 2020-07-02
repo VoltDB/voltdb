@@ -489,7 +489,7 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
-            if (builder.getKiplingConfiguration().isEnabled()) {
+            if (builder.isKiplingEnabled()) {
                 templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
             }
         }
@@ -608,7 +608,6 @@ public class LocalCluster extends VoltServerConfig {
     private void startLocalServer(int hostId, int leaderPort, boolean clearLocalDataDirectories, StartAction action) {
         // make sure the local server has the same environment properties as separate process
         m_additionalProcessEnv.forEach(System::setProperty);
-
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         if (!isNewCli) {
@@ -2411,7 +2410,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // verify the presence of messages in the log from specified host
-    private boolean logMessageContains(int hostId, List<String> patterns) {
+    public boolean logMessageContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 

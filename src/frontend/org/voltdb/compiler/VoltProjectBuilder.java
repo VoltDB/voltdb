@@ -411,9 +411,14 @@ public class VoltProjectBuilder {
 
     public TopicsType getKiplingConfiguration() {
         if (m_kiplingConfiguration == null) {
+            // Note - Kipling enabled by default
             m_kiplingConfiguration = new TopicsType();
         }
         return m_kiplingConfiguration;
+    }
+
+    public boolean isKiplingEnabled() {
+        return m_kiplingConfiguration != null && m_kiplingConfiguration.isEnabled();
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {

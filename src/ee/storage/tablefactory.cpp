@@ -62,7 +62,7 @@ Table* TableFactory::getPersistentTable(
     PersistentTable *persistentTable = NULL;
 
     if (tableTypeIsStream(tableType)) {
-        table = streamedTable = new StreamedTable(partitionColumn);
+        table = streamedTable = new StreamedTable(partitionColumn, isReplicated);
     } else {
         table = persistentTable = new PersistentTable(
                 partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize,
@@ -83,7 +83,7 @@ Table* TableFactory::getPersistentTable(
 
     // If a regular table with export enabled, create a companion streamed table
     if (isTableWithStream(tableType)) {
-        streamedTable = new StreamedTable(partitionColumn);
+        streamedTable = new StreamedTable(partitionColumn, isReplicated);
         initCommon(databaseId, streamedTable, name, schema, columnNames, false);
         persistentTable->setStreamedTable(streamedTable);
         VOLT_TRACE("Created companion streamed table for %s", persistentTable->name().c_str());

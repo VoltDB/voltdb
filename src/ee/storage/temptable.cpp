@@ -55,10 +55,6 @@ TempTable::TempTable() : AbstractTempTable(TABLE_BLOCKSIZE) { }
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool, bool) {
-    deleteAllTempTuples();
-}
-
 void TempTable::deleteAllTempTupleDeepCopies() {
     if (m_tupleCount != 0) {
         if (m_schema->getUninlinedObjectColumnCount() > 0) {
@@ -68,7 +64,7 @@ void TempTable::deleteAllTempTupleDeepCopies() {
                 target.freeObjectColumns();
             }
         }
-        deleteAllTempTuples();
+        deleteAllTuples();
     }
 }
 

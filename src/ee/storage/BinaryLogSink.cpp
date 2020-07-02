@@ -499,7 +499,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 }
 
 inline void truncateTable(std::unordered_map<int64_t, PersistentTable*> &tables,
-        VoltDBEngine *engine, bool replicatedTableOperation, int64_t tableHandle, std::string *tableName) {
+        VoltDBEngine *engine, int64_t tableHandle, std::string *tableName) {
     std::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
     if (tableIter == tables.end()) {
         throwDRTableNotFoundException(tableHandle, "Unable to find table %s hash %jd while applying binary log for truncate record",
@@ -508,7 +508,7 @@ inline void truncateTable(std::unordered_map<int64_t, PersistentTable*> &tables,
 
     PersistentTable *table = tableIter->second;
 
-    table->truncateTable(engine, replicatedTableOperation, true);
+    table->truncateTable(engine);
 }
 
 } //end of anonymous namespace
@@ -780,7 +780,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
                 }
 
                 bool skipRow = !engine->isLocalSite(logs[i]->m_partitionHash);
-                rowCount += applyRecord(logs[i].get(), type, tables, pool, engine, remoteClusterId, false, skipRow);
+                rowCount += applyRecord(logs[i].get(), type, tables, pool, engine, remoteClusterId, skipRow);
             }
 
             if (type == DR_RECORD_END_TXN) {
@@ -796,7 +796,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
             truncateCount = 0;
 
             VOLT_DEBUG("Applying MP binary log truncate to %s", truncateTableName.c_str());
-            truncateTable(tables, engine, false, truncateTableHandle, &truncateTableName);
+            truncateTable(tables, engine, truncateTableHandle, &truncateTableName);
             truncateTableName = std::string();
         }
     } while (completedLogs < logCount);
@@ -820,7 +820,7 @@ int64_t BinaryLogSink::applyLog(BinaryLog *log, std::unordered_map<int64_t, Pers
 
     do {
         pool->purge();
-        rowCount += applyTxn(log, tables, pool, engine, remoteClusterId, localUniqueId, false);
+        rowCount += applyTxn(log, tables, pool, engine, remoteClusterId, localUniqueId);
     } while (log->readNextTransaction());
 
     return rowCount;
@@ -828,7 +828,7 @@ int64_t BinaryLogSink::applyLog(BinaryLog *log, std::unordered_map<int64_t, Pers
 
 int64_t BinaryLogSink::applyTxn(BinaryLog *log, std::unordered_map<int64_t, PersistentTable*> &tables,
                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                 int64_t localUniqueId, bool replicatedTable) {
+                 int64_t localUniqueId) {
 
     DRRecordType type;
     int64_t rowCount = 0;
@@ -849,7 +849,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, std::unordered_map<int64_t, Pers
                         "Binary log txns were sent to the wrong partition");
             }
         }
-        rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, replicatedTable, skipRow);
+        rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, skipRow);
     }
 
     log->validateEndTxn();
@@ -868,7 +868,7 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, std::unordered_map<int
     long rowCount = 0;
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         VOLT_TRACE("applyBinaryLogMP for replicated table");
-        rowCount = applyTxn(log, tables, pool, engine, remoteClusterId, localUniqueId, true);
+        rowCount = applyTxn(log, tables, pool, engine, remoteClusterId, localUniqueId);
         s_replicatedApplySuccess = true;
     } else if (!s_replicatedApplySuccess) {
         const char* msg = "Replicated table apply binary log threw an unknown exception on other thread.";
@@ -887,8 +887,7 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, std::unordered_map<int
 
 int64_t BinaryLogSink::applyRecord(
         BinaryLog *log, const DRRecordType type, std::unordered_map<int64_t, PersistentTable*> &tables,
-        Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-        bool replicatedTable, bool skipRow) {
+        Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, bool skipRow) {
     ReferenceSerializeInputLE *taskInfo = &log->m_taskInfo;
     int64_t uniqueId = log->m_uniqueId;
     int64_t sequenceNumber = log->m_sequenceNumber;
@@ -1090,7 +1089,7 @@ int64_t BinaryLogSink::applyRecord(
         int64_t tableHandle = taskInfo->readLong();
         std::string tableName = taskInfo->readTextString();
 
-        truncateTable(tables, engine, replicatedTable, tableHandle, &tableName);
+        truncateTable(tables, engine, tableHandle, &tableName);
         STOP_TIMER_OP("TRUNCATE TABLE %s", tableName.c_str());
 
         break;

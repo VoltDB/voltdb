@@ -2983,7 +2983,7 @@ void VoltDBEngine::addToTuplesModified(int64_t amount) {
 
 void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
-        tbl->deleteAllTempTuples();
+        tbl->deleteAllTuples();
     }
 }
 
