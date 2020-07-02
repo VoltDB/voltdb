@@ -26,10 +26,10 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include "harness.h"
-#include "kipling/orm/Group.h"
+#include "topics/orm/Group.h"
 
 using namespace voltdb;
-using namespace voltdb::kipling;
+using namespace voltdb::topics;
 
 // Utility class to wrap a char[] of random data
 class RandomData {

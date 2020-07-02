@@ -46,7 +46,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
-import org.voltdb.KiplingSystemTableConnection;
+import org.voltdb.TopicsSystemTableConnection;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
@@ -122,7 +122,7 @@ import com.google_voltpatches.common.collect.Lists;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
-public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, KiplingSystemTableConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, TopicsSystemTableConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger drLog = new VoltLogger("DRAGENT");
@@ -680,7 +680,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public KiplingSystemTableConnection getKiplingSystemTableConnection() {
+        public TopicsSystemTableConnection getTopicsSystemTableConnection() {
             return Site.this;
         };
     };
@@ -2038,31 +2038,31 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void storeGroup(byte[] groupMetadata) {
-        m_ee.storeKiplingGroup(getNextUndoToken(), groupMetadata);
+        m_ee.storeTopicsGroup(getNextUndoToken(), groupMetadata);
     }
 
     @Override
     public void deleteGroup(String groupId) {
-        m_ee.deleteKiplingGroup(getNextUndoToken(), groupId);
+        m_ee.deleteTopicsGroup(getNextUndoToken(), groupId);
     }
 
     @Override
     public Pair<Boolean, byte[]> fetchGroups(int maxResultSize, String startGroupId) {
-        return m_ee.fetchKiplingGroups(maxResultSize, startGroupId);
+        return m_ee.fetchTopicsGroups(maxResultSize, startGroupId);
     }
 
     @Override
     public byte[] commitGroupOffsets(long spHandle, short requestVersion, String groupId, byte[] offsets) {
-        return m_ee.commitKiplingGroupOffsets(spHandle, getNextUndoToken(), requestVersion, groupId, offsets);
+        return m_ee.commitTopicsGroupOffsets(spHandle, getNextUndoToken(), requestVersion, groupId, offsets);
     }
 
     @Override
     public byte[] fetchGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
-        return m_ee.fetchKiplingGroupOffsets(requestVersion, groupId, offsets);
+        return m_ee.fetchTopicsGroupOffsets(requestVersion, groupId, offsets);
     }
 
     @Override
     public void deleteExpiredOffsets(TimestampType deleteOlderThan) {
-        m_ee.deleteExpiredKiplingOffsets(getNextUndoToken(), deleteOlderThan);
+        m_ee.deleteExpiredTopicsOffsets(getNextUndoToken(), deleteOlderThan);
     }
 }

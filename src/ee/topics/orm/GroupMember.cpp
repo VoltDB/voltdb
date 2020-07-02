@@ -16,11 +16,11 @@
  */
 
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
-#include "kipling/orm/GroupMember.h"
+#include "topics/TableFactory.h"
+#include "topics/orm/GroupMember.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId, int32_t sessionTimeout,
         int32_t rebalanceTimeout, const NValue& instanceId, const NValue& protocolMetadata,
@@ -110,5 +110,5 @@ bool GroupMember::equalDeleted(const GroupOrmBase& other) const {
     return getGroupId() == otherMember.getGroupId() && m_memberId == otherMember.m_memberId;
 }
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

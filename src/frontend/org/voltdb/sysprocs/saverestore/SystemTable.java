@@ -27,9 +27,9 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
  * SystemTableFactory.h but the the names do not need to be the same.
  */
 public enum SystemTable {
-    KIPLING_GROUP(-1, "_KIPLING_GROUP"),
-    KIPLING_GROUP_MEMBER(-2, "_KIPLING_GROUP_MEMBER"),
-    KIPLING_GROUP_OFFSET(-3, "_KIPLING_GROUP_OFFSET");
+    TOPICS_GROUP(-1, "_TOPICS_GROUP"),
+    TOPICS_GROUP_MEMBER(-2, "_TOPICS_GROUP_MEMBER"),
+    TOPICS_GROUP_OFFSET(-3, "_TOPICS_GROUP_OFFSET");
 
     private static final Map<String, SystemTable> s_nameToTable;
 

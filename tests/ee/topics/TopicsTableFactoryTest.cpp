@@ -24,21 +24,21 @@
 #include "harness.h"
 #include "storage/SystemTableFactory.h"
 #include "indexes/tableindex.h"
-#include "kipling/TableFactory.h"
+#include "topics/TableFactory.h"
 
 using namespace voltdb;
-using namespace voltdb::kipling;
+using namespace voltdb::topics;
 
-class KiplingTableFactoryTest: public Test {
+class TopicsTableFactoryTest: public Test {
 public:
-    KiplingTableFactoryTest() {
+    TopicsTableFactoryTest() {
         srand(0);
         m_topend = new voltdb::DummyTopend();
         m_pool = new voltdb::Pool();
         m_context = new ExecutorContext(0, 0, nullptr, m_topend, m_pool, nullptr, "", 0, NULL, NULL, 0);
     }
 
-    virtual ~KiplingTableFactoryTest() {
+    virtual ~TopicsTableFactoryTest() {
         delete m_context;
         delete m_pool;
         delete m_topend;
@@ -57,8 +57,8 @@ protected:
     SystemTableFactory m_factory;
 };
 
-TEST_F(KiplingTableFactoryTest, KiplingGroup) {
-    PersistentTable *table = m_factory.create(SystemTableId::KIPLING_GROUP);
+TEST_F(TopicsTableFactoryTest, TopicsGroup) {
+    PersistentTable *table = m_factory.create(SystemTableId::TOPICS_GROUP);
 
     EXPECT_TRUE(table);
     EXPECT_EQ(GroupTable::name, table->name());
@@ -87,8 +87,8 @@ TEST_F(KiplingTableFactoryTest, KiplingGroup) {
     delete table;
 }
 
-TEST_F(KiplingTableFactoryTest, KiplingGroupMember) {
-    PersistentTable *table = m_factory.create(SystemTableId::KIPLING_GROUP_MEMBER);
+TEST_F(TopicsTableFactoryTest, TopicsGroupMember) {
+    PersistentTable *table = m_factory.create(SystemTableId::TOPICS_GROUP_MEMBER);
 
     EXPECT_TRUE(table);
     EXPECT_EQ(GroupMemberTable::name, table->name());
@@ -113,8 +113,8 @@ TEST_F(KiplingTableFactoryTest, KiplingGroupMember) {
     delete table;
 }
 
-TEST_F(KiplingTableFactoryTest, KiplingGroupOffset) {
-    PersistentTable *table = m_factory.create(SystemTableId::KIPLING_GROUP_OFFSET);
+TEST_F(TopicsTableFactoryTest, TopicsGroupOffset) {
+    PersistentTable *table = m_factory.create(SystemTableId::TOPICS_GROUP_OFFSET);
 
     EXPECT_TRUE(table);
     EXPECT_EQ(GroupOffsetTable::name, table->name());
@@ -141,7 +141,7 @@ TEST_F(KiplingTableFactoryTest, KiplingGroupOffset) {
     delete table;
 }
 
-TEST_F(KiplingTableFactoryTest, UnknownSystemTableId) {
+TEST_F(TopicsTableFactoryTest, UnknownSystemTableId) {
     try {
         m_factory.create(static_cast<SystemTableId>(0));
         FAIL("Should have thrown an exception");

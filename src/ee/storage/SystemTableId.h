@@ -23,9 +23,9 @@ namespace voltdb {
 
 // These IDs must be shared between the EE and the jvm layer
 enum class SystemTableId : int32_t {
-    KIPLING_GROUP = -1,
-    KIPLING_GROUP_MEMBER = -2,
-    KIPLING_GROUP_OFFSET = -3
+    TOPICS_GROUP = -1,
+    TOPICS_GROUP_MEMBER = -2,
+    TOPICS_GROUP_OFFSET = -3
 };
 
 }
