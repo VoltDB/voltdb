@@ -17,7 +17,7 @@
 
 #include "common/TupleSchema.h"
 #include "indexes/tableindexfactory.h"
-#include "kipling/TableFactory.h"
+#include "topics/TableFactory.h"
 #include "storage/tablefactory.h"
 #include "storage/SystemTableFactory.h"
 
@@ -47,12 +47,12 @@ void SystemTableFactory::addIndex(PersistentTable *table, const std::string name
 
 PersistentTable* SystemTableFactory::create(const SystemTableId id) {
     switch (id) {
-    case SystemTableId::KIPLING_GROUP:
-        return kipling::TableFactory::createGroup(*this);
-    case SystemTableId::KIPLING_GROUP_MEMBER:
-        return kipling::TableFactory::createGroupMember(*this);
-    case SystemTableId::KIPLING_GROUP_OFFSET:
-        return kipling::TableFactory::createGroupOffset(*this);
+    case SystemTableId::TOPICS_GROUP:
+        return topics::TableFactory::createGroup(*this);
+    case SystemTableId::TOPICS_GROUP_MEMBER:
+        return topics::TableFactory::createGroupMember(*this);
+    case SystemTableId::TOPICS_GROUP_OFFSET:
+        return topics::TableFactory::createGroupOffset(*this);
     default:
         std::string errorMessage = "Unknown system table ID: " + std::to_string(static_cast<int32_t>(id));
         throw SerializableEEException(VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_GENERIC, errorMessage);

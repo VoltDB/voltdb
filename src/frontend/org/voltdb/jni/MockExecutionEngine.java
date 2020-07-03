@@ -283,33 +283,33 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+    public void storeTopicsGroup(long undoToken, byte[] serializedGroup) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void deleteKiplingGroup(long undoToken, String groupId) {
+    public void deleteTopicsGroup(long undoToken, String groupId) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+    public Pair<Boolean, byte[]> fetchTopicsGroups(int maxResultSize, String startGroupId) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+    public byte[] commitTopicsGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
             byte[] offsets) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+    public byte[] fetchTopicsGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+    public void deleteExpiredTopicsOffsets(long undoToken, TimestampType deleteOlderThan) {
         throw new UnsupportedOperationException();
     }
 

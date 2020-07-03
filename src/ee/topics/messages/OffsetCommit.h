@@ -21,12 +21,12 @@
 #include <string>
 
 #include "common/serializeio.h"
-#include "kipling/messages/CheckedSerializeInput.h"
-#include "kipling/messages/Message.h"
+#include "topics/messages/CheckedSerializeInput.h"
+#include "topics/messages/Message.h"
 
-#define KIPLING_ERROR_NONE 0
+#define TOPICS_ERROR_NONE 0
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 /**
  * Request class for committing an offset for a partition

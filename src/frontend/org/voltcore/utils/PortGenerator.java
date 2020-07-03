@@ -77,19 +77,19 @@ public class PortGenerator {
         throw new RuntimeException("Exhausted all possible http ports");
     }
 
-    public synchronized int nextKipling() {
+    public synchronized int nextTopics() {
         while (nextCport <= MAX_STATIC_PORT) {
             int port = nextKport++;
             if (MiscUtils.isBindable(port)) {
                 return port;
             }
         }
-        throw new RuntimeException("Exhausted all possible kipling ports");
+        throw new RuntimeException("Exhausted all possible topics ports");
     }
 
     public synchronized void reset() {
         nextCport = VoltDB.DEFAULT_PORT + portOffset;
         nextAport = VoltDB.DEFAULT_ADMIN_PORT + portOffset;
-        nextKport = VoltDB.DEFAULT_KIPLING_PORT + portOffset;
+        nextKport = VoltDB.DEFAULT_TOPICS_PORT + portOffset;
     }
 }
