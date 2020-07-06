@@ -780,6 +780,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     private M m_extraHeader;
     private Executor m_deferredDeleter = Runnable::run;
+    // Note: see #stopRetentionPolicyEnforcement
     private PBDRetentionPolicy m_retentionPolicy;
     private long m_retentionDeletePoint = PBDSegment.INVALID_ID;
     private boolean m_requiresId;
@@ -1525,10 +1526,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         // Check all segments from latest to oldest to see if segments before that segment can be deleted.
         //
+        // When retention policies are used on this PBD, only the retention policy can delete segments.
+        //
         // In the one-to-many DR use case, the snapshot placeholder cursor prevents purging segments that have
         // been read by the other cursors. Therefore, DR calls this method with {@code purgeOnLastCursor} == true,
         // in order to ensure that closing the last DR cursor will purge those segments.
-        if (reader.m_isTransient || (m_readCursors.isEmpty() && !purgeOnLastCursor)) {
+        if (reader.m_isTransient || m_retentionPolicy != null 
+                || (m_readCursors.isEmpty() && !purgeOnLastCursor)) {
             return;
         }
         try {
@@ -1965,6 +1969,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     @Override
     public synchronized void stopRetentionPolicyEnforcement() {
+        /*
+         * Note: m_retentionPolicy is never reset to null. It is used
+         * as an indicator that only retention can delete segments on this PBD.
+         * 
+         * See CloseCursor(String, boolean)
+         */
         if (m_retentionPolicy != null) {
             m_retentionPolicy.stopPolicyEnforcement();
         }
