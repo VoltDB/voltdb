@@ -446,14 +446,7 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            // Do not remove staged catalog for transaction restart
-            if (vae instanceof TransactionRestartException) {
-                TransactionRestartException tre = (TransactionRestartException)vae;
-                // The exception should not be from re-routing/leader migration.
-                assert(!tre.isMisrouted());
-            } else {
-                ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, String.valueOf(nextCatalogVersion)));
-            }
+            // Do not delete staged catalog upon exception. Other hosts may fall behind in transaction and need the catalog.
             throw vae;
         }
 
