@@ -2459,6 +2459,16 @@ public class LocalCluster extends VoltServerConfig {
         m_logMessageMatchResults.get(hostId).clear();
     }
 
+    // Get the host's real hostId or -1 if undefined
+    public int getRealHostId(int hostId) {
+        if (m_pipes == null) {
+            return -1;
+        }
+
+        int realHostId = m_pipes.get(hostId).getHostId();
+        return realHostId == Integer.MAX_VALUE ? -1 : realHostId;
+    }
+
     public enum ListenerPort {
         SQL {
             @Override
