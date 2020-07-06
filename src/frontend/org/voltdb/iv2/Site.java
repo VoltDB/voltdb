@@ -1699,7 +1699,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     public void decommissionSite(boolean remove, boolean promote, int newSitePerHost) throws InterruptedException {
-        if (m_ee != null) {
+        // If there is no partition leader on the host, no need to de-commission it.
+        // since the host will eventually be brought down
+        if (m_ee != null && newSitePerHost > 0) {
             m_ee.decommission(remove, promote, newSitePerHost);
         }
     }
