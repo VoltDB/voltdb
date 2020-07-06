@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.After;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
@@ -75,6 +76,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                     "CREATE INDEX idx_kv ON kv(nondetval);" +
                     "CREATE TABLE mp_update(key bigint not null, nondetval bigint not null);";
 
+    LocalCluster server = null;
     Client client;
     final int sitesPerHost = 2;
     final int hostCount = 2;
@@ -84,14 +86,14 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     static String expectedHashNotIncludeMessage = "after " + (DeterminismHash.MAX_HASHES_COUNT / 2 - DeterminismHash.HEADER_OFFSET + 1) + " statements";
     static String expectedSysProcMessage = "is system procedure. Please Contact VoltDB Support.";
 
-    LocalCluster createCluster(String method) throws IOException {
-        return createCluster(method, kfactor, hostCount, sitesPerHost);
+
+    void createCluster(String method) throws IOException {
+        createCluster(method, kfactor, hostCount, sitesPerHost);
     }
-    LocalCluster createCluster(String method, int k, int hosts, int sph) throws IOException {
-        return createCluster(method, k, hosts, sph, false);
+    void createCluster(String method, int k, int hosts, int sph) throws IOException {
+        createCluster(method, k, hosts, sph, false);
     }
-    LocalCluster createCluster(String method, int k, int hostcount, int sph, boolean clEnabled) throws IOException {
-        LocalCluster server = null;
+    void createCluster(String method, int k, int hostcount, int sph, boolean clEnabled) throws IOException {
         VoltFile.resetSubrootForThisProcess();
         File tempDir = new File(TMPDIR);
         if (!tempDir.exists()) {
@@ -136,22 +138,24 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             e.printStackTrace();
             fail();
         }
-        return server;
     }
 
-    private void shutDown(LocalCluster cluster) {
+    @After
+    public void shutDown() {
         if ( client != null) {
             try {
                 client.close();
+                client = null;
             } catch (InterruptedException e) {
             }
         }
-        if (cluster != null) {
+        if (server != null) {
             try {
-                cluster.shutDown();
+                server.shutDown();
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            server = null;
         }
     }
 
@@ -161,7 +165,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
     @Test(timeout = 60_000)
     public void testNonDeterministicInsert() throws Exception {
         VoltFile.resetSubrootForThisProcess();
-        LocalCluster server = createCluster("testNonDeterministicInsert");
+        createCluster("testNonDeterministicInsert");
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -184,8 +188,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             if (!MiscUtils.isPro()) {
                 assertTrue(server.verifyLogMessage(expectedLogMessage));
             }
-        } finally {
-            shutDown(server);
         }
     }
 
@@ -195,45 +197,21 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      */
     @Test(timeout = 60_000)
     public void testNonDeterministic_RO_SP() throws Exception {
-        LocalCluster server = createCluster("testNonDeterministic_RO_SP");
+        createCluster("testNonDeterministic_RO_SP");
         try {
             insertMoreNormalData(1, 100);
             client.callProcedure("NonDeterministic_RO_SP", 0);
         } catch (ProcCallException e) {
             fail("R/O SP mismatch failed?! " + e.toString());
-        } finally {
-            shutDown(server);
         }
     }
-
-    // This test seems has no meaning.
-    // Volt should be able to detect hash mismatch at insertion, not reply on a later
-    // deterministic proc to bail out.
-    // It was passing because the deterministic proc was not defined.
-    /**
-     * Negative test that expects a deterministic proc to fail due to mismatched results.
-     */
-    /*
-    @Test(timeout = 60_000)
-    public void testDeterministicProc() throws Exception {
-        LocalCluster server = createCluster("testDeterministicProc");
-        try {
-            insertMoreNormalData(1, 100);
-            client.callProcedure("Deterministic_RO_MP");
-            fail("Deterministic procedure succeeded for non-deterministic results?");
-        } catch (ProcCallException e) {
-            e.printStackTrace();
-        } finally {
-            shutDown(server);
-        }
-    }*/
 
     /**
      * Test that different whitespace fails the determinism CRC check on SQL
      */
     @Test(timeout = 60_000)
     public void testWhitespaceChanges() throws Exception {
-        LocalCluster server = createCluster("testWhitespaceChanges");
+        createCluster("testWhitespaceChanges");
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -256,21 +234,18 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             if (!MiscUtils.isPro()) {
                 assertTrue(server.verifyLogMessage(expectedLogMessage));
             }
-        } finally {
-            shutDown(server);
         }
     }
 
     @Test(timeout = 60_000)
     public void testMultistatementNonDeterministicProc() throws Exception {
-        LocalCluster server = createCluster("testMultistatementNonDeterministicProc");
+        createCluster("testMultistatementNonDeterministicProc");
 
         try {
             for (int i = 0; i < 10000; i++) {
                 client.callProcedure("KV.insert", i, 999);
             }
         } catch (Exception e) {
-            shutDown(server);
             fail("Failed to insert data");
             return;
         }
@@ -296,20 +271,17 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             if (!MiscUtils.isPro()) {
                 assertTrue(server.verifyLogMessage(expectedLogMessage));
             }
-        } finally {
-            shutDown(server);
         }
     }
 
     @Test(timeout = 60_000)
     public void testPartialstatementNonDeterministicProc() throws Exception {
-        LocalCluster server = createCluster("testPartialstatementNonDeterministicProc");
+        createCluster("testPartialstatementNonDeterministicProc");
         try {
             for (int i = 0; i < 10000; i++) {
                 client.callProcedure("KV.insert", i, 999);
             }
         } catch (Exception e) {
-            shutDown(server);
             fail("Failed to insert data");
             return;
         }
@@ -335,14 +307,12 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             if (!MiscUtils.isPro()) {
                 assertTrue(server.verifyLogMessage(expectedLogMessage));
             }
-        } finally {
-            shutDown(server);
         }
     }
 
     @Test(timeout = 60_000)
     public void testBuggyNonDeterministicProc() throws Exception {
-       LocalCluster server = createCluster("testBuggyNonDeterministicProc");
+        createCluster("testBuggyNonDeterministicProc");
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -365,17 +335,16 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             if (!MiscUtils.isPro()) {
                 assertTrue(server.verifyLogMessage(expectedLogMessage));
             }
-        } finally {
-            shutDown(server);
         }
     }
 
     @Test(timeout = 60_000)
     public void testSnapshotSaveRestoreWithoutCL() throws Exception {
-        if (!MiscUtils.isPro()) {
+        if (!MiscUtils.isPro() || LocalCluster.isMemcheckDefined()) {
             return;
         }
-        LocalCluster server = createCluster("testSnapshotSaveRestoreWithoutCL", 2, 3, 18);
+        deleteTestFiles(TESTNONCE);
+        createCluster("testSnapshotSaveRestoreWithoutCL", 2, 3, 18);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
@@ -397,13 +366,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
                 client.callProcedure("mp.insert",i,i);
             }
             client.drain();
-
-            File tempDir = new File(TMPDIR);
-            if (!tempDir.exists()) {
-                assertTrue(tempDir.mkdirs());
-            }
-            deleteTestFiles(TESTNONCE);
-
             System.out.println("Saving snapshot...");
             ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
             vt = resp.getResults()[0];
@@ -434,8 +396,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             assert(mprows == vt.asScalarLong());
         } catch (ProcCallException e) {
             fail("testSnapshotSaveRestoreWithoutCL failed");
-        } finally {
-            shutDown(server);
         }
     }
 
@@ -444,7 +404,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         if (!MiscUtils.isPro()) {
             return;
         }
-        LocalCluster server = createCluster("testUacAfterHashMismatch", 2, 3, 18);
+        createCluster("testUacAfterHashMismatch", 2, 3, 18);
         try {
             for (int i = 5000; i < 5091; i++) {
                 client.callProcedure(
@@ -482,17 +442,16 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         } catch (ProcCallException e) {
             e.printStackTrace();
             fail("testUacAfterHashMismatch failed");
-        } finally {
-            shutDown(server);
         }
     }
 
     @Test(timeout = 180_000)
     public void testShutdownRecoverWithoutCL() throws Exception {
-        if (!MiscUtils.isPro()) {
+        if (!MiscUtils.isPro() || LocalCluster.isMemcheckDefined()) {
             return;
         }
-        LocalCluster server = createCluster("testShutdownRecoverWithoutCL", 2, 3, 18);
+        deleteTestFiles(TESTNONCE);
+        createCluster("testShutdownRecoverWithoutCL", 2, 3, 18);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
@@ -518,13 +477,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             vt = client.callProcedure("@AdHoc", "select count(*) from MP").getResults()[0];
             long mprows = vt.asScalarLong();
             client.drain();
-
-            File tempDir = new File(TMPDIR);
-            if (!tempDir.exists()) {
-                assertTrue(tempDir.mkdirs());
-            }
-            deleteTestFiles(TESTNONCE);
-
             System.out.println("Saving snapshot...");
             ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
             vt = resp.getResults()[0];
@@ -560,8 +512,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             assert(mprows == vt.asScalarLong());
         } catch (ProcCallException e) {
             fail("testShutdownRecoverWithoutCL failed");
-        } finally {
-            shutDown(server);
         }
     }
 
@@ -579,7 +529,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         if (!MiscUtils.isPro()) {
             return;
         }
-        LocalCluster server = createCluster(testCase, 2, 3, 18, true);
+        createCluster(testCase, 2, 3, 18, true);
         VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
         System.out.println(vt.toFormattedString());
         try {
@@ -641,8 +591,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             }
         } catch (ProcCallException e) {
             fail(testCase + " failed");
-        } finally {
-            shutDown(server);
         }
     }
     private void insertMoreNormalData(int start, int end) throws NoConnectionsException, IOException, ProcCallException {

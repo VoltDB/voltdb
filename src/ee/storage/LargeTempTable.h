@@ -68,12 +68,7 @@ public:
     TableIterator iteratorDeletingAsWeGo() override;
 
     /** Delete all the tuples in this table */
-    void deleteAllTuples(bool freeAllocatedStrings, bool fallible) override {
-        return deleteAllTempTuples();
-    }
-
-    /** Delete all the tuples in this table */
-    void deleteAllTempTuples() override;
+    void deleteAllTuples() override;
 
     /** insert a tuple into this table */
     bool insertTuple(TableTuple& tuple) override;

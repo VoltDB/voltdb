@@ -22,6 +22,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +32,6 @@ import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -73,7 +73,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
      * extra serialization work.
      */
     private volatile boolean m_writeFailed = false;
-    private volatile Throwable m_writeException = null;
+    private volatile Exception m_writeException = null;
     private volatile IOException m_reportedSerializationFailure = null;
 
     public SimpleFileSnapshotDataTarget(
@@ -156,10 +156,10 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     } finally {
                         data.discard();
                     }
-                } catch (Throwable t) {
-                    m_writeException = t;
+                } catch (InterruptedException | ExecutionException | IOException e) {
+                    m_writeException = e;
                     m_writeFailed = true;
-                    throw Throwables.propagate(t);
+                    throw e;
                 }
                 return null;
             }
@@ -169,6 +169,11 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void reportSerializationFailure(IOException ex) {
         m_reportedSerializationFailure = ex;
+    }
+
+    @Override
+    public Exception getSerializationException() {
+        return m_reportedSerializationFailure;
     }
 
     @Override
@@ -206,7 +211,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Throwable getLastWriteException() {
+    public Exception getLastWriteException() {
         return m_writeException;
     }
 

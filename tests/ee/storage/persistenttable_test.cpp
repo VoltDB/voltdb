@@ -379,7 +379,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     ASSERT_TRUE(added);
-    table->truncateTable(engine, false);
+    table->truncateTable(engine);
     commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
@@ -624,7 +624,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
 
     // X is not a partitioned table.
-    dupTable->truncateTable(engine, false);
+    dupTable->truncateTable(engine);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
 
     ASSERT_NE(NULL, dupTable);
@@ -665,7 +665,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    dupTable->truncateTable(engine, false);
+    dupTable->truncateTable(engine);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 

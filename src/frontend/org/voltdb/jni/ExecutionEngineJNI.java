@@ -1126,22 +1126,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+    public void storeTopicsGroup(long undoToken, byte[] serializedGroup) {
         clearPsetAndEnsureCapacity(serializedGroup.length);
         m_psetBuffer.put(serializedGroup);
-        checkErrorCode(nativeStoreKiplingGroup(pointer, undoToken));
+        checkErrorCode(nativeStoreTopicsGroup(pointer, undoToken));
     }
 
     @Override
-    public void deleteKiplingGroup(long undoToken, String groupId) {
-        checkErrorCode(nativeDeleteKiplingGroup(pointer, undoToken, groupId.getBytes(Constants.UTF8ENCODING)));
+    public void deleteTopicsGroup(long undoToken, String groupId) {
+        checkErrorCode(nativeDeleteTopicsGroup(pointer, undoToken, groupId.getBytes(Constants.UTF8ENCODING)));
     }
 
     @Override
-    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+    public Pair<Boolean, byte[]> fetchTopicsGroups(int maxResultSize, String startGroupId) {
         byte[] groupIdBytes = startGroupId == null ? null : startGroupId.getBytes(Constants.UTF8ENCODING);
         m_nextDeserializer.clear();
-        int result = nativeFetchKiplingGroups(pointer, maxResultSize, groupIdBytes);
+        int result = nativeFetchTopicsGroups(pointer, maxResultSize, groupIdBytes);
         if (result < 0) {
             checkErrorCode(ERRORCODE_ERROR);
         }
@@ -1153,13 +1153,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+    public byte[] commitTopicsGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
             byte[] offsets) {
         clearPsetAndEnsureCapacity(offsets.length);
         m_psetBuffer.putInt(offsets.length);
         m_psetBuffer.put(offsets);
         m_nextDeserializer.clear();
-        checkErrorCode(nativeCommitKiplingGroupOffsets(pointer, spUniqueId, undoToken, requestVersion,
+        checkErrorCode(nativeCommitTopicsGroupOffsets(pointer, spUniqueId, undoToken, requestVersion,
                 groupId.getBytes(Constants.UTF8ENCODING)));
         try {
             return readVarbinary(m_nextDeserializer);
@@ -1169,13 +1169,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+    public byte[] fetchTopicsGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
         clearPsetAndEnsureCapacity(offsets.length);
         m_psetBuffer.putInt(offsets.length);
         m_psetBuffer.put(offsets);
         m_nextDeserializer.clear();
         checkErrorCode(
-                nativeFetchKiplingGroupOffsets(pointer, requestVersion, groupId.getBytes(Constants.UTF8ENCODING)));
+                nativeFetchTopicsGroupOffsets(pointer, requestVersion, groupId.getBytes(Constants.UTF8ENCODING)));
         try {
             return readVarbinary(m_nextDeserializer);
         } catch (IOException e) {
@@ -1184,8 +1184,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
-        checkErrorCode(nativeDeleteExpiredKiplingOffsets(pointer, undoToken, deleteOlderThan.getTime()));
+    public void deleteExpiredTopicsOffsets(long undoToken, TimestampType deleteOlderThan) {
+        checkErrorCode(nativeDeleteExpiredTopicsOffsets(pointer, undoToken, deleteOlderThan.getTime()));
     }
 
     private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {

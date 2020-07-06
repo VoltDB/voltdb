@@ -35,8 +35,8 @@ I
 (Returned 0 rows in #.##s)
 
 explain select * from t;
-EXECUTION_PLAN                 
--------------------------------
+EXECUTION_PLAN                                                                             
+-------------------------------------------------------------------------------------------
 RETURN RESULTS TO STORED PROCEDURE
  RECEIVE FROM ALL PARTITIONS
   SEND PARTITION RESULTS TO COORDINATOR

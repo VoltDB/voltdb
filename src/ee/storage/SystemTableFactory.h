@@ -31,8 +31,8 @@ public:
      * Return a vector containing all SystemTableIds
      */
     static inline const std::vector<SystemTableId> getAllSystemTableIds() {
-        return { SystemTableId::KIPLING_GROUP, SystemTableId::KIPLING_GROUP_MEMBER,
-            SystemTableId::KIPLING_GROUP_OFFSET };
+        return { SystemTableId::TOPICS_GROUP, SystemTableId::TOPICS_GROUP_MEMBER,
+            SystemTableId::TOPICS_GROUP_OFFSET };
     }
 
     /**

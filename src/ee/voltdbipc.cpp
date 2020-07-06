@@ -79,7 +79,6 @@ public:
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
         kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
-        kErrorCode_pushEndOfStream = 113,              // Push EOF for dropped stream.
         kErrorCode_callJavaUserDefinedAggregateStart = 114,  // Notify the frontend to call a Java user-defined aggregate function start method.
         kErrorCode_callJavaUserDefinedAggregateAssemble = 115,  // Notify the frontend to call a Java user-defined aggregate function assemble method.
         kErrorCode_callJavaUserDefinedAggregateCombine = 116,  // Notify the frontend to call a Java user-defined aggregate function combine method.
@@ -151,7 +150,6 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block);
-    void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
@@ -245,14 +243,14 @@ private:
     void getUSOForExportTable(struct ipc_command *cmd);
 
     // ------------------------------------------------------
-    // Methods for kipling interface
+    // Methods for topics interface
     // ------------------------------------------------------
-    void storeKiplingGroup(struct ipc_command *cmd);
-    void deleteKiplingGroup(struct ipc_command *cmd);
-    void fetchKiplingGroups(struct ipc_command *cmd);
-    void commitKiplingGroupOffsets(struct ipc_command *cmd);
-    void fetchKiplingGroupOffsets(struct ipc_command *cmd);
-    void deleteExpiredKiplingOffsets(struct ipc_command *cmd);
+    void storeTopicsGroup(struct ipc_command *cmd);
+    void deleteTopicsGroup(struct ipc_command *cmd);
+    void fetchTopicsGroups(struct ipc_command *cmd);
+    void commitTopicsGroupOffsets(struct ipc_command *cmd);
+    void fetchTopicsGroupOffsets(struct ipc_command *cmd);
+    void deleteExpiredTopicsOffsets(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
@@ -409,21 +407,21 @@ typedef struct {
     int64_t undoToken;
     int32_t groupDataLength;
     char groupData[0];
-}__attribute__((packed)) store_kipling_group;
+}__attribute__((packed)) store_topics_group;
 
 typedef struct {
     struct ipc_command cmd;
     int64_t undoToken;
     int32_t groupIdLength;
     char groupId[0];
-}__attribute__((packed)) delete_kipling_group;
+}__attribute__((packed)) delete_topics_group;
 
 typedef struct {
     struct ipc_command cmd;
     int32_t maxResultSize;
     int32_t groupIdLength;
     char startGroupId[0];
-}__attribute__((packed)) fetch_kipling_groups;
+}__attribute__((packed)) fetch_topics_groups;
 
 typedef struct {
     struct ipc_command cmd;
@@ -433,7 +431,7 @@ typedef struct {
     int32_t groupIdLength;
     int32_t offsetsLength;
     char data[0]; // After groupId is offsets
-}__attribute__((packed)) commit_kipling_group_offsets;
+}__attribute__((packed)) commit_topics_group_offsets;
 
 typedef struct {
     struct ipc_command cmd;
@@ -441,13 +439,13 @@ typedef struct {
     int32_t groupIdLength;
     int32_t offsetsLength;
     char data[0]; // After groupId is offsets
-}__attribute__((packed)) fetch_kipling_group_offsets;
+}__attribute__((packed)) fetch_topics_group_offsets;
 
 typedef struct {
     struct ipc_command cmd;
     int64_t undoToken;
     int64_t deleteOlderThan;
-}__attribute__((packed)) delete_expired_kipling_offsets;
+}__attribute__((packed)) delete_expired_topics_offsets;
 
 typedef struct {
     struct ipc_command cmd;
@@ -661,22 +659,22 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           result = kErrorCode_None;
           break;
       case 35:
-          storeKiplingGroup(cmd);
+          storeTopicsGroup(cmd);
           break;
       case 36:
-          deleteKiplingGroup(cmd);
+          deleteTopicsGroup(cmd);
           break;
       case 37:
-          fetchKiplingGroups(cmd);
+          fetchTopicsGroups(cmd);
           break;
       case 38:
-           commitKiplingGroupOffsets(cmd);
+           commitTopicsGroupOffsets(cmd);
            break;
        case 39:
-           fetchKiplingGroupOffsets(cmd);
+           fetchTopicsGroupOffsets(cmd);
            break;
        case 40:
-           deleteExpiredKiplingOffsets(cmd);
+           deleteExpiredTopicsOffsets(cmd);
            break;
       default:
         result = stub(cmd);
@@ -1646,35 +1644,35 @@ void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)response, sizeof(int8_t));
 }
 
-void VoltDBIPC::storeKiplingGroup(struct ipc_command *cmd) {
-    store_kipling_group *msg = (store_kipling_group*) cmd;
+void VoltDBIPC::storeTopicsGroup(struct ipc_command *cmd) {
+    store_topics_group *msg = (store_topics_group*) cmd;
     ReferenceSerializeInputBE in(msg->groupData, static_cast<int32_t>(ntohl(msg->groupDataLength)));
     try {
-        sendResponseOrException((uint8_t) m_engine->storeKiplingGroup(ntohll(msg->undoToken), in));
+        sendResponseOrException((uint8_t) m_engine->storeTopicsGroup(ntohll(msg->undoToken), in));
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
 
-void VoltDBIPC::deleteKiplingGroup(struct ipc_command *cmd) {
-    delete_kipling_group *msg = (delete_kipling_group*) cmd;
+void VoltDBIPC::deleteTopicsGroup(struct ipc_command *cmd) {
+    delete_topics_group *msg = (delete_topics_group*) cmd;
 
     NValue groupId = ValueFactory::getTempStringValue(msg->groupId, static_cast<int32_t>(ntohl(msg->groupIdLength)));
 
     try {
-        sendResponseOrException((uint8_t) m_engine->deleteKiplingGroup(ntohll(msg->undoToken), groupId));
+        sendResponseOrException((uint8_t) m_engine->deleteTopicsGroup(ntohll(msg->undoToken), groupId));
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
 
-void VoltDBIPC::fetchKiplingGroups(struct ipc_command *cmd) {
-    fetch_kipling_groups *msg = (fetch_kipling_groups*) cmd;
+void VoltDBIPC::fetchTopicsGroups(struct ipc_command *cmd) {
+    fetch_topics_groups *msg = (fetch_topics_groups*) cmd;
     NValue startGroupId = ValueFactory::getTempStringValue(msg->startGroupId,
             static_cast<int32_t>(ntohl(msg->groupIdLength)));
 
     try {
-        int32_t result = m_engine->fetchKiplingGroups(static_cast<int32_t>(ntohl(msg->maxResultSize)), startGroupId);
+        int32_t result = m_engine->fetchTopicsGroups(static_cast<int32_t>(ntohl(msg->maxResultSize)), startGroupId);
         uint8_t response = result < 0 ? 1 : 0;
         if (sendResponseOrException(response)) {
             return;
@@ -1689,15 +1687,15 @@ void VoltDBIPC::fetchKiplingGroups(struct ipc_command *cmd) {
     }
 }
 
-void VoltDBIPC::commitKiplingGroupOffsets(struct ipc_command *cmd) {
-    commit_kipling_group_offsets *msg = (commit_kipling_group_offsets*) cmd;
+void VoltDBIPC::commitTopicsGroupOffsets(struct ipc_command *cmd) {
+    commit_topics_group_offsets *msg = (commit_topics_group_offsets*) cmd;
 
     int32_t groupIdLength = static_cast<int32_t>(ntohl(msg->groupIdLength));
     NValue groupId = ValueFactory::getTempStringValue(msg->data, groupIdLength);
     ReferenceSerializeInputBE in(&msg->data[groupIdLength], static_cast<int32_t>(ntohl(msg->offsetsLength)));
 
     try {
-        uint8_t result = (uint8_t) m_engine->commitKiplingGroupOffsets(
+        uint8_t result = (uint8_t) m_engine->commitTopicsGroupOffsets(
                 ntohll(msg->uniqueId), ntohll(msg->undoToken), static_cast<int16_t>(ntohs(msg->requestVersion)), groupId, in);
 
         if (sendResponseOrException(result)) {
@@ -1710,15 +1708,15 @@ void VoltDBIPC::commitKiplingGroupOffsets(struct ipc_command *cmd) {
     }
 }
 
-void VoltDBIPC::fetchKiplingGroupOffsets(struct ipc_command *cmd) {
-    fetch_kipling_group_offsets *msg = (fetch_kipling_group_offsets*) cmd;
+void VoltDBIPC::fetchTopicsGroupOffsets(struct ipc_command *cmd) {
+    fetch_topics_group_offsets *msg = (fetch_topics_group_offsets*) cmd;
 
     int32_t groupIdLength = static_cast<int32_t>(ntohl(msg->groupIdLength));
     NValue groupId = ValueFactory::getTempStringValue(msg->data, groupIdLength);
     ReferenceSerializeInputBE in(&msg->data[groupIdLength], static_cast<int32_t>(ntohl(msg->offsetsLength)));
 
     try {
-        uint8_t result = (uint8_t) m_engine->fetchKiplingGroupOffsets(static_cast<int16_t>(ntohs(msg->requestVersion)),
+        uint8_t result = (uint8_t) m_engine->fetchTopicsGroupOffsets(static_cast<int16_t>(ntohs(msg->requestVersion)),
                 groupId, in);
 
         if (sendResponseOrException(result)) {
@@ -1731,11 +1729,11 @@ void VoltDBIPC::fetchKiplingGroupOffsets(struct ipc_command *cmd) {
     }
 }
 
-void VoltDBIPC::deleteExpiredKiplingOffsets(struct ipc_command *cmd) {
-    delete_expired_kipling_offsets *msg = (delete_expired_kipling_offsets*) cmd;
+void VoltDBIPC::deleteExpiredTopicsOffsets(struct ipc_command *cmd) {
+    delete_expired_topics_offsets *msg = (delete_expired_topics_offsets*) cmd;
     try {
         sendResponseOrException(
-                (uint8_t) m_engine->deleteExpiredKiplingOffsets(ntohll(msg->undoToken), ntohll(msg->deleteOlderThan)));
+                (uint8_t) m_engine->deleteExpiredTopicsOffsets(ntohll(msg->undoToken), ntohll(msg->deleteOlderThan)));
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
@@ -1876,21 +1874,6 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
-}
-
-void VoltDBIPC::pushEndOfStream(
-        int32_t partitionId,
-        std::string signature) {
-    int32_t index = 0;
-    m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
-    index += 4;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(static_cast<int32_t>(signature.size()));
-    index += 4;
-    ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
-    index += static_cast<int32_t>(signature.size());
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
-    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {

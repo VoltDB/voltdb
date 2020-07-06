@@ -337,7 +337,7 @@ public class VoltProjectBuilder {
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
-    private TopicsType m_kiplingConfiguration;
+    private TopicsType m_topicsConfiguration;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -409,11 +409,16 @@ public class VoltProjectBuilder {
         m_featureOptions.getFeature().add(exportFeature);
     }
 
-    public TopicsType getKiplingConfiguration() {
-        if (m_kiplingConfiguration == null) {
-            m_kiplingConfiguration = new TopicsType();
+    public TopicsType getTopicsConfiguration() {
+        if (m_topicsConfiguration == null) {
+            // Note - Topics feature is enabled by default
+            m_topicsConfiguration = new TopicsType();
         }
-        return m_kiplingConfiguration;
+        return m_topicsConfiguration;
+    }
+
+    public boolean isTopicsEnabled() {
+        return m_topicsConfiguration != null && m_topicsConfiguration.isEnabled();
     }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
@@ -1391,7 +1396,7 @@ public class VoltProjectBuilder {
         }
 
         deployment.setFeatures(m_featureOptions);
-        setKiplingConfiguration(deployment);
+        setTopicsConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1404,9 +1409,9 @@ public class VoltProjectBuilder {
         return deploymentPath;
     }
 
-    private void setKiplingConfiguration(DeploymentType deployment) {
-        if (m_kiplingConfiguration != null) {
-            deployment.setTopics(m_kiplingConfiguration);
+    private void setTopicsConfiguration(DeploymentType deployment) {
+        if (m_topicsConfiguration != null) {
+            deployment.setTopics(m_topicsConfiguration);
         }
     }
 

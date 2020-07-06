@@ -34,8 +34,8 @@ CREATE PROCEDURE P_EXPLAINTEST AS SELECT * FROM EXPLAINTEST;
 Command succeeded.
 
 explain SELECT * FROM V_EXPLAINTEST;
-EXECUTION_PLAN                 
--------------------------------
+EXECUTION_PLAN                                                                             
+-------------------------------------------------------------------------------------------
 RETURN RESULTS TO STORED PROCEDURE
  RECEIVE FROM ALL PARTITIONS
   SEND PARTITION RESULTS TO COORDINATOR
@@ -45,8 +45,8 @@ RETURN RESULTS TO STORED PROCEDURE
 (Returned 1 rows in #.##s)
 
 explainproc P_EXPLAINTEST;
-STATEMENT_NAME  SQL_STATEMENT               EXECUTION_PLAN                 
---------------- --------------------------- -------------------------------
+STATEMENT_NAME  SQL_STATEMENT               EXECUTION_PLAN                                                                             
+--------------- --------------------------- -------------------------------------------------------------------------------------------
 sql0            SELECT * FROM EXPLAINTEST;  RETURN RESULTS TO STORED PROCEDURE
  RECEIVE FROM ALL PARTITIONS
   SEND PARTITION RESULTS TO COORDINATOR
@@ -56,8 +56,8 @@ sql0            SELECT * FROM EXPLAINTEST;  RETURN RESULTS TO STORED PROCEDURE
 (Returned 1 rows in #.##s)
 
 explainview V_EXPLAINTEST;
-TASK                      EXECUTION_PLAN                 
-------------------------- -------------------------------
+TASK                      EXECUTION_PLAN                                                                             
+------------------------- -------------------------------------------------------------------------------------------
 Refresh MAX column "C0"   RETURN RESULTS TO STORED PROCEDURE
  INDEX SCAN of "EXPLAINTEST" using its primary key index
  range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C0 <= ?1)

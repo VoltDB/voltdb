@@ -586,7 +586,7 @@
       <xs:element name="properties" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
       <xs:element name="profiles" type="topicProfilesType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean" default="false" />
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
     <xs:attribute name="threadpool" type="xs:string" default="" />
   </xs:complexType>
 

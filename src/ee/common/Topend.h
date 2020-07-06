@@ -68,11 +68,6 @@ class Topend {
             int32_t partitionId,
             std::string tableName,
             ExportStreamBlock *block) = 0;
-    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
-    // are managed (they really don't belong in row buffers).
-    virtual void pushEndOfStream(
-            int32_t partitionId,
-            std::string tableName) = 0;
 
     virtual int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block) = 0;
 
@@ -141,7 +136,6 @@ public:
 
     int64_t getFlushedExportBytes(int32_t partitionId);
     virtual void pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block);
-    virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
