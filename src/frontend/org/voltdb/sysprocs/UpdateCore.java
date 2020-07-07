@@ -237,7 +237,7 @@ public class UpdateCore extends VoltSystemProcedure {
             VoltTable result = new VoltTable(column);
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
-            } catch (SpecifiedException ex) {
+            } catch (Exception ex) {
                 log.info("checking non-empty tables failed: " + ex.getMessage() +
                          ", cleaning up temp catalog jar file");
                 VoltDB.instance().cleanUpTempCatalogJar();
@@ -270,7 +270,7 @@ public class UpdateCore extends VoltSystemProcedure {
                     try {
                         ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, Integer.toString(nextVersion)));
                     } catch (Exception e) {
-                        log.error("error deleting staged catalog:" + e.getMessage());
+                        log.error("error deleting staged catalog.", e);
                     }
                     log.info("@UpdateCore aborted for catalog version " + nextVersion);
                     throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, t.getString("MESSAGE"));
