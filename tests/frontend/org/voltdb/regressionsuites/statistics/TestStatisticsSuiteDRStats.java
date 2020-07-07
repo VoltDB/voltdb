@@ -63,7 +63,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING),
             new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT),
             new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT),
-            new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT)
+            new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT),
+            new ColumnInfo("REMOTECREATIONTIMESTAMP", VoltType.TIMESTAMP)
         };
 
         expectedDRPartitionStatsSchema = new ColumnInfo[] {
