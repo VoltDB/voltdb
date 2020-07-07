@@ -1707,6 +1707,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         new DRProducerStatsBase.DRProducerNodeStatsBase());
                 getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
                         new DRProducerStatsBase.DRProducerPartitionStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERCLUSTER, 0,
+                        new DRProducerStatsBase.DRProducerClusterStatsBase());
             }
             m_drRoleStats = new DRRoleStats(this);
             getStatsAgent().registerStatsSource(StatsSelector.DRROLE, 0, m_drRoleStats);

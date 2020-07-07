@@ -45,12 +45,13 @@ public enum StatsSelector {
     PROCEDUREDETAIL(PROCEDURE),  // provides more granular statistics for procedure calls at a per-statement level.
 
     /*
-     * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
+     * DRPRODUCERPARTITION, DRPRODUCERNODE and DRPRODUCERCLUSTER are internal names
      * Externally the selector is "DRPRODUCER", or just "DR"
      */
     DRPRODUCERPARTITION(false),
     DRPRODUCERNODE(false),
-    DR(DRPRODUCERPARTITION, DRPRODUCERNODE),
+    DRPRODUCERCLUSTER(false),
+    DR(DRPRODUCERPARTITION, DRPRODUCERNODE, DRPRODUCERCLUSTER),
     DRPRODUCER(DR.subSelectors()),
 
     DRCONSUMERNODE(false),

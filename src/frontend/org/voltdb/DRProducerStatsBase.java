@@ -31,8 +31,13 @@ public class DRProducerStatsBase {
         public static final String CLUSTER_ID = "CLUSTER_ID";
         public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
 
-        // columns for the node-level table
+        // column for both cluster-level and node-level tables
         public static final String STATE = "STATE";
+
+        // columns for cluster-level table
+        public static final String LAST_FAILURE = "LASTFAILURE";
+
+        // columns for the node-level table
         public static final String SYNC_SNAPSHOT_STATE = "SYNCSNAPSHOTSTATE";
         public static final String ROWS_IN_SYNC_SNAPSHOT = "ROWSINSYNCSNAPSHOT";
         public static final String ROWS_ACKED_FOR_SYNC_SNAPSHOT = "ROWSACKEDFORSYNCSNAPSHOT";
@@ -52,6 +57,27 @@ public class DRProducerStatsBase {
         public static final String IS_SYNCED = "ISSYNCED";
         public static final String MODE = "MODE";
         public static final String CONNECTION_STATUS = "CONNECTION_STATUS";
+    }
+
+    public static class DRProducerClusterStatsBase extends StatsSource {
+
+        public DRProducerClusterStatsBase() {
+            super(false);
+        }
+
+        @Override
+        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
+            super.populateColumnSchema(columns);
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
+            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.SMALLINT));
+        }
+
+        @Override
+        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+            return ImmutableSet.of().iterator();
+        }
     }
 
     public static class DRProducerNodeStatsBase extends StatsSource {
