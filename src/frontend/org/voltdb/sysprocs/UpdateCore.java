@@ -28,6 +28,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -229,14 +230,19 @@ public class UpdateCore extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
-
+            int nextCatalogVersion = (int) params.getParam(2);
+            ColumnInfo[] column = new ColumnInfo[2];
+            column[0] = new ColumnInfo("NEXT_VERSION", VoltType.INTEGER);
+            column[1] = new ColumnInfo("MESSAGE", VoltType.STRING);
+            VoltTable result = new VoltTable(column);
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
-            } catch (Exception ex) {
+            } catch (SpecifiedException ex) {
                 log.info("checking non-empty tables failed: " + ex.getMessage() +
                          ", cleaning up temp catalog jar file");
                 VoltDB.instance().cleanUpTempCatalogJar();
-                throw ex;
+                result.addRow(nextCatalogVersion, ex.getMessage());
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync, result);
             }
 
             // Note: this call can block up to a fixed timeout waiting for data source
@@ -247,21 +253,29 @@ public class UpdateCore extends VoltSystemProcedure {
             // all the cluster sites on the start of catalog update, we'll do
             // the actual work on the second round-trip below
 
-            // Don't actually care about the returned table, just need to send something back to the MPI
-            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-
             if (log.isDebugEnabled()) {
                 log.debug("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data precheck.");
             }
-            return success;
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
-            // Don't actually care about the returned table, just need to send something
-            // back to the MPI scoreboard
             log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                     " acknowledged data and catalog prechecks.");
+            List<VoltTable> tables = dependencies.get(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
+            for (VoltTable t : tables) {
+                if (t.advanceRow()) {
+                    ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+                    final int nextVersion = (int) t.getLong("NEXT_VERSION");
+                    try {
+                        ZKUtil.deleteRecursively(zk, ZKUtil.joinZKPath(VoltZK.catalogbytes, Integer.toString(nextVersion)));
+                    } catch (Exception e) {
+                        log.error("error deleting staged catalog:" + e.getMessage());
+                    }
+                    log.info("@UpdateCore aborted for catalog version " + nextVersion);
+                    throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, t.getString("MESSAGE"));
+                }
+            }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
@@ -344,14 +358,15 @@ public class UpdateCore extends VoltSystemProcedure {
 
     private final void performCatalogVerifyWork(
             String[] tablesThatMustBeEmpty,
-            String[] reasonsForEmptyTables)
+            String[] reasonsForEmptyTables,
+            int nextCatalogVersion)
     {
         // Do a null round of work to sync up all the sites.  Avoids the possibility that
         // skew between nodes and/or partitions could result in cases where a catalog update
         // affects global state before transactions expecting the old catalog run
         createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
                 SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate, tablesThatMustBeEmpty,
-                reasonsForEmptyTables);
+                reasonsForEmptyTables, nextCatalogVersion);
     }
 
     private final VoltTable[] performCatalogUpdateWork(
@@ -439,7 +454,8 @@ public class UpdateCore extends VoltSystemProcedure {
         try {
             performCatalogVerifyWork(
                     tablesThatMustBeEmpty,
-                    reasonsForEmptyTables);
+                    reasonsForEmptyTables,
+                    nextCatalogVersion);
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
