@@ -151,7 +151,7 @@ template<typename Alloc> bool remove_single(Alloc& alloc, void const* p) {
         return alloc.template remove<truth>(const_cast<void*>(p),
                 bind(memcpy, const_cast<void*>(p), placeholders::_1, TupleSize));
     } else {       // 20% of the time, use heavy-weight batch removal API
-        void const* r = nullptr;
+        void const* r = p;
         alloc.remove_reserve(1);
         alloc.remove_add(const_cast<void*>(p));
         assert(1 ==
