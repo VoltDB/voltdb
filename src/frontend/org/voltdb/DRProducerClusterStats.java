@@ -17,6 +17,10 @@
 
 package org.voltdb;
 
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.voltcore.utils.Pair;
 import org.voltdb.dr2.DRCtrlRespFailure;
 
 public class DRProducerClusterStats {
@@ -33,5 +37,58 @@ public class DRProducerClusterStats {
         this.consumerClusterId = consumerClusterId;
         this.state = state;
         this.lastFailure = lastFailure;
+    }
+
+    /**
+     * Aggregates DRPRODUCERCLUSTER statistics reported by multiple nodes into
+     * a one per-remote-cluster row. The last failure column should be the first
+     * non-zero value across entire cluster.
+     * The state column may defer slightly and it uses the same logical
+     * AND-ish operation to combine the states.
+     *
+     * This method modifies the VoltTable in place.
+     * @param stats Statistics from all cluster nodes. This will be modified in
+     *              place. Cannot be null.
+     * @return The same VoltTable as in the parameter.
+     */
+    public static VoltTable aggregateStats(VoltTable stats) {
+        stats.resetRowPosition();
+        if (stats.getRowCount() == 0) {
+            return stats;
+        }
+
+        Map<String, Byte> failureMap = new TreeMap<>();
+        Map<String, Pair<DRRoleStats.State, Byte>> rowMap = new TreeMap<>();
+        while (stats.advanceRow()) {
+            final byte clusterId = (byte) stats.getLong(DRProducerStatsBase.Columns.CLUSTER_ID);
+            final byte remoteClusterId = (byte) stats.getLong(DRProducerStatsBase.Columns.REMOTE_CLUSTER_ID);
+            String key = clusterId + ":" + remoteClusterId;
+
+            // Remember the first non-zero failure per connection.
+            final byte lastFailure = (byte) stats.getLong(DRProducerStatsBase.Columns.LAST_FAILURE);
+            Byte failure = failureMap.get(key);
+            if (failure == null) {
+                failureMap.put(key, lastFailure);
+            } else if (failure == DRCtrlRespFailure.NONE.errorCode() &&
+                    lastFailure != DRCtrlRespFailure.NONE.errorCode()){
+                failureMap.put(key, lastFailure);
+            }
+
+            final DRRoleStats.State state = DRRoleStats.State.valueOf(stats.getString(DRProducerStatsBase.Columns.STATE));
+            Pair<DRRoleStats.State, Byte> pair = rowMap.get(key);
+            if (pair == null) {
+                rowMap.put(key, Pair.of(state, failureMap.get(key)));
+            } else {
+                rowMap.put(key, Pair.of(
+                    state.and(pair.getFirst()), failureMap.get(key)));
+            }
+        }
+
+        stats.clearRowData();
+        for (Map.Entry<String, Pair<DRRoleStats.State, Byte>> e : rowMap.entrySet()) {
+            String[] ids = e.getKey().split(":", 2);
+            stats.addRow(Byte.parseByte(ids[0]), Byte.parseByte(ids[1]), e.getValue().getFirst().toString(), e.getValue().getSecond());
+        }
+        return stats;
     }
 }

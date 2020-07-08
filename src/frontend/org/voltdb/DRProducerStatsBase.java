@@ -67,7 +67,6 @@ public class DRProducerStatsBase {
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            super.populateColumnSchema(columns);
             columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
