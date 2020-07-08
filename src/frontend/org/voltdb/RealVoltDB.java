@@ -4881,7 +4881,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Object args[] = { m_mode == OperationMode.PAUSED ? "PAUSED" : "NORMAL"};
         consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
         consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-        m_statusTracker.set(NodeState.UP);
+        m_statusTracker.set(m_mode == OperationMode.PAUSED ? NodeState.PAUSED : NodeState.UP);
         if (allDone) {
             m_statusTracker.setStartupComplete();
         }
