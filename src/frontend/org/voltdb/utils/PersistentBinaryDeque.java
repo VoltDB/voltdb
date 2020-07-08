@@ -1532,6 +1532,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         // Purge segments
         // Check all segments from latest to oldest to see if segments before that segment can be deleted.
+        // Never purge when closing transient readers.
         //
         // By default with {@code purgeOnLastCursor} == false, attempt to purge segments except when closing
         // the last cursor.
@@ -1539,7 +1540,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         // In the one-to-many DR use case, the snapshot placeholder cursor prevents purging segments that have
         // been read by the other cursors. Therefore, DR calls this method with {@code purgeOnLastCursor} == true,
         // in order to ensure that closing the last DR cursor will purge those segments.
-        if (m_readCursors.isEmpty() && !purgeOnLastCursor) {
+        if (reader.m_isTransient || (m_readCursors.isEmpty() && !purgeOnLastCursor)) {
             return;
         }
         try {
