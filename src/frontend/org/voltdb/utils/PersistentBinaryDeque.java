@@ -764,6 +764,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private final String m_nonce;
     private final boolean m_compress;
     private final PBDSegmentFactory m_pbdSegmentFactory;
+    private final boolean m_noPurgeOnCursorClose;
     private boolean m_initializedFromExistingFiles = false;
 
     private final BinaryDequeSerializer<M> m_extraHeaderSerializer;
@@ -806,6 +807,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         m_extraHeaderSerializer = builder.m_extraHeaderSerializer;
         m_pbdSegmentFactory = builder.m_pbdSegmentFactory;
         m_requiresId = builder.m_requiresId;
+        m_noPurgeOnCursorClose = builder.m_noPurgeOnCursorClose;
 
         if (!m_path.exists() || !m_path.canRead() || !m_path.canWrite() || !m_path.canExecute()
                 || !m_path.isDirectory()) {
@@ -1523,7 +1525,17 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
         reader.close();
 
+        if (m_noPurgeOnCursorClose) {
+            assert !purgeOnLastCursor : " noPurgeOnCursorClose and purgeOnLastCursoe are mutually exclusive options";
+            return;
+        }
+
+        // Purge segments
         // Check all segments from latest to oldest to see if segments before that segment can be deleted.
+        // Never purge when closing transient readers.
+        //
+        // By default with {@code purgeOnLastCursor} == false, attempt to purge segments except when closing
+        // the last cursor.
         //
         // In the one-to-many DR use case, the snapshot placeholder cursor prevents purging segments that have
         // been read by the other cursors. Therefore, DR calls this method with {@code purgeOnLastCursor} == true,
@@ -2003,6 +2015,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         final VoltLogger m_logger;
         boolean m_useCompression = false;
         boolean m_deleteExisting = false;
+        boolean m_noPurgeOnCursorClose = false;
         BinaryDequeSerializer<M> m_extraHeaderSerializer;
         M m_initialExtraHeader;
         PBDSegmentFactory m_pbdSegmentFactory = PBDRegularSegment::new;
@@ -2047,6 +2060,19 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         public Builder<M> deleteExisting(boolean deleteExisting) {
             m_deleteExisting = deleteExisting;
+            return this;
+        }
+
+        /**
+         * Set whether segments should never be purged on cursor close.
+         * <p>
+         * Default: {@code false}
+         *
+         * @param noPurgeOnCursorClose {@code true} if segments should never be purged on cursor close.
+         * @return An updated {@link Builder} instance
+         */
+        public Builder<M> noPurgeOnCursorClose(boolean noPurgeOnCursorClose) {
+            m_noPurgeOnCursorClose = noPurgeOnCursorClose;
             return this;
         }
 
