@@ -745,7 +745,7 @@ namespace voltdb {
              * State changes
              */
             void freeze();
-            void thaw();          // when to apply finalizer
+            void thaw();
             /**
              * Auxillary others
              */
@@ -795,9 +795,11 @@ namespace voltdb {
             typename = typename enable_if<is_chunks<Alloc>::value && is_base_of<BaseHistoryRetainTrait, Trait>::value>::type>
         class TxnPreHook : private Trait {
             using map_type = typename Collections<collections_type>::template map<void const*, void const*>;
+            using set_type = typename Collections<collections_type>::template set<void const*>;
             static FinalizerAndCopier const EMPTY_FINALIZER;
             bool m_recording = false;            // in snapshot process?
             map_type m_changes{};                // addr in persistent storage under change => addr storing before-change content
+            set_type m_updates{};                // a subset of keys of m_changes due to updates (whose values in m_changes need to be finalized)
             Alloc m_changeStore;
             FinalizerAndCopier const& m_finalizerAndCopier;
         public:

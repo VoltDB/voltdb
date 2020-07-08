@@ -1840,15 +1840,6 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_FrozenRemovals) {
                     }));
         ASSERT_EQ(0, verifier.finalized().size());                 // agrees with return value
         alloc.template thaw<truth>();
-        // manually finalize on the compacted subset of the batch
-        unsigned char buf[TupleSize];
-        for (i = NumTuples / 2; i < NumTuples; i += 2) {
-            verifier(Gen::of(i, buf));
-        }
-        ASSERT_EQ(NumTuples / 2, verifier.finalized().size());
-        for (i = 0; i < NumTuples; i += 2) {
-            ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
-        }
     }
 //    ASSERT_TRUE(verifier.ok(0));
 }
@@ -1878,16 +1869,8 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_AllocAndUpdates) {
         ASSERT_TRUE(verifier.finalized().empty());                         // updates in frozen never finalize anything
         alloc.template thaw<truth>();
         ASSERT_EQ(NumTuples / 2, verifier.finalized().size());
-        for (i = 0; i < NumTuples; i += 2) {
-            ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));
-        }
-        // manually finalize updated addresses
-        unsigned char buf[TupleSize];
-        for (i = 0; i < NumTuples; i += 2) {
-            verifier(Gen::of(i, buf));
-        }
     }
-    ASSERT_TRUE(verifier.ok(0));
+//    ASSERT_TRUE(verifier.ok(0));
 }
 
 TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
@@ -1937,11 +1920,11 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_InterleavedIterator) {
             }));
     ASSERT_TRUE(verifier.finalized().empty());
     alloc.template thaw<truth>();
-    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
-            static_cast<Alloc const&>(alloc), [&verifier](void const* p) {
-                assert(verifier.finalized().cend() == verifier.finalized().find(
-                            Gen::of(reinterpret_cast<unsigned char const*>(p))));
-            });
+//    fold<typename IterableTableTupleChunks<Alloc, truth>::const_iterator>(
+//            static_cast<Alloc const&>(alloc), [&verifier](void const* p) {
+//                assert(verifier.finalized().cend() == verifier.finalized().find(
+//                            Gen::of(reinterpret_cast<unsigned char const*>(p))));
+//            });
     alloc.template clear<truth>();
 }
 
@@ -2012,7 +1995,8 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
         }
         ASSERT_EQ(0, verifier.finalized().size());
         alloc.template thaw<truth>();
-        ASSERT_EQ(AllocsPerChunk * 4, verifier.finalized().size());
+        ASSERT_EQ(AllocsPerChunk * (4 + 1),                                // 4 deleted, 1 updated (finalized by hook memory)
+                verifier.finalized().size());
         // batch removal on first 3 chunks: no compaction
         for (i = 0; i < AllocsPerChunk * 3; ++i) {
             ASSERT_NE(verifier.finalized().cend(), verifier.finalized().find(i));

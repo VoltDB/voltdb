@@ -656,7 +656,11 @@ void PersistentTable::compact(void* dst, void const* src, bool frozen) {
         decreaseStringMemCount(m_dstTuple.getNonInlinedMemorySizeForPersistentTable());
         m_dstTuple.freeObjectColumns();
     }
-    memcpy(m_dstTuple.address(), m_srcTuple.address(), m_tupleLength);
+    if (allocator().finalizerAndCopier()) {         // Compactor deep copies
+        allocator().finalizerAndCopier().copy(dst, src);
+    } else {
+        memcpy(dst, src, m_tupleLength);
+    }
     vassert(!m_srcTuple.isPendingDeleteOnUndoRelease());
 
     for_each(m_indexes.begin(), m_indexes.end(),
@@ -677,7 +681,7 @@ void PersistentTable::compact(void* dst, void const* src, bool frozen) {
 
 void PersistentTable::finalizeRelease() {
     allocator().template remove_force<storage::truth>(
-            [this] (vector<pair<void*, void const*>> const& tuples) {    // shallow copy when frozen
+            [this] (vector<pair<void*, void const*>> const& tuples) {    // deep copy when frozen
         for_each(tuples.cbegin(), tuples.cend(),
                 [this, frozen = allocator().frozen()] (pair<void*, void const*> const& tuple) {
                     compact(tuple.first, tuple.second, frozen);
