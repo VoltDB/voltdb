@@ -265,6 +265,7 @@ public class UpdateCore extends VoltSystemProcedure {
             List<VoltTable> tables = dependencies.get(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
             for (VoltTable t : tables) {
                 if (t.advanceRow()) {
+                    // Update failed. Remove the staged catalog after all the sites get chance to work on it (ENG-19821)
                     ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
                     final int nextVersion = (int) t.getLong("NEXT_VERSION");
                     try {
@@ -459,7 +460,6 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            // Do not delete staged catalog. Other hosts may fall behind in transaction and need the catalog.
             throw vae;
         }
 
