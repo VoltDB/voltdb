@@ -20,14 +20,14 @@
 #include <functional>
 #include <unordered_map>
 
-#include "kipling/orm/GroupOrmBase.h"
-#include "kipling/orm/GroupMember.h"
+#include "topics/orm/GroupOrmBase.h"
+#include "topics/orm/GroupMember.h"
 
 namespace voltdb {
-namespace kipling {
+namespace topics {
 
 /**
- * Class which represents a row from GroupTable. The row represents the state of a kipling group
+ * Class which represents a row from GroupTable. The row represents the state of a topics group
  */
 class Group : public GroupOrmBase {
 public:
@@ -149,5 +149,5 @@ private:
     bool m_membersLoaded = false;
 };
 
-} /* namespace kipling */
+} /* namespace topics */
 } /* namespace voltdb */

@@ -366,7 +366,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public org.voltdb.KiplingSystemTableConnection getKiplingSystemTableConnection() {
+        public org.voltdb.TopicsSystemTableConnection getTopicsSystemTableConnection() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         };
     };

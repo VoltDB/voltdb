@@ -15,9 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "kipling/messages/OffsetCommit.h"
+#include "topics/messages/OffsetCommit.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 OffsetCommitRequestPartition::OffsetCommitRequestPartition(const int16_t version, CheckedSerializeInput& request) :
         m_partitionIndex(request.readInt()), m_offset(request.readLong()) {

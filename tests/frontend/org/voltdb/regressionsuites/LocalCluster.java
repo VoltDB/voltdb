@@ -489,8 +489,8 @@ public class LocalCluster extends VoltServerConfig {
             m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
-            if (builder.isKiplingEnabled()) {
-                templateCmdLine.setKiplingHostPort(HostAndPort.fromHost(""));
+            if (builder.isTopicsEnabled()) {
+                templateCmdLine.setTopicsHostPort(HostAndPort.fromHost(""));
             }
         }
         return m_compiled;
@@ -664,7 +664,7 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.m_ipcPort = proc.port();
         }
         if (cmdln.m_topicsHostPort != null) {
-            cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
+            cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextTopics());
         }
 
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
@@ -1183,7 +1183,7 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             if (cmdln.m_topicsHostPort != null) {
-                cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextKipling());
+                cmdln.m_topicsHostPort = cmdln.m_topicsHostPort.withDefaultPort(portGenerator.nextTopics());
             }
 
             // If local directories are being cleared
@@ -2459,6 +2459,16 @@ public class LocalCluster extends VoltServerConfig {
         m_logMessageMatchResults.get(hostId).clear();
     }
 
+    // Get the host's real hostId or -1 if undefined
+    public int getRealHostId(int hostId) {
+        if (m_pipes == null) {
+            return -1;
+        }
+
+        int realHostId = m_pipes.get(hostId).getHostId();
+        return realHostId == Integer.MAX_VALUE ? -1 : realHostId;
+    }
+
     public enum ListenerPort {
         SQL {
             @Override
@@ -2472,7 +2482,7 @@ public class LocalCluster extends VoltServerConfig {
                 return cl.m_adminPort;
             }
         },
-        KIPLING {
+        TOPICS {
             @Override
             int getPort(CommandLine cl) {
                 return cl.m_topicsHostPort.getPort();

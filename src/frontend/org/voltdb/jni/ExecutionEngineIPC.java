@@ -144,12 +144,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , DeleteMigratedRows(32)
         , DisableExternalStreams(33)
         , ExternalStreamsEnabled(34)
-        , StoreKiplingGroup(35)
-        , DeleteKiplingGroup(36)
-        , FetchKiplingGroups(37)
-        , CommitKiplingGroupOffsets(38)
-        , FetchKiplingGroupOffsets(39)
-        , DeleteExpiredKiplingOffsets(40);
+        , StoreTopicsGroup(35)
+        , DeleteTopicsGroup(36)
+        , FetchTopicsGroups(37)
+        , CommitTopicsGroupOffsets(38)
+        , FetchTopicsGroupOffsets(39)
+        , DeleteExpiredTopicsOffsets(40);
 
         Commands(final int id) {
             m_id = id;
@@ -1980,11 +1980,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void storeKiplingGroup(long undoToken, byte[] serializedGroup) {
+    public void storeTopicsGroup(long undoToken, byte[] serializedGroup) {
         verifyDataCapacity(Integer.BYTES * 2 + Long.BYTES + serializedGroup.length);
 
         m_data.clear();
-        m_data.putInt(Commands.StoreKiplingGroup.m_id);
+        m_data.putInt(Commands.StoreTopicsGroup.m_id);
         m_data.putLong(undoToken);
         m_data.putInt(serializedGroup.length);
         m_data.put(serializedGroup);
@@ -2000,12 +2000,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void deleteKiplingGroup(long undoToken, String groupId) {
+    public void deleteTopicsGroup(long undoToken, String groupId) {
         byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
         verifyDataCapacity(Integer.BYTES * 2 + Long.BYTES + groupIdBytes.length);
 
         m_data.clear();
-        m_data.putInt(Commands.DeleteKiplingGroup.m_id);
+        m_data.putInt(Commands.DeleteTopicsGroup.m_id);
         m_data.putLong(undoToken);
         m_data.putInt(groupIdBytes.length);
         m_data.put(groupIdBytes);
@@ -2021,12 +2021,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String startGroupId) {
+    public Pair<Boolean, byte[]> fetchTopicsGroups(int maxResultSize, String startGroupId) {
         byte[] groupIdBytes = startGroupId == null ? new byte[0] : startGroupId.getBytes(Constants.UTF8ENCODING);
         verifyDataCapacity(Integer.BYTES * 3 + groupIdBytes.length);
 
         m_data.clear();
-        m_data.putInt(Commands.FetchKiplingGroups.m_id);
+        m_data.putInt(Commands.FetchTopicsGroups.m_id);
         m_data.putInt(maxResultSize);
         m_data.putInt(groupIdBytes.length);
         m_data.put(groupIdBytes);
@@ -2046,13 +2046,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
+    public byte[] commitTopicsGroupOffsets(long spUniqueId, long undoToken, short requestVersion, String groupId,
             byte[] offsets) {
         byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
         verifyDataCapacity(Integer.BYTES * 3 + Long.BYTES * 2 + Short.BYTES + groupIdBytes.length + offsets.length);
 
         m_data.clear();
-        m_data.putInt(Commands.CommitKiplingGroupOffsets.m_id);
+        m_data.putInt(Commands.CommitTopicsGroupOffsets.m_id);
         m_data.putLong(spUniqueId);
         m_data.putLong(undoToken);
         m_data.putShort(requestVersion);
@@ -2073,12 +2073,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
+    public byte[] fetchTopicsGroupOffsets(short requestVersion, String groupId, byte[] offsets) {
         byte[] groupIdBytes = groupId.getBytes(Constants.UTF8ENCODING);
         verifyDataCapacity(Integer.BYTES * 3 + Short.BYTES + groupIdBytes.length + offsets.length);
 
         m_data.clear();
-        m_data.putInt(Commands.FetchKiplingGroupOffsets.m_id);
+        m_data.putInt(Commands.FetchTopicsGroupOffsets.m_id);
         m_data.putShort(requestVersion);
         m_data.putInt(groupIdBytes.length);
         m_data.putInt(offsets.length);
@@ -2097,11 +2097,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan) {
+    public void deleteExpiredTopicsOffsets(long undoToken, TimestampType deleteOlderThan) {
         verifyDataCapacity(Long.BYTES * 2);
 
         m_data.clear();
-        m_data.putInt(Commands.DeleteExpiredKiplingOffsets.m_id);
+        m_data.putInt(Commands.DeleteExpiredTopicsOffsets.m_id);
         m_data.putLong(undoToken);
         m_data.putLong(deleteOlderThan.getTime());
 

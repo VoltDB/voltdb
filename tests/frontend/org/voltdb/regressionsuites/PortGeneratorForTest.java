@@ -37,7 +37,7 @@ public class PortGeneratorForTest extends PortGenerator {
         public int nJMXPort = -1;
         public int nInternalPort = -1;
         public int nHttp = -1;
-        public int nKipling = -1;
+        public int nTopics = -1;
 
         public int nextInternalPort() {
             return nInternalPort;
@@ -95,12 +95,12 @@ public class PortGeneratorForTest extends PortGenerator {
             nHttp = nc;
         }
 
-        public int nextKipling() {
-            return nKipling;
+        public int nextTopics() {
+            return nTopics;
         }
 
-        public void setKipling(int nc) {
-            nKipling = nc;
+        public void setTopics(int nc) {
+            nTopics = nc;
         }
     }
 
@@ -172,13 +172,13 @@ public class PortGeneratorForTest extends PortGenerator {
     }
 
     @Override
-    public int nextKipling() {
+    public int nextTopics() {
         if (pprovider != null) {
-            int rport = pprovider.nextKipling();
+            int rport = pprovider.nextTopics();
             if (rport != -1) {
                 return rport;
             }
         }
-        return super.nextKipling();
+        return super.nextTopics();
     }
 }

@@ -21,10 +21,10 @@
 #include <string>
 
 #include "common/serializeio.h"
-#include "kipling/messages/CheckedSerializeInput.h"
-#include "kipling/messages/Message.h"
+#include "topics/messages/CheckedSerializeInput.h"
+#include "topics/messages/Message.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 /**
  * Response to a specific topic partition offset fetch request

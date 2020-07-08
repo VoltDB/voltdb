@@ -168,6 +168,9 @@ public class SyncBenchmark {
         @Option(desc = "Number of get/puts to perform")
         long maxops = -1L;
 
+        @Option(desc = "use topology awareness" )
+        boolean topologyaware = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -297,6 +300,9 @@ public class SyncBenchmark {
 
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
+        if ( config.topologyaware ) {
+            clientConfig.setTopologyChangeAware(true);
+        }
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();

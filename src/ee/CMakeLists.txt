@@ -210,14 +210,14 @@ SET (VOLTDB_SRC
   indexes/IndexStats.cpp
   indexes/tableindex.cpp
   indexes/tableindexfactory.cpp
-  kipling/GroupStore.cpp
-  kipling/messages/OffsetCommit.cpp
-  kipling/messages/OffsetFetch.cpp
-  kipling/orm/Group.cpp
-  kipling/orm/GroupOffset.cpp
-  kipling/orm/GroupMember.cpp
-  kipling/orm/GroupOrmBase.cpp
-  kipling/TableFactory.cpp
+  topics/GroupStore.cpp
+  topics/messages/OffsetCommit.cpp
+  topics/messages/OffsetFetch.cpp
+  topics/orm/Group.cpp
+  topics/orm/GroupOffset.cpp
+  topics/orm/GroupMember.cpp
+  topics/orm/GroupOrmBase.cpp
+  topics/TableFactory.cpp
   logging/JNILogProxy.cpp
   logging/LogManager.cpp
   plannodes/SchemaColumn.cpp

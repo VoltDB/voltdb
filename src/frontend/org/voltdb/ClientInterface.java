@@ -153,7 +153,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_COORDINATOR_CID    = Long.MIN_VALUE + 3;
-    public static final long KIPLING_COORDINATOR_CID    = Long.MIN_VALUE + 4;
+    public static final long TOPICS_COORDINATOR_CID    = Long.MIN_VALUE + 4;
     public static final long EXPORT_MANAGER_CID         = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
