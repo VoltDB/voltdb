@@ -274,7 +274,7 @@ public class UpdateCore extends VoltSystemProcedure {
                         log.error("error deleting staged catalog.", e);
                     }
                     log.info("@UpdateCore aborted for catalog version " + nextVersion);
-                    throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, t.getString("MESSAGE"));
+                    throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, t.getString("MESSAGE"));
                 }
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
