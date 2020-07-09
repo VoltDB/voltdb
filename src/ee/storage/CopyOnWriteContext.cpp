@@ -149,74 +149,75 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
     PersistentTable &table = getTable();
     TableTuple tuple(table.schema());
+    {
+        ConditionalExecuteWithMpMemoryAndScopedResourceLock lockInMpMemory(m_replicated);
+        // Set to true to break out of the loop after the tuples dry up
+        // or the byte count threshold is hit.
+        bool yield = false;
+        while (!yield) {
 
-    // Set to true to break out of the loop after the tuples dry up
-    // or the byte count threshold is hit.
-    bool yield = false;
-    while (!yield) {
+           // Next tuple?
+           bool hasMore = m_iterator->next(tuple);
+           if (hasMore) {
 
-        // Next tuple?
-        bool hasMore = m_iterator->next(tuple);
-        if (hasMore) {
+               // -1 is used as a sentinel value to disable counting for tests.
+               if (m_tuplesRemaining > 0) {
+                   m_tuplesRemaining--;
+               }
 
-            // -1 is used as a sentinel value to disable counting for tests.
-            if (m_tuplesRemaining > 0) {
-                m_tuplesRemaining--;
-            }
+               /*
+                * Write the tuple to all the output streams.
+                * Done if any of the buffers filled up.
+                * The returned copy count helps decide when to delete if m_doDelete is true.
+               */
+               bool deleteTuple = false;
+               yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
+               /*
+                * May want to delete tuple if processing the actual table.
+                */
+               if (!m_finishedTableScan) {
+                   /*
+                   * If this is the table scan, check to see if the tuple is pending
+                   * delete and return the tuple if it iscop
+                   */
+                   if (tuple.isPendingDelete()) {
+                       vassert(!tuple.isPendingDeleteOnUndoRelease());
+                       CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+                       //Save the extra lookup if possible
+                       m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
+                    }
 
-            /*
-             * Write the tuple to all the output streams.
-             * Done if any of the buffers filled up.
-             * The returned copy count helps decide when to delete if m_doDelete is true.
-             */
-            bool deleteTuple = false;
-            yield = outputStreams.writeRow(tuple, m_hiddenColumnFilter, &deleteTuple);
-            /*
-             * May want to delete tuple if processing the actual table.
-             */
-            if (!m_finishedTableScan) {
-                /*
-                 * If this is the table scan, check to see if the tuple is pending
-                 * delete and return the tuple if it iscop
-                 */
-                if (tuple.isPendingDelete()) {
-                    vassert(!tuple.isPendingDeleteOnUndoRelease());
-                    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-                    //Save the extra lookup if possible
-                    m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
-                }
+                    /*
+                     * Delete a moved tuple?
+                     * This is used for Elastic rebalancing, which is wrapped in a transaction.
+                     * The delete for undo is generic enough to support this operation.
+                     */
+                    else if (deleteTuple) {
+                        m_surgeon.deleteTupleForUndo(tuple.address(), true);
+                    }
+              }
 
-                /*
-                 * Delete a moved tuple?
-                 * This is used for Elastic rebalancing, which is wrapped in a transaction.
-                 * The delete for undo is generic enough to support this operation.
-                 */
-                else if (deleteTuple) {
-                    m_surgeon.deleteTupleForUndo(tuple.address(), true);
-                }
-            }
+           } else if (!m_finishedTableScan) {
+              /*
+               * After scanning the persistent table switch to scanning the temp
+               * table with the tuples that were backed up.
+               */
+               m_finishedTableScan = true;
+               m_skippedDirtyRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+               m_skippedInactiveRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
+               // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
+               m_iterator.reset(new TableIterator(m_backedUpTuples->iterator()));
+           } else {
+               /*
+                * No more tuples in the temp table and had previously finished the
+                * persistent table.
+                */
+               size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
+               size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
+               if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
 
-        } else if (!m_finishedTableScan) {
-            /*
-             * After scanning the persistent table switch to scanning the temp
-             * table with the tuples that were backed up.
-             */
-            m_finishedTableScan = true;
-            m_skippedDirtyRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-            m_skippedInactiveRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
-            // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
-            m_iterator.reset(new TableIterator(m_backedUpTuples->iterator()));
-        } else {
-            /*
-             * No more tuples in the temp table and had previously finished the
-             * persistent table.
-             */
-            size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
-            size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
-            if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
-
-                char message[1024 * 8];
-                snprintf(message, sizeof(message),
+                   char message[1024 * 8];
+                   snprintf(message, sizeof(message),
                          "serializeMore(): tuple count > 0 after streaming:\n"
                          "Table name: %s\n"
                          "Table type: %s\n"
@@ -246,49 +247,49 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          table.partitionColumn(),
                          m_skippedDirtyRows,
                          m_skippedInactiveRows);
-                message[sizeof message - 1] = '\0';
-                // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
-                // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
-                // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
-                // at least returned it's currentBlock to the lists.
-                if (allPendingCnt > 0) {
-                    // We have orphaned or corrupted some tables. Let's make them pristine.
-                    TBMapI iter = m_surgeon.getData().begin();
-                    while (iter != m_surgeon.getData().end()) {
-                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
-                        iter++;
-                    }
-                }
-                if (!m_surgeon.blockCountConsistent()) {
-                    throwFatalException("%s", message);
-                }
-                else {
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
-                    m_tuplesRemaining = 0;
-                    outputStreams.close();
-                    for (size_t i = 0; i < outputStreams.size(); i++) {
-                        retPositions.push_back((int)outputStreams.at(i).position());
-                    }
-                    return TABLE_STREAM_SERIALIZATION_ERROR;
-                }
-            } else if (m_tuplesRemaining < 0)  {
-                // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
-                m_tuplesRemaining = 0;
-            }
-        }
+                   message[sizeof message - 1] = '\0';
+                   // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
+                   // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
+                   // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
+                   // at least returned it's currentBlock to the lists.
+                   if (allPendingCnt > 0) {
+                       // We have orphaned or corrupted some tables. Let's make them pristine.
+                       TBMapI iter = m_surgeon.getData().begin();
+                       while (iter != m_surgeon.getData().end()) {
+                           m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
+                           iter++;
+                       }
+                   }
+                   if (!m_surgeon.blockCountConsistent()) {
+                       throwFatalException("%s", message);
+                   }
+                   else {
+                       LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+                       m_tuplesRemaining = 0;
+                       outputStreams.close();
+                       for (size_t i = 0; i < outputStreams.size(); i++) {
+                           retPositions.push_back((int)outputStreams.at(i).position());
+                       }
+                       return TABLE_STREAM_SERIALIZATION_ERROR;
+                   }
+               } else if (m_tuplesRemaining < 0)  {
+                   // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
+                   m_tuplesRemaining = 0;
+               }
+           }
 
-        // All tuples serialized, bail
-        if (m_tuplesRemaining == 0) {
-            /*
-             * CAUTION: m_iterator->next() is NOT side-effect free!!! It also
-             * returns the block back to the table if the call causes it to go
-             * over the boundary of used tuples. In case it actually returned
-             * the very last tuple in the table last time it's called, the block
-             * is still hanging around. So we need to call it again to return
-             * the block here.
-             */
+           // All tuples serialized, bail
+           if (m_tuplesRemaining == 0) {
+               /*
+                * CAUTION: m_iterator->next() is NOT side-effect free!!! It also
+                * returns the block back to the table if the call causes it to go
+                * over the boundary of used tuples. In case it actually returned
+                * the very last tuple in the table last time it's called, the block
+                * is still hanging around. So we need to call it again to return
+                * the block here.
+                */
 
-            VOLT_TRACE("serializeMore(): Finish streaming"
+               VOLT_TRACE("serializeMore(): Finish streaming"
                                   "Table name: %s\n"
                                   "Table type: %s\n"
                                   "Original tuple count: %jd\n"
@@ -310,12 +311,13 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                                   (intmax_t)m_updates,
                                   table.partitionColumn());
 
-            if (hasMore) {
-                hasMore = m_iterator->next(tuple);
-                vassert(!hasMore);
-            }
-            yield = true;
-        }
+               if (hasMore) {
+                   hasMore = m_iterator->next(tuple);
+                   vassert(!hasMore);
+               }
+               yield = true;
+           }
+       }
     }
     // end tuple processing while loop
 
