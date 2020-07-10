@@ -160,7 +160,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
-import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -4484,7 +4483,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // Allow export datasources to start consuming their binary deques safely
         // as at this juncture the initial truncation snapshot is already complete
-        VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.REJOIN);
+        VoltDB.getExportManager().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
         VoltDB.getImportManager().readyForData();
@@ -4717,7 +4716,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
-            VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.RECOVER);
+            VoltDB.getExportManager().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
             VoltDB.getImportManager().readyForData();
