@@ -49,10 +49,18 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
 
     private static int REPLICATION_PORT = 11000;
 
+    private static final ColumnInfo[] expectedDRClusterStatsSchema;
     private static final ColumnInfo[] expectedDRNodeStatsSchema;
     private static final ColumnInfo[] expectedDRPartitionStatsSchema;
 
     static {
+        expectedDRClusterStatsSchema = new ColumnInfo[] {
+                new ColumnInfo("CLUSTER_ID", VoltType.SMALLINT),
+                new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.SMALLINT),
+                new ColumnInfo("STATE", VoltType.STRING),
+                new ColumnInfo("LASTFAILURE", VoltType.SMALLINT)
+        };
+
         expectedDRNodeStatsSchema = new ColumnInfo[] {
             new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
             new ColumnInfo("HOST_ID", VoltType.INTEGER),
@@ -63,7 +71,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING),
             new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT),
             new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT),
-            new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT)
+            new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT),
+            new ColumnInfo("REMOTECREATIONTIMESTAMP", VoltType.TIMESTAMP)
         };
 
         expectedDRPartitionStatsSchema = new ColumnInfo[] {
@@ -229,17 +238,19 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
 
         VoltTable expectedTable1 = new VoltTable(expectedDRPartitionStatsSchema);
         VoltTable expectedTable2 = new VoltTable(expectedDRNodeStatsSchema);
-
+        VoltTable expectedTable3 = new VoltTable(expectedDRClusterStatsSchema);
         //
         // DR
         //
         VoltTable[] results = client.callProcedure("@Statistics", "DR", 0).getResults();
         // two aggregate tables returned
-        assertEquals(2, results.length);
+        assertEquals(3, results.length);
         System.out.println("Test DR table: " + results[0].toString());
         System.out.println("Test DR table: " + results[1].toString());
+        System.out.println("Test DR table: " + results[2].toString());
         validateSchema(results[0], expectedTable1);
         validateSchema(results[1], expectedTable2);
+        validateSchema(results[2], expectedTable3);
 
         // One row per host for DRNODE stats
         results[1].advanceRow();
