@@ -31,6 +31,8 @@ public class DRProducerClusterStats {
     public final DRRoleStats.State state;
     public final byte lastErrorCode;
 
+    private final static byte NO_FAILURE = 0;
+
     public DRProducerClusterStats(short clusterId,
                                short consumerClusterId,
                                DRRoleStats.State state,
@@ -71,8 +73,7 @@ public class DRProducerClusterStats {
             Byte failure = failureMap.get(key);
             if (failure == null) {
                 failureMap.put(key, lastFailure);
-            } else if (failure == DRCtrlRespFailure.NONE.errorCode() &&
-                    lastFailure != DRCtrlRespFailure.NONE.errorCode()){
+            } else if (failure == NO_FAILURE && lastFailure != NO_FAILURE){
                 failureMap.put(key, lastFailure);
             }
 
