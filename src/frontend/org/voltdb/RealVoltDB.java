@@ -1456,7 +1456,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     AbstractTopology recoveredTopo = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
                     if (recoveredTopo != null) {
                         topo = recoveredTopo;
-                        partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                        partitions = getPartitionsForLocalHost(topo);
                     }
                     if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
@@ -1472,7 +1472,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
-                    partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                    partitions = getPartitionsForLocalHost(topo);
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
 
@@ -1951,7 +1951,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (recoveredTopo == null) {
             return null;
         }
-        List<Integer> partitions = Lists.newArrayList(recoveredTopo.getPartitionIdList(m_messenger.getHostId()));
+        List<Integer> partitions = getPartitionsForLocalHost(recoveredTopo);
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
         }
@@ -1959,6 +1959,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.info("Partition placement layout has been restored for rejoining.");
         }
         return recoveredTopo;
+    }
+
+    private List<Integer> getPartitionsForLocalHost(AbstractTopology topo) {
+        int hostId = m_messenger.getHostId();
+        List<Integer> pars = topo.getPartitionIdList(hostId);
+        if (pars == null) { // check, else newArrayList throws an even less understandable error
+            String err = String.format("Unexpected error: no partition list for local host id %d (rejoining: %s)",
+                                       hostId, m_rejoining);
+            hostLog.error(err);
+            throw new IllegalStateException(err);
+        }
+        return Lists.newArrayList(pars);
     }
 
     @Override
