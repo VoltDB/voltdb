@@ -3394,7 +3394,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 result = value;
             }
             else if (value != null && !value.equals(result)) {
-                hostLog.info(String.format("System property '%s' overrides deployment-file value"));
+                hostLog.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
             }
         }
 
