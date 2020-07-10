@@ -3374,22 +3374,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
         String sysProp = System.getProperty(sysPropName, "");
+        String result = null;
 
         // allow leading/trailing blanks for password, not otherwise
         if (!sysProp.isEmpty()) {
             if ("password".equals(valueType)) {
-                return sysProp;
+                result = sysProp;
             } else {
-                if (!sysProp.trim().isEmpty()) {
-                    return sysProp.trim();
+                String trimmed = sysProp.trim();
+                if (!trimmed.isEmpty()) {
+                    result = trimmed;
                 }
             }
         }
-        String value = null;
+
         if (store != null) {
-            value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            String value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            if (result == null) {
+                result = value;
+            }
+            else if (value != null && !value.equals(result)) {
+                hostLog.info(String.format("System property '%s' overrides deployment-file value"));
+            }
         }
-        return value;
+
+        return result;
     }
 
     /**
@@ -4701,7 +4710,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void reportNodeStartupProgress(int completed, int total)
     {
-        m_statusTracker.reportProgress(completed, total);
+        if (m_statusTracker != null) {
+            m_statusTracker.reportProgress(completed, total);
+        }
     }
 
     @Override
