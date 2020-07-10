@@ -15,28 +15,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.dr2;
 
 import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.dr2.DRCtrlRespFailure;
+import org.voltdb.DRProducerStatsBase;
+import org.voltdb.DRRoleStats;
+import org.voltdb.VoltTable;
 
 public class DRProducerClusterStats {
     public final short clusterId;
     public final short consumerClusterId;
     public final DRRoleStats.State state;
-    public final DRCtrlRespFailure lastFailure;
+    public final byte lastErrorCode;
 
     public DRProducerClusterStats(short clusterId,
                                short consumerClusterId,
                                DRRoleStats.State state,
-                               DRCtrlRespFailure lastFailure) {
+                               byte lastFailure) {
         this.clusterId = clusterId;
         this.consumerClusterId = consumerClusterId;
         this.state = state;
-        this.lastFailure = lastFailure;
+        this.lastErrorCode = lastFailure;
     }
 
     /**

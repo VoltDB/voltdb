@@ -28,6 +28,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dr2.DRProducerClusterStats;
 import org.voltdb.task.TaskStatsSource;
 
 import com.google_voltpatches.common.base.Supplier;
