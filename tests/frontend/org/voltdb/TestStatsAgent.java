@@ -22,23 +22,26 @@
  */
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import org.voltcore.network.*;
+import org.voltcore.network.Connection;
+import org.voltcore.network.MockConnection;
+import org.voltcore.network.MockWriteStream;
+import org.voltcore.network.WriteStream;
 import org.voltdb.client.ClientResponse;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class TestStatsAgent {
 
@@ -104,6 +107,8 @@ public class TestStatsAgent {
         });
         m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0, nodeSource);
 
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERCLUSTER, 0, nodeSource);
+
         List<VoltTable.ColumnInfo> snapshotStatusColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
             new VoltTable.ColumnInfo("c1", VoltType.STRING),
             new VoltTable.ColumnInfo("c2", VoltType.STRING)
@@ -146,7 +151,7 @@ public class TestStatsAgent {
         VoltTable results[] = response.getResults();
         System.out.println(results[0]);
         System.out.println(results[1]);
-        verifyResults(response);
+        verifyResults(response, 3);
     }
 
     @Test
@@ -236,12 +241,12 @@ public class TestStatsAgent {
          */
         m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         ClientResponseImpl response = responses.take();
-        verifyResults(response);
+        verifyResults(response, 3);
     }
 
-    private void verifyResults(ClientResponseImpl response) {
+    private void verifyResults(ClientResponseImpl response, int expectedTables) {
         VoltTable results[] = response.getResults();
-        assertEquals(2, results.length);
+        assertEquals(expectedTables, results.length);
 
         Set<Integer> pValues = new HashSet<Integer>();
         pValues.add(45);

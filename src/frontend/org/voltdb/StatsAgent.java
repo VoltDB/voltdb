@@ -28,6 +28,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dr2.DRProducerClusterStats;
 import org.voltdb.task.TaskStatsSource;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -89,6 +90,10 @@ public class StatsAgent extends OpsAgent
             break;
         case SNAPSHOTSUMMARY:
             request.aggregateTables = SnapshotSummary.summarize(request.aggregateTables[0]);
+            break;
+        case DRPRODUCER:
+            request.aggregateTables = aggregateDRProducerClusterStats(request.aggregateTables);
+            break;
         default:
         }
     }
@@ -461,6 +466,11 @@ public class StatsAgent extends OpsAgent
 
     private VoltTable[] aggregateDRRoleStats(VoltTable[] stats) {
         return new VoltTable[] { DRRoleStats.aggregateStats(stats[0]) };
+    }
+
+    private VoltTable[] aggregateDRProducerClusterStats(VoltTable[] stats) {
+        VoltTable clusterStats = DRProducerClusterStats.aggregateStats(stats[2]);
+        return new VoltTable[] { stats[0], stats[1], clusterStats };
     }
 
     public void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
