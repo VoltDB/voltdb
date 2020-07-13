@@ -534,8 +534,8 @@ public class CommandLine extends VoltDB.Configuration
         m_vemTag = tag;
     }
 
-    public CommandLine setKiplingHostPort(HostAndPort kiplingInterface) {
-        m_topicsHostPort = kiplingInterface;
+    public CommandLine setTopicsHostPort(HostAndPort topicsInterface) {
+        m_topicsHostPort = topicsInterface;
         return this;
     }
 

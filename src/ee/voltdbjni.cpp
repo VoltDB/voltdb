@@ -1641,16 +1641,16 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeE
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeStoreKiplingGroup
+ * Method:    nativeStoreTopicsGroup
  * Signature: (JJ)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeStoreKiplingGroup
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeStoreTopicsGroup
   (JNIEnv *env, jclass clazz, jlong pointer, jlong undoQuantum) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
     try {
-        return engine->storeKiplingGroup(undoQuantum, in);
+        return engine->storeTopicsGroup(undoQuantum, in);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1659,10 +1659,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeStore
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeDeleteKiplingGroup
+ * Method:    nativeDeleteTopicsGroup
  * Signature: (JJ[B)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteKiplingGroup
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteTopicsGroup
   (JNIEnv *env, jclass clazz, jlong pointer, jlong undoQuantum, jbyteArray groupIdIn) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1671,7 +1671,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDelet
             env->GetArrayLength(groupIdIn));
     env->ReleaseByteArrayElements(groupIdIn, groupIdBytes, JNI_ABORT);
     try {
-        return engine->deleteKiplingGroup(undoQuantum, groupId);
+        return engine->deleteTopicsGroup(undoQuantum, groupId);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1680,10 +1680,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDelet
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeFetchKiplingGroups
+ * Method:    nativeFetchTopicsGroups
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchKiplingGroups
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchTopicsGroups
   (JNIEnv *env, jclass clazz, jlong pointer, jint maxReultSize, jbyteArray startGroupIdIn) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1697,7 +1697,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetch
         env->ReleaseByteArrayElements(startGroupIdIn, groupIdBytes, JNI_ABORT);
     }
     try {
-        return engine->fetchKiplingGroups(maxReultSize, groupId);
+        return engine->fetchTopicsGroups(maxReultSize, groupId);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1706,10 +1706,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetch
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeCommitKiplingGroupOffsets
+ * Method:    nativeCommitTopicsGroupOffsets
  * Signature: (JJJS[B)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCommitKiplingGroupOffsets
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCommitTopicsGroupOffsets
   (JNIEnv *env, jclass clazz, jlong pointer, jlong spUniqueId, jlong undoQuantum, jshort requestVersion,
           jbyteArray groupIdIn) {
     auto engine = castToEngine(pointer);
@@ -1721,7 +1721,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCommi
     ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
     try {
         in.limit(in.readInt());
-        return engine->commitKiplingGroupOffsets(spUniqueId, undoQuantum, requestVersion, groupId, in);
+        return engine->commitTopicsGroupOffsets(spUniqueId, undoQuantum, requestVersion, groupId, in);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1730,10 +1730,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCommi
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeFetchKiplingGroupOffsets
+ * Method:    nativeFetchTopicsGroupOffsets
  * Signature: (JS[B)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchKiplingGroupOffsets
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetchTopicsGroupOffsets
   (JNIEnv *env, jclass clazz, jlong pointer, jshort requestVersion, jbyteArray groupIdIn) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1744,7 +1744,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetch
     ReferenceSerializeInputBE in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
     try {
         in.limit(in.readInt());
-        return engine->fetchKiplingGroupOffsets(requestVersion, groupId, in);
+        return engine->fetchTopicsGroupOffsets(requestVersion, groupId, in);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1753,15 +1753,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeFetch
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeDeleteExpiredKiplingOffsets
+ * Method:    nativeDeleteExpiredTopicsOffsets
  * Signature: (JJJ)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteExpiredKiplingOffsets
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteExpiredTopicsOffsets
   (JNIEnv *env, jclass clazz, jlong pointer, jlong undoToken, jlong deleteOlderThan) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        return engine->deleteExpiredKiplingOffsets(undoToken, deleteOlderThan);
+        return engine->deleteExpiredTopicsOffsets(undoToken, deleteOlderThan);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }

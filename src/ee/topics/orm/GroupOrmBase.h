@@ -19,9 +19,9 @@
 
 #include "common/tabletuple.h"
 #include "storage/persistenttable.h"
-#include "kipling/GroupTables.h"
+#include "topics/GroupTables.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 /**
  * Base class for updating tuples in a table by tracking the the changes in an external tuple and applying all changes

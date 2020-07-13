@@ -169,7 +169,8 @@ public class KafkaImportBenchmark {
         String password = "";
 
         @Option(desc = "Set to autoreconnect (setReconnectOnConnectionLoss) or topoaware (setTopologyChangeAware)")
-        String connectoption = "topoaware";
+        // String connectoption = "topoaware";
+        String connectoption = "autoreconnect";
 
         @Override
         public void validate() {

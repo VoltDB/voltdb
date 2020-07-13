@@ -160,7 +160,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
-import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -275,9 +274,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "10.0.rc1";
+    static final String m_defaultVersionString = "10.0.beta5";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0.rc1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0.beta5\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -3009,7 +3008,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 shutdownDeployment = true;
             }
             if (deployment.getTopics() != null && deployment.getTopics().isEnabled()) {
-                consoleLog.error("Kipling is not supported in the community edition of VoltDB.");
+                consoleLog.error("Topics feature is not supported in the community edition of VoltDB.");
                 shutdownDeployment = true;
             }
             if (checkForDr && deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
@@ -4484,7 +4483,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // Allow export datasources to start consuming their binary deques safely
         // as at this juncture the initial truncation snapshot is already complete
-        VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.REJOIN);
+        VoltDB.getExportManager().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
         VoltDB.getImportManager().readyForData();
@@ -4717,7 +4716,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
-            VoltDB.getExportManager().startPolling(m_catalogContext, StreamStartAction.RECOVER);
+            VoltDB.getExportManager().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
             VoltDB.getImportManager().readyForData();

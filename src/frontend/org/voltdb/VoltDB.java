@@ -95,7 +95,7 @@ public class VoltDB {
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
-    public static final int DEFAULT_KIPLING_PORT = 9092;
+    public static final int DEFAULT_TOPICS_PORT = 9092;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
     // Staged filenames for advanced deployments

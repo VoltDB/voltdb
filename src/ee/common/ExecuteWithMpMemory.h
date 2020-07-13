@@ -98,6 +98,15 @@ public:
     ~ScopedReplicatedResourceLock();
 };
 
+class ConditionalExecuteWithMpMemoryAndScopedResourceLock {
+public:
+    ConditionalExecuteWithMpMemoryAndScopedResourceLock(bool needMpMemory);
+
+    ~ConditionalExecuteWithMpMemoryAndScopedResourceLock();
+
+private:
+    bool m_usingMpMemory;
+};
 } // end namespace voltdb
 
 #endif //VOLTDB_EXECUTEWITHMPMEMORY_H

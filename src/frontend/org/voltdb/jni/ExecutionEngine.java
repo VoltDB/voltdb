@@ -931,20 +931,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract boolean externalStreamsEnabled();
 
     /**
-     * Store a kipling group and its members in the system tables
+     * Store a topics group and its members in the system tables
      *
      * @param undoToken       to be used for this transaction
-     * @param serializedGroup kipling group serialized into a byte[]
+     * @param serializedGroup topics group serialized into a byte[]
      */
-    public abstract void storeKiplingGroup(long undoToken, byte[] serializedGroup);
+    public abstract void storeTopicsGroup(long undoToken, byte[] serializedGroup);
 
     /**
-     * Delete a kiplng group, all members and all offsets
+     * Delete a topics group, all members and all offsets
      *
      * @param undoToken to be used for this transaction
      * @param groupId   ID of group to be dleted
      */
-    public abstract void deleteKiplingGroup(long undoToken, String groupId);
+    public abstract void deleteTopicsGroup(long undoToken, String groupId);
 
     /**
      * Start or continue a fetch of all group from this site.
@@ -956,30 +956,30 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param groupId       non-inclusive start point for iterating over groups. {@code null} means start at begining
      * @return A {@link Pair} indicating if there are more groups and the serialized groups
      */
-    public abstract Pair<Boolean, byte[]> fetchKiplingGroups(int maxResultSize, String groupId);
+    public abstract Pair<Boolean, byte[]> fetchTopicsGroups(int maxResultSize, String groupId);
 
     /**
-     * Commit topic partition offsets for a kipling group in the system tables
+     * Commit topic partition offsets for a topics group in the system tables
      *
      * @param spUniqueId     for this transaction
      * @param undoToken      to be used for this transaction
-     * @param requestVersion Version of the kipling message making this request
+     * @param requestVersion Version of the topics message making this request
      * @param groupId        ID of the group
      * @param offsets        serialized offsets to be stored
      * @return response to requester
      */
-    public abstract byte[] commitKiplingGroupOffsets(long spUniqueId, long undoToken, short requestVersion,
+    public abstract byte[] commitTopicsGroupOffsets(long spUniqueId, long undoToken, short requestVersion,
             String groupId, byte[] offsets);
 
     /**
-     * Fetch topic partition offsets for a kipling group from the system tables
+     * Fetch topic partition offsets for a topics group from the system tables
      *
-     * @param requestVersion version of the kipling message making this request
+     * @param requestVersion version of the topics message making this request
      * @param groupId        IF of group
      * @param offsets        serialized offsets being requested
      * @return response to requester
      */
-    public abstract byte[] fetchKiplingGroupOffsets(short requestVersion, String groupId, byte[] offsets);
+    public abstract byte[] fetchTopicsGroupOffsets(short requestVersion, String groupId, byte[] offsets);
 
     /**
      * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
@@ -988,7 +988,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken       to be used for this transaction
      * @param deleteOlderThan timestamp to use to select what offsets should be deleted
      */
-    public abstract void deleteExpiredKiplingOffsets(long undoToken, TimestampType deleteOlderThan);
+    public abstract void deleteExpiredTopicsOffsets(long undoToken, TimestampType deleteOlderThan);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1366,26 +1366,26 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                 long startSequenceNumber);
 
     // --------------------------------------------------------
-    // Kipling methods
+    // Topics methods
     // --------------------------------------------------------
     /**
-     * Store a kipling group in the kipling system tables. The serialized group should be put in the m_psetBuffer
+     * Store a topics group in the topics system tables. The serialized group should be put in the m_psetBuffer
      *
      * @param pointer   to execution engine
      * @param undoToken to use to be able to rollback the store
      * @return 0 on succes otherwise 1
      */
-    native static protected int nativeStoreKiplingGroup(long pointer, long undoToken);
+    native static protected int nativeStoreTopicsGroup(long pointer, long undoToken);
 
     /**
-     * Delete a kipling group, all members and offsets
+     * Delete a topics group, all members and offsets
      *
      * @param pointer   to execution engine
      * @param undoToken to use to be able to rollback the delete
      * @param groupId   of the group to delete
      * @return 0 on success otherwise 1
      */
-    native static protected int nativeDeleteKiplingGroup(long pointer, long undoToken, byte[] groupId);
+    native static protected int nativeDeleteTopicsGroup(long pointer, long undoToken, byte[] groupId);
 
     /**
      * Start or continue a fetch of all groups from this site. The response will be in m_nextDeserializer
@@ -1396,20 +1396,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param startGroupId Non inclusive groupId from which to start fetching groups
      * @return 0 on success otherwise 1
      */
-    native static protected int nativeFetchKiplingGroups(long pointer, int maxResponse, byte[] startGroupId);
+    native static protected int nativeFetchTopicsGroups(long pointer, int maxResponse, byte[] startGroupId);
 
     /**
-     * Commit topic partition offsets for the kipling group. The serialized offsets should be put in the m_psetBuffer
+     * Commit topic partition offsets for the topics group. The serialized offsets should be put in the m_psetBuffer
      * and the response will be in m_nextDeserializer
      *
      * @param pointer        to execution engine
      * @param spUniqueId     for this transaction
      * @param undoToken      to use to be able to rollback the commit
-     * @param requestVersion of the kipling request
+     * @param requestVersion of the topics request
      * @param groupId        of the group these offsets should be associated with
      * @return 0 on success otherwise 1
      */
-    native static protected int nativeCommitKiplingGroupOffsets(long pointer, long spUniqueId, long undoToken,
+    native static protected int nativeCommitTopicsGroupOffsets(long pointer, long spUniqueId, long undoToken,
             short requestVersion, byte[] groupId);
 
     /**
@@ -1417,11 +1417,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * m_psetBuffer and the response will be in m_nextDeserializer
      *
      * @param pointer        to execution engine
-     * @param requestVersion of the kipling request
+     * @param requestVersion of the topics request
      * @param groupId        of the group to fetch offsets from
      * @return 0 on success otherwise 1
      */
-    native static protected int nativeFetchKiplingGroupOffsets(long pointer, short requestVersion, byte[] groupId);
+    native static protected int nativeFetchTopicsGroupOffsets(long pointer, short requestVersion, byte[] groupId);
 
     /**
      * Delete the expired offsets of standalone groups. An offset is expired if its commit timestamp is <
@@ -1432,7 +1432,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param deleteOlderThan timestamp to use to select what offsets should be deleted
      * @return 0 on success otherwise 1
      */
-    native static protected int nativeDeleteExpiredKiplingOffsets(long pointer, long undoToken, long deleteOlderThan);
+    native static protected int nativeDeleteExpiredTopicsOffsets(long pointer, long undoToken, long deleteOlderThan);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

@@ -15,9 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "kipling/messages/OffsetFetch.h"
+#include "topics/messages/OffsetFetch.h"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 OffsetFetchResponsePartition::OffsetFetchResponsePartition(int16_t version, CheckedSerializeInput& in) :
         m_partitionIndex(in.readInt()), m_offset(in.readLong()) {

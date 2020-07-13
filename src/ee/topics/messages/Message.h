@@ -26,7 +26,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 
-namespace voltdb { namespace kipling {
+namespace voltdb { namespace topics {
 
 /**
  * Base response message for all of the classes which are serialized as part of a response
