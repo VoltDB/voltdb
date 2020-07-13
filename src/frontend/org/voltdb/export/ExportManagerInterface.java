@@ -178,7 +178,7 @@ public interface ExportManagerInterface {
 
     public void shutdown();
 
-    public void startPolling(CatalogContext catalogContext, StreamStartAction action);
+    public void startPolling(CatalogContext catalogContext);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, Map<Integer, Integer> localPartitionsToSites);

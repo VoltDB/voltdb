@@ -248,7 +248,7 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public synchronized void startPolling(CatalogContext catalogContext, StreamStartAction action) {
+    public synchronized void startPolling(CatalogContext catalogContext) {
         m_startPolling = true;
 
         CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
