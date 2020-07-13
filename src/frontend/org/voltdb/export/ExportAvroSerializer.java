@@ -54,6 +54,26 @@ public class ExportAvroSerializer {
     private SchemaRegistryClient m_schemaRegistryClient;
     private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
+   /**
+    * Return a schema name expected by Kafka Connect for the value part of a polled topic
+    *
+    * @param name topic name
+    * @return schema name for value
+    */
+    public static String getValueSchemaName(String name) {
+        return name + "-value";
+    }
+
+    /**
+     * Return a schema name expected by Kafka Connect for the key part of a polled topic
+     *
+     * @param name topic name
+     * @return schema name for key
+     */
+    public static String getKeySchemaName(String name) {
+        return name + "-key";
+    }
+
     public ExportAvroSerializer(AvroType avro) {
         updateConfig(avro);
     }
@@ -108,9 +128,7 @@ public class ExportAvroSerializer {
      * Cleanup the decoders when a topic is dropped.
      * <p>
      * Note: the map of decoders is keyed by avro subject names: for every topic
-     * we have 2 avro subjects (for the value and the key). This method assumes
-     * that the key name for a topic has the suffix defined by the implementation
-     * of {@link ExportRow#extractKey(java.util.List)}
+     * we have 2 avro subjects (for the value and the key).
      *
      * @param topicName
      */
@@ -118,8 +136,8 @@ public class ExportAvroSerializer {
         if (m_avro == null) {
             return;
         }
-        m_decoderMap.remove(getAvroSubjectName(topicName));
-        m_decoderMap.remove(getAvroSubjectName(topicName + ExportRow.KEY_SUFFIX));
+        m_decoderMap.remove(getAvroSubjectName(getValueSchemaName(topicName)));
+        m_decoderMap.remove(getAvroSubjectName(getKeySchemaName(topicName)));
     }
 
     /**

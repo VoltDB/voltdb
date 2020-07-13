@@ -53,6 +53,7 @@ class PersistentTable;
 class SynchronizedThreadLock {
     friend class ExecuteWithAllSitesMemory;
     friend class ReplicatedMaterializedViewHandler;
+    friend class ConditionalExecuteWithMpMemoryAndScopedResourceLock;
     friend class ScopedReplicatedResourceLock;
     friend class VoltDBEngine;
     friend class ::DRBinaryLogTest;

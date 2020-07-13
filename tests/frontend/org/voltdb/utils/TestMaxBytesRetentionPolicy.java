@@ -211,7 +211,7 @@ public class TestMaxBytesRetentionPolicy {
 
         long gapStartId = startId + 1000;
         long endId = gapStartId + 100 - 1;
-        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(0)), gapStartId, endId, System.currentTimeMillis());
+        gapWriter.offer(DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledSmallBuffer(0)), gapStartId, endId, System.currentTimeMillis());
         gapWriter.updateGapHeader(header);
         assertEquals(3, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         // Create gap segment in the end
