@@ -35,9 +35,9 @@ set -x
 voltdb/bin/sqlcmd --servers=$SERVERS --query="select key from store limit 1"
 if [ $? != 0 ]; then
     echo "loading ddl"
-    voltdb/bin/sqlcmd < ddl.sql
+    voltdb/bin/sqlcmd --servers=$SERVERS < ddl.sql
 else
-    voltdb/bin/sqlcmd --query="truncate table store"
+    voltdb/bin/sqlcmd --servers=$SERVERS --query="truncate table store"
 fi
 JAVA=`which java`
 $JAVA -classpath kvbenchmark.jar:$VJAR:voltdb/lib/*.jar -Dlog4j.configuration=file://$LOG4J \
