@@ -4740,8 +4740,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void replaceDRConsumerStatsWithDummy()
     {
+        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERCLUSTER, 0);
         getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
         getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERCLUSTER, 0,
+                new DRConsumerStatsBase.DRConsumerClusterStatsBase());
         getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
                 new DRConsumerStatsBase.DRConsumerNodeStatsBase());
         getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,

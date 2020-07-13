@@ -23,6 +23,7 @@ import java.util.Iterator;
 import org.voltdb.VoltTable.ColumnInfo;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Iterators;
 
 public class DRConsumerStatsBase {
 
@@ -31,8 +32,13 @@ public class DRConsumerStatsBase {
         public static final String CLUSTER_ID = "CLUSTER_ID";
         public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
 
-        // columns for the node-level table
+        // column for both the cluster and node-level tables
         public static final String STATE = "STATE";
+
+        // columns for the cluster-level table
+        public static final String LAST_FAILURE = "LAST_FAILURE";
+
+        // columns for the node-level table
         public static final String REPLICATION_RATE_1M = "REPLICATION_RATE_1M";
         public static final String REPLICATION_RATE_5M = "REPLICATION_RATE_5M";
 
@@ -43,7 +49,53 @@ public class DRConsumerStatsBase {
         public static final String LAST_APPLIED_TIMESTAMP = "LAST_APPLIED_TIMESTAMP";
         public static final String IS_PAUSED = "IS_PAUSED";
         public static final String REMOTE_CREATION_TIMESTMAP = "REMOTE_CREATION_TIMESTMAP";
-        public static final String LAST_FAILURE = "LAST_FAILURE";
+    }
+
+    public static class DRConsumerClusterStats extends DRConsumerClusterStatsBase {
+        private final byte m_localClusterId;
+        public DRConsumerClusterStats(byte localClusterId) {
+            m_localClusterId = localClusterId;
+        }
+
+        @Override
+        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+            return Iterators.<Object>singletonIterator(1);
+        }
+
+        @Override
+        protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+            rowValues[columnNameToIndex.get(Columns.CLUSTER_ID)] = m_localClusterId;
+            rowValues[columnNameToIndex.get(Columns.REMOTE_CLUSTER_ID)] = -1;
+//            assert m_dispatcher.getState() != null;
+            rowValues[columnNameToIndex.get(Columns.STATE)] = "";//m_dispatcher.getState().toString();
+//            for (Map.Entry<AbstractDRClient, ProducerReport> e : m_lastProducerReport.entrySet()) {
+//                ClusterInfo producerInfo = e.getKey().getActualProducerClusterInfo();
+//                if (producerInfo != null && producerInfo.getClusterId() == m_remoteClusterId) {
+//                    m_lastFailureCode = e.getValue().m_lastFailureCode.getValue();
+//                    break;
+//                }
+//            }
+            rowValues[columnNameToIndex.get(Columns.LAST_FAILURE)] = 0;
+        }
+    }
+
+    public static class DRConsumerClusterStatsBase extends StatsSource {
+        public DRConsumerClusterStatsBase() {
+            super(false);
+        }
+
+        @Override
+        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
+        }
+
+        @Override
+        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+            return ImmutableSet.of().iterator();
+        }
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
@@ -60,7 +112,6 @@ public class DRConsumerStatsBase {
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_1M, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_5M, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.REMOTE_CREATION_TIMESTMAP, VoltType.TIMESTAMP));
-            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
         }
 
         @Override
