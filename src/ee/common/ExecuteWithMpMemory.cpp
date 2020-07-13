@@ -100,5 +100,19 @@ ScopedReplicatedResourceLock::ScopedReplicatedResourceLock() {
 ScopedReplicatedResourceLock::~ScopedReplicatedResourceLock() {
     SynchronizedThreadLock::unlockReplicatedResource();
 }
+ConditionalExecuteWithMpMemoryAndScopedResourceLock::ConditionalExecuteWithMpMemoryAndScopedResourceLock(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
+    if (m_usingMpMemory) {
+        VOLT_DEBUG("Entering Conditional (locked) UseMPmemory");
+        SynchronizedThreadLock::lockReplicatedResource();
+        SynchronizedThreadLock::assumeMpMemoryContext();
+    }
+}
 
+ConditionalExecuteWithMpMemoryAndScopedResourceLock::~ConditionalExecuteWithMpMemoryAndScopedResourceLock() {
+    if (m_usingMpMemory) {
+        VOLT_DEBUG("Exiting Conditional (locked) UseMPmemory");
+        SynchronizedThreadLock::assumeLocalSiteContext();
+        SynchronizedThreadLock::unlockReplicatedResource();
+    }
+}
 } // end namespace voltdb

@@ -38,7 +38,7 @@ public class HashMismatchMessage extends VoltMessage {
 
     public HashMismatchMessage(boolean reschedule, boolean hostLeaderCheck) {
         this(reschedule);
-        m_reschedule = hostLeaderCheck;
+        m_checkHostMessage = hostLeaderCheck;
     }
 
     @Override
