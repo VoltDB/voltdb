@@ -821,7 +821,11 @@ void VoltDBEngine::checkUserDefinedFunctionInfo(UserDefinedFunctionInfo *info, i
 
 void VoltDBEngine::checkJavaFunctionReturnCode(int32_t returnCode, const char* name) {
     if (returnCode != 0) {
-        throwSQLException(SQLException::volt_user_defined_function_error, "%s failed", name);
+        throwSQLException(
+                SQLException::volt_user_defined_function_error,
+                "%s failed: %s",
+                name,
+                ReferenceSerializeInputBE(m_udfBuffer, m_udfBufferCapacity).readTextString().c_str());
     }
 }
 
@@ -851,7 +855,7 @@ NValue VoltDBEngine::udfResultHelper(int32_t returnCode, bool partition_table, V
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     checkUserDefinedFunctionInfo(findInMapOrNull(functionId, m_functionInfo), functionId);
     checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateStart(functionId),
-            "callJavaUserDefinedAggregateStart");
+            "UserDefinedAggregate::start()");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(
@@ -861,7 +865,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(
     serializeToUDFOutputBuffer(functionId, argVector, argCount,
             info->paramTypes.front(), udafIndex);
     checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateAssemble(),
-            "callJavaUserDefinedAggregateAssemble");
+            "UserDefinedAggregate::assemble()");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateCombine(
@@ -871,7 +875,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(
     // array after the worker end method
     serializeToUDFOutputBuffer(functionId, argument, ValueType::tVARBINARY, udafIndex);
     checkJavaFunctionReturnCode(m_topend->callJavaUserDefinedAggregateCombine(),
-            "callJavaUserDefinedAggregateCombine");
+            "UserDefinedAggregate::combine()");
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, int32_t udafIndex) {

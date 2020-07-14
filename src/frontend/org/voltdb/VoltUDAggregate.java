@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import org.voltdb.VoltType;
-
 public interface VoltUDAggregate<T, U> {
 
     /**
@@ -26,21 +24,21 @@ public interface VoltUDAggregate<T, U> {
      * to store the aggregation results.
      * This method initializes the data structures.
      */
-    public void start();
+    void start();
 
     /**
      * Add a value of column type T to the aggregation results.
      */
-    public void assemble(T val);
+    void assemble(T val);
 
     /**
      * Combine the partial results of different tables together (partitioned)
      * @param other An instance of the implementing class of interface VoltUDAggregate
      */
-    public void combine(U other);
+    void combine(U other);
 
     /**
      * @return return the aggregation results based on the used defined return value U
      */
-    public Object end();
+    Object end();
 }
