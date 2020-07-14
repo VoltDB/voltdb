@@ -24,6 +24,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.DRConsumerStatsBase.DRConsumerClusterStats;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
@@ -94,6 +95,8 @@ public class StatsAgent extends OpsAgent
         case DRPRODUCER:
             request.aggregateTables = aggregateDRProducerClusterStats(request.aggregateTables);
             break;
+        case DRCONSUMER:
+            request.aggregateTables = aggregateDRConsumerClusterStats(request.aggregateTables);
         default:
         }
     }
@@ -470,6 +473,11 @@ public class StatsAgent extends OpsAgent
 
     private VoltTable[] aggregateDRProducerClusterStats(VoltTable[] stats) {
         VoltTable clusterStats = DRProducerClusterStats.aggregateStats(stats[2]);
+        return new VoltTable[] { stats[0], stats[1], clusterStats };
+    }
+
+    private VoltTable[] aggregateDRConsumerClusterStats(VoltTable[] stats) {
+        VoltTable clusterStats = DRConsumerClusterStats.aggregateStats(stats[2]);
         return new VoltTable[] { stats[0], stats[1], clusterStats };
     }
 
