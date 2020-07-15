@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.DRConsumerStatsBase;
 import org.voltdb.DRProducerStatsBase;
 import org.voltdb.DRRoleStats;
 import org.voltdb.StatsAgent;
@@ -30,6 +29,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.VoltType;
 
 /**

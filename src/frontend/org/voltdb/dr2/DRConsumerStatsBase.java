@@ -15,10 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
-
-import static com.google_voltpatches.common.base.Predicates.equalTo;
-import static com.google_voltpatches.common.base.Predicates.not;
+package org.voltdb.dr2;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -26,13 +23,13 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.StatsSource;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.dr2.DRConsumerDispatcher;
-import org.voltdb.dr2.DRStateMachine;
+import org.voltdb.VoltType;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Maps;
 
 public class DRConsumerStatsBase {
 
@@ -60,77 +57,25 @@ public class DRConsumerStatsBase {
         public static final String REMOTE_CREATION_TIMESTMAP = "REMOTE_CREATION_TIMESTMAP";
     }
 
-    public static class DRConsumerClusterStats extends DRConsumerClusterStatsBase {
-        private final byte m_localClusterId;
-        private Map<Byte, Pair<DRConsumerDispatcher, Byte>> m_lastFailures = ImmutableMap.of();
+    public static class DRConsumerClusterStatsBase extends StatsSource {
         private final static byte NO_FAILURE = 0;
 
-        public DRConsumerClusterStats(byte localClusterId) {
-            m_localClusterId = localClusterId;
+        public DRConsumerClusterStatsBase() {
+            super(false);
+        }
+
+        @Override
+        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
         }
 
         @Override
         protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-            if (interval) {
-                throw new UnsupportedOperationException("Haven't implemented interval stats for DR replication");
-            }
-            return buildIterator();
+            return ImmutableSet.of().iterator();
         }
-
-        private Iterator<Object> buildIterator() {
-            final Iterator<Byte> iter = m_lastFailures.keySet().iterator();
-            return new Iterator<Object>() {
-                @Override
-                public boolean hasNext() {
-                    return iter.hasNext();
-                }
-
-                @Override
-                public Object next() {
-                    return iter.next();
-                }
-            };
-        }
-
-        @Override
-        protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-            rowValues[columnNameToIndex.get(Columns.CLUSTER_ID)] = m_localClusterId;
-            for (Map.Entry<Byte, Pair<DRConsumerDispatcher, Byte>> e : m_lastFailures.entrySet()) {
-                if (rowKey == e.getKey()) {
-                    DRConsumerDispatcher dispatcher = e.getValue().getFirst();
-                    rowValues[columnNameToIndex.get(Columns.STATE)] =
-                            dispatcher == null ? DRStateMachine.State.INITIALIZE.name() : dispatcher.getState().name();
-                    rowValues[columnNameToIndex.get(Columns.REMOTE_CLUSTER_ID)] = e.getKey();
-                    rowValues[columnNameToIndex.get(Columns.LAST_FAILURE)] = e.getValue().getSecond();
-                    break;
-                }
-            }
-        }
-
-        public void updateDispatcher(Byte producerClusterId, DRConsumerDispatcher dispatcher) {
-            Pair<DRConsumerDispatcher, Byte> pair = m_lastFailures.get(producerClusterId);
-            if (pair == null || pair.getFirst() != dispatcher) {
-                ImmutableMap.Builder<Byte, Pair<DRConsumerDispatcher, Byte>> builder = ImmutableMap.builder();
-                builder.putAll(Maps.filterKeys(m_lastFailures, not(equalTo(producerClusterId))));
-                builder.put(producerClusterId, new Pair<>(dispatcher, pair == null ? NO_FAILURE : pair.getSecond()));
-                m_lastFailures = builder.build();
-            }
-        }
-
-        public void update(Byte producerClusterId, Byte errorCode) {
-            // Ignore uninitialized producer cluster id
-            if (producerClusterId == -1) {
-                return;
-            }
-            Pair<DRConsumerDispatcher, Byte> pair = m_lastFailures.get(producerClusterId);
-            if (pair == null || pair.getSecond() != errorCode) {
-                ImmutableMap.Builder<Byte, Pair<DRConsumerDispatcher, Byte>> builder = ImmutableMap.builder();
-                builder.putAll(Maps.filterKeys(m_lastFailures, not(equalTo(producerClusterId))));
-                builder.put(producerClusterId, new Pair<>(pair == null ? null : pair.getFirst(), errorCode));
-                m_lastFailures = builder.build();
-            }
-        }
-
 
         /**
          * Aggregates DRCONSUMERCLUSTER statistics reported by multiple nodes into
@@ -149,7 +94,7 @@ public class DRConsumerStatsBase {
             }
 
             Map<String, Byte> failureMap = new TreeMap<>();
-            Map<String, Pair<DRStateMachine.State, Byte>> rowMap = new TreeMap<>();
+            Map<String, Pair<String, Byte>> rowMap = new TreeMap<>();
             while (stats.advanceRow()) {
                 final byte clusterId = (byte) stats.getLong(DRConsumerStatsBase.Columns.CLUSTER_ID);
                 final byte remoteClusterId = (byte) stats.getLong(DRConsumerStatsBase.Columns.REMOTE_CLUSTER_ID);
@@ -164,38 +109,19 @@ public class DRConsumerStatsBase {
                     failureMap.put(key, lastFailure);
                 }
 
-                final DRStateMachine.State state = DRStateMachine.State.valueOf(stats.getString(DRConsumerStatsBase.Columns.STATE));
-                Pair<DRStateMachine.State, Byte> pair = rowMap.get(key);
+                final String state = stats.getString(DRConsumerStatsBase.Columns.STATE);
+                Pair<String, Byte> pair = rowMap.get(key);
                 if (pair == null) {
                     rowMap.put(key, Pair.of(state, failureMap.get(key)));
                 }
             }
 
             stats.clearRowData();
-            for (Map.Entry<String, Pair<DRStateMachine.State, Byte>> e : rowMap.entrySet()) {
+            for (Map.Entry<String, Pair<String, Byte>> e : rowMap.entrySet()) {
                 String[] ids = e.getKey().split(":", 2);
-                stats.addRow(Byte.parseByte(ids[0]), Byte.parseByte(ids[1]), e.getValue().getFirst().toString(), e.getValue().getSecond());
+                stats.addRow(Byte.parseByte(ids[0]), Byte.parseByte(ids[1]), e.getValue().getFirst(), e.getValue().getSecond());
             }
             return stats;
-        }
-    }
-
-    public static class DRConsumerClusterStatsBase extends StatsSource {
-        public DRConsumerClusterStatsBase() {
-            super(false);
-        }
-
-        @Override
-        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
-        }
-
-        @Override
-        protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-            return ImmutableSet.of().iterator();
         }
     }
 
