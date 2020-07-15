@@ -24,26 +24,35 @@
 package org.voltdb_testfuncs;
 
 import java.io.Serializable;
+
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltUDAggregate;
 
-public class Umin implements Serializable, VoltUDAggregate<Double, Umin> {
+public class UminWithException implements Serializable, VoltUDAggregate<Double, UminWithException> {
     private double min = Double.POSITIVE_INFINITY;
 
+    @Override
     public void start() {
     }
 
+    @Override
     public void assemble (Double value) {
         if (value < min) {
             min = value;
+            if (min < 0) {
+                throw new VoltAbortException("Minimum value negative");
+            }
         }
     }
 
-    public void combine (Umin other) {
+    @Override
+    public void combine (UminWithException other) {
         if (other.min < min) {
             min = other.min;
         }
     }
 
+    @Override
     public Double end () {
         return min;
     }

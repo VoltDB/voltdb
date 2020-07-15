@@ -10,6 +10,7 @@ DROP AGGREGATE FUNCTION ucount IF EXISTS;
 DROP AGGREGATE FUNCTION umax IF EXISTS;
 DROP AGGREGATE FUNCTION umedian IF EXISTS;
 DROP AGGREGATE FUNCTION umin IF EXISTS;
+DROP AGGREGATE FUNCTION uminwithexception IF EXISTS;
 DROP AGGREGATE FUNCTION umode IF EXISTS;
 DROP AGGREGATE FUNCTION uprimesum IF EXISTS;
 DROP AGGREGATE FUNCTION usum IF EXISTS;
@@ -26,5 +27,7 @@ CREATE AGGREGATE FUNCTION umode FROM CLASS org.voltdb_testfuncs.Umode;
 CREATE AGGREGATE FUNCTION uprimesum FROM CLASS org.voltdb_testfuncs.Uprimesum;
 CREATE AGGREGATE FUNCTION usum FROM CLASS org.voltdb_testfuncs.Usum;
 
+CREATE AGGREGATE FUNCTION uminwithexception FROM CLASS org.voltdb_testfuncs.UminWithException;
+
 CREATE FUNCTION add2Integer FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Integer;
-CREATE FUNCTION add2Float     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float;
+CREATE FUNCTION add2Float   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float;

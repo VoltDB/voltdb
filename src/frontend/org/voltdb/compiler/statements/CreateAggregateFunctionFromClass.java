@@ -50,8 +50,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
     // If it is valid, return the function class
     // Otherwise, throw an exception
     private Class<?> isSQLParamValid(String functionName, String className, String shortName)
-        throws VoltCompilerException, RuntimeException, Error
-    {
+        throws VoltCompilerException, RuntimeException, Error {
         // Check if the function is already defined
         if (isDefinedFunctionName(functionName)) {
             throw m_compiler.new VoltCompilerException(String.format(
@@ -85,8 +84,9 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
 
         // The UDAF must implement interfaces "Serializable" and "VoltUDAggregate"
         if (!Serializable.class.isAssignableFrom(funcClass) || !VoltUDAggregate.class.isAssignableFrom(funcClass)) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Cannot define a aggregate function without implementing Serializable or VoltUDAggregate in the class declaration"));
+            throw m_compiler.new VoltCompilerException(
+                    "Cannot define a aggregate function without implementing Serializable or " +
+                            "VoltUDAggregate in the class declaration");
         }
 
         // Loaded class can not be abstract
@@ -100,8 +100,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
     }
 
     public static Map<String, Method> retrieveMethodsFromClass(Class<?> funcClass)
-    throws RuntimeException
-    {
+    throws RuntimeException {
         Map<String, Method> methods = new HashMap<>();
         for (Method m : funcClass.getDeclaredMethods()) {
             // method must public and only be public
@@ -153,8 +152,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
     }
 
     private VoltXMLElement createVoltXMLElementForUDAF(String functionName, String className, Map<String, Method> methods)
-        throws VoltCompilerException, RuntimeException
-    {
+        throws RuntimeException {
         // already check the validity of voltReturnType
         VoltType voltReturnType = VoltType.typeFromClass(methods.get("end").getReturnType());
 
@@ -179,7 +177,8 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         // valid, but it helps us give a nice error message.  Note that this definition
         // may revive a saved user defined function, and that nothing is put into the
         // catalog here.
-        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes, true);
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName,
+                -1, voltReturnType, voltParamTypes, true);
         funcXML.withValue("functionid", String.valueOf(functionId));
 
         return funcXML;
@@ -187,8 +186,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
 
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
-        throws VoltCompilerException, Error
-    {
+        throws VoltCompilerException, Error {
         // Matches if it is CREATE AGGREGATE FUNCTION <name> FROM CLASS <class-name>
         Matcher statementMatcher = SQLParser.matchCreateAggregateFunctionFromClass(ddlStatement.statement);
         if (!statementMatcher.matches()) {
