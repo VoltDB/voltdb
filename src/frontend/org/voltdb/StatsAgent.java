@@ -28,6 +28,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dr2.DRConsumerStatsBase.DRConsumerClusterStatsBase;
 import org.voltdb.dr2.DRProducerClusterStats;
 import org.voltdb.task.TaskStatsSource;
 
@@ -94,6 +95,8 @@ public class StatsAgent extends OpsAgent
         case DRPRODUCER:
             request.aggregateTables = aggregateDRProducerClusterStats(request.aggregateTables);
             break;
+        case DRCONSUMER:
+            request.aggregateTables = aggregateDRConsumerClusterStats(request.aggregateTables);
         default:
         }
     }
@@ -470,6 +473,11 @@ public class StatsAgent extends OpsAgent
 
     private VoltTable[] aggregateDRProducerClusterStats(VoltTable[] stats) {
         VoltTable clusterStats = DRProducerClusterStats.aggregateStats(stats[2]);
+        return new VoltTable[] { stats[0], stats[1], clusterStats };
+    }
+
+    private VoltTable[] aggregateDRConsumerClusterStats(VoltTable[] stats) {
+        VoltTable clusterStats = DRConsumerClusterStatsBase.aggregateStats(stats[2]);
         return new VoltTable[] { stats[0], stats[1], clusterStats };
     }
 
