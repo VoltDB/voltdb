@@ -927,7 +927,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!didWork) {
                         Thread.yield();
                     }
-                } else {
+                } else if (m_runningState.isRejoining()){
                     SiteTasker task = m_pendingSiteTasks.take();
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 }
@@ -1101,9 +1101,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         try {
             if (m_non_voltdb_backend != null) {
                 m_non_voltdb_backend.shutdownInstance();
-            }
-            if (m_ee != null) {
-                // m_ee.decommission(true, , );
             }
             // TODO: investigate restartability of snapshotter and taskLog
             if (m_snapshotter != null) {
