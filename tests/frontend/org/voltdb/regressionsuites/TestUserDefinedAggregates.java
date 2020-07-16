@@ -28,7 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
-import junit.framework.Test;
+import org.junit.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -73,15 +73,15 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         Client client = getClient();
 
         // INSERT rows into the table that we are using for testing
-        String allColumnNames = "ID";
-        String allColumnValues = "";
+        StringBuilder allColumnNames = new StringBuilder("ID");
+        StringBuilder allColumnValues = new StringBuilder();
         for (int i = 0; i < columnValues.length; ++i) {
-            allColumnNames += ", " + columnNames[i];
+            allColumnNames.append(", ").append(columnNames[i]);
         }
         for (int i = 0; i < columnValues[0].length; ++i) {
-            allColumnValues = Integer.toString(i);
+            allColumnValues = new StringBuilder(Integer.toString(i));
             for (int j = 0; j < columnValues.length; ++j) {
-                allColumnValues += ", " + columnValues[j][i];
+                allColumnValues.append(", ").append(columnValues[j][i]);
             }
             String insertStatement = "INSERT INTO "+ tableName
                     + " ("+allColumnNames+") VALUES" + " ("+allColumnValues+")";
@@ -145,7 +145,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
                 " (with " + expectedExcepCauseType + " cause)");
     }
 
-    protected void testCreateFunctionException(String functionCall, String errorMessage) throws IOException, ProcCallException {
+    protected void testCreateFunctionException(String functionCall, String errorMessage) throws IOException {
         Client client = getClient();
         try {
             client.callProcedure("@AdHoc", functionCall);
@@ -157,6 +157,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
     }
 
     // Unit tests for UDAFs
+    @Test
     public void testUavg() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1", "2", "3", "4"}};
@@ -164,6 +165,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uavg(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUavgAndAbs() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1", "-2", "3", "-4"}};
@@ -171,6 +173,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uavg(abs(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUavgAndFloor() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1.2", "2.8", "3.3", "4.6"}};
@@ -178,6 +181,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uavg(floor(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUavgTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"1", "2", "3", "4"}, {"2", "3", "4", "5"}};
@@ -185,6 +189,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uavg(NUM), uavg(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUavgAddColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"1", "2", "3", "4"}, {"2", "3", "4", "5"}};
@@ -192,6 +197,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uavg(NUM) + uavg(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUCount() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
@@ -199,6 +205,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("ucount(NUM)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUCountTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
@@ -206,6 +213,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("ucount(NUM), ucount(DEC)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUCountSubtractColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
@@ -213,6 +221,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("ucount(NUM) - ucount(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUCountThreeColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}, {"1.6", "2.2", "3.5", "4", "5", "6.4", "7", "8.0"}};
@@ -220,6 +229,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("ucount(NUM), ucount(DEC), count(DEC)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUmax() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}};
@@ -227,6 +237,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmaxAndAbs() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}};
@@ -234,6 +245,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(abs(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmaxTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"0", "1.1", "100.4", "999.0", "-1000.4", "999"}, {"-0.5", "11000.2", "100.4", "999.8", "-1000.4", "998.3"}};
@@ -241,6 +253,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(NUM), umax(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmaxDivideColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"0", "1.1", "100.4", "999.8", "-1000.4", "999"}, {"-0.5", "100.2", "100.4", "999.8", "-1000.4", "998.3"}};
@@ -248,6 +261,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(NUM)/umax(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmaxAndCeilingDivideColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"0", "1.1", "100.4", "999.8", "-1000.4", "999"}, {"-0.5", "100.2", "100.4", "1999.8", "-1000.4", "998.3"}};
@@ -255,6 +269,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umax(ceiling(NUM))/umax(ceiling(DEC))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmedian() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"2", "4", "5", "10"}};
@@ -262,6 +277,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umedian(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmedianTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"2", "4", "5", "10"}, {"1", "10", "5", "5"}};
@@ -269,6 +285,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umedian(NUM), umedian(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmedianAndDivide() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"2", "9", "9", "10"}, {"1", "10", "4", "4"}};
@@ -276,6 +293,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umedian(NUM)/umedian(DEC)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmedianThreeColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM", "DEC"};
         String[][] columnValues = {{"2", "4", "5", "10"}, {"1", "10", "5", "5"}};
@@ -283,12 +301,14 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umedian(NUM), umedian(DEC), sum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
-    public void testUmedianEndUnsupportedReturn() throws IOException, ProcCallException {
+    @Test
+    public void testUmedianEndUnsupportedReturn() throws IOException {
         String functionCall = "CREATE AGGREGATE FUNCTION umedianEndUnsupportedReturn FROM CLASS org.voltdb_testfuncs.UmedianEndUnsupportedReturn";
         String errorMessage = "Unexpected condition occurred applying DDL statements: Unsupported return value type: java.util.List";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
+    @Test
     public void testUmin() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
@@ -296,6 +316,21 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umin(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
+    public void testUminWithException() throws IOException, ProcCallException {
+        String[] columnNames = {"NUM"};
+        String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
+        Object[] expected = {-1000.0};
+        try {
+            testFunction("uminwithexception(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
+        } catch (ProcCallException e) {
+            // In debug run, exception also has stacktrace appended.
+            assertTrue(e.getMessage().startsWith(
+                    "VOLTDB ERROR: SQL ERROR UserDefinedAggregate::assemble() failed: Minimum value negative"));
+        }
+    }
+
+    @Test
     public void testUminAndUDF() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"0.4", "1", "100.3", "999.9", "-1000.0", "999.1"}};
@@ -303,6 +338,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("add2Float(umin(NUM),1001.0)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUmode() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}};
@@ -310,6 +346,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umode(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUmodeTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"INT", "BIG"};
         String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}, {"0", "0", "0", "23", "13", "9", "12"}};
@@ -317,6 +354,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("umode(INT), umode(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUmodeAndUDF() throws IOException, ProcCallException {
         String[] columnNames = {"INT", "BIG"};
         String[][] columnValues = {{"1", "3", "3", "3", "5", "5", "7"}, {"0", "0", "0", "23", "13", "9", "12"}};
@@ -324,12 +362,14 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("add2Integer(umode(INT), umode(BIG))", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
-    public void testUmodeAssembleUnsupportedParameter() throws IOException, ProcCallException {
+    @Test
+    public void testUmodeAssembleUnsupportedParameter() throws IOException {
         String functionCall = "CREATE AGGREGATE FUNCTION umodeAssembleUnsupportedParameter FROM CLASS org.voltdb_testfuncs.UmodeAssembleUnsupportedParameter";
         String errorMessage = "Unexpected condition occurred applying DDL statements: Unsupported parameter value type: java.util.ArrayList";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
+    @Test
     public void testUprimesum() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}};
@@ -337,6 +377,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uprimesum(INT)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUprimesumTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"INT", "BIG"};
         String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}, {"2", "3", "5", "7", "11", "13", "17"}};
@@ -344,6 +385,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uprimesum(INT), uprimesum(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
+    @Test
     public void testUprimesumAndPower() throws IOException, ProcCallException {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}};
@@ -351,6 +393,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("power(uprimesum(INT), 2)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUprimesumAndSubtractTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"INT", "BIG"};
         String[][] columnValues = {{"0", "2", "13", "25", "37", "14", "87"}, {"2", "3", "5", "7", "11", "13", "17"}};
@@ -358,12 +401,14 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("uprimesum(INT) - uprimesum(BIG)", expected, VoltType.INTEGER, columnNames, columnValues);
     }
 
-    public void testUprimesumCombineWrongParameter() throws IOException, ProcCallException {
+    @Test
+    public void testUprimesumCombineWrongParameter() throws IOException {
         String functionCall = "CREATE AGGREGATE FUNCTION uprimesumCombineWrongParameter FROM CLASS org.voltdb_testfuncs.UprimesumCombineWrongParameter";
         String errorMessage = "Unexpected condition occurred applying DDL statements: Parameter type must be instance of Class: org.voltdb_testfuncs.UprimesumCombineWrongParameter";
         testCreateFunctionException(functionCall, errorMessage);
     }
 
+    @Test
     public void testUsum() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1.2", "2.5", "-4.6", "6.4", "-5.5"}};
@@ -371,6 +416,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("usum(NUM)", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUsumAndSqrt() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1.45", "2.5", "-4.6", "6.4", "-5.5"}};
@@ -378,6 +424,7 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("sqrt(usum(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
+    @Test
     public void testUsumAndSqrtAndCeilingTwoColumn() throws IOException, ProcCallException {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"1.45", "2.5", "-4.6", "6.4", "-5.5"}};
@@ -385,73 +432,84 @@ public class TestUserDefinedAggregates extends RegressionSuite {
         testFunction("sqrt(usum(NUM)), ceiling(usum(NUM))", expected, VoltType.FLOAT, columnNames, columnValues);
     }
 
-    public void testUminOverflow() throws IOException, ProcCallException {
+    @Test
+    public void testUminOverflow() {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"-99999999999999999999999999.999999999999, -0.000000000001"}};
         testFunctionThrowsException("umin(NUM)", VoltType.FLOAT, RuntimeException.class, columnNames, columnValues);
     }
 
-    public void testUmaxOverflow() throws IOException, ProcCallException {
+    @Test
+    public void testUmaxOverflow() {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"99999999999999999999999999.999999999999, 0.000000000001"}};
         testFunctionThrowsException("umax(NUM)", VoltType.FLOAT, RuntimeException.class, columnNames, columnValues);
     }
 
-    public void testUcountNullPointerException() throws IOException, ProcCallException {
+    @Test
+    public void testUcountNullPointerException() {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"UDF_TEST.THROW_NullPointerException", "1.3", "-3.55"}};
         testFunctionThrowsException("ucount(NUM)", VoltType.INTEGER, NullPointerException.class, columnNames, columnValues);
     }
 
-    public void testUmedianIllegalArgumentException() throws IOException, ProcCallException {
+    @Test
+    public void testUmedianIllegalArgumentException() {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"UDF_TEST.THROW_IllegalArgumentException", "2", "-3"}};
         testFunctionThrowsException("umedian(INT)", VoltType.FLOAT, IllegalArgumentException.class, columnNames, columnValues);
     }
 
-    public void testUmodeNumberFormatException() throws IOException, ProcCallException {
+    @Test
+    public void testUmodeNumberFormatException() {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"UDF_TEST.THROW_NumberFormatException", "4", "-6"}};
         testFunctionThrowsException("umode(INT)", VoltType.FLOAT, NumberFormatException.class, columnNames, columnValues);
     }
 
-    public void testUavgArrayIndexOutOfBoundsException() throws IOException, ProcCallException {
+    @Test
+    public void testUavgArrayIndexOutOfBoundsException() {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"UDF_TEST.THROW_ArrayIndexOutOfBoundsException", "2.8", "28"}};
         testFunctionThrowsException("uavg(NUM)", VoltType.FLOAT, ArrayIndexOutOfBoundsException.class, columnNames, columnValues);
     }
 
-    public void testUaddstrClassCastException() throws IOException, ProcCallException {
+    @Test
+    public void testUaddstrClassCastException() {
         String[] columnNames = {"VCHAR"};
         String[][] columnValues = {{"UDF_TEST.THROW_ClassCastException", "'Kawhi'", "'Paul'"}};
         testFunctionThrowsException("uaddstr(VCHAR)", VoltType.STRING, ClassCastException.class, columnNames, columnValues);
     }
 
-    public void testUprimesumArithmeticException() throws IOException, ProcCallException {
+    @Test
+    public void testUprimesumArithmeticException() {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"UDF_TEST.THROW_ArithmeticException", "2", "3"}};
         testFunctionThrowsException("uprimesum(INT)", VoltType.INTEGER, ArithmeticException.class, columnNames, columnValues);
     }
 
-    public void testUcountUnsupportedOperationException() throws IOException, ProcCallException {
+    @Test
+    public void testUcountUnsupportedOperationException() {
         String[] columnNames = {"NUM"};
         String[][] columnValues = {{"UDF_TEST.THROW_UnsupportedOperationException", "1.3", "-3.55"}};
         testFunctionThrowsException("ucount(NUM)", VoltType.INTEGER, UnsupportedOperationException.class, columnNames, columnValues);
     }
 
-    public void testUmedianVoltTypeException() throws IOException, ProcCallException {
+    @Test
+    public void testUmedianVoltTypeException() {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"UDF_TEST.THROW_VoltTypeException", "2", "-3"}};
         testFunctionThrowsException("umedian(INT)", VoltType.FLOAT, VoltTypeException.class, columnNames, columnValues);
     }
 
-    public void testUmodeUserDefinedTestException() throws IOException, ProcCallException {
+    @Test
+    public void testUmodeUserDefinedTestException() {
         String[] columnNames = {"INT"};
         String[][] columnValues = {{"UDF_TEST.THROW_UserDefinedTestException", "4", "-6"}};
         testFunctionThrowsException("umode(INT)", VoltType.FLOAT, UserDefinedTestException.class, columnNames, columnValues);
     }
 
-    static public Test suite() {
+    static public junit.framework.Test suite() {
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUserDefinedAggregates.class);
 
         // build up a project builder for the workload
