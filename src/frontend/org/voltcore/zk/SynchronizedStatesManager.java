@@ -1344,12 +1344,7 @@ public class SynchronizedStatesManager {
                         m_log.debug(m_stateMachineId + ": Initialized (existing) with State " +
                                 stateToString(m_synchronizedState.asReadOnlyBuffer()));
                     }
-                    ByteBuffer staleTask;
-                    if (existingAndProposedStates.m_requestType != REQUEST_TYPE.INITIALIZING) {
-                        staleTask = existingAndProposedStates.m_proposal.asReadOnlyBuffer();
-                    } else {
-                        staleTask = null;
-                    }
+
                     m_initializationCompleted = true;
                     cancelDistributedLock();
                     // Add an acceptable result so the next initializing member recognizes an immediate quorum.
@@ -1366,17 +1361,6 @@ public class SynchronizedStatesManager {
                                 }
                                 m_initializationCompleted = false;
                                 submitCallable(new CallbackExceptionHandler(StateMachineInstance.this));
-                            }
-                            if (staleTask != null) {
-                                try {
-                                    staleTaskRequestNotification(staleTask);
-                                } catch (Exception e) {
-                                    if (m_log.isDebugEnabled()) {
-                                        m_log.debug("Error in StateMachineInstance callbacks.", e);
-                                    }
-                                    m_initializationCompleted = false;
-                                    submitCallable(new CallbackExceptionHandler(StateMachineInstance.this));
-                                }
                             }
                         }
                     };
@@ -1912,12 +1896,6 @@ public class SynchronizedStatesManager {
          * warning: The ByteBuffer is not guaranteed to start at position 0 (avoid rewind, flip, ...)
          */
         protected void taskRequested(ByteBuffer proposedTask) {}
-
-        /*
-         * Notification of a task request for newly joined members.
-         * warning: The ByteBuffer is not guaranteed to start at position 0 (avoid rewind, flip, ...)
-         */
-        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {}
 
         /*
          * Called to accept or reject a new proposed state change by another member.

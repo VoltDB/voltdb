@@ -217,7 +217,6 @@ public class TestStateMachine extends ZKTestBase {
 
         boolean notifiedOfReset = false;
         boolean isDirectVictim;
-        volatile boolean staleTaskRequestProcessed = false;
 
         final CompletableFuture<?> initializedFuture = new CompletableFuture<>();
         volatile CompletableFuture<?> workFuture;
@@ -387,10 +386,6 @@ public class TestStateMachine extends ZKTestBase {
         }
 
         @Override
-        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {
-        }
-
-        @Override
         protected String stateToString(ByteBuffer state)
         {
             byte[] b = new byte[state.remaining()];
@@ -409,7 +404,6 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
             this.isDirectVictim = isDirectVictim;
-            staleTaskRequestProcessed = false;
             makeProposal = false;
             startTask = false;
             proposalsOrTasksCompleted = 0;
@@ -499,17 +493,6 @@ public class TestStateMachine extends ZKTestBase {
             }
             else {
                 super.stateChangeProposed(proposedState);
-            }
-        }
-
-        @Override
-        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {
-            if (brokenCallbackName.equals("staleTaskRequestNotification")) {
-                throw new NullPointerException();
-            }
-            else {
-                super.staleTaskRequestNotification(proposedTask);
-                staleTaskRequestProcessed = true;
             }
         }
 
@@ -685,10 +668,6 @@ public class TestStateMachine extends ZKTestBase {
                 initiateCoordinatedTask(correlatedTask, proposed);
                 assertFalse("State machine local lock held after byte task request", debugIsLocalStateLocked());
             }
-        }
-
-        @Override
-        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {
         }
 
         @Override
@@ -1998,55 +1977,6 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(i0.state);
             assertTrue(i0.notifiedOfReset);
             assertEquals(1, i0.getResetCounter());
-        }
-        catch (InterruptedException e) {
-            fail("Exception occurred during test.");
-        }
-    }
-
-    @Test
-    public void testResetIfExceptionInStaleTaskRequestNotification() {
-
-        // Remove the pre-staged machines because they did not have broken state machines
-        for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-            removeStateMachinesFor(ii);
-        }
-        addStateMachinesFor(0, true, false, false);
-        addStateMachinesFor(1);
-
-        try {
-            BrokenBooleanStateMachine i0 = (BrokenBooleanStateMachine) m_booleanStateMachinesForGroup1[0];
-            BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
-            i0.brokenCallbackName = "staleTaskRequestNotification";
-
-            assertEquals(0, i0.getResetCounter());
-
-            registerGroup1BoolFor(1);
-            i1.startTask(); // the task will be seen as a stale task when i0 is initializing
-            registerGroup1BoolFor(0);
-
-            while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
-                Thread.sleep(500);
-            }
-
-            assertTrue(boolsSynchronized(m_booleanStateMachinesForGroup1));
-
-            int ii = 0;
-            for (; ii < 5; ii++) {
-                // stale task request will never be processed because of the broken callback
-                if (i0.staleTaskRequestProcessed) {
-                    break;
-                }
-                Thread.sleep(500);
-            }
-
-            // i0 will always fail to initialize because of the stale task left by i1, hence the timeout
-            assertEquals(5, ii);
-
-            // state will remain false and the default reset limit 5 will be reached
-            assertFalse(i0.state);
-            assertTrue(i0.notifiedOfReset);
-            assertEquals(6, i0.getResetCounter());
         }
         catch (InterruptedException e) {
             fail("Exception occurred during test.");
