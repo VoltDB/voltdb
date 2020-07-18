@@ -40,9 +40,9 @@ public class SampleRecord
     public final Object type_null_integer;
     public final Object type_not_null_integer;
     public final Object type_null_bigint;
+    public final Object type_not_null_timestamp;
     public final Object type_not_null_bigint;
     public final Object type_null_timestamp;
-    public final Object type_not_null_timestamp;
     public final Object type_null_float;
     public final Object type_not_null_float;
     public final Object type_null_decimal;
@@ -65,8 +65,8 @@ public class SampleRecord
         this.type_not_null_integer      = nextInteger(rand);
         this.type_null_bigint           = nextBigint(rand, true);
         this.type_not_null_bigint       = nextBigint(rand);
-        this.type_null_timestamp        = nextTimestamp(rand, true);
         this.type_not_null_timestamp    = nextTimestamp(rand);
+        this.type_null_timestamp        = nextTimestamp(rand, true);
         this.type_null_float            = nextFloat(rand, true);
         this.type_not_null_float        = nextFloat(rand);
         this.type_null_decimal          = nextDecimal(rand, true);

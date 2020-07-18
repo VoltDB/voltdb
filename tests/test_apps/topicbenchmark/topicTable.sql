@@ -15,8 +15,8 @@ CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid AS TOPIC PROFILE topicbenchm
 , type_not_null_integer     INTEGER       NOT NULL
 , type_null_bigint          BIGINT
 , type_not_null_bigint      BIGINT        NOT NULL
+, type_not_null_timestamp   TIMESTAMP     DEFAULT NOW NOT NULL
 , type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
