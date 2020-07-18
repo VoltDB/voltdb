@@ -136,6 +136,9 @@ public class KafkaClientVerifier {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
+        @Option(desc = "Filename to write periodic stat infomation in CSV format")
+        Integer loops = 1;
+
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
         Integer timeout = 60;
         // Integer timeout = 300;
@@ -364,6 +367,7 @@ public class KafkaClientVerifier {
             Integer partitionFieldNum, Boolean usetableexport, Boolean metadata, Integer count) throws Exception {
 
         List<String> topics = new ArrayList<String>();
+        consumedRows.set(0);
         topics.add(topic);
 
         ExecutorService executor = Executors.newFixedThreadPool(consumerGroup.size());
@@ -386,6 +390,7 @@ public class KafkaClientVerifier {
         long wtime = System.currentTimeMillis();
         while (true) {
             cnt = consumedRows.get();
+            log.info("Consumed cnt rows: " + cnt);
             Thread.sleep(5000);
             if (cnt != consumedRows.get()) {
                 long delta = consumedRows.get() - cnt;
@@ -509,24 +514,28 @@ public class KafkaClientVerifier {
         VoltLogger log = new VoltLogger("KafkaClientVerifier.main");
         VerifierCliConfig config = new VerifierCliConfig();
         config.parse(KafkaClientVerifier.class.getName(), args);
-        final KafkaClientVerifier verifier = new KafkaClientVerifier(config);
-        String fulltopic = config.topicprefix + config.topic;
-        Boolean metadata = config.metadata;
-        try {
-            verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
-                config.partitionfield, config.usetableexport, metadata, config.count);
-        } catch (IOException e) {
-            log.error(e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
-        } catch (ValidationErr e) {
-            log.error("in Validation: " + e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
-        } catch (Exception e) {
-            log.error("in Application: " + e.toString());
-            e.printStackTrace(System.err);
-            System.exit(-1);
+        KafkaClientVerifier verifier = null;
+        for (int i = config.loops; i > 0; i--) {
+            verifier = new KafkaClientVerifier(config);
+            String fulltopic = config.topicprefix + config.topic;
+            Boolean metadata = config.metadata;
+            log.info("+++ Loops: " + i);
+            try {
+                verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield,
+                        config.partitionfield, config.usetableexport, metadata, config.count);
+            } catch (IOException e) {
+                log.error(e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            } catch (ValidationErr e) {
+                log.error("in Validation: " + e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            } catch (Exception e) {
+                log.error("in Application: " + e.toString());
+                e.printStackTrace(System.err);
+                System.exit(-1);
+            }
         }
 
         if (verifier.testGood.get()) {
