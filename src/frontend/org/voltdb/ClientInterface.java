@@ -22,6 +22,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -352,6 +353,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 if (m_socket != null) {
+                    SocketAddress remoteAddr = m_socket.socket().getRemoteSocketAddress();
 
                     SSLEngine sslEngine = null;
                     ByteBuffer remnant = ByteBuffer.wrap(new byte[0]);
@@ -397,7 +399,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             } catch (IOException e1) {
                                 hostLog.warn("failed to close channel",e1);
                             }
-                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage(), e);
+                            networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed: %s",
+                                                          remoteAddr, e.getMessage()), e);
                             return;
                         }
                         if (!handshakeStatus) {
@@ -405,11 +408,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 m_socket.close();
                             } catch (IOException e) {
                             }
-                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
+                            networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed",
+                                                          remoteAddr));
                             return;
                         }
-                        networkLog.info("SSL enabled on connection " + m_socket.socket().getRemoteSocketAddress() +
-                                " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
+                        networkLog.info(String.format("SSL enabled on connection %s with protocol %s and with cipher %s",
+                                                      remoteAddr, sslEngine.getSession().getProtocol(),
+                                                      sslEngine.getSession().getCipherSuite()));
                     }
 
                     boolean success = false;
@@ -421,9 +426,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                          * Enforce a limit on the maximum number of connections
                          */
                         if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
-                            networkLog.warn("Rejected connection from " +
-                                    m_socket.socket().getRemoteSocketAddress() +
-                                    " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
+                            networkLog.warn(String.format("Rejected connection from %s because the connection limit of %s has been reached",
+                                                          remoteAddr, MAX_CONNECTIONS));
                             try {
                             /*
                              * Send rejection message with reason code
