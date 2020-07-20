@@ -136,7 +136,7 @@ public class KafkaClientVerifier {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
-        @Option(desc = "Filename to write periodic stat infomation in CSV format")
+        @Option(desc = "Number of times to loop over the Kafka topic")
         Integer loops = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
