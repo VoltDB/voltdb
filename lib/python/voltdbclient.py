@@ -316,7 +316,21 @@ class FastSerializer:
         if self.socket:
             self.socket.settimeout(self.default_timeout)
 
+    # Front end to SSL socket support. Uses the name of the supplied
+    # config file to determine processing.
+    # : "insecure" - no authentication of server (certificates not checked)
+    # : .pem file  - file contains certificates used to authenticate server
+    # : otherwise  - text file containing paths to java key/trust stores
+    # The default case is consistent with pre-10.0 support
     def __wrap_socket(self, ss):
+        if self.ssl_config_file.lower() == "insecure":
+            return self.__wrap_socket_none(ss)
+        elif self.ssl_config_file[-4:].lower() == '.pem':
+            return self.__wrap_socket_pem(ss)
+        else:
+            return self.__wrap_socket_jks(ss)
+
+    def __wrap_socket_jks(self, ss):
         jks_config = {}
         if self.ssl_config_file:
             with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
@@ -379,18 +393,43 @@ class FastSerializer:
         # extract ssl_version
         if 'ssl_version' in jks_config and jks_config['ssl_version']:
             self.ssl_config['ca_certs'] = jks_config['ssl_version']
+
+        return ssl.wrap_socket(ss,
+                               keyfile=self.ssl_config['keyfile'],
+                               certfile=self.ssl_config['certfile'],
+                               server_side=False,
+                               cert_reqs=self.ssl_config['cert_reqs'],
+                               ssl_version=self.__best_tlsv(),
+                               ca_certs=self.ssl_config['ca_certs'])
+
+    def __wrap_socket_pem(self, ss):
+        if self.ssl_config_file:
+            self.ssl_config['ca_certs'] = self.ssl_config_file
+            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+
+        return ssl.wrap_socket(ss,
+                               keyfile=self.ssl_config['keyfile'],
+                               certfile=self.ssl_config['certfile'],
+                               server_side=False,
+                               cert_reqs=self.ssl_config['cert_reqs'],
+                               ssl_version=self.__best_tlsv(),
+                               ca_certs=self.ssl_config['ca_certs'])
+
+    def __wrap_socket_none(self, ss):
+        return ssl.wrap_socket(ss, ssl_version=self.__best_tlsv())
+
+    def __best_tlsv(self):
         tlsv = None
         try:
-            tlsv = ssl.PROTOCOL_TLSv1_2
-        except AttributeError, e:
-            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
-            tlsv = ssl.PROTOCOL_TLSv1
-
-        return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
-                               self.ssl_config['certfile'], False,
-                               cert_reqs=self.ssl_config['cert_reqs'],
-                               ssl_version=tlsv,
-                               ca_certs=self.ssl_config['ca_certs'])
+            # highest protocol mutually supported
+            tlsv = ssl.PROTOCOL_TLS
+        except:
+            try:
+                tlsv = ssl.PROTOCOL_TLSv1_2
+            except AttributeError, e:
+                print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+                tlsv = ssl.PROTOCOL_TLSv1
+        return tlsv
 
     def __compileStructs(self):
         # Compiled structs for each type
