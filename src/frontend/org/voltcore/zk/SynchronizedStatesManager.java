@@ -18,7 +18,6 @@
 package org.voltcore.zk;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,13 +26,14 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -52,6 +52,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.Mutex;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -299,7 +300,7 @@ public class SynchronizedStatesManager {
         private final String m_statePath;
         private final String m_lockPath;
         private final String m_barrierResultsPath;
-        private String m_myResultPath;
+        private String m_myResultPathBase;
         private final String m_barrierParticipantsPath;
         private String m_myParticipantPath;
         private boolean m_stateChangeInitiator = false;
@@ -312,7 +313,7 @@ public class SynchronizedStatesManager {
         private ByteBuffer m_pendingProposal = null;
         private REQUEST_TYPE m_currentRequestType = REQUEST_TYPE.INITIALIZING;
         private int m_currentParticipants = 0;
-        private Set<String> m_memberResults = null;
+        private Map<String, String> m_memberResults = null;
         private int m_lastProposalVersion = 0;
 
         private boolean m_initializationCompleted = false;
@@ -398,7 +399,7 @@ public class SynchronizedStatesManager {
         {
             m_statePath = "MockInstanceStatePath";
             m_barrierResultsPath = "MockBarrierResultsPath";
-            m_myResultPath = "MockMyResultPath";
+            m_myResultPathBase = "MockMyResultPath";
             m_barrierParticipantsPath = "MockParticipantsPath";
             m_myParticipantPath = "MockMyParticipantPath";
             m_lockPath = "MockLockPath";
@@ -416,7 +417,7 @@ public class SynchronizedStatesManager {
             m_statePath = ZKUtil.joinZKPath(m_stateMachineRoot, instanceName);
             m_lockPath = ZKUtil.joinZKPath(m_statePath, "LOCK_CONTENDERS");
             m_barrierResultsPath = ZKUtil.joinZKPath(m_statePath, "BARRIER_RESULTS");
-            m_myResultPath = ZKUtil.joinZKPath(m_barrierResultsPath, m_memberId);
+            m_myResultPathBase = ZKUtil.joinZKPath(m_barrierResultsPath, m_memberId);
             m_barrierParticipantsPath = ZKUtil.joinZKPath(m_statePath, "BARRIER_PARTICIPANTS");
             m_myParticipantPath = ZKUtil.joinZKPath(m_barrierParticipantsPath, m_memberId);
             m_log = logger;
@@ -647,7 +648,6 @@ public class SynchronizedStatesManager {
                         // This means we will ignore the current update if there is one in progress.
                         // Note that if we are not the next waiter for the lock, we will blindly
                         // accept the next proposal and use the outcome to set our initial state.
-                        addResultEntry(null);
                         Stat nodeStat = new Stat();
                         boolean resultNodeFound = false;
                         do {
@@ -660,6 +660,7 @@ public class SynchronizedStatesManager {
                             }
                         } while (!resultNodeFound);
                         m_lastProposalVersion = nodeStat.getVersion();
+                        addResultEntry(null);
                         outOfLockWork = checkForBarrierParticipantsChange();
                     }
                 }
@@ -733,7 +734,7 @@ public class SynchronizedStatesManager {
             m_memberResults = null;
             m_lastProposalVersion = 0;
 
-            m_myResultPath = ZKUtil.joinZKPath(m_barrierResultsPath, m_memberId);
+            m_myResultPathBase = ZKUtil.joinZKPath(m_barrierResultsPath, m_memberId);
             m_myParticipantPath = ZKUtil.joinZKPath(m_barrierParticipantsPath, m_memberId);
             m_stateMachineId = "SMI " + m_ssmRootNode + "/" + m_stateMachineName + "/" + m_memberId;
         }
@@ -937,15 +938,16 @@ public class SynchronizedStatesManager {
             }
         }
 
-        private RESULT_CONCENSUS resultsAgreeOnSuccess(Set<String> memberList)
+        private RESULT_CONCENSUS resultsAgreeOnSuccess(Map<String, String> resultNodes)
                 throws KeeperException, InterruptedException {
             boolean agree = false;
-            for (String memberId : memberList) {
+            for (Map.Entry<String, String> entry : resultNodes.entrySet()) {
                 byte result[];
                 try {
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
+                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, entry.getValue()), false, null);
                     if (m_log.isDebugEnabled()) {
-                        m_log.debug(String.format("%s: Checking result from member %s: %s", m_stateMachineId, memberId,
+                        m_log.debug(String.format("%s: Checking result from member %s: %s", m_stateMachineId,
+                                entry.getKey(),
                                 Arrays.toString(result)));
                     }
                     if (result != null) {
@@ -959,7 +961,7 @@ public class SynchronizedStatesManager {
                     // it's initialization code is called and a Null result is supplied to treat this as a null result.
                     if (m_log.isDebugEnabled()) {
                         m_log.debug(String.format("%s: Could not find a result from member %s", m_stateMachineId,
-                                memberId));
+                                entry.getKey()));
                     }
                 }
             }
@@ -969,49 +971,22 @@ public class SynchronizedStatesManager {
             return RESULT_CONCENSUS.NO_QUORUM;
         }
 
-        private ArrayList<ByteBuffer> getUncorrelatedResults(ByteBuffer taskRequest, Set<String> memberList)
+        private List<ByteBuffer> getUncorrelatedResults(ByteBuffer taskRequest, Map<String, String> resultNodes)
                 throws KeeperException {
-            // Treat ZooKeeper failures as empty result
-            ArrayList<ByteBuffer> results = new ArrayList<ByteBuffer>();
-            try {
-                for (String memberId : memberList) {
-                    byte result[];
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
-                    if (result != null) {
-                        ByteBuffer bb = ByteBuffer.wrap(result);
-                        results.add(bb);
-                        if (m_log.isDebugEnabled()) {
-                            m_log.debug(m_stateMachineId + ":    " + memberId + " reports Result " +
-                                    taskResultToString(taskRequest.asReadOnlyBuffer(), bb.asReadOnlyBuffer()));
-                        }
-                    }
-                    else {
-                        if (m_log.isDebugEnabled()) {
-                            m_log.debug(m_stateMachineId + ":    " + memberId + " did not supply a Task Result");
-                        }
-                    }
-                }
-                // Remove ourselves from the participants list to unblock the next distributed lock waiter
-                m_zk.delete(m_myParticipantPath, -1);
-            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
-                    | InterruptedException e) {
-                results = new ArrayList<ByteBuffer>();
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": Received " + e.getClass().getSimpleName()
-                            + " in getUncorrelatedResults");
-                }
-            }
-            return results;
+            return getCorrelatedResults(taskRequest, resultNodes).values().stream().filter(r -> r != null)
+                    .collect(Collectors.toList());
         }
 
-        private Map<String, ByteBuffer> getCorrelatedResults(ByteBuffer taskRequest, Set<String> memberList)
+        private Map<String, ByteBuffer> getCorrelatedResults(ByteBuffer taskRequest, Map<String, String> memberResults)
                 throws KeeperException {
             // Treat ZooKeeper failures as empty result
             Map<String, ByteBuffer> results = new HashMap<String, ByteBuffer>();
             try {
-                for (String memberId : memberList) {
+                for (Map.Entry<String, String> memberToResult : memberResults.entrySet()) {
+                    String memberId = memberToResult.getKey();
                     byte result[];
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
+                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberToResult.getValue()), false,
+                            null);
                     if (result != null) {
                         ByteBuffer bb = ByteBuffer.wrap(result);
                         results.put(memberId, bb);
@@ -1042,7 +1017,7 @@ public class SynchronizedStatesManager {
         }
 
         // The number of results is a superset of the membership so analyze the results
-        private SmiCallable processResultQuorum(Set<String> memberList) throws KeeperException {
+        private SmiCallable processResultQuorum(Map<String, String> resultNodes) throws KeeperException {
             assert(m_currentRequestType != REQUEST_TYPE.INITIALIZING);
             m_memberResults = null;
             if (m_requestedInitialState != null) {
@@ -1061,7 +1036,7 @@ public class SynchronizedStatesManager {
                     // another member's proposal or because we initiated a LAST_CHANGE_OUTCOME_REQUEST
                     if (m_currentRequestType == REQUEST_TYPE.LAST_CHANGE_OUTCOME_REQUEST) {
                         // We don't have a result yet but it is available
-                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(memberList);
+                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(resultNodes);
                         if (result == RESULT_CONCENSUS.NO_QUORUM) {
                             // Bad news. There is no definitive state so if we are the distributed
                             // lock owner we will assign our initial state as our initial state
@@ -1086,7 +1061,7 @@ public class SynchronizedStatesManager {
                     else
                     if (m_currentRequestType == REQUEST_TYPE.STATE_CHANGE_REQUEST) {
                         // We don't have a result yet but it is available
-                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(memberList);
+                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(resultNodes);
                         if (result == RESULT_CONCENSUS.AGREE) {
                             m_synchronizedState = existingAndProposedStates.m_proposal;
                         }
@@ -1151,7 +1126,7 @@ public class SynchronizedStatesManager {
                     ByteBuffer attemptedChange = m_pendingProposal.asReadOnlyBuffer();
                     try {
                         // We don't have a result yet but it is available
-                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(memberList);
+                        RESULT_CONCENSUS result = resultsAgreeOnSuccess(resultNodes);
                         // Now that we have a result we can remove ourselves from the participants list.
                         m_zk.delete(m_myParticipantPath, -1);
                         if (result == RESULT_CONCENSUS.AGREE) {
@@ -1206,7 +1181,7 @@ public class SynchronizedStatesManager {
                         m_log.debug(m_stateMachineId + ": All members completed task " + taskToString(taskRequest.asReadOnlyBuffer()));
                     }
                     if (m_currentRequestType == REQUEST_TYPE.CORRELATED_COORDINATED_TASK) {
-                        Map<String, ByteBuffer> results = getCorrelatedResults(taskRequest, memberList);
+                        Map<String, ByteBuffer> results = getCorrelatedResults(taskRequest, resultNodes);
                         if (m_stateChangeInitiator) {
                             // Since we don't care if we are the last to go away, remove ourselves from the participant
                             // list
@@ -1231,7 +1206,7 @@ public class SynchronizedStatesManager {
                         };
                     }
                     else {
-                        ArrayList<ByteBuffer> results = getUncorrelatedResults(taskRequest, memberList);
+                        List<ByteBuffer> results = getUncorrelatedResults(taskRequest, resultNodes);
                         if (m_stateChangeInitiator) {
                             // Since we don't care if we are the last to go away, remove ourselves from the participant list
                             assert(m_holdingDistributedLock);
@@ -1265,19 +1240,26 @@ public class SynchronizedStatesManager {
                 // Don't check for barrier results until we notice the participant list change.
                 return null;
             }
-            Set<String> membersWithResults;
+            Map<String, String> membersWithResults;
             try {
-                membersWithResults = ImmutableSet.copyOf(m_zk.getChildren(m_barrierResultsPath,
-                        m_barrierResultsWatcher));
+                ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+                for (String resultNode : m_zk.getChildren(m_barrierResultsPath, m_barrierResultsWatcher)) {
+                    int index = resultNode.lastIndexOf('_');
+                    assert index > 0 : "No '_' in: " + resultNode;
+                    if (Integer.parseInt(resultNode.substring(index + 1)) == m_lastProposalVersion) {
+                        builder.put(resultNode.substring(0, index), resultNode);
+                    }
+                }
+                membersWithResults = builder.build();
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
                     | InterruptedException e) {
-                membersWithResults = new TreeSet<String>(Arrays.asList("We died so avoid Quorum path"));
+                membersWithResults = ImmutableMap.of("We died so avoid Quorum path", "We died so avoid Quorum path");
                 if (m_log.isDebugEnabled()) {
                     m_log.debug(m_stateMachineId + ": Received " + e.getClass().getSimpleName()
                             + " in checkForBarrierResultsChanges");
                 }
             }
-            if (Sets.difference(m_knownMembers, membersWithResults).isEmpty()) {
+            if (membersWithResults.keySet().containsAll(m_knownMembers)) {
                 return processResultQuorum(membersWithResults);
             }
             m_memberResults = membersWithResults;
@@ -1296,7 +1278,8 @@ public class SynchronizedStatesManager {
                 StateChangeRequest existingAndProposedStates =
                         getExistingAndProposedBuffersFromResultsNode(oldAndProposedState);
                 if (existingAndProposedStates.m_requestType == REQUEST_TYPE.LAST_CHANGE_OUTCOME_REQUEST) {
-                    RESULT_CONCENSUS result = resultsAgreeOnSuccess(m_knownMembers);
+                    RESULT_CONCENSUS result = resultsAgreeOnSuccess(m_knownMembers.stream()
+                            .collect(Collectors.toMap(Function.identity(), m -> m + '_' + lastProposal.getVersion())));
                     if (result == RESULT_CONCENSUS.AGREE) {
                         // Fall through to set up the initial state and provide notification of initialization
                         existingAndProposedStates = new StateChangeRequest(REQUEST_TYPE.INITIALIZING,
@@ -1549,7 +1532,7 @@ public class SynchronizedStatesManager {
                 m_membershipChangePending = false;
                 notInitializing = m_requestedInitialState == null;
                 if (m_pendingProposal != null && m_memberResults != null
-                        && Sets.difference(m_knownMembers, m_memberResults).isEmpty()) {
+                        && m_memberResults.keySet().containsAll(m_knownMembers)) {
                     // We can stop watching for results since we have a quorum.
                     outOfLockWork = processResultQuorum(m_memberResults);
                 }
@@ -1664,8 +1647,10 @@ public class SynchronizedStatesManager {
                         (result == null || result.length < 10 || m_log.isTraceEnabled()) ? Arrays.toString(result)
                                 : "suppressed"));
             }
+            String resultPath = m_myResultPathBase + '_' + m_lastProposalVersion;
             try {
-                m_zk.create(m_myResultPath, result, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_zk.create(resultPath, result, Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT);
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
                     | InterruptedException e) {
                 if (m_log.isDebugEnabled()) {
@@ -1678,7 +1663,7 @@ public class SynchronizedStatesManager {
                 if (m_requestedInitialState == null || result != null) {
                     byte[] previousResult = null;
                     try {
-                        previousResult = m_zk.getData(m_myResultPath, null, null);
+                        previousResult = m_zk.getData(resultPath, null, null);
                     } catch (Exception e1) {
                         m_log.error("Failed to retrieve existing result", e1);
                     }
