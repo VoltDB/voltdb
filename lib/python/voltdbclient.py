@@ -322,8 +322,10 @@ class FastSerializer:
             with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
                 lines = f.readlines()
                 for line in lines:
-                    k, v = line.strip().split('=')
-                    jks_config[k.lower()] = v
+                    l = line.strip()
+                    if l:
+                        k, v = l.split('=')
+                        jks_config[k.lower()] = v
 
         def write_pem(der_bytes, type, f):
             f.write("-----BEGIN %s-----\n" % type)
