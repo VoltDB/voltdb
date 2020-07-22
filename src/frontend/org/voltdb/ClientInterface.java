@@ -115,6 +115,7 @@ import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
 
 /**
@@ -393,21 +394,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                              */
                             remnant = handshaker.getRemnant();
 
+                        } catch (NotSslRecordException e) {
+                            closeSocket();
+                            // A common cause is that the client simply did not use SSL (e.g., forgot to type --ssl)
+                            networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed: %s",
+                                                          remoteAddr, e.getMessage()));
+                            return;
                         } catch (IOException e) {
-                            try {
-                                m_socket.close();
-                            } catch (IOException e1) {
-                                hostLog.warn("failed to close channel",e1);
-                            }
+                            closeSocket();
                             networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed: %s",
                                                           remoteAddr, e.getMessage()), e);
                             return;
                         }
                         if (!handshakeStatus) {
-                            try {
-                                m_socket.close();
-                            } catch (IOException e) {
-                            }
+                            closeSocket();
                             networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed",
                                                           remoteAddr));
                             return;
@@ -477,11 +477,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             success = true;
                         }
                     } catch (Exception e) {
-                        try {
-                            m_socket.close();
-                        } catch (IOException e1) {
-                            //Don't care connection is already lost anyways
-                        }
+                        closeSocket();
                         if (m_running) {
                             if (timeoutRef.get() != null) {
                                 hostLog.warn(timeoutRef.get());
@@ -496,6 +492,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_numConnections.decrementAndGet();
                         }
                     }
+                }
+            }
+
+            private void closeSocket() {
+                try {
+                    m_socket.close();
+                } catch (IOException ex) {
+                    // Don't care
                 }
             }
         }
