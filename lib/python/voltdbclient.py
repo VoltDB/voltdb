@@ -334,12 +334,14 @@ class FastSerializer:
         jks_config = {}
         if self.ssl_config_file:
             with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
-                lines = f.readlines()
-                for line in lines:
-                    l = line.strip()
-                    if l:
-                        k, v = l.split('=')
-                        jks_config[k.lower()] = v
+                for line in f.readlines():
+                    try:
+                        l = line.strip()
+                        if l:
+                            k, v = l.split('=', 1)
+                            jks_config[k.lower()] = v
+                    except:
+                        raise ValueError('Malformed line in SSL config: ' + line)
 
         def write_pem(der_bytes, type, f):
             f.write("-----BEGIN %s-----\n" % type)
@@ -416,19 +418,16 @@ class FastSerializer:
                                ca_certs=self.ssl_config['ca_certs'])
 
     def __wrap_socket_none(self, ss):
+        print "SSL insecure mode specified: identity of remote server cannot be verified"
         return ssl.wrap_socket(ss, ssl_version=self.__best_tlsv())
 
     def __best_tlsv(self):
         tlsv = None
         try:
-            # highest protocol mutually supported
-            tlsv = ssl.PROTOCOL_TLS
-        except:
-            try:
-                tlsv = ssl.PROTOCOL_TLSv1_2
-            except AttributeError, e:
-                print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
-                tlsv = ssl.PROTOCOL_TLSv1
+            tlsv = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+            tlsv = ssl.PROTOCOL_TLSv1
         return tlsv
 
     def __compileStructs(self):
