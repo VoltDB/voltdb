@@ -418,7 +418,7 @@ class FastSerializer:
                                ca_certs=self.ssl_config['ca_certs'])
 
     def __wrap_socket_none(self, ss):
-        print "SSL insecure mode specified: identity of remote server cannot be verified"
+        print "SSL insecure mode specified: identity of remote server will not be verified"
         return ssl.wrap_socket(ss, ssl_version=self.__best_tlsv())
 
     def __best_tlsv(self):
