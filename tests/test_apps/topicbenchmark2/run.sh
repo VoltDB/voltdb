@@ -31,6 +31,7 @@ CLIENTLIBS=$({ \
     \ls -1 "$VOLTDB_LIB"/kafka-clients-*.jar; \
     \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/log4j-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/commons-lang3-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=$CLIENTLIBS:$CLIENTCLASSPATH
 
@@ -110,12 +111,40 @@ function run_benchmark_help() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH topicbenchmark2.TopicBenchmark2 --help
 }
 
+# generic run on default topic
 function run_benchmark() {
     srccompile-ifneeded
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
-        --count=5000000
+        --count=500 \
+        --producers=2 \
+        --subscribers=2
+}
+
+# the following use a non-default topic as an example
+# producer-only, run once, make sure the (count * producers) matches the count of subscriber-only runs
+function run_producers() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --topic=test_topic01 \
+        --count=500 \
+        --producers=2 \
+        --subscribers=0
+}
+
+# subscriber-only, run once or more, make sure the count matches (count * producers) of the producer-only run
+function run_subscribers() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --topic=test_topic01 \
+        --count=1000 \
+        --producers=0 \
+        --subscribers=2
 }
 
 function shutdown() {
