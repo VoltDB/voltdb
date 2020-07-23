@@ -26,6 +26,7 @@ import datetime
 import decimal
 import hashlib
 import os
+import stat
 try:
     import ssl
     ssl_available = True
@@ -356,6 +357,8 @@ class FastSerializer:
             self.ssl_config['ca_certs'] = parsed_config['cacerts']
             self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
+        self.__create('test.tmp').close()
+
         #if 'ssl_version' in parsed_config and parsed_config['ssl_version']:
         #   self.ssl_config['ca_certs'] = parsed_config['ssl_version']
 
@@ -389,8 +392,8 @@ class FastSerializer:
         if 'keystore' in jks_config and jks_config['keystore'] and \
                'keystorepassword' in jks_config and jks_config['keystorepassword']:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
-            keyfile = open(jks_config['keystore'] + '.key.pem', 'w')
-            certfile = open(jks_config['keystore'] + '.cert.pem', 'w')
+            keyfile = self.__create(jks_config['keystore'] + '.key.pem')
+            certfile = self.__create(jks_config['keystore'] + '.cert.pem')
             for alias, pk in ks.private_keys.items():
                 # print("Private key: %s" % pk.alias)
                 if pk.algorithm_oid == jks.util.RSA_ENCRYPTION_OID:
@@ -412,7 +415,7 @@ class FastSerializer:
         if 'truststore' in jks_config and jks_config['truststore'] and \
                'truststorepassword' in jks_config and jks_config['truststorepassword']:
             ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
-            cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
+            cafile = self.__create(jks_config['truststore'] + '.ca.cert.pem')
             for alias, c in ts.certs.items():
                 # print("Certificate: %s" % c.alias)
                 write_pem(c.cert, "CERTIFICATE", cafile)
@@ -421,6 +424,11 @@ class FastSerializer:
             if use_ca_cert:
                 self.ssl_config['ca_certs'] = cafile.name
                 self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+
+    def __create(self, filename):
+        f = open(filename, 'w')
+        os.chmod(filename, stat.S_IRUSR|stat.S_IWUSR)
+        return f
 
     def __compileStructs(self):
         # Compiled structs for each type
