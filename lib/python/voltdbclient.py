@@ -316,14 +316,68 @@ class FastSerializer:
         if self.socket:
             self.socket.settimeout(self.default_timeout)
 
+    # Front end to SSL socket support.
+    #
+    # The SSL config file contains a sequence of key=value lines which
+    # are used to provide the arguments to the SSL wrap_socket call:
+    #   Key                Value                    Provides arguments
+    #   ------------------ ------------------------ ------------------
+    #   keystore           path to JKS keystore     keyfile, certfile
+    #   keystorepassword   password for keystore    --
+    #   truststore         path to JKS truststore   ca_certs, cert_reqs
+    #   truststorepassword password for truststore  --
+    #   cacerts            path to PEM cert chain   ca_certs, cert_reqs
+    #   ssl_version        ignored                  --
+    #
+    # Thus keystore identifies the client (rarely needed), whereas truststore
+    # and cacerts identify the server. If truststore and cacerts are both
+    # specified, cacerts takes precedence.
+    #
+    # An empty or missing ssl_config_file results in no certificate checks.
+
     def __wrap_socket(self, ss):
-        jks_config = {}
+        parsed_config = {}
         if self.ssl_config_file:
             with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
-                lines = f.readlines()
-                for line in lines:
-                    k, v = line.strip().split('=')
-                    jks_config[k.lower()] = v
+                 for line in f:
+                     try:
+                        l = line.strip()
+                        if l:
+                            k, v = l.split('=', 1)
+                            parsed_config[k.lower()] = v
+                     except:
+                        raise ValueError('Malformed line in SSL config: ' + line)
+
+        if ('keystore' in parsed_config and parsed_config['keystore']) or \
+           ('truststore' in parsed_config and parsed_config['truststore']):
+            self.__convert_jks_files(ss, parsed_config)
+
+        if 'cacerts' in parsed_config and parsed_config['cacerts']:
+            self.ssl_config['ca_certs'] = parsed_config['cacerts']
+            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+
+        #if 'ssl_version' in parsed_config and parsed_config['ssl_version']:
+        #   self.ssl_config['ca_certs'] = parsed_config['ssl_version']
+
+        tlsv = None
+        try:
+            tlsv = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+            tlsv = ssl.PROTOCOL_TLSv1
+
+        return ssl.wrap_socket(ss,
+                               keyfile=self.ssl_config['keyfile'],
+                               certfile=self.ssl_config['certfile'],
+                               server_side=False,
+                               cert_reqs=self.ssl_config['cert_reqs'],
+                               ssl_version=tlsv,
+                               ca_certs=self.ssl_config['ca_certs'])
+
+    def __convert_jks_files(self, ss, jks_config):
+        if not pyjks_available:
+            print "To use Java KeyStore please install the pyjks"
+            raise pyjks_exception
 
         def write_pem(der_bytes, type, f):
             f.write("-----BEGIN %s-----\n" % type)
@@ -331,12 +385,9 @@ class FastSerializer:
             f.write("\n-----END %s-----\n" % type)
 
         # extract key and certs
-        if not pyjks_available:
-            print "To use Java KeyStore please install the pyjks"
-            raise pyjks_exception
         use_key_cert = False
         if 'keystore' in jks_config and jks_config['keystore'] and \
-                'keystorepassword' in jks_config and jks_config['keystorepassword']:
+               'keystorepassword' in jks_config and jks_config['keystorepassword']:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
             keyfile = open(jks_config['keystore'] + '.key.pem', 'w')
             certfile = open(jks_config['keystore'] + '.cert.pem', 'w')
@@ -359,7 +410,7 @@ class FastSerializer:
         # extract ca certs
         use_ca_cert = False
         if 'truststore' in jks_config and jks_config['truststore'] and \
-                        'truststorepassword' in jks_config and jks_config['truststorepassword']:
+               'truststorepassword' in jks_config and jks_config['truststorepassword']:
             ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
             cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
             for alias, c in ts.certs.items():
@@ -370,25 +421,6 @@ class FastSerializer:
             if use_ca_cert:
                 self.ssl_config['ca_certs'] = cafile.name
                 self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
-        elif 'cacerts' in jks_config and jks_config['cacerts']:
-            self.ssl_config['ca_certs'] = jks_config['cacerts']
-            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
-
-        # extract ssl_version
-        if 'ssl_version' in jks_config and jks_config['ssl_version']:
-            self.ssl_config['ca_certs'] = jks_config['ssl_version']
-        tlsv = None
-        try:
-            tlsv = ssl.PROTOCOL_TLSv1_2
-        except AttributeError, e:
-            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
-            tlsv = ssl.PROTOCOL_TLSv1
-
-        return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
-                               self.ssl_config['certfile'], False,
-                               cert_reqs=self.ssl_config['cert_reqs'],
-                               ssl_version=tlsv,
-                               ca_certs=self.ssl_config['ca_certs'])
 
     def __compileStructs(self):
         # Compiled structs for each type
