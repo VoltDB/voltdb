@@ -357,8 +357,6 @@ class FastSerializer:
             self.ssl_config['ca_certs'] = parsed_config['cacerts']
             self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
-        self.__create('test.tmp').close()
-
         #if 'ssl_version' in parsed_config and parsed_config['ssl_version']:
         #   self.ssl_config['ca_certs'] = parsed_config['ssl_version']
 
