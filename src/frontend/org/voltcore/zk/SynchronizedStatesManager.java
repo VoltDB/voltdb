@@ -43,6 +43,7 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -52,6 +53,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.Mutex;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
@@ -75,8 +77,10 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  *      | |- 'LOCK_CONTENDERS'
  *      |\
  *      | |- 'BARRIER_PARTICIPANTS'
+ *      |\
+ *      | |- 'BARRIER_RESULTS'
  *       \
- *        |- 'BARRIER_RESULTS'
+ *        |- 'FORCE_RESULT'
  *
  * This hierarchy supports multiple topologies so one SynchronizedStatesManager could be used to track
  * cluster membership while another could be used to track partition membership. Each SynchronizedStatesManager
@@ -290,6 +294,10 @@ public class SynchronizedStatesManager {
      *    lock node AND all ephemeral nodes under the BARRIER_PARTICIPANTS node are gone,
      *    indicating that all members waiting on the outcome of the last state change or
      *    task results have processed the previous outcome
+     *14b. One exception to 14 is when a member is initializing and current proposer dies before
+     *    any other members can add a participant node. In this case the initializing member
+     *    can grab the log but has to trigger a FORCE_RESULT event before continuing with
+     *    standard initialization
      */
     public abstract class StateMachineInstance {
         protected String m_stateMachineId;
@@ -303,6 +311,7 @@ public class SynchronizedStatesManager {
         private String m_myResultPathBase;
         private final String m_barrierParticipantsPath;
         private String m_myParticipantPath;
+        private final String m_forceResponseNode;
         private boolean m_stateChangeInitiator = false;
         private String m_ourDistributedLockName = null;
         private String m_lockWaitingOn = null;
@@ -406,6 +415,7 @@ public class SynchronizedStatesManager {
             m_log = null;
             m_stateMachineId = "MockStateMachineId";
             m_stateMachineName = "MockStateMachineName";
+            m_forceResponseNode = "MockForceResponseNode";
         }
 
         public StateMachineInstance(String instanceName, VoltLogger logger) throws RuntimeException {
@@ -422,6 +432,7 @@ public class SynchronizedStatesManager {
             m_myParticipantPath = ZKUtil.joinZKPath(m_barrierParticipantsPath, m_memberId);
             m_log = logger;
             m_stateMachineId = "SMI " + m_ssmRootNode + "/" + m_stateMachineName + "/" + m_memberId;
+            m_forceResponseNode = ZKUtil.joinZKPath(m_statePath, "FORCE_RESPONSE");
             if (m_log.isDebugEnabled()) {
                 m_log.debug(m_stateMachineId + " created.");
             }
@@ -566,6 +577,69 @@ public class SynchronizedStatesManager {
             }
         }
 
+        /**
+         * Register a watcher for the force response node. Only register the watcher and don't
+         */
+        private void registerForceResponseNodeWatcher() {
+            m_zk.exists(m_forceResponseNode, this::forceResponseWatcher, (rc, path, ctx, stat) -> {
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug(String.format(
+                            "%s: Received response code while registering force response watcher on %s: %s",
+                            m_stateMachineId, m_forceResponseNode, KeeperException.Code.get(rc)));
+                }
+
+                // Force response node exists so handle it
+                if (stat != null) {
+                    submitRunnable(this::handleForceResponseNodeCreated);
+                }
+            }, null);
+        }
+
+        // Watcher implementation for the force result node
+        private void forceResponseWatcher(WatchedEvent event) {
+            if (isRunning()) {
+                if (event.getType() == EventType.NodeCreated) {
+                    submitRunnable(this::handleForceResponseNodeCreated);
+                } else {
+                    submitRunnable(this::registerForceResponseNodeWatcher);
+                }
+            }
+        }
+
+        /**
+         * Handler for when the force response node is created.
+         * <p>
+         * This gets the proposal version which is being forced from the node and then tries to create a response for
+         * that version if the node still exists
+         */
+        private void handleForceResponseNodeCreated() {
+            m_zk.getData(m_forceResponseNode, this::forceResponseWatcher, (rc, path, ctx, data, stat) -> {
+                KeeperException.Code code = KeeperException.Code.get(rc);
+
+                if (code == KeeperException.Code.OK) {
+                    submitCallable(() -> {
+                        try (Mutex.Releaser r = m_mutex.acquire()) {
+                            if (isRunning() && m_pendingProposal == null) {
+                                if (m_log.isDebugEnabled()) {
+                                    m_log.debug(String.format("%s: Adding forced null result", m_stateMachineId));
+                                }
+                                addResultEntry(null, ByteBuffer.wrap(data).getInt(), true);
+                            }
+                        }
+                        return null;
+                    });
+                } else if (code == KeeperException.Code.NONODE || code == KeeperException.Code.SESSIONEXPIRED
+                        || code == KeeperException.Code.CONNECTIONLOSS) {
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(String.format("%s: Error getting path %s: %s", m_stateMachineId, path, code));
+                    }
+                } else {
+                    VoltDB.crashLocalVoltDB(
+                            String.format("%s: Error getting path %s: %s", m_stateMachineId, path, code));
+                }
+            }, null);
+        }
+
         private AsyncStateMachineInitializer createAsyncInitializer(final AtomicInteger pendingStateMachineInits,
                 final Set<String> knownMembers) {
             return new AsyncStateMachineInitializer(pendingStateMachineInits, knownMembers);
@@ -581,6 +655,7 @@ public class SynchronizedStatesManager {
         private void initializeStateMachine(Set<String> knownMembers)
                 throws KeeperException, InterruptedException {
             SmiCallable outOfLockWork = null;
+            registerForceResponseNodeWatcher();
             try (Mutex.Releaser r = m_mutex.acquire()) {
                 // Make sure the child count is correct so that an init does not race with a released lock where the
                 // results have not been processed yet. If it is non-zero, it means results still need to be collected
@@ -1018,12 +1093,22 @@ public class SynchronizedStatesManager {
 
         // The number of results is a superset of the membership so analyze the results
         private SmiCallable processResultQuorum(Map<String, String> resultNodes) throws KeeperException {
-            assert(m_currentRequestType != REQUEST_TYPE.INITIALIZING);
+            assert (m_currentRequestType != REQUEST_TYPE.INITIALIZING
+                    || (m_requestedInitialState != null && m_stateChangeInitiator));
             m_memberResults = null;
             if (m_requestedInitialState != null) {
                 // We can now initialize this state machine instance
                 assert(m_holdingDistributedLock);
                 try {
+                    if (m_stateChangeInitiator && m_currentRequestType == REQUEST_TYPE.INITIALIZING) {
+                        // Not initialized and state change initiator but request type is initializing means a quarum
+                        // was not previously seen. Initialize from the community skipping the quorum check
+                        m_zk.delete(m_forceResponseNode, -1);
+                        m_stateChangeInitiator = false;
+                        m_pendingProposal = null;
+                        return initializeFromActiveCommunity(false);
+                    }
+
                     assert(m_synchronizedState == null);
                     Stat versionInfo = new Stat();
                     byte oldAndProposedState[] = m_zk.getData(m_barrierResultsPath, false, versionInfo);
@@ -1271,12 +1356,50 @@ public class SynchronizedStatesManager {
          * or request the current state from the community (if the existing state is ambiguous)
          */
         private SmiCallable initializeFromActiveCommunity() throws KeeperException {
+            return initializeFromActiveCommunity(true);
+        }
+
+        private SmiCallable initializeFromActiveCommunity(boolean performQuorumCheck) throws KeeperException {
             byte oldAndProposedState[];
             try {
                 Stat lastProposal = new Stat();
                 oldAndProposedState = m_zk.getData(m_barrierResultsPath, false, lastProposal);
-                StateChangeRequest existingAndProposedStates =
-                        getExistingAndProposedBuffersFromResultsNode(oldAndProposedState);
+                m_lastProposalVersion = lastProposal.getVersion();
+
+                StateChangeRequest existingAndProposedStates = getExistingAndProposedBuffersFromResultsNode(
+                        oldAndProposedState);
+
+                if (performQuorumCheck && existingAndProposedStates.m_requestType != REQUEST_TYPE.INITIALIZING
+                        && !hasAllOtherResultQuarum()) {
+                    // No quarum exists so force all hosts to post a result just to make sure nothing is outstanding
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug(String.format("%s: No quorum found in results. Forcing results", m_stateMachineId));
+                    }
+                    m_stateChangeInitiator = true;
+                    m_pendingProposal = m_requestedInitialState;
+                    addResultEntry(null);
+                    m_zk.create(m_forceResponseNode,
+                            ByteBuffer.allocate(Integer.BYTES).putInt(m_lastProposalVersion).array(),
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, (rc, path, ctx, name) -> {
+                                KeeperException.Code code = KeeperException.Code.get(rc);
+                                if (code != KeeperException.Code.OK) {
+                                    if (code == KeeperException.Code.SESSIONEXPIRED
+                                            && code == KeeperException.Code.CONNECTIONLOSS) {
+                                        if (m_log.isDebugEnabled()) {
+                                            m_log.debug(String.format("%s: Failed to create %s: %s", m_stateMachineId,
+                                                    path, code));
+                                        }
+                                        m_state.set(State.ERROR);
+                                        m_initComplete.set(false);
+                                    } else {
+                                        VoltDB.crashLocalVoltDB(String.format("%s: Failed to create %s: %s",
+                                                m_stateMachineId, path, code));
+                                    }
+                                }
+                            }, null);
+                    return null;
+                }
+
                 if (existingAndProposedStates.m_requestType == REQUEST_TYPE.LAST_CHANGE_OUTCOME_REQUEST) {
                     RESULT_CONCENSUS result = resultsAgreeOnSuccess(m_knownMembers.stream()
                             .collect(Collectors.toMap(Function.identity(), m -> m + '_' + lastProposal.getVersion())));
@@ -1321,7 +1444,6 @@ public class SynchronizedStatesManager {
                     m_synchronizedState = existingAndProposedStates.m_previousState;
                     m_requestedInitialState = null;
                     ByteBuffer readOnlyResult = m_synchronizedState.asReadOnlyBuffer();
-                    m_lastProposalVersion = lastProposal.getVersion();
                     m_pendingProposal = null;
                     if (m_log.isDebugEnabled()) {
                         m_log.debug(m_stateMachineId + ": Initialized (existing) with State " +
@@ -1356,6 +1478,25 @@ public class SynchronizedStatesManager {
                 }
             }
             return null;
+        }
+
+        /**
+         * @return {@code true} if all member other than this member have responded to any proposal even if it is not
+         *         the current proposal
+         * @throws KeeperException
+         * @throws InterruptedException
+         */
+        private boolean hasAllOtherResultQuarum() throws KeeperException, InterruptedException {
+            HashMultimap<Integer, String> resultesByProposal = HashMultimap.create();
+            for (String resultNode : m_zk.getChildren(m_barrierResultsPath, m_barrierResultsWatcher)) {
+                int index = resultNode.lastIndexOf('_');
+                assert index > 0 : "No '_' in: " + resultNode;
+                resultesByProposal.put(Integer.valueOf(resultNode.substring(index + 1)),
+                        resultNode.substring(0, index));
+            }
+            Set<String> otherMembers = m_knownMembers.stream().filter(m -> !m_memberId.equals(m))
+                    .collect(Collectors.toSet());
+            return resultesByProposal.asMap().values().stream().anyMatch(r -> r.containsAll(otherMembers));
         }
 
         private int wakeCommunityWithProposal(byte[] proposal) throws KeeperException {
@@ -1641,13 +1782,27 @@ public class SynchronizedStatesManager {
         }
 
         private void addResultEntry(byte result[]) throws KeeperException {
+            addResultEntry(result, m_lastProposalVersion, false);
+        }
+
+        /**
+         * Post a result entry for specific proposal version
+         *
+         * @param result           result to post
+         * @param proposalVersion  proposal version this result is for
+         * @param ignoreNodeExists if {@code true} and a result already exists ignore the error
+         * @throws KeeperException
+         */
+        private void addResultEntry(byte result[], int proposalVersion, boolean ignoreNodeExists)
+                throws KeeperException {
+
             if (m_log.isDebugEnabled()) {
                 m_log.debug(String.format("%s: Responding to request %d:%s with result: %s", m_stateMachineId,
-                        m_lastProposalVersion, m_currentRequestType,
+                        proposalVersion, m_currentRequestType,
                         (result == null || result.length < 10 || m_log.isTraceEnabled()) ? Arrays.toString(result)
                                 : "suppressed"));
             }
-            String resultPath = m_myResultPathBase + '_' + m_lastProposalVersion;
+            String resultPath = m_myResultPathBase + '_' + proposalVersion;
             try {
                 m_zk.create(resultPath, result, Ids.OPEN_ACL_UNSAFE,
                         CreateMode.PERSISTENT);
@@ -1660,7 +1815,7 @@ public class SynchronizedStatesManager {
                 // There is a race during initialization where a null result is assigned once so a current proposal
                 // is not hung. However, if a new proposal is submitted by another instance between that assignment
                 // and the call to checkForBarrierParticipantsChange, a second null result is assigned.
-                if (m_requestedInitialState == null || result != null) {
+                if ((m_requestedInitialState == null || result != null) && !ignoreNodeExists) {
                     byte[] previousResult = null;
                     try {
                         previousResult = m_zk.getData(resultPath, null, null);
