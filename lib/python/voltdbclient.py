@@ -16,8 +16,8 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.hexversion < 0x02050000:
-    raise Exception("Python version 2.5 or greater is required.")
+if sys.hexversion < 0x02070d00:
+    raise Exception("Python version 2.7.13 or greater is required.")
 import array
 import socket
 import base64, textwrap
@@ -27,6 +27,7 @@ import decimal
 import hashlib
 import os
 import stat
+
 try:
     import ssl
     ssl_available = True
@@ -213,17 +214,19 @@ class FastSerializer:
         self.socket = None
         if self.host != None and self.port != None:
             ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if (self.usessl):
-                if (ssl_available):
+            if self.usessl:
+                if ssl_available:
                     self.socket = self.__wrap_socket(ss)
                 else:
-                    print "ERROR: To use SSL functionality please Install the Python ssl module."
+                    print "ERROR: To use SSL functionality please install the Python ssl module."
                     raise ssl_exception
             else:
                 self.socket = ss
             self.socket.setblocking(1)
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
             self.socket.connect((self.host, self.port))
+            #if self.usessl:
+            #    print 'Cipher suite: ' + str(self.socket.cipher())
 
         # input can be big or little endian
         self.inputBOM = self.BIG_ENDIAN  # byte order if input stream
@@ -357,22 +360,12 @@ class FastSerializer:
             self.ssl_config['ca_certs'] = parsed_config['cacerts']
             self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
-        #if 'ssl_version' in parsed_config and parsed_config['ssl_version']:
-        #   self.ssl_config['ca_certs'] = parsed_config['ssl_version']
-
-        tlsv = None
-        try:
-            tlsv = ssl.PROTOCOL_TLSv1_2
-        except AttributeError, e:
-            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
-            tlsv = ssl.PROTOCOL_TLSv1
-
         return ssl.wrap_socket(ss,
                                keyfile=self.ssl_config['keyfile'],
                                certfile=self.ssl_config['certfile'],
                                server_side=False,
                                cert_reqs=self.ssl_config['cert_reqs'],
-                               ssl_version=tlsv,
+                               ssl_version=ssl.PROTOCOL_TLS,
                                ca_certs=self.ssl_config['ca_certs'])
 
     def __convert_jks_files(self, ss, jks_config):
