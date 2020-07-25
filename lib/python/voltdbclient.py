@@ -16,9 +16,8 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.hexversion < 0x02070d00:
-    v = sys.version.split(' ')[0]
-    raise Exception("Python version 2.7.13 or greater is required, this is " + v)
+if sys.hexversion < 0x02050000:
+    raise Exception("Python version 2.5 or greater is required.")
 import array
 import socket
 import base64, textwrap
@@ -339,8 +338,17 @@ class FastSerializer:
     # specified, cacerts takes precedence.
     #
     # An empty or missing ssl_config_file results in no certificate checks.
+    #
+    # We require a sufficiently-recent version of Python in order to have
+    # reasonable TLS (not SSL) support. The minimum acceptable version is
+    # set to 2.7.13 so that we can explicitly use PROTOCOL_TLS. We could
+    # perhaps settle for 2.7.9 but I see little point in so doing.
 
     def __wrap_socket(self, ss):
+        if sys.hexversion < 0x02070d00:
+            raise Exception('Use of SSL requires Python version 2.7.13 or greater; this is ' + \
+                            sys.version.split(' ')[0]
+
         parsed_config = {}
         if self.ssl_config_file:
             with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
