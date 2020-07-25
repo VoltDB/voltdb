@@ -17,7 +17,8 @@
 
 import sys
 if sys.hexversion < 0x02070d00:
-    raise Exception("Python version 2.7.13 or greater is required.")
+    v = sys.version.split(' ')[0]
+    raise Exception("Python version 2.7.13 or greater is required, this is " + v)
 import array
 import socket
 import base64, textwrap
