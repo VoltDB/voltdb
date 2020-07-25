@@ -347,7 +347,7 @@ class FastSerializer:
     def __wrap_socket(self, ss):
         if sys.hexversion < 0x02070d00:
             raise Exception('Use of SSL requires Python version 2.7.13 or greater; this is ' + \
-                            sys.version.split(' ')[0]
+                            sys.version.split(' ')[0])
 
         parsed_config = {}
         if self.ssl_config_file:
