@@ -72,24 +72,27 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         // is backed by java.util.TreeMap
         results.advanceRow();
         assertEquals("AA_T", results.get("TABLE_NAME", VoltType.STRING));
-        JSONObject json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
-        assertTrue(json != null && json.length() == 2 &&
-                json.get("drEnabled").equals("true") &&
-                json.get("partitionColumn").equals("A1"));
+        JSONObject json = new JSONObject(results.getString("REMARKS"));
+        assertNotNull(json);
+        assertEquals(2, json.length());
+        assertEquals("true", json.get("drEnabled"));
+        assertEquals("A1", json.get("partitionColumn"));
 
         results.advanceRow();
         assertEquals("BB_V", results.get("TABLE_NAME", VoltType.STRING));
-        json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
-        assertTrue(json != null && json.length() == 2 &&
-                json.get("partitionColumn").equals("A1") &&
-                json.get("sourceTable").equals("AA_T"));
+        json = new JSONObject(results.getString("REMARKS"));
+        assertNotNull(json);
+        assertEquals(2, json.length());
+        assertEquals("AA_T", json.get("sourceTable"));
+        assertEquals("A1", json.get("partitionColumn"));
 
         results.advanceRow();
         assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
-        json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
-        assertTrue(json != null && json.length() == 2 &&
-                json.get("limitPartitionRowsDeleteStmt").equals("DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;") &&
-                json.get("partitionColumn").equals("A1"));
+        json = new JSONObject(results.getString("REMARKS"));
+        assertNotNull(json);
+        assertEquals(2, json.length());
+        assertEquals("DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;", json.get("limitPartitionRowsDeleteStmt"));
+        assertEquals("A1", json.get("partitionColumn"));
 
         assertEquals(false, results.advanceRow());
     }
