@@ -45,22 +45,29 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
 /**
- * Serializer for converting {@link ExportRow} to Avro format byte array as well as
- * register the schema in the schema registry.
+ * A schema-registry aware serde (serializer/deserializer) for VoltDB exports or topics, that can
+ * be used for reading and writing data in a "specific Avro" format.
+ *
+ * <p>This serde reads and writes data according to the wire format defined at
+ * http://docs.confluent.io/current/schema-registry/docs/serializer-formatter.html#wire-format.
+ * It requires access to a Confluent Schema Registry endpoint, which you must
+ * configure in the <avro> element of the deployment file.</p>
  * <p>
  * Synchronization: the implementation must be thread-safe as it may be called
  * from multiple {@link SubscriberSession} instances executing in a thread pool.
  */
-public class ExportAvroSerializer {
+public class AvroSerde {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     // Map of <avroSubject, AvroDecoder>
+    // NOTE: AvroDecoder is a VoltDB misnomer since it is used in the serialize methods (technically, "encoding" to Avro)
     private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>();
+
     private final DecoderFactory m_decoderFactory = DecoderFactory.get();
+    private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
     private AvroType m_avro;
     private SchemaRegistryClient m_schemaRegistryClient;
-    private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
    /**
     * Return a schema name expected by Kafka Connect for the value part of a polled topic
@@ -82,17 +89,21 @@ public class ExportAvroSerializer {
         return name + "-key";
     }
 
-    public ExportAvroSerializer(AvroType avro) {
+    /**
+     * Constructor with Avro deployment configuration
+     * @param avro Avro config from deployment
+     */
+    public AvroSerde(AvroType avro) {
         updateConfig(avro);
     }
 
     /**
-     * Converting {@link ExportRow} to Avro format byte array as well as register the schema
+     * Serializing {@link ExportRow} to byte array in wire format, as well as registering the schema
      * in the schema registry.
      *
-     * @param exportRow
-     * @param schemaName
-     * @return The serialize byte array in Avro format.
+     * @param exportRow     the row to encode in Avro
+     * @param schemaName    the name to use for registering the schema
+     * @return              the serialized byte array in wire format.
      */
     public byte[] serialize(ExportRow exportRow, String schemaName) {
         String avroSubject = getAvroSubjectName(schemaName);
@@ -114,8 +125,12 @@ public class ExportAvroSerializer {
             int schemaId = m_schemaRegistryClient.register(avroSubject, schema);
             // serialize to bytes
             ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+            // Write 5-byte header: magic byte and schema id (4 bytes)
             out.write(0);
             out.write(ByteBuffer.allocate(4).putInt(schemaId).array());
+
+            // Serialize row
             BinaryEncoder encoder = m_encoderFactory.directBinaryEncoder(out, null);
             DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
 
@@ -125,27 +140,42 @@ public class ExportAvroSerializer {
             byte[] bytes = out.toByteArray();
             out.close();
             return bytes;
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new SerializationException("Error serializing Avro message", e);
-        } catch (RestClientException e) {
+        }
+        catch (RestClientException e) {
             throw new SerializationException("Error registering Avro schema: " + schema, e);
         }
     }
 
+    /**
+     * Deserializing {@link ByteBuffer} in wire format to {@link Object} array, looking up
+     * the schema in the schema registry.
+     *
+     * @param buf   the buffer to deserialize
+     * @return      an array of objects
+     * @throws IOException
+     */
     public Object[] deserialize(ByteBuffer buf) throws IOException {
         Object[] params = null;
 
-        byte magic = buf.get();
-        if (magic != 0) {
-            throw new IOException("Invalid magic value " + magic);
-        }
-
         try {
+            byte magic = buf.get();
+            if (magic != 0) {
+                throw new IOException("Invalid magic value " + magic);
+            }
+
             int schemaId = buf.getInt();
             Schema schema = m_schemaRegistryClient.getById(schemaId);
+            if (schema == null) {
+                throw new IOException("Unknown avro schema: " + schemaId);
+            }
             if (schema.getType() != Schema.Type.RECORD ) {
                 throw new IOException("Unsupported avro schema type: " + schema.getType());
             }
+
+            // FIXME: cache schema or reader?
 
             DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
             int start = buf.position() + buf.arrayOffset();
