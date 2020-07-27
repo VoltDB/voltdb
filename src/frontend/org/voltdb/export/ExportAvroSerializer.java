@@ -20,17 +20,22 @@ package org.voltdb.export;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DatumWriter;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.common.errors.SerializationException;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.deploymentfile.AvroType;
 import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.AvroDecoder;
@@ -47,8 +52,11 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
  * from multiple {@link SubscriberSession} instances executing in a thread pool.
  */
 public class ExportAvroSerializer {
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+
     // Map of <avroSubject, AvroDecoder>
     private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>();
+    private final DecoderFactory m_decoderFactory = DecoderFactory.get();
 
     private AvroType m_avro;
     private SchemaRegistryClient m_schemaRegistryClient;
@@ -122,6 +130,57 @@ public class ExportAvroSerializer {
         } catch (RestClientException e) {
             throw new SerializationException("Error registering Avro schema: " + schema, e);
         }
+    }
+
+    public Object[] deserialize(ByteBuffer buf) throws IOException {
+        Object[] params = null;
+
+        byte magic = buf.get();
+        if (magic != 0) {
+            throw new IOException("Invalid magic value " + magic);
+        }
+
+        try {
+            int schemaId = buf.getInt();
+            Schema schema = m_schemaRegistryClient.getById(schemaId);
+            if (schema.getType() != Schema.Type.RECORD ) {
+                throw new IOException("Unsupported avro schema type: " + schema.getType());
+            }
+
+            DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
+            int start = buf.position() + buf.arrayOffset();
+            int length = buf.limit() - 5;
+
+            GenericRecord genRec = datumReader.read(null, m_decoderFactory.binaryDecoder(buf.array(),
+                    start, length, null));
+
+            ArrayList<Object> objs = new ArrayList<>();
+            for (Schema.Field f : schema.getFields()) {
+                Object obj = genRec.get(f.name());
+                if (obj == null) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("no object for field: " + f.name());
+                    }
+                    continue;
+                }
+
+                if (obj instanceof org.apache.avro.util.Utf8) {
+                    objs.add(obj.toString());
+                }
+                else {
+                    objs.add(obj);
+                }
+            }
+            params = objs.toArray();
+        }
+        catch (IOException ex) {
+            throw ex;
+        }
+        catch (Exception ex) {
+            exportLog.error("Failed to decode avro buffer ", ex);
+            throw new IOException(ex.getMessage());
+        }
+        return params;
     }
 
     /**
