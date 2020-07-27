@@ -1768,7 +1768,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public long getTableCheckSum(boolean includeHeader) {
         ByteBuffer buffer = m_buffer.asReadOnlyBuffer();
-        int limit = buffer.position();
+        final int limit = buffer.position();
         long hash = 0;
         // Better off using native since the most common user uses direct byte buffers
         PureJavaCrc32 crc = new PureJavaCrc32();
@@ -1798,7 +1798,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             assert position == buffer.position();
         }
 
-        assert limit == position && buffer.limit() == limit;
+        assert limit == position;
         return hash;
     }
 
