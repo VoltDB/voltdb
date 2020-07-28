@@ -2521,7 +2521,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
         } finally {
             VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
-            // Send message to the client interfaces of other hosts. If there is no partition leaders on the host, shutdown
+            // Send a message to the client interfaces. Hosts without partition leaders will be shutdown
             RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
             Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
             for (Integer hostId : liveHids) {
