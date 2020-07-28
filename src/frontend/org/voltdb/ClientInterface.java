@@ -2524,15 +2524,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltZK.removeActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress, tmLog);
             // Send message to the client interfaces of other hosts. If there is no partition leaders on the host, shutdown
             Set<Integer> liveHids = voltDB.getHostMessenger().getLiveHostIds();
-            liveHids.remove(voltDB.getHostMessenger().getHostId());
             for (Integer hostId : liveHids) {
                 final long ciHsid = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
                 m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
-            }
-            if (voltDB.getLeaderSites().isEmpty()) {
-                VoltDB.crashLocalVoltDB("The cluster will transfer to master-only state after hash mismatch is found." +
-                        " There is no partition leaders on this host. As a result, the host is shutdown.");
-
             }
         }
         return false;
