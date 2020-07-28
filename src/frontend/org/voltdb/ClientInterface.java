@@ -2517,8 +2517,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             final long timeoutMS = TimeUnit.MINUTES.toMillis(2);
             ClientResponse resp = cb.getResponse(timeoutMS);
-            MpInitiator init = (MpInitiator)voltDB.getInitiator(MpInitiator.MP_INIT_PID);
-            init.updateBuddyHSIds(voltDB.getLeaderSites());
             return (resp.getStatus() == ClientResponse.SUCCESS);
         } catch (Exception e) {
             tmLog.error(String.format("The transaction of removing replicas failed: %s", e.getMessage()));
@@ -2530,6 +2528,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             for (Integer hostId : liveHids) {
                 final long ciHsid = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
                 m_mailbox.send(ciHsid, new HashMismatchMessage(false, true));
+            }
+            if (voltDB.getLeaderSites().isEmpty()) {
+                VoltDB.crashLocalVoltDB("The cluster will transfer to master-only state after hash mismatch is found." +
+                        " There is no partition leaders on this host. As a result, the host is shutdown.");
+
             }
         }
         return false;
