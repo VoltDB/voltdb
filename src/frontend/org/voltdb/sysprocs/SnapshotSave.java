@@ -44,6 +44,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.MpInitiator;
@@ -79,6 +81,11 @@ public class SnapshotSave extends VoltSystemProcedure
         String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_createSnapshotTargets)
         {
+            final int numLocalSites = context.getLocalActiveSitesCount();
+            if (numLocalSites == 0) {
+                throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE,
+                        String.format("All sites on host %d have been de-commissioned.", context.getHostId()));
+            }
             // Those plan fragments are created in performSnapshotCreationWork()
             VoltTable result = SnapshotUtil.constructNodeResultsTable();
 
