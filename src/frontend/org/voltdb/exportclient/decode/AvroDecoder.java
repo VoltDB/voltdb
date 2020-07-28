@@ -353,7 +353,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
     public static class Builder extends RowDecoder.Builder {
 
-        protected String m_packageName = "volt.db";
+        protected String m_packageName = null;
         protected TimeZone m_timeZone = TimeZone.getDefault();
 
         public Builder packageName(String packageName) {
@@ -380,7 +380,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
 
         @Override
         public String toString() {
-            return "Builder [m_packageName=" + m_packageName
+            return "Builder [m_packageName=" + (m_packageName == null ? "null" : m_packageName)
                     + ", m_firstFieldOffset=" + m_firstFieldOffset + "]";
         }
     }
