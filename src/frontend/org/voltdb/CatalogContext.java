@@ -98,7 +98,7 @@ public class CatalogContext {
             }
 
             m_deploymentBytes = deploymentBytes;
-            m_deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
+            m_deploymentHash = CatalogUtil.makeHash(deploymentBytes);
             m_deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         }
 
