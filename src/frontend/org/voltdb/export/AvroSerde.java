@@ -21,9 +21,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericDatumReader;
@@ -54,20 +56,26 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
  * configure in the <avro> element of the deployment file.</p>
  * <p>
  * Synchronization: the implementation must be thread-safe as it may be called
- * from multiple {@link SubscriberSession} instances executing in a thread pool.
+ * from multiple {@link SubscriberSession} instances or multiple {@link ProduceRequestHandler}
+ * instances executing in a thread pool.
  */
 public class AvroSerde {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     // Map of <avroSubject, AvroDecoder>
-    // NOTE: AvroDecoder is a VoltDB misnomer since it is used in the serialize methods (technically, "encoding" to Avro)
-    private final Map<String, AvroDecoder> m_decoderMap = new ConcurrentHashMap<>();
+    // NOTE: AvroDecoder is a VoltDB misnomer since it decodes export rows and is used in
+    // the serialize methods (technically, "encoding" to Avro)
+    private final Map<String, AvroDecoder> m_rowDecoders = new ConcurrentHashMap<>();
+
+    // Map if schemaId to Schema cached from registry
+    private final Map<Integer, Schema> m_schemas = new ConcurrentHashMap<>();
 
     private final DecoderFactory m_decoderFactory = DecoderFactory.get();
     private final EncoderFactory m_encoderFactory = EncoderFactory.get();
 
+    private final AtomicReference<SchemaRegistryClient> m_schemaRegistryClient = new AtomicReference<>(null);
+
     private AvroType m_avro;
-    private SchemaRegistryClient m_schemaRegistryClient;
 
    /**
     * Return a schema name expected by Kafka Connect for the value part of a polled topic
@@ -90,11 +98,116 @@ public class AvroSerde {
     }
 
     /**
+     * A reader to handle deserialization for one {@link ProduceRequestHandler} instance, optimizing
+     * instantiations of Avro objects per recommendations in
+     * <a href="https://avro.apache.org/docs/current/gettingstartedjava.html#Deserializing-N10220">
+     * Apache Avro™ 1.10.0 Getting Started (Java)
+     * </a>
+     * <p>Each instance of this class is expected to be used by the same thread.</p>
+     */
+    public class Reader {
+        // Locak caches indexed by schema id
+        private Map<Integer, GenericRecord> m_records = new HashMap<>();
+        private Map<Integer, DatumReader<GenericRecord>> m_datumReaders = new HashMap<>();
+
+        /**
+         * Deserializing {@link ByteBuffer} in wire format to {@link Object} array, looking up
+         * the schema in the schema registry, and maintaining locally cached objects.
+         *
+         * @param buf   the buffer to deserialize
+         * @return      an array of objects
+         * @throws IOException
+         */
+        public Object[] deserialize(ByteBuffer buf) throws IOException {
+            Object[] params = null;
+
+            try {
+                byte magic = buf.get();
+                if (magic != 0) {
+                    throw new IOException("Invalid magic value " + magic);
+                }
+
+                // Get cached schema or update global schema cache from registry
+                int schemaId = buf.getInt();
+                Schema schema = m_schemas.get(schemaId);
+                if (schema == null) {
+                    SchemaRegistryClient client = m_schemaRegistryClient.get();
+                    if (client == null) {
+                        // May have been reset by concurrent catalog update
+                        throw new IOException("No schema registry");
+                    }
+                    schema = client.getById(schemaId);
+                    if (schema == null) {
+                        throw new IOException("Unknown avro schema: " + schemaId);
+                    }
+                    if (schema.getType() != Schema.Type.RECORD ) {
+                        throw new IOException("Unsupported avro schema type: " + schema.getType());
+                    }
+                    m_schemas.putIfAbsent(schemaId, schema);
+                }
+
+                // Get locally cached datum reader or cache a new one
+                DatumReader<GenericRecord> datumReader = m_datumReaders.get(schemaId);
+                if (datumReader == null) {
+                    datumReader = new GenericDatumReader<GenericRecord>(schema);
+                    m_datumReaders.put(schemaId, datumReader);
+                }
+
+                // Deserialize into generic record, reusing a previously created one
+                int start = buf.position() + buf.arrayOffset();
+                int length = buf.limit() - 5;
+
+                GenericRecord genRec = datumReader.read(m_records.get(schemaId), m_decoderFactory.binaryDecoder(buf.array(),
+                        start, length, null));
+                m_records.putIfAbsent(schemaId, genRec);
+
+                // Parse generic record for objects to return
+                ArrayList<Object> objs = new ArrayList<>();
+                for (Schema.Field f : schema.getFields()) {
+                    Object obj = genRec.get(f.name());
+                    if (obj == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(this.getClass().getSimpleName() + " found no object for field: " + f.name());
+                        }
+                        continue;
+                    }
+
+                    if (obj instanceof org.apache.avro.util.Utf8) {
+                        objs.add(obj.toString());
+                    }
+                    else {
+                        objs.add(obj);
+                    }
+                }
+                params = objs.toArray();
+                if (exportLog.isTraceEnabled()) {
+                    exportLog.trace(this.getClass().getSimpleName() + " decoded " + length + " avro bytes to " + params.length + " objects");
+                }
+            }
+            catch (IOException ex) {
+                throw ex;
+            }
+            catch (Exception ex) {
+                exportLog.error("Failed to decode avro buffer ", ex);
+                throw new IOException(ex.getMessage());
+            }
+            return params;
+        }
+    }
+
+    /**
      * Constructor with Avro deployment configuration
      * @param avro Avro config from deployment
      */
     public AvroSerde(AvroType avro) {
         updateConfig(avro);
+    }
+
+    /**
+     * @return a new {@link Reader} instance.
+     */
+    public Reader getReader() {
+        return new Reader();
     }
 
     /**
@@ -107,7 +220,7 @@ public class AvroSerde {
      */
     public byte[] serialize(ExportRow exportRow, String schemaName) {
         String avroSubject = getAvroSubjectName(schemaName);
-        AvroDecoder decoder = m_decoderMap.computeIfAbsent(
+        AvroDecoder decoder = m_rowDecoders.computeIfAbsent(
                 avroSubject, k -> new AvroDecoder.Builder().packageName(getAvroNamespace()).build());
         GenericRecord avroRecord = decoder.decode(exportRow.generation, exportRow.tableName, exportRow.types,
                 exportRow.names, null, exportRow.values);
@@ -122,7 +235,13 @@ public class AvroSerde {
         Schema schema = avroRecord.getSchema();
         try {
             // register the schema if not registered, return the schema id.
-            int schemaId = m_schemaRegistryClient.register(avroSubject, schema);
+            SchemaRegistryClient client = m_schemaRegistryClient.get();
+            if (client == null) {
+                // May have been reset by concurrent catalog update
+                throw new IOException("No schema registry");
+            }
+            int schemaId = client.register(avroSubject, schema);
+
             // serialize to bytes
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -150,70 +269,6 @@ public class AvroSerde {
     }
 
     /**
-     * Deserializing {@link ByteBuffer} in wire format to {@link Object} array, looking up
-     * the schema in the schema registry.
-     *
-     * @param buf   the buffer to deserialize
-     * @return      an array of objects
-     * @throws IOException
-     */
-    public Object[] deserialize(ByteBuffer buf) throws IOException {
-        Object[] params = null;
-
-        try {
-            byte magic = buf.get();
-            if (magic != 0) {
-                throw new IOException("Invalid magic value " + magic);
-            }
-
-            int schemaId = buf.getInt();
-            Schema schema = m_schemaRegistryClient.getById(schemaId);
-            if (schema == null) {
-                throw new IOException("Unknown avro schema: " + schemaId);
-            }
-            if (schema.getType() != Schema.Type.RECORD ) {
-                throw new IOException("Unsupported avro schema type: " + schema.getType());
-            }
-
-            // FIXME: cache schema or reader?
-
-            DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
-            int start = buf.position() + buf.arrayOffset();
-            int length = buf.limit() - 5;
-
-            GenericRecord genRec = datumReader.read(null, m_decoderFactory.binaryDecoder(buf.array(),
-                    start, length, null));
-
-            ArrayList<Object> objs = new ArrayList<>();
-            for (Schema.Field f : schema.getFields()) {
-                Object obj = genRec.get(f.name());
-                if (obj == null) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("no object for field: " + f.name());
-                    }
-                    continue;
-                }
-
-                if (obj instanceof org.apache.avro.util.Utf8) {
-                    objs.add(obj.toString());
-                }
-                else {
-                    objs.add(obj);
-                }
-            }
-            params = objs.toArray();
-        }
-        catch (IOException ex) {
-            throw ex;
-        }
-        catch (Exception ex) {
-            exportLog.error("Failed to decode avro buffer ", ex);
-            throw new IOException(ex.getMessage());
-        }
-        return params;
-    }
-
-    /**
      * Cleanup the decoders when a topic is dropped.
      * <p>
      * Note: the map of decoders is keyed by avro subject names: for every topic
@@ -225,8 +280,8 @@ public class AvroSerde {
         if (m_avro == null) {
             return;
         }
-        m_decoderMap.remove(getAvroSubjectName(getValueSchemaName(topicName)));
-        m_decoderMap.remove(getAvroSubjectName(getKeySchemaName(topicName)));
+        m_rowDecoders.remove(getAvroSubjectName(getValueSchemaName(topicName)));
+        m_rowDecoders.remove(getAvroSubjectName(getKeySchemaName(topicName)));
     }
 
     /**
@@ -234,28 +289,47 @@ public class AvroSerde {
      */
     public synchronized void updateConfig(AvroType avro) {
         if (avro == null) {
-            if (m_schemaRegistryClient != null) {
-                m_schemaRegistryClient.reset();
-                m_schemaRegistryClient = null;
+            SchemaRegistryClient client = m_schemaRegistryClient.getAndSet(null);
+            if (client != null) {
+                client.reset();
             }
-            m_decoderMap.clear();
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(this.getClass().getSimpleName() + " is set to no registry");
+            }
+            clearCache();
             m_avro = avro;
             return;
         }
 
         // update the serializer config if the schema_registry url in the deployment file changes
+        boolean mustClear = false;
         if (m_avro == null || !Objects.equals(m_avro.getRegistry(), avro.getRegistry())) {
-            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            if (m_schemaRegistryClient != null) {
-                m_schemaRegistryClient.reset();
+
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(this.getClass().getSimpleName() + " is moved to registry " + avro.getRegistry());
             }
-            m_schemaRegistryClient = new CachedSchemaRegistryClient(avro.getRegistry().trim(), 10000);
+
+            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
+            SchemaRegistryClient client = m_schemaRegistryClient.getAndSet(new CachedSchemaRegistryClient(avro.getRegistry().trim(), 10000));
+            if (client != null) {
+                client.reset();
+            }
+            mustClear = true;
         }
 
-        // Clear all the decoders if the prefix or schema changes
+        // Clear the cached data if the prefix or schema changes
         if (m_avro == null || !Objects.equals(m_avro.getPrefix(), avro.getPrefix())
                 || !Objects.equals(m_avro.getNamespace(), avro.getNamespace())) {
-            m_decoderMap.clear();
+
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(this.getClass().getSimpleName() + " is moved to namespace/prefix " + avro.getNamespace()
+                    + "/" + avro.getPrefix());
+            }
+            mustClear = true;
+        }
+
+        if (mustClear) {
+            clearCache();
         }
         m_avro = avro;
     }
@@ -278,4 +352,11 @@ public class AvroSerde {
         return m_avro.getNamespace();
     }
 
+    private void clearCache() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(this.getClass().getSimpleName() + " clears cached data");
+        }
+        m_rowDecoders.clear();
+        m_schemas.clear();
+    }
 }
