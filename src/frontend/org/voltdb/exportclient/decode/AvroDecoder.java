@@ -68,22 +68,19 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
      *
      * @param firstFieldOffset
      * @param tableName avro record type name
-     * @param packageName avro record package name space (equivalent to java packages)
+     * @param packageName avro record package name space (equivalent to java packages), or null, or empty
      */
     protected AvroDecoder(int firstFieldOffset, String packageName, TimeZone tz) {
 
         super(firstFieldOffset);
 
         Preconditions.checkArgument(
-                packageName != null && !packageName.trim().isEmpty(),
-                "package name is null or empty"
-                );
-        Preconditions.checkArgument(
                 tz != null,
                 "time zone name is null"
                 );
 
-        m_packageName = packageName;
+        // Setting an empty packageName creates record schemas without namespace
+        m_packageName = packageName != null && !packageName.trim().isEmpty() ? packageName : "";
         m_dtfmt.setTimeZone(tz);
     }
 
