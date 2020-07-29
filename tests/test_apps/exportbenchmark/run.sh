@@ -148,10 +148,33 @@ function run_benchmark_10x() {
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
-	--multiply=10 \
+	      --multiply=10 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }
+
+# spread --count rows across --targets streams and export targets
+function run_benchmark_10x_20() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --count=1000000 \
+	      --multiply=10 \
+        --targets=20 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+function run_benchmark_100x_20() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --count=1000000 \
+	      --multiply=100 \
+        --targets=20 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
 
 function run_benchmark_100x() {
     srccompile-ifneeded
