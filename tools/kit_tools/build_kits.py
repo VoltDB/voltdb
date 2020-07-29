@@ -61,7 +61,7 @@ def checkoutCode(voltdbGit, proGit, gitloc):
         # pro repos so user gets status on both checkouts
         message = ""
         if voltdbGit:
-            repo = gitloc + "/voltdb.git"
+            repo = gitloc + "/internal.git"
             checkout_succeeded = repoCheckout(repo, voltdbGit)
             if not checkout_succeeded:
                 message += "\nCheckout of '%s' from %s repository failed." % (voltdbGit, repo)
