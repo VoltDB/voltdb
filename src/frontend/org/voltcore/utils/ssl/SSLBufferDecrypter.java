@@ -70,38 +70,6 @@ public class SSLBufferDecrypter {
         return true;
     }
 
-    public int tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
-        while (true) {
-            SSLEngineResult result = null;
-            ByteBuffer slice = dstBuffer.slice();
-            try {
-                result = m_sslEngine.unwrap(srcBuffer, slice);
-            } catch (SSLException|ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
-                throw new TLSException("ssl engine unwrap fault", e);
-            }
-            switch (result.getStatus()) {
-                case OK:
-                    if (result.bytesProduced() == 0 && !srcBuffer.hasRemaining()) {
-                        return 0;
-                    }
-                    // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    if (result.bytesProduced() > 0) {
-                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return result.bytesProduced();
-                        }
-                    else {
-                        continue;
-                    }
-                case BUFFER_OVERFLOW:
-                    throw new TLSException("SSL engine unexpectedly overflowed when decrypting");
-                case BUFFER_UNDERFLOW:
-                    throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
-                case CLOSED:
-                    throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");
-            }
-        }
-    }
-
     /**
      * @see #tlsunwrap(ByteBuffer, ByteBuf, PooledByteBufAllocator)
      */
