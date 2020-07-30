@@ -18,7 +18,6 @@
 package org.voltcore.zk;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +33,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -969,39 +969,10 @@ public class SynchronizedStatesManager {
             return RESULT_CONCENSUS.NO_QUORUM;
         }
 
-        private ArrayList<ByteBuffer> getUncorrelatedResults(ByteBuffer taskRequest, Set<String> memberList)
+        private List<ByteBuffer> getUncorrelatedResults(ByteBuffer taskRequest, Set<String> memberList)
                 throws KeeperException {
-            // Treat ZooKeeper failures as empty result
-            ArrayList<ByteBuffer> results = new ArrayList<ByteBuffer>();
-            try {
-                for (String memberId : memberList) {
-                    byte result[];
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
-                    if (result != null) {
-                        ByteBuffer bb = ByteBuffer.wrap(result);
-                        results.add(bb);
-                        if (m_log.isDebugEnabled()) {
-                            m_log.debug(m_stateMachineId + ":    " + memberId + " reports Result " +
-                                    taskResultToString(taskRequest.asReadOnlyBuffer(), bb.asReadOnlyBuffer()));
-                        }
-                    }
-                    else {
-                        if (m_log.isDebugEnabled()) {
-                            m_log.debug(m_stateMachineId + ":    " + memberId + " did not supply a Task Result");
-                        }
-                    }
-                }
-                // Remove ourselves from the participants list to unblock the next distributed lock waiter
-                m_zk.delete(m_myParticipantPath, -1);
-            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
-                    | InterruptedException e) {
-                results = new ArrayList<ByteBuffer>();
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": Received " + e.getClass().getSimpleName()
-                            + " in getUncorrelatedResults");
-                }
-            }
-            return results;
+            return getCorrelatedResults(taskRequest, memberList).values().stream().filter(r -> r != null)
+                    .collect(Collectors.toList());
         }
 
         private Map<String, ByteBuffer> getCorrelatedResults(ByteBuffer taskRequest, Set<String> memberList)
@@ -1231,7 +1202,7 @@ public class SynchronizedStatesManager {
                         };
                     }
                     else {
-                        ArrayList<ByteBuffer> results = getUncorrelatedResults(taskRequest, memberList);
+                        List<ByteBuffer> results = getUncorrelatedResults(taskRequest, memberList);
                         if (m_stateChangeInitiator) {
                             // Since we don't care if we are the last to go away, remove ourselves from the participant list
                             assert(m_holdingDistributedLock);
