@@ -91,12 +91,6 @@ function server() {
     server_common
 }
 
-function server_e3() {
-    srccompile-ifneeded
-    voltdb init --force --config=deployment_e3.xml
-    server_common
-}
-
 function server_common() {
     echo
     echo "Installing exportbenchmark-exporter.jar to ${VOLTDB_LIB}/extension"
@@ -124,7 +118,7 @@ function init() {
     sqlcmd < exportTable.sql
 }
 
-# run the client that drives the example
+# run the client that drives the example - change function to run other test cases
 function client() {
     run_benchmark
 }
@@ -134,6 +128,7 @@ function run_benchmark_help() {
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH exportbenchmark.ExportBenchmark --help
 }
 
+# simple test example
 function run_benchmark() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
@@ -143,6 +138,7 @@ function run_benchmark() {
         --statsfile=exportbench.csv
 }
 
+# tuple multiply test examples
 function run_benchmark_10x() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
@@ -153,35 +149,35 @@ function run_benchmark_10x() {
         --statsfile=exportbench.csv
 }
 
-# spread --count rows across --targets streams and export targets
-function run_benchmark_10x_20() {
+function run_benchmark_100x() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
-        --count=1000000 \
-	      --multiply=10 \
-        --targets=20 \
+        --duration=60 \
+	      --multiply=100 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }
+
+# multi-stream test examples, using --count instead of --duration
 function run_benchmark_100x_20() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --count=1000000 \
 	      --multiply=100 \
-        --targets=20 \
+        --streams=20 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }
 
-
-function run_benchmark_100x() {
+function run_benchmark_10x_50() {
     srccompile-ifneeded
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
-        --duration=60 \
-	--multiply=100 \
+        --count=1000000 \
+	      --multiply=10 \
+        --streams=50 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }

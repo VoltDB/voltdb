@@ -2,7 +2,7 @@ LOAD CLASSES exportbenchmark-procedures.jar;
 
 file -inlinebatch END_OF_BATCH
 
-CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
+CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -28,7 +28,7 @@ CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET export_targe
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid EXPORT TO TARGET default1 (
+CREATE STREAM ALL_VALUES2 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -54,7 +54,7 @@ CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid EXPORT TO TARGET default1 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES2 PARTITION ON COLUMN rowid EXPORT TO TARGET default2 (
+CREATE STREAM ALL_VALUES3 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -80,7 +80,7 @@ CREATE STREAM ALL_VALUES2 PARTITION ON COLUMN rowid EXPORT TO TARGET default2 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES3 PARTITION ON COLUMN rowid EXPORT TO TARGET default3 (
+CREATE STREAM ALL_VALUES4 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -106,7 +106,7 @@ CREATE STREAM ALL_VALUES3 PARTITION ON COLUMN rowid EXPORT TO TARGET default3 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES4 PARTITION ON COLUMN rowid EXPORT TO TARGET default4 (
+CREATE STREAM ALL_VALUES5 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -132,7 +132,7 @@ CREATE STREAM ALL_VALUES4 PARTITION ON COLUMN rowid EXPORT TO TARGET default4 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES5 PARTITION ON COLUMN rowid EXPORT TO TARGET default5 (
+CREATE STREAM ALL_VALUES6 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -158,7 +158,7 @@ CREATE STREAM ALL_VALUES5 PARTITION ON COLUMN rowid EXPORT TO TARGET default5 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES6 PARTITION ON COLUMN rowid EXPORT TO TARGET default6 (
+CREATE STREAM ALL_VALUES7 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -184,7 +184,7 @@ CREATE STREAM ALL_VALUES6 PARTITION ON COLUMN rowid EXPORT TO TARGET default6 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES7 PARTITION ON COLUMN rowid EXPORT TO TARGET default7 (
+CREATE STREAM ALL_VALUES8 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -210,7 +210,7 @@ CREATE STREAM ALL_VALUES7 PARTITION ON COLUMN rowid EXPORT TO TARGET default7 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES8 PARTITION ON COLUMN rowid EXPORT TO TARGET default8 (
+CREATE STREAM ALL_VALUES9 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -236,33 +236,7 @@ CREATE STREAM ALL_VALUES8 PARTITION ON COLUMN rowid EXPORT TO TARGET default8 (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES9 PARTITION ON COLUMN rowid EXPORT TO TARGET default9 (
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
-, rowid_group               TINYINT       NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT       NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT      NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER       NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT        NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP     NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT         NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)   NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)  NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-);
-
-CREATE STREAM ALL_VALUES10 PARTITION ON COLUMN rowid EXPORT TO TARGET default10 (
+CREATE STREAM ALL_VALUES10 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -292,7 +266,7 @@ CREATE STREAM ALL_VALUES10 PARTITION ON COLUMN rowid EXPORT TO TARGET default10 
 
 
 
-CREATE STREAM ALL_VALUES11 PARTITION ON COLUMN rowid EXPORT TO TARGET default11 (
+CREATE STREAM ALL_VALUES11 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -318,7 +292,7 @@ CREATE STREAM ALL_VALUES11 PARTITION ON COLUMN rowid EXPORT TO TARGET default11 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES12 PARTITION ON COLUMN rowid EXPORT TO TARGET default12 (
+CREATE STREAM ALL_VALUES12 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -344,7 +318,7 @@ CREATE STREAM ALL_VALUES12 PARTITION ON COLUMN rowid EXPORT TO TARGET default12 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES13 PARTITION ON COLUMN rowid EXPORT TO TARGET default13 (
+CREATE STREAM ALL_VALUES13 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -370,7 +344,7 @@ CREATE STREAM ALL_VALUES13 PARTITION ON COLUMN rowid EXPORT TO TARGET default13 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES14 PARTITION ON COLUMN rowid EXPORT TO TARGET default14 (
+CREATE STREAM ALL_VALUES14 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -396,7 +370,7 @@ CREATE STREAM ALL_VALUES14 PARTITION ON COLUMN rowid EXPORT TO TARGET default14 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES15 PARTITION ON COLUMN rowid EXPORT TO TARGET default15 (
+CREATE STREAM ALL_VALUES15 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -422,7 +396,7 @@ CREATE STREAM ALL_VALUES15 PARTITION ON COLUMN rowid EXPORT TO TARGET default15 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES16 PARTITION ON COLUMN rowid EXPORT TO TARGET default16 (
+CREATE STREAM ALL_VALUES16 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -448,7 +422,7 @@ CREATE STREAM ALL_VALUES16 PARTITION ON COLUMN rowid EXPORT TO TARGET default16 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES17 PARTITION ON COLUMN rowid EXPORT TO TARGET default17 (
+CREATE STREAM ALL_VALUES17 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -474,7 +448,7 @@ CREATE STREAM ALL_VALUES17 PARTITION ON COLUMN rowid EXPORT TO TARGET default17 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES18 PARTITION ON COLUMN rowid EXPORT TO TARGET default18 (
+CREATE STREAM ALL_VALUES18 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -500,7 +474,7 @@ CREATE STREAM ALL_VALUES18 PARTITION ON COLUMN rowid EXPORT TO TARGET default18 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES19 PARTITION ON COLUMN rowid EXPORT TO TARGET default19 (
+CREATE STREAM ALL_VALUES19 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -526,7 +500,7 @@ CREATE STREAM ALL_VALUES19 PARTITION ON COLUMN rowid EXPORT TO TARGET default19 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES20 PARTITION ON COLUMN rowid EXPORT TO TARGET default20 (
+CREATE STREAM ALL_VALUES20 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -552,7 +526,7 @@ CREATE STREAM ALL_VALUES20 PARTITION ON COLUMN rowid EXPORT TO TARGET default20 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES21 PARTITION ON COLUMN rowid EXPORT TO TARGET default21 (
+CREATE STREAM ALL_VALUES21 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -578,7 +552,7 @@ CREATE STREAM ALL_VALUES21 PARTITION ON COLUMN rowid EXPORT TO TARGET default21 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES22 PARTITION ON COLUMN rowid EXPORT TO TARGET default22 (
+CREATE STREAM ALL_VALUES22 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -604,7 +578,7 @@ CREATE STREAM ALL_VALUES22 PARTITION ON COLUMN rowid EXPORT TO TARGET default22 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES23 PARTITION ON COLUMN rowid EXPORT TO TARGET default23 (
+CREATE STREAM ALL_VALUES23 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -630,7 +604,7 @@ CREATE STREAM ALL_VALUES23 PARTITION ON COLUMN rowid EXPORT TO TARGET default23 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES24 PARTITION ON COLUMN rowid EXPORT TO TARGET default24 (
+CREATE STREAM ALL_VALUES24 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -656,7 +630,7 @@ CREATE STREAM ALL_VALUES24 PARTITION ON COLUMN rowid EXPORT TO TARGET default24 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES25 PARTITION ON COLUMN rowid EXPORT TO TARGET default25 (
+CREATE STREAM ALL_VALUES25 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -682,7 +656,7 @@ CREATE STREAM ALL_VALUES25 PARTITION ON COLUMN rowid EXPORT TO TARGET default25 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES26 PARTITION ON COLUMN rowid EXPORT TO TARGET default26 (
+CREATE STREAM ALL_VALUES26 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -708,7 +682,7 @@ CREATE STREAM ALL_VALUES26 PARTITION ON COLUMN rowid EXPORT TO TARGET default26 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES27 PARTITION ON COLUMN rowid EXPORT TO TARGET default27 (
+CREATE STREAM ALL_VALUES27 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -734,7 +708,7 @@ CREATE STREAM ALL_VALUES27 PARTITION ON COLUMN rowid EXPORT TO TARGET default27 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES28 PARTITION ON COLUMN rowid EXPORT TO TARGET default28 (
+CREATE STREAM ALL_VALUES28 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -760,7 +734,7 @@ CREATE STREAM ALL_VALUES28 PARTITION ON COLUMN rowid EXPORT TO TARGET default28 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES29 PARTITION ON COLUMN rowid EXPORT TO TARGET default29 (
+CREATE STREAM ALL_VALUES29 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -786,7 +760,7 @@ CREATE STREAM ALL_VALUES29 PARTITION ON COLUMN rowid EXPORT TO TARGET default29 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES30 PARTITION ON COLUMN rowid EXPORT TO TARGET default30 (
+CREATE STREAM ALL_VALUES30 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -812,7 +786,7 @@ CREATE STREAM ALL_VALUES30 PARTITION ON COLUMN rowid EXPORT TO TARGET default30 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES31 PARTITION ON COLUMN rowid EXPORT TO TARGET default31 (
+CREATE STREAM ALL_VALUES31 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -838,7 +812,7 @@ CREATE STREAM ALL_VALUES31 PARTITION ON COLUMN rowid EXPORT TO TARGET default31 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES32 PARTITION ON COLUMN rowid EXPORT TO TARGET default32 (
+CREATE STREAM ALL_VALUES32 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -864,7 +838,7 @@ CREATE STREAM ALL_VALUES32 PARTITION ON COLUMN rowid EXPORT TO TARGET default32 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES33 PARTITION ON COLUMN rowid EXPORT TO TARGET default33 (
+CREATE STREAM ALL_VALUES33 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -890,7 +864,7 @@ CREATE STREAM ALL_VALUES33 PARTITION ON COLUMN rowid EXPORT TO TARGET default33 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES34 PARTITION ON COLUMN rowid EXPORT TO TARGET default34 (
+CREATE STREAM ALL_VALUES34 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -916,7 +890,7 @@ CREATE STREAM ALL_VALUES34 PARTITION ON COLUMN rowid EXPORT TO TARGET default34 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES35 PARTITION ON COLUMN rowid EXPORT TO TARGET default35 (
+CREATE STREAM ALL_VALUES35 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -942,7 +916,7 @@ CREATE STREAM ALL_VALUES35 PARTITION ON COLUMN rowid EXPORT TO TARGET default35 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES36 PARTITION ON COLUMN rowid EXPORT TO TARGET default36 (
+CREATE STREAM ALL_VALUES36 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -968,7 +942,7 @@ CREATE STREAM ALL_VALUES36 PARTITION ON COLUMN rowid EXPORT TO TARGET default36 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES37 PARTITION ON COLUMN rowid EXPORT TO TARGET default37 (
+CREATE STREAM ALL_VALUES37 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -994,7 +968,7 @@ CREATE STREAM ALL_VALUES37 PARTITION ON COLUMN rowid EXPORT TO TARGET default37 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES38 PARTITION ON COLUMN rowid EXPORT TO TARGET default38 (
+CREATE STREAM ALL_VALUES38 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1020,7 +994,7 @@ CREATE STREAM ALL_VALUES38 PARTITION ON COLUMN rowid EXPORT TO TARGET default38 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES39 PARTITION ON COLUMN rowid EXPORT TO TARGET default39 (
+CREATE STREAM ALL_VALUES39 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1046,7 +1020,7 @@ CREATE STREAM ALL_VALUES39 PARTITION ON COLUMN rowid EXPORT TO TARGET default39 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES40 PARTITION ON COLUMN rowid EXPORT TO TARGET default40 (
+CREATE STREAM ALL_VALUES40 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1072,7 +1046,7 @@ CREATE STREAM ALL_VALUES40 PARTITION ON COLUMN rowid EXPORT TO TARGET default40 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES41 PARTITION ON COLUMN rowid EXPORT TO TARGET default41 (
+CREATE STREAM ALL_VALUES41 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1098,7 +1072,7 @@ CREATE STREAM ALL_VALUES41 PARTITION ON COLUMN rowid EXPORT TO TARGET default41 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES42 PARTITION ON COLUMN rowid EXPORT TO TARGET default42 (
+CREATE STREAM ALL_VALUES42 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1124,7 +1098,7 @@ CREATE STREAM ALL_VALUES42 PARTITION ON COLUMN rowid EXPORT TO TARGET default42 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES43 PARTITION ON COLUMN rowid EXPORT TO TARGET default43 (
+CREATE STREAM ALL_VALUES43 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1150,7 +1124,7 @@ CREATE STREAM ALL_VALUES43 PARTITION ON COLUMN rowid EXPORT TO TARGET default43 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES44 PARTITION ON COLUMN rowid EXPORT TO TARGET default44 (
+CREATE STREAM ALL_VALUES44 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1176,7 +1150,7 @@ CREATE STREAM ALL_VALUES44 PARTITION ON COLUMN rowid EXPORT TO TARGET default44 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES45 PARTITION ON COLUMN rowid EXPORT TO TARGET default45 (
+CREATE STREAM ALL_VALUES45 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1202,7 +1176,7 @@ CREATE STREAM ALL_VALUES45 PARTITION ON COLUMN rowid EXPORT TO TARGET default45 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES46 PARTITION ON COLUMN rowid EXPORT TO TARGET default46 (
+CREATE STREAM ALL_VALUES46 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1228,7 +1202,7 @@ CREATE STREAM ALL_VALUES46 PARTITION ON COLUMN rowid EXPORT TO TARGET default46 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES47 PARTITION ON COLUMN rowid EXPORT TO TARGET default47 (
+CREATE STREAM ALL_VALUES47 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1254,7 +1228,7 @@ CREATE STREAM ALL_VALUES47 PARTITION ON COLUMN rowid EXPORT TO TARGET default47 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES48 PARTITION ON COLUMN rowid EXPORT TO TARGET default48 (
+CREATE STREAM ALL_VALUES48 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1280,7 +1254,7 @@ CREATE STREAM ALL_VALUES48 PARTITION ON COLUMN rowid EXPORT TO TARGET default48 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES49 PARTITION ON COLUMN rowid EXPORT TO TARGET default49 (
+CREATE STREAM ALL_VALUES49 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1306,7 +1280,7 @@ CREATE STREAM ALL_VALUES49 PARTITION ON COLUMN rowid EXPORT TO TARGET default49 
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM ALL_VALUES50 PARTITION ON COLUMN rowid EXPORT TO TARGET default50 (
+CREATE STREAM ALL_VALUES50 PARTITION ON COLUMN rowid EXPORT TO TARGET export_target (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -1331,8 +1305,6 @@ CREATE STREAM ALL_VALUES50 PARTITION ON COLUMN rowid EXPORT TO TARGET default50 
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-
-CREATE PROCEDURE PARTITION ON TABLE ALL_VALUES COLUMN rowid PARAMETER 0 FROM CLASS exportbenchmark.InsertExport;
 
 CREATE PROCEDURE PARTITION ON TABLE ALL_VALUES1 COLUMN rowid PARAMETER 0 FROM CLASS exportbenchmark.InsertExport1;
 CREATE PROCEDURE PARTITION ON TABLE ALL_VALUES2 COLUMN rowid PARAMETER 0 FROM CLASS exportbenchmark.InsertExport2;
