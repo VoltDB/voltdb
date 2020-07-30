@@ -235,6 +235,12 @@ public class UpdateCore extends VoltSystemProcedure {
             column[0] = new ColumnInfo("NEXT_VERSION", VoltType.INTEGER);
             column[1] = new ColumnInfo("MESSAGE", VoltType.STRING);
             VoltTable result = new VoltTable(column);
+            final int numLocalSites = context.getLocalActiveSitesCount();
+            if (numLocalSites == 0) {
+                result.addRow(nextCatalogVersion, String.format("All sites on host %d have been de-commissioned.", context.getHostId()));
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync, result);
+            }
+
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
             } catch (Exception ex) {

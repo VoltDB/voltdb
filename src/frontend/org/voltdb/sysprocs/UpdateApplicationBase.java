@@ -259,7 +259,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.deploymentBytes = newDeploymentString.getBytes(Constants.UTF8ENCODING);
 
             // make deployment hash from string
-            retval.deploymentHash = CatalogUtil.makeDeploymentHash(retval.deploymentBytes);
+            retval.deploymentHash = CatalogUtil.makeHash(retval.deploymentBytes);
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify

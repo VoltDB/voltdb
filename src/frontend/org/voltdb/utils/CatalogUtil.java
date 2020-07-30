@@ -2765,7 +2765,7 @@ public abstract class CatalogUtil {
      * or deployment file, do the irritating exception crash test, jam the bytes in,
      * and get the SHA-1 hash.
      */
-    public static byte[] makeDeploymentHash(byte[] inbytes)
+    public static byte[] makeHash(byte[] inbytes)
     {
         MessageDigest md = null;
         try {

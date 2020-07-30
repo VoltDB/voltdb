@@ -47,6 +47,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
@@ -471,6 +472,11 @@ public class MiscUtils {
             return "Can not change license from " +
                     (currentLicense.isUnrestricted() ? "unrestricted" : "restricted") +
                     " to " + (newLicense.isUnrestricted() ? "unrestricted" : "restricted");
+        }
+        int clusterSize = ((RealVoltDB)VoltDB.instance()).getHostCount();
+        if ( newLicense.maxHostcount() < clusterSize) {
+            return String.format("Can not update a license with the max host count [%d] lower than current cluster size [%d].",
+                    newLicense.maxHostcount(), clusterSize);
         }
         return null;
     }
