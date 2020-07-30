@@ -375,6 +375,97 @@ public class SynchronizedStatesManager {
             }
         }
 
+        private byte[] serializeResultData(byte[] result) {
+            ByteBuffer buffer = ByteBuffer.allocate(Result.s_bodyStart + (result == null ? 0 : result.length));
+            buffer.putInt(m_lastProposalVersion);
+            buffer.put((byte) (result == null ? 0 : 1));
+            if (result != null) {
+                buffer.put(result);
+            }
+            return buffer.array();
+        }
+
+        // Set of classes to retrieve and interpret a proposal result
+
+        /**
+         * Base class for all result types. Result header is parsed and can be accessed through this class
+         */
+        private class Result {
+            private static final int s_versionIndex = 0;
+            private static final int s_hasResultIndex = s_versionIndex + Integer.BYTES;
+            static final int s_bodyStart = s_hasResultIndex + Byte.BYTES;
+            final ByteBuffer m_resultData;
+
+            Result() throws KeeperException, InterruptedException {
+                this(m_zk.getData(m_myResultPath, false, null));
+            }
+
+            Result(String memberId) throws KeeperException, InterruptedException {
+               this(m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null));
+            }
+
+            private Result(byte[] data) {
+                m_resultData = ByteBuffer.wrap(data);
+            }
+
+            /**
+             * @return {@code true} if there was data associated with the result node
+             */
+            boolean hasResult() {
+                return m_resultData.get(s_hasResultIndex) == 1;
+            }
+
+            /**
+             * @return the version of the proposal for which this result was generated
+             */
+            int getProposalVersion() {
+                return m_resultData.getInt(s_versionIndex);
+            }
+        }
+
+        /**
+         * Class for retrieving results which are simple agree, disagree or abstain
+         */
+        private class AgreementResult extends Result {
+            AgreementResult(String memberId) throws KeeperException, InterruptedException {
+                super(memberId);
+            }
+
+            /**
+             * @return {@code true} if the host agrees with the proposal
+             * @throws IndexOutOfBoundsException If {@link #hasResult()} returns {@code false}
+             */
+            boolean agrees() throws IndexOutOfBoundsException {
+                return m_resultData.get(s_bodyStart) == 1;
+            }
+
+            @Override
+            public String toString() {
+                return hasResult() ? Boolean.toString(agrees()) : null;
+            }
+        }
+
+        /**
+         * Class for retrieving a task result
+         */
+        private class TaskResult extends Result {
+            TaskResult(String memberId) throws KeeperException, InterruptedException {
+                super(memberId);
+            }
+
+            /**
+             * @return The result of the task as a read only {@link ByteBuffer}
+             */
+            ByteBuffer taskResult() {
+                if (!hasResult()) {
+                    return null;
+                }
+                ByteBuffer ro = m_resultData.asReadOnlyBuffer();
+                ro.position(s_bodyStart);
+                return ro.slice();
+            }
+        }
+
         private final BarrierParticipantsWatcher m_barrierParticipantsWatcher = new BarrierParticipantsWatcher();
 
         private class BarrierResultsWatcher implements Watcher {
@@ -941,15 +1032,14 @@ public class SynchronizedStatesManager {
                 throws KeeperException, InterruptedException {
             boolean agree = false;
             for (String memberId : memberList) {
-                byte result[];
                 try {
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
+                    AgreementResult result = new AgreementResult(memberId);
                     if (m_log.isDebugEnabled()) {
                         m_log.debug(String.format("%s: Checking result from member %s: %s", m_stateMachineId, memberId,
-                                Arrays.toString(result)));
+                                result));
                     }
-                    if (result != null) {
-                        if (result[0] == 0) {
+                    if (result.hasResult()) {
+                        if (!result.agrees()) {
                             return RESULT_CONCENSUS.DISAGREE;
                         }
                         agree = true;
@@ -981,10 +1071,9 @@ public class SynchronizedStatesManager {
             Map<String, ByteBuffer> results = new HashMap<String, ByteBuffer>();
             try {
                 for (String memberId : memberList) {
-                    byte result[];
-                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
-                    if (result != null) {
-                        ByteBuffer bb = ByteBuffer.wrap(result);
+                    TaskResult result = new TaskResult(memberId);
+                    if (result.hasResult()) {
+                        ByteBuffer bb = result.taskResult();
                         results.put(memberId, bb);
                         if (m_log.isDebugEnabled()) {
                             m_log.debug(m_stateMachineId + ":    " + memberId + " reports Result " +
@@ -1635,8 +1724,9 @@ public class SynchronizedStatesManager {
                         (result == null || result.length < 10 || m_log.isTraceEnabled()) ? Arrays.toString(result)
                                 : "suppressed"));
             }
+
             try {
-                m_zk.create(m_myResultPath, result, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_zk.create(m_myResultPath, serializeResultData(result), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException
                     | InterruptedException e) {
                 if (m_log.isDebugEnabled()) {
