@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
@@ -198,6 +199,12 @@ public class UpdateLicense extends VoltNTSystemProcedure {
             err = checkResult(result);
             if (err != null) {
                 vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
+                return new VoltTable[] { vt };
+            }
+            try {
+                zk.setData(VoltZK.license, licenseBytes, -1);
+            } catch (KeeperException | InterruptedException e) {
+                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, "Unable to upload the new license to ZK");
                 return new VoltTable[] { vt };
             }
 

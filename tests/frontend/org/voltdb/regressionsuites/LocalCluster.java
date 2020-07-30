@@ -525,6 +525,17 @@ public class LocalCluster extends VoltServerConfig {
         }
     }
 
+    public void updateLicense(String licensePath) throws IOException, ProcCallException, InterruptedException {
+        byte[] licenseBytes = Files.readAllBytes(Paths.get(licensePath));
+        Client client = createAdminClient(new ClientConfig());
+        try {
+            assertEquals(ClientResponse.SUCCESS,
+                    client.callProcedure("@UpdateLicense", licenseBytes).getStatus());
+        } finally {
+            client.close();
+        }
+    }
+
     @Override
     public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
         if (!m_compiled) {
