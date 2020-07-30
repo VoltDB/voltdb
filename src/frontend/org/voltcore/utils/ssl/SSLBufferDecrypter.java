@@ -40,7 +40,7 @@ public class SSLBufferDecrypter {
         this.m_sslEngine = sslEngine;
     }
 
-    public boolean readTLSFrame(ScatteringByteChannel chn, ByteBuf buf) throws IOException {
+    public static boolean readTLSFrame(ScatteringByteChannel chn, ByteBuf buf) throws IOException {
         int widx = buf.writerIndex();
         ByteBuf header = buf.slice(widx, TLS_HEADER_SIZE).clear();
         int rc = 0;
