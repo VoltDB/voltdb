@@ -25,7 +25,8 @@ from voltcli import utility
             'license',
             'VoltDB_license_file (extension .xml)',
             min_count=1, max_count=1),
-    )
+    ),
+    hideverb=True
 )
 
 # get proper error message from the procedure call
