@@ -27,7 +27,8 @@ import org.voltdb.VoltDB;
 public enum EncodeFormat {
     INVALID(-1),
     CSV(0),
-    AVRO(1);
+    AVRO(1),
+    RAW(2);
 
     /** ID for the encode format used in serialization of the format */
     private final byte m_id;
