@@ -106,7 +106,7 @@ public class AvroSerde {
      * <p>Each instance of this class is expected to be used by the same thread.</p>
      */
     public class Reader {
-        // Locak caches indexed by schema id
+        // Local caches indexed by schema id
         private Map<Integer, GenericRecord> m_records = new HashMap<>();
         private Map<Integer, DatumReader<GenericRecord>> m_datumReaders = new HashMap<>();
 
@@ -119,7 +119,7 @@ public class AvroSerde {
          * @throws IOException
          */
         public Object[] deserialize(ByteBuffer buf) throws IOException {
-            Object[] params = null;
+            Object[] results = null;
 
             try {
                 byte magic = buf.get();
@@ -128,7 +128,7 @@ public class AvroSerde {
                 }
 
                 // Get cached schema or update global schema cache from registry
-                int schemaId = buf.getInt();
+                Integer schemaId = buf.getInt();
                 Schema schema = m_schemas.get(schemaId);
                 if (schema == null) {
                     SchemaRegistryClient client = m_schemaRegistryClient.get();
@@ -155,33 +155,27 @@ public class AvroSerde {
 
                 // Deserialize into generic record, reusing a previously created one
                 int start = buf.position() + buf.arrayOffset();
-                int length = buf.limit() - 5;
+                int length = buf.remaining();
 
                 GenericRecord genRec = datumReader.read(m_records.get(schemaId), m_decoderFactory.binaryDecoder(buf.array(),
                         start, length, null));
                 m_records.putIfAbsent(schemaId, genRec);
 
                 // Parse generic record for objects to return
-                ArrayList<Object> objs = new ArrayList<>();
+                results = new Object[schema.getFields().size()];
+                int i = 0;
                 for (Schema.Field f : schema.getFields()) {
                     Object obj = genRec.get(f.name());
-                    if (obj == null) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(this.getClass().getSimpleName() + " found no object for field: " + f.name());
-                        }
-                        continue;
-                    }
-
                     if (obj instanceof org.apache.avro.util.Utf8) {
-                        objs.add(obj.toString());
+                        results[i++] = obj.toString();
                     }
                     else {
-                        objs.add(obj);
+                        // Note: may be null
+                        results[i++] = obj;
                     }
                 }
-                params = objs.toArray();
                 if (exportLog.isTraceEnabled()) {
-                    exportLog.trace(this.getClass().getSimpleName() + " decoded " + length + " avro bytes to " + params.length + " objects");
+                    exportLog.trace(this.getClass().getSimpleName() + " decoded " + length + " avro bytes to " + results.length + " objects");
                 }
             }
             catch (IOException ex) {
@@ -191,7 +185,7 @@ public class AvroSerde {
                 exportLog.error("Failed to decode avro buffer ", ex);
                 throw new IOException(ex.getMessage());
             }
-            return params;
+            return results;
         }
     }
 
@@ -285,7 +279,9 @@ public class AvroSerde {
     }
 
     /**
-     * Handling the change of the {@link AvroType} in the deployment file.
+     * Handling the change of the {@link AvroType} in the deployment file, and clearing the caches.
+     *
+     * @param avro
      */
     public synchronized void updateConfig(AvroType avro) {
         if (avro == null) {
@@ -302,7 +298,6 @@ public class AvroSerde {
         }
 
         // update the serializer config if the schema_registry url in the deployment file changes
-        boolean mustClear = false;
         if (m_avro == null || !Objects.equals(m_avro.getRegistry(), avro.getRegistry())) {
 
             if (exportLog.isDebugEnabled()) {
@@ -314,7 +309,6 @@ public class AvroSerde {
             if (client != null) {
                 client.reset();
             }
-            mustClear = true;
         }
 
         // Clear the cached data if the prefix or schema changes
@@ -325,12 +319,10 @@ public class AvroSerde {
                 exportLog.debug(this.getClass().getSimpleName() + " is moved to namespace/prefix " + avro.getNamespace()
                     + "/" + avro.getPrefix());
             }
-            mustClear = true;
         }
 
-        if (mustClear) {
-            clearCache();
-        }
+        // Systematically clear the caches
+        clearCache();
         m_avro = avro;
     }
 
