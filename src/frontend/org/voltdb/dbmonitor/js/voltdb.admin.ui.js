@@ -3103,9 +3103,6 @@ function loadAdminPage() {
                     }
 
                     if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
-                        if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
-                            $("#selectRabbitMq").val(properties[i].name);
-                        }
                         if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).length) {
                             $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
                             $(".newStreamMinProperty").addClass("orgProperty");
@@ -3459,9 +3456,6 @@ function loadAdminPage() {
                 var multiPropertyCount = 0;
                 for (var i = 0; i < properties.length; i++) {
                     if (VoltDbAdminConfig.newImportStreamMinPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newImportStreamMinPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
-                        if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
-                            $("#selectRabbitMq").val(properties[i].name);
-                        }
                         if ($(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name]).length) {
                             $(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name]).val(properties[i].value);
                             $(".newImportStreamMinProperty").addClass("orgProperty");
@@ -4120,24 +4114,6 @@ function loadAdminPage() {
             } else {
                 $('#txtJdbcDriver').attr("disabled", "disabled");
             }
-        } else if (exportType.toUpperCase() == "RABBITMQ") {
-            if (!$('#selectRabbitMq').length) {
-                exportProperties += '' +
-                    '<tr class="newStreamMinProperty">' +
-                    '   <td>' +
-                    '       <select id="selectRabbitMq" name="selectRabbitMq" class="newStreamPropertyName newStreamProperty  requiredProperty"> ' +
-                    '           <option>broker.host</option> ' +
-                    '           <option>amqp.uri</option> ' +
-                    '       </select>' +
-                    '   </td>' +
-                    '   <td>' +
-                    '       <input size="15" id="txtRabbitMqValue" name="txtRabbitMqValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
-                    '       <label id="errorRabbitMqValue" for="txtRabbitMqValue" class="error" style="display: none;"></label>' +
-                    '   </td>' +
-                    '   <td></td>' +
-                    '</tr>';
-            }
-
         } else if (exportType.toUpperCase() == "ELASTICSEARCH") {
             if (!$('#txtEndpointES').length) {
                 exportProperties = '<tr class="newStreamMinProperty">' +
@@ -4200,9 +4176,6 @@ function loadAdminPage() {
                 var $row1 = $(object).closest("tr");
                 $row1.remove();
             }
-            if (propertyName == "broker.host" || propertyName == "amqp.uri") {
-                $("#selectRabbitMq").val(propertyName);
-            }
         }
     };
 
@@ -4239,12 +4212,6 @@ function loadAdminPage() {
             setNormalDisplay($("#txtJdbcDriver"));
         }
 
-        if (exportType.toUpperCase() == "RABBITMQ") {
-            setDefaultDisplay($("#selectRabbitMq"));
-        } else {
-            setNormalDisplay($("#selectRabbitMq"));
-        }
-
         if (exportType.toUpperCase() == "ELASTICSEARCH") {
             setDefaultDisplay($("#txtEndpointES"));
         } else {
@@ -4254,8 +4221,6 @@ function loadAdminPage() {
     };
 
     var setDefaultDisplay = function (txtbox) {
-        if (txtbox.selector != "#selectRabbitMq")
-            txtbox.attr('disabled', 'disabled');
         var $row = txtbox.closest("tr");
         $('#tblAddNewProperty tr.headerProperty').after($row);
         var $td = $row.find("td:last-child");
@@ -5056,8 +5021,6 @@ function loadAdminPage() {
             "bootstrap.servers": "#txtBootstrapServersListValue",
             "jdbcurl": "#txtJdbcUrlValue",
             "jdbcdriver": "#txtJdbcDriverValue",
-            "broker.host": "#txtRabbitMqValue",
-            "amqp.uri": "#txtRabbitMqValue",
             "endpoint_ELASTICSEARCH": "#txtEndpointESValue"
         };
 
