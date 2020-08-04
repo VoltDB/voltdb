@@ -224,7 +224,7 @@ public class TLSDecryptionAdapter {
      */
     class DecryptionGateway implements Runnable {
 
-        private final byte [] m_overlap = new byte[CipherExecutor.FRAME_SIZE + 2048];
+        private final byte[] m_overlap = new byte[m_decrypter.getPacketBufferSize()];
         private final ConcurrentLinkedDeque<NIOReadStream.Slice> m_q = new ConcurrentLinkedDeque<>();
         private final CompositeByteBuf m_msgbb = Unpooled.compositeBuffer();
 
