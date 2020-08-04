@@ -87,12 +87,8 @@ public class JDBCExportClient extends ExportClientBase {
         ,UNRECOGNIZED;
     }
     private final Set<DatabaseType> supportsIfNotExists =
-        ImmutableSet.<DatabaseType>builder()
-        .add(DatabaseType.POSTGRES)
-        .add(DatabaseType.MYSQL)
-        .add(DatabaseType.NETEZZA)
-        .add(DatabaseType.VERTICA)
-        .build();
+            ImmutableSet.<DatabaseType>builder().add(
+                    DatabaseType.POSTGRES).add(DatabaseType.MYSQL).add(DatabaseType.VERTICA).build();
 
     static final class RefCountedDS {
         private final DataSource ds;
@@ -479,13 +475,11 @@ public class JDBCExportClient extends ExportClientBase {
                 } catch (SQLException e1) {
                     throw new RuntimeException(e1);
                 }
-                if ((e.getSQLState().equals(SQLSTATE_UNIQUE_VIOLATION)) ||
-                    (e.getMessage().lower().contains("already exists")) ||
-                    (m_dbType == DatabaseType.ORACLE && e.getMessage().contains("ORA-00955"))) {
-                    // table already exists
-                    // set m_createTableStr = null, then createTable() won't be called again
-                    m_createTableStr = null;
-                } else {
+                if (!e.getSQLState().equals(SQLSTATE_UNIQUE_VIOLATION) &&
+                        //Todo, this predicate is broken, the regex doesn't work
+                        !(m_dbType == DatabaseType.NETEZZA && !e.getMessage().matches(".+Relation\\s+'[^']+'\\s+already\\s+exists.+")) &&
+                        (m_dbType == DatabaseType.ORACLE && !e.getMessage().contains("ORA-00955"))) {
+                    //Crappy hack around the fact that create if not exists is racy in postgres
                     throw new RuntimeException(e);
                 }
             }
