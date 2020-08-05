@@ -33,6 +33,8 @@ public class EstTimeUpdater {
     public static volatile boolean s_pause = false;
     public static final AtomicBoolean s_done = new AtomicBoolean(true);
 
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     private final static Runnable updaterRunnable = new Runnable() {
         @Override
         public void run() {
@@ -49,7 +51,7 @@ public class EstTimeUpdater {
                 if (s_pause) continue;
                 Long delta = EstTimeUpdater.update(System.currentTimeMillis());
                 if ( delta != null ) {
-                    new VoltLogger("HOST").info(delta +" estimated time update.");
+                    hostLog.warn(delta +" estimated time update.");
                 }
             }
         }
