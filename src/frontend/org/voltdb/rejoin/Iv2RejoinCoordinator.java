@@ -75,11 +75,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
-    private final Queue<Long>                   m_snapshotSites  = new LinkedList<Long>();
+    private final Queue<Long> m_snapshotSites  = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
     private final ArrayListMultimap<Long, Long> m_srcToDest = ArrayListMultimap.create();
     // contains all sites that haven't finished replaying transactions
-    private final Queue<Long>                   m_rejoiningSites = new LinkedList<Long>();
+    private final Queue<Long>  m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
     private final boolean m_liveRejoin;
     // Need to remember the nonces we're using here (for now)
@@ -87,6 +87,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // Node-wise stream snapshot receiver buffer pool
     private final Queue<BBContainer> m_snapshotDataBufPool;
     private final Queue<BBContainer> m_snapshotCompressedDataBufPool;
+    // For progress tracking
+    private int m_initialSiteCount;
 
     private String m_hostId;
 
@@ -203,9 +205,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         m_startTime = System.currentTimeMillis();
         List<Long> firstSites = new ArrayList<Long>();
         synchronized (m_lock) {
+            m_initialSiteCount = m_pendingSites.size();
             firstSites.addAll(m_pendingSites);
             m_snapshotSites.addAll(m_pendingSites);
             m_pendingSites.clear();
+            VoltDB.instance().reportNodeStartupProgress(0, m_initialSiteCount);
         }
         REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
         initiateRejoinOnSites(firstSites);
@@ -232,6 +236,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                 msg += ". All sites completed rejoin.";
             }
             REJOINLOG.info(msg);
+            VoltDB.instance().reportNodeStartupProgress(m_initialSiteCount-remainingSites.size(),
+                                                        m_initialSiteCount);
             allDone = m_snapshotSites.isEmpty() && m_rejoiningSites.isEmpty();
         }
 

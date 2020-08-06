@@ -370,7 +370,7 @@ public class ClientConfig {
      * using FAST reads, enabling this setting will load balance reads amongst
      * partition replicas, often increasing throughput and decreasing latency.</p>
      *
-     * <p>Note: consistency modality SAFE/FAST is obsolete and no longer supported. 
+     * <p>Note: consistency modality SAFE/FAST is obsolete and no longer supported.
      *</p>
      *
      * <p>Defaults to FALSE. Has no effect if Client Affinity is disabled.</p>

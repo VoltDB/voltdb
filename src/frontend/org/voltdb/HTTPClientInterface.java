@@ -52,8 +52,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.ClientResponseToJsonApiV2;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -192,8 +192,13 @@ public class HTTPClientInterface {
     }
 
     private final static void simpleJsonResponse(String jsonp, String message, HttpServletResponse rsp, int code) {
+        simpleJsonResponse(jsonp, message, rsp, code, ClientResponse.UNEXPECTED_FAILURE);
+    }
+
+    private final static void simpleJsonResponse(String jsonp, String message, HttpServletResponse rsp, int code,
+            byte status) {
         ClientResponseImpl rimpl = new ClientResponseImpl(
-                ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], message);
+                status, new VoltTable[0], message);
         String msg = rimpl.toJSONString();
         msg = asJsonp(jsonp, msg);
         rsp.setStatus(code);
@@ -202,6 +207,11 @@ public class HTTPClientInterface {
             rsp.getWriter().flush();
         } catch (IOException ignoreThisAsBrowserMustHaveClosed) {
         }
+    }
+
+    private final static void unavailable(String jsonp, String message, HttpServletResponse rsp) {
+        simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_NOT_FOUND,
+                ClientResponse.SERVER_UNAVAILABLE);
     }
 
     private final static void badRequest(String jsonp, String message, HttpServletResponse rsp) {
@@ -316,6 +326,12 @@ public class HTTPClientInterface {
                     request.setHandled(true);
                     return;
                 }
+            }
+
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+                unavailable(jsonp, "database is shutting down.", response);
+                request.setHandled(true);
+                return;
             }
 
             authResult = authenticate(request);

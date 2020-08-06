@@ -430,6 +430,8 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "IV2ENABLED", "true");
         long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
+        long createTimeMs = VoltDB.instance().getClusterCreateTime();
+        vt.addRow(hostId, "CREATIONTIME", Long.toString(createTimeMs));
         vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
 
         vt.addRow(hostId, "LAST_UPDATECORE_DURATION",
@@ -500,18 +502,18 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("jsonenabled", json_enabled);
 
+        results.addRow("snapshotpath", VoltDB.instance().getSnapshotPath());
         SnapshotSchedule snaps = database.getSnapshotschedule().get("default");
-        String snap_enabled = "false";
+        String autosnap_enabled = "false";
         if (snaps != null && snaps.getEnabled())
         {
-            snap_enabled = "true";
+            autosnap_enabled = "true";
             String snap_freq = Integer.toString(snaps.getFrequencyvalue()) + snaps.getFrequencyunit();
-            results.addRow("snapshotpath", VoltDB.instance().getSnapshotPath());
             results.addRow("snapshotprefix", snaps.getPrefix());
             results.addRow("snapshotfrequency", snap_freq);
             results.addRow("snapshotretain", Integer.toString(snaps.getRetain()));
         }
-        results.addRow("snapshotenabled", snap_enabled);
+        results.addRow("snapshotenabled", autosnap_enabled);
 
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
