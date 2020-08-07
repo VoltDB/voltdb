@@ -4219,7 +4219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requiresNewExportGeneration,
             boolean hasSecurityUserChange)
     {
-        NodeState prevNodeState = null;
+
         try {
             /*
              * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
@@ -4228,11 +4228,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              */
             final UpdatableSiteCoordinationBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
             sysProcBarrier.await();
-
             synchronized (sysProcBarrier) {
-                final ReplicationRole oldRole = getReplicationRole();
 
-                prevNodeState = m_statusTracker.set(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                     if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
                         throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -4240,174 +4237,189 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                     }
                     assert(m_catalogContext.catalogVersion == nextCatalogVersion);
-                    return m_catalogContext;
                 }
 
-                //Security credentials may be part of the new catalog update.
-                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
-                //before CatalogContext swap.
-                if (m_adminListener != null && hasSecurityUserChange) {
-                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
-                }
-
-                CatalogInfo catalogInfo = null;
-                Catalog newCatalog = null;
-                CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                if (isForReplay) {
+                else {
+                    final NodeState prevNodeState = m_statusTracker.set(NodeState.UPDATING);
                     try {
-                        CatalogAndDeployment catalogStuff =
-                                CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                        byte[] depbytes = catalogStuff.deploymentBytes;
-                        if (depbytes == null) {
-                            depbytes = ctx.m_catalogInfo.m_deploymentBytes;
-                        }
-                        catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
-                        newCatalog = ctx.getNewCatalog(diffCommands);
-                    } catch (Exception e) {
-                        // impossible to hit, log for debug purpose
-                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
-                        throw new RuntimeException("Error reading catalog from zookeeper");
+                        doCatalogUpdate(diffCommands, nextCatalogVersion, genId, isForReplay,
+                                        requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
+                                        requiresNewExportGeneration, hasSecurityUserChange);
                     }
-                } else {
-                    if (ctx.m_preparedCatalogInfo == null) {
-                        // impossible to hit, log for debug purpose
-                        throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
+                    finally {
+                        m_statusTracker.set(prevNodeState);
                     }
-                    // using the prepared catalog information if prepared
-                    catalogInfo = ctx.m_preparedCatalogInfo;
-                    newCatalog = catalogInfo.m_catalog;
                 }
-
-                byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
-                final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
-
-                // 0. A new catalog! Update the global context and the context tracker
-                m_catalogContext = m_catalogContext.update(isForReplay,
-                                                           newCatalog,
-                                                           nextCatalogVersion,
-                                                           genId,
-                                                           catalogInfo,
-                                                           m_messenger,
-                                                           hasSchemaChange);
-
-                // 1. update the export manager.
-                VoltDB.getExportManager().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
-                        requiresNewExportGeneration, getPartitionToSiteMap());
-
-                // 1.1 Update the elastic service throughput settings
-                if (m_elasticService != null) {
-                    m_elasticService.updateConfig(m_catalogContext);
-                }
-
-                // 1.5 update the dead host timeout
-                if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
-                    m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
-                    m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
-                }
-
-                // 2. update client interface (asynchronously)
-                //    CI in turn updates the planner thread.
-                if (m_clientInterface != null) {
-                    m_clientInterface.notifyOfCatalogUpdate();
-                }
-
-                // 3. update HTTPClientInterface (asynchronously)
-                // This purges cached connection state so that access with
-                // stale auth info is prevented.
-                if (m_adminListener != null && hasSecurityUserChange) {
-                    m_adminListener.notifyOfCatalogUpdate();
-                }
-
-                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfPreCatalogUpdate();
-
-                // 4. Flush StatisticsAgent old user PROCEDURE statistics.
-                // The stats agent will hold all other stats in memory.
-                getStatsAgent().notifyOfCatalogUpdate();
-
-                // 4.5. (added)
-                // Update the NT procedure service AFTER stats are cleared in the previous step
-                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
-
-                // 5. MPIs don't run fragments. Update them here. Do
-                // this after flushing the stats -- this will re-register
-                // the MPI statistics.
-                if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
-                            requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-                }
-
-                // Update catalog for import processor this should be just/stop start and update partitions.
-                VoltDB.getImportManager().updateCatalog(m_catalogContext, m_messenger);
-
-                // 6. Perform updates required by the DR subsystem
-
-                // 6.1. Perform any actions that would have been taken during the ordinary initialization path
-                if (m_consumerDRGateway != null) {
-                    // 6.2. If we are a DR replica and the consumer was created
-                    // before the catalog update, we may care about a deployment
-                    // update. If it was created above, no need to notify
-                    // because the consumer already has the latest catalog.
-                    final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
-                    m_consumerDRGateway.updateCatalog(m_catalogContext,
-                                                      (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
-                                                       ? newDRConnectionSource
-                                                       : null),
-                                                      (byte) m_catalogContext.cluster.getPreferredsource());
-                }
-
-                // Check if this is promotion
-                if (oldRole == ReplicationRole.REPLICA &&
-                    m_catalogContext.cluster.getDrrole().equals("master")) {
-                    // Promote replica to master
-                    promoteToMaster();
-                }
-
-                // 6.3. If we are a DR master, update the DR table signature hash
-                if (m_producerDRGateway != null) {
-                    m_producerDRGateway.updateCatalog(m_catalogContext,
-                            VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
-                }
-
-                // 7 Update tasks (asynchronously) after replica change if it occurred
-                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
-
-                new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
-
-                // log system setting information if the deployment config has changed
-                if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
-                    logSystemSettingFromCatalogContext();
-                }
-                //Before starting resource monitor update any Snmp configuration changes.
-                if (m_snmp != null) {
-                    m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
-                }
-
-                //TTL control works on the host with MPI
-                if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
-                    VoltDB.getTTLManager().scheduleTTLTasks();
-                }
-                // restart resource usage monitoring task
-                startHealthMonitor();
-
-                checkHeapSanity(m_catalogContext.tables.size(),
-                        (getLocalPartitionCount()), m_configuredReplicationFactor);
-
-                checkThreadsSanity();
-
-                m_statusTracker.set(prevNodeState);
-                prevNodeState = null;
-
-                return m_catalogContext;
-            } // end of synchronization on sysProcBarrier
+            }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
-        } finally {
-            // Set state back to what it was, if we did not already do that
-            // TODO: rearrange code so that we do this under sync
-            if (prevNodeState != null) {
-                m_statusTracker.set(prevNodeState);
-            }
         }
+
+        return m_catalogContext;
+    }
+
+    private void doCatalogUpdate(
+            String diffCommands,
+            int nextCatalogVersion,
+            long genId,
+            boolean isForReplay,
+            boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange) {
+
+        final ReplicationRole oldRole = getReplicationRole();
+
+        //Security credentials may be part of the new catalog update.
+        //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+        //before CatalogContext swap.
+        if (m_adminListener != null && hasSecurityUserChange) {
+            m_adminListener.dontStoreAuthenticationResultInHttpSession();
+        }
+
+        CatalogInfo catalogInfo = null;
+        Catalog newCatalog = null;
+        CatalogContext ctx = VoltDB.instance().getCatalogContext();
+        if (isForReplay) {
+            try {
+                CatalogAndDeployment catalogStuff =
+                    CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                byte[] depbytes = catalogStuff.deploymentBytes;
+                if (depbytes == null) {
+                    depbytes = ctx.m_catalogInfo.m_deploymentBytes;
+                }
+                catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
+                newCatalog = ctx.getNewCatalog(diffCommands);
+            } catch (Exception e) {
+                // impossible to hit, log for debug purpose
+                hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
+                throw new RuntimeException("Error reading catalog from zookeeper");
+            }
+        } else {
+            if (ctx.m_preparedCatalogInfo == null) {
+                // impossible to hit, log for debug purpose
+                throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
+            }
+            // using the prepared catalog information if prepared
+            catalogInfo = ctx.m_preparedCatalogInfo;
+            newCatalog = catalogInfo.m_catalog;
+        }
+
+        byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
+        final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+
+        // 0. A new catalog! Update the global context and the context tracker
+        m_catalogContext = m_catalogContext.update(isForReplay,
+                                                   newCatalog,
+                                                   nextCatalogVersion,
+                                                   genId,
+                                                   catalogInfo,
+                                                   m_messenger,
+                                                   hasSchemaChange);
+
+        // 1. update the export manager.
+        VoltDB.getExportManager().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
+                                                requiresNewExportGeneration, getPartitionToSiteMap());
+
+        // 1.1 Update the elastic service throughput settings
+        if (m_elasticService != null) {
+            m_elasticService.updateConfig(m_catalogContext);
+        }
+
+        // 1.5 update the dead host timeout
+        if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
+            m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
+            m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+        }
+
+        // 2. update client interface (asynchronously)
+        //    CI in turn updates the planner thread.
+        if (m_clientInterface != null) {
+            m_clientInterface.notifyOfCatalogUpdate();
+        }
+
+        // 3. update HTTPClientInterface (asynchronously)
+        // This purges cached connection state so that access with
+        // stale auth info is prevented.
+        if (m_adminListener != null && hasSecurityUserChange) {
+            m_adminListener.notifyOfCatalogUpdate();
+        }
+
+        m_clientInterface.getDispatcher().notifyNTProcedureServiceOfPreCatalogUpdate();
+
+        // 4. Flush StatisticsAgent old user PROCEDURE statistics.
+        // The stats agent will hold all other stats in memory.
+        getStatsAgent().notifyOfCatalogUpdate();
+
+        // 4.5. (added)
+        // Update the NT procedure service AFTER stats are cleared in the previous step
+        m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
+
+        // 5. MPIs don't run fragments. Update them here. Do
+        // this after flushing the stats -- this will re-register
+        // the MPI statistics.
+        if (m_MPI != null) {
+            m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
+                                requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+        }
+
+        // Update catalog for import processor this should be just/stop start and update partitions.
+        VoltDB.getImportManager().updateCatalog(m_catalogContext, m_messenger);
+
+        // 6. Perform updates required by the DR subsystem
+
+        // 6.1. Perform any actions that would have been taken during the ordinary initialization path
+        if (m_consumerDRGateway != null) {
+            // 6.2. If we are a DR replica and the consumer was created
+            // before the catalog update, we may care about a deployment
+            // update. If it was created above, no need to notify
+            // because the consumer already has the latest catalog.
+            final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+            m_consumerDRGateway.updateCatalog(m_catalogContext,
+                                              (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
+                                               ? newDRConnectionSource
+                                               : null),
+                                              (byte) m_catalogContext.cluster.getPreferredsource());
+        }
+
+        // Check if this is promotion
+        if (oldRole == ReplicationRole.REPLICA &&
+            m_catalogContext.cluster.getDrrole().equals("master")) {
+            // Promote replica to master
+            promoteToMaster();
+        }
+
+        // 6.3. If we are a DR master, update the DR table signature hash
+        if (m_producerDRGateway != null) {
+            m_producerDRGateway.updateCatalog(m_catalogContext,
+                                              VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+        }
+
+        // 7 Update tasks (asynchronously) after replica change if it occurred
+        m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
+
+        new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
+
+        // log system setting information if the deployment config has changed
+        if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
+            logSystemSettingFromCatalogContext();
+        }
+        //Before starting resource monitor update any Snmp configuration changes.
+        if (m_snmp != null) {
+            m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
+        }
+
+        //TTL control works on the host with MPI
+        if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
+            VoltDB.getTTLManager().scheduleTTLTasks();
+        }
+        // restart resource usage monitoring task
+        startHealthMonitor();
+
+        checkHeapSanity(m_catalogContext.tables.size(),
+                        (getLocalPartitionCount()), m_configuredReplicationFactor);
+
+        checkThreadsSanity();
     }
 
     Map<Integer, Integer> getPartitionToSiteMap() {
