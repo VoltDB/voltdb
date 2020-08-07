@@ -18,8 +18,6 @@
 package org.voltdb.exportclient;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
@@ -31,12 +29,8 @@ import java.util.Map;
 
 import org.voltdb.VoltType;
 import org.voltdb.compiler.DDLCompiler;
-import org.voltdb.types.GeographyPointValue;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Charsets;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -353,61 +347,11 @@ public class ExportRow {
     // Rather, it decodes the next non-null column in the FastDeserializer
     private static Object decodeNextColumn(ByteBuffer bb, VoltType columnType)
             throws IOException {
-        Object retval = null;
-        switch (columnType) {
-        case TINYINT:
-            retval = decodeTinyInt(bb);
-            break;
-        case SMALLINT:
-            retval = decodeSmallInt(bb);
-            break;
-        case INTEGER:
-            retval = decodeInteger(bb);
-            break;
-        case BIGINT:
-            retval = decodeBigInt(bb);
-            break;
-        case FLOAT:
-            retval = decodeFloat(bb);
-            break;
-        case TIMESTAMP:
-            retval = decodeTimestamp(bb);
-            break;
-        case STRING:
-            retval = decodeString(bb);
-            break;
-        case VARBINARY:
-            retval = decodeVarbinary(bb);
-            break;
-        case DECIMAL:
-            retval = decodeDecimal(bb);
-            break;
-        case GEOGRAPHY_POINT:
-            retval = decodeGeographyPoint(bb);
-            break;
-        case GEOGRAPHY:
-            retval = decodeGeography(bb);
-            break;
-        default:
-            throw new IOException("Invalid column type: " + columnType);
+        try {
+            return columnType.decodeValue(bb);
+        } catch (UnsupportedOperationException e) {
+            throw new IOException("Invalid column type: " + columnType, e);
         }
-
-        return retval;
-    }
-
-    /**
-     * Read a decimal according to the Four Dot Four encoding specification.
-     *
-     * @param bb
-     *            ByteBuffer containing Export stream data
-     * @return decoded BigDecimal value
-     */
-    static public BigDecimal decodeDecimal(final ByteBuffer bb) {
-        final int scale = bb.get();
-        final int precisionBytes = bb.get();
-        final byte[] bytes = new byte[precisionBytes];
-        bb.get(bytes);
-        return new BigDecimal(new BigInteger(bytes), scale);
     }
 
     /**
@@ -417,116 +361,6 @@ public class ExportRow {
      * @throws IOException
      */
     static public String decodeString(final ByteBuffer bb) {
-        final int strlength = bb.getInt();
-        final int position = bb.position();
-        String decoded = null;
-        if (bb.hasArray()) {
-            decoded = new String(bb.array(), bb.arrayOffset() + position, strlength, Charsets.UTF_8);
-        } else {
-            // Must be a direct buffer
-            byte[] dst = new byte[strlength];
-            bb.get(dst, 0, strlength);
-            decoded = new String(dst, Charsets.UTF_8);
-        }
-        bb.position(position + strlength);
-        return decoded;
-    }
-
-    /**
-     * Read a varbinary according to the Export encoding specification
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public Object decodeVarbinary(final ByteBuffer bb) {
-        final int length = bb.getInt();
-        final byte[] data = new byte[length];
-        bb.get(data);
-        return data;
-    }
-
-    /**
-     * Read a timestamp according to the Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public TimestampType decodeTimestamp(final ByteBuffer bb) {
-        final Long val = bb.getLong();
-        return new TimestampType(val);
-    }
-
-    /**
-     * Read a float according to the Export encoding specification
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public double decodeFloat(final ByteBuffer bb) {
-        return bb.getDouble();
-    }
-
-    /**
-     * Read a bigint according to the Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public long decodeBigInt(final ByteBuffer bb) {
-        return bb.getLong();
-    }
-
-    /**
-     * Read an integer according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public int decodeInteger(final ByteBuffer bb) {
-        return bb.getInt();
-    }
-
-    /**
-     * Read a small int according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public short decodeSmallInt(final ByteBuffer bb) {
-        return bb.getShort();
-    }
-
-    /**
-     * Read a tiny int according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public byte decodeTinyInt(final ByteBuffer bb) {
-        return bb.get();
-    }
-
-    /**
-     * Read a point according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public GeographyPointValue decodeGeographyPoint(final ByteBuffer bb) {
-        return GeographyPointValue.unflattenFromBuffer(bb);
-    }
-
-    /**
-     * Read a geography according to the Four Dot Four Export encoding specification.
-     *
-     * @param bb
-     * @throws IOException
-     */
-    static public GeographyValue decodeGeography(final ByteBuffer bb) {
-        final int strLength = bb.getInt();
-        final int startPosition = bb.position();
-        GeographyValue gv = GeographyValue.unflattenFromBuffer(bb);
-        assert(bb.position() - startPosition == strLength);
-        return gv;
+        return (String) VoltType.STRING.decodeValue(bb);
     }
 }

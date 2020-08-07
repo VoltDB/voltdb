@@ -17,6 +17,7 @@
 
 package org.voltdb;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -85,7 +86,13 @@ public enum VoltType {
             't',
             java.sql.Types.TINYINT,  // java.sql.Types DATA_TYPE
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            "java.lang.Byte"), // getObject return type
+            "java.lang.Byte" // getObject return type
+    ) {
+        @Override
+        public Byte decodeValue(ByteBuffer buffer) {
+            return buffer.get();
+        }
+    },
 
     /**
      * 2-byte signed 2s-compliment short.
@@ -97,7 +104,13 @@ public enum VoltType {
             's',
             java.sql.Types.SMALLINT,  // java.sql.Types DATA_TYPE
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            "java.lang.Short"), // getObject return type
+            "java.lang.Short" // getObject return type
+    ) {
+        @Override
+        public Short decodeValue(ByteBuffer buffer) {
+            return buffer.getShort();
+        }
+    },
 
     /**
      * 4-byte signed 2s-compliment integer.
@@ -109,7 +122,13 @@ public enum VoltType {
             'i',
             java.sql.Types.INTEGER,  // java.sql.Types DATA_TYPE
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            "java.lang.Integer"), // getObject return type
+            "java.lang.Integer" // getObject return type
+    ) {
+        @Override
+        public Integer decodeValue(ByteBuffer buffer) {
+            return buffer.getInt();
+        }
+    },
 
     /**
      * 8-byte signed 2s-compliment long.
@@ -121,7 +140,13 @@ public enum VoltType {
             'b',
             java.sql.Types.BIGINT,  // java.sql.Types DATA_TYPE
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            "java.lang.Long"), // getObject return type
+            "java.lang.Long" // getObject return type
+    ) {
+        @Override
+        public Long decodeValue(ByteBuffer buffer) {
+            return buffer.getLong();
+        }
+    },
 
     /**
      * Special purpose internal type to describe expectations for parameters to
@@ -168,7 +193,13 @@ public enum VoltType {
             'f',
             java.sql.Types.FLOAT,  // java.sql.Types DATA_TYPE
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            "java.lang.Double"), // getObject return type
+            "java.lang.Double" // getObject return type
+    ) {
+        @Override
+        public Double decodeValue(ByteBuffer buffer) {
+            return buffer.getDouble();
+        }
+    },
 
     /**
      * UTF-8 string with up to 32K chars.
@@ -202,6 +233,19 @@ public enum VoltType {
         public boolean isIndexable() { return true; }
         @Override
         public boolean isUniqueIndexable() { return true; }
+
+        @Override
+        public String decodeValue(ByteBuffer buffer) {
+            int length = buffer.getInt();
+            if (length < 0) {
+                return null;
+            }
+            int origLimit = buffer.limit();
+            buffer.limit(buffer.position() + length);
+            String result = Constants.UTF8ENCODING.decode(buffer).toString();
+            buffer.limit(origLimit);
+            return result;
+        }
     },
 
     /**
@@ -257,6 +301,11 @@ public enum VoltType {
         public boolean isIndexable() { return true; }
         @Override
         public boolean isUniqueIndexable() { return true; }
+
+        @Override
+        public TimestampType decodeValue(ByteBuffer buffer) {
+            return new TimestampType(buffer.getLong());
+        }
     },
 
     /**
@@ -280,6 +329,15 @@ public enum VoltType {
 
         @Override
         public Integer getMaximumScale() { return 12; }
+
+        @Override
+        public BigDecimal decodeValue(ByteBuffer buffer) {
+            int scale = buffer.get();
+            int precisionBytes = buffer.get();
+            byte[] bytes = new byte[precisionBytes];
+            buffer.get(bytes);
+            return new BigDecimal(new BigInteger(bytes), scale);
+        }
     },
 
     /**
@@ -341,6 +399,17 @@ public enum VoltType {
         public boolean isIndexable() { return true; }
         @Override
         public boolean isUniqueIndexable() { return true; }
+
+        @Override
+        public byte[] decodeValue(ByteBuffer buffer) {
+            int length = buffer.getInt();
+            if (length < 0) {
+                return null;
+            }
+            byte[] result = new byte[length];
+            buffer.get(result);
+            return result;
+        }
     },
 
     /**
@@ -354,7 +423,13 @@ public enum VoltType {
             'P', // signature char
             java.sql.Types.OTHER, // JDBC type (this is used for vendor specific types)
             java.sql.DatabaseMetaData.typePredBasic, // basic where-clauses supported
-            "org.voltdb.types.GeographyPointValue"), // JDBC getObject return type
+            "org.voltdb.types.GeographyPointValue" // JDBC getObject return type
+    ) {
+        @Override
+        public GeographyPointValue decodeValue(ByteBuffer buffer) {
+            return GeographyPointValue.unflattenFromBuffer(buffer);
+        }
+    },
 
     /**
      * Geography type, for geographical objects (polygons, etc)
@@ -379,6 +454,12 @@ public enum VoltType {
         public boolean isIndexable() { return true; }
         @Override
         public boolean isUniqueIndexable() { return false; }
+
+        @Override
+        public GeographyValue decodeValue(ByteBuffer buffer) {
+            buffer.getInt(); // Length of value which is not used
+            return GeographyValue.unflattenFromBuffer(buffer);
+        }
     },
     ;
 
@@ -1204,6 +1285,17 @@ public enum VoltType {
             throw new RuntimeException(
                     "bytesToValue failed to convert a non-partitionable type.");
         }
+    }
+
+    /**
+     * Decode a on object of this type from {@code buffer}
+     *
+     * @param buffer to read object from
+     * @return Decoded object
+     * @throws UnsupportedOperationException if this type does not support decoding
+     */
+    public Object decodeValue(ByteBuffer buffer) throws UnsupportedOperationException {
+        throw new UnsupportedOperationException(name() + " does not supporte decoding");
     }
 
     // VALUE constants
