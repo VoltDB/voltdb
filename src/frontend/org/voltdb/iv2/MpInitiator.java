@@ -37,7 +37,6 @@ import org.voltdb.Promotable;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
-import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;

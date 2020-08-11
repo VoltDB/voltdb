@@ -23,12 +23,14 @@ get_resource_help = ('Supported configuration resources for get command are \'cl
                      '           classes    - gets procedure classes of current node\n'
                      '           deployment - gets deployment configuration of current node\n'
                      '           schema     - gets schema of current node\n'
-                     '           license     - gets license of current node\n')
-output_help = ('Specifies the path and file name for the output file. Defaults are: '
+                     '           license    - gets license of current node\n')
+output_help = ('Specifies the path and file name for the output file. \'-\' operator means standard output. '
+               'Defaults are: '
                'Deployment - deployment.xml;\r\n'
                'Schema - schema.sql;\r\n'
-               'Classes - procedures.jar'
-               'License - license.xml')
+               'Classes - procedures.jar;\r\n'
+               'License - license.xml;\r\n'
+               )
 
 @VOLT.Command(
     description = 'Write the selected database resource (deployment or schema) to a file.',
@@ -36,7 +38,7 @@ output_help = ('Specifies the path and file name for the output file. Defaults a
         VOLT.StringOption('-o', '--output', 'output', output_help, default=None),
         VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrites an existing file.'),
-        VOLT.StringOption('-l', '--license', 'license', license_help, default=None)
+        VOLT.StringOption('-l', '--license', 'license', license_help, default=None),
     ),
     arguments = (
         VOLT.StringArgument('resource', get_resource_help, default=None),

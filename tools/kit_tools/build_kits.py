@@ -61,7 +61,7 @@ def checkoutCode(voltdbGit, proGit, gitloc):
         # pro repos so user gets status on both checkouts
         message = ""
         if voltdbGit:
-            repo = gitloc + "/voltdb.git"
+            repo = gitloc + "/internal.git"
             checkout_succeeded = repoCheckout(repo, voltdbGit)
             if not checkout_succeeded:
                 message += "\nCheckout of '%s' from %s repository failed." % (voltdbGit, repo)
@@ -74,7 +74,7 @@ def checkoutCode(voltdbGit, proGit, gitloc):
         if len(message) > 0:
             abort(message)
 
-        return run("cat voltdb/version.txt").strip()
+        return run("cat internal/version.txt").strip()
 
 ################################################
 # MAKE A RELEASE DIR
@@ -99,7 +99,7 @@ def buildCommunity(ee_only=False):
         packageMacLib="true"
     else:
         packageMacLib="false"
-    with cd(builddir + "/voltdb"):
+    with cd(builddir + "/internal"):
         run("pwd")
         run("git status")
         if ee_only:
@@ -121,7 +121,7 @@ def buildEnterprise(version):
     with cd(builddir + "/pro"):
         run("pwd")
         run("git status")
-        run("VOLTCORE=../voltdb ant -f mmt.xml \
+        run("VOLTCORE=../internal ant -f mmt.xml \
         -Djmemcheck=NO_MEMCHECK \
         -DallowDrReplication=true -DallowDrActiveActive=true \
         -Dlicensedays=%d -Dlicensee='%s' \
@@ -161,9 +161,9 @@ def makeSHA256SUM(version, type):
 ################################################
 
 def makeMavenJars():
-    with cd(builddir + "/voltdb"):
-        run("VOLTCORE=../voltdb ant -f build.xml maven-jars")
-        run("VOLTCORE=../voltdb ant -f build-client.xml maven-jars")
+    with cd(builddir + "/internal"):
+        run("VOLTCORE=../internal ant -f build.xml maven-jars")
+        run("VOLTCORE=../internal ant -f build-client.xml maven-jars")
 
 ################################################
 # COPY FILES
@@ -184,13 +184,13 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
     local("chmod 755 %s" % releaseDir)
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/voltdb/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
+    get("%s/internal/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
         "%s/voltdb-community-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
         os.makedirs(releaseDir + "/other")
-        get("%s/voltdb/obj/release/voltdb-%s.sym" % (builddir, version),
+        get("%s/internal/obj/release/voltdb-%s.sym" % (builddir, version),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
 
 def copyTrialLicenseToReleaseDir(licensefile, releaseDir):
@@ -204,25 +204,25 @@ def copyMavenJarsToReleaseDir(releaseDir, version):
         os.makedirs(mavenProjectDir)
 
     #Get the upload.gradle file
-    get("%s/voltdb/tools/kit_tools/upload.gradle" % (builddir),
+    get("%s/internal/tools/kit_tools/upload.gradle" % (builddir),
         "%s/upload.gradle" % (mavenProjectDir))
 
     #Get the voltdbclient-n.n.jar from the recently built community build
-    get("%s/voltdb/obj/release/dist-client-java/voltdb/voltdbclient-%s.jar" % (builddir, version),
+    get("%s/internal/obj/release/dist-client-java/voltdb/voltdbclient-%s.jar" % (builddir, version),
         "%s/voltdbclient-%s.jar" % (mavenProjectDir, version))
     #Get the client's src and javadoc .jar files
-    get("%s/voltdb/obj/release/voltdbclient-%s-javadoc.jar" % (builddir, version),
+    get("%s/internal/obj/release/voltdbclient-%s-javadoc.jar" % (builddir, version),
         "%s/voltdbclient-%s-javadoc.jar" % (mavenProjectDir, version))
-    get("%s/voltdb/obj/release/voltdbclient-%s-sources.jar" % (builddir, version),
+    get("%s/internal/obj/release/voltdbclient-%s-sources.jar" % (builddir, version),
         "%s/voltdbclient-%s-sources.jar" % (mavenProjectDir, version))
 
     #Get the voltdb-n.n.jar from the recently built community build
-    get("%s/voltdb/voltdb/voltdb-%s.jar" % (builddir, version),
+    get("%s/internal/voltdb/voltdb-%s.jar" % (builddir, version),
         "%s/voltdb-%s.jar" % (mavenProjectDir, version))
     #Get the server's src and javadoc .jar files
-    get("%s/voltdb/obj/release/voltdb-%s-javadoc.jar" % (builddir, version),
+    get("%s/internal/obj/release/voltdb-%s-javadoc.jar" % (builddir, version),
         "%s/voltdb-%s-javadoc.jar" % (mavenProjectDir, version))
-    get("%s/voltdb/obj/release/voltdb-%s-sources.jar" % (builddir, version),
+    get("%s/internal/obj/release/voltdb-%s-sources.jar" % (builddir, version),
         "%s/voltdb-%s-sources.jar" % (mavenProjectDir, version))
 
 ################################################

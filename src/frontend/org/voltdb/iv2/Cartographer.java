@@ -730,11 +730,15 @@ public class Cartographer extends StatsSource
                     if (message != null) {
                         return message;
                     }
-                    // Partition leader distribution mast be balanced, otherwise, the migrated partition leader will
-                    // be moved back.
-                    if (!isPartitionLeadersBalanced()) {
-                        return "Cann't move partition leaders since leader migration is in progress";
-                    }
+                    // Check existence of background partition leader migration request, and fail early if it exists.
+                    // Background leader migration interferes PrepareStopNode check.
+                    // Partition leader distribution must be balanced, otherwise leader might be ping-ponged
+                    // from one request to another.
+                    try {
+                        if (m_zk.exists(VoltZK.migratePartitionLeaderBlocker, false) != null || !isPartitionLeadersBalanced()) {
+                            return "Can't move partition leaders while another leader migration is in progress";
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {}
                     return null;
                 }}).get();
         } catch (InterruptedException | ExecutionException t) {

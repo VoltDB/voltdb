@@ -56,6 +56,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.NodeState;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -504,6 +505,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public StartAction getStartAction() {
+        return voltconfig.m_startAction;
+    }
+
+    @Override
     public void startSampler()
     {
     }
@@ -647,6 +653,42 @@ public class MockVoltDB implements VoltDBInterface
     public OperationMode getStartMode()
     {
         return m_startMode;
+    }
+
+    @Override
+    public NodeState getNodeState()
+    {
+        return NodeState.UP; // a small lie
+    }
+
+    @Override
+    public boolean getNodeStartupComplete()
+    {
+        return true;
+    }
+
+    @Override
+    public int[] getNodeStartupProgress()
+    {
+        int[] p = { 1, 1 };
+        return p;
+    }
+
+    @Override
+    public void reportNodeStartupProgress(int c, int t)
+    {
+    }
+
+    @Override
+    public int getMyHostId()
+    {
+        return m_hostId;
+    }
+
+    @Override
+    public int getVoltPid()
+    {
+        return 9999; // no-one cares
     }
 
     @Override

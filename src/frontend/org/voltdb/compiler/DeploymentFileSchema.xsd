@@ -450,7 +450,6 @@
       <xs:enumeration value="jdbc"/>
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
-      <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="elasticsearch"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>

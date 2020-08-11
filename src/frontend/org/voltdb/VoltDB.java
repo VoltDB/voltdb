@@ -58,7 +58,6 @@ import org.voltdb.export.E3ExecutorFactoryInterface;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExporterVersion;
 import org.voltdb.importer.ImportManager;
-import org.voltdb.VoltDBInterface;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
@@ -95,6 +94,8 @@ public class VoltDB {
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
+    public static final int AUTO_STATUS_PORT = 0;
+    public static final int DEFAULT_STATUS_PORT = 11780;
     public static final int DEFAULT_TOPICS_PORT = 9092;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
@@ -223,6 +224,10 @@ public class VoltDB {
         public String m_httpPortInterface = "";
 
         public String m_publicInterface = "";
+
+        /** Status monitoring interface and port */
+        public int m_statusPort = DISABLED_PORT;
+        public String m_statusInterface = "";
 
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
@@ -469,6 +474,17 @@ public class VoltDB {
                         m_httpPort = hap.getPort();
                     } else {
                         m_httpPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("statusport")) {
+                    String portStr = args[++i];
+                    try { // port only
+                        m_statusInterface = "";
+                        m_statusPort = Integer.parseInt(portStr);
+                    }
+                    catch (NumberFormatException ex) { // interface only, or interface:port
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, AUTO_STATUS_PORT);
+                        m_statusInterface = hap.getHost();
+                        m_statusPort = hap.getPort();
                     }
                 } else if (arg.startsWith("zkport")) {
                     //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
@@ -849,7 +865,7 @@ public class VoltDB {
                         File licFH;
 
                         if (m_pathToLicense == null) {
-                            licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
+                            licFH = new VoltFile(m_voltdbRoot, "license.xml");
                             m_pathToLicense = licFH.getAbsolutePath();
                         } else {
                             licFH = new VoltFile(m_pathToLicense);
@@ -1005,11 +1021,11 @@ public class VoltDB {
         public boolean validate() {
             m_validateSuccess = true;
 
-            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
+            EnumSet<StartAction> hostNotRequired = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 generateFatalLog("The startup action is missing (either create, recover or rejoin).");
             }
-            if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
+            if (m_leader == null && !hostNotRequired.contains(m_startAction)) {
                 generateFatalLog("The hostname is missing.");
             }
 
@@ -1036,7 +1052,7 @@ public class VoltDB {
             if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
                 generateFatalLog("Starting in admin mode is only allowed when using start, create or recover.");
             }
-            if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
+            if (!hostNotRequired.contains(m_startAction) && m_coordinators.isEmpty()) {
                 generateFatalLog("List of hosts is missing");
             }
 

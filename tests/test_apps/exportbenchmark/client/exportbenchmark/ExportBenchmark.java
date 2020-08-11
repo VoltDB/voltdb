@@ -167,8 +167,8 @@ public class ExportBenchmark {
         @Option(desc="How many tuples to insert for each procedure call (default = 1)")
         int multiply = 1;
 
-        @Option(desc="How many targets to divide the multiplier into (default = 1)")
-        int targets = 1;
+        @Option(desc="How many streams to divide the procedure calls to (default = 1)")
+        int streams = 1;
 
         @Override
         public void validate() {
@@ -414,14 +414,13 @@ public class ExportBenchmark {
             now = System.currentTimeMillis();
             rowId = new AtomicLong(0);
             while (benchmarkWarmupEndTS > now) {
-                for (int t = 1; t <= config.targets; t++) {
+                for (int t = 1; t <= config.streams; t++) {
                 try {
                     client.callProcedure(
                             new NullCallback(),
                             "InsertExport"+t,
                             rowId.getAndIncrement(),
-                            config.multiply,
-                            1);
+                            config.multiply);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -451,14 +450,13 @@ public class ExportBenchmark {
                 break;
             }
 
-            for (int t = 1; t <= config.targets; t++) {
+            for (int t = 1; t <= config.streams; t++) {
             try {
                 client.callProcedure(
                         new ExportCallback(),
                         "InsertExport"+t,
                         rowId.getAndIncrement(),
-                        config.multiply,
-                        config.targets);
+                        config.multiply);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
@@ -639,7 +637,6 @@ public class ExportBenchmark {
 
         boolean isSocketTest = config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"));
         boolean success = true;
-        // int t = config.targets;
         // Connect to servers
         try {
             log.info("Test initialization");
