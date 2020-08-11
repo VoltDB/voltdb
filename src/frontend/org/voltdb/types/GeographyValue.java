@@ -17,6 +17,7 @@
 
 package org.voltdb.types;
 
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.StreamTokenizer;
 import java.io.StringReader;
@@ -416,6 +417,28 @@ public class GeographyValue {
     }
 
     /**
+     * Serialize this object to a {@link DataOutput}
+     * <p>
+     * To be consisitent with {@link #flattenToBuffer(ByteBuffer)} <br>
+     * (Assumes that the 4-byte length prefix for variable-length data has already been serialized.)
+     *
+     * @param output into which this object will be serialized
+     * @throws IOException
+     */
+    public void serialize(DataOutput output) throws IOException {
+        output.write(INCOMPLETE_ENCODING_FROM_JAVA);
+        output.write(1);
+        output.write(m_loops.isEmpty() ? 0 : 1);
+        output.writeInt(m_loops.size());
+        int depth = 0;
+        for (List<XYZPoint> loop : m_loops) {
+            serializeLoop(loop, depth, output);
+            depth = 1;
+        }
+        serializeEmptyBound(output);
+    }
+
+    /**
      * Deserialize a GeographyValue from a ByteBuffer from an absolute offset.
      * (Assumes that the 4-byte length prefix has already been deserialized, and that
      * offset points to the start of data just after the prefix.)
@@ -444,13 +467,9 @@ public class GeographyValue {
         inBuffer.get(); // has holes
         int numLoops = inBuffer.getInt();
         List<List<XYZPoint>> loops = new ArrayList<>();
-        int indexOfOuterRing = 0;
         for (int i = 0; i < numLoops; ++i) {
             List<XYZPoint> loop = new ArrayList<>();
-            int depth = unflattenLoopFromBuffer(inBuffer, loop);
-            if (depth == 0) {
-                indexOfOuterRing = i;
-            }
+            unflattenLoopFromBuffer(inBuffer, loop);
 
             loops.add(loop);
         }
@@ -574,6 +593,14 @@ public class GeographyValue {
         buf.putDouble(GeographyPointValue.NULL_COORD);
     }
 
+    private static void serializeEmptyBound(DataOutput output) throws IOException {
+        output.write(INCOMPLETE_ENCODING_FROM_JAVA); // for encoding version
+        output.writeDouble(GeographyPointValue.NULL_COORD);
+        output.writeDouble(GeographyPointValue.NULL_COORD);
+        output.writeDouble(GeographyPointValue.NULL_COORD);
+        output.writeDouble(GeographyPointValue.NULL_COORD);
+    }
+
     private static void flattenLoopToBuffer(List<XYZPoint> loop, int depth, ByteBuffer buf) {
         //   1 byte     for encoding version
         //   4 bytes    for number of vertices
@@ -594,6 +621,25 @@ public class GeographyValue {
         flattenEmptyBoundToBuffer(buf);
     }
 
+    private static void serializeLoop(List<XYZPoint> loop, int depth, DataOutput output) throws IOException {
+        // 1 byte for encoding version
+        // 4 bytes for number of vertices
+        // number of vertices * 8 * 3 bytes for vertices as XYZPoints
+        // 1 byte for origin_inside_
+        // 4 bytes for depth_
+        // length of bound
+        output.write(INCOMPLETE_ENCODING_FROM_JAVA);
+        output.writeInt(loop.size());
+        for (XYZPoint xyz : loop) {
+            output.writeDouble(xyz.x());
+            output.writeDouble(xyz.y());
+            output.writeDouble(xyz.z());
+        }
+
+        output.write((byte) 0); // origin_inside_
+        output.writeInt(depth);// depth
+        serializeEmptyBound(output);
+    }
 
     private static void unflattenBoundFromBuffer(ByteBuffer inBuffer) {
         inBuffer.get(); // for encoding version
