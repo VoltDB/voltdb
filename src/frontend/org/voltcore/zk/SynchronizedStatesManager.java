@@ -839,16 +839,8 @@ public class SynchronizedStatesManager {
                         // Note that if we are not the next waiter for the lock, we will blindly
                         // accept the next proposal and use the outcome to set our initial state.
                         Stat nodeStat = new Stat();
-                        Proposal currentProposal = null;
-                        do {
-                            try {
-                                currentProposal = getProposalFromResultsNode(
-                                        m_zk.getData(m_barrierResultsPath, false, nodeStat));
-                            } catch (NoNodeException noNode) {
-                                // This is a race between another node who got the Distributed lock but
-                                // Has not set up the result path yet. Keep Retrying.
-                            }
-                        } while (currentProposal == null);
+                        Proposal currentProposal = getProposalFromResultsNode(
+                                m_zk.getData(m_barrierResultsPath, false, nodeStat));
                         m_lastProposalVersion = nodeStat.getVersion();
                         addNullResultEntry(currentProposal);
                         outOfLockWork = checkForBarrierParticipantsChange();
