@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -40,7 +41,7 @@ import org.voltdb.utils.SerializationHelper;
  * the FastSerializable interface.
  *
  */
-public class FastSerializer implements DataOutput {
+public class FastSerializer extends OutputStream implements DataOutput {
     /** callbacked when the internal buffer was grown. */
     public interface BufferGrowCallback {
         void onBufferGrow(FastSerializer obj);
