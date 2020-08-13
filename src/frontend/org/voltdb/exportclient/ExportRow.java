@@ -29,6 +29,7 @@ import java.util.Map;
 
 import org.voltdb.VoltType;
 import org.voltdb.compiler.DDLCompiler;
+import org.voltdb.exportclient.decode.RowDecoder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -52,6 +53,7 @@ public class ExportRow {
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
     public static final int EXPORT_TIMESTAMP_COLUMN = 1;
+    public static final int SEQUENCE_NUMBER_COLUMN = 2;
     public static final int INTERNAL_OPERATION_COLUMN = 5;
     public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE }
     public static final String KEY_SUFFIX = "_key";
@@ -124,14 +126,8 @@ public class ExportRow {
      * with a constant key suffix added: this is necessary to distinguish it from the
      * values in whatever target namespace the row will be decoded into.
      *
-     * @param keySuffix the string to append to the table name
      * @param keyColumnNames list of key column names in the desired order for the key
      * @return the {@link ExportRow} instance carrying the data for the key columns
-     */
-    /**
-     *
-     * @param keyColumnNames
-     * @return
      */
     public ExportRow extractKey(List<String> keyColumnNames) {
         String keyName = tableName + KEY_SUFFIX;
@@ -238,10 +234,10 @@ public class ExportRow {
         final int partitionColIndex = bb.getInt();
         final int columnCount = bb.getInt();
         assert(columnCount <= DDLCompiler.MAX_COLUMNS);
-        if (columnCount != previous.names.size()) {
+        if (columnCount != previous.types.size()) {
             throw new IOException(
                     String.format("Read %d columns from row but expected %d columns: %s", columnCount,
-                            previous.names.size(), previous));
+                            previous.types.size(), previous));
         }
 
         boolean[] is_null = extractNullFlags(bb, columnCount);
@@ -252,9 +248,9 @@ public class ExportRow {
         final List<VoltType> colTypes = previous.types;
         final List<Integer> colLengths = previous.lengths;
 
-        Object[] retval = new Object[colNames.size()];
+        Object[] retval = new Object[colTypes.size()];
         Object pval = null;
-        for (int i = 0; i < colNames.size(); ++i) {
+        for (int i = 0; i < colTypes.size(); ++i) {
             if (is_null[i]) {
                 retval[i] = null;
             } else {
