@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,6 +77,7 @@ import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
 import org.voltdb.compiler.statements.CreateTask;
+import org.voltdb.compiler.statements.CreateTopic;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
@@ -83,6 +85,7 @@ import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
 import org.voltdb.compiler.statements.DropTask;
+import org.voltdb.compiler.statements.DropTopic;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -246,6 +249,8 @@ public class DDLCompiler {
                                 .addNextProcessor(new CreateTask(this))
                                 .addNextProcessor(new DropTask(this))
                                 .addNextProcessor(new AlterTask(this))
+                                .addNextProcessor(new CreateTopic(this))
+                                .addNextProcessor(new DropTopic(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -685,7 +690,7 @@ public class DDLCompiler {
             String topicKeyColumnNames = null;
             String topicAllowedRoleNames = null;
 
-            // Parse the EXPORT, PARTITION, and AS TOPIC clauses.
+            // Parse the EXPORT, PARTITION, and TOPIC clauses.
             if ((statementMatcher.groupCount() > 1) &&
                 (statementMatcher.group(2) != null) &&
                 (!statementMatcher.group(2).isEmpty())) {
@@ -703,7 +708,7 @@ public class DDLCompiler {
                         }
                         else if (isTopic) {
                             throw m_compiler.new VoltCompilerException(
-                                    "An EXPORT clause is not allowed with an AS TOPIC clause.");
+                                    "An EXPORT clause is not allowed with a TOPIC clause.");
                         }
                         targetName = matcher.group(SQLParser.CAPTURE_EXPORT_TARGET);
                     }
@@ -716,14 +721,14 @@ public class DDLCompiler {
                         columnName = matcher.group(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN);
                     }
                     else {
-                        // Note: AS TOPIC subclauses are optional but ordered without repetition
+                        // Note: TOPIC subclauses are optional but ordered without repetition
                         if (targetName != null) {
                             throw m_compiler.new VoltCompilerException(
-                                    "An AS TOPIC clause is not allowed with an EXPORT clause.");
+                                    "A TOPIC clause is not allowed with an EXPORT clause.");
                         }
                         if (isTopic) {
                             throw m_compiler.new VoltCompilerException(
-                                    "Only one AS TOPIC clause is allowed or CREATE STREAM.");
+                                    "Only one TOPIC clause is allowed or CREATE STREAM.");
                         }
                         isTopic = true;
                         topicProfileName = matcher.group(SQLParser.CAPTURE_TOPIC_PROFILE);
@@ -780,7 +785,7 @@ public class DDLCompiler {
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
                     + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); "
-                    + "or CREATE STREAM <table> PARTITION ON COLUMN <column-name> AS TOPIC [PROFILE <profile>] [FORMAT <format>] [KEYS <keys>] [ALLOW <roles>] (column datatype, ...);",
+                    + "or CREATE STREAM <table> PARTITION ON COLUMN <column-name> TOPIC [PROFILE <profile>] [FORMAT <format>] [KEYS <keys>] [ALLOW <roles>] (column datatype, ...);",
                     statement.substring(0, statement.length() - 1)));
         }
     }
@@ -1425,7 +1430,7 @@ public class DDLCompiler {
          *
          * if (!VoltDB.instance().getConfig().m_isEnterprise) {
          *   throw m_compiler.new VoltCompilerException(
-         *          String.format("STREAM %s cannot be declared AS TOPIC in community edition", name));
+         *          String.format("STREAM %s cannot be declared TOPIC in community edition", name));
          * }
          */
 
@@ -1612,7 +1617,7 @@ public class DDLCompiler {
 
         // Add the topic-related information
         if (isTopic) {
-            addTopicToCatalogTable(table, node, columnMap, db, m_compiler);
+            addTopicAttributesToCatalogTable(table, node, columnMap, db, m_compiler);
         }
 
         // Temporarily assign the view Query to the annotation so we can use when we build
@@ -1626,7 +1631,7 @@ public class DDLCompiler {
         }
     }
 
-    private static void addTopicToCatalogTable (Table table,
+    private static void addTopicAttributesToCatalogTable (Table table,
                             VoltXMLElement node,
                             Map<String, Column> columnMap,
                             Database db,
@@ -1641,11 +1646,16 @@ public class DDLCompiler {
         String topicFormatName = node.attributes.get(SQLParser.CAPTURE_TOPIC_FORMAT);
         EncodeFormat format = EncodeFormat.CSV;
         if (topicFormatName != null) {
+            EnumSet<EncodeFormat> allowedFmts = EnumSet.of(EncodeFormat.AVRO, EncodeFormat.CSV);
             try {
                 // Parse the format in an unchecked fashion and handle exceptions
                 format = EncodeFormat.valueOf(topicFormatName);
+                if (!allowedFmts.contains(format)) {
+                    throw new RuntimeException("encoding format " + format + " is not allowed on STREAM declaration");
+                }
             }
             catch (Exception ex) {
+
                 throw compiler.new VoltCompilerException(
                         String.format("%s is not a valid topic format in STREAM %s. Acceptable values are: %s",
                                 topicFormatName, table.getTypeName(), EncodeFormat.valueSet()));

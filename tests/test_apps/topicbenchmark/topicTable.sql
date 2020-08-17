@@ -3,7 +3,7 @@ LOAD CLASSES topicbenchmark-procedures.jar;
 DROP PROCEDURE InsertTopic1 if exists;
 DROP TABLE ALL_VALUES1 if exists;
 
-CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid AS TOPIC PROFILE topicbenchmark (
+CREATE STREAM ALL_VALUES1 PARTITION ON COLUMN rowid TOPIC PROFILE topicbenchmark (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL

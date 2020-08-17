@@ -713,6 +713,10 @@ public class SystemProcedureCatalog {
         builder.put("@LiveLicenseUpdate",
                 Builder.createNp("org.voltdb.sysprocs.UpdateLicense$LiveLicenseUpdate").commercial().allowedInReplica().build());
 
+        builder.put("@TopicDirectInsertSP",
+                Builder.createSp("org.voltdb.sysprocs.TopicDirectInsertSP", -1, VoltType.INVALID)
+                        .commercial().build());
+
         listing = builder.build();
     }
 

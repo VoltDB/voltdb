@@ -570,22 +570,11 @@ public class CatalogDiffEngine {
             return null;
         }
 
-        else if (suspect instanceof Connector) {
-            m_requiresNewExportGeneration = true;
-            return null;
-        }
-
-        else if (suspect instanceof ThreadPool) {
-            m_requiresNewExportGeneration = true;
-            return null;
-        }
-
-        else if (suspect instanceof ConnectorTableInfo) {
-            m_requiresNewExportGeneration = true;
-            return null;
-        }
-
-        else if (suspect instanceof ConnectorProperty) {
+        else if (suspect instanceof Connector
+                || suspect instanceof ThreadPool
+                || suspect instanceof ConnectorTableInfo
+                || suspect instanceof ConnectorProperty
+                || suspect instanceof Topic) {
             m_requiresNewExportGeneration = true;
             return null;
         }

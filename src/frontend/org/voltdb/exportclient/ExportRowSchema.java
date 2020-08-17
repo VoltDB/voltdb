@@ -26,6 +26,7 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
@@ -110,6 +111,22 @@ public class ExportRowSchema extends ExportRow {
         }
 
         return new ExportRowSchema(table.getTypeName(), colNames.build(), colTypes.build(), colSizes.build(),
+                partitionId, initialGenerationId, generationId);
+    }
+
+    /**
+     * Create a {@code ExportRowSchema} from a Catalog {@code Topic}, which must be OPAQUE.
+     * <p>
+     * The created schema has no columns.
+     *
+     * @param topic Catalog {@code Topic}
+     * @param partitionId the partition id
+     * @param generationId the generation id
+     * @return
+     */
+    public static ExportRowSchema create(Topic topic, int partitionId, long initialGenerationId, long generationId) {
+        assert topic.getIsopaque();
+        return new ExportRowSchema(topic.getTypeName(), ImmutableList.of(), ImmutableList.of(), ImmutableList.of(),
                 partitionId, initialGenerationId, generationId);
     }
 

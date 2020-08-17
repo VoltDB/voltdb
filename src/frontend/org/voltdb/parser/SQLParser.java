@@ -306,7 +306,7 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_DROP_FUNCTION =
         SPF.statement(
-            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()), SPF.ifExisits()
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()), SPF.ifExists()
         ).compile("PAT_DROP_FUNCTION");
 
     /*
@@ -497,7 +497,7 @@ public class SQLParser extends SQLPatternFactory
             ).compile("PAT_CREATE_TASK");
 
     /**
-     * Build regex to support drop task statement in the from of
+     * Build regex to support drop task statement in the form of
      * <p>
      * <code>
      * DROP TASK <task name> [IF EXISTS]
@@ -506,7 +506,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_DROP_TASK =
             SPF.statement(
                     SPF.token("drop"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.ifExisits())
+                    SPF.ifExists())
             .compile("PAT_DROP_TASK");
 
     /**
@@ -560,6 +560,31 @@ public class SQLParser extends SQLPatternFactory
                     SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_STREAM");
 
+    private static final Pattern PAT_CREATE_TOPIC =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("topic"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(
+                            SPF.clause(
+                                SPF.token("opaque"),
+                                SPF.optional(SPF.clause(SPF.token("single"), SPF.token("partition")))
+                            )
+                    )
+            ).compile("PAT_CREATE_TOPIC");
+
+    /**
+     * Build regex to support drop tOPIC statement in the form of
+     * <p>
+     * <code>
+     * DROP TOPIC <name> [IF EXISTS]
+     * </code>
+     */
+    private static final Pattern PAT_DROP_TOPIC =
+            SPF.statement(
+                    SPF.token("drop"), SPF.token("TOPIC"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.ifExists())
+            .compile("PAT_DROP_TOPIC");
+
+
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
      *  one of create procedure, create role, create function, create aggregate function,
@@ -582,7 +607,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE)|" + // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE|TOPIC)|" + // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -913,6 +938,16 @@ public class SQLParser extends SQLPatternFactory
     {
         return PAT_CREATE_STREAM.matcher(statement);
     }
+
+    public static Matcher matchCreateTopic(String statement)
+    {
+        return PAT_CREATE_TOPIC.matcher(statement);
+    }
+
+    public static Matcher matchDropTopic(String statement) {
+        return PAT_DROP_TOPIC.matcher(statement);
+    }
+
 
     /**
      * Match statement against create table ... migrate to target ... pattern.
@@ -1364,7 +1399,7 @@ public class SQLParser extends SQLPatternFactory
                     SPF.group(captureTokens, CAPTURE_STREAM_PARTITION_COLUMN, SPF.databaseObjectName())
                 ),
                 SPF.clause(
-                    SPF.token("as"),SPF.token("topic"),
+                    SPF.token("topic"),
                     SPF.optional(
                         SPF.clause(
                             SPF.token("profile"),
@@ -1427,6 +1462,7 @@ public class SQLParser extends SQLPatternFactory
         // Force the leading space to go inside the repeat block.
         return SPF.capture(SPF.repeat(makeInnerStreamModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
+
     //========== Other utilities from or for SQLCommand ==========
 
     /**

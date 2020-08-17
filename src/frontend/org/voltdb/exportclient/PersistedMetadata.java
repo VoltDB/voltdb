@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
@@ -72,6 +73,13 @@ public class PersistedMetadata implements DeferredSerialization {
             }
         }
         m_schema = ExportRowSchema.create(table, partitionId, initialGenerationId, generationId);
+    }
+
+    public PersistedMetadata(Topic topic, int partitionId, long initialGenerationId, long generationId) {
+        assert topic.getIsopaque();
+        m_format = EncodeFormat.OPAQUE;
+        m_keyColumns = ImmutableList.of();
+        m_schema = ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId);
     }
 
     private PersistedMetadata(EncodeFormat format, List<String> keyColumns, ExportRowSchema schema) {

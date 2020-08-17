@@ -117,6 +117,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.ThreadPool;
+import org.voltdb.catalog.Topic;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -625,6 +626,17 @@ public abstract class CatalogUtil {
             exportTables.put(t.getTypeName(), t);
         }
         return exportTables.build();
+    }
+
+    public static NavigableMap<String, Topic> getAllOpaqueTopics(Database db) {
+        ImmutableSortedMap.Builder<String, Topic> opaqueTopics = ImmutableSortedMap
+                .orderedBy(String.CASE_INSENSITIVE_ORDER);
+        for (Topic t : db.getTopics()) {
+            if (t.getIsopaque()) {
+                opaqueTopics.put(t.getTypeName(), t);
+            }
+        }
+        return opaqueTopics.build();
     }
 
     public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
@@ -1429,6 +1441,17 @@ public abstract class CatalogUtil {
                         t.getTypeName(), profileName));
             }
         }
+
+        // Verify that CREATE TOPIC doesn't conflict with existing tables and vice-versa
+        CatalogMap<Topic> topics = CatalogUtil.getDatabase(catalog).getTopics();
+        for (Topic topic : topics) {
+            if (tables.get(topic.getTypeName()) != null) {
+                errors.addErrorMessage(String.format(
+                        "Topic %s conflicts with existing table of the same name.",
+                        topic.getTypeName()));
+            }
+        }
+
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
         }

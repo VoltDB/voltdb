@@ -54,6 +54,7 @@ begin Database                       "A set of schema, procedures and other meta
   Task*  tasks                       "The set of configured tasks"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
   string securityprovider            "The security provider used to authenticate users"
+  Topic* topics			 			 "The set of topics for the database"
 end
 
 begin CommandLog javaonly     "Configuration for a command log"
@@ -183,6 +184,11 @@ begin Table                                  "A table (relation) in the database
   string topicFormat                         "The format of the topic"
   string topicKeyColumnNames                 "A CSV string of the key column names, ordered"
   string topicAllowedRoleNames               "A CSV string of the roles allowed to access this topic"
+end
+
+begin Topic javaonly                         "A topic in the database"
+  bool isOpaque								 "Is this an opaque topic?"
+  bool isSingle                              "Is this a single partition opaque topic?"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

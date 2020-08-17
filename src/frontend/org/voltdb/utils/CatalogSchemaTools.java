@@ -53,6 +53,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.TimeToLive;
+import org.voltdb.catalog.Topic;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -127,7 +128,7 @@ public abstract class CatalogSchemaTools {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
                 if (catalog_tbl.getIstopic()) {
-                    table_sb.append(" AS TOPIC ");
+                    table_sb.append(" TOPIC ");
                     String topicProfileName = catalog_tbl.getTopicprofile();
                     if (!StringUtils.isEmpty(topicProfileName)) {
                         table_sb.append(" PROFILE ").append(topicProfileName);
@@ -510,6 +511,17 @@ public abstract class CatalogSchemaTools {
         sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
     }
 
+    public static void toSchema(StringBuilder sb, Topic topic) {
+        sb.append("CREATE TOPIC ").append(topic.getTypeName());
+        if (topic.getIsopaque()) {
+           sb.append(" OPAQUE");
+        }
+        if (topic.getIssingle()) {
+            sb.append(" SINGLE PARTITION");
+        }
+        sb.append(";\n");
+    }
+
     private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";
@@ -705,6 +717,13 @@ public abstract class CatalogSchemaTools {
                 if (!schedules.isEmpty()) {
                     for (Task task : schedules) {
                         toSchema(sb, task);
+                    }
+                }
+
+                CatalogMap<Topic> topics = db.getTopics();
+                if (!topics.isEmpty()) {
+                    for (Topic topic : topics) {
+                        toSchema(sb, topic);
                     }
                 }
 

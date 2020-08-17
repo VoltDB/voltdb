@@ -217,7 +217,7 @@ public class SQLPatternFactory
             return new SQLPatternPartElement("\\d+");
         }
 
-        public static SQLPatternPart ifExisits() {
+        public static SQLPatternPart ifExists() {
             return SPF.optional(SPF.capture("ifExists", SPF.clause(SPF.token("if"), SPF.token("exists"))));
         }
 
