@@ -26,15 +26,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.nio.channels.SocketChannel;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
 
 import org.voltcore.network.CipherExecutor;
-import org.voltcore.utils.ssl.SSLBufferDecrypter;
+import org.voltcore.network.TLSException;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.Inits;
@@ -52,8 +55,8 @@ public class PortConnector {
 
     boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
+    SSLEngine m_sslEngine;
     SSLBufferEncrypter m_enc = null;
-    SSLBufferDecrypter m_dec = null;
     int m_packetBufferSize;
 
     //For unit testing.
@@ -96,9 +99,9 @@ public class PortConnector {
             SslContext sslContext;
             sslContext = SSLConfiguration.createClientSslContext(sslConfig);
 
-            SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT, m_host, m_port);
-            sslEngine.setUseClientMode(true);
-            TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
+            m_sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT, m_host, m_port);
+            m_sslEngine.setUseClientMode(true);
+            TLSHandshaker handshaker = new TLSHandshaker(m_socket, m_sslEngine);
             boolean shookHands = false;
             try {
                 shookHands = handshaker.handshake();
@@ -108,9 +111,8 @@ public class PortConnector {
             if (! shookHands) {
                 throw new IOException("SSL handshake failed");
             }
-            m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
-            m_enc = new SSLBufferEncrypter(sslEngine);
-            m_dec = new SSLBufferDecrypter(sslEngine);
+            m_packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+            m_enc = new SSLBufferEncrypter(m_sslEngine);
             m_tlsFrame = null;
         }
     }
@@ -147,12 +149,12 @@ public class PortConnector {
         }
         int allocsz = Math.min(CipherExecutor.FRAME_SIZE, Integer.highestOneBit((frame.capacity()<<1) + 128));
         m_tlsFrame = ByteBuffer.allocate(allocsz);
-        m_dec.tlsunwrap((ByteBuffer)frame.flip(), m_tlsFrame);
+        tlsunwrap((ByteBuffer) frame.flip(), m_tlsFrame);
         return m_tlsFrame;
     }
 
     public void read(ByteBuffer buf, int sz) throws IOException {
-        if (m_dec != null) {
+        if (m_sslEngine != null) {
             ByteBuffer clear = readTlsFrame();
 
             if (clear.remaining() < sz) {
@@ -181,9 +183,42 @@ public class PortConnector {
                 Logger.getLogger(PortConnector.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        m_sslEngine = null;
         m_enc = null;
-        m_dec = null;
         m_tlsFrame = null;
         return 0;
+    }
+
+
+   private int tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
+        while (true) {
+            SSLEngineResult result = null;
+            ByteBuffer slice = dstBuffer.slice();
+            try {
+                result = m_sslEngine.unwrap(srcBuffer, slice);
+            } catch (SSLException|ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
+                throw new TLSException("ssl engine unwrap fault", e);
+            }
+            switch (result.getStatus()) {
+                case OK:
+                    if (result.bytesProduced() == 0 && !srcBuffer.hasRemaining()) {
+                        return 0;
+                    }
+                    // in m_dstBuffer, newly decrtyped data is between pos and lim
+                    if (result.bytesProduced() > 0) {
+                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
+                        return result.bytesProduced();
+                        }
+                    else {
+                        continue;
+                    }
+                case BUFFER_OVERFLOW:
+                    throw new TLSException("SSL engine unexpectedly overflowed when decrypting");
+                case BUFFER_UNDERFLOW:
+                    throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
+                case CLOSED:
+                    throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");
+            }
+        }
     }
 }

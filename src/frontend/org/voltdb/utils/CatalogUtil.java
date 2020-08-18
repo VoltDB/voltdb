@@ -1633,7 +1633,6 @@ public abstract class CatalogUtil {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient"; break;
-            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
             // Validate that we can load the class.

@@ -16,10 +16,12 @@
  */
 package org.voltcore.messaging;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedSelectorException;
@@ -96,19 +98,26 @@ public class SocketJoiner {
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
+    private static final int NAME_LOOKUP_RETRY_MS = 1000;
+    private static final int NAME_LOOKUP_RETRY_LIMIT = 10;
+    private static final int SOCKET_CONNECT_RETRY_MS = 250;
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
-    /**
-     * Supports quick probes for request host id attempts to seed nodes
-     */
-    enum ConnectStrategy {
-        CONNECT, PROBE
-    }
 
     enum ConnectionType {
         REQUEST_HOSTID,
         PUBLISH_HOSTID,
         REQUEST_CONNECTION;
+    }
+
+    /**
+     * Exception for wrapping retryable connect failures
+     */
+    private static final class SocketRetryException extends Exception {
+        private static final long serialVersionUID = 1L;
+        public SocketRetryException(Throwable cause) {
+            super(cause);
+        }
     }
 
     /**
@@ -196,7 +205,7 @@ public class SocketJoiner {
         boolean retval = false;
 
         /*
-         * probe coordinator host list for leader candidates that may are operational
+         * Probe coordinator host list for leader candidates that are operational
          * (i.e. node state is operational)
          */
         m_coordIp = null;
@@ -204,30 +213,37 @@ public class SocketJoiner {
             if (m_coordIp != null) {
                 break;
             }
-            HostAndPort host = HostAndPort.fromString(coordHost)
-                    .withDefaultPort(org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
-
-            InetSocketAddress ip = !host.getHost().isEmpty() ?
-                      new InetSocketAddress(host.getHost(), host.getPort())
-                    : new InetSocketAddress(host.getPort());
             /*
              * On an operational leader (i.e. node is up) the request to join the cluster
              * may be rejected, e.g. multiple hosts rejoining at the same time. In this case,
              * the code will retry.
              */
             long retryInterval = RETRY_INTERVAL;
+            int nameRetries = NAME_LOOKUP_RETRY_LIMIT;
             final Random salt = new Random();
             while (true) {
+                InetSocketAddress primary = null;
                 try {
-                    connectToPrimary(ip, ConnectStrategy.PROBE);
+                    primary = addressFromHost(coordHost);
+                    connectToPrimary(primary);
+                    // m_coordIp is now filled in
+                    break;
+                } catch (UnknownHostException e) {
+                    if (--nameRetries <= 0) {
+                        warnInfrequently("Unknown host name '%s', no more retries", coordHost);
+                        break; // no more retries; move on to next potential coordinator
+                    }
+                    warnInfrequently("Unknown host name '%s', retrying", coordHost);
+                    safeSleep(NAME_LOOKUP_RETRY_MS);
+                } catch (SocketRetryException e) {
+                    LOG.debug(String.format("Cannot connect to %s. %s", primary, e.getMessage()));
+                    m_coordIp = null;  // no retry; move on to next potential coordinator
                     break;
                 } catch (CoreUtils.RetryException e) {
                     LOG.warn(String.format("Request to join cluster mesh is rejected, retrying in %d seconds. %s",
                                            retryInterval, e.getMessage()));
-                    try {
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval));
-                    } catch (InterruptedException ignoreIt) {
-                    }
+                    safeSleep(TimeUnit.SECONDS.toMillis(retryInterval));
+
                     // exponential back off with a salt to avoid collision. Max is 5 minutes.
                     retryInterval = (Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) +
                                      salt.nextInt(RETRY_INTERVAL_SALT));
@@ -241,32 +257,39 @@ public class SocketJoiner {
                         retryInterval = RETRY_INTERVAL;
                     }
                 } catch (Exception e) {
+                    String s = m_coordIp != null ? m_coordIp.toString() : coordHost;
                     hostLog.error("Failed to establish socket mesh.", e);
-                    throw new RuntimeException("Failed to establish socket mesh with " + m_coordIp, e);
+                    throw new RuntimeException("Failed to establish socket mesh with " + s, e);
                 }
             }
         }
 
-        boolean haveMeshedLeader = m_coordIp != null;
-
         /*
-         *  if none were found pick the first one in lexicographical order
+         * m_coordIp will have been set by connectToPrimary if we
+         * succeeded in finding a leader. Otherwise we need to
+         * appoint one.
          */
         if (m_coordIp == null) {
-            HostAndPort leader = m_acceptor.getLeader();
-            m_coordIp = !leader.getHost().isEmpty() ?
-                      new InetSocketAddress(leader.getHost(), leader.getPort())
-                    : new InetSocketAddress(leader.getPort());
-        }
+            String leader = m_acceptor.getLeader().toString(); // may have host name
+            InetSocketAddress leaderAddr = null; // resolved to address and port
 
-        if (!haveMeshedLeader && m_coordIp.getPort() == m_internalPort) {
+            /*
+             * Attempt to become the leader by binding to the specified address
+             * (but only if the port is the correct one for our configuration).
+             * Note: no retry for unresolved hostname here; we assume if a
+             * name is not known, it cannot be our name, and therefore there
+             * is no point in waiting so we can try to bind to that address.
+             */
             try {
-                hostLog.info("Attempting to bind to leader ip " + m_coordIp);
-                ServerSocketChannel listenerSocket = ServerSocketChannel.open();
-                listenerSocket.socket().bind(m_coordIp);
-                listenerSocket.socket().setPerformancePreferences(0, 2, 1);
-                listenerSocket.configureBlocking(false);
-                m_listenerSockets.add(listenerSocket);
+                leaderAddr = addressFromHost(leader); // may throw for unresolved host name
+                if (leaderAddr.getPort() == m_internalPort) {
+                    hostLog.info("Attempting to bind to leader ip " + leaderAddr.getAddress().getHostAddress());
+                    ServerSocketChannel listenerSocket = ServerSocketChannel.open();
+                    listenerSocket.socket().bind(leaderAddr);
+                    listenerSocket.socket().setPerformancePreferences(0, 2, 1);
+                    listenerSocket.configureBlocking(false);
+                    m_listenerSockets.add(listenerSocket);
+                }
             }
             catch (IOException e) {
                 if (!m_listenerSockets.isEmpty()) {
@@ -279,51 +302,68 @@ public class SocketJoiner {
                     }
                 }
             }
-        }
 
-        if (!m_listenerSockets.isEmpty()) {
-            // if an internal interface was specified, see if it matches any
-            // of the forms of the leader address we've bound to.
-            if (m_internalInterface != null && !m_internalInterface.equals("")) {
-                if (!m_internalInterface.equals(ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress())) &&
-                    !m_internalInterface.equals(m_coordIp.getAddress().getCanonicalHostName()) &&
-                    !m_internalInterface.equals(m_coordIp.getAddress().getHostAddress()))
-                {
-                    org.voltdb.VoltDB.crashLocalVoltDB(
-                            String.format("The provided internal interface (%s) does not match the "
-                                    + "specified leader address (%s, %s). "
-                                    + "This will result in either a cluster which fails to start or an unintended network topology. "
-                                    + "The leader will now exit; correct your specified leader and interface and try restarting.",
-                                    m_internalInterface,
-                                    ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress()),
-                                    m_coordIp.getAddress().getHostAddress()),
-                            false, null);
+            // There's a listener socket if and only if we're the leader
+            if (!m_listenerSockets.isEmpty()) {
+
+                // If an internal interface was specified, see if it matches any
+                // of the forms of the leader address we've bound to.
+                if (m_internalInterface != null && !m_internalInterface.equals("")) {
+                    InetAddress testAddr = leaderAddr.getAddress();
+                    if (!m_internalInterface.equals(ReverseDNSCache.hostnameOrAddress(testAddr)) &&
+                        !m_internalInterface.equals(testAddr.getCanonicalHostName()) &&
+                        !m_internalInterface.equals(testAddr.getHostAddress())) {
+                        String msg = String.format("The provided internal interface (%s) does not match the "
+                                                   + "specified leader address (%s, %s). "
+                                                   + "This will result in either a cluster which fails to start or an unintended network topology. "
+                                                   + "The leader will now exit; correct your specified leader and interface and try restarting.",
+                                                   m_internalInterface,
+                                                   ReverseDNSCache.hostnameOrAddress(testAddr),
+                                                   testAddr.getHostAddress());
+                        org.voltdb.VoltDB.crashLocalVoltDB(msg, false, null);
+                    }
                 }
+
+                // We are the leader
+                consoleLog.info("Connecting to VoltDB cluster as the leader...");
+                m_coordIp = leaderAddr;
+                retval = true;
+
+                /*
+                 * Need to wait for external initialization to complete before
+                 * accepting new connections. This is slang for the leader
+                 * creating an agreement site that agrees with itself
+                 */
+                m_es.submit(new Callable<Object>() {
+                        @Override
+                        public Object call() throws Exception {
+                            externalInitBarrier.await();
+                            return null;
+                        }
+                    });
             }
-            retval = true;
-            consoleLog.info("Connecting to VoltDB cluster as the leader...");
 
             /*
-             * Need to wait for external initialization to complete before
-             * accepting new connections. This is slang for the leader
-             * creating an agreement site that agrees with itself
+             * Did not find a meshed leader, and we're not becoming the leader.
+             * Retranslate any host name each time in case the name/address
+             * mapping has changed.
              */
-            m_es.submit(new Callable<Object>() {
-                @Override
-                public Object call() throws Exception {
-                    externalInitBarrier.await();
-                    return null;
+            while (m_coordIp == null) {
+                try {
+                    leaderAddr = addressFromHost(leader); // may throw for unresolved host name
+                    consoleLog.info("Connecting to the VoltDB cluster leader " + leaderAddr);
+                    connectToPrimary(leaderAddr);
+                } catch (UnknownHostException e) {
+                    warnInfrequently("Unknown host name '%s', retrying", leader);
+                    safeSleep(NAME_LOOKUP_RETRY_MS);
+                } catch (SocketRetryException e) {
+                    warnInfrequently("Cannot connect to %s, retrying. %s", leaderAddr, e.getMessage());
+                    safeSleep(SOCKET_CONNECT_RETRY_MS);
+                } catch (Exception e) {
+                    hostLog.error(FAIL_ESTABLISH_MESH_MSG, e);
+                    throw new RuntimeException("Failed to establish socket mesh with " + leader, e);
                 }
-            });
-        }
-        else if (!haveMeshedLeader) {
-            consoleLog.info("Connecting to the VoltDB cluster leader " + m_coordIp);
-
-            try {
-                connectToPrimary(m_coordIp, ConnectStrategy.CONNECT);
-            } catch (Exception e) {
-                hostLog.error(FAIL_ESTABLISH_MESH_MSG, e);
-                throw new RuntimeException("Failed to establish socket mesh with " + m_coordIp, e);
+                leaderAddr = null;
             }
         }
 
@@ -338,7 +378,7 @@ public class SocketJoiner {
                 try {
                     runPrimary();
                 } catch (InterruptedException e) {
-
+                    // ignored
                 } catch (Throwable e) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Error in socket joiner run loop", true, e);
                 }
@@ -346,6 +386,38 @@ public class SocketJoiner {
         });
 
         return retval;
+    }
+
+    /*
+     * Handles repetitive logging from the retry loops in start().
+     * Prevents the same message from being logged more frequently
+     * than once every 30 secs. This implicitly assumes that
+     * we're not interleaving different messages (which is true;
+     * we get past "unknown hostname" before "connect failed"
+     * can happen).
+     */
+    private String m_lastWarning;
+    private long m_lastWarnTime;
+
+    private void warnInfrequently(String format, Object... args) {
+        long now = System.currentTimeMillis();
+        if (now > m_lastWarnTime + 30_000 || !format.equals(m_lastWarning)) {
+            String msg = String.format(format, args);
+            LOG.warn(msg);
+        }
+        m_lastWarning = format;
+        m_lastWarnTime = now;
+    }
+
+    /*
+     * Wrapper for sleep(), catching and ignoring interrupts.
+     */
+    private static void safeSleep(long msec) {
+        try {
+            Thread.sleep(msec);
+        } catch (InterruptedException ex) {
+            // ignore
+        }
     }
 
     /** Set to true when the thread exits correctly. */
@@ -375,6 +447,23 @@ public class SocketJoiner {
         m_acceptor = acceptor;
         m_sslServerContext = sslServerContext;
         m_sslClientContext = sslClientContext;
+    }
+
+    /*
+     * Form socket address from host string.
+     */
+    private static InetSocketAddress addressFromHost(String nameOrAddr) throws UnknownHostException  {
+        HostAndPort hap = HostAndPort.fromString(nameOrAddr)
+                                     .withDefaultPort(org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
+        if (hap.getHost().isEmpty()) {
+            return new InetSocketAddress(hap.getPort());
+        } else {
+            InetSocketAddress addr = new InetSocketAddress(hap.getHost(), hap.getPort());
+            if (addr.isUnresolved()) {
+                throw new UnknownHostException(hap.getHost());
+            }
+            return addr;
+        }
     }
 
     /*
@@ -501,6 +590,7 @@ public class SocketJoiner {
         SocketChannel sc = null;
         while ((sc = ssc.accept()) != null) {
             boolean success = false;
+            boolean active = false;
             try {
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
@@ -527,6 +617,7 @@ public class SocketJoiner {
                     jsObj = readJSONObjFromWire(messagingChannel);
                 }
 
+                active = true;  // we've got a live one
                 LOG.info(jsObj.toString(2));
 
                 // get the connecting node's version string
@@ -585,19 +676,17 @@ public class SocketJoiner {
                 }
                 success = true;
             } catch (IOException e) {
-                LOG.info("IOException occurred while handling new client connection " + sc
-                        + ". Client will most likely retry: " + e);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("", e);
+                String msg = "IOException occurred while handling new client connection " + sc
+                    + ". Client will most likely retry: " + e;
+                if (active) {
+                    LOG.info(msg);
+                } else { // skip info logging if connection never really got started
+                    LOG.debug(msg);
                 }
             } finally {
                 // do not leak sockets when exception happens
                 if (!success) {
-                    try {
-                        sc.close();
-                    } catch (IOException ioex) {
-                        // ignore the close exception on purpose
-                    }
+                    safeClose(sc);
                 }
             }
 
@@ -637,16 +726,10 @@ public class SocketJoiner {
         }
         finally {
             for (ServerSocketChannel ssc : m_listenerSockets) {
-                try {
-                    ssc.close();
-                } catch (IOException e) {
-                }
+                safeClose(ssc);
             }
             m_listenerSockets.clear();
-            try {
-                m_selector.close();
-            } catch (IOException e) {
-            }
+            safeClose(m_selector);
             m_selector = null;
         }
     }
@@ -695,40 +778,32 @@ public class SocketJoiner {
     }
 
     /**
-     * Create socket to the leader node
+     * Create socket to the leader node. Certain errors are
+     * classified as retryable, and will be wrapped in a
+     * SocketRetryException. Others are passed on as-is.
      */
-    private SocketChannel createLeaderSocket(
-            SocketAddress hostAddr,
-            ConnectStrategy mode) throws IOException
-    {
-        SocketChannel socket;
-        int connectAttempts = 0;
-        do {
-            try {
-                socket = SocketChannel.open();
-                socket.socket().connect(hostAddr, 5000);
-            }
-            catch (java.net.ConnectException
-                  |java.nio.channels.UnresolvedAddressException
-                  |java.net.NoRouteToHostException
-                  |java.net.PortUnreachableException e)
-            {
-                // reset the socket to null for loop purposes
-                socket = null;
+    private SocketChannel createLeaderSocket(SocketAddress hostAddr)
+        throws IOException, SocketRetryException {
 
-                if (mode == ConnectStrategy.PROBE) {
-                    return null;
-                }
-                if ((++connectAttempts % 8) == 0) {
-                    LOG.warn("Joining primary failed: " + e + " retrying..");
-                }
-                try {
-                    Thread.sleep(250); //  milliseconds
-                }
-                catch (InterruptedException dontcare) {}
-            }
-        } while (socket == null);
-        return socket;
+        SocketChannel socket = null;
+        try {
+            socket = SocketChannel.open();
+            socket.socket().connect(hostAddr, 5000);
+            return socket;
+        }
+        catch (java.net.ConnectException
+               | java.net.NoRouteToHostException
+               | java.net.PortUnreachableException
+               | java.net.SocketTimeoutException
+               | java.net.UnknownHostException
+               | java.nio.channels.UnresolvedAddressException ex) {
+            safeClose(socket);
+            throw new SocketRetryException(ex);
+        }
+        catch (Exception ex) {
+            safeClose(socket);
+            throw ex;
+        }
     }
 
     /**
@@ -744,10 +819,7 @@ public class SocketJoiner {
             }
             catch (java.net.ConnectException e) {
                 LOG.warn("Joining host failed: " + e.getMessage() + " retrying..");
-                try {
-                    Thread.sleep(250); //  milliseconds
-                }
-                catch (InterruptedException dontcare) {}
+                safeSleep(250);
             }
         }
         return socket;
@@ -850,9 +922,7 @@ public class SocketJoiner {
         try {
             sslEngine = initializeSocket(socket, true, null).m_sslEngine;
         } catch(IOException e) {
-            try {
-                socket.close();
-            } catch(IOException t) { }
+            safeClose(socket);
             throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
         }
         MessagingChannel messagingChannel = MessagingChannel.get(socket, sslEngine);
@@ -879,7 +949,7 @@ public class SocketJoiner {
      * it must connect to the leader which will generate a host id and
      * advertise the rest of the cluster so that connectToPrimary can connect to it
      */
-    private void connectToPrimary(InetSocketAddress coordIp, ConnectStrategy mode) throws Exception {
+    private void connectToPrimary(InetSocketAddress coordIp) throws Exception {
         // collect clock skews from all nodes
         List<Long> skews = new ArrayList<Long>();
 
@@ -888,22 +958,17 @@ public class SocketJoiner {
         Set<String> activeVersions = new TreeSet<String>();
 
         try {
-            LOG.debug("Non-Primary Starting & Connecting to Primary: " + coordIp + " in mode: " + mode);
-            SocketChannel socket = createLeaderSocket(coordIp, mode);
-            if (socket == null)
-             {
-                return; // in probe mode
-            }
+            LOG.debug("Non-Primary Starting & Connecting to Primary: " + coordIp);
+            SocketChannel socket = createLeaderSocket(coordIp); // may throw SocketRetryException or other IOException
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
+
             SSLEngine leaderSSLEngine;
             try {
                 leaderSSLEngine = initializeSocket(socket, true, skews).m_sslEngine;
             } catch(IOException e) {
                 SocketAddress socketAddress = socket.getRemoteAddress();
-                try {
-                    socket.close();
-                } catch(IOException t) { }
+                safeClose(socket);
                 throw new IOException("SSL setup to " + socketAddress + " failed", e);
             }
             MessagingChannel leaderChannel = MessagingChannel.get(socket, leaderSSLEngine);
@@ -916,7 +981,7 @@ public class SocketJoiner {
             // check if the membership request is accepted
             JSONObject responseBody = response.getResponseBody();
             if (!responseBody.optBoolean(ACCEPTED, true)) {
-                socket.close();
+                safeClose(socket);
                 if (!responseBody.optBoolean(MAY_RETRY, false)) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Request to join cluster is rejected: "
@@ -1049,28 +1114,15 @@ public class SocketJoiner {
     }
 
     public void shutdown() throws InterruptedException {
-        if (m_selector != null) {
-            try {
-                m_selector.close();
-            } catch (IOException e) {
-            }
-        }
+        safeClose(m_selector);
         m_es.shutdownNow();
         m_es.awaitTermination(356, TimeUnit.DAYS);
         for (ServerSocketChannel ssc : m_listenerSockets) {
-            try {
-                ssc.close();
-            } catch (IOException e) {
-            }
+            safeClose(ssc);
         }
         m_listenerSockets.clear();
-        if (m_selector != null) {
-            try {
-                m_selector.close();
-            } catch (IOException e) {
-            }
-            m_selector = null;
-        }
+        safeClose(m_selector); // duplicate call?
+        m_selector = null;
     }
 
     int getLocalHostId() {
@@ -1096,6 +1148,20 @@ public class SocketJoiner {
         public SslHandshakeResult(TLSHandshaker handshaker) throws IOException {
             m_sslEngine = handshaker.getSslEngine();
             m_remnant = handshaker.hasRemnant() ? handshaker.getRemnant() : null;
+        }
+    }
+
+    /**
+     * Helper for cleaning up resources when we don't care about failure.
+     * Usable for socket channels and selectors.
+     */
+    private static void safeClose(Closeable s) {
+        if (s != null) {
+            try {
+                s.close();
+            } catch (Exception ex) {
+                // ignore
+            }
         }
     }
 }

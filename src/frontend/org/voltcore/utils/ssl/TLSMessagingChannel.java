@@ -116,7 +116,7 @@ public class TLSMessagingChannel extends MessagingChannel {
         ByteBuffer src;
         do {
             readbuf.clear();
-            if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
+            if (!SSLBufferDecrypter.readTLSFrame(m_socketChannel, readbuf)) {
                 return null;
             }
             src = readbuf.nioBuffer();

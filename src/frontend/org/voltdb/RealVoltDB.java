@@ -152,6 +152,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -179,6 +180,11 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
+import org.voltdb.operator.PauseActivityStats;
+import org.voltdb.operator.ShutdownActivityStats;
+import org.voltdb.operator.StatusListener;
+import org.voltdb.operator.StopActivityStats;
+import org.voltdb.operator.XDCRReadinessStats;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
@@ -274,9 +280,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "10.0.beta6";
+    static final String m_defaultVersionString = "10.0";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0.beta6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q10.0\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -300,7 +306,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
-    int m_myHostId;
+    int m_myHostId = -1; // not valid until we have a mesh
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
 
@@ -317,7 +323,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final FailedLoginCounter m_flc = new FailedLoginCounter();
 
+    // State tracking
     private NodeStateTracker m_statusTracker;
+    private int m_voltPid;
+
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -447,7 +456,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    StartAction getStartAction() {
+    @Override
+    public StartAction getStartAction() {
         return m_config.m_startAction;
     }
 
@@ -644,6 +654,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
     }
 
+    private static String[] ignoredFilenames = { "lost+found" };
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute()) {
@@ -651,10 +663,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else {
             managedPath = new VoltFile(voltDbRoot, path);
         }
-        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0) {
-            return managedPath.getAbsolutePath();
+        if (!managedPath.exists()) {
+            return null; // if it does not exist, there's nothing in it
         }
-        return null;
+        String absPath = managedPath.getAbsolutePath();
+        if (!managedPath.canRead()) { // can't read? assume empty but note in log
+            hostLog.warn(String.format("Cannot read directory '%s'", absPath));
+            return null;
+        }
+        Collection<String> ignorable = Arrays.asList(ignoredFilenames); // HashSet<> is overkill
+        String[] content = managedPath.list((dir,name) -> !ignorable.contains(name));
+        if (content.length == 0) { // nothing we care about
+            return null;
+        }
+        // Directory contains files we should not ignore
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("Directory '").append(absPath).append("' contains:");
+        for (int i=0; i<10 && i<content.length; i++) {
+            sb.append(' ').append(content[i]);
+        }
+        if (content.length > 10) {
+            sb.append(" ...");
+        }
+        hostLog.warn(sb.toString());
+        return absPath;
     }
 
     private void managedPathsEmptyCheck(Configuration config) {
@@ -723,6 +755,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
+    private boolean checkExistence(Configuration config, String artifact) {
+        if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
+            consoleLog.fatal("Failed to save " + artifact + ", file already exists: " + config.m_getOutput);
+            return true;
+        }
+        return false;
+    }
+
     private int outputDeployment(Configuration config) {
         try {
             File configInfoDir = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR);
@@ -744,18 +784,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // We don't have catalog context so host count is not there.
             String out;
             if ((out = CatalogUtil.getDeployment(dt, true)) != null) {
-                if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
-                    consoleLog.fatal("Failed to save deployment, file already exists: " + config.m_getOutput);
-                    return -1;
+                if (config.m_getOutput.equals("-")) {
+                    System.out.println(out);
+                } else {
+                    if (checkExistence(config, "deployment")) {
+                        return -1;
+                    }
+                    try (FileOutputStream fos = new FileOutputStream(config.m_getOutput)){
+                        fos.write(out.getBytes());
+                    } catch (IOException e) {
+                        consoleLog.fatal("Failed to write deployment to " + config.m_getOutput
+                                + " : " + e.getMessage());
+                        return -1;
+                    }
+                    consoleLog.info("Deployment configuration saved in " + config.m_getOutput);
                 }
-                try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
-                    fos.write(out.getBytes());
-                } catch (IOException e) {
-                    consoleLog.fatal("Failed to write deployment to " + config.m_getOutput
-                            + " : " + e.getMessage());
-                    return -1;
-                }
-                consoleLog.info("Deployment configuration saved in " + config.m_getOutput.trim());
             } else {
                 consoleLog.fatal("Failed to get configuration or deployment configuration is invalid.");
                 return -1;
@@ -769,21 +812,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private int outputSchema(Configuration config) {
-        if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
-            consoleLog.fatal("Failed to save schema file, file already exists: " + config.m_getOutput);
-            return -1;
-        }
-
         try {
             InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
             String ddl = CatalogUtil.getAutoGenDDLFromJar(catalogJar);
-            try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
-                fos.write(ddl.getBytes());
-            } catch (IOException e) {
-                consoleLog.fatal("Failed to write schema to " + config.m_getOutput + " : " + e.getMessage());
-                return -1;
+            if (config.m_getOutput.equals("-")) {
+                System.out.println(ddl);
+            } else {
+                if (checkExistence(config, "schema")) {
+                    return -1;
+                }
+                try (FileOutputStream fos = new FileOutputStream(config.m_getOutput)){
+                    fos.write(ddl.getBytes());
+                } catch (IOException e) {
+                    consoleLog.fatal("Failed to write schema to " + config.m_getOutput + " : " + e.getMessage());
+                    return -1;
+                }
+                consoleLog.info("Schema saved in " + config.m_getOutput);
             }
-            consoleLog.info("Schema saved in " + config.m_getOutput.trim());
         } catch (IOException e) {
             consoleLog.fatal("Failed to load the catalog jar from " + config.m_pathToCatalog
                     + " : " + e.getMessage());
@@ -793,16 +838,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private int outputProcedures(Configuration config) {
-        File outputFile = new File(config.m_getOutput);
-        if (outputFile.exists() && !config.m_forceGetCreate) {
-            consoleLog.fatal("Failed to save classes, file already exists: " + config.m_getOutput);
-            return -1;
-        }
         try {
             InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
             InMemoryJarfile filteredJar = CatalogUtil.getCatalogJarWithoutDefaultArtifacts(catalogJar);
-            filteredJar.writeToFile(outputFile);
-            consoleLog.info("Classes saved in " + outputFile.getPath());
+            if (config.m_getOutput.equals("-")) {
+                filteredJar.writeToStdout();
+            } else {
+                if (checkExistence(config, "classes")) {
+                    return -1;
+                }
+                File outputFile = new File(config.m_getOutput);
+                filteredJar.writeToFile(outputFile);
+                consoleLog.info("Classes saved in " + outputFile.getPath());
+            }
         } catch (IOException e) {
             consoleLog.fatal("Failed to read classes " + config.m_pathToCatalog
                     + " : " + e.getMessage());
@@ -819,9 +867,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return -1;
         }
 
+        boolean useStdout = config.m_getOutput.equals("-");
         try {
-            if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
-                consoleLog.fatal("Failed to save license.xml, file already exists: " + config.m_getOutput);
+            if (!useStdout && checkExistence(config, "license")) {
                 return -1;
             }
             try {
@@ -834,7 +882,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     byte[] buffer = new byte[1024];
                     int length;
                     while ((length = is.read(buffer)) > 0) {
-                        os.write(buffer, 0, length);
+                        if (useStdout) {
+                            System.out.write(buffer, 0, length);
+                        } else {
+                            os.write(buffer, 0, length);
+                        }
                     }
                 } finally {
                     is.close();
@@ -845,7 +897,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + " : " + e.getMessage());
                 return -1;
             }
-            consoleLog.info("license saved as " + config.m_getOutput.trim());
+            if (!useStdout) {
+                consoleLog.info("license saved as " + config.m_getOutput);
+            }
         } catch (Exception e) {
             consoleLog.fatal("Failed to get license. " + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
             return -1;
@@ -988,6 +1042,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info(String.format("Licensed to: %s", licensee));
             }
         }
+
+        // Log some facts about the user account: account name,
+        // home dir, working dir where Java was started
+        hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
+                                   System.getProperty("user.name"),
+                                   System.getProperty("user.home"),
+                                   System.getProperty("user.dir")));
     }
 
     /**
@@ -996,7 +1057,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     @Override
     public void initialize(Configuration config) {
-        hostLog.info("PID of this Volt process is " + CLibrary.getpid());
+        int myPid = CLibrary.getpid();
+        hostLog.info("PID of this Volt process is " + myPid);
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             exitAfterMessage = false;
@@ -1007,6 +1069,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
             CipherExecutor.CLIENT.shutdown();
+            StatusListener.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1015,6 +1078,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
+
+            // Node state is INITIALIZING
+            m_statusTracker = new NodeStateTracker();
+            m_voltPid = myPid;
 
             // Print the ascii art!
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
@@ -1056,6 +1123,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
                     deleteInitializationMarkers(config);
+                }
+            }
+
+            // Start the listener that responds to "status" requests. This needs
+            // to be started "early" to be available during initialization.
+            else if (config.m_statusPort != VoltDB.DISABLED_PORT) {
+                try {
+                    StatusListener sl = new StatusListener(config.m_statusInterface,
+                                                           config.m_statusPort,
+                                                           config.m_publicInterface);
+                    sl.start();
+                    config.m_statusInterface = sl.getListenInterface();
+                    config.m_statusPort = sl.getAssignedPort();
+                    consoleLog.info(String.format("Listening for status requests on %s:%s", config.m_statusInterface, config.m_statusPort));
+                }
+                catch (StatusListener.InitException ex) {
+                    VoltDB.crashLocalVoltDB(ex.getMessage(), false, ex);
                 }
             }
 
@@ -1102,8 +1186,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
             }
 
-            // config UUID is part of the status tracker.
-            m_statusTracker = new NodeStateTracker();
             final File stagedCatalogLocation = new VoltFile(
                     RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
@@ -1240,6 +1322,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             clusterSettings.store();
             m_clusterSettings.set(clusterSettings, 1);
 
+            // Potential wait here as mesh is built.
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
@@ -1398,7 +1481,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     AbstractTopology recoveredTopo = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
                     if (recoveredTopo != null) {
                         topo = recoveredTopo;
-                        partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                        partitions = getPartitionsForLocalHost(topo);
                     }
                     if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
@@ -1414,7 +1497,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
-                    partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                    partitions = getPartitionsForLocalHost(topo);
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
 
@@ -1559,6 +1642,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
 
+            // Operator function helpers
+            StatsAgent sa = getStatsAgent();
+            sa.registerStatsSource(StatsSelector.SHUTDOWN_CHECK, 0, new ShutdownActivityStats());
+            sa.registerStatsSource(StatsSelector.STOP_CHECK, 0, new StopActivityStats());
+            sa.registerStatsSource(StatsSelector.PAUSE_CHECK, 0, new PauseActivityStats());
+            sa.registerStatsSource(StatsSelector.XDCR_READINESS, 0, new XDCRReadinessStats());
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -1642,6 +1732,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         new DRProducerStatsBase.DRProducerNodeStatsBase());
                 getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
                         new DRProducerStatsBase.DRProducerPartitionStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERCLUSTER, 0,
+                        new DRProducerStatsBase.DRProducerClusterStatsBase());
             }
             m_drRoleStats = new DRRoleStats(this);
             getStatsAgent().registerStatsSource(StatsSelector.DRROLE, 0, m_drRoleStats);
@@ -1886,7 +1978,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (recoveredTopo == null) {
             return null;
         }
-        List<Integer> partitions = Lists.newArrayList(recoveredTopo.getPartitionIdList(m_messenger.getHostId()));
+        List<Integer> partitions = getPartitionsForLocalHost(recoveredTopo);
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
         }
@@ -1894,6 +1986,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.info("Partition placement layout has been restored for rejoining.");
         }
         return recoveredTopo;
+    }
+
+    private List<Integer> getPartitionsForLocalHost(AbstractTopology topo) {
+        int hostId = m_messenger.getHostId();
+        List<Integer> pars = topo.getPartitionIdList(hostId);
+        if (pars == null) { // check, else newArrayList throws an even less understandable error
+            String err = String.format("Unexpected error: no partition list for local host id %d (rejoining: %s)",
+                                       hostId, m_rejoining);
+            hostLog.error(err);
+            throw new IllegalStateException(err);
+        }
+        return Lists.newArrayList(pars);
     }
 
     @Override
@@ -3264,12 +3368,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
-        String[] excludeCiphers = new String[] {"SSL_RSA_WITH_DES_CBC_SHA",
-                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"};
+        String[] excludeCiphers = new String[] {
+            "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA",
+            "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+            "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+            "SSL_DHE_RSA_WITH_DES_CBC_SHA",
+            "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+            "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+            "SSL_RSA_WITH_DES_CBC_SHA",
+            "TLS_DHE_DSS_WITH_AES_128_CBC_SHA",
+            "TLS_DHE_DSS_WITH_AES_256_CBC_SHA",
+            "TLS_DHE_RSA_WITH_AES_128_CBC_SHA",
+            "TLS_DHE_RSA_WITH_AES_256_CBC_SHA",
+            "TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA",
+            "TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA",
+            "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+            "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+            "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+            "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+            "TLS_ECDH_RSA_WITH_AES_128_CBC_SHA",
+            "TLS_ECDH_RSA_WITH_AES_256_CBC_SHA",
+            "TLS_RSA_WITH_AES_128_CBC_SHA",
+            "TLS_RSA_WITH_AES_128_CBC_SHA256",
+            "TLS_RSA_WITH_AES_128_GCM_SHA256",
+            "TLS_RSA_WITH_AES_256_CBC_SHA",
+            "TLS_RSA_WITH_AES_256_CBC_SHA256",
+            "TLS_RSA_WITH_AES_256_GCM_SHA384",
+        };
 
         // exclude weak ciphers
         sslContextFactory.setExcludeCipherSuites(excludeCiphers);
@@ -3334,22 +3459,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
         String sysProp = System.getProperty(sysPropName, "");
+        String result = null;
 
         // allow leading/trailing blanks for password, not otherwise
         if (!sysProp.isEmpty()) {
             if ("password".equals(valueType)) {
-                return sysProp;
+                result = sysProp;
             } else {
-                if (!sysProp.trim().isEmpty()) {
-                    return sysProp.trim();
+                String trimmed = sysProp.trim();
+                if (!trimmed.isEmpty()) {
+                    result = trimmed;
                 }
             }
         }
-        String value = null;
+
         if (store != null) {
-            value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            String value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            if (result == null) {
+                result = value;
+            }
+            else if (value != null && !value.equals(result)) {
+                hostLog.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
+            }
         }
-        return value;
+
+        return result;
     }
 
     /**
@@ -3444,6 +3578,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
         consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
+        // This is where we wait
         MeshProber.Determination determination = criteria.waitForDetermination();
         m_meshProbe.set(null);
         if (determination.startAction == null) {
@@ -3763,6 +3898,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
+                m_statusTracker.set(NodeState.SHUTTINGDOWN);
 
                 if (m_catalogContext != null && m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
                     hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
@@ -3900,6 +4036,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
+
+                // We left the status API up as long as possible...
+                StatusListener.shutdown();
+
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();
@@ -4079,6 +4219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requiresNewExportGeneration,
             boolean hasSecurityUserChange)
     {
+
         try {
             /*
              * Synchronize updates of catalog contexts across the multiple sites on this host. Ensure that catalogUpdate() is
@@ -4087,11 +4228,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              */
             final UpdatableSiteCoordinationBarrier sysProcBarrier = VoltDB.getSiteCountBarrier();
             sysProcBarrier.await();
-
             synchronized (sysProcBarrier) {
-                final ReplicationRole oldRole = getReplicationRole();
 
-                m_statusTracker.set(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                     if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
                         throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -4099,168 +4237,189 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                     }
                     assert(m_catalogContext.catalogVersion == nextCatalogVersion);
-                    return m_catalogContext;
                 }
 
-                //Security credentials may be part of the new catalog update.
-                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
-                //before CatalogContext swap.
-                if (m_adminListener != null && hasSecurityUserChange) {
-                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
-                }
-
-                CatalogInfo catalogInfo = null;
-                Catalog newCatalog = null;
-                CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                if (isForReplay) {
+                else {
+                    final NodeState prevNodeState = m_statusTracker.set(NodeState.UPDATING);
                     try {
-                        CatalogAndDeployment catalogStuff =
-                                CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                        byte[] depbytes = catalogStuff.deploymentBytes;
-                        if (depbytes == null) {
-                            depbytes = ctx.m_catalogInfo.m_deploymentBytes;
-                        }
-                        catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
-                        newCatalog = ctx.getNewCatalog(diffCommands);
-                    } catch (Exception e) {
-                        // impossible to hit, log for debug purpose
-                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
-                        throw new RuntimeException("Error reading catalog from zookeeper");
+                        doCatalogUpdate(diffCommands, nextCatalogVersion, genId, isForReplay,
+                                        requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
+                                        requiresNewExportGeneration, hasSecurityUserChange);
                     }
-                } else {
-                    if (ctx.m_preparedCatalogInfo == null) {
-                        // impossible to hit, log for debug purpose
-                        throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
+                    finally {
+                        m_statusTracker.set(prevNodeState);
                     }
-                    // using the prepared catalog information if prepared
-                    catalogInfo = ctx.m_preparedCatalogInfo;
-                    newCatalog = catalogInfo.m_catalog;
                 }
-
-                byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
-                final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
-
-                // 0. A new catalog! Update the global context and the context tracker
-                m_catalogContext = m_catalogContext.update(isForReplay,
-                                                           newCatalog,
-                                                           nextCatalogVersion,
-                                                           genId,
-                                                           catalogInfo,
-                                                           m_messenger,
-                                                           hasSchemaChange);
-
-                // 1. update the export manager.
-                VoltDB.getExportManager().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
-                        requiresNewExportGeneration, getPartitionToSiteMap());
-
-                // 1.1 Update the elastic service throughput settings
-                if (m_elasticService != null) {
-                    m_elasticService.updateConfig(m_catalogContext);
-                }
-
-                // 1.5 update the dead host timeout
-                if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
-                    m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
-                    m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
-                }
-
-                // 2. update client interface (asynchronously)
-                //    CI in turn updates the planner thread.
-                if (m_clientInterface != null) {
-                    m_clientInterface.notifyOfCatalogUpdate();
-                }
-
-                // 3. update HTTPClientInterface (asynchronously)
-                // This purges cached connection state so that access with
-                // stale auth info is prevented.
-                if (m_adminListener != null && hasSecurityUserChange) {
-                    m_adminListener.notifyOfCatalogUpdate();
-                }
-
-                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfPreCatalogUpdate();
-
-                // 4. Flush StatisticsAgent old user PROCEDURE statistics.
-                // The stats agent will hold all other stats in memory.
-                getStatsAgent().notifyOfCatalogUpdate();
-
-                // 4.5. (added)
-                // Update the NT procedure service AFTER stats are cleared in the previous step
-                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
-
-                // 5. MPIs don't run fragments. Update them here. Do
-                // this after flushing the stats -- this will re-register
-                // the MPI statistics.
-                if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
-                            requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-                }
-
-                // Update catalog for import processor this should be just/stop start and update partitions.
-                VoltDB.getImportManager().updateCatalog(m_catalogContext, m_messenger);
-
-                // 6. Perform updates required by the DR subsystem
-
-                // 6.1. Perform any actions that would have been taken during the ordinary initialization path
-                if (m_consumerDRGateway != null) {
-                    // 6.2. If we are a DR replica and the consumer was created
-                    // before the catalog update, we may care about a deployment
-                    // update. If it was created above, no need to notify
-                    // because the consumer already has the latest catalog.
-                    final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
-                    m_consumerDRGateway.updateCatalog(m_catalogContext,
-                                                      (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
-                                                       ? newDRConnectionSource
-                                                       : null),
-                                                      (byte) m_catalogContext.cluster.getPreferredsource());
-                }
-
-                // Check if this is promotion
-                if (oldRole == ReplicationRole.REPLICA &&
-                    m_catalogContext.cluster.getDrrole().equals("master")) {
-                    // Promote replica to master
-                    promoteToMaster();
-                }
-
-                // 6.3. If we are a DR master, update the DR table signature hash
-                if (m_producerDRGateway != null) {
-                    m_producerDRGateway.updateCatalog(m_catalogContext,
-                            VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
-                }
-
-                // 7 Update tasks (asynchronously) after replica change if it occurred
-                m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
-
-                new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
-
-                // log system setting information if the deployment config has changed
-                if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
-                    logSystemSettingFromCatalogContext();
-                }
-                //Before starting resource monitor update any Snmp configuration changes.
-                if (m_snmp != null) {
-                    m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
-                }
-
-                //TTL control works on the host with MPI
-                if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
-                    VoltDB.getTTLManager().scheduleTTLTasks();
-                }
-                // restart resource usage monitoring task
-                startHealthMonitor();
-
-                checkHeapSanity(m_catalogContext.tables.size(),
-                        (getLocalPartitionCount()), m_configuredReplicationFactor);
-
-                checkThreadsSanity();
-
-                return m_catalogContext;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw VoltDB.crashLocalVoltDB("Error waiting for barrier", true, e);
-        } finally {
-            //Set state back to UP
-            m_statusTracker.set(NodeState.UP);
         }
+
+        return m_catalogContext;
+    }
+
+    private void doCatalogUpdate(
+            String diffCommands,
+            int nextCatalogVersion,
+            long genId,
+            boolean isForReplay,
+            boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange) {
+
+        final ReplicationRole oldRole = getReplicationRole();
+
+        //Security credentials may be part of the new catalog update.
+        //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+        //before CatalogContext swap.
+        if (m_adminListener != null && hasSecurityUserChange) {
+            m_adminListener.dontStoreAuthenticationResultInHttpSession();
+        }
+
+        CatalogInfo catalogInfo = null;
+        Catalog newCatalog = null;
+        CatalogContext ctx = VoltDB.instance().getCatalogContext();
+        if (isForReplay) {
+            try {
+                CatalogAndDeployment catalogStuff =
+                    CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                byte[] depbytes = catalogStuff.deploymentBytes;
+                if (depbytes == null) {
+                    depbytes = ctx.m_catalogInfo.m_deploymentBytes;
+                }
+                catalogInfo = new CatalogInfo(catalogStuff.catalogBytes, catalogStuff.catalogHash, depbytes);
+                newCatalog = ctx.getNewCatalog(diffCommands);
+            } catch (Exception e) {
+                // impossible to hit, log for debug purpose
+                hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes + ":" + e);
+                throw new RuntimeException("Error reading catalog from zookeeper");
+            }
+        } else {
+            if (ctx.m_preparedCatalogInfo == null) {
+                // impossible to hit, log for debug purpose
+                throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
+            }
+            // using the prepared catalog information if prepared
+            catalogInfo = ctx.m_preparedCatalogInfo;
+            newCatalog = catalogInfo.m_catalog;
+        }
+
+        byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
+        final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+
+        // 0. A new catalog! Update the global context and the context tracker
+        m_catalogContext = m_catalogContext.update(isForReplay,
+                                                   newCatalog,
+                                                   nextCatalogVersion,
+                                                   genId,
+                                                   catalogInfo,
+                                                   m_messenger,
+                                                   hasSchemaChange);
+
+        // 1. update the export manager.
+        VoltDB.getExportManager().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
+                                                requiresNewExportGeneration, getPartitionToSiteMap());
+
+        // 1.1 Update the elastic service throughput settings
+        if (m_elasticService != null) {
+            m_elasticService.updateConfig(m_catalogContext);
+        }
+
+        // 1.5 update the dead host timeout
+        if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
+            m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
+            m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+        }
+
+        // 2. update client interface (asynchronously)
+        //    CI in turn updates the planner thread.
+        if (m_clientInterface != null) {
+            m_clientInterface.notifyOfCatalogUpdate();
+        }
+
+        // 3. update HTTPClientInterface (asynchronously)
+        // This purges cached connection state so that access with
+        // stale auth info is prevented.
+        if (m_adminListener != null && hasSecurityUserChange) {
+            m_adminListener.notifyOfCatalogUpdate();
+        }
+
+        m_clientInterface.getDispatcher().notifyNTProcedureServiceOfPreCatalogUpdate();
+
+        // 4. Flush StatisticsAgent old user PROCEDURE statistics.
+        // The stats agent will hold all other stats in memory.
+        getStatsAgent().notifyOfCatalogUpdate();
+
+        // 4.5. (added)
+        // Update the NT procedure service AFTER stats are cleared in the previous step
+        m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
+
+        // 5. MPIs don't run fragments. Update them here. Do
+        // this after flushing the stats -- this will re-register
+        // the MPI statistics.
+        if (m_MPI != null) {
+            m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
+                                requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+        }
+
+        // Update catalog for import processor this should be just/stop start and update partitions.
+        VoltDB.getImportManager().updateCatalog(m_catalogContext, m_messenger);
+
+        // 6. Perform updates required by the DR subsystem
+
+        // 6.1. Perform any actions that would have been taken during the ordinary initialization path
+        if (m_consumerDRGateway != null) {
+            // 6.2. If we are a DR replica and the consumer was created
+            // before the catalog update, we may care about a deployment
+            // update. If it was created above, no need to notify
+            // because the consumer already has the latest catalog.
+            final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+            m_consumerDRGateway.updateCatalog(m_catalogContext,
+                                              (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
+                                               ? newDRConnectionSource
+                                               : null),
+                                              (byte) m_catalogContext.cluster.getPreferredsource());
+        }
+
+        // Check if this is promotion
+        if (oldRole == ReplicationRole.REPLICA &&
+            m_catalogContext.cluster.getDrrole().equals("master")) {
+            // Promote replica to master
+            promoteToMaster();
+        }
+
+        // 6.3. If we are a DR master, update the DR table signature hash
+        if (m_producerDRGateway != null) {
+            m_producerDRGateway.updateCatalog(m_catalogContext,
+                                              VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+        }
+
+        // 7 Update tasks (asynchronously) after replica change if it occurred
+        m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
+
+        new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
+
+        // log system setting information if the deployment config has changed
+        if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
+            logSystemSettingFromCatalogContext();
+        }
+        //Before starting resource monitor update any Snmp configuration changes.
+        if (m_snmp != null) {
+            m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
+        }
+
+        //TTL control works on the host with MPI
+        if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
+            VoltDB.getTTLManager().scheduleTTLTasks();
+        }
+        // restart resource usage monitoring task
+        startHealthMonitor();
+
+        checkHeapSanity(m_catalogContext.tables.size(),
+                        (getLocalPartitionCount()), m_configuredReplicationFactor);
+
+        checkThreadsSanity();
     }
 
     Map<Integer, Integer> getPartitionToSiteMap() {
@@ -4404,6 +4563,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down because of @StopNode");
             snmp.shutdown();
         }
+
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
@@ -4411,7 +4571,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
                 shutdownInitiators();
                 m_isRunning = false;
+                m_statusTracker.set(NodeState.STOPPED); // not that anyone is going to see this.
                 hostLog.warn("VoltDB node has been shutdown By @StopNode");
+                StatusListener.shutdown();
                 System.exit(0);
             }
         };
@@ -4428,7 +4590,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         System.exit(0);
                     }
                     try {
-                        Thread.sleep(5);
+                        Thread.sleep(5); // 5 mSec
                     } catch (Exception e) {}
                 }
             }
@@ -4537,6 +4699,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     megabytesPerSecond + " megabytes/sec");
         }
 
+        boolean allDone = false;
         try {
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
@@ -4565,7 +4728,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 String actionName = m_joining ? "join" : "rejoin";
                 m_joining = false;
-                consoleLog.info(String.format("Node %s completed", actionName));
+                consoleLog.info(String.format("Node %s completed", actionName)); // onRejoinCompletion
+                allDone = true;
             }
 
             //start MigratePartitionLeader task
@@ -4573,11 +4737,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
+
         hostLog.info("Logging host rejoin completion to ZK");
-        m_statusTracker.set(NodeState.UP);
-        Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        initializationIsComplete(allDone); // onRejoinCompletion
     }
 
     @Override
@@ -4625,6 +4787,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public NodeState getNodeState()
+    {
+        return m_statusTracker.get();
+    }
+
+    @Override
+    public boolean getNodeStartupComplete()
+    {
+        return m_statusTracker.getStartupComplete();
+    }
+
+    @Override
+    public int[] getNodeStartupProgress()
+    {
+        return m_statusTracker.getProgress();
+    }
+
+    @Override
+    public void reportNodeStartupProgress(int completed, int total)
+    {
+        if (m_statusTracker != null) {
+            m_statusTracker.reportProgress(completed, total);
+        }
+    }
+
+    @Override
+    public int getMyHostId()
+    {
+        return m_myHostId;
+    }
+
+    @Override
+    public int getVoltPid()
+    {
+        return m_voltPid;
+    }
+
+    @Override
     public void promoteToMaster()
     {
         consoleLog.info("Promoting replication role from replica to master.");
@@ -4637,8 +4837,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void replaceDRConsumerStatsWithDummy()
     {
+        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERCLUSTER, 0);
         getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
         getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERCLUSTER, 0,
+                new DRConsumerStatsBase.DRConsumerClusterStatsBase());
         getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
                 new DRConsumerStatsBase.DRConsumerNodeStatsBase());
         getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
@@ -4772,13 +4975,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
 
-            // Set m_mode to RUNNING
+            // Set m_mode to RUNNING, and initialization complete
             databaseIsRunning();
+            initializationIsComplete(true); // onReplayCompletion
 
-            Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-            m_statusTracker.set(NodeState.UP);
         } else {
             // Set m_mode to RUNNING
             databaseIsRunning();
@@ -4795,6 +4995,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to start elastic services", false, e);
             }
+        }
+    }
+
+    /*
+     * Sets various indicators to show that initialization is complete,
+     * including logging that event to the console.
+     */
+    private void initializationIsComplete(boolean allDone) {
+        Object args[] = { m_mode == OperationMode.PAUSED ? "PAUSED" : "NORMAL"};
+        consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+        consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        m_statusTracker.set(m_mode == OperationMode.PAUSED ? NodeState.PAUSED : NodeState.UP);
+        if (allDone) {
+            m_statusTracker.setStartupComplete();
         }
     }
 
@@ -4832,7 +5046,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 String actionName = m_joining ? "join" : "rejoin";
                 // remove the rejoin blocker
                 CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
-                consoleLog.info(String.format("Node %s completed", actionName));
+                consoleLog.info(String.format("Node %s completed", actionName)); // onRecoveryComplete
+                m_statusTracker.setStartupComplete();
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;
             }
@@ -5480,4 +5695,3 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return false;
     }
 }
-

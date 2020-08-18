@@ -114,7 +114,7 @@ public class TickProducer extends SiteTasker implements Runnable
                 String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
             } else {
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
             }
         }
     }

@@ -370,8 +370,8 @@ public class ClientConfig {
      * using FAST reads, enabling this setting will load balance reads amongst
      * partition replicas, often increasing throughput and decreasing latency.</p>
      *
-     * <p>See section <a href="https://docs.voltdb.com/AdminGuide/HostConfigDBOpts.php">
-     * A.3.4 of the Administrators Guide</a> for info on SAFE vs. FAST.</p>
+     * <p>Note: consistency modality SAFE/FAST is obsolete and no longer supported.
+     *</p>
      *
      * <p>Defaults to FALSE. Has no effect if Client Affinity is disabled.</p>
      *

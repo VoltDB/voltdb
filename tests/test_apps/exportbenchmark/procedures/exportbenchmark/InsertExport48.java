@@ -37,7 +37,7 @@ public class InsertExport48 extends VoltProcedure {
 
     public final SQLStmt export = new SQLStmt(template);
 
-    public long run(long rowid, int multiply, int targets)
+    public long run(long rowid, int multiply)
     {
         @SuppressWarnings("deprecation")
         long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);

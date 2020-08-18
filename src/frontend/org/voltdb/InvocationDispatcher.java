@@ -784,32 +784,23 @@ public final class InvocationDispatcher {
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
-            return gracefulFailureResponse(
-                    "@StopNode must provide hostId",
-                    task.clientHandle);
+            return rejectStopNode("@StopNode must provide hostId", task);
         }
         if (!(params[0] instanceof Integer)) {
-            return gracefulFailureResponse(
-                    "@StopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
-                    task.clientHandle);
+            return rejectStopNode("@StopNode must have one Integer parameter specified. Provided type was " +
+                                  params[0].getClass().getName(), task);
         }
         int ihid = (Integer) params[0];
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         if (!liveHids.contains(ihid)) {
-            return gracefulFailureResponse(
-                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
-                    task.clientHandle);
+            return rejectStopNode("Invalid Host Id or Host Id not member of cluster: " + ihid, task);
         }
         String reason = m_cartographer.stopNodeIfClusterIsSafe(liveHids, ihid);
         if (reason != null) {
-            hostLog.info("It's unsafe to shutdown node " + ihid
-                    + ". Cannot stop the requested node. " + reason
-                    + ". Use shutdown to stop the cluster.");
-            return gracefulFailureResponse(
-                    "It's unsafe to shutdown node " + ihid
-                  + ". Cannot stop the requested node. " + reason
-                  + ". Use shutdown to stop the cluster.", task.clientHandle);
+            return rejectStopNode("It's unsafe to shutdown node " + ihid +
+                                  ". Cannot stop the requested node. " + reason +
+                                  ". Use shutdown to stop the cluster.", task);
         }
 
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
@@ -818,26 +809,22 @@ public final class InvocationDispatcher {
     private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
-            return gracefulFailureResponse(
-                    "@PrepareStopNode must provide hostId",
-                    task.clientHandle);
+            return rejectStopNode("@PrepareStopNode must provide hostId", task);
         }
         if (!(params[0] instanceof Integer)) {
-            return gracefulFailureResponse(
-                    "@PrepareStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
-                    task.clientHandle);
+            return rejectStopNode("@PrepareStopNode must have one Integer parameter specified. Provided type was " +
+                                  params[0].getClass().getName(), task);
         }
         int ihid = (Integer) params[0];
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         if (!liveHids.contains(ihid)) {
-            return gracefulFailureResponse("@PrepareStopNode: " + ihid + " is not valid.", task.clientHandle);
+            return rejectStopNode("@PrepareStopNode: " + ihid + " is not valid.", task);
         }
 
        String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
        if (reason != null) {
-           return gracefulFailureResponse(
-                   "@PrepareStopNode:" + reason, task.clientHandle);
+           return rejectStopNode("@PrepareStopNode: " + reason, task);
        }
 
        // The host has partition masters, go ahead to move them
@@ -858,6 +845,12 @@ public final class InvocationDispatcher {
        }
 
        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    // We logged that StopNode/PrepareStopNode was called, so log rejection
+    private final static ClientResponseImpl rejectStopNode(String msg, StoredProcedureInvocation task) {
+        hostLog.info(msg);
+        return gracefulFailureResponse(msg, task.clientHandle);
     }
 
     public final ClientResponseImpl dispatchNTProcedure(InvocationClientHandler handler,

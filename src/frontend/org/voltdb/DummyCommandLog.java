@@ -88,6 +88,10 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
+    public void getCommandLogOutstanding(long[] out) {
+    }
+
+    @Override
     public boolean isSynchronous() {
         return false;
     }

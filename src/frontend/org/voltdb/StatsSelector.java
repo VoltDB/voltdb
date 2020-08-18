@@ -45,17 +45,19 @@ public enum StatsSelector {
     PROCEDUREDETAIL(PROCEDURE),  // provides more granular statistics for procedure calls at a per-statement level.
 
     /*
-     * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
+     * DRPRODUCERPARTITION, DRPRODUCERNODE and DRPRODUCERCLUSTER are internal names
      * Externally the selector is "DRPRODUCER", or just "DR"
      */
     DRPRODUCERPARTITION(false),
     DRPRODUCERNODE(false),
-    DR(DRPRODUCERPARTITION, DRPRODUCERNODE),
+    DRPRODUCERCLUSTER(false),
+    DR(DRPRODUCERPARTITION, DRPRODUCERNODE, DRPRODUCERCLUSTER),
     DRPRODUCER(DR.subSelectors()),
 
+    DRCONSUMERCLUSTER(false),
     DRCONSUMERNODE(false),
     DRCONSUMERPARTITION(false),
-    DRCONSUMER(DRCONSUMERNODE, DRCONSUMERPARTITION),
+    DRCONSUMER(DRCONSUMERNODE, DRCONSUMERPARTITION, DRCONSUMERCLUSTER),
 
     DRROLE(false),
 
@@ -73,7 +75,13 @@ public enum StatsSelector {
     TASK(false),
     TASK_SCHEDULER(false, TASK),
     TASK_PROCEDURE(false, TASK),
-    SYSTEM_TASK(false);
+    SYSTEM_TASK(false),
+
+    // Activity summary for use by 'operator' functions
+    SHUTDOWN_CHECK,
+    STOP_CHECK,
+    PAUSE_CHECK,
+    XDCR_READINESS;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

@@ -186,6 +186,9 @@ SnapshotCompletionInterest, Promotable
                 findRestoreCatalog();
             }
 
+            // Initialize progress report
+            VoltDB.instance().reportNodeStartupProgress(0, m_liveHosts.size());
+
             try {
                 if (!m_isLeader) {
                     // wait on the leader's barrier.
@@ -573,6 +576,7 @@ SnapshotCompletionInterest, Promotable
             VoltDB.crashLocalVoltDB("Unable to delete zk node " + m_generatedRestoreBarrier2, false, e);
         }
 
+        VoltDB.instance().reportNodeStartupProgress(1, m_liveHosts.size());
         if (m_callback != null) {
             m_callback.onSnapshotRestoreCompletion();
         }
@@ -587,6 +591,9 @@ SnapshotCompletionInterest, Promotable
             } catch (InterruptedException e2) {
                 continue;
             }
+
+            int completed = m_liveHosts.size() - children.size();
+            VoltDB.instance().reportNodeStartupProgress(completed, m_liveHosts.size());
 
             if (children.size() > 0) {
                 try {

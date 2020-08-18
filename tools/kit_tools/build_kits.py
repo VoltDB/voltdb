@@ -161,9 +161,9 @@ def makeSHA256SUM(version, type):
 ################################################
 
 def makeMavenJars():
-    with cd(builddir + "/voltdb"):
-        run("VOLTCORE=../voltdb ant -f build.xml maven-jars")
-        run("VOLTCORE=../voltdb ant -f build-client.xml maven-jars")
+    with cd(builddir + "/internal"):
+        run("VOLTCORE=../internal ant -f build.xml maven-jars")
+        run("VOLTCORE=../internal ant -f build-client.xml maven-jars")
 
 ################################################
 # COPY FILES

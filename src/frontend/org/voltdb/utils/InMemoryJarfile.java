@@ -213,6 +213,10 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         return output.toByteArray();
     }
 
+    public void writeToStdout() throws IOException {
+        writeToOutputStream(System.out);
+    }
+
     protected void writeToOutputStream(OutputStream output) throws IOException {
         JarOutputStream jarOut = new JarOutputStream(output);
 

@@ -17,7 +17,7 @@ jenkins_vars=[
     'GIT_URL',
 ]
 
-repos = dict(voltdb='unknown', pro='unknown')
+repos = dict(internal='unknown',voltdb='unknown', pro='unknown')
 
 def map_repo(url, branch):
     for r in repos.iterkeys():
@@ -37,6 +37,7 @@ for jv in jenkins_vars:
     if jv in os.environ:
         stored_vars_map[sv] = os.environ[jv]
     else:
+        print("missing env var '%s', setting to 'unknown'" % jv)
         stored_vars_map[sv] = 'unknown'
 
 map_repo(stored_vars_map['kit_git_url'], stored_vars_map['kit_git_branch'])
@@ -50,7 +51,10 @@ for i in range(1, 10):
 
 #BRANCH is used by downstream jobs
 branch = repos['voltdb']
-if repos['voltdb'] != repos['pro']:
+if repos['voltdb'] == "unknown":
+   branch = repos['internal']
+
+if repos['voltdb'] != repos['pro'] and repos['internal'] != repos['pro']:
     branch += ("/" + repos['pro'])
 
 stored_vars_map['BRANCH'] = branch

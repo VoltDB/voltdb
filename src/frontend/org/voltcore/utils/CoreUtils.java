@@ -1253,9 +1253,8 @@ public class CoreUtils {
     }
 
     /**
-     * Print beautiful logs surrounded by stars. This function handles long lines (wrapping
-     * into multiple lines) as well. Please use only spaces and newline characters for word
-     * separation.
+     * Print beautiful logs surrounded by stars. Please use only spaces and newline
+     * characters for word separation.
      * @param vLogger   The provided VoltLogger
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
@@ -1264,43 +1263,45 @@ public class CoreUtils {
     {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
-        // 80 stars in a line
+        // Length of stars = msg length, plus 4 for the surrounding "* " and " *"
+        int width = msg.length() + 4;
         StringBuilder starBuilder = new StringBuilder();
-        for (int i = 0; i < 80; i++) {
-            starBuilder.append("*");
+        for (int i = 0; i < width; i++) {
+            starBuilder.append('*');
         }
         String stars = starBuilder.toString();
+        String xmsg = "* " + msg + " *";
 
         // Wrap the message with 2 lines of stars
         switch (level) {
             case DEBUG:
                 vLogger.debug(stars);
-                vLogger.debug("* " + msg + " *");
+                vLogger.debug(xmsg);
                 vLogger.debug(stars);
                 break;
             case WARN:
                 vLogger.warn(stars);
-                vLogger.warn("* " + msg + " *");
+                vLogger.warn(xmsg);
                 vLogger.warn(stars);
                 break;
             case ERROR:
                 vLogger.error(stars);
-                vLogger.error("* " + msg + " *");
+                vLogger.error(xmsg);
                 vLogger.error(stars);
                 break;
             case FATAL:
                 vLogger.fatal(stars);
-                vLogger.fatal("* " + msg + " *");
+                vLogger.fatal(xmsg);
                 vLogger.fatal(stars);
                 break;
             case INFO:
                 vLogger.info(stars);
-                vLogger.info("* " + msg + " *");
+                vLogger.info(xmsg);
                 vLogger.info(stars);
                 break;
             case TRACE:
                 vLogger.trace(stars);
-                vLogger.trace("* " + msg + " *");
+                vLogger.trace(xmsg);
                 vLogger.trace(stars);
                 break;
             default:
