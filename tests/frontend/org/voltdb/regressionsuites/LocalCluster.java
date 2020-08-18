@@ -449,10 +449,17 @@ public class LocalCluster extends VoltServerConfig {
     public void setToStartPaused() {
        m_isPaused = true;
     }
+
     /**
-     * Override the Valgrind backend with a JNI backend.
-     * Called after a constructor but before startup.
+     * Override the Valgrind backend with a JNI backend. Called after a constructor but before startup.
+     * <p>
+     * The biggest reason this is used is for tests which use snapshotting, which is not supported by the IPC EE
+     * implementation.
+     *
+     * @deprecated If the test does not support valgrind it would be better to skip the test during memcheck test runs.
+     *             Use {@link #isMemcheckDefined()} or {@link #isValgrind()} to test if this is a memcheck run.
      */
+    @Deprecated
     public void overrideAnyRequestForValgrind() {
         if (templateCmdLine.m_backend.isValgrindTarget) {
             m_target = BackendTarget.NATIVE_EE_JNI;

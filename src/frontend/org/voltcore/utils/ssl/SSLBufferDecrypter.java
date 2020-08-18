@@ -40,7 +40,7 @@ public class SSLBufferDecrypter {
         this.m_sslEngine = sslEngine;
     }
 
-    public boolean readTLSFrame(ScatteringByteChannel chn, ByteBuf buf) throws IOException {
+    public static boolean readTLSFrame(ScatteringByteChannel chn, ByteBuf buf) throws IOException {
         int widx = buf.writerIndex();
         ByteBuf header = buf.slice(widx, TLS_HEADER_SIZE).clear();
         int rc = 0;
@@ -70,36 +70,8 @@ public class SSLBufferDecrypter {
         return true;
     }
 
-    public int tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
-        while (true) {
-            SSLEngineResult result = null;
-            ByteBuffer slice = dstBuffer.slice();
-            try {
-                result = m_sslEngine.unwrap(srcBuffer, slice);
-            } catch (SSLException|ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
-                throw new TLSException("ssl engine unwrap fault", e);
-            }
-            switch (result.getStatus()) {
-                case OK:
-                    if (result.bytesProduced() == 0 && !srcBuffer.hasRemaining()) {
-                        return 0;
-                    }
-                    // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    if (result.bytesProduced() > 0) {
-                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return result.bytesProduced();
-                        }
-                    else {
-                        continue;
-                    }
-                case BUFFER_OVERFLOW:
-                    throw new TLSException("SSL engine unexpectedly overflowed when decrypting");
-                case BUFFER_UNDERFLOW:
-                    throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
-                case CLOSED:
-                    throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");
-            }
-        }
+    public int getPacketBufferSize() {
+        return m_sslEngine.getSession().getPacketBufferSize();
     }
 
     /**
@@ -138,10 +110,14 @@ public class SSLBufferDecrypter {
 
             switch (result.getStatus()) {
             case OK:
-                if (result.bytesProduced() <= 0 || srcBuffer.hasRemaining()) {
+                int bytesProduced = result.bytesProduced();
+                if (bytesProduced > 0) {
+                    writerIndex += result.bytesProduced();
+                }
+                if (bytesProduced <= 0 || srcBuffer.hasRemaining()) {
                     continue;
                 }
-                dstBuf.writerIndex(writerIndex + result.bytesProduced());
+                dstBuf.writerIndex(writerIndex);
                 return dstBuf;
             case BUFFER_OVERFLOW:
                 dstBuf.release();
@@ -154,8 +130,11 @@ public class SSLBufferDecrypter {
                 }
                 throw new TLSException("SSL engine unexpectedly overflowed when decrypting");
             case BUFFER_UNDERFLOW:
-                dstBuf.release();
-                throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
+                if (srcBuffer.hasRemaining()) {
+                    dstBuf.release();
+                    throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
+                }
+                return dstBuf;
             case CLOSED:
                 dstBuf.release();
                 throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");

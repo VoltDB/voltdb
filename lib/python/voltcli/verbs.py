@@ -364,7 +364,7 @@ class JavaBundle(object):
            cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port as [ipaddress:]port-number (1st of 3 sequential ports)'),
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
-           cli.StringOption(None, '--status', 'statusport', 'specify the port used for status monitoring via http, as [ipaddress:]port-number'),
+           cli.StringOption(None, '--status', 'statusport', None), # hidden: 'specify the port used for status monitoring via http, as [ipaddress:]port-number'
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
            cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'),
