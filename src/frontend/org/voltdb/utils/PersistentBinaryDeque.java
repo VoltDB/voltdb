@@ -1929,9 +1929,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         /*
          * Iterator all the objects in all the segments and pass them to the scanner
          */
-        Iterator<PBDSegment<M>> iter = m_segments.values().iterator();
+        Iterator<Map.Entry<Long, PBDSegment<M>>> iter = m_segments.entrySet().iterator();
         while (iter.hasNext()) {
-            PBDSegment<M> segment = iter.next();
+            Map.Entry<Long, PBDSegment<M>> entry = iter.next();
+            PBDSegment<M> segment = entry.getValue();
             try {
                 int entriesToDelete = segment.validate(validator);
                 if (entriesToDelete != 0) {
@@ -1941,8 +1942,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     segmentDeleted = true;
                 }
             } catch (IOException e) {
-                m_usageSpecificLog.warn("Error validating segment: " + segment.file() + ". Quarantining segment.");
-                quarantineSegment(segment);
+                m_usageSpecificLog.warn("Error validating segment: " + segment.file() + ". Quarantining segment.", e);
+                quarantineSegment(entry);
             }
         }
         return segmentDeleted;
