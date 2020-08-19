@@ -131,6 +131,7 @@ public class FastSerializer extends OutputStream implements DataOutput {
             } else {
                 next = DBBPool.wrapBB(ByteBuffer.allocate(newCapacity));
             }
+            next.b().order(buffer.b().order());
             buffer.b().flip();
             next.b().put(buffer.b());
             assert next.b().remaining() == newRemaining;
@@ -139,7 +140,6 @@ public class FastSerializer extends OutputStream implements DataOutput {
             if (callback != null) {
                 callback.onBufferGrow(this);
             }
-            assert(buffer.b().order() == ByteOrder.BIG_ENDIAN);
         }
     }
 
@@ -187,7 +187,7 @@ public class FastSerializer extends OutputStream implements DataOutput {
         assert(buffer.b().hasArray());
         assert(!buffer.b().isDirect());
         buffer.b().flip();
-        return buffer.b().asReadOnlyBuffer();
+        return buffer.b().asReadOnlyBuffer().order(buffer.b().order());
     }
 
     /**
