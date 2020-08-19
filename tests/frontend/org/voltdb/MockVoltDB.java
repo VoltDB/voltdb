@@ -65,6 +65,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.serdes.AvroSerde;
 import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
@@ -1053,5 +1054,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         return true;
+    }
+
+    @Override
+    public AvroSerde getAvroSerde() {
+        throw new UnsupportedOperationException();
     }
 }

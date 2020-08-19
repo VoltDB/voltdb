@@ -34,6 +34,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.task.TaskManager;
@@ -376,6 +377,15 @@ public interface VoltDBInterface
      * @return The instance of {@link TaskManager} which is running in this instance
      */
     public TaskManager getTaskManager();
+
+    /**
+     * Return the static {@link AvroSerde} for this instance. When the configuration is updated the instance of
+     * {@link AvroSerde} will be updated with the new configuration so all users of the class can keep using the
+     * retrieved instance with the new configuration.
+     *
+     * @return The instance of {@link AvroSerde} which is currently configured in this instance.
+     */
+    public AvroSerde getAvroSerde();
 
     /**
      * notify surviving node upon shutting itself down
