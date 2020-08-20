@@ -637,6 +637,35 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
 }
 
+/**
+ * Simple test to verify the poison pill callback is made when a second
+ * txn is invoked after the first txn was not committed.
+ */
+TEST_F(DRTupleStreamTest, TestPoisonPillIncludesIncompleteTxn)
+{
+    long preOffset = m_wrapper.getCurrBlock()->offset();
+    appendTuple(0, 1);
+    // commit first tuple
+    m_wrapper.endTransaction(addPartitionId(1));
+    long offset = m_wrapper.getCurrBlock()->offset();
+    EXPECT_GT(offset, preOffset);
+
+    // write a new tuple
+    appendTuple(2, 3);
+    ASSERT_FALSE(m_topend.receivedDRBuffer);
+    long newOffset = m_wrapper.getCurrBlock()->offset();
+    EXPECT_GT(newOffset, offset);
+    // This has a different uniqueID so that should generate a poisonpill
+    m_wrapper.endTransaction(addPartitionId(16383));
+
+    // we should be a poison pill
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
+
+    EXPECT_EQ(results->offset(), newOffset);
+    EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + MAGIC_BEGIN_TRANSACTION_SIZE + (2 * MAGIC_TUPLE_SIZE));
+}
+
 
 /**
  * Another simple rollback test, verify that a tuple in the middle of
