@@ -42,6 +42,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.DuplicateCounter.HashResult;
+import org.voltdb.iv2.MpTerm.RepairType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -135,7 +136,7 @@ public class MpScheduler extends Scheduler
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
         m_pendingTasks.shutdown();
-        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters, false);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters, RepairType.NORMAL);
         m_tasks.offer(m_nullTask);
     }
 
@@ -143,13 +144,13 @@ public class MpScheduler extends Scheduler
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
             TransactionState snapshotTransactionState)
     {
-        return updateReplicas(replicas, partitionMasters, false, false);
+        return updateReplicas(replicas, partitionMasters, RepairType.NORMAL);
     }
 
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
-            boolean balanceSPI, boolean skipRepair)
+            RepairType repairType)
     {
-        applyLeaderMigration(replicas, balanceSPI);
+        applyLeaderMigration(replicas, repairType.isMigrate());
 
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
@@ -166,7 +167,7 @@ public class MpScheduler extends Scheduler
         // in this list for further processing.
 
         // Do not update DuplicateCounter upon leader migration
-        if (!balanceSPI) {
+        if (!repairType.isMigrate()) {
             List<Long> doneCounters = new LinkedList<Long>();
             for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
                 DuplicateCounter counter = entry.getValue();
@@ -199,9 +200,9 @@ public class MpScheduler extends Scheduler
         partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
 
         // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI,
-                partitionLeaderHosts.isEmpty(), skipRepair);
-        m_pendingTasks.repair(repairTask, replicas, partitionMasters, skipRepair);
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas,
+                partitionLeaderHosts.isEmpty(), repairType);
+        m_pendingTasks.repair(repairTask, replicas, partitionMasters, repairType);
         return new long[0];
     }
 
@@ -215,6 +216,10 @@ public class MpScheduler extends Scheduler
         Set<Long> previousLeaders = Sets.newHashSet();
         previousLeaders.addAll(m_iv2Masters);
         previousLeaders.removeAll(updatedReplicas);
+        // Update is triggered by manufactured callback
+        if (previousLeaders.isEmpty()) {
+            return;
+        }
          // Find the new leader
         Set<Long> currentLeaders = Sets.newHashSet();
         currentLeaders.addAll(updatedReplicas);

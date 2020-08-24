@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -771,6 +772,23 @@ public class MpTransactionState extends TransactionState
 
     public boolean isRestart() {
         return m_isRestart;
+    }
+
+    // Check dependencies on failed host for rerouted transactions upon leader migration.
+    public boolean checkFailedHostDependancies(List<Long> masters) {
+        if (!isFragmentRestarted()) {
+            return false;
+        }
+
+        Set<Integer> hostIds = masters.stream().map(CoreUtils::getHostIdFromHSId).collect(Collectors.toSet());
+        for (Set<Long> hsids : m_remoteDeps.values()) {
+            for (Long hsid : hsids) {
+                if (!hostIds.contains(CoreUtils.getHostIdFromHSId(hsid))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
 

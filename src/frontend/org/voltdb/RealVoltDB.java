@@ -169,6 +169,7 @@ import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.MpTerm;
 import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -2015,9 +2016,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 //create a blocker for repair if this is a MP leader and partition leaders change
-                if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
-                    VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
-                            CreateMode.EPHEMERAL, hostLog, "MP Repair");
+                if (m_leaderAppointer.isLeader()) {
+                    if ( m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
+                        VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
+                                CreateMode.EPHEMERAL, hostLog, "MP Repair");
+                    } else {
+                        // When the last partition leader on a host is migrated away and there is an MP transaction which depends on
+                        // the partition leader, the transaction can be deadlocked if the host is shutdown. Since the host does not have
+                        // any partition leaders, its shutdown won't trigger transaction repair process to beak up the dependency.
+                        // Add a new ZK node to trigger transaction repair.
+                        MpTerm.createTxnRestartTrigger(m_messenger.getZK());
+                    }
                 }
 
                 // First check to make sure that the cluster still is viable before
@@ -2072,7 +2081,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // let the client interface know host(s) have failed to clean up any outstanding work
                 // especially non-transactional work
                 m_clientInterface.handleFailedHosts(failedHosts);
-
                 if (m_elasticService != null) {
                     m_elasticService.hostsFailed(failedHosts);
                 }
