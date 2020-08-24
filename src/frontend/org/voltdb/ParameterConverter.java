@@ -140,7 +140,7 @@ public class ParameterConverter {
         // Remove commas.  Doing this seems kind of dubious since it lets strings like
         //    ,,,3.1,4,,e,+,,16
         // be parsed as a valid double value (for example).
-        String commaFreeValue = value.contains(",") ? value.replaceAll(",", "") : value;
+        String commaFreeValue = value.contains(",") ? value.replace(",", "") : value;
 
         try {
             // autoboxing converts to boxed types since this method returns a java Object
