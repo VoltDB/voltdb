@@ -27,6 +27,7 @@ import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
@@ -41,7 +42,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
  *
  * Generic Export Manager Interface, also exposes singleton ExportManager instance.
  */
-public interface ExportManagerInterface {
+public interface ExportManagerInterface extends Promotable {
 
     public static final String EXPORT_FEATURE = "export";
 
@@ -95,7 +96,7 @@ public interface ExportManagerInterface {
      * @throws ExportManager.SetupException
      * @throws ReflectiveOperationException
      */
-    public static void initialize(
+    public static ExportManagerInterface initialize(
             FeaturesType deploymentFeatures,
             int myHostId,
             VoltDB.Configuration configuration,
@@ -121,6 +122,7 @@ public interface ExportManagerInterface {
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
                 myHostId, // m_siteId,
                 em.getExportStats());
+        return em;
     }
 
     /**
@@ -255,4 +257,8 @@ public interface ExportManagerInterface {
      * @param removedPartitions  The de-commissioned local partitions
      */
     public void releaseResources(List<Integer> removedPartitions);
+
+    @Override
+    default void acceptPromotion() throws InterruptedException, java.util.concurrent.ExecutionException,
+            org.apache.zookeeper_voltpatches.KeeperException {};
 }

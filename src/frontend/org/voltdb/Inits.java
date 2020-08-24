@@ -727,7 +727,7 @@ public class Inits {
             // Let the Export system read its configuration from the catalog.
             try {
                 FeaturesType features = m_rvdb.m_catalogContext.getDeployment().getFeatures();
-                ExportManagerInterface.initialize(
+                ExportManagerInterface emi = ExportManagerInterface.initialize(
                         features,
                         m_rvdb.m_myHostId,
                         m_config,
@@ -738,6 +738,7 @@ public class Inits {
                         m_rvdb.m_messenger,
                         m_rvdb.getPartitionToSiteMap()
                         );
+                m_rvdb.m_globalServiceElector.registerService(emi);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error setting up export", true, t);
             }
