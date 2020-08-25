@@ -73,7 +73,7 @@ namespace voltdb {
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
+        exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(block));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
@@ -82,14 +82,14 @@ namespace voltdb {
     int64_t DummyTopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
-        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(block));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         return pushDRBufferRetval;
     }
 
     void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {
         partitionIds.push(partitionId);
-        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(block));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
     }
 

@@ -1870,6 +1870,7 @@ void VoltDBIPC::pushExportBuffer(
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
         // Need the delete in the if statement for valgrind
         delete [] block->rawPtr();
+        delete block;
     } else {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
@@ -1915,6 +1916,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
 int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
+        delete block;
     }
     return -1;
 }
@@ -1922,6 +1924,7 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
 void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::DrStreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
+        delete block;
     }
 }
 
