@@ -17,6 +17,9 @@ function tt-find-directories() {
     elif [[ -e $TT_HOME_DIR/voltdb/tests/test-tools.sh ]]; then
         # It looks like we're running from just 'above' a <voltdb> directory
         VOLTDB_COM_DIR=$TT_HOME_DIR/voltdb
+    elif [[ -e $TT_HOME_DIR/internal/tests/test-tools.sh ]]; then
+        # It looks like we're running from just 'above' an <internal> directory
+        VOLTDB_COM_DIR=$TT_HOME_DIR/internal
     elif [[ $TT_HOME_DIR == */tests ]] && [[ -e $TT_HOME_DIR/test-tools.sh ]]; then
         # It looks like we're running from a <voltdb>/tests/ directory
         VOLTDB_COM_DIR=$(cd $TT_HOME_DIR/..; pwd)
