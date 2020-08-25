@@ -33,14 +33,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.voltdb.VoltType;
-import org.voltdb.compiler.deploymentfile.AvroType;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.test.utils.RandomTestRule;
 
 import com.google_voltpatches.common.collect.ImmutableList;
-
-import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 
 public class TestAvroSerde {
     @Rule
@@ -51,10 +47,7 @@ public class TestAvroSerde {
 
     @Test
     public void serializeDeserialize() throws Exception {
-        AvroType avro = new AvroType();
-        avro.setRegistry("faker");
-
-        AvroSerde client = new MockAvroClient(avro);
+        AvroSerde client = MockAvroSerde.create();
 
         List<VoltType> types = ImmutableList.of(VoltType.TINYINT, VoltType.SMALLINT, VoltType.INTEGER, VoltType.BIGINT,
                 VoltType.FLOAT, VoltType.DECIMAL, VoltType.TIMESTAMP, VoltType.STRING, VoltType.VARBINARY,
@@ -83,16 +76,5 @@ public class TestAvroSerde {
         }
 
         assertFalse(serialized.hasRemaining());
-    }
-
-    private class MockAvroClient extends AvroSerde {
-        public MockAvroClient(AvroType avro) {
-            super(avro);
-        }
-
-        @Override
-        SchemaRegistryClient buildClient(AvroType avro) {
-            return new MockSchemaRegistryClient();
-        }
     }
 }
