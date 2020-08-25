@@ -17,6 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+import java.util.Map;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -76,6 +79,8 @@ public abstract class TransactionTask extends SiteTasker
     }
 
     protected void durabilityTraceEnd() {}
+
+    public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMaster) {}
 
     @Override
     abstract public void run(SiteProcedureConnection siteConnection);

@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
@@ -80,7 +81,8 @@ public class EveryPartitionTask extends TransactionTask
      * Currently only thread-"safe" by virtue of only calling this on
      * ProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
      */
-    public void updateMasters(List<Long> masters)
+    @Override
+    public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMaster)
     {
         m_initiatorHSIds.clear();
         m_initiatorHSIds.addAll(masters);

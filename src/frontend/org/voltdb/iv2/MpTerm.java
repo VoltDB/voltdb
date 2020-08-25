@@ -18,13 +18,19 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.SortedSet;
-import java.util.concurrent.ExecutionException;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
@@ -43,10 +49,36 @@ public class MpTerm implements Term
     private final InitiatorMailbox m_mailbox;
     private final ZooKeeper m_zk;
     private volatile SortedSet<Long> m_knownLeaders = ImmutableSortedSet.of();
+    private volatile Map<Integer, Long> m_cacheCopy = ImmutableMap.of();
+    private boolean m_lastUpdateByMigration;
+    private final ExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("mpterm", 15000);
+
+    public static enum RepairType {
+        // Repair process from partition leader changes via LeaderAppointer
+        NORMAL(0),
+        // Repair process from partition leader changes via migration
+        MIGRATE(1),
+        // Repair process not from partition leader changes
+        TXN_RESTART(2),
+        // Do not restart current transactions while repaired.
+        SKIP_TXN_RESTART(4);
+        final int type;
+        RepairType(int type) {
+            this.type = type;
+        }
+        public boolean isMigrate() {
+            return this == MIGRATE|| this == SKIP_TXN_RESTART;
+        }
+        public boolean isTxnRestart() {
+            return this == TXN_RESTART;
+        }
+        public boolean isSkipTxnRestart() {
+            return this == SKIP_TXN_RESTART;
+        }
+    }
 
     // Initialized in start() -- when the term begins.
     protected LeaderCache m_leaderCache;
-
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
     // the Term processing.
@@ -59,15 +91,14 @@ public class MpTerm implements Term
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
-            HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+            ImmutableMap.Builder<Integer, Long> cacheBuilder = ImmutableMap.builder();
             boolean migratePartitionLeaderRequested = false;
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
                 long hsid = e.getValue().m_HSId;
                 builder.add(hsid);
-                cacheCopy.put(e.getKey(), hsid);
-
+                cacheBuilder.put(e.getKey(), hsid);
                 //The master change is triggered via @MigratePartitionLeader
-                if (e.getValue().m_isMigratePartitionLeaderRequested && !(m_knownLeaders.contains(hsid))) {
+                if (e.getValue().m_isMigratePartitionLeaderRequested && !m_knownLeaders.contains(hsid)) {
                     migratePartitionLeaderRequested = true;
                 }
             }
@@ -77,9 +108,13 @@ public class MpTerm implements Term
                         + CoreUtils.hsIdCollectionToString(updatedLeaders) + ". MigratePartitionLeader:" + migratePartitionLeaderRequested);
             }
             m_knownLeaders = updatedLeaders;
-
-            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy,
-                    migratePartitionLeaderRequested);
+            RepairType repairType = RepairType.NORMAL;
+            if (migratePartitionLeaderRequested) {
+                repairType = RepairType.MIGRATE;
+            }
+            m_lastUpdateByMigration = migratePartitionLeaderRequested;
+            m_cacheCopy = cacheBuilder.build();
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), m_cacheCopy, repairType);
         }
     };
 
@@ -104,10 +139,8 @@ public class MpTerm implements Term
         try {
             m_leaderCache = new LeaderCache(m_zk, "MpTerm-iv2masters", VoltZK.iv2masters, m_leadersChangeHandler);
             m_leaderCache.start(true);
-        }
-        catch (ExecutionException ee) {
-            VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
-        } catch (InterruptedException e) {
+            watchTxnRestart();
+        } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, e);
         }
     }
@@ -119,8 +152,13 @@ public class MpTerm implements Term
             try {
                 m_leaderCache.shutdown();
             } catch (InterruptedException e) {
-                // We're shutting down...this may jsut be faster.
+                // We're shutting down...this may just be faster.
             }
+        }
+        try {
+            m_es.shutdown();
+            m_es.awaitTermination(5, TimeUnit.MINUTES);
+        } catch (Exception e) {
         }
     }
 
@@ -133,5 +171,60 @@ public class MpTerm implements Term
                 return new ArrayList<Long>(m_knownLeaders);
             }
         };
+    }
+
+    private final Watcher txnRestartWatcher = new Watcher() {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(() -> {
+                try {
+                    watchTxnRestart();
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+                }}
+            );
+        }
+    };
+
+    // m_leadersChangeHandler and watchTxnRestart are running on the same ZK callback thread, one at a time
+    // So they won't step on each other. MP transactions are repaired upon partition leader changes via m_leadersChangeHandler.
+    // If no partition leader changes occur, MP transactions won't be repaired since ZK won't invoke callback m_leadersChangeHandler.
+    // voltadmin stop command may hit the scenario: the host is shutdown after the last partition leader on the host is migrated away
+    // If there happens to be a rerouted transaction from the last leader migration, the transaction won't be repaired via m_leadersChangeHandler.
+    private void watchTxnRestart() throws KeeperException, InterruptedException {
+        if(m_zk.exists(VoltZK.trigger_txn_restart, txnRestartWatcher) == null) {
+            return;
+        }
+        if (!m_lastUpdateByMigration) {
+            removeTxnRestartTrigger(m_zk);
+            return;
+        }
+        // If any partition masters are still on dead host, let m_leadersChangeHandler process transaction repair
+        Set<Integer> liveHostIds = m_mailbox.m_messenger.getLiveHostIds();
+        if (!m_knownLeaders.stream().map(CoreUtils::getHostIdFromHSId).allMatch(liveHostIds::contains)) {
+            removeTxnRestartTrigger(m_zk);
+            return;
+        }
+        tmLog.info(m_whoami + "repair transaction after leader migration.");
+        ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), m_cacheCopy, RepairType.TXN_RESTART);
+    }
+
+    public static void createTxnRestartTrigger(ZooKeeper zk) {
+        try {
+            zk.create(VoltZK.trigger_txn_restart,
+                    null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (KeeperException.NodeExistsException e) {
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to store trsansaction restart trigger info", true, e);
+        }
+    }
+
+    public static void removeTxnRestartTrigger(ZooKeeper zk) {
+        try {
+            zk.delete(VoltZK.trigger_txn_restart, -1);
+        } catch (KeeperException.NoNodeException e) {
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to delete trsansaction restart trigger info", true, e);
+        }
     }
 }

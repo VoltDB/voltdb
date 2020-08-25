@@ -249,6 +249,8 @@ public class VoltZK {
 
     public static final String hashMismatchedReplicas = "/db/mismatched";
 
+    public static final String trigger_txn_restart = "/db/restart";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,

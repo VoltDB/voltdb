@@ -27,6 +27,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.MpTerm.RepairType;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google_voltpatches.common.base.Suppliers;
@@ -61,16 +62,18 @@ public class MpRepairTask extends SiteTasker
 
     // Indicate if the round of leader promotion has been completed
     private final boolean m_partitionLeaderPromotionComplete;
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration,
-            boolean partitionLeaderPromotionComplete, boolean skipRepair)
+    private final boolean m_txnRestartTrigger;
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters,
+            boolean partitionLeaderPromotionComplete, RepairType repairType)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        m_leaderMigration = leaderMigration;
+        m_leaderMigration = repairType.isMigrate();
         m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, skipRepair);
+        m_txnRestartTrigger = repairType.isTxnRestart();
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, repairType.isSkipTxnRestart());
     }
 
     @Override
@@ -96,6 +99,9 @@ public class MpRepairTask extends SiteTasker
                     // in the repair process. Remove the mp repair blocker
                     if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
                         VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                    }
+                    if (m_txnRestartTrigger) {
+                        MpTerm.removeTxnRestartTrigger(m_mailbox.m_messenger.getZK());
                     }
                 }
             }

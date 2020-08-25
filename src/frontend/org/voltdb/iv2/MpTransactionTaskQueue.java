@@ -31,6 +31,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.iv2.MpTerm.RepairType;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -99,7 +100,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters, boolean balanceSPI)
+    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters, RepairType repairType)
     {
         // We know that every Site assigned to the MPI (either the main writer or
         // any of the MP read pool) will only have one active transaction at a time,
@@ -109,7 +110,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + balanceSPI);
+                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + repairType.isMigrate());
             }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
@@ -118,7 +119,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         else {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + balanceSPI);
+                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + repairType.isMigrate());
             }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
@@ -126,28 +127,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
+                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("MpTTQ: poisoning task: " + next.toShortString());
                 }
                 next.doRestart(masters, partitionMasters);
-
-                if (!balanceSPI) {
-                    MpTransactionState txn = (MpTransactionState)next.getTransactionState();
-                    // inject poison pill
-                    FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, txn.txnId, txn.uniqueId,
-                            false, false, false, txn.isNPartTxn(), txn.getTimetamp());
-                    FragmentResponseMessage poison =
-                            new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-                    // Provide a TransactionRestartException which will be converted
-                    // into a ClientResponse.RESTART, so that the MpProcedureTask can
-                    // detect the restart and take the appropriate actions.
-                    TransactionRestartException restart = new TransactionRestartException(TXN_RESTART_MSG, next.getTxnId());
-                    restart.setMisrouted(false);
-                    poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-                    txn.offerReceivedFragmentResponse(poison);
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("MpTTQ: restarting:" + next.toShortString());
+                if ( repairType.isTxnRestart()) {
+                    // If there are dependencies on failed host for rerouted transaction, poison the transaction
+                    if (txn.checkFailedHostDependancies(masters)) {
+                        poisonTransaction(txn, next);
                     }
+                } else if (!repairType.isSkipTxnRestart()) {
+                    poisonTransaction(txn, next);
                 }
             }
         }
@@ -156,24 +148,30 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
             TransactionTask tt = iter.next();
-            if (tt instanceof MpProcedureTask) {
-                MpProcedureTask next = (MpProcedureTask)tt;
-
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Repair updating task: " + next.toShortString() + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
-                }
-                next.updateMasters(masters, partitionMasters);
-            }
-            else if (tt instanceof EveryPartitionTask) {
-                EveryPartitionTask next = (EveryPartitionTask)tt;
-                if (tmLog.isDebugEnabled())  {
-                    tmLog.debug("Repair updating EPT task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
-                }
-                next.updateMasters(masters);
+            tt.updateMasters(masters, partitionMasters);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Repair updating task: " + tt + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
             }
         }
     }
 
+    private void poisonTransaction(MpTransactionState txn, MpProcedureTask next) {
+        // inject poison pill
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, txn.txnId, txn.uniqueId,
+                false, false, false, txn.isNPartTxn(), txn.getTimetamp());
+        FragmentResponseMessage poison =
+                new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+        // Provide a TransactionRestartException which will be converted
+        // into a ClientResponse.RESTART, so that the MpProcedureTask can
+        // detect the restart and take the appropriate actions.
+        TransactionRestartException restart = new TransactionRestartException(TXN_RESTART_MSG, next.getTxnId());
+        restart.setMisrouted(false);
+        poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+        txn.offerReceivedFragmentResponse(poison);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("MpTTQ: restarting:" + next.toShortString());
+        }
+    }
     private void taskQueueOffer(TransactionTask task)
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);

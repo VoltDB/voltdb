@@ -82,6 +82,7 @@ public class MpProcedureTask extends ProcedureTask
      * Currently only thread-"safe" by virtue of only calling this on
      * MpProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
      */
+    @Override
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         m_initiatorHSIds.clear();
