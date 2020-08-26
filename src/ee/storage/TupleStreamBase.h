@@ -216,9 +216,8 @@ void TupleStreamBase<SB>::pushPendingBlocks()
         if (m_committedUso >= (block->uso() + block->offset()))
         {
             //The block is handed off to the topend which is responsible for releasing the
-            //memory associated with the block data. The metadata is deleted here.
+            //memory associated with the block data.
             pushStreamBuffer(block);
-            delete block;
             m_pendingBlocks.pop_front();
         }
         else
