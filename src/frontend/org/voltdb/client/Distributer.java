@@ -1574,6 +1574,19 @@ class Distributer {
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 
+    /**
+     * This is used by clients such as VoltDBKafkaPartitioner which puts processing into buckets.
+     *
+     * @param value the representative value
+     * @return
+     */
+    public long getPartitionForParameter(byte[] bytes) {
+        if (m_hashinator == null) {
+            return -1;
+        }
+        return m_hashinator.getHashedPartitionForParameter(bytes);
+    }
+
     private ByteBuffer serializeSPI(ProcedureInvocation pi) throws IOException {
         ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
