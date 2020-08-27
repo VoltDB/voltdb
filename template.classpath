@@ -26,7 +26,7 @@
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-3.4.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.7.3.jar"/>
-	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/super-csv-2.4.0.jar"/>
 	<classpathentry kind="lib" path="lib/owner-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/owner-java8-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/snmp4j-2.5.2.jar"/>
