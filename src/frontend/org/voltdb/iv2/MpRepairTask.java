@@ -70,10 +70,10 @@ public class MpRepairTask extends SiteTasker
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        m_leaderMigration = repairType.isMigrate();
+        m_leaderMigration = repairType.isSkipTxnRestart();
         m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
         m_txnRestartTrigger = repairType.isTxnRestart();
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, repairType.isSkipTxnRestart());
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, repairType.isSkipRepair());
     }
 
     @Override

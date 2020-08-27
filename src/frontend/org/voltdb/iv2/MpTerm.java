@@ -60,20 +60,28 @@ public class MpTerm implements Term
         MIGRATE(1),
         // Repair process not from partition leader changes
         TXN_RESTART(2),
-        // Do not restart current transactions while repaired.
-        SKIP_TXN_RESTART(4);
+        // Skip MP repair for leader migration while MP repair algo is cancelled.
+        SKIP_MP_REPAIR(4);
         final int type;
+
         RepairType(int type) {
             this.type = type;
         }
+
         public boolean isMigrate() {
-            return this == MIGRATE|| this == SKIP_TXN_RESTART;
+            return this == MIGRATE;
         }
+
+        public boolean isSkipTxnRestart() {
+            return this == MIGRATE || this == SKIP_MP_REPAIR;
+        }
+
         public boolean isTxnRestart() {
             return this == TXN_RESTART;
         }
-        public boolean isSkipTxnRestart() {
-            return this == SKIP_TXN_RESTART;
+
+        public boolean isSkipRepair() {
+            return this == SKIP_MP_REPAIR;
         }
     }
 
