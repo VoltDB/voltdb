@@ -80,7 +80,7 @@ def _check_segmentation_offload():
 
 def test_os_release(output):
     supported = False
-    distInfo = ""
+    distInfo = ('', '', '')
     formatString = "{0} release {1} {2}"
     if platform.system() == "Linux":
         output['OS'] = ["PASS", "Linux"]
@@ -93,6 +93,10 @@ def test_os_release(output):
         elif "ubuntu" in distInfo[0].lower():
             if distInfo[1] in ("14.04", "16.04", "18.04"):
                 supported = True
+        elif not distInfo[0]: # empty in our k8s image (adoptopenjdk/openjdk11:alpine-slim)
+            release = platform.release()
+            distInfo = ("Unspecified", release, "")
+            supported = True # not validating release
     elif platform.system() == "Darwin":
         output["OS"] = ["PASS", "MacOS X"]
         version = platform.uname()[2]
@@ -101,10 +105,12 @@ def test_os_release(output):
             supported = True
     else:
         output['OS'] = ["WARN", "Only supports Linux based platforms"]
-        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 12.04/14.04 and RedHat/CentOS 6.6 or later"]
-    if not supported:
+        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 14.04/16.04/18.04 and RedHat/CentOS 7.0 or later"]
+    if supported:
+        output['OS release'] = ["PASS", formatString.format(*distInfo)]
+    elif 'OS release' not in output:
         formatString = "Unsupported release: " + formatString
-    output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
+        output['OS release'] = ["WARN", formatString.format(*distInfo)]
 
 def test_64bit_os(output):
     if platform.machine().endswith('64'):
