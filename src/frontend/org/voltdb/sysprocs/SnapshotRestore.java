@@ -91,6 +91,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
@@ -1352,6 +1353,31 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
             }
             // Truncate the PBD buffers and assign the stats to the restored value
+            VoltDB.getExportManager().updateInitialExportStateToSeqNo(myPartitionId, name,
+                    action,
+                    sequenceNumberPerPartition);
+        }
+
+        // Iterate over opaque topics
+        for (Topic topic : db.getTopics()) {
+            if (!CatalogUtil.isOpaqueTopicForPartition(topic, myPartitionId)) {
+                continue;
+            }
+            String name = topic.getTypeName();
+
+            //Sequence numbers for this table for every partition
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
+            if (sequenceNumberPerPartition == null) {
+                SNAP_LOG.warn("Could not find export sequence number for table " + name +
+                        ". This warning is safe to ignore if you are loading a pre 1.3 snapshot" +
+                        " which would not contain these sequence numbers (added in 1.3)." +
+                        " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                        " are reset to 0");
+                continue;
+            }
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Restoring opaque topic " + name + " from snapshot:\n" + sequenceNumberPerPartition);
+            }
             VoltDB.getExportManager().updateInitialExportStateToSeqNo(myPartitionId, name,
                     action,
                     sequenceNumberPerPartition);

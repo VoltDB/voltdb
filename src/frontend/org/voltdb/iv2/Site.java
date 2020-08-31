@@ -46,7 +46,6 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
-import org.voltdb.TopicsSystemTableConnection;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
@@ -72,6 +71,7 @@ import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.TopicsSystemTableConnection;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -87,6 +87,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -1569,13 +1570,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         for (Map.Entry<String, Map<Integer, ExportSnapshotTuple>> tableEntry : exportSequenceNumbers.entrySet()) {
-            final Table catalogTable = m_context.tables.get(tableEntry.getKey());
-            if (catalogTable == null) {
+            Table catalogTable = m_context.tables.get(tableEntry.getKey());
+            Topic opaqueTopic = m_context.database.getTopics().get(tableEntry.getKey());
+            if (opaqueTopic != null && !opaqueTopic.getIsopaque()) {
+                // Non-opaque topics must be a regular stream
+                opaqueTopic = null;
+            }
+            if (catalogTable == null && opaqueTopic == null) {
                 VoltDB.crashLocalVoltDB(
                         "Unable to find catalog entry for table named " + tableEntry.getKey(),
                         true,
                         null);
             }
+            if (opaqueTopic != null && opaqueTopic.getIssingle() && m_partitionId > 0) {
+                // Skip nonzero partitions for single-partition opaque topics
+                continue;
+            }
+            String tableName = catalogTable != null ? catalogTable.getTypeName() : opaqueTopic.getTypeName();
             ExportSnapshotTuple sequenceNumbers = tableEntry.getValue().get(m_partitionId);
 
             if (sequenceNumbers == null) {
@@ -1589,9 +1600,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
 
-            setExportStreamPositions(sequenceNumbers, m_partitionId, catalogTable.getTypeName());
+            if (catalogTable != null) {
+                // Don't do this for opaque topics
+                setExportStreamPositions(sequenceNumbers, m_partitionId, tableName);
+            }
             // assign the stats to the other partition's value
-            VoltDB.getExportManager().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
+            VoltDB.getExportManager().updateInitialExportStateToSeqNo(m_partitionId, tableName,
                     StreamStartAction.REJOIN, tableEntry.getValue());
         }
         if (m_sysprocContext.isLowestSiteId()) {

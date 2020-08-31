@@ -119,6 +119,19 @@ public class SnapshotCompletionMonitor {
              m_sequenceNumber = in.readLong();
              m_generationId = in.readLong();
          }
+
+         @Override
+         public String toString() {
+             return new StringBuilder(this.getClass().getSimpleName())
+                     .append("[ack ")
+                     .append(m_ackOffset)
+                     .append(", seq ")
+                     .append(m_sequenceNumber)
+                     .append(", gen ")
+                     .append(m_generationId)
+                     .append("]")
+                     .toString();
+         }
     }
 
     /*

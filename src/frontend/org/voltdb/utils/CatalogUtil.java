@@ -3895,4 +3895,16 @@ public abstract class CatalogUtil {
     public static Iterable<String> splitOnCommas(String input) {
         return Splitter.on(',').trimResults().split(input);
     }
+
+    /**
+     * Test if this is an opaque topic for the partition, also checks for single partition topics
+     *
+     * @param topic {@link Topic} from catalog
+     * @param partitionId the partition id
+     * @return {@code true} if this is an opaque topic for the partition
+     *      {@code false} if not opaque or nonzero partition for single partition topic
+     */
+    public static boolean isOpaqueTopicForPartition(Topic topic, int partitionId) {
+        return topic.getIsopaque() && (!topic.getIssingle() || partitionId == 0);
+    }
 }

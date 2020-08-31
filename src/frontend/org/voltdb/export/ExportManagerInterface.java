@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -173,6 +174,9 @@ public interface ExportManagerInterface extends Promotable {
         return count;
     }
 
+    /**
+     * Initialize on startup; any exceptions thrown from here will crash VoltDB
+     */
     public void initialize(CatalogContext catalogContext, Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin);
 
@@ -180,6 +184,12 @@ public interface ExportManagerInterface extends Promotable {
 
     public void shutdown();
 
+    /**
+     * Start polling.
+     *
+     * Called exactly once from RealVoltDB after rejoin or replay completion,
+     * after the PBDs have been safely truncated.
+     */
     public void startPolling(CatalogContext catalogContext);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
@@ -199,6 +209,17 @@ public interface ExportManagerInterface extends Promotable {
         throw new UnsupportedOperationException("Topics are not supported in this version");
     }
 
+    /**
+     * Push a stream buffer to either an export target or a topic
+     *
+     * @param partitionId
+     * @param tableName
+     * @param startSequenceNumber
+     * @param committedSequenceNumber
+     * @param tupleCount
+     * @param uniqueId
+     * @param buffer
+     */
     public void pushBuffer(
             int partitionId,
             String tableName,
@@ -207,6 +228,51 @@ public interface ExportManagerInterface extends Promotable {
             long tupleCount,
             long uniqueId,
             BBContainer buffer);
+
+    /**
+     * Push a buffer for an opaque topic
+     *
+     * <p>The export manager manages the starting sequence number in order to allow
+     * correctly reporting the offsets to the producer application</p>
+     *
+     * @param partitionId
+     * @param tableName
+     * @param tupleCount
+     * @param uniqueId
+     * @param buffer
+     * @return a {@link Pair} containing the data source's starting offset, and the offset of the
+     * first record inserted
+     */
+    default public Pair<Long, Long> pushOpaqueTopicBuffer(
+            int partitionId,
+            String topicName,
+            long tupleCount,
+            long uniqueId,
+            BBContainer buffer) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
+
+    /**
+     * Return the offset of the next record that would be added to the opaque topic
+     *
+     * @param partitionId
+     * @param topicName
+     * @return
+     */
+    default public long getNextOpaqueTopicOffset(int partitionId, String topicName) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
+
+    /**
+     * Return the {@link ExportSnapshotTuple} of the opaque topic
+     *
+     * @param partitionId
+     * @param topicName
+     * @return
+     */
+    default ExportSnapshotTuple getOpaqueTopicSnapshotTuple(int partitionId, String topicName) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
 
     public void sync();
 
