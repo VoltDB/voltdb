@@ -18,7 +18,6 @@ import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-import com.google_voltpatches.common.math.LongMath;
 import java.util.concurrent.TimeUnit;
 
 @GwtIncompatible
@@ -317,7 +316,7 @@ abstract class SmoothRateLimiter extends RateLimiter {
    * The time when the next request (no matter its size) will be granted. After granting a request,
    * this is pushed further in the future. Large requests push this further than small requests.
    */
-  private long nextFreeTicketMicros = 0L; // could be either in the past or future
+  private double nextFreeTicketMicros = 0.0; // could be either in the past or future
 
   private SmoothRateLimiter(SleepingStopwatch stopwatch) {
     super(stopwatch);
@@ -340,20 +339,20 @@ abstract class SmoothRateLimiter extends RateLimiter {
 
   @Override
   final long queryEarliestAvailable(long nowMicros) {
-    return nextFreeTicketMicros;
+    return Math.round(nextFreeTicketMicros);
   }
 
   @Override
   final long reserveEarliestAvailable(int requiredPermits, long nowMicros) {
     resync(nowMicros);
-    long returnValue = nextFreeTicketMicros;
+    long returnValue = queryEarliestAvailable(nowMicros);
     double storedPermitsToSpend = min(requiredPermits, this.storedPermits);
     double freshPermits = requiredPermits - storedPermitsToSpend;
-    long waitMicros =
+    double waitMicros =
         storedPermitsToWaitTime(this.storedPermits, storedPermitsToSpend)
-            + (long) (freshPermits * stableIntervalMicros);
+            + (freshPermits * stableIntervalMicros);
 
-    this.nextFreeTicketMicros = LongMath.saturatedAdd(nextFreeTicketMicros, waitMicros);
+    this.nextFreeTicketMicros = nextFreeTicketMicros + waitMicros;
     this.storedPermits -= storedPermitsToSpend;
     return returnValue;
   }

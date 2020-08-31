@@ -81,8 +81,6 @@ import javax.annotation_voltpatches.concurrent.ThreadSafe;
  * @author Dimitris Andreou
  * @since 13.0
  */
-// TODO(user): switch to nano precision. A natural unit of cost is "bytes", and a micro precision
-// would mean a maximum rate of "1MB/s", which might be small in some cases.
 @ThreadSafe
 @Beta
 @GwtIncompatible
