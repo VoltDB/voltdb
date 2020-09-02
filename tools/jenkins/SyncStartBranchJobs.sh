@@ -65,10 +65,15 @@ PROBRANCH=$BRANCH
 case $GIT_REPO in
 
     pro)
-        git ls-remote --heads git@github.com:VoltDB/voltdb.git origin "$BRANCH" | grep -q refs || exit 0
+        git ls-remote --heads git@github.com:VoltDB/internal.git origin "$BRANCH" | grep -q refs || exit 0
         ;;
 
     voltdb)
+        startVoltdbJobs
+        git ls-remote --heads git@github.com:VoltDB/pro.git origin "$BRANCH" | grep -q refs || PROBRANCH=master
+        ;;
+
+    internal)
         startVoltdbJobs
         git ls-remote --heads git@github.com:VoltDB/pro.git origin "$BRANCH" | grep -q refs || PROBRANCH=master
         ;;

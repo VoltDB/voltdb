@@ -162,12 +162,17 @@ function bigjars() {
         return
     fi
 
+    # if VOLTCORE is set, use it to find the relevant test directory
+    if [[ -d ${VOLTCORE}/tests/test_apps/txnid-selfcheck2 ]]; then
+        VOLTDB_TEST="${VOLTCORE}/tests/test_apps/txnid-selfcheck2"
     # voltdb (community) build has relevant tests 3 levels below the "base" (voltdb) directory
-    if [[ -d ${VOLTDB_BASE}/tests/test_apps/txnid-selfcheck2 ]]; then
+    elif [[ -d ${VOLTDB_BASE}/tests/test_apps/txnid-selfcheck2 ]]; then
         VOLTDB_TEST="${VOLTDB_BASE}/tests/test_apps/txnid-selfcheck2"
-    # pro build has to find the tests below the adjacent voltdb (community) directory
+    # pro build has to find the tests below the adjacent 'voltdb' (community) or 'internal' directory
     elif [[ -d ${VOLTDB_BASE}/../../../../voltdb/tests/test_apps/txnid-selfcheck2 ]]; then
         VOLTDB_TEST="${VOLTDB_BASE}/../../../../voltdb/tests/test_apps/txnid-selfcheck2"
+    elif [[ -d ${VOLTDB_BASE}/../../../../internal/tests/test_apps/txnid-selfcheck2 ]]; then
+        VOLTDB_TEST="${VOLTDB_BASE}/../../../../internal/tests/test_apps/txnid-selfcheck2"
     fi
     if [[ -e ${VOLTDB_TEST}/txnid-big-java1.jar && -e ${VOLTDB_TEST}/txnid-big-java2.jar ]]; then
         set -e
