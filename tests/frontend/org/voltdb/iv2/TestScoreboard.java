@@ -67,7 +67,7 @@ public class TestScoreboard {
         Scoreboard scoreboard = new Scoreboard();
         MpRestartSequenceGenerator repairGen = new MpRestartSequenceGenerator(1, false);
 
-        // Message with newer timestmap steps on older one
+        // Message with newer timestamp steps on older one
         CompleteTransactionTask comp1 = createComp(1000L, CompleteTransactionMessage.INITIAL_TIMESTAMP);
         scoreboard.addCompletedTransactionTask(comp1, false);
         long expectedTimestamp = repairGen.getNextSeqNum();

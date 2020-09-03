@@ -89,7 +89,7 @@ public:
             SerializeOutput& out);
 
     /**
-     * Delete the offsets of standalone groups which are older than the given timestmap
+     * Delete the offsets of standalone groups which are older than the given timestamp
      * @param deleteOlderThan any offsets older than this will be deleted
      */
     void deleteExpiredOffsets(const int64_t deleteOlderThan);
