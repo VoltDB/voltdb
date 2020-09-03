@@ -77,7 +77,7 @@ public:
     }
 
     /**
-     * Returns the timestmap for when this groffsetoup was last committed or -1 if this offset was never committed
+     * Returns the timestamp for when this groffsetoup was last committed or -1 if this offset was never committed
      */
     const int64_t getCommitTimestamp() const {
         return isInTable() ? ValuePeeker::peekTimestamp(getNValue(GroupOffsetTable::Column::COMMIT_TIMESTAMP)) : -1;
