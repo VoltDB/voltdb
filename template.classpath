@@ -13,7 +13,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/junit-4.12.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/system-rules-1.19.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
