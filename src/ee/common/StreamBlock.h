@@ -46,15 +46,6 @@ namespace voltdb
               m_lastSpUniqueId(0)
         {}
 
-        StreamBlock(StreamBlock *other)
-            : m_data(other->m_data), m_capacity(other->m_capacity),
-              m_headerSize(other->m_headerSize), m_offset(other->m_offset),
-              m_uso(other->m_uso),
-              m_type(other->m_type),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
-              m_lastSpUniqueId(other->m_lastSpUniqueId)
-        {}
-
         ~StreamBlock()
         {}
 
@@ -171,13 +162,6 @@ namespace voltdb
             m_committedSequenceNumber(-1L)
         {}
 
-        ExportStreamBlock(ExportStreamBlock* other) :
-            StreamBlock(other),
-            m_rowCount(other->m_rowCount),
-            m_startSequenceNumber(other->m_startSequenceNumber),
-            m_committedSequenceNumber(other->m_committedSequenceNumber)
-        {}
-
         ~ExportStreamBlock()
         {}
 
@@ -237,17 +221,6 @@ namespace voltdb
             m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
             m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
             m_lastMpUniqueId(0)
-        {}
-
-        DrStreamBlock(DrStreamBlock *other) :
-            StreamBlock(other),
-            m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
-            m_rowCountForDR(other->m_rowCountForDR),
-            m_drEventType(other->m_drEventType),
-            m_hasDRBeginTxn(other->m_hasDRBeginTxn),
-            m_startDRSequenceNumber(other->m_startDRSequenceNumber),
-            m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
-            m_lastMpUniqueId(other->m_lastMpUniqueId)
         {}
 
         ~DrStreamBlock()

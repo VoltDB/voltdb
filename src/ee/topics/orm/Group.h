@@ -49,7 +49,7 @@ public:
             const NValue& leader, const NValue& protocol);
 
     /**
-     * Returns the timestmap for when this group was last committed or -1 if this group was never committed
+     * Returns the timestamp for when this group was last committed or -1 if this group was never committed
      */
     const int64_t getCommitTimestamp() const {
         return ValuePeeker::peekTimestamp(getNValue(GroupTable::Column::COMMIT_TIMESTAMP));

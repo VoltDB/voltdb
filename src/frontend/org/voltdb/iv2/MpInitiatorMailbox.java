@@ -253,7 +253,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 // message is not necessarily needed
                 RepairType type = repairType;
                 if (repairType.isMigrate() && m_algo != null && m_algo.isCancelled()) {
-                    type = RepairType.SKIP_TXN_RESTART;
+                    type = RepairType.SKIP_MP_REPAIR;
                 }
                 // If a replica set has been configured and it changed during
                 // promotion, must cancel the term

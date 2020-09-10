@@ -23,12 +23,6 @@
 	<lib name="japex.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/japex.jar!/"/>
 	</lib>
-	<lib name="jcommon-1.0.16.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jcommon-1.0.16.jar!/"/>
-	</lib>
-	<lib name="jfreechart-1.0.13.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jfreechart-1.0.13.jar!/"/>
-	</lib>
 	<lib name="junit-4.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-4.12.jar!/"/>
 	</lib>

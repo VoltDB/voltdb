@@ -109,21 +109,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + repairType.isMigrate());
-            }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
             }
             currentSet = m_currentReads;
         }
         else {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + repairType.isMigrate());
-            }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
         }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("MpTTQ: repairing transactions. Transaction restart:" + repairType.isSkipTxnRestart());
+        }
+
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();

@@ -1616,47 +1616,6 @@ japex
 */
 
 ================================================================================
-jcommon-1.0.16
- *********************************************
-* THE JCOMMON CLASS LIBRARY: Version 1.0.16 *
-*********************************************
-17 April 2009.
-(C)opyright, 2000-2009, by Object Refinery Limited and Contributors. 12:16
-Test-Ex: /*
- * Copyright 2007 Google Inc.
-This software is released under Apache software license as mentioned below.
-/*
-
-================================================================================
-jfreechart-1.0.13
-
-/* ===========================================================
-* JFreeChart : a free chart library for the Java(tm) platform
-* ===========================================================
-*
-* (C) Copyright 2000-2008, by Object Refinery Limited and Contributors.
-*
-* Project Info:  http://www.jfree.org/jfreechart/index.html
-*
-* This library is free software; you can redistribute it and/or modify it
-* under the terms of the GNU Lesser General Public License as published by
-* the Free Software Foundation; either version 2.1 of the License, or
-* (at your option) any later version.
-*
-* This library is distributed in the hope that it will be useful, but
-* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-* License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public
-* License along with this library; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
-* USA.
-*
-* [Java is a trademark or registered trademark of Sun Microsystems, Inc.
-* in the United States and other countries.]  */
-
-================================================================================
 junit 4.4 is licensed with the Common Public License - v1.0
 Source is available at http://sourceforge.net/projects/junit/files/junit/4.4/junit-4.4-src.jar/download
 

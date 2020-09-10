@@ -604,6 +604,7 @@ void JNITopend::pushExportBuffer(
                 reinterpret_cast<jlong>(block->rawPtr()),
                 container);
         m_jniEnv->DeleteLocalRef(container);
+        delete block;
     } else {
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
@@ -640,6 +641,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
                 block->drEventType(),
                 container);
         m_jniEnv->DeleteLocalRef(container);
+        delete block;
     }
     return retval;
 }
@@ -656,6 +658,7 @@ void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStrea
                 jReason,
                 container);
         m_jniEnv->DeleteLocalRef(container);
+        delete block;
     }
     m_jniEnv->DeleteLocalRef(jReason);
 }
