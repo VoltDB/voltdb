@@ -1655,15 +1655,6 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-testability-explorer and ant-testability-explorer
- * Copyright 2007 Google Inc.
-This software is released under Apache software license as mentioned below.
-
-/*
-
-See Apache 2.0 license below.
-
-================================================================================
 Evan Jones Test Harness
 /*
 Copyright (c) 2008 Evan Jones

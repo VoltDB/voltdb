@@ -14,9 +14,6 @@
 	<lib name="ant-junit.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-junit.jar!/"/>
 	</lib>
-	<lib name="ant-testability-explorer.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-testability-explorer.jar!/"/>
-	</lib>
 	<lib name="ant.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant.jar!/"/>
 	</lib>
@@ -25,9 +22,6 @@
 	</lib>
 	<lib name="pmd-4.2.5.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/pmd-4.2.5.jar!/"/>
-	</lib>
-	<lib name="testability-explorer.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/testability-explorer.jar!/"/>
 	</lib>
 	<lib name="log4j-1.2.16.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/log4j-1.2.16.jar!/"/>

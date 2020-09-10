@@ -1189,14 +1189,6 @@ JAR BUILDING
     </ant>
 </target>
 
-<target name="voltdbthin.jar" depends="compile" description="used by testability-explorer">
-    <jar destfile="${build.prod.dir}/voltdbthin.jar">
-        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
-            <include name="org/voltdb/**" />
-        </fileset>
-    </jar>
-</target>
-
 <target name="voltdbfat.jar" depends="compile, buildinfo">
     <jar destfile="${build.prod.dir}/voltdbfat.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
@@ -2050,23 +2042,6 @@ TEST CASES
 
         <html destdir="jacoco-report"/>
     </jacoco:report>
-</target>
-
-<target name='testability-report' depends="voltdbthin.jar"
-    description="produce Google Code testability-explorer report">
-    <path id="testability.lib">
-        <pathelement location="${vendor.lib.dir}/ant-testability-explorer.jar" />
-        <pathelement location="${vendor.lib.dir}/testability-explorer.jar" />
-    </path>
-    <taskdef name="testability" classname="com.google.ant.TestabilityTask" classpathref="testability.lib" />
-    <testability resultfile="${build.dir}/testability.result.html" print="html"
-        errorfile="${build.dir}/testability.err.txt">
-        <classpath>
-            <fileset dir="${build.prod.dir}">
-                <include name="voltdbthin.jar" />
-            </fileset>
-        </classpath>
-    </testability>
 </target>
 
 <target name="cpd">

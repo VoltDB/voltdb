@@ -11,12 +11,10 @@
 	<classpathentry kind="lib" path="lib/jline-2.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/hamcrest-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/junit-4.12.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/system-rules-1.19.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
 	<classpathentry kind="lib" path="lib/servlet-api-3.1.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
