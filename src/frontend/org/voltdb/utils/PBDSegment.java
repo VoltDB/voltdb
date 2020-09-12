@@ -27,6 +27,9 @@ import java.util.List;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
+import org.voltdb.utils.BinaryDeque.EntryUpdater;
+import org.voltdb.utils.BinaryDeque.UpdateResult;
 
 public abstract class PBDSegment<M> {
     private static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
@@ -216,6 +219,20 @@ public abstract class PBDSegment<M> {
 
 
     abstract int validate(BinaryDeque.BinaryDequeValidator<M> validator) throws IOException;
+
+    /**
+     * Iterate over entries in reverse order and pass each entry to {@code updater}. If one or more of the entries are
+     * modified return a new segment instance with the updates.
+     * <p>
+     * The result is a {@link Pair}. {@link Pair#getFirst()} will return the new {@link PBDSegment} with the updates or
+     * {@code null} if no updates were made. {@link Pair#getSecond()} will return {@code true} if iteration should stop
+     * because {@code updater} returned {@link UpdateResult#STOP}
+     *
+     * @param updater {@link EntryUpdater} to apply
+     * @return {@link Pair} of update segment and whether iteration should stop
+     * @throws IOException
+     */
+    abstract Pair<PBDSegment<M>, Boolean> updateEntries(EntryUpdater<? super M> updater) throws IOException;
 
     /**
      * Returns whether the file is final
