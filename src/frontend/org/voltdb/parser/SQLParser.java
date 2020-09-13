@@ -560,14 +560,137 @@ public class SQLParser extends SQLPatternFactory
                     SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_STREAM");
 
-    private static final Pattern PAT_CREATE_TOPIC =
+    /**
+     * Build regex to support create opaque topic statement in the from of
+     * <p>
+     *
+     * <pre>
+     * CREATE OPAQUE TOPIC {name} [PARTITIONED]
+     *     [ALLOW [PRODUCER | CONSUMER] {roles}]
+     *     [PROFILE {profile}]
+     * </pre>
+     */
+    private static final Pattern PAT_CREATE_OPAQUE_TOPIC =
             SPF.statement(
-                    SPF.token("create"), SPF.token("topic"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.token("create"), SPF.token("opaque"), SPF.token("topic"), SPF.capture("topicName", SPF.databaseObjectName()),
+                    SPF.optional(
+                        SPF.clause(
+                           SPF.token("partitioned")
+                        )
+                    ),
+                    // TO DO: combine allows with SPF.repeat(0, 2,?
+                    SPF.optional(
+                        SPF.clause(
+                           SPF.token("allow"),
+                           SPF.optional(SPF.clause(
+                                   SPF.capture("producerConsumer1", SPF.oneOf("producer", "consumer")))),
+                           SPF.group(true, "allowedRole1", new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*"))
+                       )
+                    ),
                     SPF.optional(
                             SPF.clause(
-                                SPF.token("opaque"),
-                                SPF.optional(SPF.clause(SPF.token("single"), SPF.token("partition")))
+                               SPF.token("allow"),
+                               SPF.optional(SPF.clause(
+                                       SPF.capture("producerConsumer2", SPF.oneOf("producer", "consumer")))),
+                               SPF.group(true, "allowedRole2", new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*"))
+                           )
+                        ),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("profile"), SPF.capture("profile", SPF.databaseObjectName())
+                        )
+                    )
+            ).compile("PAT_CREATE_OPAQUE_TOPIC");
+
+    /**
+     * Build regex to support create topic statement in the from of
+     * <p>
+     *
+     * <pre>
+     * CREATE TOPIC [USING STREAM]{name} [EXECUTE PROCEDURE z [WITH KEYS]]
+     *     [FORMAT [KEY | VALUE] {avro | csv | json} [PROPERTIES (key1=value1, ...)]]
+     *     [KEYS  column-name [,...] ]
+     *     [ALLOW [PRODUCER | CONSUMER] {roles}]
+     *     [PROFILE {profile}]
+     * </pre>
+     */
+    private static final Pattern PAT_CREATE_TOPIC =
+            SPF.statement(
+                    SPF.token("create"),SPF.token("topic"),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("using"), SPF.token("stream")
+                        )
+                    ),
+                    SPF.capture("topicName", SPF.databaseObjectName()),
+                    SPF.optional(
+                        SPF.clause(
+                           SPF.token("execute"), SPF.token("procedure"),  SPF.capture("procedureName", SPF.databaseObjectName()),
+                           SPF.optional(
+                               SPF.clause(SPF.token("with"),SPF.token("keys"))
+                           )
+                        )
+                    ),
+                    // TO DO: combine formats with SPF.repeat(0, 2,?
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("format"),
+                            SPF.optional(SPF.clause(
+                                 SPF.capture("formatTarget1", SPF.oneOf("key", "value")))
+                            ),
+                            SPF.capture("formatName1", SPF.databaseObjectName()),
+                            SPF.optional(
+                                    SPF.clause(
+                                        SPF.token("properties"),
+                                        SPF.group(true, "formatProp1", new SQLPatternPartElement("[(]{1}\\s*[\\w$]+\\s*=\\s*[\\w$]+\\s*(,\\s*[\\w$]+\\s*=\\s*[\\w$]+)*\\s*[)]{1}"))
+                                    )
+                              )
+                        )
+                    ),
+                    SPF.optional(
+                            SPF.clause(
+                                SPF.token("format"),
+                                SPF.optional(SPF.clause(
+                                     SPF.capture("formatTarget2", SPF.oneOf("key", "value")))
+                                ),
+                                SPF.capture("formatName2", SPF.databaseObjectName()),
+                                SPF.optional(
+                                     SPF.clause(
+                                         SPF.token("properties"),
+                                         SPF.group(true, "formatProp2", new SQLPatternPartElement("[(]{1}\\s*[\\w$]+\\s*=\\s*[\\w$]+\\s*(,\\s*[\\w$]+\\s*=\\s*[\\w$]+)*\\s*[)]{1}"))
+                                      )
+                               )
                             )
+                    ),
+                    SPF.optional(
+                            SPF.clause(
+                                SPF.token("keys"),
+                                SPF.group(true, "columnKeys",
+                                        new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
+                                )
+                            )
+                    ),
+                    // TO DO: combine allows with SPF.repeat(0, 2,?
+                    SPF.optional(
+                        SPF.clause(
+                           SPF.token("allow"),
+                           SPF.optional(SPF.clause(
+                                   SPF.capture("producerConsumer1", SPF.oneOf("producer", "consumer")))),
+                           SPF.group(true, "allowedRole1", new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*"))
+                       )
+                    ),
+                    SPF.optional(
+                            SPF.clause(
+                               SPF.token("allow"),
+                               SPF.optional(SPF.clause(
+                                       SPF.capture("producerConsumer2", SPF.oneOf("producer", "consumer")))),
+                               SPF.group(true, "allowedRole2", new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*"))
+                           )
+                    ),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("profile"), SPF.capture("profile", SPF.databaseObjectName())
+                        )
                     )
             ).compile("PAT_CREATE_TOPIC");
 
@@ -607,7 +730,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE|TOPIC)|" + // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE|TOPIC|OPAQUE)|" + // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -948,6 +1071,10 @@ public class SQLParser extends SQLPatternFactory
         return PAT_DROP_TOPIC.matcher(statement);
     }
 
+    public static Matcher matchCreateOpaqueTopic(String statement)
+    {
+        return PAT_CREATE_OPAQUE_TOPIC.matcher(statement);
+    }
 
     /**
      * Match statement against create table ... migrate to target ... pattern.

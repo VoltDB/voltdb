@@ -21,6 +21,7 @@ import java.util.regex.Matcher;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Topic;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -50,11 +51,13 @@ public class DropTopic extends StatementProcessor {
                 throw m_compiler.new VoltCompilerException(
                         String.format("Topic name \"%s\" in DROP TOPIC statement does not exist.", name));
             }
-        }
-        else {
+        } else {
             topics.delete(name);
+            Table t = db.getTables().get(name);
+            if (t != null) {
+                t.setTopicname("");
+            }
         }
         return true;
     }
-
 }

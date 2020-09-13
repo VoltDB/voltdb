@@ -600,6 +600,39 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
     }
 
+    public void testTopic() {
+        File jarOut = new File("Topics.jar");
+        jarOut.deleteOnExit();
+        String schema[] = {
+                "CREATE STREAM FOO1 (S1 INTEGER);" +
+                "CREATE TOPIC USING STREAM foo1 EXECUTE PROCEDURE z WITH KEYS FORMAT KEY avro PROPERTIES ( X=Y, Z=C,  W=X6 ) FORMAT VALUE avro PROPERTIES (X7=Y, Z=C,  W=X) ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X1,Y1,Z1 PROFILE prof1;",
+                "CREATE OPAQUE TOPIC foo2 PARTITIONED ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X8,Y1,Z1 PROFILE prof1;",
+                "CREATE OPAQUE TOPIC foo3 ALLOW X,Y,Z PROFILE prof1;",
+                "CREATE OPAQUE TOPIC foo4 PARTITIONED;",
+                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC foo5 FORMAT avro PROPERTIES ( X=Y9, Z=C,  W=X ) ALLOW PRODUCER X,Y,Z PROFILE prof1;"
+        };
+        VoltCompiler compiler = new VoltCompiler(false);
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+            assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+            jarOut.delete();
+        }
+
+        String schema1[] = {
+                "CREATE STREAM FOO6 (S1 INTEGER);" +
+                "CREATE TOPIC USING STREAM foo6 EXECUTE PROCEDURE z WITH KEYS FORMAT KEY avro PROPERTIES ( X=Y10, Z=C,  W=X ) FORMAT KEY avro PROPERTIES ( X=Y11, Z=C,  W=X ) ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X1,Y1,Z1 PROFILE prof1;",
+                "CREATE OPAQUE TOPIC foo7 PARTITIONED ALLOW PRODUCER X,Y,Z ALLOW PRODUCER X12,Y1,Z1 PROFILE prof1;",
+                "CREATE TOPIC USING STREAM foo8 EXECUTE PROCEDURE z WITH KEYS FORMAT KEY avro PROPERTIES ( X=Y13, Z=C,  W=X ) FORMAT KEY avro PROPERTIES ( X=Y14, Z=C,  W=X ) ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X1,Y1,Z1 PROFILE prof1;",
+        };
+        compiler = new VoltCompiler(false);
+        for (int ii = 0; ii < schema1.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1[ii]);
+            String schemaPath = schemaFile.getPath();
+            assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+            jarOut.delete();
+        }
+    }
     public void testSetDatabaseConfig() {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();

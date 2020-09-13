@@ -72,6 +72,7 @@ import org.voltdb.compiler.statements.AlterTask;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
+import org.voltdb.compiler.statements.CreateOpaqueTopic;
 import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
@@ -251,6 +252,7 @@ public class DDLCompiler {
                                 .addNextProcessor(new AlterTask(this))
                                 .addNextProcessor(new CreateTopic(this))
                                 .addNextProcessor(new DropTopic(this))
+                                .addNextProcessor(new CreateOpaqueTopic(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -345,6 +347,8 @@ public class DDLCompiler {
         protected static final String DR = "DR";
         protected static final String TASK = "TASK";
         protected static final String AGGREGATE = "AGGREGATE";
+        protected static final String TOPIC = "TOPIC";
+        protected static final String OPAQUE = "OPAQUE";
     }
 
     public void loadSchemaWithFiltering(Reader reader, final Database db, final DdlProceduresToLoad whichProcs, SQLParser.FileInfo fileInfo)
@@ -550,7 +554,7 @@ public class DDLCompiler {
         loadSchema(reader, db, previousDBIfAny, whichProcs, false);
     }
 
-    private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
+    private void applyDiff(VoltXMLDiff stmtDiff, final Database db) throws VoltCompilerException
     {
         // record which tables changed
         for (Map.Entry<String, VoltXMLDiff> entry : stmtDiff.getChangedNodes().entrySet()) {
@@ -567,6 +571,10 @@ public class DDLCompiler {
             String tableName = tableXML.attributes.get("name");
             assert(tableName != null);
             m_compiler.markTableAsDirty(tableName);
+            Table table = db.getTables().get(tableName);
+            if (table != null && StringUtils.isNoneBlank(table.getTopicname())) {
+                throw m_compiler.new VoltCompilerException(String.format("The table %s is used by topic, cannot be dropped", tableName));
+            }
         }
         for (VoltXMLElement tableXML : stmtDiff.getAddedNodes()) {
             String tableName = tableXML.attributes.get("name");
@@ -1523,6 +1531,11 @@ public class DDLCompiler {
             }
         }
 
+        final String topicName = node.attributes.get("topicName");
+        if (!StringUtil.isEmpty(topicName)) {
+            table.setTopicname(topicName);
+        }
+
         final String migratingIndexName =
                 StreamSupport.stream(((Iterable<Index>) () -> table.getIndexes().iterator()).spliterator(), false)
                         .filter(Index::getMigrating)
@@ -2389,7 +2402,7 @@ public class DDLCompiler {
                 VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
                 // null diff means no change (usually drop if exists for non-existent thing)
                 if (thisStmtDiff != null) {
-                    applyDiff(thisStmtDiff);
+                    applyDiff(thisStmtDiff, db);
                 }
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {

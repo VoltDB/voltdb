@@ -187,7 +187,7 @@ begin Table                                  "A table (relation) in the database
   string topicKeyColumnNames                 "A CSV string of the key column names, ordered"
   string topicAllowedRoleNames               "A CSV string of the roles allowed to access this topic"
 
-  Topic? topic                               "Associated topic for stream"
+  string topicName                           "Associated topic for stream"
 end
 
 begin Topic javaonly                         "A topic in the database"

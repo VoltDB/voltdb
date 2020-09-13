@@ -1442,16 +1442,6 @@ public abstract class CatalogUtil {
             }
         }
 
-        // Verify that CREATE TOPIC doesn't conflict with existing tables and vice-versa
-        CatalogMap<Topic> topics = CatalogUtil.getDatabase(catalog).getTopics();
-        for (Topic topic : topics) {
-            if (tables.get(topic.getTypeName()) != null) {
-                errors.addErrorMessage(String.format(
-                        "Topic %s conflicts with existing table of the same name.",
-                        topic.getTypeName()));
-            }
-        }
-
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
         }

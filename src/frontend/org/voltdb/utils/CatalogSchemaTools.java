@@ -44,6 +44,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.FormatParameter;
 import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
@@ -512,16 +513,98 @@ public abstract class CatalogSchemaTools {
     }
 
     public static void toSchema(StringBuilder sb, Topic topic) {
-        sb.append("CREATE TOPIC ").append(topic.getTypeName());
+        sb.append("CREATE");
         if (topic.getIsopaque()) {
            sb.append(" OPAQUE");
         }
-        if (topic.getIssingle()) {
-            sb.append(" SINGLE PARTITION");
+        sb.append(" TOPIC");
+
+        if (StringUtils.isNoneBlank(topic.getStreamname())) {
+            sb.append(" USING STREAM");
         }
+
+        sb.append(" " + topic.getTypeName());
+
+        if (topic.getIssingle()) {
+            sb.append(" PARTITIONED");
+        }
+
+        if (StringUtils.isNoneBlank(topic.getProcedurename())) {
+            sb.append(" EXECUTE PROCEDURE " + topic.getProcedurename());
+        }
+
+        if (topic.getUsekey()) {
+            sb.append(" WITH KEYS");
+        }
+
+        // Combine formats
+        if (StringUtils.isNoneBlank(topic.getKeyformatname()) && StringUtils.isBlank(topic.getValueformatname())) {
+            sb.append(" FORMAT KEY " + topic.getKeyformatname());
+            appendTopicFormatProperties(sb, topic.getKeyformatproperties());
+        }
+
+        if (StringUtils.isBlank(topic.getKeyformatname()) && StringUtils.isNoneBlank(topic.getValueformatname())) {
+            sb.append(" FORMAT VALUE " + topic.getValueformatname());
+            appendTopicFormatProperties(sb, topic.getValueformatproperties());
+        }
+
+        if (StringUtils.isNoneBlank(topic.getKeyformatname()) && StringUtils.isNoneBlank(topic.getValueformatname())) {
+            boolean theSameProp = topic.getKeyformatproperties().equals(topic.getValueformatproperties());
+            if (theSameProp && topic.getKeyformatname().equalsIgnoreCase(topic.getValueformatname())) {
+                sb.append(" FORMAT " + topic.getValueformatname());
+                appendTopicFormatProperties(sb, topic.getValueformatproperties());
+            } else {
+                sb.append(" FORMAT KEY " + topic.getKeyformatname());
+                appendTopicFormatProperties(sb, topic.getKeyformatproperties());
+                sb.append(" FORMAT VALUE " + topic.getValueformatname());
+                appendTopicFormatProperties(sb, topic.getValueformatproperties());
+            }
+        }
+
+        // Key columns
+        if (StringUtils.isNoneBlank(topic.getKeycolumnnames())) {
+            sb.append(" KEYS " + topic.getKeycolumnnames());
+        }
+        // Combine roles
+        if (StringUtils.isNoneBlank(topic.getProducerroles()) && StringUtils.isBlank(topic.getConsumerroles())) {
+            sb.append(" ALLOW PRODUCER " + topic.getProducerroles());
+        }
+
+        if (StringUtils.isBlank(topic.getProducerroles()) && StringUtils.isNoneBlank(topic.getConsumerroles())) {
+            sb.append(" ALLOW CONSUMER " + topic.getConsumerroles());
+        }
+
+        if (StringUtils.isNoneBlank(topic.getProducerroles()) && StringUtils.isNoneBlank(topic.getConsumerroles())) {
+            // They are the same
+            if (topic.getProducerroles().equalsIgnoreCase(topic.getConsumerroles())) {
+                sb.append(" ALLOW " + topic.getConsumerroles());
+            } else {
+                sb.append(" ALLOW PRODUCER " + topic.getProducerroles());
+                sb.append(" ALLOW CONSUMER " + topic.getConsumerroles());
+            }
+        }
+
+        if (StringUtils.isNoneBlank(topic.getProfile())) {
+            sb.append(" PROFILE " + topic.getProfile());
+        }
+
         sb.append(";\n");
     }
 
+    private static void appendTopicFormatProperties(StringBuilder sb, CatalogMap<FormatParameter> params) {
+        if (!params.isEmpty()) {
+            sb.append(" PROPERTIES (");
+            int i = 0;
+            for (FormatParameter param : params) {
+                sb.append(param.getName() + "=" + param.getValue());
+                i++;
+                if (i < params.size()) {
+                    sb.append(", ");
+                }
+            }
+            sb.append(")");
+        }
+    }
     private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";

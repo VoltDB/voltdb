@@ -509,6 +509,13 @@ public class CatalogDiffEngine {
         {
             return null;
         }
+        else if (suspect instanceof Topic) {
+            Topic topic = (Topic)suspect;
+            if (StringUtils.isNoneBlank(topic.getStreamname())) {
+                m_requiresNewExportGeneration = true;
+            }
+            return null;
+        }
         else if (suspect instanceof TimeToLive) {
             Column column = ((TimeToLive) suspect).getTtlcolumn();
             Table table = (Table) column.getParent();
@@ -925,7 +932,8 @@ public class CatalogDiffEngine {
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
             suspect instanceof PlanFragment ||
-            suspect instanceof TimeToLive) {
+            suspect instanceof TimeToLive ||
+            suspect instanceof Topic ) {
             return null;
         }
 
@@ -1017,8 +1025,15 @@ public class CatalogDiffEngine {
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
-            if (field.equals("signature") || field.equals("tuplelimit") )
+            if (field.equals("signature") || field.equals("tuplelimit")) {
                 return null;
+            }
+            if (field.equals("topicName") && prevType != null) {
+                if (!(((Table)suspect).getTopicname().equals(((Table)prevType).getTopicname()))) {
+                    m_requiresNewExportGeneration = true;
+                }
+                return null;
+            }
 
             if (field.equals("tableType") && prevType != null) {
                 if (((Table)suspect).getTabletype() != ((Table)prevType).getTabletype()) {
