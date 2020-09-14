@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component inheritJdk="true">
+<component jdk="1.8" jdk_type="JavaSDK">
 	<exclude-output/>
 	<contentEntry url="file://$MODULE_DIR$"/>
 	<lib name="commons-lang3-3.8.1.jar" scope="COMPILE">
@@ -25,6 +25,9 @@
 	</lib>
 	<lib name="junit-4.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-4.12.jar!/"/>
+	</lib>
+	<lib name="system-rules-1.19.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/system-rules-1.19.0.jar!/"/>
 	</lib>
 	<lib name="pmd-4.2.5.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/pmd-4.2.5.jar!/"/>
@@ -113,14 +116,26 @@
 	<lib name="httpclient-4.3.6.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpclient-4.3.6.jar!/"/>
 	</lib>
+	<lib name="httpclient-4.3.6-tests.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.6-tests.jar!/"/>
+	</lib>
 	<lib name="httpcore-4.3.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpcore-4.3.3.jar!/"/>
 	</lib>
 	<lib name="commons-logging-1.1.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-logging-1.1.3.jar!/"/>
 	</lib>
-	<lib name="tomcat-jdbc.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-jdbc.jar!/"/>
+	<lib name="tomcat-jdbc-7.0.96.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-jdbc-7.0.96.jar!/"/>
+	</lib>
+	<lib name="jackson-databind-2.9.10.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.9.10.1.jar!/"/>
+	</lib>
+	<lib name="jackson-core-2.9.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-2.9.10.jar!/"/>
+	</lib>
+	<lib name="jackson-annotations-2.9.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-annotations-2.9.10.jar!/"/>
 	</lib>
 	<lib name="amazon-kinesis-client-1.6.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/amazon-kinesis-client-1.6.2.jar!/"/>
@@ -128,26 +143,14 @@
 	<lib name="aws-java-sdk-1.10.72.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/aws-java-sdk-1.10.72.jar!/"/>
 	</lib>
-	<lib name="jackson-dataformat-cbor-2.5.3.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-dataformat-cbor-2.5.3.jar!/"/>
-	</lib>
-	<lib name="jackson-databind-2.9.4.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.9.4.jar!/"/>
-	</lib>
-	<lib name="jackson-core-2.9.4.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-2.9.4.jar!/"/>
-	</lib>
-	<lib name="jackson-annotations-2.9.4.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-annotations-2.9.4.jar!/"/>
-	</lib>
 	<lib name="joda-time-2.9.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/joda-time-2.9.3.jar!/"/>
 	</lib>
 	<lib name="guava-18.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-18.0.jar!/"/>
 	</lib>
-	<lib name="tomcat-juli.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli.jar!/"/>
+	<lib name="tomcat-juli-7.0.96.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli-7.0.96.jar!/"/>
 	</lib>
 	<lib name="javassist-3.20.0-GA.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javassist-3.20.0-GA.jar!/"/>
@@ -187,9 +190,6 @@
 	<lib name="commons-io-1.4.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/commons-io-1.4.jar!/"/>
 	</lib>
-	<lib name="httpclient-4.3.4-tests.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.4-tests.jar!/"/>
-	</lib>
 	<lib name="avro-1.9.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avro-1.9.0.jar!/"/>
 	</lib>
@@ -220,13 +220,40 @@
 	<lib name="jetty-security-9.4.15.v20190215.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="netty-tcnative-boringssl-static-2.0.27.Final.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.27.Final.jar!/"/>
+	<lib name="netty-tcnative-boringssl-static-2.0.34.Final.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.34.Final.jar!/"/>
 	</lib>
 	<lib name="netty-all-4.1.43.Final.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.43.Final.jar!/"/>
 	</lib>
-	<levels>
-		<level name="3pty_jars" value="project"/>
-	</levels>
+	<lib name="cron-java8-1.5.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/cron-java8-1.5.jar!/"/>
+	</lib>
+	<lib name="jsch-0.1.51.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jsch-0.1.51.jar!/"/>
+	</lib>
+	<lib name="kafka-avro-serializer-3.0.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-avro-serializer-3.0.0.jar!/"/>
+	</lib>
+	<lib name="kafka-schema-registry-client-5.3.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-schema-registry-client-5.3.2.jar!/"/>
+	</lib>
+	<lib name="jaxb-api-2.3.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jaxb-api-2.3.0.jar!/"/>
+	</lib>
+	<lib name="jaxb-core-2.3.0.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jaxb-core-2.3.0.1.jar!/"/>
+	</lib>
+	<lib name="jaxb-runtime-2.3.0.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jaxb-runtime-2.3.0.1.jar!/"/>
+	</lib>
+	<lib name="istack-commons-runtime-3.0.8.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/istack-commons-runtime-3.0.8.jar!/"/>
+	</lib>
+	<lib name="javax.activation-api-1.2.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/javax.activation-api-1.2.0.jar!/"/>
+	</lib>
+	<lib name="javax.annotation-api-1.3.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/javax.annotation-api-1.3.2.jar!/"/>
+	</lib>
 </component>
