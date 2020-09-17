@@ -2170,34 +2170,52 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         return m_entriesClosedSinceUpdate;
     }
 
+    /*
+     * In order to prevent holding a object monitor for an extended period of time the monitor will only be held to
+     * process each segment and at the end to clean up trailing segments
+     */
     @Override
-    public synchronized void updateEntries(BinaryDeque.EntryUpdater<? super M> updater) throws IOException {
-        m_entriesClosedSinceUpdate = 0;
-
-        for (Map.Entry<Long, PBDSegment<M>> entry : m_segments.descendingMap().entrySet()) {
-            PBDSegment<M> segment = entry.getValue();
-            if (segment.isActive() || segment.size() == 0) {
-                continue;
-            }
-            Pair<PBDSegment<M>, Boolean> result = segment.updateEntries(updater);
-            PBDSegment<M> updated = result.getFirst();
-            if (updated != null) {
-                int updateCount = updated.getNumEntries() - segment.getNumEntries();
-                m_numObjects += updateCount;
-                updateCursorsReadCount(segment, updateCount);
-                entry.setValue(updated);
-            }
-
-            if (result.getSecond()) {
-                return;
-            }
+    public void updateEntries(BinaryDeque.EntryUpdater<? super M> updater) throws IOException {
+        synchronized (this) {
+            m_entriesClosedSinceUpdate = 0;
         }
 
-        Iterator<PBDSegment<M>> iter = m_segments.values().iterator();
-        PBDSegment<M> segment;
-        while (iter.hasNext() && (segment = iter.next()).size() == 0) {
-            segment.closeAndDelete();
-            iter.remove();
+        Long prevSegmentId = Long.MAX_VALUE;
+        Map.Entry<Long, PBDSegment<M>> entry;
+        do {
+            synchronized (this) {
+                entry = m_segments.lowerEntry(prevSegmentId);
+                if (entry == null) {
+                    break;
+                }
+                prevSegmentId = entry.getKey();
+                PBDSegment<M> segment = entry.getValue();
+                if (segment.isActive() || segment.size() == 0) {
+                    continue;
+                }
+                Pair<PBDSegment<M>, Boolean> result = segment.updateEntries(updater);
+                PBDSegment<M> updated = result.getFirst();
+                if (updated != null) {
+                    int updateCount = updated.getNumEntries() - segment.getNumEntries();
+                    m_numObjects += updateCount;
+                    updateCursorsReadCount(segment, updateCount);
+                    m_segments.put(prevSegmentId, updated);
+                }
+
+                if (result.getSecond()) {
+                    return;
+                }
+            }
+            Thread.yield();
+        } while (true);
+
+        synchronized (this) {
+            Iterator<PBDSegment<M>> iter = m_segments.values().iterator();
+            PBDSegment<M> segment;
+            while (iter.hasNext() && (segment = iter.next()).size() == 0) {
+                segment.closeAndDelete();
+                iter.remove();
+            }
         }
     }
 
