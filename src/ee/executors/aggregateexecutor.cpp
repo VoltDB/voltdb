@@ -1035,7 +1035,7 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregatePartialExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
-    for (auto const iter : m_hash) {
+    for (auto const& iter : m_hash) {
         AggregateRow *aggregateRow = iter.second;
         if (insertOutputTuple(aggregateRow)) {
             m_pmp->countdownProgress();
