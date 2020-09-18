@@ -24,19 +24,20 @@ import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Topic;
-import org.voltdb.serdes.EncodeFormat;
+import org.voltdb.serdes.EncodeConfiguration;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
- * Class which holds all of the metadata which is persisted with export rows within a PBD. Primarily it holds the schema
- * of the rows
+ * Class which holds all of the metadata which is persisted with export rows within a PBD. It holds the schema
+ * of the rows, the encoding parameters for keys and values, and the key column names.
  */
 public class PersistedMetadata implements DeferredSerialization {
-    private static short LATEST_VERSION = 1;
-    private final EncodeFormat m_format;
+    private static short LATEST_VERSION = 2;
+    private final EncodeConfiguration m_keyFormat;
+    private final EncodeConfiguration m_valueFormat;
     private final List<String> m_keyColumns;
     private final ExportRowSchema m_schema;
 
@@ -45,7 +46,8 @@ public class PersistedMetadata implements DeferredSerialization {
         if (version != LATEST_VERSION) {
             throw new IOException("Unsupported serialization version: " + version);
         }
-        EncodeFormat format = EncodeFormat.byId(buf.get());
+        EncodeConfiguration keyFormat = EncodeConfiguration.deserialize(buf);
+        EncodeConfiguration valueFormat = EncodeConfiguration.deserialize(buf);
         List<String> keyColumns;
         // keyCount is stored as unsigned byte
         int keyCount = (buf.get() & 0xFF);
@@ -58,42 +60,75 @@ public class PersistedMetadata implements DeferredSerialization {
         } else {
             keyColumns = ImmutableList.of();
         }
-        return new PersistedMetadata(format, keyColumns, ExportRowSchema.deserialize(buf));
+        return new PersistedMetadata(keyFormat, valueFormat, keyColumns, ExportRowSchema.deserialize(buf));
     }
 
     public PersistedMetadata(Table table, int partitionId, long initialGenerationId, long generationId) {
-        m_format = table.getIstopic() ? EncodeFormat.checkedValueOf(table.getTopicformat()) : EncodeFormat.INVALID;
-        String keyColumns = table.getTopickeycolumnnames();
-        if (StringUtils.isBlank(keyColumns)) {
+        this(table, null, partitionId, initialGenerationId, generationId);
+    }
+
+    /**
+     * Constructor
+     *
+     * @param table       Catalog {@link Table} which this is a source, or {@code null} if opaque topic
+     * @param topic       Catalog {@link Topic} if the source is a topic, or {@code null}
+     * @param partitionId
+     * @param initialGenerationId
+     * @param generationId
+     */
+    public PersistedMetadata(Table table, Topic topic, int partitionId, long initialGenerationId, long generationId) {
+        assert table != null || topic != null;
+        if (topic == null) {
+            // FIXME: done in DDL validation?
+            m_keyFormat = m_valueFormat = new EncodeConfiguration();
             m_keyColumns = ImmutableList.of();
-        } else {
-            m_keyColumns = ImmutableList.copyOf(CatalogUtil.splitOnCommas(keyColumns));
-            if (m_keyColumns.size() > 0xFF) {
-                throw new IllegalArgumentException("Maximum number of key columns exceeded: " + m_keyColumns.size());
+        }
+        else {
+            m_keyFormat = new EncodeConfiguration(topic.getIsopaque(), topic.getKeyformatname(), topic.getKeyformatproperties());
+            m_valueFormat = new EncodeConfiguration(topic.getIsopaque(), topic.getValueformatname(), topic.getValueformatproperties());
+
+            String keyColumns = topic.getKeycolumnnames();
+            if (StringUtils.isBlank(keyColumns)) {
+                m_keyColumns = ImmutableList.of();
+            } else {
+                m_keyColumns = ImmutableList.copyOf(CatalogUtil.splitOnCommas(keyColumns));
+                if (m_keyColumns.size() > 0xFF) {
+                    throw new IllegalArgumentException("Maximum number of key columns exceeded: " + m_keyColumns.size());
+                }
             }
         }
-        m_schema = ExportRowSchema.create(table, partitionId, initialGenerationId, generationId);
+        m_schema = table != null ? ExportRowSchema.create(table, partitionId, initialGenerationId, generationId)
+                : ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId);
     }
 
-    public PersistedMetadata(Topic topic, int partitionId, long initialGenerationId, long generationId) {
-        assert topic.getIsopaque();
-        m_format = EncodeFormat.OPAQUE;
-        m_keyColumns = ImmutableList.of();
-        m_schema = ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId);
-    }
-
-    private PersistedMetadata(EncodeFormat format, List<String> keyColumns, ExportRowSchema schema) {
+    private PersistedMetadata(EncodeConfiguration keyFormat, EncodeConfiguration valueFormat, List<String> keyColumns, ExportRowSchema schema) {
         super();
-        m_format = format;
+        m_keyFormat = keyFormat;
+        m_valueFormat = valueFormat;
         m_keyColumns = keyColumns;
         m_schema = schema;
     }
 
     /**
-     * @return The configured {@link EncodeFormat} for this topic
+     * @return The configured {@link EncodeConfiguration} for this topic
+     * FIXME: for now return the encoding format of the value
      */
-    public EncodeFormat getEncodingFormat() {
-        return m_format;
+    public EncodeConfiguration getEncodingFormat() {
+        return getValueFormat();
+    }
+
+    /**
+     * @return the encoding configuration for keys
+     */
+    public EncodeConfiguration getKeyFormat() {
+        return m_keyFormat;
+    }
+
+    /**
+     * @return the encoding configuration for values
+     */
+    public EncodeConfiguration getValueFormat() {
+        return m_valueFormat;
     }
 
     /**
@@ -113,7 +148,8 @@ public class PersistedMetadata implements DeferredSerialization {
     @Override
     public void serialize(ByteBuffer buf) throws IOException {
         buf.putShort(LATEST_VERSION);
-        buf.put(m_format.getId());
+        m_keyFormat.serialize(buf);
+        m_valueFormat.serialize(buf);
         buf.put((byte) m_keyColumns.size());
         m_keyColumns.forEach(v -> SerializationHelper.writeString(v, buf));
         m_schema.serialize(buf);
@@ -125,15 +161,16 @@ public class PersistedMetadata implements DeferredSerialization {
 
     @Override
     public int getSerializedSize() throws IOException {
-        // Version + format ID + keyColumnCount + serializedKeys size + schema size
-        return Short.BYTES + Byte.BYTES + Byte.BYTES
+        // Version + key format size + value format size + keyColumnCount + serializedKeys size + schema size
+        return Short.BYTES + m_keyFormat.getSerializedSize() + m_valueFormat.getSerializedSize() + Byte.BYTES
                 + m_keyColumns.stream().mapToInt(SerializationHelper::calculateSerializedSize).sum()
                 + m_schema.getSerializedSize();
     }
 
     @Override
     public String toString() {
-        return "PersistedMetadata [m_format=" + m_format + ", m_keyColumns='" + m_keyColumns + "', m_schema="
+        return "PersistedMetadata [m_keyFormat=" + m_keyFormat + ", m_valueFormat" + m_valueFormat
+                + ", m_keyColumns='" + m_keyColumns + "', m_schema="
                 + m_schema + "]";
     }
 

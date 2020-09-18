@@ -58,7 +58,8 @@ public class CreateOpaqueTopic extends StatementProcessor {
         }
         Topic topic = topics.add(topicName);
         topic.setIsopaque(true);
-        topic.setIssingle(statement.toUpperCase().contains("PARTITIONED"));
+        String partitioned = statementMatcher.group("partitioned");
+        topic.setIssingle(partitioned == null);
         processProfile(statementMatcher, statement, topic);
         if(processPermissions(statementMatcher, statement, topic, 1)) {
             processPermissions(statementMatcher, statement, topic, 2);

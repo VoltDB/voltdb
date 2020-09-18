@@ -256,12 +256,12 @@ public class SnapshotSiteProcessor {
                 }
 
                 Map<Integer, ExportSnapshotTuple> sequenceNumbers = s_exportSequenceNumbers.computeIfAbsent(
-                        topic.getTypeName(),
+                        topic.getTypeName().toUpperCase(),
                         k -> new HashMap<Integer, ExportSnapshotTuple>());
 
                 sequenceNumbers.put(
                         context.getPartitionId(),
-                        exportManager.getOpaqueTopicSnapshotTuple(context.getPartitionId(), topic.getTypeName()));
+                        exportManager.getOpaqueTopicSnapshotTuple(context.getPartitionId(), topic.getTypeName().toUpperCase()));
             }
         }
 

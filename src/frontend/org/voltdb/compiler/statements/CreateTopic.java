@@ -26,11 +26,13 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.FormatParameter;
 import org.voltdb.catalog.Topic;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.serdes.EncodeFormat;
 
 import com.google_voltpatches.common.base.Splitter;
 
@@ -100,6 +102,8 @@ public class CreateTopic extends CreateOpaqueTopic {
     }
 
 
+    // Check that the table is a stream exporting to no targets, set the topic name attribute and remove
+    // the table from the default connector
     private void checkTable(String topicName) throws VoltCompilerException {
         VoltXMLElement tableXML = m_schema.findChild("table", topicName.toUpperCase());
         if (tableXML == null) {
@@ -108,9 +112,10 @@ public class CreateTopic extends CreateOpaqueTopic {
         }
 
         if (Boolean.parseBoolean(tableXML.getStringAttribute("stream", "false"))) {
-            String exportTarget = tableXML.getStringAttribute("export", "_UNSPECIFIED_TARGET_");
-            if ("__UNSPECIFIED_TARGET__".equals(exportTarget)) {
+            String exportTarget = tableXML.getStringAttribute("export", Constants.CONNECTORLESS_STREAM_TARGET_NAME);
+            if (Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(exportTarget)) {
                 tableXML.attributes.put("topicName", topicName);
+                tableXML.attributes.remove("export");
             } else {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid CREATE TOPIC USING STREAM statement: stream %s must not have an export clause", topicName));
@@ -124,6 +129,17 @@ public class CreateTopic extends CreateOpaqueTopic {
     //[FORMAT [KEY | VALUE] {avro | csv | json} [PROPERTIES (key1=value1, ...)]]
     private boolean processFormat(Matcher statementMatcher, String statement, Topic topic, int index) throws VoltCompilerException {
         String formatName = statementMatcher.group("formatName" + index);
+        if (formatName != null) {
+            try {
+                // Parse the format in an unchecked fashion and handle exceptions
+                EncodeFormat.valueOf(formatName.toUpperCase());
+            }
+            catch (Exception ex) {
+                throw m_compiler.new VoltCompilerException(
+                        String.format("%s is not a valid topic format in TOPIC %s. Acceptable values are: %s",
+                                formatName, topic.getTypeName(), EncodeFormat.valueSet()));
+            }
+        }
         String formatTarget = statementMatcher.group("formatTarget" + index);
         String formatProps = statementMatcher.group("formatProp" + index);
         if (index == 2 && formatName == null) {

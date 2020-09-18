@@ -44,6 +44,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.export.StreamBlock;
 import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -104,7 +105,8 @@ public class TestGapFillMessages {
     private Table generateTable() {
         CatalogMap<Table> tables = new Catalog().getClusters().add("cluster").getDatabases().add("database")
                 .getTables();
-        Table table = tables.add("myTable");
+        String typeName = "myTable";
+        Table table = tables.add(typeName);
         Column c = table.getColumns().add("1");
         c.setIndex(0);
         c.setName("Column_1");
@@ -114,10 +116,15 @@ public class TestGapFillMessages {
         c.setName("Column_2");
         c.setType(VoltType.STRING.getValue());
         c.setSize(4096);
-        table.setIstopic(true);
-        table.setTopicformat("CSV");
-        table.setTopickeycolumnnames("Column_1");
 
+        CatalogMap<Topic> topics = new Catalog().getClusters().add("cluster").getDatabases().add("database")
+                .getTopics();
+        Topic topic = topics.add(typeName);
+        topic.setKeyformatname("CSV");
+        topic.setValueformatname("CSV");
+        topic.setKeycolumnnames("Column_1");
+
+        table.setTopicname(typeName);
         return table;
     }
 
@@ -155,7 +162,7 @@ public class TestGapFillMessages {
         PersistedMetadata deserializedMetadata = deserialized.getMetadata();
         assertEquals(originalMetadata == null, deserializedMetadata == null);
         if (originalMetadata != null) {
-            assertEquals(originalMetadata.getEncodingFormat(), deserializedMetadata.getEncodingFormat());
+            assertEquals(originalMetadata.getEncodingFormat().getFormat(), deserializedMetadata.getEncodingFormat().getFormat());
             assertEquals(originalMetadata.getKeyColumns(), deserializedMetadata.getKeyColumns());
             assertEquals(originalMetadata.getSchema().tableName, deserializedMetadata.getSchema().tableName);
             assertEquals(originalMetadata.getSchema().generation, deserializedMetadata.getSchema().generation);

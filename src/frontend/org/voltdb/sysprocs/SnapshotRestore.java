@@ -1335,7 +1335,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            if (action == StreamStartAction.RECOVER || t.getIstopic()) {
+            if (action == StreamStartAction.RECOVER) {
                 ExportSnapshotTuple sequences =
                         sequenceNumberPerPartition.get(myPartitionId);
                 if (sequences == null) {
@@ -1363,9 +1363,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
             if (!CatalogUtil.isOpaqueTopicForPartition(topic, myPartitionId)) {
                 continue;
             }
-            String name = topic.getTypeName();
 
-            //Sequence numbers for this table for every partition
+            //Sequence numbers for this topic for every partition, looked up in UPPERCASE
+            String name = topic.getTypeName().toUpperCase();
             Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
             if (sequenceNumberPerPartition == null) {
                 SNAP_LOG.warn("Could not find export sequence number for table " + name +

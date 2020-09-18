@@ -510,10 +510,7 @@ public class CatalogDiffEngine {
             return null;
         }
         else if (suspect instanceof Topic) {
-            Topic topic = (Topic)suspect;
-            if (StringUtils.isNoneBlank(topic.getStreamname())) {
-                m_requiresNewExportGeneration = true;
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
         else if (suspect instanceof TimeToLive) {

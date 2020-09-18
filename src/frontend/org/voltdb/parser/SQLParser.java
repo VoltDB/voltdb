@@ -575,7 +575,7 @@ public class SQLParser extends SQLPatternFactory
                     SPF.token("create"), SPF.token("opaque"), SPF.token("topic"), SPF.capture("topicName", SPF.databaseObjectName()),
                     SPF.optional(
                         SPF.clause(
-                           SPF.token("partitioned")
+                            SPF.capture("partitioned", SPF.token("partitioned"))
                         )
                     ),
                     // TO DO: combine allows with SPF.repeat(0, 2,?
@@ -625,7 +625,7 @@ public class SQLParser extends SQLPatternFactory
                     SPF.capture("topicName", SPF.databaseObjectName()),
                     SPF.optional(
                         SPF.clause(
-                           SPF.token("execute"), SPF.token("procedure"),  SPF.capture("procedureName", SPF.databaseObjectName()),
+                           SPF.token("execute"), SPF.token("procedure"),  SPF.capture("procedureName", SPF.procedureName()),
                            SPF.optional(
                                SPF.clause(SPF.token("with"),SPF.token("keys"))
                            )
@@ -1490,7 +1490,7 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Build a pattern segment to accept single optional EXPORT, PARTITION, or AS TOPIC clauses
+     * Build a pattern segment to accept single optional EXPORT, PARTITION,
      * to modify CREATE STREAM statements.
      *
      * @param captureTokens  Capture individual tokens if true
@@ -1500,18 +1500,9 @@ public class SQLParser extends SQLPatternFactory
      *
      *  (1) EXPORT TO TARGET    ("targetName"): target name
      *  (2) PARTITION           ("partitionColumnName"): column name
-     *  If AS TOPIC:
-     *  (3) PROFILE             ("topicProfileName"): topic profile name
-     *  (4) FORMAT              ("topicFormatName"): topic format
-     *  (5) KEYS                ("topicKeyColumnNames"): list of column names
-     *  (6) ALLOW               ("topicAllowedRoleNames"): list of role names
      */
     public static final String CAPTURE_EXPORT_TARGET = "targetName";
     public static final String CAPTURE_STREAM_PARTITION_COLUMN = "partitionColumnName";
-    public static final String CAPTURE_TOPIC_PROFILE = "topicProfileName";
-    public static final String CAPTURE_TOPIC_FORMAT = "topicFormatName";
-    public static final String CAPTURE_TOPIC_KEY_COLUMNS = "topicKeyColumnNames";
-    public static final String CAPTURE_TOPIC_ALLOWED_ROLES = "topicAllowedRoleNames";
 
     private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
     {
@@ -1524,40 +1515,6 @@ public class SQLParser extends SQLPatternFactory
                 SPF.clause(
                     SPF.token("partition"), SPF.token("on"), SPF.token("column"),
                     SPF.group(captureTokens, CAPTURE_STREAM_PARTITION_COLUMN, SPF.databaseObjectName())
-                ),
-                SPF.clause(
-                    SPF.token("topic"),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("profile"),
-                            SPF.group(captureTokens, CAPTURE_TOPIC_PROFILE, SPF.databaseObjectName())
-                        )
-                    ),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("format"),
-                            // Note: not using SPF.oneOf() in order to improve error reporting
-                            SPF.group(captureTokens, CAPTURE_TOPIC_FORMAT, SPF.databaseObjectName())
-                        )
-                    ),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("keys"),
-                            SPF.group(captureTokens,
-                                    CAPTURE_TOPIC_KEY_COLUMNS,
-                                    new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
-                            )
-                        )
-                    ),
-                    SPF.optional(
-                            SPF.clause(
-                                SPF.token("allow"),
-                                SPF.group(captureTokens,
-                                        CAPTURE_TOPIC_ALLOWED_ROLES,
-                                        new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
-                                )
-                            )
-                        )
                 )
             );
     }

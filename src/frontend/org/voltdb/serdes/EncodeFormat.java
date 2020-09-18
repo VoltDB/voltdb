@@ -19,6 +19,7 @@ package org.voltdb.serdes;
 
 import java.util.EnumSet;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 
 /**
@@ -50,11 +51,31 @@ public enum EncodeFormat {
     }
 
     /**
-     * @return the set of acceptable values
+     * Parse an {@link EncodeFormat} from a {@link String} and apply defaults.
+     *
+     * @param isOpaque  {@code true} if opaque
+     * @param fmt       the format string
+     * @return
+     */
+    public static EncodeFormat parseFormat(boolean isOpaque, String fmt) {
+        if (isOpaque) {
+            // FIXME: done in DDL validation?
+            return EncodeFormat.OPAQUE;
+        }
+        else if (StringUtils.isBlank(fmt)) {
+            // FIXME: done in DDL validation?
+            return EncodeFormat.CSV;
+        }
+        return EncodeFormat.checkedValueOf(fmt.toUpperCase());
+    }
+
+    /**
+     * @return the set of acceptable values in configuration
      */
     public static EnumSet<EncodeFormat> valueSet() {
         EnumSet<EncodeFormat> allowedValues = EnumSet.allOf(EncodeFormat.class);
         allowedValues.remove(INVALID);
+        allowedValues.remove(OPAQUE);
         return allowedValues;
     }
 

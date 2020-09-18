@@ -56,6 +56,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -220,8 +221,10 @@ public class MockVoltDB implements VoltDBInterface
 
     public void addTopic(String topicName) {
         addTable(topicName, false);
-        getTable(topicName).setIstopic(true);
-        getTable(topicName).setTopicformat(EncodeFormat.CSV.name());
+        getDatabase().getTopics().add(topicName);
+        getTable(topicName).setTopicname(topicName);
+        getTopic(topicName).setKeyformatname(EncodeFormat.CSV.name());
+        getTopic(topicName).setValueformatname(EncodeFormat.CSV.name());
     }
 
     public void setDRProducerEnabled()
@@ -296,6 +299,11 @@ public class MockVoltDB implements VoltDBInterface
     public Table getTable(String tableName)
     {
         return getDatabase().getTables().get(tableName);
+    }
+
+    public Topic getTopic(String topicName)
+    {
+        return getDatabase().getTopics().get(topicName);
     }
 
     Column getColumnFromTable(String tableName, String columnName)

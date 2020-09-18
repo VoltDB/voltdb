@@ -709,11 +709,12 @@ public abstract class CatalogUtil {
     public static boolean isExportTable(Database db, String name) {
         Table table = db.getTables().get(name);
         if (table != null) {
+            boolean isTopic = isTopic(db, name);
             int type = table.getTabletype();
             if (TableType.isInvalidType(type)) {
-                return isStream(db, table);
+                return isStream(db, table) && !isTopic;
             }
-            return TableType.PERSISTENT.get() != type && !table.getIstopic();
+            return TableType.PERSISTENT.get() != type && !isTopic;
         }
         return false;
     }
@@ -726,11 +727,8 @@ public abstract class CatalogUtil {
      * @return      {@code true} if a table with {@code name} is a topic
      */
     public static boolean isTopic(Database db, String name) {
-        Table table = db.getTables().get(name);
-        if (table != null) {
-            return table.getIstopic();
-        }
-        return false;
+        Topic topic = db.getTopics().get(name);
+        return topic != null;
     }
 
     /**
@@ -1396,7 +1394,7 @@ public abstract class CatalogUtil {
             }
         }
 
-        // Validate topics in deployment file
+        // Validate profiles in deployment file
         Map<String, TopicProfileType> profileMap = getDeploymentTopics(topicsType, errors);
         if (profileMap != null) {
             Pattern profilePattern = Pattern.compile("^\\p{Alnum}[\\w]*$");
@@ -1415,12 +1413,9 @@ public abstract class CatalogUtil {
 
         // Verify that every topic that refers to a profile refers to an existing profile,
         // and that if a topic uses avro, the <avro> element is defined
-        CatalogMap<Table> tables = CatalogUtil.getDatabase(catalog).getTables();
-        for (Table t : tables) {
-            if (!t.getIstopic()) {
-                continue;
-            }
-            String profileName = t.getTopicprofile();
+        CatalogMap<Topic> topics = CatalogUtil.getDatabase(catalog).getTopics();
+        for (Topic t : topics) {
+            String profileName = t.getProfile();
             if (StringUtils.isEmpty(profileName)) {
                 continue;
             }
@@ -1432,16 +1427,19 @@ public abstract class CatalogUtil {
                         t.getTypeName(), profileName));
             }
 
-            EncodeFormat topicFormat = StringUtils.isBlank(t.getTopicformat()) ? null
-                    : EncodeFormat.checkedValueOf(t.getTopicformat());
+            EncodeFormat keyFormat = StringUtils.isBlank(t.getKeyformatname()) ? null
+                    : EncodeFormat.checkedValueOf(t.getKeyformatname());
 
-            if (topicFormat == EncodeFormat.AVRO && deployment.getAvro() == null) {
+            EncodeFormat valFormat = StringUtils.isBlank(t.getValueformatname()) ? null
+                    : EncodeFormat.checkedValueOf(t.getValueformatname());
+
+            if ((keyFormat == EncodeFormat.AVRO || valFormat == EncodeFormat.AVRO)
+                    && deployment.getAvro() == null) {
                 errors.addErrorMessage(String.format(
                         "Topic %s uses AVRO encoding and requires that <avro> be defined in deployment.",
                         t.getTypeName(), profileName));
             }
         }
-
         if (errors.hasErrors()) {
             throw new RuntimeException(errors.getErrorMessage());
         }

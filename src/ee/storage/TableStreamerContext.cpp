@@ -63,8 +63,7 @@ void TableStreamerContext::updatePredicates(const std::vector<std::string> &pred
     std::ostringstream errmsg;
     m_predicates.clear();
     if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
-        const char* details = errmsg.str().c_str();
-        throwFatalException("TableStreamerContext() failed to parse predicate strings: %s", details);
+        throwFatalException("TableStreamerContext() failed to parse predicate strings: %s", errmsg.str().c_str());
     }
 }
 

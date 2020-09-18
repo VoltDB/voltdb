@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -104,7 +103,6 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
-import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
@@ -692,11 +690,6 @@ public class DDLCompiler {
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             String targetName = null;
             String columnName = null;
-            boolean isTopic = false;
-            String topicProfileName = null;
-            String topicFormatName = null;
-            String topicKeyColumnNames = null;
-            String topicAllowedRoleNames = null;
 
             // Parse the EXPORT, PARTITION, and TOPIC clauses.
             if ((statementMatcher.groupCount() > 1) &&
@@ -714,10 +707,6 @@ public class DDLCompiler {
                             throw m_compiler.new VoltCompilerException(
                                 "Only one Export clause is allowed for CREATE STREAM.");
                         }
-                        else if (isTopic) {
-                            throw m_compiler.new VoltCompilerException(
-                                    "An EXPORT clause is not allowed with a TOPIC clause.");
-                        }
                         targetName = matcher.group(SQLParser.CAPTURE_EXPORT_TARGET);
                     }
                     else if (matcher.group(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN) != null) {
@@ -727,22 +716,6 @@ public class DDLCompiler {
                                 "Only one PARTITION clause is allowed for CREATE STREAM.");
                         }
                         columnName = matcher.group(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN);
-                    }
-                    else {
-                        // Note: TOPIC subclauses are optional but ordered without repetition
-                        if (targetName != null) {
-                            throw m_compiler.new VoltCompilerException(
-                                    "A TOPIC clause is not allowed with an EXPORT clause.");
-                        }
-                        if (isTopic) {
-                            throw m_compiler.new VoltCompilerException(
-                                    "Only one TOPIC clause is allowed or CREATE STREAM.");
-                        }
-                        isTopic = true;
-                        topicProfileName = matcher.group(SQLParser.CAPTURE_TOPIC_PROFILE);
-                        topicFormatName = matcher.group(SQLParser.CAPTURE_TOPIC_FORMAT);
-                        topicKeyColumnNames = matcher.group(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
-                        topicAllowedRoleNames = matcher.group(SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES);
                     }
                 }
             }
@@ -769,31 +742,13 @@ public class DDLCompiler {
             if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
-            } else if (!isTopic) {
+            } else {
                 tableXML.attributes.put("export", targetName);
-            }
-
-            // process topic - note that the list attributes are copied raw (i.e. with inner spaces)
-            if (isTopic) {
-                tableXML.attributes.put("topic", "true");
-                if (topicProfileName != null) {
-                    tableXML.attributes.put(SQLParser.CAPTURE_TOPIC_PROFILE, topicProfileName.trim().toUpperCase());
-                }
-                if (topicFormatName != null) {
-                    tableXML.attributes.put(SQLParser.CAPTURE_TOPIC_FORMAT, topicFormatName.trim().toUpperCase());
-                }
-                if (topicKeyColumnNames != null) {
-                    tableXML.attributes.put(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS, topicKeyColumnNames.trim().toUpperCase());
-                }
-                if (topicAllowedRoleNames != null) {
-                    tableXML.attributes.put(SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES, topicAllowedRoleNames.trim().toUpperCase());
-                }
-
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
                     + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); "
-                    + "or CREATE STREAM <table> PARTITION ON COLUMN <column-name> TOPIC [PROFILE <profile>] [FORMAT <format>] [KEYS <keys>] [ALLOW <roles>] (column datatype, ...);",
+                    + "or CREATE STREAM <table> PARTITION ON COLUMN <column-name> (column datatype, ...);",
                     statement.substring(0, statement.length() - 1)));
         }
     }
@@ -1427,11 +1382,6 @@ public class DDLCompiler {
         String streamTarget = node.attributes.get("export");
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
 
-        // is this a topic?
-        final boolean isTopic = Boolean.parseBoolean(node.attributes.get("topic"));
-
-        // remove assertion if persistent tables can be topics
-        assert !isTopic || (isTopic && isStream) : " a topic must be a stream";
         /*
          * FIXME: the check below is disabled because it breaks auto-generated EE tests
          * See ENG-18737
@@ -1450,7 +1400,7 @@ public class DDLCompiler {
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
         if (isStream) {
-            if(isTopic || (streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget))) {
+            if(streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget)) {
                 table.setTabletype(TableType.STREAM.get());
             } else {
                 table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
@@ -1531,9 +1481,13 @@ public class DDLCompiler {
             }
         }
 
+        // Note: This code depends on the {@link Topic} to have ben added to catalog.
+        // If table is a topic, its type may change from CONNECTOR_LESS_STREAM to STREAM,
+        // the reverse change may occur when we drop a topic.
         final String topicName = node.attributes.get("topicName");
-        if (!StringUtil.isEmpty(topicName)) {
+        if (!StringUtil.isEmpty(topicName)  && db.getTopics().get(topicName) != null) {
             table.setTopicname(topicName);
+            table.setTabletype(TableType.STREAM.get());
         }
 
         final String migratingIndexName =
@@ -1628,11 +1582,6 @@ public class DDLCompiler {
                     " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
 
-        // Add the topic-related information
-        if (isTopic) {
-            addTopicAttributesToCatalogTable(table, node, columnMap, db, m_compiler);
-        }
-
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
         if (query != null) {
@@ -1641,87 +1590,6 @@ public class DDLCompiler {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn, streamTarget);
-        }
-    }
-
-    private static void addTopicAttributesToCatalogTable (Table table,
-                            VoltXMLElement node,
-                            Map<String, Column> columnMap,
-                            Database db,
-                            VoltCompiler compiler) throws VoltCompilerException {
-        assert node.name.equals("table");
-
-        table.setIstopic(true);
-        String topicProfileName = node.attributes.get(SQLParser.CAPTURE_TOPIC_PROFILE);
-        if (topicProfileName != null) {
-            table.setTopicprofile(topicProfileName);
-        }
-        String topicFormatName = node.attributes.get(SQLParser.CAPTURE_TOPIC_FORMAT);
-        EncodeFormat format = EncodeFormat.CSV;
-        if (topicFormatName != null) {
-            EnumSet<EncodeFormat> allowedFmts = EnumSet.of(EncodeFormat.AVRO, EncodeFormat.CSV);
-            try {
-                // Parse the format in an unchecked fashion and handle exceptions
-                format = EncodeFormat.valueOf(topicFormatName);
-                if (!allowedFmts.contains(format)) {
-                    throw new RuntimeException("encoding format " + format + " is not allowed on STREAM declaration");
-                }
-            }
-            catch (Exception ex) {
-
-                throw compiler.new VoltCompilerException(
-                        String.format("%s is not a valid topic format in STREAM %s. Acceptable values are: %s",
-                                topicFormatName, table.getTypeName(), EncodeFormat.valueSet()));
-            }
-        }
-        table.setTopicformat(format.name());
-        String topicKeyColumnNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
-        if (topicKeyColumnNames != null) {
-            List<String> definedColumns = new ArrayList<>();
-            for (String col : CatalogUtil.splitOnCommas(topicKeyColumnNames)) {
-                if (StringUtils.isBlank(col)) {
-                    throw compiler.new VoltCompilerException(String
-                            .format("Blank column listed in the KEYS attribute of STREAM %s", table.getTypeName()));
-                }
-                if (definedColumns.contains(col)) {
-                    // Do not tolerate any ambiguous key topic definition
-                    throw compiler.new VoltCompilerException(
-                            String.format("Column %s is defined more than once in the KEYS attribute of STREAM %s",
-                                    col, table.getTypeName()));
-                }
-                if (!columnMap.keySet().contains(col)) {
-                    throw compiler.new VoltCompilerException(
-                            String.format("Unknown column %s defined in the KEYS attribute of STREAM %s",
-                                    col, table.getTypeName()));
-                }
-                definedColumns.add(col);
-            }
-            topicKeyColumnNames = StringUtils.join(definedColumns, ',');
-            table.setTopickeycolumnnames(topicKeyColumnNames);
-        }
-        String topicAllowedRoleNames = node.attributes.get(SQLParser.CAPTURE_TOPIC_ALLOWED_ROLES);
-        if (topicAllowedRoleNames != null) {
-            Set<String> definedRoles = new HashSet<>();
-            for (String role : CatalogUtil.splitOnCommas(topicAllowedRoleNames)) {
-                if (StringUtils.isBlank(role)) {
-                    throw compiler.new VoltCompilerException(String
-                            .format("Blank role listed in the ALLOW attribute of STREAM %s", table.getTypeName()));
-                }
-                if (definedRoles.contains(role)) {
-                    // Tolerate duplicates
-                    compiler.addWarn(String.format(
-                                "Role %s is defined more than once in the ALLOW attribute of STREAM %s",
-                                role, table.getTypeName()));
-                }
-                if (db.getGroups().get(role) == null) {
-                    throw compiler.new VoltCompilerException(
-                            String.format("Unknown role %s listed in the ALLOW attribute of STREAM %s", role,
-                                    table.getTypeName()));
-                }
-                definedRoles.add(role);
-            }
-            topicAllowedRoleNames = StringUtils.join(definedRoles, ',');
-            table.setTopicallowedrolenames(topicAllowedRoleNames);
         }
     }
 
