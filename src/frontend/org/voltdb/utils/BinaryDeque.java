@@ -345,7 +345,7 @@ public interface BinaryDeque<M> {
      * @param <M> Type of metadata
      */
     @FunctionalInterface
-    public interface EntryUpdater<M> {
+    public interface EntryUpdater<M> extends AutoCloseable {
         /**
          * Invoked when an entry which is eligible for being updated in a {@link BinaryDeque} is visited
          * <p>
@@ -357,6 +357,19 @@ public interface BinaryDeque<M> {
          * @see UpdateResult
          */
         UpdateResult update(M metadata, ByteBuffer entry);
+
+        /**
+         * Notify the updater that the end of a segment has been encountered and any updates queued for that segment
+         * have been written out
+         */
+        default void segmentComplete() {}
+
+        /**
+         * Guaranteed to be invoked before {@link BinaryDeque#updateEntries(EntryUpdater)} returns after all updates
+         * have been completed
+         */
+        @Override
+        default void close() {};
     }
 
     /**

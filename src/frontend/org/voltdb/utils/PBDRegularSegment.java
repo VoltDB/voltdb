@@ -614,6 +614,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 updatedSegment = new PBDRegularSegment<>(m_id, m_file, m_usageSpecificLog, m_extraHeaderSerializer);
                 updatedSegment.finalize(true);
             }
+        } finally {
+            entries.clear();
+            updater.segmentComplete();
         }
 
         return Pair.of(updatedSegment, stop);
