@@ -728,8 +728,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
 
-        m_numOfEntries = -1;
-        m_size = -1;
+        m_numOfEntries = 0;
+        m_size = 0;
     }
 
     @Override
