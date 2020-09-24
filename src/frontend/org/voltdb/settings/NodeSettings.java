@@ -45,7 +45,7 @@ public interface NodeSettings extends Settings {
 
     public final static String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
     public final static String CL_PATH_KEY = "org.voltdb.path.command_log";
-    public final static String SNAPTHOT_PATH_KEY = "org.voltdb.path.snapshots";
+    public final static String SNAPSHOT_PATH_KEY = "org.voltdb.path.snapshots";
     public final static String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
     public final static String EXPORT_CURSOR_PATH_KEY = "org.voltdb.path.export_cursor";
     public final static String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
@@ -64,7 +64,7 @@ public interface NodeSettings extends Settings {
     @Key(CL_SNAPSHOT_PATH_KEY)
     public File getCommandLogSnapshot();
 
-    @Key(SNAPTHOT_PATH_KEY)
+    @Key(SNAPSHOT_PATH_KEY)
     public File getSnapshoth();
 
     @Key(EXPORT_OVERFLOW_PATH_KEY)
@@ -117,7 +117,7 @@ public interface NodeSettings extends Settings {
         return ImmutableSortedMap.<String, File>naturalOrder()
                 .put(CL_PATH_KEY, resolve(getCommandLog()))
                 .put(CL_SNAPSHOT_PATH_KEY, resolve(getCommandLogSnapshot()))
-                .put(SNAPTHOT_PATH_KEY, resolve(getSnapshoth()))
+                .put(SNAPSHOT_PATH_KEY, resolve(getSnapshoth()))
                 .put(EXPORT_OVERFLOW_PATH_KEY, resolve(getExportOverflow()))
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
                 .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))

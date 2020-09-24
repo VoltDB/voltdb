@@ -1510,7 +1510,7 @@ public abstract class CatalogUtil {
                 .put(NodeSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
                 .put(NodeSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
                 .put(NodeSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
-                .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
+                .put(NodeSettings.SNAPSHOT_PATH_KEY, paths.getSnapshots().getPath())
                 .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
                 .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
                 .put(NodeSettings.LARGE_QUERY_SWAP_PATH_KEY, paths.getLargequeryswap().getPath())
