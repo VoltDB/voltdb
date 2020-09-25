@@ -51,6 +51,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -437,6 +439,15 @@ public class SQLCommand {
                 if (t.equalsIgnoreCase(describeArgs)) {
                     tableName = t;
                     type = tableData.getString(3);
+                    String remarks = tableData.getString(4);
+                    if (remarks != null) {
+                        JSONObject json = new JSONObject(remarks);
+                        try {
+                            if (json != null && Boolean.valueOf((String)json.get("drEnabled"))) {
+                                type = "DR TABLE";
+                            }
+                        } catch (JSONException e) {/* swallow it */}
+                    }
                     break;
                 }
             }

@@ -76,3 +76,23 @@ ID        |BIGINT          |          8|NOT NULL |PARTITION_COLUMN
 TS        |TIMESTAMP       |          8|         |                
 ------------------------------------------------------------------
 Type: EXPORT
+
+DR TABLE t1;
+Command succeeded.
+COLUMN    |DATATYPE        |SIZE       |NULLABLE |REMARKS         
+------------------------------------------------------------------
+ID        |BIGINT          |          8|NOT NULL |PARTITION_COLUMN
+COL1      |TINYINT         |          1|         |                
+COL2      |SMALLINT        |          2|         |                
+COL3      |INTEGER         |          4|         |                
+COL4      |FLOAT           |          8|         |                
+COL5      |DECIMAL         |         16|         |                
+COL6      |GEOGRAPHY       |      32768|         |                
+COL7      |GEOGRAPHY_POINT |         16|         |                
+COL8      |VARCHAR         |          1|         |                
+COL9      |VARCHAR         |         10|         |                
+COL10     |VARCHAR         |        500|         |                
+COL11     |VARBINARY       |       1000|         |                
+COL12     |TIMESTAMP       |          8|         |                
+------------------------------------------------------------------
+Type: DR TABLE, Primary Key (ID)

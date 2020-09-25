@@ -34,3 +34,6 @@ CREATE STREAM s1 PARTITION ON COLUMN id (
 DESCRIBE s1;
 
 describe t2;
+
+DR TABLE t1;
+describe t1;
