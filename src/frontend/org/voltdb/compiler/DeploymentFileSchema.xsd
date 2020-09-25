@@ -628,6 +628,7 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="size"/>
       <xs:enumeration value="time"/>
+      <xs:enumeration value="compact"/>
     </xs:restriction>
   </xs:simpleType>
 

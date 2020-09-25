@@ -59,7 +59,7 @@ public class TestTimeBasedRetentionPolicy {
 
     @Test(timeout=60_000)
     public void testNoReadersOneSegment() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1, 1);
         // In this test, retention policy has only one segment to delete at a time.
         int segmentsCount = 5;
 
@@ -113,7 +113,7 @@ public class TestTimeBasedRetentionPolicy {
 
     @Test
     public void testNoReadersMultiSegments() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3, 1);
         // In this test, retention policy may have more than one segment to delete at a time.
         int segmentsCount = 5;
         Random rand = new Random();
@@ -318,7 +318,7 @@ public class TestTimeBasedRetentionPolicy {
 
     @BeforeClass
     public static void setUpClass() {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2, 1);
     }
 
     @Before

@@ -212,9 +212,9 @@ public class TestPersistentBinaryDeque {
 
     @Test (timeout = 10_000)
     public void testRetentionThreads() {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2, 1);
         assertEquals(2, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
-        PersistentBinaryDeque.setupRetentionPolicyMgr(5);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(5, 1);
         assertEquals(5, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
     }
 

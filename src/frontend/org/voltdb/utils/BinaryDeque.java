@@ -37,7 +37,8 @@ public interface BinaryDeque<M> {
      */
     public static enum RetentionPolicyType {
         TIME_MS,
-        MAX_BYTES;
+        MAX_BYTES,
+        UPDATE;
     }
 
     /*

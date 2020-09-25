@@ -150,6 +150,7 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
 import org.voltdb.compiler.deploymentfile.TopicProfileType;
+import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
 import org.voltdb.compiler.deploymentfile.TopicRetentionType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -1416,14 +1417,20 @@ public abstract class CatalogUtil {
         CatalogMap<Topic> topics = CatalogUtil.getDatabase(catalog).getTopics();
         for (Topic t : topics) {
             String profileName = t.getProfile();
+            TopicProfileType profile;
             if (StringUtils.isEmpty(profileName)) {
                 continue;
             }
-            else if (profileMap.get(profileName) == null) {
+            else if ((profile = profileMap.get(profileName)) == null) {
                 // Missing profile only generates warning
                 hostLog.warn(String.format(
                         "Topic %s refers to profile %s which is not defined in deployment, "
                         + "topic data will persist forever.",
+                        t.getTypeName(), profileName));
+            } else if (profile.getRetention() != null
+                    && profile.getRetention().getPolicy() == TopicRetentionPolicyEnum.COMPACT && !t.getIsopaque()) {
+                errors.addErrorMessage(String.format(
+                        "Topic %s refers to profile %s which uses retention policy COMPACT but the topic is not opaque",
                         t.getTypeName(), profileName));
             }
 
@@ -1498,6 +1505,9 @@ public abstract class CatalogUtil {
                 break;
             case SIZE:
                 RetentionPolicyMgr.parseByteLimit(retention.getLimit());
+                break;
+            case COMPACT:
+                RetentionPolicyMgr.parseCompactInterval(retention.getLimit());
                 break;
             default:
                 errors.addErrorMessage("Unsupported retention policy \"" + retention.getPolicy() + "\"");

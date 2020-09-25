@@ -60,7 +60,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testNoReaders() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1, 1);
         Random random = new Random(System.currentTimeMillis());
         int maxNumBuffers = 100;
         long numWritten = 0;
@@ -81,7 +81,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testWithReaders() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3, 1);
         int numReaders = 2;
         @SuppressWarnings("unchecked")
         BinaryDequeReader<ExtraHeaderMetadata>[] readers = new BinaryDequeReader[numReaders];
@@ -366,7 +366,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @BeforeClass
     public static void setUpClass() {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2, 1);
     }
 
     @Before

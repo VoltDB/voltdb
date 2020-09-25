@@ -20,13 +20,19 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
+import org.voltdb.utils.BinaryDeque.EntryUpdater;
 import org.voltdb.utils.BinaryDeque.RetentionPolicyType;
 
 import com.google.common.collect.ImmutableMap;
@@ -68,17 +74,23 @@ public class RetentionPolicyMgr {
     private static long s_minBytesLimitMb = 64;
 
     private final ScheduledThreadPoolExecutor m_scheduler;
+    private final ThreadPoolExecutor m_updaterThreads;
     private final Map<PersistentBinaryDeque<?>.ReadCursor, ScheduledFuture<?>> m_futures = new HashMap<>();
 
-    RetentionPolicyMgr(int numThreads) {
-        m_scheduler = new ScheduledThreadPoolExecutor(numThreads);
-        LOG.info("Initialized PBD with " + numThreads + " threads to enforce retention policy");
+    RetentionPolicyMgr() {
+        m_scheduler = new ScheduledThreadPoolExecutor(1);
+        m_updaterThreads = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new LinkedTransferQueue<>());
     }
 
-    void updateThreadPoolSize(int numThreads) {
+    void configure(int numThreads, int numUpdaterThreads) {
         if (numThreads != m_scheduler.getCorePoolSize()) {
             m_scheduler.setCorePoolSize(numThreads);
             LOG.info("Updated PBD to use " + numThreads + " threads to enforce retention policy");
+        }
+        if (numUpdaterThreads != m_updaterThreads.getCorePoolSize()) {
+            m_updaterThreads.setCorePoolSize(numUpdaterThreads);
+            m_updaterThreads.setMaximumPoolSize(numUpdaterThreads);
+            LOG.info("Updated PBD to use " + numUpdaterThreads + " threads for update entry processing");
         }
     }
 
@@ -86,12 +98,15 @@ public class RetentionPolicyMgr {
         return m_scheduler.getCorePoolSize();
     }
 
-    public PBDRetentionPolicy addRetentionPolicy(RetentionPolicyType policyType, PersistentBinaryDeque<?> pbd, Object... params) {
+    public <M> PBDRetentionPolicy addRetentionPolicy(RetentionPolicyType policyType, PersistentBinaryDeque<M> pbd,
+            Object... params) {
         switch(policyType) {
         case TIME_MS:
             return addTimeBasedRetentionPolicy(pbd, params);
         case MAX_BYTES:
             return addMaxBytesRetentionPolicy(pbd, params);
+        case UPDATE:
+            return addUpdateRetentionPolicy(pbd, params);
         }
 
         throw new RuntimeException("Invalid retention policy type" + policyType);
@@ -111,6 +126,17 @@ public class RetentionPolicyMgr {
         long maxBytes = ((Long) params[0]).longValue();
         assert (maxBytes > 0);
         return new MaxBytesRetentionPolicy(pbd, maxBytes);
+    }
+
+    private <M> UpdateRetentionPolicy<M> addUpdateRetentionPolicy(PersistentBinaryDeque<M> pbd, Object[] params) {
+        assert params.length == 2;
+        assert params[0] != null && params[0] instanceof Supplier;
+        assert params[1] != null && params[1] instanceof Long;
+
+        @SuppressWarnings("unchecked")
+        Supplier<BinaryDeque.EntryUpdater<? super M>> supplier = (Supplier<EntryUpdater<? super M>>) params[0];
+        long intervalMs = (Long) params[1];
+        return new UpdateRetentionPolicy<>(pbd, supplier, intervalMs);
     }
 
     /*
@@ -275,7 +301,7 @@ public class RetentionPolicyMgr {
         @Override
         protected void executeRetention(PersistentBinaryDeque<?>.ReadCursor reader) {
             try {
-                while (reader.isOpen() && reader.skipToNextSegmentIfOlder(m_retainMillis));
+                while (reader.isOpen() && reader.skipToNextSegmentIfOlder(m_retainMillis)) {}
             } catch(IOException e) {
                 m_pbd.getUsageSpecificLog().warn("Unexpected error trying to check for PBD segments to be deleted", e);
                 // We will try this again when we get the next notification
@@ -387,6 +413,81 @@ public class RetentionPolicyMgr {
         }
     }
 
+    class UpdateRetentionPolicy<M> implements PBDRetentionPolicy {
+        private final BinaryDeque<M> m_pbd;
+        private final Supplier<BinaryDeque.EntryUpdater<? super M>> m_supplier;
+        private final long m_intervalMs;
+        private volatile Future<?> m_future;
+
+        UpdateRetentionPolicy(PersistentBinaryDeque<M> pbd,
+                Supplier<BinaryDeque.EntryUpdater<? super M>> supplier, long intervalMs) {
+            m_pbd = pbd;
+            m_supplier = supplier;
+            m_intervalMs = intervalMs;
+        }
+
+        @Override
+        public void newSegmentAdded(long initialBytes) {}
+
+        @Override
+        public void bytesAdded(long numBytes) {}
+
+        @Override
+        public void finishedGapSegment() {}
+
+        @Override
+        public String getCursorId() {
+            return "_CompactRetentionPolicy_";
+        }
+
+        @Override
+        public void startPolicyEnforcement() throws IOException {
+            if (!isPolicyEnforced()) {
+                scheduleNextCompaction();
+            }
+        }
+
+        @Override
+        public synchronized void stopPolicyEnforcement() {
+            if (m_future != null) {
+                m_future.cancel(false);
+                m_future = null;
+            }
+        }
+
+        @Override
+        public boolean isPolicyEnforced() {
+            return m_future != null;
+        }
+
+        private synchronized void scheduleNextCompaction() {
+            if (m_future != null && !m_future.isDone()) {
+                m_future.cancel(false);
+            }
+            m_future = m_scheduler.schedule(this::updateSchedule, m_intervalMs, TimeUnit.MILLISECONDS);
+        }
+
+        private void updateSchedule() {
+            if (m_pbd.newEligibleUpdateEntries() > 0) {
+                m_updaterThreads.execute(this::update);
+            } else {
+                scheduleNextCompaction();
+            }
+        }
+
+        private void update() {
+            try {
+                m_pbd.updateEntries(m_supplier.get());
+            } catch (IOException e) {
+                LOG.warn(this + " error while updating records", e);
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Unexpected error encountered during update of " + m_pbd, true, t);
+            } finally {
+                scheduleNextCompaction();
+            }
+        }
+    }
+
     public static long parseTimeLimit(String limitStr) throws RetentionLimitException {
         return parseLimit(limitStr, s_timeLimitConverter);
     }
@@ -398,6 +499,21 @@ public class RetentionPolicyMgr {
             throw new RetentionLimitException("Size-based retention limit must be > " + s_minBytesLimitMb + " mb");
         }
         return limit;
+    }
+
+    public static long parseCompactInterval(String intervalStr) throws RetentionLimitException {
+        if (StringUtils.isBlank(intervalStr)) {
+            throw new RetentionLimitException("empty compaction interval");
+        }
+        try {
+            long limit = TimeUnit.SECONDS.toMillis(Integer.parseInt(intervalStr));
+            if (limit < 0) {
+                throw new RetentionLimitException("Compaction interval must be positive: " + intervalStr);
+            }
+            return limit;
+        } catch (NumberFormatException e) {
+            throw new RetentionLimitException("Compaction interval must be an integer: " + e);
+        }
     }
 
     // Parse a retention limit qualified by a 2-character qualifier and return its converted value

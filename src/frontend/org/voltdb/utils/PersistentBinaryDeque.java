@@ -61,12 +61,11 @@ import com.google_voltpatches.common.base.Throwables;
 public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private static RetentionPolicyMgr s_retentionPolicyMgr;
 
-    public static synchronized void setupRetentionPolicyMgr(int numThreads) {
+    public static synchronized void setupRetentionPolicyMgr(int numThreads, int numCompactionThreads) {
         if (s_retentionPolicyMgr == null) {
-            s_retentionPolicyMgr = new RetentionPolicyMgr(numThreads);
-        } else {
-            s_retentionPolicyMgr.updateThreadPoolSize(numThreads);
+            s_retentionPolicyMgr = new RetentionPolicyMgr();
         }
+        s_retentionPolicyMgr.configure(numThreads, numCompactionThreads);
     }
 
     public static RetentionPolicyMgr getRetentionPolicyMgr() {
