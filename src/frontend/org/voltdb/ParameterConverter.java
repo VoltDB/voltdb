@@ -23,7 +23,6 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.regex.Pattern;
 import java.nio.ByteBuffer;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -121,8 +120,6 @@ public class ParameterConverter {
         return true;
     }
 
-    private static final Pattern thousandSeparator = Pattern.compile("\\,");
-
     /**
      * Given a string, covert it to a primitive type or boxed type of the primitive type or return null.
      *
@@ -143,7 +140,7 @@ public class ParameterConverter {
         // Remove commas.  Doing this seems kind of dubious since it lets strings like
         //    ,,,3.1,4,,e,+,,16
         // be parsed as a valid double value (for example).
-        String commaFreeValue = thousandSeparator.matcher(value).replaceAll("");
+        String commaFreeValue = value.contains(",") ? value.replace(",", "") : value;
 
         try {
             // autoboxing converts to boxed types since this method returns a java Object
