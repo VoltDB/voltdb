@@ -29,7 +29,12 @@ public enum EncodeFormat {
     INVALID(-1),
     CSV(0),
     AVRO(1),
-    OPAQUE(2);
+    OPAQUE(2),
+    INT(3),
+    LONG(4),
+    STRING(5),
+    UUID(6),
+    BYTEARRAY(7);
 
     /** ID for the encode format used in serialization of the format */
     private final byte m_id;

@@ -605,11 +605,11 @@ public class TestDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
         String schema[] = {
                 "CREATE STREAM FOO1 (S1 INTEGER);" +
-                "CREATE TOPIC USING STREAM foo1 EXECUTE PROCEDURE z WITH KEYS FORMAT KEY avro PROPERTIES ( X=Y, Z=C,  W=X6 ) FORMAT VALUE avro PROPERTIES (X7=Y, Z=C,  W=X) ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X1,Y1,Z1 PROFILE prof1;",
+                "CREATE TOPIC USING STREAM foo1 EXECUTE PROCEDURE z WITH KEYS FORMAT KEY int PROPERTIES ( X=Y, Z=C,  W=X6 ) FORMAT VALUE avro PROPERTIES (X7=Y, Z=C,  W=X) ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X1,Y1,Z1 PROFILE prof1;",
                 "CREATE OPAQUE TOPIC foo2 PARTITIONED ALLOW PRODUCER X,Y,Z ALLOW CONSUMER X8,Y1,Z1 PROFILE prof1;",
                 "CREATE OPAQUE TOPIC foo3 ALLOW X,Y,Z PROFILE prof1;",
                 "CREATE OPAQUE TOPIC foo4 PARTITIONED;",
-                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC foo5 FORMAT avro PROPERTIES ( X=Y9, Z=C,  W=X ) ALLOW PRODUCER X,Y,Z PROFILE prof1;"
+                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC foo5 FORMAT int PROPERTIES ( X=Y9, Z=C,  W=X ) ALLOW PRODUCER X,Y,Z PROFILE prof1;"
         };
         VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {

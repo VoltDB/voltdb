@@ -17,9 +17,9 @@
 
 package org.voltdb.compiler.statements;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.regex.Matcher;
-
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.CatalogMap;
@@ -149,14 +149,18 @@ public class CreateTopic extends CreateOpaqueTopic {
             if (index == 2) {
                throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
-            topic.setKeyformatname(formatName);
-            topic.setValueformatname(formatName);
-            setFormatProperties(formatProps, topic.getKeyformatproperties());
-            setFormatProperties(formatProps, topic.getValueformatproperties());
+            if (formatName != null) {
+                validateKeyFormat(formatName);
+                topic.setKeyformatname(formatName);
+                topic.setValueformatname(formatName);
+                setFormatProperties(formatProps, topic.getKeyformatproperties());
+                setFormatProperties(formatProps, topic.getValueformatproperties());
+            }
         } else if ("key".equalsIgnoreCase(formatTarget)) {
             if (!StringUtils.isBlank(topic.getKeyformatname())) {
                 throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
+            validateKeyFormat(formatName);
             topic.setKeyformatname(formatName);
             setFormatProperties(formatProps, topic.getKeyformatproperties());
         } else {
@@ -167,6 +171,18 @@ public class CreateTopic extends CreateOpaqueTopic {
             setFormatProperties(formatProps, topic.getValueformatproperties());
         }
         return true;
+    }
+
+    private void validateKeyFormat(String formatName) throws VoltCompilerException {
+        EncodeFormat keyFormat = EncodeFormat.checkedValueOf(formatName.toUpperCase());
+        EnumSet<EncodeFormat> keySet = EncodeFormat.valueSet();
+        keySet.remove(EncodeFormat.CSV);
+        keySet.remove(EncodeFormat.AVRO);
+        keySet.remove(EncodeFormat.OPAQUE);
+        if (!keySet.contains(keyFormat)) {
+            throw m_compiler.new VoltCompilerException(
+                    String.format("Invalid CREATE TOPIC statement. key format %s is invalid. Allowed key format: %s", formatName, keySet.toString()));
+        }
     }
 
     private void setFormatProperties(String formatProps, CatalogMap<FormatParameter> properties) {
