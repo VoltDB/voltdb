@@ -66,4 +66,5 @@ def init(runner):
         runner.args.extend(['license', runner.opts.license])
 
     args = runner.args
-    runner.java_execute(VoltDB, None, *args)
+    kwargs = { 'exec': True }
+    runner.java_execute(VoltDB, None, *args, **kwargs)
