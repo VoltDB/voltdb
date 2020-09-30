@@ -361,7 +361,8 @@ public class SQLCommand {
         // SHOW or LIST <blah> statement
         String subcommand = SQLParser.parseShowStatementSubcommand(line);
         if (subcommand != null) {
-            switch (subcommand.toLowerCase()) {
+            String[] modifiers = subcommand.split(" ", 2);
+            switch (modifiers[0].toLowerCase()) {
                 case "proc":
                 case "procedures":
                     execListProcedures();
@@ -370,7 +371,14 @@ public class SQLCommand {
                     execListFunctions();
                     break;
                 case "tables":
-                    execListTables();
+                    String filter = null;
+                    if (modifiers.length > 1) {
+                        filter = modifiers[1];
+                        if (filter.endsWith(";")) {
+                            filter = filter.substring(0, filter.length() - 1);
+                        }
+                    }
+                    execListTables(filter);
                     break;
                 case "classes":
                     execListClasses();
@@ -386,13 +394,13 @@ public class SQLCommand {
                     break;
                 */
 
-            case "tasks":
+                case "tasks":
                     executeListTasks();
                     break;
                 default:
-                    String errorCase = (subcommand.equals("") || subcommand.equals(";")) ?
+                    String errorCase = (modifiers[0].equals("") || modifiers[0].equals(";")) ?
                             ("Incomplete SHOW command.\n") :
-                            ("Invalid SHOW command completion: '" + subcommand + "'.\n");
+                            ("Invalid SHOW command completion: '" + modifiers[0] + "'.\n");
                     System.out.println(errorCase +
                             "The valid SHOW command completions are classes, procedures, tables, or tasks.");
                     break;
@@ -440,13 +448,8 @@ public class SQLCommand {
                     tableName = t;
                     type = tableData.getString(3);
                     String remarks = tableData.getString(4);
-                    if (remarks != null) {
-                        JSONObject json = new JSONObject(remarks);
-                        try {
-                            if (json != null && Boolean.valueOf((String)json.get("drEnabled"))) {
-                                type = "DR TABLE";
-                            }
-                        } catch (JSONException e) {/* swallow it */}
+                    if (isDRTable(remarks)) {
+                        type = "DR TABLE";
                     }
                     break;
                 }
@@ -637,15 +640,38 @@ public class SQLCommand {
         System.out.println();
     }
 
-    private static void execListTables() throws Exception {
+    private static void execListTables(String typeFilter) throws Exception {
         //TODO: since sqlcmd makes no intrinsic use of the tables list, it would be more
         // efficient to load the list only "on demand" from here and to cache a
         // complete formatted String result rather than the multiple lists.
         // This would save churn on startup and on DDL update.
+
+        // list all tables
         Tables tables = getTables();
+        if (typeFilter != null) {
+            switch (typeFilter) {
+            case "dr":
+                printTables("DR Tables", tables.drs);
+                break;
+            case "export":
+                printTables("User Export Streams", tables.exports);
+                break;
+            case "view":
+                printTables("User Views", tables.views);
+                break;
+            case "ordinary":
+                printTables("User Tables", tables.tables);
+                break;
+            default:
+                System.out.println("Unrecognized table type. The valid types are \"dr\", \"export\", \"view\", and \"ordinary\".");
+            }
+            // Handled all type filer
+            return;
+        }
         printTables("User Tables", tables.tables);
         printTables("User Views", tables.views);
         printTables("User Export Streams", tables.exports);
+        printTables("DR Tables", tables.drs);
         System.out.println();
     }
 
@@ -1387,6 +1413,7 @@ public class SQLCommand {
     private static class Tables {
         TreeSet<String> tables = new TreeSet<>();
         TreeSet<String> exports = new TreeSet<>();
+        TreeSet<String> drs = new TreeSet<>();
         TreeSet<String> views = new TreeSet<>();
     }
 
@@ -1396,10 +1423,13 @@ public class SQLCommand {
         while (tableData.advanceRow()) {
             String tableName = tableData.getString("TABLE_NAME");
             String tableType = tableData.getString("TABLE_TYPE");
+            String tableRemark = tableData.getString("REMARKS");
             if (tableType.equalsIgnoreCase("EXPORT")) {
                 tables.exports.add(tableName);
             } else if (tableType.equalsIgnoreCase("VIEW")) {
                 tables.views.add(tableName);
+            } else if (isDRTable(tableRemark)) {
+                tables.drs.add(tableName);
             } else {
                 tables.tables.add(tableName);
             }
@@ -1814,5 +1844,17 @@ public class SQLCommand {
                 }
             }
         } catch (Throwable ignored) { }
+    }
+
+    private static boolean isDRTable(String remark) {
+        if (remark != null) {
+            try {
+                JSONObject json = new JSONObject(remark);
+                if (json != null && Boolean.valueOf((String)json.get("drEnabled"))) {
+                    return true;
+                }
+            } catch (JSONException e) {/* swallow it */}
+        }
+        return false;
     }
 }
