@@ -93,19 +93,19 @@ public class TestUpdateRetentionPolicy {
 
         m_pbd.updateExtraHeader(this);
 
-        assertTrue(waitForCount(10, 30_000));
+        assertTrue(waitForCount(11, 30_000));
 
         for (int i = 0; i < 10; ++i) {
             m_pbd.offer(DBBPool.allocateDirect(1024));
         }
 
         // Assert that the count does not increase until after a new segment is created
-        assertFalse(waitForCount(11, 500));
+        assertFalse(waitForCount(12, 500));
 
         m_pbd.updateExtraHeader(this);
 
         // Assert that count increases after new segment is created
-        assertTrue(waitForCount(30, 30_000));
+        assertTrue(waitForCount(33, 30_000));
 
         // Validate that count does not go up when retention policy is stopped
         m_pbd.stopRetentionPolicyEnforcement();
@@ -118,7 +118,7 @@ public class TestUpdateRetentionPolicy {
         m_pbd.updateExtraHeader(this);
 
         // Assert that the count does not increase until after a new segment is created
-        assertFalse(waitForCount(31, 500));
+        assertFalse(waitForCount(34, 500));
     }
 
     private Supplier<CountingUpdator> m_supplier = CountingUpdator::new;

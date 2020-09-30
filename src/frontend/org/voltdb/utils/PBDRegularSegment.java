@@ -564,33 +564,47 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         try (ReverseSegmentReader reader = new ReverseSegmentReader()) {
             boolean updated = false;
-            BBContainer cont;
             // Use a mmap buffer to not have to hold unmodified entries in memory
             MappedByteBuffer mmap = m_fc.map(MapMode.READ_ONLY, 0, m_fc.size());
 
             pollLoop:
-            while ((cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true)) != null) {
+            while (true) {
+                BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                ByteBuffer entry = null;
+                int length = 0;
+                if (cont != null) {
+                    entry = cont.b().asReadOnlyBuffer();
+                    length = entry.remaining();
+                }
+
                 UpdateResult result;
-                int length = cont.b().remaining();
                 try {
-                    result = updater.update(getExtraHeader(), cont.b());
+                    result = updater.update(getExtraHeader(), entry);
                 } finally {
-                    cont.discard();
+                    if (cont != null) {
+                        cont.discard();
+                    }
                 }
 
                 switch (result.m_result) {
                     case KEEP:
+                        if (cont == null) {
+                            // This was the end of the segment and this keeps it as the end
+                            break pollLoop;
+                        }
                         mmap.position(reader.m_entryStart).limit(reader.m_entryEnd);
                         entries.addFirst(UpdateEntry.copy(mmap.slice(), length));
                         break;
                     case UPDATE:
                         entries.addFirst(UpdateEntry.entry(result.m_update));
                     case DELETE:
-                        updated = true;
+                        if (cont != null) {
+                            updated = true;
+                        }
                         break;
                     case STOP:
                         stop = Boolean.TRUE;
-                        if (updated) {
+                        if (updated && cont != null) {
                             // Add this entry and all other entries into the queue of entries
                             do {
                                 mmap.position(reader.m_entryStart).limit(reader.m_entryEnd);

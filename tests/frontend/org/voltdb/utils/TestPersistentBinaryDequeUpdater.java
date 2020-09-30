@@ -114,8 +114,10 @@ public class TestPersistentBinaryDequeUpdater {
 
         fillEntries(5, 20, entries::add);
 
-        m_pbd.updateEntries((o, e) -> {
-            assertEquals(entries.pollLast(), e);
+        m_pbd.updateEntries((m, e) -> {
+            if (e != null) {
+                assertEquals(entries.pollLast(), e);
+            }
             return UpdateResult.KEEP;
         });
         assertTrue(entries.isEmpty());
@@ -132,7 +134,7 @@ public class TestPersistentBinaryDequeUpdater {
         fillEntries(5, 20);
 
         m_pbd.updateEntries((o, e) -> {
-            return UpdateResult.DELETE;
+            return e == null ? UpdateResult.KEEP : UpdateResult.DELETE;
         });
 
         PersistentBinaryDeque<Object>.ReadCursor cursor = m_pbd.openForRead(m_name.getMethodName());
@@ -156,7 +158,10 @@ public class TestPersistentBinaryDequeUpdater {
         MutableInt count = new MutableInt(0);
         Deque<ByteBuffer> entries = new ArrayDeque<>(4 * 20 / 2);
 
-        m_pbd.updateEntries((o, e) -> {
+        m_pbd.updateEntries((m, e) -> {
+            if (e == null) {
+                return UpdateResult.KEEP;
+            }
             int index = count.incrementAndGet();
             if (index < 4 * 20 && index % 2 == 0) {
                 entries.add((ByteBuffer) ByteBuffer.allocate(e.remaining()).put(e).flip());
@@ -181,7 +186,10 @@ public class TestPersistentBinaryDequeUpdater {
 
         Deque<ByteBuffer> entries = new ArrayDeque<>(5 * 20);
 
-        m_pbd.updateEntries((o, e) -> {
+        m_pbd.updateEntries((m, e) -> {
+            if (e == null) {
+                return UpdateResult.KEEP;
+            }
             ByteBuffer update = randomBuffer();
             entries.add(update.asReadOnlyBuffer());
             return UpdateResult.update(update);
@@ -202,28 +210,32 @@ public class TestPersistentBinaryDequeUpdater {
 
         Deque<ByteBuffer> entries = new ArrayDeque<>(5 * 20);
 
-        m_pbd.updateEntries((o, e) -> {
+        m_pbd.updateEntries((m, e) -> {
             float value = m_random.nextFloat();
             if (value < 0.01) {
                 // 1% chance to stop
-                do {
+                while (!allEntries.isEmpty()) {
                     entries.add(allEntries.removeLast());
-                } while (!allEntries.isEmpty());
+                }
                 return UpdateResult.STOP;
             }
 
-            allEntries.removeLast();
+            if (e != null) {
+                allEntries.removeLast();
+            }
 
             if (value < 0.21) {
                 // 20% chance to delete
                 return UpdateResult.DELETE;
             } else if (value < 0.51) {
                 // 30% chance to keep
-                entries.add((ByteBuffer) ByteBuffer.allocate(e.remaining()).put(e).flip());
+                if (e != null) {
+                    entries.add((ByteBuffer) ByteBuffer.allocate(e.remaining()).put(e).flip());
+                }
                 return UpdateResult.KEEP;
             }
 
-            // Everything else is a update
+            // Everything else is an update
             ByteBuffer update = randomBuffer();
             entries.add(update.asReadOnlyBuffer());
             return UpdateResult.update(update);

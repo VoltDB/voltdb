@@ -348,12 +348,17 @@ public interface BinaryDeque<M> {
     @FunctionalInterface
     public interface EntryUpdater<M> extends AutoCloseable {
         /**
-         * Invoked when an entry which is eligible for being updated in a {@link BinaryDeque} is visited
+         * Invoked for every entry in a segment which can be updated and also invoked with a {@code null entry} so new
+         * entries can be added at the start of the segment.
          * <p>
          * This method should never return {@code null}
+         * <p>
+         * Will be continually invoked until {@link UpdateResult#KEEP} is returned when {@code entry} is {@code null}.
+         * If {@link UpdateResult#DELETE} is returned this does not actually affect the contents of the PBD and the
+         * method will be invoked again.
          *
          * @param metadata associated with {@code entry}
-         * @param entry    that can be updated
+         * @param entry    that can be updated or {@code null} if it is the end of a segment
          * @return {@link UpdateResult} instance describing how to handle the current entry
          * @see UpdateResult
          */
