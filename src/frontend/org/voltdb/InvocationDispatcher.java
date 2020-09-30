@@ -485,7 +485,12 @@ public final class InvocationDispatcher {
                 }
             }
             else if ("@UpdateLogging".equals(procName)) {
-                task = appendAuditParams(task, ccxn, user);
+                StoredProcedureInvocation task2 = appendAuditParams(task, ccxn, user);
+                if (task2 == null) {
+                    return gracefulFailureResponse("Internal error while adding audit parameters",
+                                                   task.clientHandle);
+                }
+                task = task2;
             }
             else if ("@JStack".equals(procName)) {
                 return dispatchJstack(task);
@@ -909,21 +914,30 @@ public final class InvocationDispatcher {
 
     private StoredProcedureInvocation appendAuditParams(StoredProcedureInvocation task,
             Connection ccxn, AuthSystem.AuthUser user) {
-        String username = user.m_name;
-        if (username == null) {
-            username = "An anonymous user";
+        String username = "anonymous user";
+        String remoteHost = "unknown address";
+        try {
+            if (user.m_name != null) {
+                username = user.m_name;
+            }
+            if (ccxn != null && ccxn.getRemoteSocketAddress() != null) {
+                remoteHost = ccxn.getRemoteSocketAddress().toString();
+            }
+            String xml = (String)task.getParams().toArray()[0];
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(task.getProcName());
+            spi.setParams(username, remoteHost, xml);
+            spi.setClientHandle(task.getClientHandle());
+            spi.setBatchTimeout(task.getBatchTimeout());
+            spi.type = task.getType();
+            spi.setAllPartition(task.getAllPartition());
+            spi.setPartitionDestination(task.getPartitionDestination());
+            return spi;
         }
-        String remoteHost = ccxn.getRemoteSocketAddress().toString();
-        String xml = (String)task.getParams().toArray()[0];
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName(task.getProcName());
-        spi.setParams(username, remoteHost, xml);
-        spi.setClientHandle(task.getClientHandle());
-        spi.setBatchTimeout(task.getBatchTimeout());
-        spi.type = task.getType();
-        spi.setAllPartition(task.getAllPartition());
-        spi.setPartitionDestination(task.getPartitionDestination());
-        return spi;
+        catch (Exception ex) {
+            log.error("Exception while adding audit parameters: " + ex);
+            return null;
+        }
     }
 
    /**
