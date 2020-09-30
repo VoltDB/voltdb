@@ -18,6 +18,7 @@
 package org.voltdb.serdes;
 
 import java.util.EnumSet;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -26,18 +27,19 @@ import org.voltdb.VoltDB;
  * An enum listing the encoding formats
  */
 public enum EncodeFormat {
-    INVALID(-1),
-    CSV(0),
-    AVRO(1),
-    OPAQUE(2),
-    INT(3),
-    LONG(4),
-    STRING(5),
-    UUID(6),
-    BYTEARRAY(7);
+    INVALID(-1, false),
+    CSV(0, false),
+    AVRO(1, false),
+    OPAQUE(2, false),
+    INT(3, true),
+    LONG(4, true),
+    STRING(5, true),
+    UUID(6, true),
+    BYTEARRAY(7, true);
 
     /** ID for the encode format used in serialization of the format */
     private final byte m_id;
+    private final boolean m_simple;
 
     /**
      * Parse an {@link EncodeFormat} from a {@link String} whose
@@ -50,6 +52,9 @@ public enum EncodeFormat {
         try {
             return valueOf(name);
         }
+        catch(IllegalArgumentException ex) {
+            return EncodeFormat.INVALID;
+        }
         catch (Exception ex) {
             throw VoltDB.crashLocalVoltDB("Illegal encoding format " + name, true, ex);
         }
@@ -58,18 +63,17 @@ public enum EncodeFormat {
     /**
      * Parse an {@link EncodeFormat} from a {@link String} and apply defaults.
      *
+     * @param isKey     {@code true} if for key format, {@code false} for value format
      * @param isOpaque  {@code true} if opaque
      * @param fmt       the format string
      * @return
      */
-    public static EncodeFormat parseFormat(boolean isOpaque, String fmt) {
+    public static EncodeFormat parseFormat(boolean isKey, boolean isOpaque, String fmt) {
         if (isOpaque) {
-            // FIXME: done in DDL validation?
             return EncodeFormat.OPAQUE;
         }
         else if (StringUtils.isBlank(fmt)) {
-            // FIXME: done in DDL validation?
-            return EncodeFormat.CSV;
+            return isKey ? EncodeFormat.STRING : EncodeFormat.CSV;
         }
         return EncodeFormat.checkedValueOf(fmt.toUpperCase());
     }
@@ -82,6 +86,13 @@ public enum EncodeFormat {
         allowedValues.remove(INVALID);
         allowedValues.remove(OPAQUE);
         return allowedValues;
+    }
+
+    /**
+     * @return the set of simple formats
+     */
+    public static EnumSet<EncodeFormat> simpleValueSet() {
+        return EnumSet.copyOf(EncodeFormat.valueSet().stream().filter(EncodeFormat::isSimple).collect(Collectors.toList()));
     }
 
     /**
@@ -100,8 +111,9 @@ public enum EncodeFormat {
         return INVALID;
     }
 
-    private EncodeFormat(int id) {
+    private EncodeFormat(int id, boolean simple) {
         m_id = (byte) id;
+        m_simple = simple;
     }
 
     /**
@@ -109,5 +121,12 @@ public enum EncodeFormat {
      */
     public byte getId() {
         return m_id;
+    }
+
+    /**
+     * @return {@code true} if simple format
+     */
+    public boolean isSimple() {
+        return m_simple;
     }
 }

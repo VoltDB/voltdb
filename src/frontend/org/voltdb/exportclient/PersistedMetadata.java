@@ -84,8 +84,8 @@ public class PersistedMetadata implements DeferredSerialization {
             m_keyColumns = ImmutableList.of();
         }
         else {
-            m_keyFormat = new EncodeConfiguration(topic.getIsopaque(), topic.getKeyformatname(), topic.getKeyformatproperties());
-            m_valueFormat = new EncodeConfiguration(topic.getIsopaque(), topic.getValueformatname(), topic.getValueformatproperties());
+            m_keyFormat = new EncodeConfiguration(true, topic);
+            m_valueFormat = new EncodeConfiguration(false, topic);
 
             String keyColumns = topic.getKeycolumnnames();
             if (StringUtils.isBlank(keyColumns)) {

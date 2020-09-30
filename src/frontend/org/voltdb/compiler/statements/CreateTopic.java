@@ -20,6 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.regex.Matcher;
+
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.CatalogMap;
@@ -74,12 +75,11 @@ public class CreateTopic extends CreateOpaqueTopic {
         topic.setIsopaque(false);
         topic.setUsekey(st.contains("WITH KEYS"));
 
-
         String columnKeys = statementMatcher.group("columnKeys");
         if (usingStream) {
             topic.setStreamname(topicName);
             if (columnKeys != null) {
-                topic.setKeyformatname(columnKeys);
+                topic.setKeycolumnnames(columnKeys.toUpperCase());
             }
         } else if(columnKeys != null) {
             throw m_compiler.new VoltCompilerException(
@@ -149,11 +149,10 @@ public class CreateTopic extends CreateOpaqueTopic {
             if (index == 2) {
                throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
+            // Unspecified format only sets the value format name
             if (formatName != null) {
-                validateKeyFormat(formatName);
-                topic.setKeyformatname(formatName);
+                validateValueFormat(formatName);
                 topic.setValueformatname(formatName);
-                setFormatProperties(formatProps, topic.getKeyformatproperties());
                 setFormatProperties(formatProps, topic.getValueformatproperties());
             }
         } else if ("key".equalsIgnoreCase(formatTarget)) {
@@ -167,6 +166,7 @@ public class CreateTopic extends CreateOpaqueTopic {
             if (!StringUtils.isBlank(topic.getValueformatname())) {
                 throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
+            validateValueFormat(formatName);
             topic.setValueformatname(formatName);
             setFormatProperties(formatProps, topic.getValueformatproperties());
         }
@@ -175,10 +175,16 @@ public class CreateTopic extends CreateOpaqueTopic {
 
     private void validateKeyFormat(String formatName) throws VoltCompilerException {
         EncodeFormat keyFormat = EncodeFormat.checkedValueOf(formatName.toUpperCase());
+        if (!keyFormat.isSimple()) {
+            throw m_compiler.new VoltCompilerException(
+                    String.format("Invalid CREATE TOPIC statement. key format %s is invalid. Allowed key format: %s",
+                            formatName, EncodeFormat.simpleValueSet().toString()));
+        }
+    }
+
+    private void validateValueFormat(String formatName) throws VoltCompilerException {
+        EncodeFormat keyFormat = EncodeFormat.checkedValueOf(formatName.toUpperCase());
         EnumSet<EncodeFormat> keySet = EncodeFormat.valueSet();
-        keySet.remove(EncodeFormat.CSV);
-        keySet.remove(EncodeFormat.AVRO);
-        keySet.remove(EncodeFormat.OPAQUE);
         if (!keySet.contains(keyFormat)) {
             throw m_compiler.new VoltCompilerException(
                     String.format("Invalid CREATE TOPIC statement. key format %s is invalid. Allowed key format: %s", formatName, keySet.toString()));

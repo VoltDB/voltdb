@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.FormatParameter;
+import org.voltdb.catalog.Topic;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -47,12 +48,14 @@ public class EncodeConfiguration implements DeferredSerialization {
     /**
      * Constructor from {@link Topic} fields
      *
-     * @param isOpaque      {@code true} if opaque topic
-     * @param formatString  the format string, or blank, or {@code null}
-     * @param parameters    the format parameters or {@code null}
+     * @param isKey {@code true} if for key format, {@code false} for value format
+     * @param topic {@link Topic} from catalog
      */
-    public EncodeConfiguration(boolean isOpaque, String formatString, CatalogMap<FormatParameter> parameters) {
-        m_format = EncodeFormat.parseFormat(isOpaque, formatString);
+    public EncodeConfiguration(boolean isKey, Topic topic) {
+        m_format = EncodeFormat.parseFormat(isKey, topic.getIsopaque(),
+                isKey ? topic.getKeyformatname() : topic.getValueformatname());
+
+        CatalogMap<FormatParameter> parameters = isKey ? topic.getKeyformatproperties() : topic.getValueformatproperties();
         if (parameters == null) {
             m_parameters = ImmutableMap.of();
         }
