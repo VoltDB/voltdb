@@ -17,10 +17,15 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
@@ -74,6 +79,18 @@ public class UpdateLogging extends VoltSystemProcedure
                            String remoteHost,
                            String xmlConfig)
     {
+        // Empty xmlConfig argument is a request to reset logging to
+        // the original as-shipped default, if we know what that was.
+        if (StringUtils.isBlank(xmlConfig)) {
+            xmlConfig = defaultLoggingConfig();
+            if (xmlConfig == null) {
+                hostLog.warn("@UpdateLogging called with empty config, and no default is defined");
+                VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+                t.addRow(VoltSystemProcedure.STATUS_FAILURE);
+                return (new VoltTable[] {t});
+            }
+        }
+
         long oldLevels  = 0;
         if (ctx.isLowestSiteId()) {
             // Logger level is a global property, pick the site with lowest id to do it.
@@ -113,5 +130,40 @@ public class UpdateLogging extends VoltSystemProcedure
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {t});
+    }
+
+    /*
+     * Provides a 'default' logging configuration when available.
+     * This allows a client to reset to default without knowing the
+     * default.
+     *
+     * The 'default' is named by a specific environment variable,
+     * currently used only when running under Kubernetes.
+     *
+     * This is not necessarily the configuration that was set
+     * at VoltDB startup.  It is intended to be the logging
+     * configuration as-shipped.
+     */
+    private static String defaultLoggingConfig() {
+        String xml = null;
+        String def = System.getenv("LOG4J_DEFAULT_PATH");
+        if (def != null) {
+            try (InputStream in = Files.newInputStream(Paths.get(def))) {
+                final int limit = 8 * 1024 * 1024; // typical size is ~3K
+                byte[] buf = new byte[limit];
+                int len = in.read(buf);
+                if (len >= limit) { // we probably did not read it all
+                    hostLog.warn(String.format("'%s' is too large; must be less than %s bytes",
+                                               def, limit));
+                } else {
+                    hostLog.debug(String.format("Read '%s', %s bytes", def, len));
+                    xml = new String(buf, 0, len, StandardCharsets.UTF_8);
+                }
+            }
+            catch (Exception ex) {
+                hostLog.warn(String.format("Unable to read '%s', %s", def, ex));
+            }
+        }
+        return xml;
     }
 }
