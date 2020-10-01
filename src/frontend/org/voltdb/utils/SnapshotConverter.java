@@ -29,9 +29,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 
@@ -259,9 +259,8 @@ public class SnapshotConverter {
                     fail = true;
                 }
             } catch (IOException e) {
-                System.err.println(e.getMessage());
                 System.err.println("Error: Failed to create output file "
-                        + outfile.getPath() + " for table " + tableName);
+                        + outfile.getPath() + " for table " + tableName + ": " + e);
                 fail = true;
             }
         }
@@ -292,8 +291,8 @@ public class SnapshotConverter {
                 try {
                     CSVTableSaveFile.convertTableSaveFile(delimiter, partitions, outfile, infile);
                 } catch (Exception e) {
-                    System.err.println(e.getMessage());
                     System.err.println("Error: Failed to convert " + infile.getPath() + " to " + outfile.getPath());
+                    e.printStackTrace();
                 }
             }
         }
