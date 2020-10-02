@@ -164,7 +164,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     return;
                 }
 
-                if (m_activeSegment!= null && m_activeSegment.m_id != m_segments.lastKey()) {
+                if (m_activeSegment != null) {
                     finishActiveSegmentWrite();
                 }
                 m_closed = true;
