@@ -274,6 +274,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
             if (!diff.supported()) {
+                retval.dynamicChangeNotSupported = true;
                 retval.errorMsg = "The requested catalog change(s) are not supported:\n" + diff.errors();
                 return retval;
             }
@@ -510,7 +511,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         if (ccr.errorMsg != null) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
+            byte respCode = (ccr.dynamicChangeNotSupported ? ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE
+                                                           : ClientResponse.GRACEFUL_FAILURE);
+            return makeQuickResponse(respCode, ccr.errorMsg);
         } else if (ccr.upgradedFromVersion != null) {
         // Log something useful about catalog upgrades when they occur.
             compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
