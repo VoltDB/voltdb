@@ -101,6 +101,13 @@ public interface ClientResponse {
     public static final byte DR_TABLE_HASH_NOT_FOUND = -12;
 
     /**
+     * An attempt was made to update the application catalog online, but the deployment contained
+     * changes that are not supported for online change. Reinitialization is required. This is
+     * a graceful failure.
+     */
+    public static final byte UNSUPPORTED_DYNAMIC_CHANGE = -13;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

@@ -48,4 +48,6 @@ public class CatalogChangeResult {
     public boolean requiresNewExportGeneration;
     // This is true if there are security user changes.
     public boolean hasSecurityUserChange;
+    // True if online change not supported (specifically for @UpdateApplicationCatalog use)
+    public boolean dynamicChangeNotSupported;
 }
