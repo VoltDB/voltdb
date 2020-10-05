@@ -27,12 +27,12 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 
 public class CSVTableSaveFile {
     private final AtomicInteger m_availableBytes = new AtomicInteger(0);
@@ -81,7 +81,7 @@ public class CSVTableSaveFile {
             }
         }
         if (bytes != null) {
-            m_availableBytes.addAndGet(-1 * bytes.length);
+            m_availableBytes.addAndGet(-bytes.length);
         }
         return bytes;
     }
@@ -210,7 +210,7 @@ public class CSVTableSaveFile {
             try {
                 while (true) {
                     final byte bytes[] = converter.read();
-                    if (bytes.length == 0) {
+                    if (bytes == null || bytes.length == 0) {
                         break;
                     }
                     fos.write(bytes);

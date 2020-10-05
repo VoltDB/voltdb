@@ -15,25 +15,23 @@ CREATE TABLE t1 (
   primary key (id)
 );
 
-desc t1;
-
 PARTITION TABLE t1 ON COLUMN id;
 
-DESCRIBE t1;
+show tables;
+
+show tables dr;
+
+show tables export;
+
+DR TABLE t1;
 
 CREATE VIEW v1 (id, records,total) AS
 SELECT id, COUNT(*), SUM(col5) FROM t1 GROUP BY id;
-
-DESCRIBE v1;
 
 CREATE STREAM s1 PARTITION ON COLUMN id (
     id BIGINT NOT NULL,
     ts TIMESTAMP
 );
 
-DESCRIBE s1;
-
-describe t2;
-
-DR TABLE t1;
-describe t1;
+show tables dr;
+show tables export;

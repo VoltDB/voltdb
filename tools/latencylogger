@@ -72,16 +72,8 @@ popd > /dev/null
 # the root of the VoltDB installation
 export VOLTDB_HOME=$(dirname $(dirname "$this"))
 
-# detect and adjust for Linux package installation vs. VoltDB distribution
-if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then
-    # Linux package installation puts all libraries in /usr/lib/voltdb
-    VOLTDB_VOLTDB=$(dirname $(dirname "$VOLTDB_HOME"))/lib/voltdb
-    VOLTDB_LIB=$VOLTDB_VOLTDB
-else
-    # distribution puts third party jars in lib and voltdb libraries in voltdb
-    VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
-    VOLTDB_LIB=$VOLTDB_HOME/lib
-fi
+VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
+VOLTDB_LIB=$VOLTDB_HOME/lib
 
 JAVA=`which java`
 if [ x"$JAVA_HEAP_MAX" = "x" ]

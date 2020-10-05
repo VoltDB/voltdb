@@ -43,6 +43,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -477,10 +478,11 @@ public class SystemInformation extends VoltSystemProcedure
             ClusterSettings clusterSettings,
             NodeSettings nodeSettings)
     {
+        VoltDBInterface voltdb = VoltDB.instance();
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
         // from the RestApiDescription.xml (or the equivalent thereof) someday --izzy
-        results.addRow("voltdbroot", VoltDB.instance().getVoltDBRootPath());
+        results.addRow("voltdbroot", voltdb.getVoltDBRootPath());
 
         Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(clusterSettings.hostcount()));
@@ -488,7 +490,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("sitesperhost", Integer.toString(nodeSettings.getLocalSitesCount()));
 
         String http_enabled = "false";
-        int http_port = VoltDB.instance().getConfig().m_httpPort;
+        int http_port = voltdb.getConfig().m_httpPort;
         if (http_port != -1 && http_port != Integer.MAX_VALUE) {
             http_enabled = "true";
             results.addRow("httpport", Integer.toString(http_port));
@@ -502,7 +504,7 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("jsonenabled", json_enabled);
 
-        results.addRow("snapshotpath", VoltDB.instance().getSnapshotPath());
+        results.addRow("snapshotpath", voltdb.getSnapshotPath());
         SnapshotSchedule snaps = database.getSnapshotschedule().get("default");
         String autosnap_enabled = "false";
         if (snaps != null && snaps.getEnabled())
@@ -518,11 +520,18 @@ public class SystemInformation extends VoltSystemProcedure
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath().getPath());
+                results.addRow("exportoverflowpath", voltdb.getExportOverflowPath().getPath());
+                results.addRow("exportcursorpath", voltdb.getExportCursorPath());
                 break;
             }
         }
+
         results.addRow("export", Boolean.toString(CatalogUtil.isExportEnabled()));
+
+        if (cluster.getDrproducerenabled() || cluster.getDrconsumerenabled()) {
+            results.addRow("droverflowpath", voltdb.getDROverflowPath());
+        }
+        results.addRow("largequeryswappath", voltdb.getLargeQuerySwapPath());
 
         String partition_detect_enabled = "false";
         if (cluster.getNetworkpartition())
@@ -532,7 +541,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-        results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
+        results.addRow("adminport", Integer.toString(voltdb.getConfig().m_adminPort));
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow
@@ -545,8 +554,8 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 command_log_mode = "sync";
             }
-            String command_log_path = VoltDB.instance().getCommandLogPath();
-            String command_log_snaps = VoltDB.instance().getCommandLogSnapshotPath();
+            String command_log_path = voltdb.getCommandLogPath();
+            String command_log_snaps = voltdb.getCommandLogSnapshotPath();
             String command_log_fsync_interval =
                 Integer.toString(command_log.getFsyncinterval());
             String command_log_max_txns =

@@ -215,7 +215,7 @@ def abort(*msgs, **kwargs):
     return_code = kwargs.get('return_code', 1)
     error(*msgs)
     # Return code must be 0-255 for shell.
-    if return_code != 0:
+    if return_code < 0 or return_code > 255:
         return_code = 1
     sys.exit(return_code)
 
@@ -484,7 +484,11 @@ def run_cmd(cmd, *args):
             verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
-            abort(return_code=retcode)
+            if (retcode & 255) == 0: # exit(N)
+                exsts = retcode >> 8
+            else: # terminated by signal
+                exsts = 128 # arbitrary choice
+            abort(return_code=exsts)
 
 #===============================================================================
 def exec_cmd(cmd, *args):

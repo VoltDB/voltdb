@@ -2094,7 +2094,8 @@ public class SQLParser extends SQLPatternFactory
     public static TimestampType parseDate(String dateIn)
     {
         // Remove any quotes around the timestamp value.  ENG-2623
-        String dateRepled = dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", "");
+        boolean shouldTrim = (dateIn.startsWith("\"") && dateIn.endsWith("\"")) || (dateIn.startsWith("'") && dateIn.endsWith("'"));
+        String dateRepled = shouldTrim ? dateIn.substring(1, dateIn.length() - 1) : dateIn;
         return new TimestampType(dateRepled);
     }
 

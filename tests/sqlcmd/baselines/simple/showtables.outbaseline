@@ -1,0 +1,62 @@
+
+CREATE TABLE t1 (
+  id       bigint not null,
+  col1     tinyint,
+  col2     smallint,
+  col3     integer,
+  col4     float,
+  col5     decimal,
+  col6     geography,
+  col7     geography_point,
+  col8     varchar(1),
+  col9     varchar(10),
+  col10    varchar(500),
+  col11    varbinary(1000),
+  col12    timestamp,
+  primary key (id)
+);
+Command succeeded.
+
+PARTITION TABLE t1 ON COLUMN id;
+Command succeeded.
+
+--- User Tables ----------------------------------------------
+T1
+
+
+--- User Views -----------------------------------------------
+
+
+--- User Export Streams --------------------------------------
+
+
+--- DR Tables ------------------------------------------------
+
+
+
+--- DR Tables ------------------------------------------------
+
+
+--- User Export Streams --------------------------------------
+
+
+DR TABLE t1;
+Command succeeded.
+
+CREATE VIEW v1 (id, records,total) AS
+SELECT id, COUNT(*), SUM(col5) FROM t1 GROUP BY id;
+Command succeeded.
+
+CREATE STREAM s1 PARTITION ON COLUMN id (
+    id BIGINT NOT NULL,
+    ts TIMESTAMP
+);
+Command succeeded.
+
+--- DR Tables ------------------------------------------------
+T1
+
+
+--- User Export Streams --------------------------------------
+S1
+
