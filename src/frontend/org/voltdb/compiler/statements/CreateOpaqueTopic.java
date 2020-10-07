@@ -51,11 +51,12 @@ public class CreateOpaqueTopic extends StatementProcessor {
         String topicName = getTopicName(statementMatcher, db, statement);
 
         CatalogMap<Topic> topics = db.getTopics();
-        Topic curTopic = topics.getIgnoreCase(topicName);
+        Topic curTopic = topics.get(topicName);
         if (curTopic != null) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid CREATE OPAQUE TOPIC statement: topic name %s conflicts with existing topic %s", curTopic.getTypeName()));
+                    "Invalid CREATE OPAQUE TOPIC statement: topic %s already exists", curTopic.getTypeName()));
         }
+
         Topic topic = topics.add(topicName);
         topic.setIsopaque(true);
         String partitioned = statementMatcher.group("partitioned");

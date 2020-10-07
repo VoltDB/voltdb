@@ -17,7 +17,6 @@
 
 package org.voltdb.compiler.statements;
 
-import java.util.EnumSet;
 import java.util.Map;
 import java.util.regex.Matcher;
 
@@ -33,7 +32,6 @@ import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
-import org.voltdb.serdes.EncodeFormat;
 
 import com.google_voltpatches.common.base.Splitter;
 
@@ -58,6 +56,7 @@ public class CreateTopic extends CreateOpaqueTopic {
 
         String topicName = getTopicName(statementMatcher, db, statement);
         CatalogMap<Topic> topics = db.getTopics();
+
         Topic curTopic = topics.getIgnoreCase(topicName);
         if (curTopic != null) {
             throw m_compiler.new VoltCompilerException(String.format(
@@ -70,8 +69,8 @@ public class CreateTopic extends CreateOpaqueTopic {
         if (usingStream) {
             checkTable(topicName);
         }
-
         Topic topic = topics.add(topicName);
+
         topic.setIsopaque(false);
         topic.setUsekey(st.contains("WITH KEYS"));
 
@@ -102,13 +101,11 @@ public class CreateTopic extends CreateOpaqueTopic {
     }
 
 
-    // Check that the table is a stream exporting to no targets, set the topic name attribute and remove
-    // the table from the default connector
+    // Remove the stream from the default connector - validation is deferred to {@link TopicsValidator}
     private void checkTable(String topicName) throws VoltCompilerException {
         VoltXMLElement tableXML = m_schema.findChild("table", topicName.toUpperCase());
         if (tableXML == null) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid CREATE TOPIC USING STREAM statement: stream %s does not exist", topicName));
+            return;
         }
 
         if (Boolean.parseBoolean(tableXML.getStringAttribute("stream", "false"))) {
@@ -116,42 +113,24 @@ public class CreateTopic extends CreateOpaqueTopic {
             if (Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(exportTarget)) {
                 tableXML.attributes.put("topicName", topicName);
                 tableXML.attributes.remove("export");
-            } else {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid CREATE TOPIC USING STREAM statement: stream %s must not have an export clause", topicName));
             }
-        } else {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid CREATE TOPIC USING STREAM statement: object %s is not a stream", topicName));
         }
     }
 
     //[FORMAT [KEY | VALUE] {avro | csv | json} [PROPERTIES (key1=value1, ...)]]
     private boolean processFormat(Matcher statementMatcher, String statement, Topic topic, int index) throws VoltCompilerException {
         String formatName = statementMatcher.group("formatName" + index);
-        if (formatName != null) {
-            try {
-                // Parse the format in an unchecked fashion and handle exceptions
-                EncodeFormat.valueOf(formatName.toUpperCase());
-            }
-            catch (Exception ex) {
-                throw m_compiler.new VoltCompilerException(
-                        String.format("%s is not a valid topic format in TOPIC %s. Acceptable values are: %s",
-                                formatName, topic.getTypeName(), EncodeFormat.valueSet()));
-            }
-        }
         String formatTarget = statementMatcher.group("formatTarget" + index);
         String formatProps = statementMatcher.group("formatProp" + index);
         if (index == 2 && formatName == null) {
             return true;
         }
         if (formatTarget == null) {
-            if (index == 2) {
-               throw m_compiler.new VoltCompilerException(INVALID_DEF);
+            if (!StringUtils.isBlank(topic.getValueformatname())) {
+                throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
             // Unspecified format only sets the value format name
             if (formatName != null) {
-                validateValueFormat(formatName);
                 topic.setValueformatname(formatName);
                 setFormatProperties(formatProps, topic.getValueformatproperties());
             }
@@ -159,36 +138,16 @@ public class CreateTopic extends CreateOpaqueTopic {
             if (!StringUtils.isBlank(topic.getKeyformatname())) {
                 throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
-            validateKeyFormat(formatName);
             topic.setKeyformatname(formatName);
             setFormatProperties(formatProps, topic.getKeyformatproperties());
         } else {
             if (!StringUtils.isBlank(topic.getValueformatname())) {
                 throw m_compiler.new VoltCompilerException(INVALID_DEF);
             }
-            validateValueFormat(formatName);
             topic.setValueformatname(formatName);
             setFormatProperties(formatProps, topic.getValueformatproperties());
         }
         return true;
-    }
-
-    private void validateKeyFormat(String formatName) throws VoltCompilerException {
-        EncodeFormat keyFormat = EncodeFormat.checkedValueOf(formatName.toUpperCase());
-        if (!keyFormat.isSimple()) {
-            throw m_compiler.new VoltCompilerException(
-                    String.format("Invalid CREATE TOPIC statement. key format %s is invalid. Allowed key format: %s",
-                            formatName, EncodeFormat.simpleValueSet().toString()));
-        }
-    }
-
-    private void validateValueFormat(String formatName) throws VoltCompilerException {
-        EncodeFormat keyFormat = EncodeFormat.checkedValueOf(formatName.toUpperCase());
-        EnumSet<EncodeFormat> keySet = EncodeFormat.valueSet();
-        if (!keySet.contains(keyFormat)) {
-            throw m_compiler.new VoltCompilerException(
-                    String.format("Invalid CREATE TOPIC statement. key format %s is invalid. Allowed key format: %s", formatName, keySet.toString()));
-        }
     }
 
     private void setFormatProperties(String formatProps, CatalogMap<FormatParameter> properties) {

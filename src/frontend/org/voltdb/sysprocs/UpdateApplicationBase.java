@@ -239,12 +239,18 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (!VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval)) {
                 return retval;
             }
+
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
+            if (!VoltDB.instance().validateNewCatalog(newCatalog, dt, retval)) {
+                return retval;
+            }
+
+            // FIXME: move to CatalogValidator
             if (!validateNewCatalog(newCatalog, newCatalogJar, retval)) {
                 return retval;
             }

@@ -149,10 +149,6 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
-import org.voltdb.compiler.deploymentfile.TopicProfileType;
-import org.voltdb.compiler.deploymentfile.TopicRetentionPolicyEnum;
-import org.voltdb.compiler.deploymentfile.TopicRetentionType;
-import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
@@ -165,7 +161,6 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -629,17 +624,6 @@ public abstract class CatalogUtil {
         return exportTables.build();
     }
 
-    public static NavigableMap<String, Topic> getAllOpaqueTopics(Database db) {
-        ImmutableSortedMap.Builder<String, Topic> opaqueTopics = ImmutableSortedMap
-                .orderedBy(String.CASE_INSENSITIVE_ORDER);
-        for (Topic t : db.getTopics()) {
-            if (t.getIsopaque()) {
-                opaqueTopics.put(t.getTypeName(), t);
-            }
-        }
-        return opaqueTopics.build();
-    }
-
     public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
         return catalogContext.database.getConnectors();
     }
@@ -910,7 +894,6 @@ public abstract class CatalogUtil {
         try {
             validateDeployment(catalog, deployment);
             validateAvro(deployment);
-            validateTopics(catalog, deployment);
             validateThreadPoolsConfiguration(deployment.getThreadpools());
             Cluster catCluster = getCluster(catalog);
 
@@ -1367,154 +1350,6 @@ public abstract class CatalogUtil {
         catch (MalformedURLException ex) {
             throw new RuntimeException(
                     "Failed to parse schema registry url in <avro>: " + ex.getMessage());
-        }
-    }
-
-    private static void validateTopics(Catalog catalog, DeploymentType deployment) {
-        CompoundErrors errors = new CompoundErrors();
-
-        // If topics have a threadpool name, validate it exists
-        TopicsType topicsType = deployment.getTopics();
-        if (topicsType != null) {
-            String thPoolName = topicsType.getThreadpool();
-            if (!StringUtils.isEmpty(thPoolName)) {
-                ThreadPoolsType tp = deployment.getThreadpools();
-                if (tp == null) {
-                    errors.addErrorMessage(String.format(
-                            "Topics use a thread pool %s and no thread pools are configured in deployment.",
-                            thPoolName));
-                }
-                else {
-                    boolean exists = tp.getPool().stream().anyMatch(i -> i.getName().equals(thPoolName));
-                    if (!exists) {
-                        errors.addErrorMessage(String.format(
-                                "Topics use a thread pool %s that is not configured in deployment.",
-                                thPoolName));
-                    }
-                }
-            }
-        }
-
-        // Validate profiles in deployment file
-        Map<String, TopicProfileType> profileMap = getDeploymentTopics(topicsType, errors);
-        if (profileMap != null) {
-            Pattern profilePattern = Pattern.compile("^\\p{Alnum}[\\w]*$");
-            for(TopicProfileType profile : profileMap.values()) {
-                String profName = profile.getName();
-                if (StringUtils.isBlank(profName)) {
-                    errors.addErrorMessage("A topic profile cannot have a blank name");
-                } else if (!profilePattern.matcher(profName).matches()) {
-                    errors.addErrorMessage(
-                            "A topic profile name must be alphanumeric and can contain but not start with underscores (_)");
-                }
-                String what = "topic profile " + profile.getName();
-                validateRetention(what, profile.getRetention(), errors);
-            }
-        }
-
-        // Verify that every topic that refers to a profile refers to an existing profile,
-        // and that if a topic uses avro, the <avro> element is defined
-        CatalogMap<Topic> topics = CatalogUtil.getDatabase(catalog).getTopics();
-        for (Topic t : topics) {
-            String profileName = t.getProfile();
-            TopicProfileType profile;
-            if (StringUtils.isEmpty(profileName)) {
-                continue;
-            }
-            else if ((profile = profileMap.get(profileName)) == null) {
-                // Missing profile only generates warning
-                hostLog.warn(String.format(
-                        "Topic %s refers to profile %s which is not defined in deployment, "
-                        + "topic data will persist forever.",
-                        t.getTypeName(), profileName));
-            } else if (profile.getRetention() != null
-                    && profile.getRetention().getPolicy() == TopicRetentionPolicyEnum.COMPACT && !t.getIsopaque()) {
-                errors.addErrorMessage(String.format(
-                        "Topic %s refers to profile %s which uses retention policy COMPACT but the topic is not opaque",
-                        t.getTypeName(), profileName));
-            }
-
-            EncodeFormat keyFormat = StringUtils.isBlank(t.getKeyformatname()) ? null
-                    : EncodeFormat.checkedValueOf(t.getKeyformatname());
-
-            EncodeFormat valFormat = StringUtils.isBlank(t.getValueformatname()) ? null
-                    : EncodeFormat.checkedValueOf(t.getValueformatname());
-
-            if ((keyFormat == EncodeFormat.AVRO || valFormat == EncodeFormat.AVRO)
-                    && deployment.getAvro() == null) {
-                errors.addErrorMessage(String.format(
-                        "Topic %s uses AVRO encoding and requires that <avro> be defined in deployment.",
-                        t.getTypeName(), profileName));
-            }
-        }
-        if (errors.hasErrors()) {
-            throw new RuntimeException(errors.getErrorMessage());
-        }
-    }
-
-    /**
-     * Get the topics defined in deployment file: defaults, and map of profiles, keyed CASE INSENSITIVE
-     *
-     * @param   deployment
-     * @param   errors
-     * @return case insensitive map of profile name to {@link TopicProfileType}
-     */
-    public final static Map<String, TopicProfileType> getDeployedTopicProfiles(
-            DeploymentType deployment, CompoundErrors errors) {
-
-        TopicsType topics = deployment.getTopics();
-        if (topics == null) {
-            return null;
-        }
-        return getDeploymentTopics(topics, errors);
-    }
-
-    public final static Map<String, TopicProfileType> getDeploymentTopics(
-            TopicsType topics, CompoundErrors errors) {
-
-        if (topics == null || topics.getProfiles() == null) {
-            return null;
-        }
-
-        List<TopicProfileType> profiles = topics.getProfiles().getProfile();
-        if (profiles == null) {
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("No topic profiles in deployment");
-            }
-            return null;
-        }
-
-        Map<String, TopicProfileType> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        for (TopicProfileType profile : profiles) {
-            if (profileMap.put(profile.getName(), profile) != null) {
-                errors.addErrorMessage("Profile " + profile.getName() + " is defined multiple times");
-            }
-        }
-        return profileMap;
-    }
-
-    private final static void validateRetention(String what, TopicRetentionType retention,
-            CompoundErrors errors) {
-        if (retention == null) {
-            return;
-        }
-        try {
-            switch(retention.getPolicy()) {
-            case TIME:
-                RetentionPolicyMgr.parseTimeLimit(retention.getLimit());
-                break;
-            case SIZE:
-                RetentionPolicyMgr.parseByteLimit(retention.getLimit());
-                break;
-            case COMPACT:
-                RetentionPolicyMgr.parseCompactInterval(retention.getLimit());
-                break;
-            default:
-                errors.addErrorMessage("Unsupported retention policy \"" + retention.getPolicy() + "\"");
-            }
-        }
-        catch (Exception ex) {
-            errors.addErrorMessage("Failed to validate retention policy in " + what + ": " + ex.getMessage());
         }
     }
 

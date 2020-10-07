@@ -1065,6 +1065,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
+        return true;
+    }
+
+    @Override
     public AvroSerde getAvroSerde() {
         throw new UnsupportedOperationException();
     }
