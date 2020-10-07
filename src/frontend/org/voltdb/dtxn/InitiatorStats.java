@@ -97,12 +97,17 @@ public class InitiatorStats extends SiteStatsSource {
             lastMinExecutionTime = Math.min( delta, lastMinExecutionTime);
             lastMaxExecutionTime = Math.max( delta, lastMaxExecutionTime);
             invocationCount++;
-            if (status != ClientResponse.SUCCESS) {
-                if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.USER_ABORT) {
-                    abortCount++;
-                } else {
-                    failureCount++;
-                }
+            switch (status) {
+            case ClientResponse.SUCCESS:
+                break;
+            case ClientResponse.USER_ABORT:
+            case ClientResponse.GRACEFUL_FAILURE:
+            case ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE:
+                abortCount++;
+                break;
+            default:
+                failureCount++;
+                break;
             }
         }
     }
