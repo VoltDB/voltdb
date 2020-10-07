@@ -34,8 +34,7 @@ public enum EncodeFormat {
     INT(3, true),
     LONG(4, true),
     STRING(5, true),
-    UUID(6, true),
-    BYTEARRAY(7, true);
+    BYTEARRAY(6, true);
 
     /** ID for the encode format used in serialization of the format */
     private final byte m_id;
