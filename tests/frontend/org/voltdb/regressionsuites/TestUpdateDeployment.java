@@ -328,7 +328,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         SyncCallback cb = new SyncCallback();
         client.updateApplicationCatalog(cb, null, new File(deploymentURL));
         cb.waitForResponse();
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        assertEquals(ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
         assertTrue(cb.getResponse().getStatusString().contains("May not dynamically modify"));
     }
