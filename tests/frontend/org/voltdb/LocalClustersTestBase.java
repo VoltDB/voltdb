@@ -98,7 +98,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
             "create stream {0}" + TOPIC_TAG + "{1} partition on column key (key bigint not null, value bigint not null);"
-                    + "create topic using stream {0}" + TOPIC_TAG + "{1} {2};"
+                    + "create topic using stream {0}" + TOPIC_TAG + "{1} {2} PROPERTIES (key.consumer.columns=key);"
                     + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} (key, value) values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change

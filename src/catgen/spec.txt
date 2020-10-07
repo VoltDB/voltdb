@@ -187,19 +187,12 @@ begin Topic javaonly                         "A topic in the database"
   bool isSingle                              "Is this a single partition opaque topic?"
   string streamName                          "Stream for the topic"
   string procedureName                       "Stored procedure for the topic"
-  string keyColumnNames                      "A CSV string of the key column names, ordered"
+  string roles                               "A CSV string of the roles to access this topic"
   string profile                             "The deployment profile of the topic"
-  string keyFormatName                       "Format name for key"
-  FormatParameter* keyFormatProperties       "Configuration properties for format on keys"
-  string valueFormatName                     "Format name for value"
-  FormatParameter* valueFormatProperties     "Configuration properties for format on values"
-  string producerRoles                       "A CSV string of the roles for producer to access this topic"
-  string consumerRoles                       "A CSV string of the roles for consumer to access this topic"
-  bool useKey                                "Indicates record key should be decoded and included in the procedure parameters"
+  Property* properties                       "Configuration properties for the topic"
 end
 
-begin FormatParameter javaonly               "Configuration format properties"
-  string name                                "Configuration property name"
+begin Property javaonly                      "Configuration property"
   string value                               "Configuration property value"
 end
 

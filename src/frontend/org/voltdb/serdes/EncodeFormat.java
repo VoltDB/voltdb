@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 
 /**
  * An enum listing the encoding formats
@@ -49,7 +50,7 @@ public enum EncodeFormat {
      */
     public static EncodeFormat checkedValueOf(String name) {
         try {
-            return valueOf(name);
+            return valueOf(name.toUpperCase());
         }
         catch(IllegalArgumentException ex) {
             return EncodeFormat.INVALID;
@@ -75,6 +76,27 @@ public enum EncodeFormat {
             return isKey ? EncodeFormat.STRING : EncodeFormat.CSV;
         }
         return EncodeFormat.checkedValueOf(fmt.toUpperCase());
+    }
+
+    /**
+     * Get the {@link EncodeFormat} for the given {@link VoltType} or {@link IllegalArgumentException} is thrown
+     *
+     * @param type to get encoding for
+     * @return format used for {@code type}
+     */
+    public static EncodeFormat forType(VoltType type) {
+        switch (type) {
+            case INTEGER:
+                return INT;
+            case BIGINT:
+                return LONG;
+            case STRING:
+                return STRING;
+            case VARBINARY:
+                return BYTEARRAY;
+            default:
+                throw new IllegalArgumentException("Unsupported type: " + type);
+        }
     }
 
     /**

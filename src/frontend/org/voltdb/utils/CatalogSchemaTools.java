@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -44,12 +45,12 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.FormatParameter;
 import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Property;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
@@ -500,7 +501,7 @@ public abstract class CatalogSchemaTools {
         }
         sb.append(" TOPIC");
 
-        if (StringUtils.isNoneBlank(topic.getStreamname())) {
+        if (StringUtils.isNotBlank(topic.getStreamname())) {
             sb.append(" USING STREAM");
         }
 
@@ -514,78 +515,31 @@ public abstract class CatalogSchemaTools {
             sb.append(" EXECUTE PROCEDURE " + topic.getProcedurename());
         }
 
-        if (topic.getUsekey()) {
-            sb.append(" WITH KEYS");
-        }
-
-        // Combine formats
-        if (StringUtils.isNoneBlank(topic.getKeyformatname()) && StringUtils.isBlank(topic.getValueformatname())) {
-            sb.append(" FORMAT KEY " + topic.getKeyformatname());
-            appendTopicFormatProperties(sb, topic.getKeyformatproperties());
-        }
-
-        if (StringUtils.isBlank(topic.getKeyformatname()) && StringUtils.isNoneBlank(topic.getValueformatname())) {
-            sb.append(" FORMAT VALUE " + topic.getValueformatname());
-            appendTopicFormatProperties(sb, topic.getValueformatproperties());
-        }
-
-        if (StringUtils.isNoneBlank(topic.getKeyformatname()) && StringUtils.isNoneBlank(topic.getValueformatname())) {
-            boolean theSameProp = topic.getKeyformatproperties().equals(topic.getValueformatproperties());
-            if (theSameProp && topic.getKeyformatname().equalsIgnoreCase(topic.getValueformatname())) {
-                sb.append(" FORMAT " + topic.getValueformatname());
-                appendTopicFormatProperties(sb, topic.getValueformatproperties());
-            } else {
-                sb.append(" FORMAT KEY " + topic.getKeyformatname());
-                appendTopicFormatProperties(sb, topic.getKeyformatproperties());
-                sb.append(" FORMAT VALUE " + topic.getValueformatname());
-                appendTopicFormatProperties(sb, topic.getValueformatproperties());
-            }
-        }
-
-        // Key columns
-        if (StringUtils.isNoneBlank(topic.getKeycolumnnames())) {
-            sb.append(" KEYS " + topic.getKeycolumnnames());
-        }
-        // Combine roles
-        if (StringUtils.isNoneBlank(topic.getProducerroles()) && StringUtils.isBlank(topic.getConsumerroles())) {
-            sb.append(" ALLOW PRODUCER " + topic.getProducerroles());
-        }
-
-        if (StringUtils.isBlank(topic.getProducerroles()) && StringUtils.isNoneBlank(topic.getConsumerroles())) {
-            sb.append(" ALLOW CONSUMER " + topic.getConsumerroles());
-        }
-
-        if (StringUtils.isNoneBlank(topic.getProducerroles()) && StringUtils.isNoneBlank(topic.getConsumerroles())) {
-            // They are the same
-            if (topic.getProducerroles().equalsIgnoreCase(topic.getConsumerroles())) {
-                sb.append(" ALLOW " + topic.getConsumerroles());
-            } else {
-                sb.append(" ALLOW PRODUCER " + topic.getProducerroles());
-                sb.append(" ALLOW CONSUMER " + topic.getConsumerroles());
-            }
+        if (StringUtils.isNoneBlank(topic.getRoles())) {
+            sb.append(" ALLOW " + topic.getRoles());
         }
 
         if (StringUtils.isNoneBlank(topic.getProfile())) {
             sb.append(" PROFILE " + topic.getProfile());
         }
 
+        if (!topic.getProperties().isEmpty()) {
+            sb.append(" PROPERTIES (");
+            Iterator<Property> iter = topic.getProperties().iterator();
+            if (iter.hasNext()) {
+                Property prop = iter.next();
+                sb.append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
+                while (iter.hasNext()) {
+                    prop = iter.next();
+                    sb.append(',').append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
+                }
+            }
+            sb.append(')');
+        }
+
         sb.append(";\n");
     }
 
-    private static void appendTopicFormatProperties(StringBuilder sb, CatalogMap<FormatParameter> params) {
-        if (!params.isEmpty()) {
-            sb.append(" PROPERTIES (");
-            int i = 0;
-            for (FormatParameter param : params) {
-                sb.append(param.getName() + "=" + param.getValue());
-                i++;
-                if (i < params.size()) {
-                    sb.append(", ");
-                }
-            }
-            sb.append(")");
-        }
-    }
     private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";

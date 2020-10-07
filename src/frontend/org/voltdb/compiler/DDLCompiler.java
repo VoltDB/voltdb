@@ -71,7 +71,6 @@ import org.voltdb.compiler.statements.AlterTask;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
-import org.voltdb.compiler.statements.CreateOpaqueTopic;
 import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
@@ -250,7 +249,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new AlterTask(this))
                                 .addNextProcessor(new CreateTopic(this))
                                 .addNextProcessor(new DropTopic(this))
-                                .addNextProcessor(new CreateOpaqueTopic(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -570,7 +568,7 @@ public class DDLCompiler {
             assert(tableName != null);
             m_compiler.markTableAsDirty(tableName);
             Table table = db.getTables().get(tableName);
-            if (table != null && StringUtils.isNoneBlank(table.getTopicname())) {
+            if (table != null && StringUtils.isNotBlank(table.getTopicname())) {
                 throw m_compiler.new VoltCompilerException(String.format("The table %s is used by topic, cannot be dropped", tableName));
             }
         }

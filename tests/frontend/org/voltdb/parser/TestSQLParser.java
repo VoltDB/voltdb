@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -962,11 +963,16 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
             "scheduleClass", "scheduleParameters", "generatorClass");
 
     private static void validateCreateTaskMatcher(String statement, Map<String, String> expectedGroupValues) {
-        Matcher matcher = SQLParser.matchCreateTask(statement);
-        assertTrue(statement, matcher.matches());
-        assertEquals(s_allCreateTaskGroups.size(), matcher.groupCount());
+        validateMatcherGroups(SQLParser::matchCreateTask, statement, expectedGroupValues, s_allCreateTaskGroups);
+    }
 
-        for (String group : s_allCreateTaskGroups) {
+    private static void validateMatcherGroups(Function<String, Matcher> matcherFactory, String statement,
+            Map<String, String> expectedGroupValues, Set<String> allGroups) {
+        Matcher matcher = matcherFactory.apply(statement);
+        assertTrue(statement, matcher.matches());
+        assertEquals(allGroups.size(), matcher.groupCount());
+
+        for (String group : allGroups) {
             assertEquals("Statement: " + statement + " group: " + group, expectedGroupValues.get(group),
                     matcher.group(group));
         }
@@ -1111,6 +1117,49 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
                 m_client = null;
             }
         }
+    }
+
+    @Test
+    public void testCreateTopic() {
+        validateCreatTopicMatcher("CREATE TOPIC foo;", ImmutableMap.of("topicName", "foo"));
+
+        validateCreatTopicMatcher("CREATE TOPIC USING STREAM foo;",
+                ImmutableMap.of("topicName", "foo", "usingStream", "USING STREAM"));
+
+        validateCreatTopicMatcher("CREATE TOPIC USING STREAM foo EXECUTE PROCEDURE MyProc;",
+                ImmutableMap.of("topicName", "foo", "usingStream", "USING STREAM", "procedureName", "MyProc"));
+
+        validateCreatTopicMatcher("CREATE TOPIC USING STREAM foo ALLOW role1, role2,role3;", ImmutableMap
+                .of("topicName", "foo", "usingStream", "USING STREAM", "allow", "role1, role2,role3"));
+
+        validateCreatTopicMatcher("CREATE TOPIC foo PROFILE myProfile;",
+                ImmutableMap.of("topicName", "foo", "profile", "myProfile"));
+
+        validateCreatTopicMatcher(
+                "CREATE TOPIC foo PROPERTIES (a=b, a.b.c= 'A)BC)D', someThing =123456, more = 'a b c d', last = ' 123');",
+                ImmutableMap.of("topicName", "foo", "properties",
+                        "a=b, a.b.c= 'A)BC)D', someThing =123456, more = 'a b c d', last = ' 123'"));
+
+        // Test OPAQUE topics
+        validateCreatTopicMatcher("CREATE OPAQUE TOPIC opaqueTopic;",
+                ImmutableMap.of("opaque", "OPAQUE", "topicName", "opaqueTopic"));
+
+        validateCreatTopicMatcher("CREATE OPAQUE TOPIC opaqueTopic PARTITIONED;",
+                ImmutableMap.of("opaque", "OPAQUE", "topicName", "opaqueTopic", "partitioned", "PARTITIONED"));
+
+        validateCreatTopicMatcher("CREATE OPAQUE TOPIC opaqueTopic ALLOW role1, role2,role3;",
+                ImmutableMap.of("opaque", "OPAQUE", "topicName", "opaqueTopic", "allow", "role1, role2,role3"));
+
+        validateCreatTopicMatcher("CREATE OPAQUE TOPIC opaqueTopic PROFILE someProfile;",
+                ImmutableMap.of("opaque", "OPAQUE", "topicName", "opaqueTopic", "profile", "someProfile"));
+
+    }
+
+    private static final Set<String> s_allTopicCaptures = ImmutableSet.of("opaque", "usingStream", "topicName",
+            "partitioned", "procedureName", "allow", "profile", "properties");
+
+    private void validateCreatTopicMatcher(String statement, Map<String, String> expectedGroupValues) {
+        validateMatcherGroups(SQLParser::matchCreateTopic, statement, expectedGroupValues, s_allTopicCaptures);
     }
 
     private LocalCluster createLocalCluster(String testMethod) throws IOException {

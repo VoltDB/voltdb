@@ -113,9 +113,8 @@ public class CatchAllVoltDBStatement extends StatementProcessor {
         if (TOPIC.equals(m_firstProcessor.getCommandPrefix())) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE TOPIC statement: \"%s\", " +
-                    "expected syntax: \"CREATE TOPIC [USING STREAM]{name} [EXECUTE PROCEDURE z [WITH KEYS]] " +
-                    "[FORMAT [KEY | VALUE] {avro | csv} [PROPERTIES (key1=value1, ...)]] " +
-                    "[KEYS  column-name [,...] ] [ALLOW [PRODUCER | CONSUMER] {roles}] [PROFILE {profile}]\"",
+                    "expected syntax: \"CREATE TOPIC [USING STREAM]{name} [EXECUTE PROCEDURE z] " +
+                    "[ALLOW {roles}] [PROFILE {profile}] [PROPERTIES (key1=val1, ...)]\"",
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 

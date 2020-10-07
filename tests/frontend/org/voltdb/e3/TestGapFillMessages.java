@@ -119,10 +119,7 @@ public class TestGapFillMessages {
 
         CatalogMap<Topic> topics = new Catalog().getClusters().add("cluster").getDatabases().add("database")
                 .getTopics();
-        Topic topic = topics.add(typeName);
-        topic.setKeyformatname("CSV");
-        topic.setValueformatname("CSV");
-        topic.setKeycolumnnames("Column_1");
+        topics.add(typeName);
 
         table.setTopicname(typeName);
         return table;
@@ -162,8 +159,7 @@ public class TestGapFillMessages {
         PersistedMetadata deserializedMetadata = deserialized.getMetadata();
         assertEquals(originalMetadata == null, deserializedMetadata == null);
         if (originalMetadata != null) {
-            assertEquals(originalMetadata.getEncodingFormat().getFormat(), deserializedMetadata.getEncodingFormat().getFormat());
-            assertEquals(originalMetadata.getKeyColumns(), deserializedMetadata.getKeyColumns());
+            assertEquals(originalMetadata.getTopicProperties(), deserializedMetadata.getTopicProperties());
             assertEquals(originalMetadata.getSchema().tableName, deserializedMetadata.getSchema().tableName);
             assertEquals(originalMetadata.getSchema().generation, deserializedMetadata.getSchema().generation);
             assertTrue(originalMetadata.getSchema().sameSchema(deserializedMetadata.getSchema()));
