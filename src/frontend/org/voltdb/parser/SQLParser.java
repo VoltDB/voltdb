@@ -464,11 +464,9 @@ public class SQLParser extends SQLPatternFactory
                             SPF.clause(
                                 SPF.token("from"), SPF.token("class"), SPF.capture("scheduleClass", SPF.className()),
                                 SPF.optional(
-                                    SPF.clause(
-                                        SPF.token("with"), SPF.token("\\(\\s*"),
-                                        SPF.capture("scheduleParameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
-                                    )
+                                    SPF.token("with"), SPF.token("\\(\\s*"),
+                                    SPF.capture("scheduleParameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
                                 )
                             )
                         ),
@@ -482,17 +480,15 @@ public class SQLParser extends SQLPatternFactory
                     )
                 ),
                 SPF.optional(
-                    SPF.clause(
-                        SPF.token("with"), SPF.token("\\(\\s*"),
-                        SPF.capture("parameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
-                    )
+                    SPF.token("with"), SPF.token("\\(\\s*"),
+                    SPF.capture("parameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
                 ),
-                SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
-                    SPF.capture("onError", SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))),
-                SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
-                    SPF.capture("scope", SPF.oneOf("database", "hosts", "partitions")))),
-                SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
+                SPF.optional(SPF.token("on"), SPF.token("error"),
+                    SPF.capture("onError", SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))),
+                SPF.optional(SPF.token("run"), SPF.token("on"),
+                    SPF.capture("scope", SPF.oneOf("database", "hosts", "partitions"))),
+                SPF.optional(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName())),
                 SPF.optional(SPF.oneOf(SPF.capture("disabled", SPF.token("disable")), SPF.token("enable")))
             ).compile("PAT_CREATE_TASK");
 
@@ -520,9 +516,9 @@ public class SQLParser extends SQLPatternFactory
             SPF.statement(
                 SPF.token("alter"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
-                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                    SPF.optional(SPF.token("on"), SPF.token("error"),
                             SPF.capture("onError",
-                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))))
+                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))
             ).compile("PAT_ALTER_TASK");
 
     /**
