@@ -489,7 +489,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     while (postfilter.isUnderLimit() && getNextTuple(
                 localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
-        if (tuple.isPendingDelete()) {
+        if (tuple.isPendingDeleteOnUndoRelease() ||
+                (initial_expression != nullptr && ! initial_expression->eval(&tuple, nullptr).isTrue())) {
+            // jump until initial expression is satisified
             continue;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
