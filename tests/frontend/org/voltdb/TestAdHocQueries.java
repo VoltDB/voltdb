@@ -1349,6 +1349,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testENG20068() throws Exception {
+        /**
+         * The bug using the query would use the only index in the executor, but such
+         * executor would ignore the "initial_expression" that sets cursor at correct
+         * starting position before further processing (post-filtering, etc). Before
+         * this fix, the query would return all 14 rows because of lack of "initial_expression"
+         * evaluation.
+         */
         final String ddl =
             "CREATE TABLE ENBA (\n" +
             "RULE_TYPE varchar(25) NOT NULL,\n" +
@@ -1358,10 +1365,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             "PARM3 varchar(300),\n" +
             ");\n" +
             "CREATE INDEX I_ENBA_I1 ON ENBA(RULE_TYPE, RULE_TYPE_ID, PARM1, PARM2);";
-
         final TestEnv env = new TestEnv(ddl,
                 m_catalogJar, m_pathToDeployment, 2, 1, 0);
-
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
