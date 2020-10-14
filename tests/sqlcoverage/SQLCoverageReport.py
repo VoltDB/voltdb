@@ -356,7 +356,7 @@ def is_different(x, cntonly, within_minutes):
             # in that case, do not fail the test.  This will be caught later
             # as a 'cmpdb_excep' - an exception in the comparison DB - and
             # reported as such in the 'SQL Coverage Test Summary', but without
-            # a test failure (see ENG-19845 & ENG-19702) 
+            # a test failure (see ENG-19845 & ENG-19702)
             if (int(jni["Status"]) > 0 and int(cmp["Status"]) < 0 and
                     any(nfet in str(cmp) for nfet in NonfatalExceptionTypes)):
                 return False
