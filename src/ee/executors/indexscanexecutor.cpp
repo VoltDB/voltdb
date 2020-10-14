@@ -489,7 +489,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     while (postfilter.isUnderLimit() && getNextTuple(
                 localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
-        if (tuple.isPendingDeleteOnUndoRelease() ||
+        if (tuple.isPendingDelete() ||
                 (initial_expression != nullptr && ! initial_expression->eval(&tuple, nullptr).isTrue())) {
             // jump until initial expression is satisified
             continue;
