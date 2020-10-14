@@ -6,6 +6,7 @@
 # that, it may not work, so user beware. Typical use would be to run this script
 # first (using 'source' or '.', so that variable names are exported to the shell),
 # then a set of SqlCoverage tests, and then the stop_postgresql.sh script.
+echo -e "\nRunning ${BASH_SOURCE[0]} ..."
 
 # Code so that this also works on a Mac (OSTYPE darwin*), assuming that PostgreSQL
 # is installed, the CLASSPATH has been set to include an appropriate PostgreSQL
@@ -20,8 +21,10 @@ if [[ "$OSTYPE" == darwin* ]]; then
 fi
 
 # Check for & kill any postgres processes, in case there is an old one leftover
+echo -e "PostgreSQL processes, if any (before killing them):"
 ps -ef | grep -i postgres
 sudo pkill $IGNORE_CASE postgres
+echo -e "PostgreSQL processes, if any (after killing them):"
 ps -ef | grep -i postgres
 
 # Function used to return an error code, if an error occurs
@@ -47,7 +50,7 @@ function error-code() {
 
 # Prepare to start the PostgreSQL server, in a new temp dir
 export PG_TMP_DIR=$(mktemp -d $MKTEMP_TEMPLATE)
-echo  "PG_TMP_DIR:" $PG_TMP_DIR
+echo -e "\nPG_TMP_DIR:" $PG_TMP_DIR
 export PG_PATH=$(locate pg_restore | grep /bin | grep -v /usr/bin | tail -1 | xargs dirname)
 if [[ -z "${PG_PATH}" ]]; then
     echo -e "\nERROR: Failed to find PG_PATH:"
@@ -67,18 +70,19 @@ echo  "CLASSPATH:" $CLASSPATH
 
 # Start the PostgreSQL server, in the new temp directory
 # Note: '--lc-collate=C' causes VARCHAR sorting to match VoltDB's
+echo -e "\nPostgreSQL startup:"
 $PG_PATH/initdb -D $PG_TMP_DIR/data --auth=trust --auth-host=trust --auth-local=trust --encoding='UTF-8' --lc-collate=C
 echo -e "unix_socket_directories='.'\nlisten_addresses='*'\nport=$PG_PORT" >> $PG_TMP_DIR/data/postgresql.conf
 $PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log
 
 # Print info about PostgreSQL processes, to make sure they are working OK
-echo -e "\nPostgreSQL processes:"
+echo -e "\nPostgreSQL processes (after startup):"
 ps -ef | grep -i postgres
 eval $SHOW_LISTENING_PORTS
 
 echo -e "\nEnvironment variables that were set:"
-echo "(To echo these in your shell, outside this script, use:"
-echo "echo -e \"PG_TMP_DIR: \$PG_TMP_DIR\nPG_PATH   : \$PG_PATH\nPG_PORT   : \$PG_PORT\nCLASSPATH : \$CLASSPATH\" )"
+echo "( To echo these in your shell, outside this script, use:"
+echo "  echo -e \"PG_TMP_DIR: \$PG_TMP_DIR\nPG_PATH   : \$PG_PATH\nPG_PORT   : \$PG_PORT\nCLASSPATH : \$CLASSPATH\" )"
 echo "PG_TMP_DIR: $PG_TMP_DIR"
 echo "PG_PATH   : $PG_PATH"
 echo "PG_PORT   : $PG_PORT"
