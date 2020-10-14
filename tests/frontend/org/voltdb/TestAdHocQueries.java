@@ -1370,25 +1370,24 @@ public class TestAdHocQueries extends AdHocQueryTester {
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
-            Stream.of(Pair.of("450887680", "524288000"),
-                    Pair.of("419430400", "450887680"),
-                    Pair.of("4194340", "62914560"),
-                    Pair.of("314572800", "41943400"),
-                    Pair.of("31457280", "4194340"),
-                    Pair.of("262144000", "314572800"),
-                    Pair.of("209715200", "262144000"),
-                    Pair.of("18774368", "26214400"),
-                    Pair.of("157286400", "209715200"),
-                    Pair.of("1503238554", "1717986918"),
-                    Pair.of("125829120", "157286400"),
-                    Pair.of("12582912", "15728640"),
-                    Pair.of("104857600", "125829120"),
-                    Pair.of("10485760", "12582912"))
-                .forEach(pair ->
+            Stream.of("'450887680', '524288000'",
+                    "'419430400', '450887680'",
+                    "'4194340', '62914560'",
+                    "'314572800', '41943400'",
+                    "'31457280', '4194340'",
+                    "'262144000', '314572800'",
+                    "'209715200', '262144000'",
+                    "'18774368', '26214400'",
+                    "'157286400', '209715200'",
+                    "'1503238554', '1717986918'",
+                    "'125829120', '157286400'",
+                    "'12582912', '15728640'",
+                    "'104857600', '125829120'",
+                    "'10485760', '12582912'")
+                .forEach(entry ->
                         batcher.add(String.format("INSERT INTO ENBA VALUES(" +
-                                "'S_RED_LT_ML_TGT_BAL', 1, 'J4U Data', '%s', '%s');\n",
-                                pair.getFirst(), pair.getSecond()),
-                            1));
+                                "'S_RED_LT_ML_TGT_BAL', 1, 'J4U Data', %s);\n",
+                                entry), 1));
             batcher.run();
             final ClientResponse cr = env.m_client.callProcedure("@AdHoc",
                     "SELECT COUNT(*) FROM ENBA WHERE RULE_TYPE = 'S_RED_LT_ML_TGT_BAL'\n" +
