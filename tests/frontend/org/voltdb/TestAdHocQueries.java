@@ -1347,6 +1347,58 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG20068() throws Exception {
+        /**
+         * The bug using the query would use the only index in the executor, but such
+         * executor would ignore the "initial_expression" that sets cursor at correct
+         * starting position before further processing (post-filtering, etc). Before
+         * this fix, the query would return all 14 rows because of lack of "initial_expression"
+         * evaluation.
+         */
+        final String ddl =
+            "CREATE TABLE ENBA (\n" +
+            "RULE_TYPE varchar(25) NOT NULL,\n" +
+            "RULE_TYPE_ID integer NOT NULL,\n" +
+            "PARM1 varchar(300),\n" +
+            "PARM2 varchar(300),\n" +
+            "PARM3 varchar(300),\n" +
+            ");\n" +
+            "CREATE INDEX I_ENBA_I1 ON ENBA(RULE_TYPE, RULE_TYPE_ID, PARM1, PARM2);";
+        final TestEnv env = new TestEnv(ddl,
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+            Stream.of("'450887680', '524288000'",
+                    "'419430400', '450887680'",
+                    "'4194340', '62914560'",
+                    "'314572800', '41943400'",
+                    "'31457280', '4194340'",
+                    "'262144000', '314572800'",
+                    "'209715200', '262144000'",
+                    "'18774368', '26214400'",
+                    "'157286400', '209715200'",
+                    "'1503238554', '1717986918'",
+                    "'125829120', '157286400'",
+                    "'12582912', '15728640'",
+                    "'104857600', '125829120'",
+                    "'10485760', '12582912'")
+                .forEach(entry ->
+                        batcher.add(String.format("INSERT INTO ENBA VALUES(" +
+                                "'S_RED_LT_ML_TGT_BAL', 1, 'J4U Data', %s);\n",
+                                entry), 1));
+            batcher.run();
+            final ClientResponse cr = env.m_client.callProcedure("@AdHoc",
+                    "SELECT COUNT(*) FROM ENBA WHERE RULE_TYPE = 'S_RED_LT_ML_TGT_BAL'\n" +
+                    "AND RULE_TYPE_ID = 1 and PARM1 = 'J4U Data'\n" +
+                    "AND 9054208 <= CAST(PARM3 as bigint) AND 9054208 > CAST(PARM2 as bigint);");
+            assertContentOfTable(new Object[][]{{1}}, cr.getResults()[0]);
+        } finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */
