@@ -18,7 +18,6 @@
 package org.voltdb.serdes;
 
 import java.util.EnumSet;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -95,8 +94,15 @@ public enum EncodeFormat {
             case VARBINARY:
                 return BYTEARRAY;
             default:
-                throw new IllegalArgumentException("Unsupported type: " + type);
+                return CSV;
         }
+    }
+
+    /**
+     * @return A set of all valid formats which can encode a multiple objects
+     */
+    public static EnumSet<EncodeFormat> complexFormats() {
+        return EnumSet.of(EncodeFormat.CSV, EncodeFormat.AVRO);
     }
 
     /**
@@ -107,13 +113,6 @@ public enum EncodeFormat {
         allowedValues.remove(INVALID);
         allowedValues.remove(OPAQUE);
         return allowedValues;
-    }
-
-    /**
-     * @return the set of simple formats
-     */
-    public static EnumSet<EncodeFormat> simpleValueSet() {
-        return EnumSet.copyOf(EncodeFormat.valueSet().stream().filter(EncodeFormat::isSimple).collect(Collectors.toList()));
     }
 
     /**
