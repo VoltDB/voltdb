@@ -57,14 +57,21 @@ public class VoltAvroLogicalTypes {
     public static final LogicalType TYPE_DECIMAL = LogicalTypes.decimal(38, 12);
 
     // Schemas for logical types
-    public static final Schema SCHEMA_TIMESTAMP = LogicalTypes.timestampMicros()
+    public static final Schema SCHEMA_TIMESTAMP_MICRO = LogicalTypes.timestampMicros()
+            .addToSchema(Schema.create(Schema.Type.LONG));
+    public static final Schema SCHEMA_TIMESTAMP_MILLI = LogicalTypes.timestampMillis()
             .addToSchema(Schema.create(Schema.Type.LONG));
     public static final Schema SCHEMA_BYTE = TYPE_BYTE.addToSchema(Schema.create(Schema.Type.INT));
     public static final Schema SCHEMA_SHORT = TYPE_SHORT.addToSchema(Schema.create(Schema.Type.INT));
     public static final Schema SCHEMA_DECIMAL = TYPE_DECIMAL.addToSchema(Schema.create(Schema.Type.BYTES));
-    public static final Schema SCHEMA_GEOGRAPHY_POINT = TYPE_GEOGRAPHY_POINT
+    public static final Schema SCHEMA_GEOGRAPHY_POINT_FIXED_BINARY = TYPE_GEOGRAPHY_POINT
             .addToSchema(SchemaBuilder.builder().fixed("geographyPoint").size(GeographyPointValue.getLengthInBytes()));
-    public static final Schema SCHEMA_GEOGRAPHY = TYPE_GEOGRAPHY.addToSchema(Schema.create(Schema.Type.BYTES));
+    public static final Schema SCHEMA_GEOGRAPHY_POINT_BINARY = TYPE_GEOGRAPHY_POINT
+            .addToSchema(Schema.create(Schema.Type.BYTES));
+    public static final Schema SCHEMA_GEOGRAPHY_POINT_STRING = TYPE_GEOGRAPHY_POINT
+            .addToSchema(Schema.create(Schema.Type.STRING));
+    public static final Schema SCHEMA_GEOGRAPHY_BINARY = TYPE_GEOGRAPHY.addToSchema(Schema.create(Schema.Type.BYTES));
+    public static final Schema SCHEMA_GEOGRAPHY_STRING = TYPE_GEOGRAPHY.addToSchema(Schema.create(Schema.Type.STRING));
     public static final Schema SCHEMA_BYTE_ARRAY = TYPE_BYTE_ARRAY.addToSchema(Schema.create(Schema.Type.BYTES));
 
     // Converters for logical types
@@ -120,7 +127,7 @@ public class VoltAvroLogicalTypes {
 
         @Override
         public String getLogicalTypeName() {
-            return SCHEMA_TIMESTAMP.getLogicalType().getName();
+            return SCHEMA_TIMESTAMP_MICRO.getLogicalType().getName();
         }
 
         @Override
@@ -142,7 +149,7 @@ public class VoltAvroLogicalTypes {
 
         @Override
         public String getLogicalTypeName() {
-            return "timestamp-millis";
+            return SCHEMA_TIMESTAMP_MILLI.getLogicalType().getName();
         }
 
         @Override

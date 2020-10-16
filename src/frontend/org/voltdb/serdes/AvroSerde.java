@@ -19,10 +19,14 @@ package org.voltdb.serdes;
 import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_BYTE;
 import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_BYTE_ARRAY;
 import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_DECIMAL;
-import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY;
-import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_POINT;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_BINARY;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_POINT_BINARY;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_POINT_FIXED_BINARY;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_POINT_STRING;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_GEOGRAPHY_STRING;
 import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_SHORT;
-import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_TIMESTAMP;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_TIMESTAMP_MICRO;
+import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_TIMESTAMP_MILLI;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -174,19 +178,22 @@ public class AvroSerde {
      * Retrieve the id for a schema with the {@code subject} and fields described by {@code fields} if the schema does
      * not exist in the registry it will be created
      *
-     * @param subject    of the schema
-     * @param schemaName name of the schema
-     * @param fields     in the schema
+     * @param subject       of the schema
+     * @param schemaName    name of the schema
+     * @param fields        in the schema
+     * @param configuration to be used to generate the schema
      * @return ID for schema in the given subject
      * @throws IOException if the id could not be retrieved or the schema registry is not configured
      */
-    public int getIdForSchema(String subject, String schemaName, List<FieldDescription> fields) throws IOException {
+    public int getIdForSchema(String subject, String schemaName, List<FieldDescription> fields,
+            Configuration configuration)
+            throws IOException {
         Internal internal = getInternal();
         AvroType avro = internal.m_avro;
         FieldAssembler<Schema> schemaFields = SchemaBuilder.record(schemaName).namespace(avro.getNamespace()).fields();
 
         for (FieldDescription field : fields) {
-            schemaFields = addField(schemaFields, field);
+            schemaFields = addField(schemaFields, field, configuration);
         }
 
         Schema schema = schemaFields.endRecord();
@@ -239,7 +246,8 @@ public class AvroSerde {
         }
     }
 
-    private FieldAssembler<Schema> addField(FieldAssembler<Schema> schemaFields, FieldDescription field) {
+    private FieldAssembler<Schema> addField(FieldAssembler<Schema> schemaFields, FieldDescription field,
+            Configuration configuration) {
         FieldBuilder<Schema> builder = schemaFields.name(field.name());
         switch (field.type()) {
             default:
@@ -255,15 +263,15 @@ public class AvroSerde {
             case DECIMAL:
                 return addLogicalType(builder, SCHEMA_DECIMAL, field);
             case TIMESTAMP:
-                return addLogicalType(builder, SCHEMA_TIMESTAMP, field);
+                return addLogicalType(builder, configuration.m_timestamp, field);
             case FLOAT:
                 return (field.isNullable() ? builder.type().nullable() : builder.type()).doubleType().noDefault();
             case STRING:
                 return (field.isNullable() ? builder.type().nullable() : builder.type()).stringType().noDefault();
             case GEOGRAPHY_POINT:
-                return addLogicalType(builder, SCHEMA_GEOGRAPHY_POINT, field);
+                return addLogicalType(builder, configuration.m_geographyPoint, field);
             case GEOGRAPHY:
-                return addLogicalType(builder, SCHEMA_GEOGRAPHY, field);
+                return addLogicalType(builder, configuration.m_geography, field);
             case VARBINARY:
                 return addLogicalType(builder, SCHEMA_BYTE_ARRAY, field);
         }
@@ -283,6 +291,91 @@ public class AvroSerde {
             throw new IOException("Avro schema registry is not configured");
         }
         return internal;
+    }
+
+    /**
+     * Configuration class for dictating how avro schemas are generated
+     */
+    public static final class Configuration {
+        final Schema m_timestamp;
+        final Schema m_geographyPoint;
+        final Schema m_geography;
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public static Configuration defaults() {
+            return new Builder().build();
+        }
+
+        public Configuration(TimestampPrecision timestamp, GeographyPointSerialization geographyPoint,
+                GeographySerialization geography) {
+            m_timestamp = timestamp.m_schema;
+            m_geographyPoint = geographyPoint.m_schema;
+            m_geography = geography.m_schema;
+        }
+
+        /**
+         * Builder to help construct {@link Configuration} with good defaults
+         */
+        public static final class Builder {
+            private TimestampPrecision m_timestamp = TimestampPrecision.MICROSECONDS;
+            private GeographyPointSerialization m_geographyPoint = GeographyPointSerialization.FIXED_BINARY;
+            private GeographySerialization m_geography = GeographySerialization.BINARY;
+
+            Builder() {}
+
+            public Builder timestampPrecision(TimestampPrecision precision) {
+                m_timestamp = precision;
+                return this;
+            }
+
+            public Builder geographyPoint(GeographyPointSerialization geographyPoint) {
+                m_geographyPoint = geographyPoint;
+                return this;
+            }
+
+            public Builder geography(GeographySerialization geography) {
+                m_geography = geography;
+                return this;
+            }
+
+            public Configuration build() {
+                return new Configuration(m_timestamp, m_geographyPoint, m_geography);
+            }
+        }
+
+        public enum TimestampPrecision {
+            MICROSECONDS(SCHEMA_TIMESTAMP_MICRO), MILLISECONDS(SCHEMA_TIMESTAMP_MILLI);
+
+            final Schema m_schema;
+
+            TimestampPrecision(Schema schema) {
+                m_schema = schema;
+            }
+        }
+
+        public enum GeographyPointSerialization {
+            STRING(SCHEMA_GEOGRAPHY_POINT_STRING), BINARY(SCHEMA_GEOGRAPHY_POINT_BINARY),
+            FIXED_BINARY(SCHEMA_GEOGRAPHY_POINT_FIXED_BINARY);
+
+            final Schema m_schema;
+
+            GeographyPointSerialization(Schema schema) {
+                m_schema = schema;
+            }
+        }
+
+        public enum GeographySerialization {
+            STRING(SCHEMA_GEOGRAPHY_STRING), BINARY(SCHEMA_GEOGRAPHY_BINARY);
+
+            final Schema m_schema;
+
+            GeographySerialization(Schema schema) {
+                m_schema = schema;
+            }
+        }
     }
 
     /**

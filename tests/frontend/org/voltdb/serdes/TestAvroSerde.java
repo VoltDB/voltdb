@@ -32,18 +32,42 @@ import java.util.stream.Collectors;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.serdes.AvroSerde.Configuration.GeographyPointSerialization;
+import org.voltdb.serdes.AvroSerde.Configuration.GeographySerialization;
+import org.voltdb.serdes.AvroSerde.Configuration.TimestampPrecision;
 import org.voltdb.test.utils.RandomTestRule;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
+@RunWith(Parameterized.class)
 public class TestAvroSerde {
     @Rule
     public final RandomTestRule m_random = new RandomTestRule();
 
     @Rule
     public final TestName m_name = new TestName();
+
+    private final AvroSerde.Configuration m_config;
+
+    @Parameterized.Parameters
+    public static Object[][] parameters() {
+        return new Object[][] { { AvroSerde.Configuration.defaults() },
+                { AvroSerde.Configuration.builder().timestampPrecision(TimestampPrecision.MICROSECONDS).build() },
+                { AvroSerde.Configuration.builder().timestampPrecision(TimestampPrecision.MILLISECONDS).build() },
+                { AvroSerde.Configuration.builder().geographyPoint(GeographyPointSerialization.FIXED_BINARY).build() },
+                { AvroSerde.Configuration.builder().geographyPoint(GeographyPointSerialization.BINARY).build() },
+                { AvroSerde.Configuration.builder().geographyPoint(GeographyPointSerialization.STRING).build() },
+                { AvroSerde.Configuration.builder().geography(GeographySerialization.BINARY).build() },
+                { AvroSerde.Configuration.builder().geography(GeographySerialization.STRING).build() } };
+    }
+
+    public TestAvroSerde(AvroSerde.Configuration configuration) {
+        m_config = configuration;
+    }
 
     @Test
     public void serializeDeserialize() throws Exception {
@@ -55,8 +79,11 @@ public class TestAvroSerde {
 
         Object[][] values = m_random.nextValues(10, types);
 
-        int id = client.getIdForSchema(m_name.getMethodName(), m_name.getMethodName(),
-                types.stream().map(t -> new FieldDescription(t.getName(), t)).collect(Collectors.toList()));
+        String name = m_name.getMethodName().replaceAll("\\[([0-9]+)\\]", "_\\1");
+
+        int id = client.getIdForSchema(name, name,
+                types.stream().map(t -> new FieldDescription(t.getName(), t)).collect(Collectors.toList()),
+                m_config);
 
         AvroSerde.Serializer serializer = client.createSerializer(id);
         FastSerializer fs = new FastSerializer();
