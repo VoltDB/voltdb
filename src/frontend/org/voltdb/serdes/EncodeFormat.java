@@ -27,17 +27,16 @@ import org.voltdb.VoltType;
  * An enum listing the encoding formats
  */
 public enum EncodeFormat {
-    INVALID(-1, false),
-    CSV(0, false),
-    AVRO(1, false),
-    OPAQUE(2, false),
-    INT(3, true),
-    LONG(4, true),
-    STRING(5, true),
-    BYTEARRAY(6, true);
+    INVALID(false),
+    CSV(false),
+    AVRO(false),
+    OPAQUE(false),
+    INT(true),
+    LONG(true),
+    STRING(true),
+    BYTEARRAY(true);
 
     /** ID for the encode format used in serialization of the format */
-    private final byte m_id;
     private final boolean m_simple;
 
     /**
@@ -115,32 +114,8 @@ public enum EncodeFormat {
         return allowedValues;
     }
 
-    /**
-     * Convert from id returned by {@link #getId()} to {@code EncodeFormat}
-     *
-     * @param id of encode format
-     * @return {@code EncodeFormat} represented by {@code id} or {@link #INVALID}
-     */
-    public static EncodeFormat byId(byte id) {
-        for (EncodeFormat ef : values()) {
-            if (ef.m_id == id) {
-                return ef;
-            }
-        }
-
-        return INVALID;
-    }
-
-    private EncodeFormat(int id, boolean simple) {
-        m_id = (byte) id;
+    private EncodeFormat(boolean simple) {
         m_simple = simple;
-    }
-
-    /**
-     * @return ID of this EncodeFormat
-     */
-    public byte getId() {
-        return m_id;
     }
 
     /**
