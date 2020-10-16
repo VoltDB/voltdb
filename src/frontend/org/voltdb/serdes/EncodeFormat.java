@@ -33,6 +33,7 @@ public enum EncodeFormat {
     OPAQUE(false),
     INT(true),
     LONG(true),
+    DOUBLE(true),
     STRING(true),
     BYTEARRAY(true);
 
@@ -88,6 +89,8 @@ public enum EncodeFormat {
                 return INT;
             case BIGINT:
                 return LONG;
+            case FLOAT:
+                return DOUBLE;
             case STRING:
                 return STRING;
             case VARBINARY:
