@@ -170,9 +170,9 @@ public class RandomTestRule extends Random implements TestRule {
                 return VoltDecimalHelper.setDefaultScale(
                         new BigDecimal(new BigInteger(nextInt(64), this), nextBoolean() ? 1 : -1));
             case TIMESTAMP:
-                return new TimestampType(nextInt() * 1000L);
+                return new TimestampType((nextLong() >> 20) * 1000);
             case STRING:
-                return RandomStringUtils.random(nextInt(4096));
+                return RandomStringUtils.random(nextInt(4096), 0, 0, false, false, null, this);
             case VARBINARY:
                 byte[] data = new byte[nextInt(4096)];
                 nextBytes(data);
