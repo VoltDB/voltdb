@@ -380,6 +380,9 @@ public class SQLCommand {
                     }
                     execListTables(filter);
                     break;
+                case "streams":
+                    execListStreams();
+                    break;
                 case "classes":
                     execListClasses();
                     break;
@@ -402,7 +405,7 @@ public class SQLCommand {
                             ("Incomplete SHOW command.\n") :
                             ("Invalid SHOW command completion: '" + modifiers[0] + "'.\n");
                     System.out.println(errorCase +
-                            "The valid SHOW command completions are classes, procedures, tables, or tasks.");
+                            "The valid SHOW command completions are classes, procedures, streams, tables, or tasks.");
                     break;
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
@@ -653,26 +656,26 @@ public class SQLCommand {
             case "dr":
                 printTables("DR Tables", tables.drs);
                 break;
-            case "export":
-                printTables("User Export Streams", tables.exports);
-                break;
             case "view":
-                printTables("User Views", tables.views);
-                break;
-            case "ordinary":
-                printTables("User Tables", tables.tables);
+                printTables("Views", tables.views);
                 break;
             default:
-                System.out.println("Unrecognized table type. The valid types are \"dr\", \"export\", \"view\", and \"ordinary\".");
+                System.out.println("Unrecognized table type. The valid types are \"dr\" and \"view\".");
             }
             // Handled all type filer
             return;
         }
-        printTables("User Tables", tables.tables);
-        printTables("User Views", tables.views);
-        printTables("User Export Streams", tables.exports);
+        printTables("Tables", tables.tables);
         printTables("DR Tables", tables.drs);
+        printTables("Streams", tables.exports);
+        printTables("Views", tables.views);
         System.out.println();
+    }
+
+    private static void execListStreams() throws Exception {
+        // list all tables
+        Tables tables = getTables();
+        printTables("Streams", tables.exports);
     }
 
     private static void execListFunctions() throws Exception {
