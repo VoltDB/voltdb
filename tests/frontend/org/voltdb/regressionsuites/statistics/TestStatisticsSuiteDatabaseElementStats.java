@@ -86,7 +86,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[13];
+        ColumnInfo[] expectedSchema = new ColumnInfo[15];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -100,6 +100,8 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
+        expectedSchema[13] = new ColumnInfo("DR", VoltType.STRING);
+        expectedSchema[14] = new ColumnInfo("EXPORT", VoltType.STRING);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

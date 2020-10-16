@@ -48,5 +48,7 @@ public class TableStats extends SiteStatsSource {
         columns.add(new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT));
         columns.add(new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER));
         columns.add(new ColumnInfo("PERCENT_FULL", VoltType.INTEGER));
+        columns.add(new ColumnInfo("DR", VoltType.STRING));
+        columns.add(new ColumnInfo("EXPORT", VoltType.STRING));
     }
 }
