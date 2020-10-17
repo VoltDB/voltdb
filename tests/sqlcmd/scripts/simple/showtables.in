@@ -21,17 +21,10 @@ show tables;
 
 show tables dr;
 
-show tables export;
-
 DR TABLE t1;
 
 CREATE VIEW v1 (id, records,total) AS
 SELECT id, COUNT(*), SUM(col5) FROM t1 GROUP BY id;
 
-CREATE STREAM s1 PARTITION ON COLUMN id (
-    id BIGINT NOT NULL,
-    ts TIMESTAMP
-);
-
 show tables dr;
-show tables export;
+show tables view;

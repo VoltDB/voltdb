@@ -20,24 +20,21 @@ Command succeeded.
 PARTITION TABLE t1 ON COLUMN id;
 Command succeeded.
 
---- User Tables ----------------------------------------------
+--- Tables ---------------------------------------------------
 T1
 
 
---- User Views -----------------------------------------------
-
-
---- User Export Streams --------------------------------------
-
-
 --- DR Tables ------------------------------------------------
 
 
+--- Streams --------------------------------------------------
+
+
+--- Views ----------------------------------------------------
+
+
 
 --- DR Tables ------------------------------------------------
-
-
---- User Export Streams --------------------------------------
 
 
 DR TABLE t1;
@@ -47,16 +44,10 @@ CREATE VIEW v1 (id, records,total) AS
 SELECT id, COUNT(*), SUM(col5) FROM t1 GROUP BY id;
 Command succeeded.
 
-CREATE STREAM s1 PARTITION ON COLUMN id (
-    id BIGINT NOT NULL,
-    ts TIMESTAMP
-);
-Command succeeded.
-
 --- DR Tables ------------------------------------------------
 T1
 
 
---- User Export Streams --------------------------------------
-S1
+--- Views ----------------------------------------------------
+V1
 

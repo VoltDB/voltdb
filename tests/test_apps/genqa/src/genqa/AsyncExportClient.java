@@ -607,7 +607,7 @@ public class AsyncExportClient
 
     static Client createClient() {
         ClientConfig clientConfig = new ClientConfig("", "");
-        // clientConfig.setReconnectOnConnectionLoss(true); **obsolete**
+        clientConfig.setReconnectOnConnectionLoss(true); // needed so clients reconnect on node stop/restarts
         clientConfig.setClientAffinity(true);
         clientConfig.setTopologyChangeAware(true);
 

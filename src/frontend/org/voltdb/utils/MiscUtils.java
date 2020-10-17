@@ -303,8 +303,10 @@ public class MiscUtils {
 
     public static String[] buildDefaultLicenseDirs(File voltdbroot) {
         // First starts from voltdbroot directory
-        File licenseF = new VoltFile(voltdbroot, Constants.LICENSE_FILE_NAME);
-        String vdbrt = licenseF.getAbsolutePath();
+        String vdbrt = null;
+        if (voltdbroot != null) {
+            vdbrt = new VoltFile(voltdbroot, Constants.LICENSE_FILE_NAME).getAbsolutePath();
+        }
         // Then search current directory
         String crt = System.getProperty("user.dir") + File.separator + Constants.LICENSE_FILE_NAME;
         // Then search jar file directory
@@ -324,7 +326,11 @@ public class MiscUtils {
         // Last search user home directory
         String home = System.getProperty("user.home") + File.separator + Constants.LICENSE_FILE_NAME;
 
-        return new String[] {vdbrt, crt, jar, home};
+        if (vdbrt != null) {
+            return new String[] {vdbrt, crt, jar, home};
+        } else {
+            return new String[] {crt, jar, home};
+        }
     }
 
     /**

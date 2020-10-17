@@ -40,6 +40,8 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("STRING_DATA_MEMORY");
     columnNames.push_back("TUPLE_LIMIT");
     columnNames.push_back("PERCENT_FULL");
+    columnNames.push_back("DR");
+    columnNames.push_back("EXPORT");
     return columnNames;
 }
 
@@ -48,43 +50,63 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull,
         vector<bool> &inBytes) {
     StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
+    // TABLE_NAME
     types.push_back(ValueType::tVARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // TABLE_TYPE
     types.push_back(ValueType::tVARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // TUPLE_COUNT
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // TUPLE_ALLOCATED_MEMORY
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // TUPLE_DATA_MEMORY
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // STRING_DATA_MEMORY
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // TUPLE_LIMIT
     types.push_back(ValueType::tINTEGER);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
+    // PERCENT_FULL
     types.push_back(ValueType::tINTEGER);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    // DR
+    types.push_back(ValueType::tVARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    // EXPORT
+    types.push_back(ValueType::tVARCHAR);
+    columnLengths.push_back(4096);
     allowNull.push_back(false);
     inBytes.push_back(false);
 }
@@ -185,6 +207,21 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
         percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
     }
     tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
+
+    string isDR = "false";
+    string isExport = "false";
+    if (persistentTable) {
+        TableType tableType = persistentTable->getTableType();
+        if (isTableWithStream(tableType)) {
+            isExport = "true";
+        } else if (persistentTable->isDREnabled()) {
+            isDR = "true";
+        }
+    } else {
+        isExport = "true";
+    }
+    tuple->setNValue( StatsSource::m_columnName2Index["DR"], ValueFactory::getStringValue(isDR));
+    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], ValueFactory::getStringValue(isExport));
 }
 
 /**

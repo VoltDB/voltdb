@@ -710,10 +710,17 @@ class Distributer {
                 final byte status = response.getStatus();
                 boolean abort = false;
                 boolean error = false;
-                if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                switch (status) {
+                case ClientResponse.SUCCESS:
+                    break;
+                case ClientResponse.USER_ABORT:
+                case ClientResponse.GRACEFUL_FAILURE:
+                case ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE:
                     abort = true;
-                } else if (status != ClientResponse.SUCCESS) {
+                    break;
+                default:
                     error = true;
+                    break;
                 }
 
                 int clusterRoundTrip = response.getClusterRoundtrip();

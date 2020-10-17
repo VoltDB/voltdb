@@ -1021,7 +1021,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 "PARTITION TABLE TT ON COLUMN PID;\n");
 
         builder.setUseDDLSchema(true);
-        if (MiscUtils.isPro()) {
+        // Command logging and memcheck are incompatible so do not enable memcheck
+        if (MiscUtils.isPro() && !LocalCluster.isMemcheckDefined()) {
             builder.configureLogging(true, true, 2, 2, 64);
         }
         LocalCluster lc = new LocalCluster("updateclasses.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -1073,7 +1074,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            if (MiscUtils.isPro()) {
+            if (MiscUtils.isPro() && !LocalCluster.isMemcheckDefined()) {
                 // Shutdown then recover the cluster
                 lc.shutDown();
                 m_client.close();

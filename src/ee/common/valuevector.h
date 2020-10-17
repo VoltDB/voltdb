@@ -70,11 +70,11 @@ template <typename V> class GenericValueArray {
 public:
     inline GenericValueArray() : size_(0),
         data_(reinterpret_cast<V*>(new char[sizeof(V) * size_])) {
-        ::memset(data_, 0, sizeof(V) * size_);
+        ::memset(reinterpret_cast<void*>(data_), 0, sizeof(V) * size_);
     }
     inline GenericValueArray(int size) : size_(size),
         data_(reinterpret_cast<V*>(new char[sizeof(V) * size_])) {
-        ::memset(data_, 0, sizeof(V) * size_);
+        ::memset(reinterpret_cast<void*>(data_), 0, sizeof(V) * size_);
     }
     inline GenericValueArray(const GenericValueArray &rhs) : size_(rhs.size_),
         data_(reinterpret_cast<V*>(new char[sizeof(V) * size_])) {
@@ -92,7 +92,7 @@ public:
         delete[] reinterpret_cast<char*>(data_);
         size_ = size;
         data_ = reinterpret_cast<V*>(new char[sizeof(V) * size_]);
-        ::memset(data_, 0, sizeof(V) * size_);
+        ::memset(reinterpret_cast<void*>(data_), 0, sizeof(V) * size_);
     }
 
     GenericValueArray<V>& operator=(const GenericValueArray<V> &rhs);
