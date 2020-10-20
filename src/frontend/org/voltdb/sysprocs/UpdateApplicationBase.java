@@ -236,7 +236,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            if (!VoltDB.instance().validateDeploymentUpdates(dt, context.getDeployment(), retval)) {
+            if (!VoltDB.instance().validateDeploymentUpdates(newCatalog, dt, context.getDeployment(), retval)) {
                 return retval;
             }
 

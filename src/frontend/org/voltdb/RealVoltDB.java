@@ -4217,9 +4217,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateDeploymentUpdates(newDep, curDep, ccr)) {
+            if (!validator.validateDeploymentUpdates(catalog, newDep, curDep, ccr)) {
                 return false;
             }
         }

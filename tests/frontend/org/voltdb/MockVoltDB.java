@@ -1057,7 +1057,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         return true;
     }
 

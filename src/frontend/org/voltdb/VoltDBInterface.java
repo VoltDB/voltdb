@@ -412,12 +412,13 @@ public interface VoltDBInterface
      * This will be called from the catalog update procedure on every catalog update.
      * All the registered validators will be called for validation from here.
      *
+     * @param catalog the new catalog
      * @param newDep the updated deployment
      * @param curDep the current deployment
      * @param ccr the result of the validations will be set on this result object
      * @return boolean indicating if the validation was successful or not.
      */
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
+    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
 
     /**
      * This will be called from the catalog update procedure on every catalog update.
