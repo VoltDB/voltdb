@@ -18,46 +18,28 @@
 package org.voltdb.client;
 
 /**
- * Exception thrown by the {@link SyncCallback} and {@link Client#callProcedure(String, Object...)}
- * when a status code that is not {@link ClientResponse#SUCCESS} is returned in the
- * {@link ClientResponse}.
+ * Exception thrown by the {@link SyncCallback} and {@link Client#callProcedure(String, Object...)} when a status code
+ * that is not {@link ClientResponse#SUCCESS} is returned in the {@link ClientResponse}.
+ * <p>
+ * The message returned by {@link #getMessage()} will be the same as the status string returned by
+ * {@link ClientResponse#getStatusString()}
  *
  */
 public class ProcCallException extends Exception {
     private static final long serialVersionUID = 1L;
-    String m_message;
-    Exception m_cause;
-    ClientResponse m_response;
+    final ClientResponse m_response;
 
-   ProcCallException(ClientResponse response, String lastCallInfo, Exception cause) {
-       m_message = lastCallInfo;
-       m_cause = cause;
-       m_response = response;
-   }
+    ProcCallException(ClientResponse response) {
+        super(response.getStatusString());
+        m_response = response;
+    }
 
-   @Override
-   public String getMessage() {
-       return m_message;
-   }
-
-   /**
-    * When a ProcCallException has a response from the server, retrieve it with this method.
-    *
-    * @return A {@link ClientResponse} associated with this exception or null.
-    */
-   public ClientResponse getClientResponse() {
-       return m_response;
-   }
-
-   @Override
-   public String getLocalizedMessage() {
-       if (m_message != null)
-           return m_message;
-       return "Unknown Procedure Call Exception.";
-   }
-
-   @Override
-   public Exception getCause() {
-       return m_cause;
-   }
+    /**
+     * When a ProcCallException has a response from the server, retrieve it with this method.
+     *
+     * @return A {@link ClientResponse} associated with this exception or null.
+     */
+    public ClientResponse getClientResponse() {
+        return m_response;
+    }
 }

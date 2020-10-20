@@ -448,8 +448,8 @@ public final class ClientImpl implements Client {
                     ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                     "",
                     new VoltTable[0],
-                    String.format("Unable to queue client request."));
-            throw new ProcCallException(r, "Unable to queue client request.", null);
+                    "Unable to queue client request.");
+            throw new ProcCallException(r);
         }
 
         try {
@@ -458,7 +458,7 @@ public final class ClientImpl implements Client {
             throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
+            throw new ProcCallException(cb.getResponse());
         }
         return cb.getResponse();
     }
@@ -1056,7 +1056,7 @@ public final class ClientImpl implements Client {
                 {
                     final ClientResponse r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
                             "The procedure is not queued for execution.");
-                    throw new ProcCallException(r, null, null);
+                    throw new ProcCallException(r);
                 }
             } catch(Exception ex) {
                 try {

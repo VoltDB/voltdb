@@ -1597,7 +1597,7 @@ class Distributer {
         refreshPartitionKeys(false);
 
         if (m_partitionUpdateStatus.get().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(m_partitionUpdateStatus.get(), null, null);
+            throw new ProcCallException(m_partitionUpdateStatus.get());
         }
 
         return m_partitionKeys.get();

@@ -84,16 +84,14 @@ public class MockVoltClient implements Client {
         calledName = procName;
         calledParameters = parameters;
 
-        if (abortMessage != null) {
-            ProcCallException e = new ProcCallException(null ,abortMessage, null);
-            abortMessage = null;
-            throw e;
-        }
-
         VoltTable[] candidateResult = null;
-        if (!nextResults.isEmpty()) candidateResult = nextResults.get(0);
+        if (!nextResults.isEmpty()) {
+            candidateResult = nextResults.get(0);
+        }
         final VoltTable[] result = candidateResult;
-        if (resetAfterCall && !nextResults.isEmpty()) nextResults.remove(0);
+        if (resetAfterCall && !nextResults.isEmpty()) {
+            nextResults.remove(0);
+        }
         return new ClientResponse() {
 
             @Override
@@ -147,7 +145,6 @@ public class MockVoltClient implements Client {
             Collections.synchronizedList(new LinkedList<VoltTable[]>());
     public int numCalls = 0;
     public boolean resetAfterCall = true;
-    public String abortMessage;
     public long lastOrigTxnId = Long.MIN_VALUE;
     public boolean origTxnIdOrderCorrect = true;
     private long m_startTime;
