@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,7 +41,7 @@ import org.junit.rules.TestName;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.RetentionPolicyMgr.RetentionLimitException;
+import org.voltdb.utils.PBDUtils.ConfigurationException;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
 import com.google.common.collect.ImmutableMap;
@@ -363,15 +363,15 @@ public class TestTimeBasedRetentionPolicy {
     @Test
     public void testParsingLimits() throws Exception {
         for (Map.Entry<String, Long> e : s_validLimits.entrySet()) {
-            long lim = RetentionPolicyMgr.parseTimeLimit(e.getKey());
+            long lim = PBDUtils.parseTimeValue(e.getKey());
             assertEquals(lim, e.getValue().longValue());
         }
         for (String limStr : s_invalidLimits) {
             try {
-                RetentionPolicyMgr.parseTimeLimit(limStr);
+                PBDUtils.parseTimeValue(limStr);
                 fail();
             }
-            catch (RetentionLimitException expected) {
+            catch (ConfigurationException expected) {
                 ; // good
             }
         }

@@ -264,6 +264,11 @@ public interface BinaryDeque<M> {
     public long getRetentionDeletionPoint();
 
     /**
+     * Set the amount of time an segment is left open for write before rolling over to next entry
+     */
+    public void setSegmentRollTimeLimit(long limit);
+
+    /**
      * Iterate over entries in reverse order applying {@code updater} to each entry. Only entries in non active segments
      * will be visited. The {@code updater} can modify the contents of any entry which is visited or determine that the
      * entry should be deleted.

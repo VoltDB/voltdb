@@ -44,7 +44,6 @@ import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.BinaryDequeReader.NoSuchOffsetException;
 import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
-
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -813,6 +812,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private GapWriter m_gapWriter;
     /** The number of entries which are in closed segments since the last time {@link #updateEntries()} was called */
     private long m_entriesClosedSinceUpdate;
+    // The amount of time in nanosecond a segment can be left open for write since the segment is constructed.
+    private long m_segmentRollTimeLimitNs = Long.MAX_VALUE;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path. This is a
@@ -843,7 +844,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         parseFiles(builder.m_deleteExisting);
-
         m_numObjects = countNumObjects();
         assertions();
     }
@@ -1329,7 +1329,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     private Pair<Integer, PBDSegment<M>> offerToSegment(PBDSegment<M> segment, Object object, long startId, long endId,
             long timestamp, M extraHeader, boolean isDs) throws IOException {
+
         if (segment == null || !segment.isActive()) {
+            segment = addSegment(segment, startId, extraHeader);
+        } else if ((System.nanoTime() - segment.getCreationTime()) > m_segmentRollTimeLimitNs) {
+            finishWrite(segment);
             segment = addSegment(segment, startId, extraHeader);
         }
 
@@ -2233,5 +2237,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         void free() {
             super.discard();
         }
+    }
+
+    @Override
+    public synchronized void setSegmentRollTimeLimit(long limit) {
+        m_segmentRollTimeLimitNs = limit;
     }
 }

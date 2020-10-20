@@ -24,7 +24,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
 import java.util.List;
-
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
@@ -86,11 +85,13 @@ public abstract class PBDSegment<M> {
     boolean m_deleteOnAck;
 
     private long m_fileSize = -1;
+    protected final long m_creationTime;
 
     PBDSegment(File file, long id) {
         super();
         m_file = file;
         m_id = id;
+        m_creationTime = System.nanoTime();
     }
 
     long segmentId() {
@@ -109,6 +110,9 @@ public abstract class PBDSegment<M> {
         return (m_fileSize > 0) ? m_fileSize : m_file.length();
     }
 
+    long getCreationTime() {
+        return m_creationTime;
+    }
     /**
      * Returns the start id stored in this segment's header.
      *
