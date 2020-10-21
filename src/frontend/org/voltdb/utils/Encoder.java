@@ -38,14 +38,10 @@ public class Encoder {
      * @return A hex-encoded string with double length.
      */
     public static String hexEncode(byte[] data) {
-        return hexEncode(data, false);
-    }
-
-    public static String hexEncode(byte[] data, boolean quote) {
         if (data == null)
             return null;
 
-        StringBuilder sb = new StringBuilder(quote ? "x'" : "");
+        StringBuilder sb = new StringBuilder();
         for (byte b : data) {
             // hex encoding same way as java.net.URLEncoder.
             char ch = Character.forDigit((b >> 4) & 0xF, 16);
@@ -60,8 +56,6 @@ public class Encoder {
             }
             sb.append(ch);
         }
-        if (quote)
-            sb.append('\'');
         return sb.toString();
     }
 
