@@ -31,7 +31,9 @@ import static org.voltdb.serdes.VoltAvroLogicalTypes.SCHEMA_TIMESTAMP_MILLI;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import javax.annotation_voltpatches.concurrent.NotThreadSafe;
 import javax.annotation_voltpatches.concurrent.ThreadSafe;
@@ -54,9 +56,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.ByteBufferInputStream;
 import org.voltdb.CatalogContext;
 import org.voltdb.compiler.deploymentfile.AvroType;
+import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.Splitter;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -140,14 +145,19 @@ public class AvroSerde {
             if (s_log.isDebugEnabled()) {
                 s_log.debug(this.getClass().getSimpleName() + " is set to no registry");
             }
-        } else if (m_internal.m_avro == null || !Objects.equals(m_internal.m_avro.getRegistry(), avro.getRegistry())) {
-            // update the serializer config if the schema_registry url in the deployment file changes
-            if (s_log.isDebugEnabled()) {
-                s_log.debug(this.getClass().getSimpleName() + " is moved to registry " + avro.getRegistry());
-            }
+        } else {
+            Map<String, String> properties = propertiesToMap(avro);
+            if (m_internal.m_avro == null || !Objects.equals(m_internal.m_avro.getRegistry(), avro.getRegistry())
+                    || !properties.equals(propertiesToMap(m_internal.m_avro))) {
+                // update the client if the schema_registry url or configurations in the deployment file changes
+                if (s_log.isDebugEnabled()) {
+                    s_log.debug(this.getClass().getSimpleName() + " registry updated to " + avro.getRegistry()
+                            + " properties: " + properties);
+                }
 
-            // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
-            updateRegistryClient(buildClient(avro), avro);
+                // create a new m_schemaRegistryClient when we have a update on the url, since the cache is outdated
+                updateRegistryClient(buildClient(avro, properties), avro);
+            }
         }
 
         m_internal = new Internal(m_internal.m_client, avro);
@@ -233,9 +243,23 @@ public class AvroSerde {
         }
     }
 
+    /**
+     * Convert {@link AvroType#getProperties()} to a {@link Map} of properties
+     *
+     * @param avro instance
+     * @return a {@link Map} of properties. Never {@code null}
+     */
+    private Map<String, String> propertiesToMap(AvroType avro) {
+        return avro.getProperties() == null ? ImmutableMap.of()
+                : avro.getProperties().getProperty().stream()
+                        .collect(Collectors.toMap(PropertyType::getName, PropertyType::getValue));
+    }
+
     @VisibleForTesting
-    SchemaRegistryClient buildClient(AvroType avro) {
-        return new CachedSchemaRegistryClient(avro.getRegistry().trim(), 10000);
+    SchemaRegistryClient buildClient(AvroType avro, Map<String, String> properties) {
+        List<String> registries = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(avro.getRegistry());
+
+        return new CachedSchemaRegistryClient(registries, 10000, properties);
     }
 
     private void updateRegistryClient(SchemaRegistryClient client, AvroType avro) {

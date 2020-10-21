@@ -22,6 +22,8 @@
  */
 package org.voltdb.serdes;
 
+import java.util.Map;
+
 import org.voltdb.compiler.deploymentfile.AvroType;
 
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
@@ -39,7 +41,7 @@ public class MockAvroSerde extends AvroSerde {
     }
 
     @Override
-    SchemaRegistryClient buildClient(AvroType avro) {
+    SchemaRegistryClient buildClient(AvroType avro, Map<String, String> properties) {
         return new MockSchemaRegistryClient();
     }
 }

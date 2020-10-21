@@ -574,6 +574,9 @@
 
   <!-- <avro> -->
   <xs:complexType name="avroType">
+    <xs:sequence>
+      <xs:element name="properties" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
     <xs:attribute name="registry" type="xs:string" use="required"/>
     <xs:attribute name="namespace" type="xs:string" default="org.voltdb"/>
     <xs:attribute name="prefix" type="xs:string" default=""/>
