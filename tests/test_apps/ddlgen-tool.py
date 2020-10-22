@@ -32,6 +32,7 @@ A simple script to read in a DDL file and replace
     %%TABLE ...
     + %%INDEX ...
     + %%STREAM ...
+    + %%TOPIC ...
 with generated SQL
 """
 
@@ -78,6 +79,11 @@ if __name__ == '__main__':
                 print("-- %s" % line2)
                 params = process_args(line2[8:], lineno)
                 print(generator.gen_stream(**params))
+
+            elif line2.startswith("%%TOPIC"):
+                print("-- %s" % line2)
+                params = process_args(line2[8:], lineno)
+                print(generator.gen_topic(**params))
 
             else:
                 print(line)

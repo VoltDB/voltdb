@@ -33,7 +33,8 @@ AS
 
 %%STREAM name=export_partitioned_table_jdbc, export_target=jdbc_target, partition_key=rowid
 
-%%STREAM name=topic_stream, topic=True, partition_key=rowid
+%%STREAM name=TOPIC_STREAM, partition_key=rowid
+%%TOPIC name=TOPIC_STREAM, profile=topicprofile
 
 %%TABLE name=export_mirror_partitioned_table, partition_key=rowid
 

@@ -198,13 +198,22 @@ class DDLGenerator(object):
         if export_target:
             sql += " EXPORT TO TARGET " + export_target
 
-        if topic:
-            sql += " AS TOPIC "
         sql += "\n(\n"
 
         sql += self._gen_common_cols(metadata, geocolumns)
 
         sql += ");"
+
+        return sql
+
+    def gen_topic(self, name,
+                   profile=None,):
+        sql = "CREATE TOPIC USING STREAM " + name
+
+        if profile:
+            sql += " PROFILE " + profile
+
+        sql += ";\n"
 
         return sql
 

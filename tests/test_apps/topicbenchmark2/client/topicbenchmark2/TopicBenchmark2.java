@@ -67,7 +67,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class TopicBenchmark2 {
 
     static VoltLogger log = new VoltLogger("TOPICS");
-    static final String TEST_TOPIC = "test_topic";
+    static final String TEST_TOPIC = "TEST_TOPIC";
     static final int MAX_SILENCE_MS = 10_000;
 
     // CSV pre-formatted row template
@@ -235,9 +235,8 @@ public class TopicBenchmark2 {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
-        log.info("Connecting to VoltDB...");
-
         String[] serverArray = servers.split(",");
+        log.info("Connecting to VoltDB Server..." + serverArray[0]);
         connectToOneServer(serverArray[0]);
     }
 

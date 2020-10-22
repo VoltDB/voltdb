@@ -129,7 +129,7 @@ function run_producers() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
-        --topic=test_topic01 \
+        --topic=TEST_TOPIC \
         --count=500 \
         --producers=2 \
         --subscribers=0
@@ -141,7 +141,7 @@ function run_subscribers() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
-        --topic=test_topic01 \
+        --topic=TEST_TOPIC \
         --count=1000 \
         --producers=0 \
         --subscribers=2
