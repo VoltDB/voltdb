@@ -70,7 +70,18 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
             StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
             buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
         } else {
-            buffer << getNValue(ctr).debug();
+            try {
+                buffer << getNValue(ctr).debug();
+            } catch (SQLException const& e) {      // hack: help get away with corrupted data in exception path
+                char b[128];
+                strncpy(b, e.what(), 128);
+                b[sizeof b - 1] = '\0';
+                buffer << "{?? [" << ctr << "] Got SQLException: "
+                    << b << (strlen(e.what()) > sizeof b ? "..." : "")
+                    << " ??}";
+                buffer << " @" << static_cast<void const*>(address());
+                return buffer.str();
+            }
         }
         buffer << ")";
     }
