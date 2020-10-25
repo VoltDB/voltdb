@@ -306,7 +306,7 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_DROP_FUNCTION =
         SPF.statement(
-            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()), SPF.ifExisits()
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()), SPF.ifExists()
         ).compile("PAT_DROP_FUNCTION");
 
     /*
@@ -464,11 +464,9 @@ public class SQLParser extends SQLPatternFactory
                             SPF.clause(
                                 SPF.token("from"), SPF.token("class"), SPF.capture("scheduleClass", SPF.className()),
                                 SPF.optional(
-                                    SPF.clause(
-                                        SPF.token("with"), SPF.token("\\(\\s*"),
-                                        SPF.capture("scheduleParameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
-                                    )
+                                    SPF.token("with"), SPF.token("\\(\\s*"),
+                                    SPF.capture("scheduleParameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
                                 )
                             )
                         ),
@@ -482,22 +480,20 @@ public class SQLParser extends SQLPatternFactory
                     )
                 ),
                 SPF.optional(
-                    SPF.clause(
-                        SPF.token("with"), SPF.token("\\(\\s*"),
-                        SPF.capture("parameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
-                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
-                    )
+                    SPF.token("with"), SPF.token("\\(\\s*"),
+                    SPF.capture("parameters", SPF.commaList(SPF.token(".+"))).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
                 ),
-                SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
-                    SPF.capture("onError", SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))),
-                SPF.optional(SPF.clause(SPF.token("run"), SPF.token("on"),
-                    SPF.capture("scope", SPF.oneOf("database", "hosts", "partitions")))),
-                SPF.optional(SPF.clause(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName()))),
+                SPF.optional(SPF.token("on"), SPF.token("error"),
+                    SPF.capture("onError", SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))),
+                SPF.optional(SPF.token("run"), SPF.token("on"),
+                    SPF.capture("scope", SPF.oneOf("database", "hosts", "partitions"))),
+                SPF.optional(SPF.token("as"), SPF.token("user"), SPF.capture("asUser", SPF.userName())),
                 SPF.optional(SPF.oneOf(SPF.capture("disabled", SPF.token("disable")), SPF.token("enable")))
             ).compile("PAT_CREATE_TASK");
 
     /**
-     * Build regex to support drop task statement in the from of
+     * Build regex to support drop task statement in the form of
      * <p>
      * <code>
      * DROP TASK <task name> [IF EXISTS]
@@ -506,7 +502,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_DROP_TASK =
             SPF.statement(
                     SPF.token("drop"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.ifExisits())
+                    SPF.ifExists())
             .compile("PAT_DROP_TASK");
 
     /**
@@ -520,9 +516,9 @@ public class SQLParser extends SQLPatternFactory
             SPF.statement(
                 SPF.token("alter"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
                     SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
-                    SPF.optional(SPF.clause(SPF.token("on"), SPF.token("error"),
+                    SPF.optional(SPF.token("on"), SPF.token("error"),
                             SPF.capture("onError",
-                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))))
+                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))
             ).compile("PAT_ALTER_TASK");
 
     /**
@@ -561,6 +557,66 @@ public class SQLParser extends SQLPatternFactory
             ).compile("PAT_CREATE_STREAM");
 
     /**
+     * Build regex to support create topic statement in the from of
+     * <p>
+     *
+     * <pre>
+     * CREATE TOPIC [USING STREAM] {name} [EXECUTE PROCEDURE {proc}]
+     *     [ALLOW {role, ...}]
+     *     [PROFILE {profile}]
+     *     [PROPERTIES (key1=value1, ...)]]
+     * </pre>
+     *
+     * or
+     *
+     * <pre>
+     * CREATE OPAQUE TOPIC {name} [PARTITIONED]
+     *     [ALLOW {roles}]
+     *     [PROFILE {profile}]
+     * </pre>
+     */
+    private static final Pattern PAT_CREATE_TOPIC =
+            SPF.statement(
+                    SPF.token("create"), SPF.optionalCapture("opaque", SPF.token("opaque")), SPF.token("topic"),
+                    SPF.optionalCapture("usingStream", SPF.token("using"), SPF.token("stream")),
+                    SPF.capture("topicName", SPF.databaseObjectName()),
+                    SPF.optional(
+                        SPF.oneOf(
+                            SPF.capture("partitioned", SPF.token("partitioned")),
+                            SPF.clause(SPF.token("execute"), SPF.token("procedure"),  SPF.capture("procedureName", SPF.procedureName()))
+                        )
+                    ),
+                    SPF.optional(
+                        SPF.token("allow"),
+                        SPF.capture("allow", SPF.commaList(SPF.databaseObjectName()))
+                    ),
+                    SPF.optional(
+                        SPF.token("profile"), SPF.capture("profile", SPF.databaseObjectName())
+                    ),
+                    SPF.optional(
+                        SPF.token("properties\\s*\\(\\s*"),
+                            SPF.capture("properties", SPF.commaList(SPF.token(
+                                    "\\w+[\\w\\.]*\\s*=\\s*.+?"))
+                        ).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                        SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                    )
+            ).compile("PAT_CREATE_TOPIC");
+
+    /**
+     * Build regex to support drop tOPIC statement in the form of
+     * <p>
+     * <code>
+     * DROP TOPIC <name> [IF EXISTS]
+     * </code>
+     */
+    private static final Pattern PAT_DROP_TOPIC =
+            SPF.statement(
+                    SPF.token("drop"), SPF.token("TOPIC"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.ifExists())
+            .compile("PAT_DROP_TOPIC");
+
+
+    /**
      *  If the statement starts with a VoltDB-specific DDL command,
      *  one of create procedure, create role, create function, create aggregate function,
      *  drop procedure, drop role, partition, replicate, export, import, or dr,
@@ -582,7 +638,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE)|" + // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE|TOPIC|OPAQUE)|" + // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -912,6 +968,21 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateStream(String statement)
     {
         return PAT_CREATE_STREAM.matcher(statement);
+    }
+
+    /**
+     * Match statement against create topic for regular and opaque
+     *
+     * @param statement to match against
+     * @return pattern matcher object result
+     */
+    public static Matcher matchCreateTopic(String statement)
+    {
+        return PAT_CREATE_TOPIC.matcher(statement);
+    }
+
+    public static Matcher matchDropTopic(String statement) {
+        return PAT_DROP_TOPIC.matcher(statement);
     }
 
     /**
@@ -1328,7 +1399,7 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Build a pattern segment to accept single optional EXPORT, PARTITION, or AS TOPIC clauses
+     * Build a pattern segment to accept single optional EXPORT, PARTITION,
      * to modify CREATE STREAM statements.
      *
      * @param captureTokens  Capture individual tokens if true
@@ -1338,18 +1409,9 @@ public class SQLParser extends SQLPatternFactory
      *
      *  (1) EXPORT TO TARGET    ("targetName"): target name
      *  (2) PARTITION           ("partitionColumnName"): column name
-     *  If AS TOPIC:
-     *  (3) PROFILE             ("topicProfileName"): topic profile name
-     *  (4) FORMAT              ("topicFormatName"): topic format
-     *  (5) KEYS                ("topicKeyColumnNames"): list of column names
-     *  (6) ALLOW               ("topicAllowedRoleNames"): list of role names
      */
     public static final String CAPTURE_EXPORT_TARGET = "targetName";
     public static final String CAPTURE_STREAM_PARTITION_COLUMN = "partitionColumnName";
-    public static final String CAPTURE_TOPIC_PROFILE = "topicProfileName";
-    public static final String CAPTURE_TOPIC_FORMAT = "topicFormatName";
-    public static final String CAPTURE_TOPIC_KEY_COLUMNS = "topicKeyColumnNames";
-    public static final String CAPTURE_TOPIC_ALLOWED_ROLES = "topicAllowedRoleNames";
 
     private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
     {
@@ -1362,40 +1424,6 @@ public class SQLParser extends SQLPatternFactory
                 SPF.clause(
                     SPF.token("partition"), SPF.token("on"), SPF.token("column"),
                     SPF.group(captureTokens, CAPTURE_STREAM_PARTITION_COLUMN, SPF.databaseObjectName())
-                ),
-                SPF.clause(
-                    SPF.token("as"),SPF.token("topic"),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("profile"),
-                            SPF.group(captureTokens, CAPTURE_TOPIC_PROFILE, SPF.databaseObjectName())
-                        )
-                    ),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("format"),
-                            // Note: not using SPF.oneOf() in order to improve error reporting
-                            SPF.group(captureTokens, CAPTURE_TOPIC_FORMAT, SPF.databaseObjectName())
-                        )
-                    ),
-                    SPF.optional(
-                        SPF.clause(
-                            SPF.token("keys"),
-                            SPF.group(captureTokens,
-                                    CAPTURE_TOPIC_KEY_COLUMNS,
-                                    new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
-                            )
-                        )
-                    ),
-                    SPF.optional(
-                            SPF.clause(
-                                SPF.token("allow"),
-                                SPF.group(captureTokens,
-                                        CAPTURE_TOPIC_ALLOWED_ROLES,
-                                        new SQLPatternPartElement("[\\w$]+(?:\\s*,\\s*[\\w$]+)*")
-                                )
-                            )
-                        )
                 )
             );
     }
@@ -1427,6 +1455,7 @@ public class SQLParser extends SQLPatternFactory
         // Force the leading space to go inside the repeat block.
         return SPF.capture(SPF.repeat(makeInnerStreamModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
+
     //========== Other utilities from or for SQLCommand ==========
 
     /**

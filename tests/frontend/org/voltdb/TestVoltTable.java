@@ -28,7 +28,6 @@ import static org.junit.Assert.assertNotEquals;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1578,13 +1577,14 @@ public class TestVoltTable extends TestCase {
      * Test that checksum and same contents methods generate the expected results for different tables
      */
     public void testTableChecksumAndSameContents() {
-        t = new VoltTable(new ColumnInfo[] { new ColumnInfo("1", VoltType.TINYINT),
-                new ColumnInfo("2", VoltType.SMALLINT), new ColumnInfo("3", VoltType.INTEGER),
-                new ColumnInfo("4", VoltType.BIGINT), new ColumnInfo("5", VoltType.STRING) });
+
+        List<VoltType> types = Arrays.asList(VoltType.TINYINT, VoltType.SMALLINT, VoltType.INTEGER, VoltType.BIGINT,
+                VoltType.FLOAT, VoltType.STRING, VoltType.VARBINARY);
+        t = new VoltTable(types.stream().map(t -> new ColumnInfo(t.getName(), t)).toArray(ColumnInfo[]::new));
         List<Object[]> rows = new ArrayList<>(1000);
         for (int i =0;i<1000;++i) {
-            Object[] row = new Object[] { nextValue(Byte.class), nextValue(Short.class), nextValue(Integer.class),
-                    nextValue(Long.class), nextValue(String.class) };
+            Object[] row = m_random
+                    .nextValues(types);
             t.addRow(row);
             rows.add(row);
         }
@@ -1655,30 +1655,5 @@ public class TestVoltTable extends TestCase {
             result += table.getTableCheckSum(includeHeader);
         }
         return result;
-    }
-
-    private Object nextValue(Class<?> clazz) {
-        if (m_random.nextGaussian() < 0.05) {
-            return null;
-        }
-
-        if (clazz == Byte.class) {
-            return (byte) m_random.nextInt();
-        } else if (clazz == Short.class) {
-            return (short) m_random.nextInt();
-        } else if (clazz == Integer.class) {
-            return m_random.nextInt();
-        } else if (clazz == Long.class) {
-            return m_random.nextLong();
-        } else if (clazz == String.class) {
-            return RandomStringUtils.random(m_random.nextInt(4096));
-        } else if (clazz == byte[].class) {
-            byte[] data = new byte[m_random.nextInt(4096)];
-            m_random.nextBytes(data);
-            return data;
-        } else if (clazz == Date.class) {
-            return new Date(m_random.nextLong());
-        }
-        throw new IllegalArgumentException(clazz.getName());
     }
 }

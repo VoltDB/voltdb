@@ -49,8 +49,11 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
@@ -222,6 +225,7 @@ public class SnapshotSiteProcessor {
         Database database = context.getDatabase();
         SiteProcedureConnection spc = context.getSiteProcedureConnection();
 
+        // Process export/topic stream tuples
         for (Table t : database.getTables()) {
             if (!TableType.needsExportDataSource(t.getTabletype())) {
                 continue;
@@ -242,6 +246,26 @@ public class SnapshotSiteProcessor {
                                 usoAndSequenceNumber[2]));
         }
 
+        // Process opaque topic tuples, append to export info
+        CatalogMap<Topic> topics = database.getTopics();
+        if (!topics.isEmpty()) {
+            ExportManagerInterface exportManager = VoltDB.getExportManager();
+            for (Topic topic : topics) {
+                if (!CatalogUtil.isOpaqueTopicForPartition(topic, context.getPartitionId())) {
+                    continue;
+                }
+
+                Map<Integer, ExportSnapshotTuple> sequenceNumbers = s_exportSequenceNumbers.computeIfAbsent(
+                        topic.getTypeName().toUpperCase(),
+                        k -> new HashMap<Integer, ExportSnapshotTuple>());
+
+                sequenceNumbers.put(
+                        context.getPartitionId(),
+                        exportManager.getOpaqueTopicSnapshotTuple(context.getPartitionId(), topic.getTypeName().toUpperCase()));
+            }
+        }
+
+        // Process DR tuples
         TupleStreamStateInfo drStateInfo = spc.getDRTupleStreamStateInfo();
         if (drStateInfo != null) {
             s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
@@ -707,6 +731,7 @@ public class SnapshotSiteProcessor {
                 final ExtensibleSnapshotDigestData snapshotDataForZookeeper = m_extraSnapshotData;
                 m_extraSnapshotData = null;
                 Thread.UncaughtExceptionHandler eh = new Thread.UncaughtExceptionHandler() {
+                    @Override
                     public void uncaughtException(Thread th, Throwable ex) {
                         SNAP_LOG.warn("Error running snapshot completion task", ex);
                     }

@@ -67,11 +67,12 @@ CREATE TABLE importNoMatch
 PARTITION TABLE importNoMatch ON COLUMN KEY;
 
 -- Export table
-CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY AS TOPIC PROFILE topicbenchmark FORMAT csv
+CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL
      );
+CREATE TOPIC USING STREAM KAFKAEXPORTTABLE1 PROFILE foo;
 
 CREATE TABLE importcounts
     (

@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -34,6 +35,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.task.TaskManager;
@@ -378,6 +380,15 @@ public interface VoltDBInterface
     public TaskManager getTaskManager();
 
     /**
+     * Return the static {@link AvroSerde} for this instance. When the configuration is updated the instance of
+     * {@link AvroSerde} will be updated with the new configuration so all users of the class can keep using the
+     * retrieved instance with the new configuration.
+     *
+     * @return The instance of {@link AvroSerde} which is currently configured in this instance.
+     */
+    public AvroSerde getAvroSerde();
+
+    /**
      * notify surviving node upon shutting itself down
      */
     public void notifyOfShutdown();
@@ -400,10 +411,23 @@ public interface VoltDBInterface
     /**
      * This will be called from the catalog update procedure on every catalog update.
      * All the registered validators will be called for validation from here.
+     *
+     * @param catalog the new catalog
      * @param newDep the updated deployment
      * @param curDep the current deployment
      * @param ccr the result of the validations will be set on this result object
      * @return boolean indicating if the validation was successful or not.
      */
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
+    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
+
+    /**
+     * This will be called from the catalog update procedure on every catalog update.
+     * All the registered validators will be called for validation from here.
+     *
+     * @param catalog the new catalog
+     * @param deployment the new deployment
+     * @param ccr the results of validation including any errors need to be set on this result object
+     * @return {@code true} if successful, {@code false} if not and ccr updated with error message
+     */
+    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr);
 }

@@ -692,6 +692,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void attachTupleStream(StreamedTable* streamedTable, const std::string& streamName,
                 std::map<std::string, ExportTupleStream*> & purgedStreams, int64_t timestamp);
 
+        void detachTupleStream(StreamedTable* streamedTable, const std::string& streamName,
+                std::map<std::string, ExportTupleStream*> & purgedStreams);
+
         // user defined aggregate functions helper functions
         /*
          * put buffer size needed, function id, udaf index, row count and a list of rows (if there is any)

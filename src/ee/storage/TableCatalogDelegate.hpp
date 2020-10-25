@@ -122,6 +122,8 @@ class TableCatalogDelegate {
         return m_tableType;
     }
 
+    void setTableType(TableType tableType);
+
     PersistentTable *getPersistentTable() {
         return dynamic_cast<PersistentTable*>(m_table);
     }

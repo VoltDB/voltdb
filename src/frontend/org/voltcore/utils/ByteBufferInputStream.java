@@ -87,7 +87,7 @@ public class ByteBufferInputStream extends InputStream {
     @Override
     public int read() throws IOException {
         if (atEOF()) return -1;
-        return m_bb.get();
+        return m_bb.get() & 0xFF;
     }
 
     public void rewind() {

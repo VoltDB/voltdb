@@ -77,7 +77,8 @@
         <include name='slf4j-api-1.6.2.jar' />
         <include name='jaxb-api-2.3.0.jar' />
         <include name='netty-all-4.1.43.Final.jar' />
-        <include name='netty-tcnative-boringssl-static-2.0.27.Final.jar' />
+        <include name='netty-tcnative-boringssl-static-2.0.34.Final.jar' />
+        <include name='kafka-clients-2.3.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
@@ -227,6 +228,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
+            <include name="src/frontend/org/voltdb/client/topics/VoltDBKafkaPartitioner.java" />
         </fileset>
     </javadoc>
 </target>

@@ -1442,10 +1442,19 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
                 if (isStreamUpdate) {
+                    TableType tableType = tcd->getTableType();
+                    TableType tableTypeUpdate = static_cast<TableType>(catalogTable->tableType());
+                    if (tableType != tableTypeUpdate) {
+                        tcd->setTableType(tableTypeUpdate);
+                    }
+
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                         attachTupleStream(streamedTable, name, purgedStreams, timestamp);
                         tableSchemaChanged = haveDifferentSchema(catalogTable, streamedTable, false);
+                    }
+                    else {
+                        detachTupleStream(streamedTable, name, purgedStreams);
                     }
                 }
 
@@ -1649,6 +1658,20 @@ void VoltDBEngine::attachTupleStream(
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
         // A case when exact same stream is dropped and added.
         vassert(purgedStreams[streamName] == NULL);
+    }
+}
+
+void VoltDBEngine::detachTupleStream(
+        StreamedTable* streamedTable,
+        const std::string& streamName,
+        std::map<std::string, ExportTupleStream*> & purgedStreams) {
+    m_exportingTables[streamName] = streamedTable;
+    ExportTupleStream* wrapper = streamedTable->getWrapper();
+    if (wrapper != nullptr) {
+        vassert(purgedStreams[streamName] == NULL);
+        purgedStreams[streamName] = wrapper;
+        streamedTable->setWrapper(NULL);
+        VOLT_TRACE("detached stream export wrapper stream %s", streamName.c_str());
     }
 }
 

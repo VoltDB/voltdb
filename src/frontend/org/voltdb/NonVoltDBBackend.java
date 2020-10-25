@@ -1071,12 +1071,7 @@ public abstract class NonVoltDBBackend {
                     b.put(messageBytes);
                     b.put(e.getSQLState().getBytes());
                     b.putInt(0); // ConstraintFailure.type
-                    try {
-                        FastSerializer.writeString(m_database_type, b);
-                    }
-                    catch (IOException e1) {
-                        e1.printStackTrace();
-                    }
+                    FastSerializer.writeString(m_database_type, b);
                     b.putInt(0);//Table size is 0
                     b.rewind();
                     throw new ConstraintFailureException(b);

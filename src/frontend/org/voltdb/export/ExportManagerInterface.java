@@ -23,10 +23,12 @@ import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
@@ -41,7 +43,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
  *
  * Generic Export Manager Interface, also exposes singleton ExportManager instance.
  */
-public interface ExportManagerInterface {
+public interface ExportManagerInterface extends Promotable {
 
     public static final String EXPORT_FEATURE = "export";
 
@@ -95,7 +97,7 @@ public interface ExportManagerInterface {
      * @throws ExportManager.SetupException
      * @throws ReflectiveOperationException
      */
-    public static void initialize(
+    public static ExportManagerInterface initialize(
             FeaturesType deploymentFeatures,
             int myHostId,
             VoltDB.Configuration configuration,
@@ -121,6 +123,7 @@ public interface ExportManagerInterface {
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
                 myHostId, // m_siteId,
                 em.getExportStats());
+        return em;
     }
 
     /**
@@ -171,6 +174,9 @@ public interface ExportManagerInterface {
         return count;
     }
 
+    /**
+     * Initialize on startup; any exceptions thrown from here will crash VoltDB
+     */
     public void initialize(CatalogContext catalogContext, Map<Integer, Integer> localPartitionsToSites,
             boolean isRejoin);
 
@@ -178,6 +184,12 @@ public interface ExportManagerInterface {
 
     public void shutdown();
 
+    /**
+     * Start polling.
+     *
+     * Called exactly once from RealVoltDB after rejoin or replay completion,
+     * after the PBDs have been safely truncated.
+     */
     public void startPolling(CatalogContext catalogContext);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
@@ -197,6 +209,17 @@ public interface ExportManagerInterface {
         throw new UnsupportedOperationException("Topics are not supported in this version");
     }
 
+    /**
+     * Push a stream buffer to either an export target or a topic
+     *
+     * @param partitionId
+     * @param tableName
+     * @param startSequenceNumber
+     * @param committedSequenceNumber
+     * @param tupleCount
+     * @param uniqueId
+     * @param buffer
+     */
     public void pushBuffer(
             int partitionId,
             String tableName,
@@ -205,6 +228,51 @@ public interface ExportManagerInterface {
             long tupleCount,
             long uniqueId,
             BBContainer buffer);
+
+    /**
+     * Push a buffer for an opaque topic
+     *
+     * <p>The export manager manages the starting sequence number in order to allow
+     * correctly reporting the offsets to the producer application</p>
+     *
+     * @param partitionId
+     * @param tableName
+     * @param tupleCount
+     * @param uniqueId
+     * @param buffer
+     * @return a {@link Pair} containing the data source's starting offset, and the offset of the
+     * first record inserted
+     */
+    default public Pair<Long, Long> pushOpaqueTopicBuffer(
+            int partitionId,
+            String topicName,
+            long tupleCount,
+            long uniqueId,
+            BBContainer buffer) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
+
+    /**
+     * Return the offset of the next record that would be added to the opaque topic
+     *
+     * @param partitionId
+     * @param topicName
+     * @return
+     */
+    default public long getNextOpaqueTopicOffset(int partitionId, String topicName) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
+
+    /**
+     * Return the {@link ExportSnapshotTuple} of the opaque topic
+     *
+     * @param partitionId
+     * @param topicName
+     * @return
+     */
+    default ExportSnapshotTuple getOpaqueTopicSnapshotTuple(int partitionId, String topicName) {
+        throw new UnsupportedOperationException("Opaque topics are not supported in this version");
+    }
 
     public void sync();
 
@@ -255,4 +323,8 @@ public interface ExportManagerInterface {
      * @param removedPartitions  The de-commissioned local partitions
      */
     public void releaseResources(List<Integer> removedPartitions);
+
+    @Override
+    default void acceptPromotion() throws InterruptedException, java.util.concurrent.ExecutionException,
+            org.apache.zookeeper_voltpatches.KeeperException {};
 }

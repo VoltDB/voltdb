@@ -467,7 +467,17 @@ CREATE STREAM T25D1
 (
     id INTEGER NOT NULL
 );
+
+-- Topic: create topics that won't fail validation
+CREATE TOPIC USING STREAM T25D1 EXECUTE PROCEDURE T25D1.insert
+    PROPERTIES ( format.value = avro,
+                 format.consumer.key = csv,
+                 key.procedure.use = true );
+DROP TOPIC T25D1;
 DROP STREAM T25D1;
+
+CREATE OPAQUE TOPIC FOO;
+DROP TOPIC FOO;
 
 -- A somewhat more complex (partitioned) Stream
 CREATE STREAM T25D2

@@ -17,6 +17,8 @@
 
 package org.voltdb.types;
 
+import java.io.DataOutput;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.util.regex.Matcher;
@@ -210,6 +212,17 @@ public class GeographyPointValue {
     public void flattenToBuffer(ByteBuffer buffer) {
         buffer.putDouble(getLongitude());
         buffer.putDouble(getLatitude());
+    }
+
+    /**
+     * Serialize this point to a {@link DataOutput}
+     *
+     * @param output to which this point will be serialized
+     * @throws IOException
+     */
+    public void serialize(DataOutput output) throws IOException {
+        output.writeDouble(getLongitude());
+        output.writeDouble(getLatitude());
     }
 
     /**

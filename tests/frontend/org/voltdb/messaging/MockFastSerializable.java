@@ -52,20 +52,19 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
-
-
 public class MockFastSerializable implements FastSerializable {
     /** A second FastSerializable type. */
     public static class Other implements FastSerializable {
+        @Override
         public void readExternal(FastDeserializer in) { read(in, VALUE); }
+        @Override
         public void writeExternal(FastSerializer out) { write(out, VALUE); }
         private static byte VALUE = 99;
     }
 
+    @Override
     public void readExternal(FastDeserializer in) { read(in, VALUE); }
+    @Override
     public void writeExternal(FastSerializer out) { write(out, VALUE); }
     private static byte VALUE = 42;
 
@@ -78,7 +77,6 @@ public class MockFastSerializable implements FastSerializable {
     }
 
     private static void write(FastSerializer out, byte value) {
-        try { out.writeByte(value); }
-        catch (IOException e) { throw new RuntimeException(e); }
+        out.writeByte(value);
     }
 }

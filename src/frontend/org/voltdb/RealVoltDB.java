@@ -191,6 +191,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
 import org.voltdb.settings.DbSettings;
@@ -413,6 +414,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Using Boolean so if this is accessed before assignment the caller will get an NPE
     private Boolean m_eligibleAsLeader = null;
+
+    // Single avro serde configured by deployment file
+    private final AvroSerde m_avroSerde = new AvroSerde();
 
     @Override
     public boolean isRunningWithOldVerbs() {
@@ -1910,6 +1914,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
+
+            m_avroSerde.updateConfig(m_catalogContext);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -3930,6 +3936,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } catch (Throwable t) { }
 
+                m_avroSerde.shutdown();
                 m_taskManager.shutdown();
 
                 //Shutdown import processors.
@@ -4210,13 +4217,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateDeploymentUpdates(newDep, curDep, ccr)) {
+            if (!validator.validateDeploymentUpdates(catalog, newDep, curDep, ccr)) {
                 return false;
             }
         }
 
+        return true;
+    }
+
+    @Override
+    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
+        for (CatalogValidator validator : m_catalogValidators) {
+            if (!validator.validateNewCatalog(catalog, deployment, ccr)) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -4410,6 +4427,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // 7 Update tasks (asynchronously) after replica change if it occurred
         m_taskManager.processUpdate(m_catalogContext, !hasSchemaChange);
+        m_avroSerde.updateConfig(m_catalogContext);
 
         new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
@@ -5617,6 +5635,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public TaskManager getTaskManager() {
         return m_taskManager;
+    }
+
+    @Override
+    public AvroSerde getAvroSerde() {
+        return m_avroSerde;
     }
 
     @Override
