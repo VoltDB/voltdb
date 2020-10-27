@@ -128,8 +128,8 @@
 	<lib name="tomcat-jdbc-7.0.96.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-jdbc-7.0.96.jar!/"/>
 	</lib>
-	<lib name="jackson-databind-2.9.10.1.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.9.10.1.jar!/"/>
+	<lib name="jackson-databind-2.11.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.11.3.jar!/"/>
 	</lib>
 	<lib name="jackson-core-2.9.10.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-2.9.10.jar!/"/>
@@ -146,8 +146,8 @@
 	<lib name="joda-time-2.9.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/joda-time-2.9.3.jar!/"/>
 	</lib>
-	<lib name="guava-18.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-18.0.jar!/"/>
+	<lib name="guava-30.0-jre.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-30.0-jre.jar!/"/>
 	</lib>
 	<lib name="tomcat-juli-7.0.96.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli-7.0.96.jar!/"/>
@@ -199,38 +199,38 @@
 	<lib name="httpcore-nio-4.3.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpcore-nio-4.3.2.jar!/"/>
 	</lib>
-	<lib name="jetty-continuation-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-continuation-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-continuation-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-continuation-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-http-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-http-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-http-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-http-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-io-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-io-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-io-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-io-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-server-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-server-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-server-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-server-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-util-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-util-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-util-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-util-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-servlet-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-servlet-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-servlet-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-servlet-9.4.33.v20201020.jar!/"/>
 	</lib>
-	<lib name="jetty-security-9.4.15.v20190215.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.4.15.v20190215.jar!/"/>
+	<lib name="jetty-security-9.4.33.v20201020.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.4.33.v20201020.jar!/"/>
 	</lib>
 	<lib name="netty-tcnative-boringssl-static-2.0.34.Final.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.34.Final.jar!/"/>
 	</lib>
-	<lib name="netty-all-4.1.43.Final.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.43.Final.jar!/"/>
+	<lib name="netty-all-4.1.53.Final.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.53.Final.jar!/"/>
 	</lib>
 	<lib name="cron-java8-1.5.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/cron-java8-1.5.jar!/"/>
 	</lib>
-	<lib name="jsch-0.1.51.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jsch-0.1.51.jar!/"/>
+	<lib name="jsch-0.1.55.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jsch-0.1.55.jar!/"/>
 	</lib>
 	<lib name="kafka-avro-serializer-3.0.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-avro-serializer-3.0.0.jar!/"/>
