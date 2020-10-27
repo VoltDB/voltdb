@@ -87,12 +87,12 @@ public class TestFastSerializer extends TestCase {
     }
 
     public void testHugeMessageBigEndian() throws IOException {
-        testHMLE(heapOut);
-        testHMLE(directOut);
+        testHMBE(heapOut);
+        testHMBE(directOut);
     }
 
-    private void testHMLE(FastSerializer out) throws IOException {
-        out = new FastSerializer(false, false);
+    private void testHMBE(FastSerializer out) throws IOException {
+        out = new FastSerializer(true, false);
 
         // 1 MB message
         byte[] huge = new byte[1024*1024];

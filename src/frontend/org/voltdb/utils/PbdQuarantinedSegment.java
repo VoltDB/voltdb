@@ -22,9 +22,11 @@ import java.io.IOException;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.BinaryDequeValidator;
+import org.voltdb.utils.BinaryDeque.EntryUpdater;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
 /**
@@ -231,5 +233,10 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     @Override
     long getTimestamp() throws IOException {
         return PBDSegment.INVALID_TIMESTAMP;
+    }
+
+    @Override
+    Pair<PBDSegment<M>, Boolean> updateEntries(EntryUpdater<? super M> updater) {
+        return Pair.of(null, Boolean.FALSE);
     }
 }

@@ -38,6 +38,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -97,7 +98,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                     + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} (key, value) values (?, ?);");
 
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
-            "create stream {0}" + TOPIC_TAG + "{1} partition on column key as topic {2} (key bigint not null, value bigint not null);"
+            "create stream {0}" + TOPIC_TAG + "{1} partition on column key (key bigint not null, value bigint not null);"
+                    + "create topic using stream {0}" + TOPIC_TAG + "{1} {2} PROPERTIES (consumer.keys=key);"
                     + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} (key, value) values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change
@@ -355,9 +357,11 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             throws Exception {
         String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
 
-        for (Pair<LocalCluster, Client> clusterAndClient : CLUSTERS_AND_CLIENTS) {
-            Client client = clusterAndClient.getSecond();
-            assertEquals(ClientResponse.SUCCESS, callDMLProcedure(client, "@AdHoc", schemaDDL).getStatus());
+        if (StringUtils.isNotBlank(schemaDDL)) {
+            for (Pair<LocalCluster, Client> clusterAndClient : CLUSTERS_AND_CLIENTS) {
+                Client client = clusterAndClient.getSecond();
+                assertEquals(ClientResponse.SUCCESS, callDMLProcedure(client, "@AdHoc", schemaDDL).getStatus());
+            }
         }
     }
 

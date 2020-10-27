@@ -161,7 +161,7 @@
             <include name="org/voltdb/importer/formatter/builtin/*.class"/>
             <include name="org/supercsv_voltpatches/tokenizer/*.class"/>
             <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
-            <zipfileset src="${base.dir}/lib/super-csv-2.1.0.jar" />
+            <zipfileset src="${base.dir}/lib/super-csv-2.4.0.jar" />
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />

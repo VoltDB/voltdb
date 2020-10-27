@@ -100,13 +100,13 @@ void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32
 
     // DR
     types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
+    columnLengths.push_back(15);
     allowNull.push_back(false);
     inBytes.push_back(false);
 
     // EXPORT
     types.push_back(ValueType::tVARCHAR);
-    columnLengths.push_back(4096);
+    columnLengths.push_back(15);
     allowNull.push_back(false);
     inBytes.push_back(false);
 }
@@ -220,8 +220,8 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     } else {
         isExport = "true";
     }
-    tuple->setNValue( StatsSource::m_columnName2Index["DR"], ValueFactory::getStringValue(isDR));
-    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], ValueFactory::getStringValue(isExport));
+    tuple->setNValue( StatsSource::m_columnName2Index["DR"], ValueFactory::getTempStringValue(isDR));
+    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], ValueFactory::getTempStringValue(isExport));
 }
 
 /**

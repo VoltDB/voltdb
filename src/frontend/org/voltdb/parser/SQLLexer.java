@@ -85,7 +85,9 @@ public class SQLLexer extends SQLPatternFactory
         new ObjectToken("procedure", false),
         new ObjectToken("role", false),
         new ObjectToken("function", false),
-        new ObjectToken("task", false)
+        new ObjectToken("task", false),
+        new ObjectToken("topic", false),
+        new ObjectToken("opaque", false)
     };
 
     private final static String[] MODIFIER_TOKENS = {

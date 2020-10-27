@@ -24,11 +24,18 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
 import java.nio.channels.FileLock;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayDeque;
+import java.util.Collection;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +46,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
+import org.voltdb.utils.BinaryDeque.EntryUpdater;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
+import org.voltdb.utils.BinaryDeque.UpdateResult;
 
 import com.google_voltpatches.common.base.Preconditions;
 
@@ -149,8 +159,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
     }
 
     @Override
-    SegmentReader openForRead(String cursorId) throws IOException
-    {
+    SegmentReader openForRead(String cursorId) throws IOException {
         Preconditions.checkNotNull(cursorId, "Reader id must be non-null");
         if (m_readCursors.containsKey(cursorId) || m_closedCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
@@ -477,7 +486,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 }
                 try {
                     lastReadId = scanner.scan(cont);
-                    assert(m_startId == INVALID_ID || lastReadId != INVALID_ID);
+                    assert (m_startId == INVALID_ID || lastReadId != INVALID_ID);
                 } finally {
                     cont.discard();
                 }
@@ -510,6 +519,121 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         } finally {
             reader.close();
         }
+    }
+
+    /**
+     * Populate this segment with {@code update entries} and copy the segment metadata from {@code original}. This
+     * segment will be flushed and closed when this method returns
+     *
+     * @param entries  to write into this segment
+     * @param original segment from which updates were generated
+     * @throws IOException
+     */
+    private void asUpdateFrom(Collection<UpdateEntry> entries, PBDRegularSegment<M> original) throws IOException {
+        openNewSegment(original.m_compress);
+        writeExtraHeader(original.getExtraHeader());
+
+        m_startId = original.m_startId;
+        m_endId = original.m_endId;
+        m_timestamp = original.m_timestamp;
+
+        for (UpdateEntry entry : entries) {
+            if (entry.m_isCopy) {
+                writeEntry(entry.m_data, -1, entry.m_isCompressed);
+            } else {
+                writeEntry(entry.m_data, maxCompressedSize(entry.m_data), false);
+            }
+
+            ++m_numOfEntries;
+            m_size += entry.m_dataLength;
+        }
+
+        writeOutHeader();
+        finalize(true);
+    }
+
+    @Override
+    Pair<PBDSegment<M>, Boolean> updateEntries(EntryUpdater<? super M> updater) throws IOException {
+        Deque<UpdateEntry> entries = new ArrayDeque<>(m_numOfEntries);
+        if (m_closed) {
+            open(false, false, false);
+        }
+
+        PBDRegularSegment<M> updatedSegment = null;
+        Boolean stop = Boolean.FALSE;
+
+        try (ReverseSegmentReader reader = new ReverseSegmentReader()) {
+            boolean updated = false;
+            // Use a mmap buffer to not have to hold unmodified entries in memory
+            MappedByteBuffer mmap = m_fc.map(MapMode.READ_ONLY, 0, m_fc.size());
+
+            pollLoop:
+            while (true) {
+                BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                ByteBuffer entry = null;
+                int length = 0;
+                if (cont != null) {
+                    entry = cont.b().asReadOnlyBuffer();
+                    length = entry.remaining();
+                }
+
+                UpdateResult result;
+                try {
+                    result = updater.update(getExtraHeader(), entry);
+                } finally {
+                    if (cont != null) {
+                        cont.discard();
+                    }
+                }
+
+                switch (result.m_result) {
+                    case KEEP:
+                        if (cont == null) {
+                            // This was the end of the segment and this keeps it as the end
+                            break pollLoop;
+                        }
+                        mmap.position(reader.m_entryStart).limit(reader.m_entryEnd);
+                        entries.addFirst(UpdateEntry.copy(mmap.slice(), length));
+                        break;
+                    case UPDATE:
+                        entries.addFirst(UpdateEntry.entry(result.m_update));
+                    case DELETE:
+                        if (cont != null) {
+                            updated = true;
+                        }
+                        break;
+                    case STOP:
+                        stop = Boolean.TRUE;
+                        if (updated && cont != null) {
+                            // Add this entry and all other entries into the queue of entries
+                            do {
+                                mmap.position(reader.m_entryStart).limit(reader.m_entryEnd);
+                                entries.addFirst(UpdateEntry.copy(mmap.slice()));
+                            } while (reader.advanceEntry());
+                        }
+                        // Break out of the poll loop since update was told to stop
+                        break pollLoop;
+                }
+            }
+
+            if (updated) {
+                // Segment was updated. Write out a new pbd segment and then move it to replace the current segment
+                Path updatedPath = Paths.get(m_file.getPath() + ".upd");
+                new PBDRegularSegment<>(m_id, updatedPath.toFile(), m_usageSpecificLog, m_extraHeaderSerializer)
+                        .asUpdateFrom(entries, this);
+
+                Files.move(updatedPath, m_file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+                // Create a new segment so any readers current on this segment will continue to operate
+                updatedSegment = new PBDRegularSegment<>(m_id, m_file, m_usageSpecificLog, m_extraHeaderSerializer);
+                updatedSegment.finalize(true);
+            }
+        } finally {
+            entries.clear();
+            updater.segmentComplete();
+        }
+
+        return Pair.of(updatedSegment, stop);
     }
 
     /**
@@ -621,8 +745,8 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
 
-        m_numOfEntries = -1;
-        m_size = -1;
+        m_numOfEntries = 0;
+        m_size = 0;
     }
 
     @Override
@@ -699,50 +823,83 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
-        boolean compress = m_compress && remaining >= 32 && buf.isDirect();
 
-        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining)
-                + ENTRY_HEADER_BYTES;
-        if (remaining() < maxCompressedSize) {
+        final int maxCompressedSize = maxCompressedSize(buf);
+        final int maxEntrySize = (maxCompressedSize > 0 ? maxCompressedSize : remaining) + ENTRY_HEADER_BYTES;
+        if (remaining() < maxEntrySize) {
             return -1;
         }
 
+        int written = writeEntry(buf, maxCompressedSize, false);
+
+        // Update segment header
+        updateHeaderDataAfterOffer(remaining, startId, endId, timestamp);
+        return written;
+    }
+
+    /**
+     * @param buffer to test if it should be compressed
+     * @return the max size if {@code buffer} were compressed or {@code -1} if it should not be compressed
+     */
+    private int maxCompressedSize(ByteBuffer buffer) {
+        int length = buffer.remaining();
+        return m_compress && length >= 32 && buffer.isDirect() ? CompressionService.maxCompressedLength(length) : -1;
+    }
+
+    /**
+     * Append a new entry to the end of this segment
+     *
+     * @param buffer            containing the entry
+     * @param maxCompressedSize the max size this entry will compress to or {@code -1} if it should not be compressed
+     * @param isPreCompressed   {@code true} if {@code buffer} contains an already compressed entry
+     * @return The number of bytes written
+     * @throws IOException
+     */
+    private int writeEntry(ByteBuffer buffer, int maxCompressedSize, boolean isPreCompressed)
+            throws IOException {
         m_syncedSinceLastEdit = false;
-        DBBPool.BBContainer destBuf = cont;
-        int written = 0;
+        DBBPool.BBContainer compressedContainer = null;
+        ByteBuffer toWrite = buffer;
+
         try {
             m_entryHeaderBuf.b().clear();
 
-            if (compress) {
-                destBuf = DBBPool.allocateDirectAndPool(maxCompressedSize);
-                final int compressedSize = CompressionService.compressBuffer(buf, destBuf.b());
-                destBuf.b().limit(compressedSize);
-                writeEntryHeader(destBuf.b(), PBDSegment.FLAG_COMPRESSED);
-            } else {
-                destBuf = cont;
-                writeEntryHeader(destBuf.b(), PBDSegment.NO_FLAGS);
+            char flags = PBDSegment.NO_FLAGS;
+            if (maxCompressedSize > 0) {
+                compressedContainer = DBBPool.allocateDirectAndPool(maxCompressedSize);
+                ByteBuffer compressed = compressedContainer.b();
+                final int compressedSize = CompressionService.compressBuffer(buffer.asReadOnlyBuffer(), compressed);
+
+                // Only bother with compression overhead if it actually saves some space
+                if (compressedSize < buffer.remaining() * 0.9) {
+                    compressed.limit(compressedSize);
+                    flags |= PBDSegment.FLAG_COMPRESSED;
+                    toWrite = compressed;
+                }
+            } else if (isPreCompressed) {
+                flags |= PBDSegment.FLAG_COMPRESSED;
             }
+
+            writeEntryHeader(toWrite, flags);
+
             // Write entry header
-            m_entryHeaderBuf.b().flip();
-            while (m_entryHeaderBuf.b().hasRemaining()) {
-                m_fc.write(m_entryHeaderBuf.b());
-            }
+            writeBuffer(m_entryHeaderBuf.b());
 
             // Write entry
-            destBuf.b().flip();
-            written = destBuf.b().remaining();
-            while (destBuf.b().hasRemaining()) {
-                m_fc.write(destBuf.b());
-            }
-            // Update segment header
-            updateHeaderDataAfterOffer(remaining, startId, endId, timestamp);
+            return writeBuffer(toWrite);
         } finally {
-            if (compress) {
-                destBuf.discard();
+            if (compressedContainer != null) {
+                compressedContainer.discard();
             }
         }
+    }
 
-        return written;
+    private int writeBuffer(ByteBuffer buffer) throws IOException {
+        buffer.flip();
+        while (buffer.hasRemaining()) {
+            m_fc.write(buffer);
+        }
+        return buffer.limit();
     }
 
     // Used by DR path
@@ -882,7 +1039,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
     private class SegmentReader implements PBDSegmentReader<M> {
         private final String m_cursorId;
-        private long m_readOffset;
+        long m_readOffset;
         //Index of the next object to read, not an offset into the file
         private int m_objectReadIndex = 0;
         private int m_bytesRead = 0;
@@ -960,7 +1117,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     throw new IOException ("File corruption detected in " + m_file.getName() + ": invalid entry length.");
                 }
 
-                if (entryId != m_segmentRandomId + m_objectReadIndex + 1) {
+                if (entryId != m_segmentRandomId + currentEntryId() + 1) {
                     throw new IOException("File corruption detected in " + m_file.getName() + ": invalid entry id.");
                 }
 
@@ -986,6 +1143,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                         fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCrc);
                     }
                 } catch(IOException e) {
+                    if (retcont != null) {
+                        retcont.discard();
+                    }
                     // rethrow with filename also in the exception message
                     throw new IOException("Error reading segment " + m_file.getName());
                 } catch (Throwable t) {
@@ -1011,6 +1171,10 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
 
+        int currentEntryId() {
+            return m_objectReadIndex;
+        }
+
         private void fillBuffer(ByteBuffer entry, int entryId, char flags, int crc, boolean checkCrc)
                 throws IOException {
             int origPosition = entry.position();
@@ -1028,7 +1192,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             }
         }
 
-        private void read(ByteBuffer buffer) throws IOException {
+        void read(ByteBuffer buffer) throws IOException {
             do {
                 try {
                     int read = m_fc.read(buffer);
@@ -1042,7 +1206,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
             } while (buffer.hasRemaining());
         }
 
-        private void truncateToCurrentReadIndex(long endId) throws IOException {
+        void truncateToCurrentReadIndex(long endId) throws IOException {
             boolean wasReadOnly = m_fc.reopen(true);
             try {
                 setFinal(false);
@@ -1123,11 +1287,161 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 open(false, false, false);
                 m_readerClosed = false;
             }
-            if (m_cursorId != null) {
-                m_closedCursors.remove(m_cursorId);
-                m_readCursors.put(m_cursorId, this);
-            }
+            m_closedCursors.remove(m_cursorId);
+            m_readCursors.put(m_cursorId, this);
         }
+    }
+
+    /**
+     * A {@link SegmentReader} which iterates over entries in the segment in reverse order. The value of
+     * {@link #m_readOffset} is not always reliable since it set to the start of the next entry prior to a poll and
+     * points to the end of the record which was just been polled after the poll. It can only be used as the next read
+     * index by {@link #poll(OutputContainerFactory, boolean)}
+     * <p>
+     * On first poll a stack of all of the entry start indexes is created and used to iterate over the entries.
+     */
+    private class ReverseSegmentReader extends SegmentReader {
+        /** Inclusive start index in the segment of the entry returned by {@link #poll(OutputContainerFactory, boolean) */
+        int m_entryStart;
+        /** Non inclusive end index in the segment of the entry returned by {@link #poll(OutputContainerFactory, boolean) */
+        int m_entryEnd;
+        /** Deque of entry starts or {@code null} before first poll */
+        private Deque<Integer> m_entryStarts;
+
+        ReverseSegmentReader() throws IOException {
+            super("");
+            assert !m_isActive;
+        }
+
+        @Override
+        void truncateToCurrentReadIndex(long endId) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        BBContainer poll(OutputContainerFactory factory, boolean checkCrc) throws IOException {
+            if (advanceEntry()) {
+                return super.poll(factory, checkCrc);
+            }
+            return null;
+        }
+
+        /**
+         * Set {@link #m_readOffset}, {@link #m_entryStart} and {@link #m_entryEnd} for the next entry to be polled
+         *
+         * @return {@code true} if there is another entry to be polled
+         * @throws IOException
+         */
+        boolean advanceEntry() throws IOException {
+            if (m_entryStarts == null) {
+                // first poll so move to the last entry and create a stack of all previous entries
+                m_entryStarts = new ArrayDeque<>(m_numOfEntries);
+                ByteBuffer buffer = m_entryHeaderBuf.b();
+
+                while (m_entryStarts.size() < m_numOfEntries) {
+                    m_fc.position(m_readOffset);
+
+                    buffer.clear();
+                    read(buffer);
+                    buffer.flip();
+
+                    int length = buffer.getInt(ENTRY_HEADER_TOTAL_BYTES_OFFSET);
+                    m_entryStarts.add((int) m_readOffset);
+                    m_readOffset += buffer.limit() + length;
+                }
+                // Initialize entryStart so that on the first poll m_entryEnd is set correctly
+                m_entryStart = (int) m_readOffset;
+            }
+
+            if (!m_entryStarts.isEmpty()) {
+                m_entryEnd = m_entryStart;
+                m_readOffset = m_entryStart = m_entryStarts.removeLast();
+                return true;
+            }
+
+            return false;
+        }
+
+        @Override
+        public void markRestReadAndDiscarded() throws IOException {
+            super.markRestReadAndDiscarded();
+            m_entryStarts.clear();
+        }
+
+        @Override
+        int currentEntryId() {
+            return m_entryStarts.size();
+        }
+    }
+
+    /**
+     * Class to hold the metadata for an entry which was visited by
+     * {@link PBDRegularSegment#updateEntries(EntryUpdater)}
+     */
+    private static final class UpdateEntry {
+        final boolean m_isCopy;
+        final boolean m_isCompressed;
+        final ByteBuffer m_data;
+        final int m_dataLength;
+
+        /**
+         * Create a entry which is a copy of the original where the size of the original entry is unknown
+         *
+         * @param headerAndData {@link ByteBuffer} holding the header and entry data for the original entry
+         * @return {@link UpdateEntry} instance
+         * @throws IOException
+         */
+        static UpdateEntry copy(ByteBuffer headerAndData) throws IOException {
+            int length;
+            boolean compressed = isCompressed(headerAndData);
+            if (compressed) {
+                ByteBuffer duplicate = headerAndData.asReadOnlyBuffer();
+                duplicate.position(ENTRY_HEADER_BYTES);
+                length = CompressionService.uncompressedLength(duplicate);
+            } else {
+                length = headerAndData.getInt(ENTRY_HEADER_TOTAL_BYTES_OFFSET);
+            }
+
+            return copy(headerAndData, compressed, length);
+        }
+
+        /**
+         * Create a entry which is a copy of the original where the size of the original entry is known
+         *
+         * @param headerAndData {@link ByteBuffer} holding the header and entry data for the original entry
+         * @param length        uncompressed length of the entry data
+         * @return {@link UpdateEntry} instance
+         */
+        static UpdateEntry copy(ByteBuffer headerAndData, int length) {
+            return copy(headerAndData, isCompressed(headerAndData), length);
+        }
+
+        private static UpdateEntry copy(ByteBuffer headerAndData, boolean compressed, int length) {
+            headerAndData.position(ENTRY_HEADER_BYTES);
+            return new UpdateEntry(true, compressed, headerAndData.slice(), length);
+        }
+
+        /**
+         * Create a new updated entry
+         *
+         * @param entry
+         * @return {@link UpdateEntry} instance
+         */
+        static UpdateEntry entry(ByteBuffer entry) {
+            return new UpdateEntry(false, false, entry, entry.remaining());
+        }
+
+        private static boolean isCompressed(ByteBuffer entryHeader) {
+            return (entryHeader.getChar(ENTRY_HEADER_FLAG_OFFSET) & FLAG_COMPRESSED) == FLAG_COMPRESSED;
+        }
+
+        UpdateEntry(boolean copy, boolean compressed, ByteBuffer data, int dataLength) {
+            m_isCopy = copy;
+            m_isCompressed = compressed;
+            m_data = data;
+            m_dataLength = dataLength;
+        }
+
     }
 
     /**

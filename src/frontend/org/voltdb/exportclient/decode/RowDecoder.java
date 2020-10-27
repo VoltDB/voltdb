@@ -80,37 +80,6 @@ public abstract class RowDecoder<T, E extends Exception> {
         return typeMap;
     }
 
-    public static String convertToCamelCase(CharSequence input, boolean upperCaseFirst) {
-        StringBuilder cName = new StringBuilder(input);
-
-        boolean upperCaseIt = upperCaseFirst;
-        boolean hasLowerCase = false;
-
-        for (int i = 0; i < cName.length();) {
-            char chr = cName.charAt(i);
-
-            if (chr == '_' || chr == '.' || chr == '$') {
-
-                cName.deleteCharAt(i);
-                upperCaseIt = true;
-                hasLowerCase = false;
-
-            } else {
-
-                if (upperCaseIt) {
-                    chr = toUpperCase(chr);
-                } else if (!(hasLowerCase = hasLowerCase || isLowerCase(chr))) {
-                    chr = toLowerCase(chr);
-                }
-                cName.setCharAt(i++, chr);
-                upperCaseIt = false;
-
-            }
-        }
-
-        return cName.toString();
-    }
-
     /**
      * Copy constructor
      *
@@ -165,7 +134,7 @@ public abstract class RowDecoder<T, E extends Exception> {
             }
         };
 
-        public static String convertToCamelCase(CharSequence input, boolean upperCaseFirst) {
+        private static String convertToCamelCase(CharSequence input, boolean upperCaseFirst) {
             StringBuilder cName = new StringBuilder(input);
 
             boolean upperCaseIt = upperCaseFirst;

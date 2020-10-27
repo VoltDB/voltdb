@@ -45,6 +45,7 @@ import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -212,9 +213,9 @@ public class TestPersistentBinaryDeque {
 
     @Test (timeout = 10_000)
     public void testRetentionThreads() {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2, 1);
         assertEquals(2, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
-        PersistentBinaryDeque.setupRetentionPolicyMgr(5);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(5, 1);
         assertEquals(5, PersistentBinaryDeque.getRetentionPolicyMgr().getRetentionThreadPoolSize());
     }
 
@@ -1716,6 +1717,43 @@ public class TestPersistentBinaryDeque {
         m_pbd.closeCursor(CURSOR_ID + 1);
 
         assertEquals(3, getSortedDirectoryListing().size());
+    }
+
+    @Test
+    public void testSegmentTTL() throws IOException, InterruptedException {
+        int segmentCount = m_pbd.numberOfSegments();
+        segmentCount = segmentCount == 0 ? 1 : segmentCount;
+        m_pbd.setSegmentRollTimeLimit(TimeUnit.SECONDS.toNanos(2));
+        // write 1 segment
+        for (int i = 0; i < 10; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertEquals(segmentCount, m_pbd.numberOfSegments());
+
+        Thread.sleep(2000);
+
+        // after 4 seconds, a new segment should be added.
+        for (int i = 0; i < 10; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        segmentCount++;
+        assertEquals(segmentCount, m_pbd.numberOfSegments());
+        // update max segment open time
+        m_pbd.setSegmentRollTimeLimit(TimeUnit.SECONDS.toNanos(4));
+        Thread.sleep(2000);
+        for (int i = 0; i < 10; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        // No new segment should be created
+        assertEquals(segmentCount, m_pbd.numberOfSegments());
+
+        Thread.sleep(3000);
+        for (int i = 0; i < 10; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        // Another segment should be added
+        segmentCount++;
+        assertEquals(segmentCount, m_pbd.numberOfSegments());
     }
 
     private int openSegmentReaderCount(String cursorId) {

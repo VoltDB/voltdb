@@ -14,14 +14,8 @@
 	<lib name="ant-junit.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-junit.jar!/"/>
 	</lib>
-	<lib name="ant-testability-explorer.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-testability-explorer.jar!/"/>
-	</lib>
 	<lib name="ant.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant.jar!/"/>
-	</lib>
-	<lib name="japex.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/japex.jar!/"/>
 	</lib>
 	<lib name="junit-4.12.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-4.12.jar!/"/>
@@ -31,9 +25,6 @@
 	</lib>
 	<lib name="pmd-4.2.5.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/pmd-4.2.5.jar!/"/>
-	</lib>
-	<lib name="testability-explorer.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/testability-explorer.jar!/"/>
 	</lib>
 	<lib name="log4j-1.2.16.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/log4j-1.2.16.jar!/"/>
@@ -53,8 +44,8 @@
 	<lib name="snappy-java-1.1.7.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/snappy-java-1.1.7.3.jar!/"/>
 	</lib>
-	<lib name="super-csv-2.1.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/super-csv-2.1.0.jar!/"/>
+	<lib name="super-csv-2.4.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/super-csv-2.4.0.jar!/"/>
 	</lib>
 	<lib name="owner-1.0.10.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-1.0.10.jar!/"/>

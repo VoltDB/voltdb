@@ -983,7 +983,11 @@ public final class ClientImpl implements Client {
     //Hidden method for getPartitionForParameter
     public long getPartitionForParameter(byte typeValue, Object value) {
         return m_distributer.getPartitionForParameter(typeValue, value);
+    }
 
+    //Hidden method for getPartitionForParameter
+    public long getPartitionForParameter(byte[] bytes) {
+        return m_distributer.getPartitionForParameter(bytes);
     }
 
     @Override

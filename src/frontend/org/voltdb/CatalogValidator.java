@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 
@@ -28,11 +29,27 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
  */
 public interface CatalogValidator {
     /**
-     * Validates the parts of the catalog relevant for this component.
+     * Validates the parts of the deployment relevant for this component.
+     *
+     * @param catalog the new catalog
      * @param newDep the updated deployment
      * @param curDep current deployment
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return boolean indicating if the validation was successful or not.
      */
-    public boolean validateDeploymentUpdates(DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
+    default public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+        return true;
+    }
+
+    /**
+     * Validates the new catalog and new deployment.
+     *
+     * @param catalog the new catalog
+     * @param deployment the new deployment
+     * @param ccr the results of validation including any errors need to be set on this result object
+     * @return {@code true} if successful, {@code false} if not and ccr updated with error message
+     */
+    default public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
+        return true;
+    }
 }

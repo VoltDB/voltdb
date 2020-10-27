@@ -26,6 +26,7 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Topic;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
@@ -41,7 +42,9 @@ public class ExportRowSchema extends ExportRow {
 
     public final long initialGenerationId;
     // Serialized schema data is preceded by fixed header
-    public static final byte EXPORT_BUFFER_VERSION = 1;
+    private static final byte EXPORT_BUFFER_VERSION_1 = 1;
+    private static final byte EXPORT_BUFFER_VERSION_2 = 2;
+    private static final byte EXPORT_BUFFER_VERSION_LATEST = EXPORT_BUFFER_VERSION_2;
 
     // Schema columns always contain metadata columns
     private static final String VOLT_TRANSACTION_ID = "VOLT_TRANSACTION_ID";
@@ -77,8 +80,8 @@ public class ExportRowSchema extends ExportRow {
 
     // private constructor
     private ExportRowSchema(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,
-            int partitionId, long initialGeneration, long generation) {
-        super(tableName, columnNames, t, l, new Object[] {}, null, -1, partitionId, generation);
+            int partitionColumnIndex, int partitionId, long initialGeneration, long generation) {
+        super(tableName, columnNames, t, l, new Object[] {}, null, partitionColumnIndex, partitionId, generation);
         initialGenerationId = initialGeneration;
 
     }
@@ -109,8 +112,27 @@ public class ExportRowSchema extends ExportRow {
             colSizes.add(c.getSize());
         }
 
+        Column partitionColumn = table.getPartitioncolumn();
+        int partitionColumnIndex = partitionColumn == null ? -1 : partitionColumn.getIndex() + INTERNAL_FIELD_COUNT;
+
         return new ExportRowSchema(table.getTypeName(), colNames.build(), colTypes.build(), colSizes.build(),
-                partitionId, initialGenerationId, generationId);
+                partitionColumnIndex, partitionId, initialGenerationId, generationId);
+    }
+
+    /**
+     * Create a {@code ExportRowSchema} from a Catalog {@code Topic}, which must be OPAQUE.
+     * <p>
+     * The created schema has no columns.
+     *
+     * @param topic Catalog {@code Topic}
+     * @param partitionId the partition id
+     * @param generationId the generation id
+     * @return
+     */
+    public static ExportRowSchema create(Topic topic, int partitionId, long initialGenerationId, long generationId) {
+        assert topic.getIsopaque();
+        return new ExportRowSchema(topic.getTypeName(), ImmutableList.of(), ImmutableList.of(), ImmutableList.of(),
+                -1, partitionId, initialGenerationId, generationId);
     }
 
     /**
@@ -144,13 +166,14 @@ public class ExportRowSchema extends ExportRow {
     public static ExportRowSchema deserialize(ByteBuffer buf) throws IOException {
         try {
             byte version = buf.get();
-            if (version != EXPORT_BUFFER_VERSION) {
-                throw new IllegalArgumentException("Illegal version, expected: " + EXPORT_BUFFER_VERSION
-                        + ", got: " + version);
+            if (version != EXPORT_BUFFER_VERSION_1 && version != EXPORT_BUFFER_VERSION_2) {
+                throw new IllegalArgumentException("Illegal version, expected between: " + EXPORT_BUFFER_VERSION_1
+                        + " and " + EXPORT_BUFFER_VERSION_LATEST + ", got: " + version);
             }
             long initialGenId = buf.getLong();
             long genId = buf.getLong();
             int partitionId = buf.getInt();
+            int partitionColumnIndex = version >= EXPORT_BUFFER_VERSION_2 ? buf.getInt() : -1;
 
             String tableName = ExportRow.decodeString(buf);
             List<String> colNames = new ArrayList<>();
@@ -162,7 +185,8 @@ public class ExportRowSchema extends ExportRow {
                 colTypes.add(VoltType.get(buf.get()));
                 colLengths.add(buf.getInt());
             }
-            return new ExportRowSchema(tableName, colNames, colTypes, colLengths, partitionId, initialGenId, genId);
+            return new ExportRowSchema(tableName, colNames, colTypes, colLengths, partitionColumnIndex, partitionId,
+                    initialGenId, genId);
         }
         catch(Exception ex) {
             throw new IOException("Failed to deserialize schema " + ex, ex);
@@ -171,10 +195,11 @@ public class ExportRowSchema extends ExportRow {
 
     public void serialize(ByteBuffer buf) throws IOException {
         try {
-            buf.put(EXPORT_BUFFER_VERSION);
+            buf.put(EXPORT_BUFFER_VERSION_2);
             buf.putLong(this.initialGenerationId);
             buf.putLong(this.generation);
             buf.putInt(this.partitionId);
+            buf.putInt(this.partitionColIndex);
             SerializationHelper.writeString(tableName, buf);
 
             Iterator<String> itNames = this.names.iterator();
@@ -202,6 +227,7 @@ public class ExportRowSchema extends ExportRow {
                 8 + // initial generation id
                 8 + // generation id
                 4 + // partition id
+                Integer.BYTES + // partition column index
                 SerializationHelper.calculateSerializedSize(tableName) +
                 4; // column count
         for (String colName : this.names) {

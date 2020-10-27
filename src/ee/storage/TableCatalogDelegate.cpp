@@ -829,4 +829,11 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
     }
 }
 
+// only allowed on streams to handle topic transitions (STREAM <--> CONNECTOR_LESS_STREAM)
+void TableCatalogDelegate::setTableType(TableType tableType) {
+    vassert(tableTypeIsStream(tableType));
+    vassert(tableTypeIsStream(m_tableType));
+    m_tableType = tableType;
+}
+
 }

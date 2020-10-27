@@ -46,9 +46,6 @@ public class HashinatorLite {
         return buf.array();
     }
 
-    //Values for legacy
-    private int catalogPartitionCount;
-
     //Values for Elastic
     /*
      * Pointer to an array of integers containing the tokens and partitions. Even values are tokens and odd values
@@ -183,17 +180,11 @@ public class HashinatorLite {
     /**
      * Given an byte[] bytes, pick a partition to store the data.
      *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
+     * @param bytes The value to hash.
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    private int hashinateBytes(Object obj) {
-        byte[] bytes = VoltType.valueToBytes(obj);
-        if (bytes == null) {
-            return 0;
-        }
-
+    private int hashinateBytes(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
         final int hash = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
         long token = getTokenPtr(hash);
@@ -223,8 +214,12 @@ public class HashinatorLite {
     /**
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
-    private int hashToPartition(VoltType type, Object obj) {
-        return hashinateBytes(obj);
+    private int hashToPartition(Object obj) {
+        byte[] bytes = VoltType.valueToBytes(obj);
+        if (bytes == null) {
+            return 0;
+        }
+        return hashinateBytes(bytes);
     }
 
     /**
@@ -267,7 +262,16 @@ public class HashinatorLite {
             }
         }
 
-        return hashToPartition(partitionParamType, partitionValue);
+        return hashToPartition(partitionValue);
+    }
+
+    /**
+     * Given bytes to return partition. THIS IS NOT SHARED BY SERVER AND CLIENT
+     * @return The partition best set up to execute the procedure.
+     */
+    public int getHashedPartitionForParameter(byte[] bytes) {
+        return hashinateBytes(bytes);
+
     }
 
     // copy and pasted code below from the compression service

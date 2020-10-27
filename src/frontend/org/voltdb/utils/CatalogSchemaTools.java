@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -49,10 +50,12 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Property;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.TimeToLive;
+import org.voltdb.catalog.Topic;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -125,25 +128,6 @@ public abstract class CatalogSchemaTools {
                 if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME) &&
                         TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
-                }
-                if (catalog_tbl.getIstopic()) {
-                    table_sb.append(" AS TOPIC ");
-                    String topicProfileName = catalog_tbl.getTopicprofile();
-                    if (!StringUtils.isEmpty(topicProfileName)) {
-                        table_sb.append(" PROFILE ").append(topicProfileName);
-                    }
-                    String topicFormatName = catalog_tbl.getTopicformat();
-                    if (!StringUtils.isEmpty(topicFormatName)) {
-                        table_sb.append(" FORMAT ").append(topicFormatName);
-                    }
-                    String topicKeyColumnNames = catalog_tbl.getTopickeycolumnnames();
-                    if (!StringUtils.isEmpty(topicKeyColumnNames)) {
-                        table_sb.append(" KEYS ").append(topicKeyColumnNames);
-                    }
-                    String topicAllowedRoleNames = catalog_tbl.getTopicallowedrolenames();
-                    if (!StringUtils.isEmpty(topicAllowedRoleNames)) {
-                        table_sb.append(" ALLOW ").append(topicAllowedRoleNames);
-                    }
                 }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
@@ -510,6 +494,52 @@ public abstract class CatalogSchemaTools {
         sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
     }
 
+    public static void toSchema(StringBuilder sb, Topic topic) {
+        sb.append("CREATE");
+        if (topic.getIsopaque()) {
+           sb.append(" OPAQUE");
+        }
+        sb.append(" TOPIC");
+
+        if (StringUtils.isNotBlank(topic.getStreamname())) {
+            sb.append(" USING STREAM");
+        }
+
+        sb.append(" " + topic.getTypeName());
+
+        if (topic.getIsopaque() && !topic.getIssingle()) {
+            sb.append(" PARTITIONED");
+        }
+
+        if (StringUtils.isNoneBlank(topic.getProcedurename())) {
+            sb.append(" EXECUTE PROCEDURE " + topic.getProcedurename());
+        }
+
+        if (StringUtils.isNoneBlank(topic.getRoles())) {
+            sb.append(" ALLOW " + topic.getRoles());
+        }
+
+        if (StringUtils.isNoneBlank(topic.getProfile())) {
+            sb.append(" PROFILE " + topic.getProfile());
+        }
+
+        if (!topic.getProperties().isEmpty()) {
+            sb.append(" PROPERTIES (");
+            Iterator<Property> iter = topic.getProperties().iterator();
+            if (iter.hasNext()) {
+                Property prop = iter.next();
+                sb.append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
+                while (iter.hasNext()) {
+                    prop = iter.next();
+                    sb.append(',').append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
+                }
+            }
+            sb.append(')');
+        }
+
+        sb.append(";\n");
+    }
+
     private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";
@@ -705,6 +735,13 @@ public abstract class CatalogSchemaTools {
                 if (!schedules.isEmpty()) {
                     for (Task task : schedules) {
                         toSchema(sb, task);
+                    }
+                }
+
+                CatalogMap<Topic> topics = db.getTopics();
+                if (!topics.isEmpty()) {
+                    for (Topic topic : topics) {
+                        toSchema(sb, topic);
                     }
                 }
 

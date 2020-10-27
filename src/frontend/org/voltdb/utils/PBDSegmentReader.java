@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import org.voltcore.utils.DBBPool;
@@ -25,7 +26,7 @@ import org.voltcore.utils.DBBPool;
  * Represents a reader for a segment. Multiple readers may be active
  * at any point in time, reading from different locations in the segment.
  */
-interface PBDSegmentReader<M> {
+interface PBDSegmentReader<M> extends Closeable {
     /**
      * Are there any more entries to read from this segment for this reader
      *
@@ -71,10 +72,11 @@ interface PBDSegmentReader<M> {
     //diverge from object count on crash or power failure
     //although incredibly unlikely
     /**
-     * Returns the number of bytes that are left to read in this segment
-     * for this reader.
+     * Returns the number of bytes that are left to read in this segment for this reader.
+     *
+     * @throws IOException
      */
-    public int uncompressedBytesToRead();
+    public int uncompressedBytesToRead() throws IOException;
 
     /**
      * Returns the current read offset for this reader in this segment.
@@ -100,6 +102,7 @@ interface PBDSegmentReader<M> {
     /**
      * Close this reader and release any resources.
      */
+    @Override
     public void close() throws IOException;
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2019 VoltDB Inc.
+ * Copyright (C) 2008-2020 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,7 +43,7 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.RetentionPolicyMgr.RetentionLimitException;
+import org.voltdb.utils.PBDUtils.ConfigurationException;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
 import com.google.common.collect.ImmutableMap;
@@ -60,7 +60,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testNoReaders() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(1);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(1, 1);
         Random random = new Random(System.currentTimeMillis());
         int maxNumBuffers = 100;
         long numWritten = 0;
@@ -81,7 +81,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @Test
     public void testWithReaders() throws Exception {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(3);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(3, 1);
         int numReaders = 2;
         @SuppressWarnings("unchecked")
         BinaryDequeReader<ExtraHeaderMetadata>[] readers = new BinaryDequeReader[numReaders];
@@ -366,7 +366,7 @@ public class TestMaxBytesRetentionPolicy {
 
     @BeforeClass
     public static void setUpClass() {
-        PersistentBinaryDeque.setupRetentionPolicyMgr(2);
+        PersistentBinaryDeque.setupRetentionPolicyMgr(2, 1);
     }
 
     @Before
@@ -411,15 +411,15 @@ public class TestMaxBytesRetentionPolicy {
     @Test
     public void testParsingLimits() throws Exception {
         for (Map.Entry<String, Long> e : s_validLimits.entrySet()) {
-            long lim = RetentionPolicyMgr.parseByteLimit(e.getKey());
+            long lim = PBDUtils.parseByteValue(e.getKey());
             assertEquals(lim, e.getValue().longValue());
         }
         for (String limStr : s_invalidLimits) {
             try {
-                RetentionPolicyMgr.parseByteLimit(limStr);
+                PBDUtils.parseByteValue(limStr);
                 fail();
             }
-            catch (RetentionLimitException expected) {
+            catch (ConfigurationException expected) {
                 ; // good
             }
         }

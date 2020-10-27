@@ -18,6 +18,7 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -36,7 +37,8 @@ public interface BinaryDeque<M> {
      */
     public static enum RetentionPolicyType {
         TIME_MS,
-        MAX_BYTES;
+        MAX_BYTES,
+        UPDATE;
     }
 
     /*
@@ -261,6 +263,28 @@ public interface BinaryDeque<M> {
      */
     public long getRetentionDeletionPoint();
 
+    /**
+     * Set the amount of time an segment is left open for write before rolling over to next entry
+     */
+    public void setSegmentRollTimeLimit(long limit);
+
+    /**
+     * Iterate over entries in reverse order applying {@code updater} to each entry. Only entries in non active segments
+     * will be visited. The {@code updater} can modify the contents of any entry which is visited or determine that the
+     * entry should be deleted.
+     *
+     * @param updater {@link EntryUpdater} to visit entries
+     * @throws IOException if an error occurs
+     */
+    // TODO add in order iteration
+    void updateEntries(EntryUpdater<? super M> updater) throws IOException;
+
+    /**
+     * @return the number of new entries which are eligible for update since the last time
+     *         {@link #updateEntries(EntryUpdater)} was invoked
+     */
+    long newEligibleUpdateEntries();
+
     public static class TruncatorResponse {
         public enum Status {
             FULL_TRUNCATE,
@@ -319,5 +343,89 @@ public interface BinaryDeque<M> {
 
     public interface BinaryDequeValidator<M> {
         public boolean isStale(M extraHeader);
+    }
+
+    /**
+     * Visitor interface that is used to visit entries within a BinaryDeque and potentially update or delete an entry
+     *
+     * @param <M> Type of metadata
+     */
+    @FunctionalInterface
+    public interface EntryUpdater<M> extends AutoCloseable {
+        /**
+         * Invoked for every entry in a segment which can be updated and also invoked with a {@code null entry} so new
+         * entries can be added at the start of the segment.
+         * <p>
+         * This method should never return {@code null}
+         * <p>
+         * Will be continually invoked until {@link UpdateResult#KEEP} is returned when {@code entry} is {@code null}.
+         * If {@link UpdateResult#DELETE} is returned this does not actually affect the contents of the PBD and the
+         * method will be invoked again.
+         *
+         * @param metadata associated with {@code entry}
+         * @param entry    that can be updated or {@code null} if it is the end of a segment
+         * @return {@link UpdateResult} instance describing how to handle the current entry
+         * @see UpdateResult
+         */
+        UpdateResult update(M metadata, ByteBuffer entry);
+
+        /**
+         * Notify the updater that the end of a segment has been encountered and any updates queued for that segment
+         * have been written out
+         */
+        default void segmentComplete() {}
+
+        /**
+         * Guaranteed to be invoked before {@link BinaryDeque#updateEntries(EntryUpdater)} returns after all updates
+         * have been completed
+         */
+        @Override
+        default void close() {};
+    }
+
+    /**
+     * Update result returned by {@link EntryUpdater#update(Object, ByteBuffer)} describing how the entry should be
+     * updated.
+     * <p>
+     * <ul>
+     * <li>{@link #DELETE}: Entry should be deleted and removed from the {@link BinaryDeque}</li>
+     * <li>{@link #KEEP}: Entry should be kept unchanged in the {@link BinaryDeque}</li>
+     * <li>{@link #STOP}: Iteration over entries should be stopped and previously visited entries should be updated</li>
+     * <li>{@link #update(ByteBuffer)}: Update the current entry with the contents of {@code update} in the
+     * {@link BinaryDeque}
+     * </ul>
+     */
+    public static final class UpdateResult {
+        /** Result which should be returned when the entry is to be deleted */
+        public static final UpdateResult DELETE = new UpdateResult(Result.DELETE, null);
+        /** Result which should be returned when the entry is to kept unmodified */
+        public static final UpdateResult KEEP = new UpdateResult(Result.KEEP, null);
+        /** Result which is returned when updating should be stopped and all previous updates applied */
+        public static final UpdateResult STOP = new UpdateResult(Result.STOP, null);
+
+        final Result m_result;
+        final ByteBuffer m_update;
+
+        /**
+         * Create a new result which replaces the current entry with {@code update}
+         *
+         * @param update new entry data
+         * @return {@link UpdateResult} to apply the update
+         */
+        public static UpdateResult update(ByteBuffer update) {
+            return new UpdateResult(Result.UPDATE, Objects.requireNonNull(update, "update"));
+        }
+
+        private UpdateResult(Result result, ByteBuffer update) {
+            m_result = result;
+            m_update = update;
+        }
+
+        enum Result {
+            KEEP,
+            DELETE,
+            UPDATE,
+            STOP
+        }
     }
 }

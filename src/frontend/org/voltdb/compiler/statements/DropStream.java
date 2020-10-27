@@ -41,8 +41,10 @@ public class DropStream extends StatementProcessor {
         for (VoltXMLElement element : m_schema.children) {
             if (element.name.equals("table")
                     && (!element.attributes.containsKey("export"))
-                    && (!element.attributes.containsKey("topic"))
                     && element.attributes.get("name").equalsIgnoreCase(name)) {
+                if (Boolean.parseBoolean(element.attributes.get("stream"))) {
+                    return false;
+                }
                 return true;
             }
         }
