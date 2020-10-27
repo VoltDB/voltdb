@@ -122,11 +122,11 @@
 	<lib name="jackson-databind-2.11.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.11.3.jar!/"/>
 	</lib>
-	<lib name="jackson-core-2.9.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-2.9.10.jar!/"/>
+	<lib name="jackson-core-2.11.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-2.11.3.jar!/"/>
 	</lib>
-	<lib name="jackson-annotations-2.9.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-annotations-2.9.10.jar!/"/>
+	<lib name="jackson-annotations-2.11.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-annotations-2.11.3.jar!/"/>
 	</lib>
 	<lib name="amazon-kinesis-client-1.6.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/amazon-kinesis-client-1.6.2.jar!/"/>
