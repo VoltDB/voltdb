@@ -1008,6 +1008,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             } else {
                 newSpHandle = getMaxScheduledTxnSpHandle();
+                // use the same sphandle for all readonly fragments
+                final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+                if (txn != null) {
+                    newSpHandle = txn.m_spHandle;
+                }
             }
 
             msg.setSpHandle(newSpHandle);
