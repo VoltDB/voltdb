@@ -37,9 +37,10 @@ class Field:
         return self.comment != None and len(self.comment) > 0
 
 class CatalogDefn:
-    def __init__(self, name, fields, comment, hasEE):
+    def __init__(self, name, fields, removedFields, comment, hasEE):
         self.name = name
         self.fields = fields
+        self.removedFields = removedFields
         self.comment = comment
         self.hasEE = hasEE
 
@@ -83,6 +84,7 @@ def parse(text, debug):
                   "(javaonly)" if not hasEE else "",
                   comment if comment else ""))
         fields = []
+        removedFields = []
         while len(text):
             fieldline = text.pop(0).strip().split(None, 2)
             if len(fieldline) == 0:
@@ -94,14 +96,19 @@ def parse(text, debug):
             fieldcomment = None
             if len(fieldline):
                 fieldcomment = fieldline.pop(0).strip("\"")
-            fields.append(Field(nametoken, typetoken, fieldcomment))
-            if debug:
-                print("  Field %s, type %s%s" % (
-                    nametoken,
-                    typetoken,
-                    (" // " + fieldcomment) if fieldcomment else ""
-                ))
-        retval.append(CatalogDefn(name, fields, comment, hasEE))
+            if typetoken == 'removed':
+                removedFields.append((nametoken, fieldcomment or ""))
+                if debug:
+                    print("  Removed field %s" % nametoken)
+            else:
+                fields.append(Field(nametoken, typetoken, fieldcomment))
+                if debug:
+                    print("  Field %s, type %s%s" % (
+                        nametoken,
+                        typetoken,
+                        (" // " + fieldcomment) if fieldcomment else ""
+                    ))
+        retval.append(CatalogDefn(name, fields, removedFields, comment, hasEE))
 
     return retval, javaOnlyClasses
 

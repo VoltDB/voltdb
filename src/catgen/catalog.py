@@ -224,6 +224,10 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
                 write(             '            }' )
                 write( interp(     '            m_$fname = value;', locals() ) )
             write(                 '            break;' )
+        for field, desc in cls.removedFields:
+            write( interp(         '        case "$field": // REMOVED $desc', locals() ) )
+        if cls.removedFields:
+            write(                 '            break;' )
         write( interp(             '        default:', locals() ) )
         write( interp(             '            throw new CatalogException("Unknown field");', locals() ) )
         write(                     '        }' )
