@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
@@ -44,6 +45,7 @@ import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.BinaryDequeReader.NoSuchOffsetException;
 import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
+
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -1866,30 +1868,72 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         if (!assertionsOn || m_closed) {
             return;
         }
+
+        class SegmentWithReader {
+            final boolean m_currentSegment;
+            final long m_id;
+            final int m_entryCount;
+            final int m_readerIndex;
+            final boolean m_allReadAndDiscarded;
+
+            SegmentWithReader(ReadCursor cursor, PBDSegment<M> segment, PBDSegmentReader<M> reader) throws IOException {
+                m_currentSegment = cursor.m_segment != null && cursor.m_segment.segmentId() == segment.segmentId();
+                m_id = segment.segmentId();
+                m_entryCount = segment.getNumEntries();
+                m_readerIndex = reader.readIndex();
+                m_allReadAndDiscarded = reader.allReadAndDiscarded();
+            }
+
+            @Override
+            public String toString() {
+                return "SegmentWithReader [currentSegment=" + m_currentSegment + ", id=" + m_id + ", entryCount="
+                        + m_entryCount + ", readerIndex=" + m_readerIndex + ", allReadAndDiscarded="
+                        + m_allReadAndDiscarded + "]";
+            }
+        }
+
+        List<String> badCounts = new ArrayList<>();
+        List<SegmentWithReader> segmentsWithReaders = new ArrayList<>();
         for (ReadCursor cursor : m_readCursors.values()) {
             if (cursor.m_hasBadCount) {
                 continue;
             }
-            int numObjects = 0;
+            boolean noReaderForCurrent = false;
+            long numObjects = 0;
+            int nullReadersBefore = 0, nullReadersAfter = 0;
+            segmentsWithReaders.clear();
             try {
                 for (PBDSegment<M> segment : m_segments.values()) {
                     PBDSegmentReader<M> reader = segment.getReader(cursor.m_cursorId);
                     if (reader == null) {
                         // reader will be null if the pbd reader has not reached this segment or has passed this and all were acked.
                         if (cursor.m_segment == null || cursor.m_segment.segmentId() <= segment.m_id) {
+                            noReaderForCurrent |= cursor.m_segment != null
+                                    && cursor.m_segment.segmentId() == segment.segmentId();
+                            ++nullReadersAfter;
                             numObjects += segment.getNumEntries();
+                        } else {
+                            ++nullReadersBefore;
                         }
                     } else {
+                        segmentsWithReaders.add(new SegmentWithReader(cursor, segment, reader));
                         numObjects += segment.getNumEntries() - reader.readIndex();
                     }
                 }
-                assert numObjects == cursor.getNumObjects() : cursor.m_cursorId + " expects " + cursor.getNumObjects()
-                        + " entries but only found " + numObjects;
+                if (numObjects != cursor.getNumObjects()) {
+                    badCounts.add(cursor.m_cursorId + " expects " + cursor.getNumObjects()
+                            + " entries but found " + numObjects + ". noReaderForCurrent=" + noReaderForCurrent
+                            + ", nullReadersBefore=" + nullReadersBefore + ", nullReadersAfter=" + nullReadersAfter
+                            + ", segments with reader=" + segmentsWithReaders + ", numObjectsDeleted="
+                            + cursor.m_numObjectsDeleted + ", numRead=" + cursor.m_numRead);
+                }
             } catch (Exception e) {
                 Throwables.throwIfUnchecked(e);
                 throw new RuntimeException(e);
             }
         }
+        assert badCounts.isEmpty() : "numDeleted=" + m_numDeleted + ", numObjects=" + m_numObjects + ": \n"
+                + badCounts.stream().map(Object::toString).collect(Collectors.joining("\n"));
     }
 
     int numberOfSegments() {
