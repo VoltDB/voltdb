@@ -182,8 +182,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         private final Set<PBDSegmentReader<M>> m_segmentReaders = new HashSet<>();
         // Number of objects out of the total
         //that were deleted at the time this cursor was created
-        private final int m_numObjectsDeleted;
-        private int m_numRead;
+        private final long m_numObjectsDeleted;
+        private long m_numRead;
         // If a rewind occurred this is set to the segment id where this cursor was before the rewind
         private long m_rewoundFromId = -1;
         private boolean m_cursorClosed = false;
@@ -194,11 +194,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         boolean m_hasBadCount = false;
 
-        public ReadCursor(String cursorId, int numObjectsDeleted) {
+        public ReadCursor(String cursorId, long numObjectsDeleted) {
             this(cursorId, numObjectsDeleted, false);
         }
 
-        public ReadCursor(String cursorId, int numObjectsDeleted, boolean isTransient) {
+        public ReadCursor(String cursorId, long numObjectsDeleted, boolean isTransient) {
             m_cursorId = cursorId;
             m_numObjectsDeleted = numObjectsDeleted;
             m_isTransient = isTransient;
@@ -507,7 +507,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         @Override
-        public int getNumObjects() throws IOException {
+        public long getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_cursorClosed) {
                     throw new IOException("Cannot compute object count of " + m_cursorId + " - Reader has been closed");
@@ -801,8 +801,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private PBDSegment<M> m_activeSegment;
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
-    private int m_numObjects;
-    private int m_numDeleted;
+    private long m_numObjects;
+    private long m_numDeleted;
 
     private M m_extraHeader;
     private Executor m_deferredDeleter = Runnable::run;

@@ -1233,7 +1233,7 @@ public class TestPersistentBinaryDeque {
         m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger)
                 .initialExtraHeader(m_metadata, SERIALIZER).build();
         BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
-        int cnt = reader.getNumObjects();
+        long cnt = reader.getNumObjects();
         assertEquals(cnt, 96);
 
         for (int ii = 96; ii < 192; ii++) {
@@ -1279,7 +1279,7 @@ public class TestPersistentBinaryDeque {
         small_pbd = PersistentBinaryDeque.builder(SMALL_TEST_NONCE, TEST_DIR, logger)
                 .initialExtraHeader(m_metadata, SERIALIZER).build();
         BinaryDequeReader<ExtraHeaderMetadata> reader = small_pbd.openForRead(CURSOR_ID);
-        int cnt = reader.getNumObjects();
+        long cnt = reader.getNumObjects();
         assertEquals(cnt, 10);
 
         for (int ii = 10; ii < 20; ii++) {
@@ -1330,7 +1330,7 @@ public class TestPersistentBinaryDeque {
         m_pbd = PersistentBinaryDeque.builder(TEST_NONCE, TEST_DIR, logger).compression(true)
                 .initialExtraHeader(m_metadata, SERIALIZER).build();
         BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
-        int cnt = reader.getNumObjects();
+        long cnt = reader.getNumObjects();
         assertEquals(cnt, 96);
         for (int ii = 96; ii < 192; ii++) {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
