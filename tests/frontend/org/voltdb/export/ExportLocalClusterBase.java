@@ -75,8 +75,12 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
     }
 
     public void startListener() throws IOException {
+        startListener(0);
+    }
+
+    public void startListener(int blockingCount) throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
-            ServerListener m_serverSocket = new ServerListener(target.getValue());
+            ServerListener m_serverSocket = new ServerListener(target.getValue(), blockingCount);
             m_serverSockets.put(target.getKey(), m_serverSocket);
             m_serverSocket.start();
         }

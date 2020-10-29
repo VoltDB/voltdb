@@ -832,6 +832,7 @@ public class JDBCExportClient extends ExportClientBase {
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             if (m_es == null) {
+                closeConnection();
                 return;
             }
             m_es.shutdown();
