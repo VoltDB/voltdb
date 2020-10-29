@@ -315,8 +315,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 PBDSegmentReader<M> reader = m_segment.getReader(m_cursorId);
                 if (reader != null) {
                     m_numRead -= reader.readIndex();
-                    m_segmentReaders.remove(reader);
-                    reader.close();
+                    closeSegmentReader(reader);
                     m_segment.openForRead(m_cursorId);
                 }
             } else { // rewind or fastforward, adjusting the numRead accordingly
@@ -334,7 +333,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                             m_numRead -= curr.getNumEntries();
                         }
                         if (currReader != null) {
-                            currReader.close();
+                            closeSegmentReader(currReader);
                         }
                     }
                 } else { // fastforward
@@ -342,7 +341,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     m_numRead += m_segment.getNumEntries();
                     if (segmentReader != null) {
                         m_numRead -= segmentReader.readIndex();
-                        segmentReader.close();
+                        closeSegmentReader(segmentReader);
                     }
                     // increment numRead
                     // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
@@ -608,9 +607,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         assert(m_segment != null);
                         // If the reader has moved past this and all have been acked close this segment reader.
                         if (segmentReader.allReadAndDiscarded() && segment.segmentId() < m_segment.m_id) {
-                            m_segmentReaders.remove(segmentReader);
                             try {
-                                segmentReader.close();
+                                closeSegmentReader(segmentReader);
                             } catch(IOException e) {
                                 m_usageSpecificLog.warn("Unexpected error closing PBD file " + segment.m_file, e);
                             }
@@ -620,6 +618,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     }
                 }
             };
+        }
+
+        private void closeSegmentReader(PBDSegmentReader<M> segmentReader) throws IOException {
+            m_segmentReaders.remove(segmentReader);
+            segmentReader.close();
         }
 
         private void deleteSegmentsOnAck(PBDSegment<M> segment, int entryNumber) {
