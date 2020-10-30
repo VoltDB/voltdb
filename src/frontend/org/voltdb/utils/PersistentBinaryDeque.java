@@ -316,21 +316,20 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 if (reader != null) {
                     m_numRead -= reader.readIndex();
                     closeSegmentReader(reader);
-                    m_segment.openForRead(m_cursorId);
                 }
             } else { // rewind or fastforward, adjusting the numRead accordingly
                 if (m_segment.segmentId() > seekSegment.segmentId()) { // rewind
-                    for (PBDSegment<M> curr : m_segments.tailMap(seekSegment.segmentId(), true).values()) {
-                        if (curr.segmentId() > m_segment.segmentId()) {
-                            break;
-                        }
+                    for (PBDSegment<M> curr : m_segments
+                            .subMap(seekSegment.segmentId(), true, m_segment.segmentId(), true).values()) {
                         PBDSegmentReader<M> currReader = curr.getReader(m_cursorId);
-                        if (curr.segmentId() == m_segment.segmentId()) {
-                            if (currReader != null) {
-                                m_numRead -= currReader.readIndex();
+                        if (assertionsOn) {
+                            if (curr.segmentId() == m_segment.segmentId()) {
+                                if (currReader != null) {
+                                    m_numRead -= currReader.readIndex();
+                                }
+                            } else {
+                                m_numRead -= curr.getNumEntries();
                             }
-                        } else {
-                            m_numRead -= curr.getNumEntries();
                         }
                         if (currReader != null) {
                             closeSegmentReader(currReader);
@@ -343,13 +342,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         m_numRead -= segmentReader.readIndex();
                         closeSegmentReader(segmentReader);
                     }
-                    // increment numRead
-                    // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
-                    for (PBDSegment<M> curr : m_segments.tailMap(m_segment.segmentId(), false).values()) {
-                        if (curr.segmentId() == seekSegment.segmentId()) {
-                            break;
+                    if (assertionsOn) {
+                        // increment numRead
+                        for (PBDSegment<M> curr : m_segments
+                                .subMap(m_segment.segmentId(), false, seekSegment.segmentId(), false).values()) {
+                            m_numRead += curr.getNumEntries();
                         }
-                        m_numRead += curr.getNumEntries();
                     }
                 }
                 m_segment = seekSegment;
