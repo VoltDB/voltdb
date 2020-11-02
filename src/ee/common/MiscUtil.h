@@ -47,11 +47,7 @@ class MiscUtil {
      * on the various platforms that we support.
      */
     static void hashCombineFloatingPoint(std::size_t &seed, double value) {
-#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && ! defined(__GCCXML__))) && ! defined(BOOST_CLANG)
         boost::hash_combine(seed, value);
-#else
-#error "Unsupported compiler"
-#endif
     }
 };
 
