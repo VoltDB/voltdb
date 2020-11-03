@@ -110,7 +110,7 @@ public interface BinaryDequeReader<M> {
      * @return number of objects left to read for this reader
      * @throws IOException
      */
-    public int getNumObjects() throws IOException;
+    public long getNumObjects() throws IOException;
 
     /**
      * Returns true if this reader still has entries to read. False otherwise

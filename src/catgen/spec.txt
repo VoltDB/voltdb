@@ -180,6 +180,13 @@ begin Table                                  "A table (relation) in the database
   int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
   string migrationTarget                     "The target where the data are migrated to"
   string topicName                           "Associated topic for stream"
+  // Fields which were once part of topic streams but were replaced by topic objects in the catalog
+  removed isTopic                         "Replaced by topicName not being empty"
+  removed topicProfile                    "Moved to topic class"
+  removed topicFormat                     "Moved to topic class"
+  removed topicKeyColumnNames             "Moved to topic class"
+  removed topicAllowedRoleNames           "Moved to topic class"
+
 end
 
 begin Topic javaonly                         "A topic in the database"

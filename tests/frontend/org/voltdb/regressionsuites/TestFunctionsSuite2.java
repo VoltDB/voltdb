@@ -2074,12 +2074,14 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         try {
             sql = "select LOG(-10) from P1";
             client.callProcedure("@AdHoc", sql);
-            fail("Expected resultfor Log(negative #): invalid result value (nan)");
+            fail("Expected resultfor Log(negative #): invalid result value (nan) or (-nan)");
         } catch (ProcCallException excp) {
             if (isHSQL()) {
                 assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
             } else {
-                assertTrue(excp.getMessage().contains("Invalid result value (nan)"));
+                final String msg = excp.getMessage();
+                assertTrue(msg.contains("Invalid result value (nan)") ||
+                        msg.contains("Invalid result value (-nan)"));
             }
         }
     }

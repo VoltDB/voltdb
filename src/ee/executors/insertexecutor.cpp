@@ -204,7 +204,6 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     }
     m_templateTuple = m_templateTupleStorage.tuple();
 
-    std::vector<int>::iterator it;
     for (auto iter: m_nowFields) {
         m_templateTuple.setNValue(iter, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }

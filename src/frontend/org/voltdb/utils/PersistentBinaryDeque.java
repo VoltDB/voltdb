@@ -182,8 +182,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         private final Set<PBDSegmentReader<M>> m_segmentReaders = new HashSet<>();
         // Number of objects out of the total
         //that were deleted at the time this cursor was created
-        private final int m_numObjectsDeleted;
-        private int m_numRead;
+        private final long m_numObjectsDeleted;
+        private long m_numRead;
         // If a rewind occurred this is set to the segment id where this cursor was before the rewind
         private long m_rewoundFromId = -1;
         private boolean m_cursorClosed = false;
@@ -194,11 +194,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
          */
         boolean m_hasBadCount = false;
 
-        public ReadCursor(String cursorId, int numObjectsDeleted) {
+        public ReadCursor(String cursorId, long numObjectsDeleted) {
             this(cursorId, numObjectsDeleted, false);
         }
 
-        public ReadCursor(String cursorId, int numObjectsDeleted, boolean isTransient) {
+        public ReadCursor(String cursorId, long numObjectsDeleted, boolean isTransient) {
             m_cursorId = cursorId;
             m_numObjectsDeleted = numObjectsDeleted;
             m_isTransient = isTransient;
@@ -315,26 +315,24 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 PBDSegmentReader<M> reader = m_segment.getReader(m_cursorId);
                 if (reader != null) {
                     m_numRead -= reader.readIndex();
-                    m_segmentReaders.remove(reader);
-                    reader.close();
-                    m_segment.openForRead(m_cursorId);
+                    closeSegmentReader(reader);
                 }
             } else { // rewind or fastforward, adjusting the numRead accordingly
                 if (m_segment.segmentId() > seekSegment.segmentId()) { // rewind
-                    for (PBDSegment<M> curr : m_segments.tailMap(seekSegment.segmentId(), true).values()) {
-                        if (curr.segmentId() > m_segment.segmentId()) {
-                            break;
-                        }
+                    for (PBDSegment<M> curr : m_segments
+                            .subMap(seekSegment.segmentId(), true, m_segment.segmentId(), true).values()) {
                         PBDSegmentReader<M> currReader = curr.getReader(m_cursorId);
-                        if (curr.segmentId() == m_segment.segmentId()) {
-                            if (currReader != null) {
-                                m_numRead -= currReader.readIndex();
+                        if (assertionsOn) {
+                            if (curr.segmentId() == m_segment.segmentId()) {
+                                if (currReader != null) {
+                                    m_numRead -= currReader.readIndex();
+                                }
+                            } else {
+                                m_numRead -= curr.getNumEntries();
                             }
-                        } else {
-                            m_numRead -= curr.getNumEntries();
                         }
                         if (currReader != null) {
-                            currReader.close();
+                            closeSegmentReader(currReader);
                         }
                     }
                 } else { // fastforward
@@ -342,15 +340,14 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     m_numRead += m_segment.getNumEntries();
                     if (segmentReader != null) {
                         m_numRead -= segmentReader.readIndex();
-                        segmentReader.close();
+                        closeSegmentReader(segmentReader);
                     }
-                    // increment numRead
-                    // TODO: Do this only if assertions are on? Unless we use m_numRead in other places too.
-                    for (PBDSegment<M> curr : m_segments.tailMap(m_segment.segmentId(), false).values()) {
-                        if (curr.segmentId() == seekSegment.segmentId()) {
-                            break;
+                    if (assertionsOn) {
+                        // increment numRead
+                        for (PBDSegment<M> curr : m_segments
+                                .subMap(m_segment.segmentId(), false, seekSegment.segmentId(), false).values()) {
+                            m_numRead += curr.getNumEntries();
                         }
-                        m_numRead += curr.getNumEntries();
                     }
                 }
                 m_segment = seekSegment;
@@ -507,7 +504,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         @Override
-        public int getNumObjects() throws IOException {
+        public long getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_cursorClosed) {
                     throw new IOException("Cannot compute object count of " + m_cursorId + " - Reader has been closed");
@@ -608,9 +605,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         assert(m_segment != null);
                         // If the reader has moved past this and all have been acked close this segment reader.
                         if (segmentReader.allReadAndDiscarded() && segment.segmentId() < m_segment.m_id) {
-                            m_segmentReaders.remove(segmentReader);
                             try {
-                                segmentReader.close();
+                                closeSegmentReader(segmentReader);
                             } catch(IOException e) {
                                 m_usageSpecificLog.warn("Unexpected error closing PBD file " + segment.m_file, e);
                             }
@@ -620,6 +616,11 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     }
                 }
             };
+        }
+
+        private void closeSegmentReader(PBDSegmentReader<M> segmentReader) throws IOException {
+            m_segmentReaders.remove(segmentReader);
+            segmentReader.close();
         }
 
         private void deleteSegmentsOnAck(PBDSegment<M> segment, int entryNumber) {
@@ -801,8 +802,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     private PBDSegment<M> m_activeSegment;
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
-    private int m_numObjects;
-    private int m_numDeleted;
+    private long m_numObjects;
+    private long m_numDeleted;
 
     private M m_extraHeader;
     private Executor m_deferredDeleter = Runnable::run;

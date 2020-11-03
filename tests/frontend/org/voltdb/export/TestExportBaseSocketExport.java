@@ -26,6 +26,7 @@ package org.voltdb.export;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -54,6 +55,7 @@ import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.SocketExporter;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertAllowNulls;
 import org.voltdb_testprocs.regressionsuites.exportprocs.ExportInsertFromTableSelectSP;
@@ -82,8 +84,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public static class ServerListener extends Thread {
 
-        private ServerSocket ssocket;
-        private int m_port;
+        private final ServerSocket ssocket;
+        private final int m_port;
+        private final int m_blockingCount;
         private boolean m_close;
 
         private final List<ClientConnectionHandler> m_clients = Collections
@@ -97,7 +100,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         private static final CSVParser m_parser = new CSVParser();
 
         public ServerListener(int port) throws IOException {
+            this(port, 0);
+        }
+
+        public ServerListener(int port, int blockingCount) throws IOException {
             m_port = port;
+            m_blockingCount = blockingCount;
             ssocket = new ServerSocket(m_port);
             m_close = false;
         }
@@ -174,7 +182,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
         private class ClientConnectionHandler extends Thread {
             private final Socket m_clientSocket;
-            private boolean m_closed = false;
+            private volatile boolean m_closed = false;
 
             public ClientConnectionHandler(Socket clientSocket) {
                 m_clientSocket = clientSocket;
@@ -184,47 +192,64 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
                 final long thid = Thread.currentThread().getId();
+                int syncs = 0;
+                int lines = 0;
                 try {
-                    while (true) {
-                        BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
-                        while (true) {
-                            String line = in.readLine();
-                            // You should convert your data to params here.
-                            if (line == null && m_closed) {
-                                System.out.println("Nothing to read");
-                                break;
-                            }
-                            if (line == null)
-                                continue;
+                    BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
+                    OutputStream out = m_clientSocket.getOutputStream();
+                    while (!m_closed) {
+                        String line = in.readLine();
+                        // You should convert your data to params here.
+                        if (line == null && m_closed) {
+                            System.out.println("Nothing to read");
+                            break;
+                        }
+                        if (line == null) {
+                            continue;
+                        }
+                        lines++;
 
-                            String parts[] = m_parser.parseLine(line);
-                            if (parts == null) {
-                                System.out.println("Failed to parse exported data.");
+                        // handle sync_block message
+                        if (line.equals(SocketExporter.SYNC_BLOCK_MSG)) {
+                            syncs++;
+                            if (m_blockingCount > 0 && syncs % m_blockingCount == 0) {
+                                System.out.println("Blocking client after " + lines + " lines and " + syncs + " syncs");
                                 continue;
                             }
-                            Long i = Long.parseLong(parts[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
-                            if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
-                                m_seenIds.get(i).incrementAndGet();
-                                if (!Arrays.equals(m_data.get(i), parts)) {
-                                    // also log the inconsistency here
-                                    m_data.put(i, parts);
-                                    if (m_verbose) {
-                                        System.out.println(thid + "-Inconsistent " + i + ": " + line);
-                                    }
-                                }
-                            } else {
+                            out.write(48); // What we send doesn't matter. Send any byte as ack.
+                            out.flush();
+                            continue;
+                        }
+
+                        String parts[] = m_parser.parseLine(line);
+                        if (parts == null) {
+                            System.out.println("Failed to parse exported data.");
+                            continue;
+                        }
+                        Long i = Long.parseLong(parts[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
+                        if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
+                            m_seenIds.get(i).incrementAndGet();
+                            if (!Arrays.equals(m_data.get(i), parts)) {
+                                // also log the inconsistency here
                                 m_data.put(i, parts);
-                                m_queue.offer(i);
                                 if (m_verbose) {
-                                    System.out.println(thid + "-Consistent " + i + ": " + line);
+                                    System.out.println(thid + "-Inconsistent " + i + ": " + line);
                                 }
+                            }
+                        } else {
+                            m_data.put(i, parts);
+                            m_queue.offer(i);
+                            if (m_verbose) {
+                                System.out.println(thid + "-Consistent " + i + ": " + line);
                             }
                         }
-                        m_clientSocket.close();
-                        System.out.println("Client Closed.");
                     }
                 } catch (IOException ioe) {
+                    if (!m_closed) {
+                        System.out.println("ClientConnection handler exited with IOException: " + ioe.getMessage());
+                    }
                 }
+                System.out.println("Client Closed: " + lines + " lines, " + syncs + " syncs");
             }
 
             public void stopClient() {
