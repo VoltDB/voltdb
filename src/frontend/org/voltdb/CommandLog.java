@@ -196,6 +196,12 @@ public interface CommandLog {
     public void requestTruncationSnapshot(final boolean queueIfPending);
 
     /**
+     * Report when a truncation snapshot has started so CommandLogging does not submit
+     * a new request until after the truncation work is complete
+     */
+    public void notifyTruncationSnapshotStarted();
+
+    /**
      * Statistics-related interface
      * Implementation should populate the stats based on column name to index mapping
      */

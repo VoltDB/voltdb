@@ -78,6 +78,12 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
+    public void notifyTruncationSnapshotStarted() {
+        // Ignore snapshot start notification when Command Logging is disabled
+        return;
+    }
+
+    @Override
     public void populateCommandLogStats(Map<String, Integer> columnNameToIndex,
             Object[] rowValues) {
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_BYTES.name())] = 0;

@@ -199,6 +199,11 @@ public class SnapshotSaveAPI
                             context.getSiteTrackerForSnapshot(),
                             hashinatorData,
                             timestamp);
+                    if (m_isTruncation) {
+                        // Prevent CommandLogging from submitting any more truncation requests until the
+                        // Snapshot has finished and the truncation of the CommandLog is complete
+                        VoltDB.instance().getCommandLog().notifyTruncationSnapshotStarted();
+                    }
                 }
             });
 
