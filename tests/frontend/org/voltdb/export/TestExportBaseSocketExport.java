@@ -369,10 +369,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @throws Exception
      */
     public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
-        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS, false);
+        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS, false, true);
     }
 
-    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames, long delayMs, boolean waitForTuples) throws Exception {
+    public static void waitForExportAllRowsDelivered(Client client,
+            List<String> streamNames, long delayMs,
+            boolean waitForTuples, boolean waitForPending) throws Exception {
         boolean passed = false;
         assertFalse(streamNames.isEmpty());
         Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
@@ -415,7 +417,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 }
                 long m = stats.getLong("TUPLE_PENDING");
                 String source = stats.getString("SOURCE");
-                if (0 != m) {
+                if (waitForPending && 0 != m) {
                     String target = stats.getString("TARGET");
                     Long host = stats.getLong("HOST_ID");
                     Long pid = stats.getLong("PARTITION_ID");
@@ -522,7 +524,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester, long delayMs, boolean waitForTuples) throws Exception {
         client.drain();
-        waitForExportAllRowsDelivered(client, streamNames, delayMs, waitForTuples);
+        waitForExportAllRowsDelivered(client, streamNames, delayMs, waitForTuples, true);
         tester.verifyRows();
         System.out.println("Passed!");
     }
