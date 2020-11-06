@@ -213,7 +213,9 @@ class FastSerializer:
 
         self.socket = None
         if self.host != None and self.port != None:
-            ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM, socket.IPPROTO_TCP, socket.AI_ADDRCONFIG)[0]
+            # ai = (family, socktype, proto, canonname, sockaddr)
+            ss = socket.socket(ai[0], ai[1], ai[2])
             if self.usessl:
                 if ssl_available:
                     self.socket = self.__wrap_socket(ss)
@@ -224,7 +226,7 @@ class FastSerializer:
                 self.socket = ss
             self.socket.setblocking(1)
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-            self.socket.connect((self.host, self.port))
+            self.socket.connect(ai[4])
             #if self.usessl:
             #    print 'Cipher suite: ' + str(self.socket.cipher())
 
