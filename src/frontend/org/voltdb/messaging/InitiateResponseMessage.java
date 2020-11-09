@@ -122,23 +122,6 @@ public class InitiateResponseMessage extends VoltMessage {
         m_connectionId = sentinel.getConnectionId();
     }
 
-    /**
-     * Create a response from a request.
-     * Note that some private request data is copied to the response.
-     * @param task The initiation request object to collect the
-     * metadata from.
-     */
-    public InitiateResponseMessage(InitiateTaskMessage task) {
-        m_txnId = task.getTxnId();
-        m_spHandle = task.getSpHandle();
-        m_initiatorHSId = task.getInitiatorHSId();
-        m_coordinatorHSId = task.getCoordinatorHSId();
-        m_subject = Subject.DEFAULT.getId();
-        m_clientInterfaceHandle = Long.MIN_VALUE;
-        m_connectionId = Long.MIN_VALUE;
-        m_readOnly = task.isReadOnly();
-    }
-
     public void setClientHandle(long clientHandle) {
         m_response.setClientHandle(clientHandle);
     }
@@ -336,10 +319,11 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("\n READ-ONLY: ").append(m_readOnly);
         sb.append("\n RECOVERING: ").append(m_recovering);
         sb.append("\n MISPARTITIONED: ").append(m_mispartitioned);
-        if (m_commit)
+        if (m_commit) {
             sb.append("\n  COMMIT");
-        else
+        } else {
             sb.append("\n  ROLLBACK/ABORT, ");
+        }
         int[] hashes = m_response.getHashes();
         if (hashes != null) {
             sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes, m_hashMismatchPos));
