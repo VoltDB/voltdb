@@ -370,6 +370,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
+                        sslEngine.setEnabledProtocols(new String[] {"TLSv1.2"});
 
                         Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
                         Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
