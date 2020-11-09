@@ -774,10 +774,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         return;
                     }
+                    // In rejoin node the initial generation ID first comes from catalog on ZK, if stream
+                    // snapshot tells us a different initial generation ID, we trust it and use it as
+                    // the source of truth.
+                    if (generationIdCreated != m_committedBuffers.getGenerationIdCreated()) {
+                        m_committedBuffers.setInitialGenerationId(generationIdCreated);
+                    }
                     if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
                         // Stale export buffers are deleted , re-create the tracker.
                         m_gapTracker = m_committedBuffers.scanForGap();
                     }
+
                     if (action == StreamStartAction.RECOVER) {
                         m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
                         // Export buffers are truncated to snapshot point

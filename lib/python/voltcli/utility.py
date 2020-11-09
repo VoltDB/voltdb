@@ -1017,28 +1017,45 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
     """
     Split host string on commas, extract optional port for each and return list
     of host objects. Check against minimum/maximum quantities if specified.
+    We attempt to classify strings as one of:
+       <ip4 address>  |  <ip4 address> : <port>
+       <ip6_address>  |  [<ip6 address>]  |  [<ip6 address>] : <port>
+       <host name>    |  <host name> : port
+    Brackets are required around IPv6 addresses; this is consistent with
+    VoltDB parsing. Also, don't forget about IPv4-mapped IPv6 addresses,
+    formatted like ::ffff:127.0.0.1:21212.
     """
     class Host(object):
         def __init__(self, host, port):
             self.host = host
             self.port = port
     hosts = []
+    # approximate syntax only, sufficient only to discriminate
+    opt_port = r'(:[0-9]+)?$'
+    addr4 = re.compile(r'[0-9.]+' + opt_port)
+    addr6 = re.compile(r'\[[0-9A-Fa-f:]+([0-9.]+)?\]' + opt_port)
+    name = re.compile(r'[0-9A-Za-z.-]+' + opt_port)
     for host_port in host_string.split(','):
-        split_host = host_port.split(':')
-        host = split_host[0]
-        if len(split_host) > 2:
-            abort('Bad HOST:PORT format "%s" - too many colons.' % host_port)
-        if len(split_host) == 1:
-            # Add the default port if specified. Validated by caller to be an integer.
-            if default_port:
-                port = default_port
-            else:
-                port = None
+        if host_port.count(':') >= 2 and addr6.match(host_port):
+            host, port = _split_ip6(host_port)
+        elif '.' in host_port and addr4.match(host_port):
+            host, port = _split_ip4(host_port)
+        elif name.match(host_port):
+            host, port = _split_name(host_port)
         else:
+            abort('''Unrecognized address syntax "%s"
+  Use one of the following: (including the brackets)
+    hostname     hostname:port
+    ip4addr      ip4addr:port
+    [ip6addr]    [ip6addr]:port''' % host_port)
+        if port is None:
+            port = default_port
+        if port is not None:
             try:
-                port = int(split_host[1])
-            except ValueError, e:
-                abort('Bad port value "%s" for host: %s' % (split_host[1], host_port))
+                port = int(port)
+            except ValueError:
+                abort('Bad port value "%s" for host: %s' % (port, host_port))
+        #print("# host_port=%s --> host=%s port=%s" % (host_port, host,port))
         hosts.append(Host(host, port))
     if min_hosts is not None and len(hosts) < min_hosts:
         abort('Too few hosts in host string "%s". The minimum is %d.'
@@ -1047,6 +1064,33 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
         abort('Too many hosts in host string "%s". The maximum is %d.'
                     % (host_string, max_hosts))
     return hosts
+
+def _split_ip4(host_port):
+    split_host = host_port.split(':')
+    if len(split_host) == 1:
+        return (host_port, None)
+    elif len(split_host) == 2:
+        return (split_host[0], split_host[1])
+    else:
+        abort('Bad HOST:PORT format "%s" - too many colons.' % host_port)
+
+def _split_ip6(host_port):
+    addr = port = None
+    if host_port[0] == '[': # bracketed address is unambiguous
+        split_host = host_port[1:].split(']',1)
+        if len(split_host) != 2:
+            abort('Bad [HOST]:PORT format "%s" - missing bracket.' % host_port)
+        addr = split_host[0]
+        if split_host[1] != '':
+            if split_host[1][0] != ':':
+                abort('Bad [HOST]:PORT format "%s" - colon required.' % host_port)
+            port = split_host[1][1:]
+    else: # we must assume it's just an IPv6 address
+        addr = host_port
+    return (addr, port)
+
+def _split_name(host_port):
+    return _split_ip4(host_port)
 
 #===============================================================================
 def paragraph(*lines):

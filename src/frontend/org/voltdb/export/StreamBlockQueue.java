@@ -115,7 +115,7 @@ public class StreamBlockQueue {
         m_initialGenerationId = genId;
 
         // When creating, delete any existing PBD files
-        constructPBD(genId, create);
+        constructPBD(genId, m_initialGenerationId, create);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
                     (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())) +
@@ -123,7 +123,7 @@ public class StreamBlockQueue {
         }
     }
 
-    public boolean isEmpty() throws IOException {
+    boolean isEmpty() throws IOException {
         if (m_memoryDeque.isEmpty() && m_reader.isEmpty()) {
             return true;
         }
@@ -172,7 +172,7 @@ public class StreamBlockQueue {
      * and regenerates it every time an element is added to the memoryDeque from
      * the persistent deque.
      */
-    public Iterator<StreamBlock> iterator() {
+     Iterator<StreamBlock> iterator() {
         return new Iterator<StreamBlock>() {
             private Iterator<StreamBlock> m_memoryIterator = m_memoryDeque.iterator();
             @Override
@@ -216,7 +216,7 @@ public class StreamBlockQueue {
         };
     }
 
-    public StreamBlock peek() {
+    StreamBlock peek() {
         if (m_memoryDeque.peek() != null) {
             return m_memoryDeque.peek();
         }
@@ -224,7 +224,7 @@ public class StreamBlockQueue {
     }
 
     // For test
-    public StreamBlock poll() {
+    StreamBlock poll() {
         StreamBlock sb = null;
         if (m_memoryDeque.peek() != null) {
             sb = m_memoryDeque.poll();
@@ -234,7 +234,7 @@ public class StreamBlockQueue {
         return sb;
     }
 
-    public StreamBlock pop() {
+    StreamBlock pop() {
         if (m_memoryDeque.isEmpty()) {
             StreamBlock sb = pollPersistentDeque(true);
             if (sb == null) {
@@ -246,14 +246,14 @@ public class StreamBlockQueue {
         }
     }
 
-    public void updateSchema(PersistedMetadata metadata) throws IOException {
+    void updateSchema(PersistedMetadata metadata) throws IOException {
         m_persistentDeque.updateExtraHeader(metadata);
     }
 
     /*
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
-    public void offer(StreamBlock streamBlock) throws IOException {
+    void offer(StreamBlock streamBlock) throws IOException {
         m_persistentDeque.offer(streamBlock.asBBContainer());
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
@@ -265,12 +265,12 @@ public class StreamBlockQueue {
         }
     }
 
-    public void sync() throws IOException {
+    void sync() throws IOException {
         m_persistentDeque.sync();
     }
 
     // Only used in tests, should be removed.
-    public long sizeInBytes() throws IOException {
+    long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
             //Use only total size, but throw in the USO
@@ -282,7 +282,7 @@ public class StreamBlockQueue {
         return memoryBlockUsage + m_reader.sizeInBytes() - (StreamBlock.HEADER_SIZE * m_reader.getNumObjects());
     }
 
-    public void close() throws IOException {
+    void close() throws IOException {
         sync();
         m_persistentDeque.close();
         for (StreamBlock sb : m_memoryDeque) {
@@ -291,7 +291,7 @@ public class StreamBlockQueue {
         m_memoryDeque.clear();
     }
 
-    public void closeAndDelete() throws IOException {
+    void closeAndDelete() throws IOException {
         m_persistentDeque.closeAndDelete();
         for (StreamBlock sb : m_memoryDeque) {
             sb.discard();
@@ -299,7 +299,7 @@ public class StreamBlockQueue {
     }
 
     // See PDB segment layout at beginning of this file.
-    public void truncateToSequenceNumber(final long truncationSeqNo) throws IOException {
+    void truncateToSequenceNumber(final long truncationSeqNo) throws IOException {
         assert(m_memoryDeque.isEmpty());
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
@@ -353,12 +353,27 @@ public class StreamBlockQueue {
         // close reopen reader
         m_persistentDeque.close();
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        constructPBD(catalogContext.m_genId, false);
+        constructPBD(catalogContext.m_genId, m_initialGenerationId, false);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
 
-    public ExportSequenceNumberTracker scanForGap() throws IOException {
+    /**
+     * Every time the initial generation ID changes, stream's PBD header needs to update as well.
+     * Database recover or node rejoin may cause the initial generation ID to change.
+     * @param initialGenId
+     * @throws IOException
+     */
+    void setInitialGenerationId(long initialGenId) throws IOException {
+        exportLog.info("SBQ updated the initial generation id from " + m_initialGenerationId + " to " + initialGenId);
+        m_initialGenerationId = initialGenId;
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        Table streamTable = catalogContext.database.getTables().get(m_streamName);
+        PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, m_initialGenerationId, catalogContext.m_genId);
+        m_persistentDeque.updateExtraHeader(metadata);
+    }
+
+    ExportSequenceNumberTracker scanForGap() throws IOException {
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
         m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
@@ -379,7 +394,7 @@ public class StreamBlockQueue {
         return tracker;
     }
 
-    public boolean deleteStaleBlocks(long generationId) throws IOException {
+    boolean deleteStaleBlocks(long generationId) throws IOException {
         boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<PersistedMetadata>() {
 
             @Override
@@ -387,37 +402,25 @@ public class StreamBlockQueue {
                 assert (metadata != null);
                 ExportRowSchema schema = metadata.getSchema();
                 boolean fromOlderGeneration = schema.initialGenerationId < generationId;
-                if (exportLog.isDebugEnabled() && fromOlderGeneration) {
-                    exportLog.debug("Delete PBD segments of " + schema.tableName + "_" + schema.partitionId
+                if (fromOlderGeneration) {
+                    exportLog.info("Delete PBD segments of " + schema.tableName + "_" + schema.partitionId
                             + " from older generation " + schema.initialGenerationId);
                 }
                 return fromOlderGeneration;
             }
 
         });
-        if (generationId != m_initialGenerationId) {
-            m_initialGenerationId = generationId;
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Update created generation id of " + m_nonce + " to " + generationId);
-            }
-        }
-        if (didCleanup) {
-            // Close and reopen
-            close();
-            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            constructPBD(catalogContext.m_genId, false);
-        }
         return didCleanup;
     }
 
-    public long getGenerationIdCreated() {
+    long getGenerationIdCreated() {
         return m_initialGenerationId;
     }
 
-    private void constructPBD(long genId, boolean deleteExisting) throws IOException {
+    private void constructPBD(long genId, long initialGenId, boolean deleteExisting) throws IOException {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
-        PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, m_initialGenerationId, genId);
+        PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, initialGenId, genId);
         PersistedMetadataSerializer serializer = new PersistedMetadataSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)

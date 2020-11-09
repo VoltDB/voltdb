@@ -19,6 +19,7 @@ package org.voltdb.compiler.statements;
 
 import java.util.regex.Matcher;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONTokener;
@@ -76,6 +77,14 @@ public class CreateTopic extends StatementProcessor {
         processAllow(statementMatcher, topic);
         processProfile(statementMatcher, topic);
         processProperties(statementMatcher, topic);
+
+        // Finally, catch the invalid statement that our regex allows
+        if (!topic.getIsopaque() && StringUtils.isBlank(topic.getStreamname())
+                && StringUtils.isBlank(topic.getProcedurename())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE TOPIC statement: topic %s must be either OPAQUE, or have USING STREAM or EXECUTE PROCEDURE clauses",
+                    topic.getTypeName()));
+        }
         return true;
     }
 

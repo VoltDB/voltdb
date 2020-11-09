@@ -3294,9 +3294,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair("httpInterface", m_config.m_httpPortInterface);
             stringer.keySymbolValuePair("internalPort", m_config.m_internalPort);
             stringer.keySymbolValuePair("internalInterface", m_config.m_internalInterface);
-            String[] zkInterface = m_config.m_zkInterface.split(":");
-            stringer.keySymbolValuePair("zkPort", zkInterface[1]);
-            stringer.keySymbolValuePair("zkInterface", zkInterface[0]);
+            HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(m_config.m_zkInterface, 0);
+            stringer.keySymbolValuePair("zkPort", hap.getPort());
+            stringer.keySymbolValuePair("zkInterface", hap.getHost());
             stringer.keySymbolValuePair("drPort", VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             stringer.keySymbolValuePair("drInterface", VoltDB.getDefaultReplicationInterface());
             stringer.keySymbolValuePair(VoltZK.drPublicHostProp, VoltDB.getPublicReplicationInterface());
