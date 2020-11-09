@@ -306,22 +306,10 @@ public class SocketJoiner {
             // There's a listener socket if and only if we're the leader
             if (!m_listenerSockets.isEmpty()) {
 
-                // If an internal interface was specified, see if it matches any
-                // of the forms of the leader address we've bound to.
+                // If an internal interface was specified, see if it matches the leader
+                // address we have bound to.
                 if (m_internalInterface != null && !m_internalInterface.equals("")) {
-                    InetAddress testAddr = leaderAddr.getAddress();
-                    if (!m_internalInterface.equals(ReverseDNSCache.hostnameOrAddress(testAddr)) &&
-                        !m_internalInterface.equals(testAddr.getCanonicalHostName()) &&
-                        !m_internalInterface.equals(testAddr.getHostAddress())) {
-                        String msg = String.format("The provided internal interface (%s) does not match the "
-                                                   + "specified leader address (%s, %s). "
-                                                   + "This will result in either a cluster which fails to start or an unintended network topology. "
-                                                   + "The leader will now exit; correct your specified leader and interface and try restarting.",
-                                                   m_internalInterface,
-                                                   ReverseDNSCache.hostnameOrAddress(testAddr),
-                                                   testAddr.getHostAddress());
-                        org.voltdb.VoltDB.crashLocalVoltDB(msg, false, null);
-                    }
+                    checkLeaderAgainstInterface(leaderAddr);
                 }
 
                 // We are the leader
@@ -387,6 +375,57 @@ public class SocketJoiner {
 
         return retval;
     }
+
+    /**
+     * Compare internal interface address with leader address for equality.
+     * The supplied internal interface may be identified by address, name, or fqdn.
+     * We attempt to match any of those against the leader. For addresses, we must
+     * compare binary addresses, not string representations, because the same address
+     * can be represented in multiple ways.
+     *
+     * @param leaderAddr
+     */
+    private void checkLeaderAgainstInterface(InetSocketAddress leaderAddr) {
+        final String mismatch = "The provided internal interface (%s%s) does not match the specified leader address (%s%s%s)."
+            + " This will result in either a cluster which fails to start or an unintended network topology."
+            + " The leader will now exit; correct your specified leader and interface and try restarting.";
+
+        String error = null;
+        try {
+            InetAddress internalAddr = addressFromHost(m_internalInterface).getAddress();
+            InetAddress testAddr = leaderAddr.getAddress();
+            if (testAddr.equals(internalAddr)) {
+                return;
+            }
+            String testHost = ReverseDNSCache.hostnameOrAddress(testAddr);
+            if (testHost.equals(m_internalInterface)) {
+                return;
+            }
+            String testCanon = testAddr.getCanonicalHostName();
+            if (testCanon.equals(m_internalInterface)) {
+                return;
+            }
+            String internalIp = internalAddr.getHostAddress();
+            String testIp = testAddr.getHostAddress();
+            error = String.format(mismatch,
+                                  internalIp,
+                                  m_internalInterface.equals(internalIp) ? "" : ", " + m_internalInterface,
+                                  testIp,
+                                  testHost.equals(testIp) ? "" : ", " + testHost,
+                                  testCanon.equals(testHost) ? "" : ", " + testCanon);
+        }
+
+        catch (UnknownHostException ex) {
+            // addressFromHost failed to map internal interface host string to address.
+            // not expected to occur, but if it does, it's a mismatch.
+            error = String.format(mismatch, m_internalInterface, "", leaderAddr.getAddress(), "", "");
+        }
+
+        if (error != null) {
+            org.voltdb.VoltDB.crashLocalVoltDB(error);
+        }
+    }
+
 
     /*
      * Handles repetitive logging from the retry loops in start().

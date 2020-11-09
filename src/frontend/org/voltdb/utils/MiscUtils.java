@@ -672,38 +672,103 @@ public class MiscUtils {
 
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.
-     * @param defaultPort If a port isn't specified, use this one.
+     *               IPv6 addresses must be enclosed in brackets.
      * @return hostname or textual ip representation.
+     *         IPv6 address will not have brackets.
      */
     public static String getHostnameFromHostnameColonPort(String server) {
-        return HostAndPort.fromString(server).getHostText();
+        return HostAndPort.fromString(server).requireBracketsForIPv6().getHostText();
     }
 
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.
+     *               IPv6 addresses must be enclosed in brackets.
      * @param defaultPort If a port isn't specified, use this one.
      * @return port number.
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
-        return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
+        return HostAndPort.fromString(server).requireBracketsForIPv6().getPortOrDefault(defaultPort);
     }
 
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.
+     *               IPv6 addresses must be enclosed in brackets.
      * @param defaultPort If a port isn't specified, use this one.
      * @return HostAndPort number.
      */
     public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
-        return HostAndPort.fromString(server).withDefaultPort(defaultPort);
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort).requireBracketsForIPv6();
     }
 
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.
+     *               IPv6 addresses must be enclosed in brackets.
      * @param defaultPort If a port isn't specified, use this one.
      * @return String in hostname/ip:port format.
+     *         IPv6 address will be enclosed in brackets.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {
-        return HostAndPort.fromString(server).withDefaultPort(defaultPort).toString();
+        return getHostAndPortFromHostnameColonPort(server, defaultPort).toString();
+    }
+
+    /**
+     * Used to parse many of the --fubar=[interface][:port] command options.
+     * This differs from the other 'host and port' methods in that it treats
+     * a spec that consists only of decimal digits as a port number. Note that
+     * brackets are required around IPv6 addresses to remove ambiguity about
+     * whether there is a port number.
+     *
+     * Expected forms: (brackets are literal here)
+     *    portnum
+     *    hostname       hostname:portnum
+     *    ip4address    ip4address:portnum
+     *    [ip6address]  [ip6address]:portnum
+     *
+     * @param spec one of: port, hostname, hostname:port, ipaddr, ipaddr:port
+     * @param defaultHost: if spec is port number, this is used as the host
+     * @param defaultPort: if a port isn't specified, use this
+     * @return HostAndPort number.
+     * @throws IllegalArgumentException
+     */
+    public static HostAndPort getHostAndPortFromInterfaceSpec(String spec, String defaultHost, int defaultPort) {
+        spec = (spec == null ? "" : spec.trim());
+        if (spec.matches("^[0-9]+$")) {
+            return HostAndPort.fromParts(defaultHost, Integer.parseInt(spec));
+        }
+        else {
+            return HostAndPort.fromString(spec).withDefaultPort(defaultPort).requireBracketsForIPv6();
+        }
+    }
+
+    /**
+     * Handles interface addresses that are not supposed to contain a port
+     * number (which is checked). Strips brackets that may be around an
+     * IPv6 address, returning the bare address.
+     *
+     * @param host - one of hostname, ip4 address, ip6 address, [ip6 address]
+     * @return input with brackets removed
+     * @throws IllegalArgumentException
+     */
+    public static String getAddressOfInterface(String host) {
+        host = (host == null ? "" : host.trim());
+        return HostAndPort.fromHost(host).getHost();
+    }
+
+    /**
+     * Combines an address/hostname and port number into an "interface spec",
+     * taking care of adding brackets as necessary for IPv6 addresses.
+     * Both host and port are required here.
+     *
+     * @param host - one of hostname, ip4 address, ip6 address
+     * @param port - port number
+     * @return host and port as string
+     */
+    public static String makeInterfaceSpec(String host, int port) {
+        host = (host == null ? "" : host.trim());
+        if (host.contains(":") && host.charAt(0) != '[') {
+            host = "[" + host + "]";
+        }
+        return host + ":" + port;
     }
 
     /**

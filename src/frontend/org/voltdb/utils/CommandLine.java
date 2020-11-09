@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.voltcore.network.LoopbackAddress;
 import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -289,7 +290,7 @@ public class CommandLine extends VoltDB.Configuration
     int zkport = -1;
     public CommandLine zkport(int zkport) {
         this.zkport = zkport;
-        m_zkInterface = "127.0.0.1:" + zkport;
+        m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), zkport);
         return this;
     }
     public String zkinterface() {
@@ -448,7 +449,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String jmxHost = "127.0.0.1";
+    String jmxHost = LoopbackAddress.get();
     public CommandLine jmxHost(String jmxHost)
     {
         this.jmxHost = jmxHost;

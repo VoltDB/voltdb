@@ -46,6 +46,7 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.LoopbackAddress;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTimeUpdater;
@@ -97,6 +98,7 @@ public class VoltDB {
     public static final int AUTO_STATUS_PORT = 0;
     public static final int DEFAULT_STATUS_PORT = 11780;
     public static final int DEFAULT_TOPICS_PORT = 9092;
+    public static final int DEFAULT_ZK_PORT = org.voltcore.common.Constants.DEFAULT_ZK_PORT;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
 
     // Staged filenames for advanced deployments
@@ -135,11 +137,11 @@ public class VoltDB {
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
+        protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
         private boolean m_validateSuccess;
 
         public int m_ipcPort = DEFAULT_IPC_PORT;
-
-        protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
         /** select normal JNI backend.
          *  IPC, Valgrind, HSQLDB, and PostgreSQL are the other options.
@@ -164,7 +166,7 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        public String m_zkInterface = "127.0.0.1:" + org.voltcore.common.Constants.DEFAULT_ZK_PORT;
+        public String m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), DEFAULT_ZK_PORT);
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
@@ -367,7 +369,7 @@ public class VoltDB {
         public HostAndPort m_topicsHostPort = null;
 
         public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
+            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, DEFAULT_ZK_PORT);
         }
 
         public Configuration(PortGenerator ports) {
@@ -376,7 +378,7 @@ public class VoltDB {
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
-            m_zkInterface = "127.0.0.1:" + ports.next();
+            m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), ports.next());
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
@@ -384,12 +386,11 @@ public class VoltDB {
         }
 
         public Configuration(String args[]) {
-            String arg;
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
             for (int i=0; i < args.length; ++i) {
-                arg = args[i];
+                String arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
                 // in the array args.  Ignore them.
                 if (arg.isEmpty()) {
@@ -421,80 +422,37 @@ public class VoltDB {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
                 } else if (arg.equals("quietadhoc")) {
                     m_quietAdhoc = true;
-                } else if (arg.equals("port")) { // handle from the command line as two strings <catalog> <filename>
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
-                        m_clientInterface = hap.getHost();
-                        m_port = hap.getPort();
-                    } else {
-                        m_port = Integer.parseInt(portStr);
-                    }
+                } else if (arg.equals("port")) {
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_clientInterface, m_port);
+                    m_clientInterface = hap.getHost();
+                    m_port = hap.getPort();
                 } else if (arg.equals("adminport")) {
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
-                        m_adminInterface = hap.getHost();
-                        m_adminPort = hap.getPort();
-                    } else {
-                        m_adminPort = Integer.parseInt(portStr);
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_adminInterface, DEFAULT_ADMIN_PORT);
+                    m_adminInterface = hap.getHost();
+                    m_adminPort = hap.getPort();
                 } else if (arg.equals("internalport")) {
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
-                        m_internalInterface = hap.getHost();
-                        m_internalPort = hap.getPort();
-                    } else {
-                        m_internalPort = Integer.parseInt(portStr);
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_internalInterface, m_internalPort);
+                    m_internalInterface = hap.getHost();
+                    m_internalPort = hap.getPort();
                 } else if (arg.equals("drpublic")) {
-                    String publicStr = args[++i];
-                    if (publicStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(publicStr, VoltDB.DEFAULT_DR_PORT);
-                        m_drPublicHost = hap.getHost();
-                        m_drPublicPort = hap.getPort();
-                    } else {
-                        m_drPublicHost = publicStr;
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_drPublicHost, DEFAULT_DR_PORT);
+                    m_drPublicHost = hap.getHost();
+                    m_drPublicPort = hap.getPort();
                 } else if (arg.equals("replicationport")) {
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
-                        m_drInterface = hap.getHost();
-                        m_drAgentPortStart = hap.getPort();
-                    } else {
-                        m_drAgentPortStart = Integer.parseInt(portStr);
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_drInterface, DEFAULT_DR_PORT);
+                    m_drInterface = hap.getHost();
+                    m_drAgentPortStart = hap.getPort();
                 } else if (arg.equals("httpport")) {
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
-                        m_httpPortInterface = hap.getHost();
-                        m_httpPort = hap.getPort();
-                    } else {
-                        m_httpPort = Integer.parseInt(portStr);
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_httpPortInterface, DEFAULT_HTTP_PORT);
+                    m_httpPortInterface = hap.getHost();
+                    m_httpPort = hap.getPort();
                 } else if (arg.equals("statusport")) {
-                    String portStr = args[++i];
-                    try { // port only
-                        m_statusInterface = "";
-                        m_statusPort = Integer.parseInt(portStr);
-                    }
-                    catch (NumberFormatException ex) { // interface only, or interface:port
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, AUTO_STATUS_PORT);
-                        m_statusInterface = hap.getHost();
-                        m_statusPort = hap.getPort();
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_statusInterface, AUTO_STATUS_PORT);
+                    m_statusInterface = hap.getHost();
+                    m_statusPort = hap.getPort();
                 } else if (arg.startsWith("zkport")) {
-                    //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
-                    String portStr = args[++i];
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
-                        m_zkInterface = hap.getHost() + ":" + hap.getPort();
-                    } else {
-                        m_zkInterface = "127.0.0.1:" + portStr.trim();
-                    }
+                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], LoopbackAddress.get(), DEFAULT_ZK_PORT);
+                    m_zkInterface = hap.toString();
                 } else if (arg.equals("mesh")) {
                     StringBuilder sbld = new StringBuilder(64);
                     while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
@@ -519,17 +477,17 @@ public class VoltDB {
                 } else if (arg.equals("missing")) {
                     m_missingHostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
-                    m_publicInterface = args[++i].trim();
+                    m_publicInterface = MiscUtils.getAddressOfInterface(args[++i]);
                 } else if (arg.startsWith("publicinterface ")) {
-                    m_publicInterface = arg.substring("publicinterface ".length()).trim();
+                    m_publicInterface = MiscUtils.getAddressOfInterface(arg.substring("publicinterface ".length()));
                 } else if (arg.equals("externalinterface")) {
-                    m_externalInterface = args[++i].trim();
+                    m_externalInterface = MiscUtils.getAddressOfInterface(args[++i]);
                 } else if (arg.startsWith("externalinterface ")) {
-                    m_externalInterface = arg.substring("externalinterface ".length()).trim();
+                    m_externalInterface = MiscUtils.getAddressOfInterface(arg.substring("externalinterface ".length()));
                 } else if (arg.equals("internalinterface")) {
-                    m_internalInterface = args[++i].trim();
+                    m_internalInterface = MiscUtils.getAddressOfInterface(args[++i]);
                 } else if (arg.startsWith("internalinterface ")) {
-                    m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                    m_internalInterface = MiscUtils.getAddressOfInterface(arg.substring("internalinterface ".length()));
                 } else if (arg.startsWith("networkbindings")) {
                     for (String core : args[++i].split(",")) {
                         m_networkCoreBindings.offer(core);
@@ -734,12 +692,7 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("e3")) {
                     m_exporterVersion = ExporterVersion.E3;
                 } else if (arg.equalsIgnoreCase("topicsHostPort")) {
-                    String value = args[++i].trim();
-                    if (value.indexOf(':') >= 0) {
-                        m_topicsHostPort = HostAndPort.fromString(value);
-                    } else {
-                        m_topicsHostPort = HostAndPort.fromParts("", Integer.parseInt(value));
-                    }
+                    m_topicsHostPort = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], "", DEFAULT_TOPICS_PORT);
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

@@ -21,6 +21,7 @@ import java.io.File;
 import java.net.URL;
 
 import org.voltcore.common.Constants;
+import org.voltcore.network.LoopbackAddress;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
@@ -127,7 +128,7 @@ public class ServerThread extends Thread {
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_coordinators = MeshProber.hosts(internalPort);
         m_config.m_internalPort = internalPort;
-        m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+        m_config.m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), zkPort);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
         // Disable loading the EE if running against HSQL.
