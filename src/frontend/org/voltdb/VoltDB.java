@@ -166,7 +166,9 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        public String m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), DEFAULT_ZK_PORT);
+        /** ZooKeeper interface */
+        public String m_zkInterface = LoopbackAddress.get();
+        public int m_zkPort = DEFAULT_ZK_PORT;
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
@@ -369,7 +371,7 @@ public class VoltDB {
         public HostAndPort m_topicsHostPort = null;
 
         public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, DEFAULT_ZK_PORT);
+            return m_zkPort;
         }
 
         public Configuration(PortGenerator ports) {
@@ -378,7 +380,8 @@ public class VoltDB {
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
-            m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), ports.next());
+            m_zkInterface = LoopbackAddress.get();
+            m_zkPort = ports.next();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
@@ -452,7 +455,8 @@ public class VoltDB {
                     m_statusPort = hap.getPort();
                 } else if (arg.startsWith("zkport")) {
                     HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], LoopbackAddress.get(), DEFAULT_ZK_PORT);
-                    m_zkInterface = hap.toString();
+                    m_zkInterface = hap.getHost();
+                    m_zkPort = hap.getPort();
                 } else if (arg.equals("mesh")) {
                     StringBuilder sbld = new StringBuilder(64);
                     while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {

@@ -128,7 +128,8 @@ public class ServerThread extends Thread {
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_coordinators = MeshProber.hosts(internalPort);
         m_config.m_internalPort = internalPort;
-        m_config.m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), zkPort);
+        m_config.m_zkInterface = LoopbackAddress.get();
+        m_config.m_zkPort = zkPort;
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
         // Disable loading the EE if running against HSQL.

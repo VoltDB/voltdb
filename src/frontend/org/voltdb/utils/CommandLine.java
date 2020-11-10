@@ -81,6 +81,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_pathToLicense = m_pathToLicense;
         cl.m_noLoadLibVOLTDB = m_noLoadLibVOLTDB;
         cl.m_zkInterface = m_zkInterface;
+        cl.m_zkPort = m_zkPort;
         cl.m_port = m_port;
         cl.m_adminPort = m_adminPort;
         cl.m_internalPort = m_internalPort;
@@ -290,9 +291,15 @@ public class CommandLine extends VoltDB.Configuration
     int zkport = -1;
     public CommandLine zkport(int zkport) {
         this.zkport = zkport;
-        m_zkInterface = MiscUtils.makeInterfaceSpec(LoopbackAddress.get(), zkport);
+        m_zkInterface = LoopbackAddress.get();
+        m_zkPort = zkport;
         return this;
     }
+
+    public int zkport() {
+        return m_zkPort;
+    }
+
     public String zkinterface() {
         return m_zkInterface;
     }

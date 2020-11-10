@@ -68,7 +68,8 @@ public class ZKTestBase {
                     .hostCount(sites)
                     .build();
             int externalPort = m_ports.next();
-            config.zkInterface = "127.0.0.1:" + externalPort;
+            config.zkInterface = "127.0.0.1";
+            config.zkPort = externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
             HostMessenger hm = new HostMessenger(config, null);
@@ -93,7 +94,8 @@ public class ZKTestBase {
             assert config.internalPort + i == hp.getPort() : "coordinator port mismatches internal port";
             config.internalPort = hp.getPort();
             int externalPort = m_ports.next();
-            config.zkInterface = "127.0.0.1:" + externalPort;
+            config.zkInterface = "127.0.0.1";
+            config.zkPort = externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
             HostMessenger hm = new HostMessenger(config, null);
@@ -107,7 +109,8 @@ public class ZKTestBase {
             config.acceptor = criteria;
             config.internalPort += i;
             int externalPort = m_ports.next();
-            config.zkInterface = "127.0.0.1:" + externalPort;
+            config.zkInterface = "127.0.0.1";
+            config.zkPort = externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
             HostMessenger hm = new HostMessenger(config, null);

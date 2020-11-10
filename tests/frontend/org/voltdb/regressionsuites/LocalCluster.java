@@ -1520,7 +1520,8 @@ public class LocalCluster extends VoltServerConfig {
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
             rejoinCmdLn.m_httpPort = portGenerator.nextHttp();
-            rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
+            rejoinCmdLn.m_zkInterface = "127.0.0.1";
+            rejoinCmdLn.m_zkPort = portGenerator.next();
             rejoinCmdLn.m_internalPort = internalPortGenerator.nextInternalPort(hostId);
             rejoinCmdLn.m_coordinators = internalPortGenerator.getCoordinators();
             setPortsFromConfig(hostId, rejoinCmdLn);
@@ -2050,8 +2051,12 @@ public class LocalCluster extends VoltServerConfig {
         return templateCmdLine.pathToDeployment();
     }
 
-    public String zkinterface(int hostId) {
+    public String zkInterface(int hostId) {
         return m_cmdLines.get(hostId).zkinterface();
+    }
+
+    public int zkPort(int hostId) {
+        return m_cmdLines.get(hostId).zkport();
     }
 
     public int drAgentStartPort(int hostId) {

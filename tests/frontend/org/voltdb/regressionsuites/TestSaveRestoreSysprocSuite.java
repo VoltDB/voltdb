@@ -1033,7 +1033,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 /*
                  * Test that the cluster doesn't goes down if you do a restore with dups
                  */
-                ZooKeeper zk = ZKUtil.getClient(lc.zkinterface(0), 5000, Sets.<Long>newHashSet());
+                ZooKeeper zk = ZKUtil.getClient(lc.zkInterface(0), lc.zkPort(0), 5000, Sets.<Long>newHashSet());
                 doDupRestore(client, TESTNONCE);
                 lc.shutDownExternal();
                 long start = System.currentTimeMillis();

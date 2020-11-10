@@ -210,9 +210,17 @@ public class ZKUtil {
         return baos.toByteArray();
     }
 
-    public static final ZooKeeper getClient(String zkAddress, int timeout, Set<Long> verbotenThreads) throws Exception {
+    private static String addressAndPort(String addr, int port) {
+        if (addr.contains(":") && addr.charAt(0) != '[') {
+            return "[" + addr + "]:" + port;
+        } else {
+            return addr + ":" + port;
+        }
+    }
+
+    public static final ZooKeeper getClient(String zkAddr, int zkPort, int timeout, Set<Long> verbotenThreads) throws Exception {
         final Semaphore zkConnect = new Semaphore(0);
-        ZooKeeper zk = new ZooKeeper(zkAddress, 2000, new Watcher() {
+        ZooKeeper zk = new ZooKeeper(addressAndPort(zkAddr, zkPort), 2000, new Watcher() {
             @Override
             public void process(WatchedEvent event) {
                 if (event.getState() == KeeperState.SyncConnected) {

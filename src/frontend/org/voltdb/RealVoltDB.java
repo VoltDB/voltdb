@@ -3294,9 +3294,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair("httpInterface", m_config.m_httpPortInterface);
             stringer.keySymbolValuePair("internalPort", m_config.m_internalPort);
             stringer.keySymbolValuePair("internalInterface", m_config.m_internalInterface);
-            HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(m_config.m_zkInterface, 0);
-            stringer.keySymbolValuePair("zkPort", hap.getPort());
-            stringer.keySymbolValuePair("zkInterface", hap.getHost());
+            stringer.keySymbolValuePair("zkPort", m_config.m_zkPort);
+            stringer.keySymbolValuePair("zkInterface", m_config.m_zkInterface);
             stringer.keySymbolValuePair("drPort", VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             stringer.keySymbolValuePair("drInterface", VoltDB.getDefaultReplicationInterface());
             stringer.keySymbolValuePair(VoltZK.drPublicHostProp, VoltDB.getPublicReplicationInterface());
@@ -3556,6 +3555,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
+        hmconfig.zkPort = m_config.m_zkPort;
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
