@@ -609,7 +609,7 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE OPAQUE TOPIC foo2 PARTITIONED ALLOW X8,Y1,Z1 PROFILE prof1;",
                 "CREATE OPAQUE TOPIC foo3 ALLOW X,Y,Z PROFILE prof1;",
                 "CREATE OPAQUE TOPIC foo4 PARTITIONED;",
-                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC foo5 ALLOW X,Y,Z PROFILE prof1 PROPERTIES (format.consumer.key = int);"
+                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC USING STREAM foo5 ALLOW X,Y,Z PROFILE prof1 PROPERTIES (format.consumer.key = int);"
         };
         VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {
