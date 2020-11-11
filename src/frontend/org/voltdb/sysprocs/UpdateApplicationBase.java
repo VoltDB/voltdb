@@ -55,7 +55,6 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
-import org.voltdb.task.TaskManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
 import org.voltdb.utils.CompressionService;
@@ -236,22 +235,20 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            if (!VoltDB.instance().validateDeploymentUpdates(newCatalog, dt, context.getDeployment(), retval)) {
+            // Validate deployment
+            if (!VoltDB.instance().validateDeployment(newCatalog, dt, context.getDeployment(), retval)) {
                 return retval;
             }
 
+            // Compile deployment into catalog
             final String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
-            if (!VoltDB.instance().validateNewCatalog(newCatalog, dt, retval)) {
-                return retval;
-            }
-
-            // FIXME: move to CatalogValidator
-            if (!validateNewCatalog(newCatalog, newCatalogJar, retval)) {
+            // Validate full configuration
+            if (!VoltDB.instance().validateConfiguration(newCatalog, dt, newCatalogJar, retval)) {
                 return retval;
             }
 
@@ -306,22 +303,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     e.getMessage();
         }
         return retval;
-    }
-
-    /**
-     * Validate that the catalog in its entirety is valid. If it is not valid an appropriate error message will be set
-     * on {@code result}
-     *
-     * @return {@code true} if the catalog is valid
-     */
-    private static boolean validateNewCatalog(Catalog catalog, InMemoryJarfile catalogJar, CatalogChangeResult result) {
-        String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
-        if (taskErrors != null) {
-            result.errorMsg = taskErrors;
-            return false;
-        }
-
-        return true;
     }
 
     /**

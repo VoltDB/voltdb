@@ -40,6 +40,7 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -397,37 +398,43 @@ public interface VoltDBInterface
     void setMasterOnly();
 
     /**
-     * Register a validator to be used to validate the catalog on every update.
-     * @param validator
+     * Build the {@link CatalogValidator} instances. Should be invoked only once on startup.
+     *
+     * @param isPro {@code true} if running enterprise
      */
-    public void registerCatalogValidator(CatalogValidator validator);
+    default void buildCatalogValidators(boolean isPro) {}
 
     /**
-     * Unregister a validator.
-     * @param validator
-     */
-    public void unregisterCatalogValidator(CatalogValidator validator);
-
-    /**
+     * Validate the deployment file.
+     * <p>
      * This will be called from the catalog update procedure on every catalog update.
      * All the registered validators will be called for validation from here.
      *
      * @param catalog the new catalog
      * @param newDep the updated deployment
-     * @param curDep the current deployment
+     * @param curDep current deployment or {@code null} if changes are not to be validated
      * @param ccr the result of the validations will be set on this result object
      * @return boolean indicating if the validation was successful or not.
      */
-    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr);
+    default boolean validateDeployment(Catalog catalog, DeploymentType newDep,
+            DeploymentType curDep, CatalogChangeResult ccr) {
+        return true;
+    }
 
     /**
-     * This will be called from the catalog update procedure on every catalog update.
+     * Validate the consistency of the whole configuration, i.e. catalog and deployment.
+     * <p>
+     * This will be called once at startup time and from the catalog update procedure on every catalog update.
      * All the registered validators will be called for validation from here.
      *
      * @param catalog the new catalog
      * @param deployment the new deployment
+     * @param catalogJar the {@link InMemoryJarfile} of the new catalog
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return {@code true} if successful, {@code false} if not and ccr updated with error message
      */
-    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr);
+    default public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
+            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+        return true;
+    }
 }

@@ -17,39 +17,87 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.InMemoryJarfile;
 
 /**
- * Interface to be implemented by components that need to be notified of catalog updates
- * and need to run validations on the catalog updates.
- * The validators need to register themselves with VoltDB instance to be notified of catalog updates
- * for validations.
+ * Base class for catalog validators. The fully qualified name of derived implementations
+ * must be added to {@code s_implementations} in order to be instantiated at startup time.
+ * <P>
+ * Implementations must only have an empty constructor. Only one instance of each implementation
+ * will be created, and invoked at startup time and on each catalog update.
  */
-public interface CatalogValidator {
+public class CatalogValidator {
+
+    private static class Entry {
+        final String m_implementation;
+        final boolean m_isPro;
+
+        Entry(String implementation, boolean isPro) {
+            m_implementation = implementation;
+            m_isPro = isPro;
+        }
+
+        String getImplementation() {
+            return m_implementation;
+        }
+
+        boolean isPro() {
+            return m_isPro;
+        }
+    }
+    private static Entry[] s_implementations = {
+            new Entry("org.voltdb.e3.topics.TopicsValidator", true),
+            new Entry("org.voltdb.e3.topics.TopicsGatewayValidator", true),
+            new Entry("org.voltdb.task.TaskValidator", false)
+    };
+
+    /**
+     * Return the list of classes implementing this.
+     * <p>
+     * Failure to instantiate any class listed in {@code s_implementations} will crash VoltDB.
+     *
+     * @param includePro {@code true} if running enterprise and corresponding validators need to be included
+     * @return list of fully qualified class names, never {@code null}.
+     */
+    public static List<String> getImplementations(boolean includePro){
+        return Arrays.asList(s_implementations).stream().filter(i -> !i.isPro() || includePro)
+                .map(Entry::getImplementation)
+                .collect(Collectors.toList());
+    }
+
     /**
      * Validates the parts of the deployment relevant for this component.
      *
      * @param catalog the new catalog
      * @param newDep the updated deployment
-     * @param curDep current deployment
+     * @param curDep current deployment or {@code null} if changes are not to be validated
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return boolean indicating if the validation was successful or not.
      */
-    default public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+    public boolean validateDeployment(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         return true;
     }
 
     /**
-     * Validates the new catalog and new deployment.
+     * Validates consistency of the whole configuration, i.e. catalog and deployment.
+     * <p>
+     * Invoked once on startup, and subsequently on each catalog update.
      *
      * @param catalog the new catalog
      * @param deployment the new deployment
+     * @param catalogJar the {@link InMemoryJarfile} of the new catalog
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return {@code true} if successful, {@code false} if not and ccr updated with error message
      */
-    default public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
+    public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
+            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
         return true;
     }
 }

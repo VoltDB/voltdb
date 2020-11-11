@@ -49,6 +49,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.FeaturesType;
@@ -417,6 +418,7 @@ public class Inits {
                 }
             } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
+            InMemoryJarfile thisNodeCatalog = null;
             assert( m_rvdb.getStartAction() != StartAction.PROBE );
             if (m_rvdb.getStartAction() == StartAction.CREATE) {
                 // We may have received a staged catalog from the leader.
@@ -425,7 +427,6 @@ public class Inits {
                     String drRole = m_rvdb.getCatalogContext().getCluster().getDrrole();
                     m_rvdb.m_pathToStartupCatalog = Inits.createEmptyStartupJarFile(drRole).getAbsolutePath();
                 }
-                InMemoryJarfile thisNodeCatalog = null;
                 try {
                     thisNodeCatalog = new InMemoryJarfile(m_rvdb.m_pathToStartupCatalog);
                 } catch (IOException e){
@@ -451,10 +452,11 @@ public class Inits {
                 Pair<InMemoryJarfile, String> loadResults =
                     CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes,
                                                              DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
+                thisNodeCatalog = loadResults.getFirst();
                 serializedCatalog =
-                    CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
-                catalogJarBytes = loadResults.getFirst().getFullJarBytes();
-                catalogJarHash = loadResults.getFirst().getSha1Hash();
+                    CatalogUtil.getSerializedCatalogStringFromJar(thisNodeCatalog);
+                catalogJarBytes = thisNodeCatalog.getFullJarBytes();
+                catalogJarHash = thisNodeCatalog.getSha1Hash();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
@@ -471,16 +473,39 @@ public class Inits {
                 // Disallow recovering from an incompatible Enterprise catalog.
                 VoltDB.crashLocalVoltDB(e.getLocalizedMessage());
             }
-
             serializedCatalog = null;
 
+            // Build validators and validate deployment
+            // Note: the validation an catalog compilation sequence is identical to that of
+            // {@link org.voltdb.sysprocs.UpdateApplicationBase#prepareApplicationCatalogDiff}
+            m_rvdb.buildCatalogValidators(m_config.m_isEnterprise);
+            CatalogChangeResult ccr = new CatalogChangeResult();
+            try {
+                if (!m_rvdb.validateDeployment(catalog, m_deployment, null, ccr)) {
+                    VoltDB.crashLocalVoltDB(ccr.errorMsg);
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unexpected error validating deployment", true, e);
+            }
+
+            // Compile deployment into catalog
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
-            // catalog context. To validate deployment we compile and create
-            // a starter context which uses a placeholder catalog.
+            // catalog context.
             String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 VoltDB.crashLocalVoltDB(result);
+            }
+
+            // Validate full configuration
+            try {
+                if (!m_rvdb.validateConfiguration(catalog, m_deployment, thisNodeCatalog, ccr)) {
+                    VoltDB.crashLocalVoltDB(ccr.errorMsg);
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unexpected error validating configuration", true, e);
             }
 
             try {

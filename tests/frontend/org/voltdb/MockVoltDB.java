@@ -58,7 +58,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Topic;
 import org.voltdb.common.NodeState;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
@@ -1047,24 +1046,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setMasterOnly() {}
-
-    @Override
-    public void registerCatalogValidator(CatalogValidator validator) {
-    }
-
-    @Override
-    public void unregisterCatalogValidator(CatalogValidator validator) {
-    }
-
-    @Override
-    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
-        return true;
-    }
-
-    @Override
-    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
-        return true;
-    }
 
     @Override
     public AvroSerde getAvroSerde() {
