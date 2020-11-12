@@ -170,6 +170,7 @@ public class JDBCExportClient extends ExportClientBase {
         private String m_preparedStmtStr = null;
         private String m_createTableStr = null;
         private boolean m_supportsUpsert = false;
+        private boolean m_supportsDuplicateKey = false;
         private boolean m_warnedOfUnsupportedOperation = false;
         private boolean m_supportsBatchUpdates;
         private boolean m_disableAutoCommits = true;
@@ -366,12 +367,11 @@ public class JDBCExportClient extends ExportClientBase {
             DatabaseMetaData md = m_conn.getMetaData();
             supportsBatchUpdatesTmp = md.supportsBatchUpdates();
             String dbName = md.getDatabaseProductName();
-            boolean supportsDuplicateKey = false;
             boolean supportsUpsert = false;
             if (dbName.equals("MySQL")) {
                 m_dbType = DatabaseType.MYSQL;
                 identifierQuoteTemp = "`";
-                supportsDuplicateKey = true;
+                m_supportsDuplicateKey = true;
             } else if (dbName.equals("PostgreSQL")) {
                 m_dbType = DatabaseType.POSTGRES;
                 identifierQuoteTemp = "\"";
@@ -444,7 +444,7 @@ public class JDBCExportClient extends ExportClientBase {
                 m_preparedStmtStr = "UP" + pstmtStringTmp.substring(2);
                 m_supportsUpsert = true;
             }
-            else if (supportsDuplicateKey) {
+            else if (m_supportsDuplicateKey) {
                 m_preparedStmtStr = pstmtStringTmp + " ON DUPLICATE KEY UPDATE " + updateFields;
                 m_supportsUpsert = true;
             }
@@ -742,40 +742,83 @@ public class JDBCExportClient extends ExportClientBase {
                 }
             }
 
+            // Insert values in statement - if the statement supports duplicate keys,
+            // insert each value twice at their expected positions in statement.
             Object[] row = rowinst.values;
             List<VoltType> columnTypes = rowinst.types;
             boolean restartBlock = false;
             try {
+                int nCols = columnTypes.size() - firstField;
+
                 for (int i = firstField; i < columnTypes.size(); i++) {
+
                     final int pstmtIndex = i + 1 - firstField;
+                    final int pstmtIndex2 = pstmtIndex + nCols;
+
                     if (row[i] == null) {
                         pstmt.setNull(pstmtIndex, Types.NULL);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setNull(pstmtIndex2, Types.NULL);
+                        }
                     } else if (columnTypes.get(i) == VoltType.DECIMAL) {
                         pstmt.setBigDecimal(pstmtIndex, (BigDecimal)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setBigDecimal(pstmtIndex2, (BigDecimal)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.TINYINT) {
                         pstmt.setByte(pstmtIndex, (Byte)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setByte(pstmtIndex2, (Byte)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.SMALLINT) {
                         pstmt.setShort(pstmtIndex, (Short)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setShort(pstmtIndex2, (Short)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.INTEGER) {
                         pstmt.setInt(pstmtIndex, (Integer)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setInt(pstmtIndex2, (Integer)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.BIGINT) {
                         pstmt.setLong(pstmtIndex, (Long)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setLong(pstmtIndex2, (Long)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.FLOAT) {
                         pstmt.setDouble(pstmtIndex, (Double)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setDouble(pstmtIndex2, (Double)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.STRING) {
                         pstmt.setString(pstmtIndex, (String)row[i]);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setString(pstmtIndex2, (String)row[i]);
+                        }
                     } else if (columnTypes.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType)row[i];
                         pstmt.setTimestamp(pstmtIndex, timestamp.asJavaTimestamp());
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setTimestamp(pstmtIndex2, timestamp.asJavaTimestamp());
+                        }
                     } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
                         GeographyPointValue gpv = (GeographyPointValue)row[i];
                         pstmt.setString(pstmtIndex, gpv.toWKT());
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setString(pstmtIndex2, gpv.toWKT());
+                        }
                     } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
                         GeographyValue gv = (GeographyValue)row[i];
                         pstmt.setString(pstmtIndex, gv.toWKT());
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setString(pstmtIndex2, gv.toWKT());
+                        }
                     } else if (columnTypes.get(i) == VoltType.VARBINARY) {
                         byte[] bytes = (byte[])row[i];
                         pstmt.setBytes(pstmtIndex, bytes);
+                        if (m_supportsDuplicateKey) {
+                            pstmt.setBytes(pstmtIndex2, bytes);
+                        }
                     }
                 }
 
