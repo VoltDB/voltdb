@@ -226,7 +226,11 @@ class FastSerializer:
                 self.socket = ss
             self.socket.setblocking(1)
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-            self.socket.connect(ai[4])
+            try:
+                self.socket.connect(ai[4])
+            except Exception:
+                print("ERROR: Failed to connect to %s port %s" % (ai[4][0], ai[4][1]))
+                raise
             #if self.usessl:
             #    print 'Cipher suite: ' + str(self.socket.cipher())
 

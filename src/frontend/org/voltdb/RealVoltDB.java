@@ -3294,9 +3294,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair("httpInterface", m_config.m_httpPortInterface);
             stringer.keySymbolValuePair("internalPort", m_config.m_internalPort);
             stringer.keySymbolValuePair("internalInterface", m_config.m_internalInterface);
-            HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(m_config.m_zkInterface, 0);
-            stringer.keySymbolValuePair("zkPort", hap.getPort());
-            stringer.keySymbolValuePair("zkInterface", hap.getHost());
+            stringer.keySymbolValuePair("zkPort", m_config.m_zkPort);
+            stringer.keySymbolValuePair("zkInterface", m_config.m_zkInterface);
             stringer.keySymbolValuePair("drPort", VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             stringer.keySymbolValuePair("drInterface", VoltDB.getDefaultReplicationInterface());
             stringer.keySymbolValuePair(VoltZK.drPublicHostProp, VoltDB.getPublicReplicationInterface());
@@ -3556,6 +3555,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
+        hmconfig.zkPort = m_config.m_zkPort;
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
@@ -4207,19 +4207,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void registerCatalogValidator(CatalogValidator validator) {
-        m_catalogValidators.add(validator);
+    public void buildCatalogValidators(boolean isPro) {
+        List <String> implementations = CatalogValidator.getImplementations(isPro);
+        if (!implementations.isEmpty() && !m_catalogValidators.isEmpty()) {
+            VoltDB.crashLocalVoltDB("Catalog validators already initialized");
+        }
+
+        Set<String> created = new HashSet<>();
+        try {
+            for (String implementation : implementations) {
+                if (!created.add(implementation)) {
+                    throw new RuntimeException("Catalog validator " + implementation + " defined multiple times");
+                }
+                Class<?> validatorClass = Class.forName(implementation);
+                CatalogValidator validator = (CatalogValidator) validatorClass.newInstance();
+                m_catalogValidators.add(validator);
+            }
+        }
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to create catalog validators", true, e);
+        }
     }
 
     @Override
-    public void unregisterCatalogValidator(CatalogValidator validator) {
-        m_catalogValidators.remove(validator);
-    }
-
-    @Override
-    public boolean validateDeploymentUpdates(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
+    public boolean validateDeployment(Catalog catalog, DeploymentType newDep, DeploymentType curDep, CatalogChangeResult ccr) {
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateDeploymentUpdates(catalog, newDep, curDep, ccr)) {
+            if (!validator.validateDeployment(catalog, newDep, curDep, ccr)) {
                 return false;
             }
         }
@@ -4228,9 +4241,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public boolean validateNewCatalog(Catalog catalog, DeploymentType deployment, CatalogChangeResult ccr) {
+    public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
+            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateNewCatalog(catalog, deployment, ccr)) {
+            if (!validator.validateConfiguration(catalog, deployment, catalogJar, ccr)) {
                 return false;
             }
         }

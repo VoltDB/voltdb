@@ -133,13 +133,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private static final String DEAD_HOST_TIMEOUT = "deadhosttimeout";
         private static final String INTERNAL_PORT = "internalport";
         private static final String INTERNAL_INTERFACE = "internalinterface";
+        private static final String ZK_PORT = "zkport";
         private static final String ZK_INTERFACE = "zkinterface";
         private static final String COORDINATOR_IP = "coordinatorip";
         private static final String GROUP = "group";
         private static final String LOCAL_SITES_COUNT = "localSitesCount";
 
         public InetSocketAddress coordinatorIp;
-        public String zkInterface = loopbackInterface(7181);
+        public String zkInterface = LoopbackAddress.get();
+        public int zkPort = 7181;
         public String internalInterface = "";
         public int internalPort = 3021;
         public int deadHostTimeout = Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
@@ -186,9 +188,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
             for (int i = 0; i < hostCount; ++i) {
                 Config cnf = new Config(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT, false);
-                cnf.zkInterface = loopbackInterface(ports.next());
+                cnf.zkInterface = LoopbackAddress.get();
+                cnf.zkPort = ports.next();
                 cnf.internalPort = ports.next();
-                coordinators[i] = ":" + cnf.internalPort;
+                coordinators[i] = ":" + cnf.internalPort; // TODO IPv6 ?
                 lbld.add(cnf);
             }
 
@@ -207,13 +210,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public int getZKPort() {
-            return HostAndPort.fromString(zkInterface)
-                    .getPortOrDefault(org.voltcore.common.Constants.DEFAULT_ZK_PORT);
+            return zkPort;
         }
 
         public String getZKHost() {
-            return HostAndPort.fromString(zkInterface)
-                    .getHost();
+            return zkInterface;
         }
 
         private void initNetworkThreads() {
@@ -238,6 +239,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 js.keySymbolValuePair(GROUP, group);
                 js.keySymbolValuePair(COORDINATOR_IP, coordinatorIp.toString());
                 js.keySymbolValuePair(ZK_INTERFACE, zkInterface);
+                js.keySymbolValuePair(ZK_PORT, zkPort);
                 js.keySymbolValuePair(INTERNAL_INTERFACE, internalInterface);
                 js.keySymbolValuePair(INTERNAL_PORT, internalPort);
                 js.keySymbolValuePair(DEAD_HOST_TIMEOUT, deadHostTimeout);
@@ -413,6 +415,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public HostMessenger(Config config, HostWatcher hostWatcher, SslContext sslServerContext,
             SslContext sslClientContext) {
+        checkArgument(!HostAndPort.fromString(config.zkInterface).hasPort(),
+                      "zkInterface '%s' should not contain port", config.zkInterface);
         m_config = config;
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
@@ -708,7 +712,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
-            m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
+            m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, m_config.zkPort, 60 * 1000, VERBOTEN_THREADS);
             if (m_zk == null) {
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
@@ -1129,7 +1133,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         VERBOTEN_THREADS.addAll(m_network.getThreadIds());
         VERBOTEN_THREADS.addAll(m_agreementSite.getThreadIds());
         m_agreementSite.waitForRecovery();
-        m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
+        m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, m_config.zkPort, 60 * 1000, VERBOTEN_THREADS);
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
@@ -1890,13 +1894,5 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (fh != null) {
             fh.updateDeadReportCount();
         }
-    }
-
-    private static String loopbackInterface(int port) {
-        String la = LoopbackAddress.get();
-        if (la.contains(":")) {
-            la = "[" + la + "]";
-        }
-        return la + ":" + port;
     }
 }

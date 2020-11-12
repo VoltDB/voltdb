@@ -23,6 +23,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Topic;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -56,6 +57,7 @@ public class DropTopic extends StatementProcessor {
             VoltXMLElement tableXML = m_schema.findChild("table", name.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.remove("topicName");
+                tableXML.attributes.put("export", Constants.CONNECTORLESS_STREAM_TARGET_NAME);
             }
         }
         return true;

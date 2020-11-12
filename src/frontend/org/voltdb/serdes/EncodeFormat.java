@@ -30,6 +30,7 @@ public enum EncodeFormat {
     INVALID(false),
     CSV(false),
     AVRO(false),
+    JSON(false),
     OPAQUE(false),
     INT(true),
     LONG(true),
@@ -104,7 +105,7 @@ public enum EncodeFormat {
      * @return A set of all valid formats which can encode a multiple objects
      */
     public static EnumSet<EncodeFormat> complexFormats() {
-        return EnumSet.of(EncodeFormat.CSV, EncodeFormat.AVRO);
+        return EnumSet.of(EncodeFormat.CSV, EncodeFormat.AVRO, EncodeFormat.JSON);
     }
 
     /**

@@ -88,7 +88,8 @@ public class TestZK extends ZKTestBase {
         config.internalPort += site;
         config.acceptor = criteria;
         int clientPort = m_ports.next();
-        config.zkInterface = "127.0.0.1:" + clientPort;
+        config.zkInterface = "127.0.0.1";
+        config.zkPort = clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
         HostMessenger hm = new HostMessenger(config, null);

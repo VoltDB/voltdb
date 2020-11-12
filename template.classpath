@@ -36,7 +36,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-3.0.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-clients-2.3.0.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-clients-2.3.1.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-java-1.6.0.jar"/>
 	<classpathentry kind="lib" path="lib/zstd-jni-1.4.4-2.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
