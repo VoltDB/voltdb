@@ -29,6 +29,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -60,6 +61,17 @@ public class MpProcedureTask extends ProcedureTask
     // Generator uses node id under ZK.leaders_globalservice directory, not host id.
     // Only used for MP scoreboard at TransactionTaskQueue to track restarted MP transactions.
     final private MpRestartSequenceGenerator m_restartSeqGenerator;
+
+    static MpProcedureTask create(Mailbox mailbox, String procName, TransactionTaskQueue queue,
+            Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters, long buddyHSId,
+            boolean isRestart, int leaderId, boolean nPartTxn) {
+        StoredProcedureInvocation spi = msg.getStoredProcedureInvocation();
+        return spi != null && spi.isBatchCall()
+                ? new BatchProcedureTask.MpBatch(mailbox, procName, queue, msg, pInitiators, partitionMasters,
+                        buddyHSId, isRestart, leaderId, nPartTxn)
+                : new MpProcedureTask(mailbox, procName, queue, msg, pInitiators, partitionMasters, buddyHSId,
+                        isRestart, leaderId, nPartTxn);
+    }
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
@@ -333,6 +345,7 @@ public class MpProcedureTask extends ProcedureTask
         return sb.toString();
     }
 
+    @Override
     public boolean needCoordination() {
         return false;
     }

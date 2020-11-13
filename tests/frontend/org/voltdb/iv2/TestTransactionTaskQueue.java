@@ -76,7 +76,7 @@ public class TestTransactionTaskQueue extends TestCase
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, "TestProc", queue, init);
+                SpProcedureTask.create(mbox, "TestProc", queue, init);
         return task;
     }
 

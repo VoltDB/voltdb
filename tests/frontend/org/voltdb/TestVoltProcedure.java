@@ -475,7 +475,7 @@ public class TestVoltProcedure extends TestCase {
                 gcip, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
-        ClientResponse r = runner.call((Object) null);
+        ClientResponse r = runner.call(new Object[] { null });
         assertEquals(expectedClusterId, gcip.clusterId);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }

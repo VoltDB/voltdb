@@ -370,11 +370,12 @@ public final class InvocationDispatcher {
         // check for allPartition invocation and provide a nice error if it's misused
         if (task.hasPartitionDestination()) {
             if (!catProc.getSinglepartition()
-                    || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1)) {
+                    || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1
+                            && !task.isBatchCall())) {
                 return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
                         "Invalid procedure for all-partition execution. "
-                                + "Targeted procedure must be partitioned on the first parameter "
-                                + "or be a directed procedure.",
+                                + "Targeted procedure must be partitioned on the first parameter, "
+                                + " be a directed procedure or part of a batch call.",
                         task.clientHandle);
             }
 
@@ -1459,7 +1460,7 @@ public final class InvocationDispatcher {
         final CatalogContext.ProcedurePartitionInfo ppi =
                 (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
-            if (procedure.getPartitionparameter() == -1) {
+            if (procedure.getPartitionparameter() == -1 || task.isBatchCall()) {
                 if (task.hasPartitionDestination()) {
                     return new int[] { task.getPartitionDestination() };
                 } else {

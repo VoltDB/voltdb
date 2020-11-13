@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.function.IntFunction;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltPort;
@@ -279,7 +280,22 @@ public class ProcedureRunner {
     /**
      * Wraps coreCall with statistics code.
      */
-    public ClientResponseImpl call(Object... paramListIn) {
+    public ClientResponseImpl call(Object[] paramListIn) {
+        return call(true, paramListIn);
+    }
+
+    /**
+     * Wraps coreCall with statistics code and allows the caller to choose if the determinism hash is reset prior to
+     * calling the procedure.
+     * <p>
+     * NOTE: {@code resetHash} should almost always be true unless this a subsequent execution of the procedure in a
+     * batch procedure call
+     *
+     * @param resetHash   if {@code true} {@link #m_determinismHash} will be reset prior to the procedure call
+     * @param paramListIn array of parameters to pass to the procedure
+     * @return result of the procedure being invoked
+     */
+    public ClientResponseImpl call(boolean resetHash, Object[] paramListIn) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
         // if we're keeping track, calculate parameter size
@@ -289,7 +305,7 @@ public class ProcedureRunner {
             m_perCallStats.setParameterSize(params.getSerializedSize());
         }
 
-        ClientResponseImpl result = coreCall(paramListIn);
+        ClientResponseImpl result = coreCall(resetHash, paramListIn);
 
         // if we're keeping track, calculate result size
         if (m_perCallStats != null) {
@@ -316,7 +332,7 @@ public class ProcedureRunner {
     }
 
     @SuppressWarnings("finally")
-    private ClientResponseImpl coreCall(Object... paramListIn) {
+    private ClientResponseImpl coreCall(boolean resetHash, Object[] paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
@@ -336,8 +352,10 @@ public class ProcedureRunner {
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
-        // catalog version and statement count are part of the CRC, reset them for a new call
-        m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
+        if (resetHash) {
+            // catalog version and statement count are part of the CRC, reset them for a new call
+            m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
+        }
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -518,6 +536,19 @@ public class ProcedureRunner {
      * @return true if the txn hashes to the current partition, false otherwise
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
+        return checkPartition(txnState, hashinator, txnState.getInvocation()::getParameterAtIndex);
+    }
+
+    /**
+     * Check if the partition parameter hashes to this partition
+     *
+     * @param txnState           current {@link TransactionState}
+     * @param hashinator         current {@link TheHashinator} to be used to calculate the partition
+     * @param parameterRetriever {@link IntFunction} to retrieve parameters that are part of the invocation
+     * @return {@code true} if the partition parameter matches this partition
+     */
+    public boolean checkPartition(TransactionState txnState, TheHashinator hashinator,
+            IntFunction<Object> parameterRetriever) {
         if (m_isSinglePartition) {
             if (m_partitionColumn == -1) {
                 // Procedure doesn't have a partition column so this is always the correct partition
@@ -546,8 +577,8 @@ public class ProcedureRunner {
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {
                 // ClientInterface should pre-validate this param is valid
-                parameterAtIndex = invocation.getParameterAtIndex(0);
-                parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
+                parameterAtIndex = parameterRetriever.apply(0);
+                parameterType = VoltType.get((Byte) parameterRetriever.apply(1));
 
                 if (parameterAtIndex == null && m_isReadOnly) {
                     assert (m_procedure instanceof AdHoc_RO_SP);
@@ -557,7 +588,7 @@ public class ProcedureRunner {
 
             } else {
                 parameterType = m_partitionColumnType;
-                parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);
+                parameterAtIndex = parameterRetriever.apply(m_partitionColumn);
             }
 
             // Note that @LoadSinglepartitionTable has problems if the parititoning param

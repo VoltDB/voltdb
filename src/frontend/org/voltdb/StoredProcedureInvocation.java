@@ -73,6 +73,7 @@ public class StoredProcedureInvocation implements JSONString {
     private int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
     private boolean m_allPartition = false;
     private int m_partitionDestination = -1;
+    private boolean m_batchCall = false;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -94,6 +95,7 @@ public class StoredProcedureInvocation implements JSONString {
         copy.m_batchTimeout = m_batchTimeout;
         copy.m_allPartition = m_allPartition;
         copy.m_partitionDestination = m_partitionDestination;
+        copy.m_batchCall = m_batchCall;
 
         return copy;
     }
@@ -203,6 +205,31 @@ public class StoredProcedureInvocation implements JSONString {
         return m_partitionDestination;
     }
 
+    /**
+     * Set this procedure invocation as a batch invocation. When the procedure is a batch invocation there should only
+     * be one parameter which is a VoltTable where each row is a set of parameters to pass to the procedure
+     * <p>
+     * If the procedure being invoked is a partitioned procedure but one of the rows in {@code params} is not valid for
+     * {@code partitionDestination} then {@link org.voltdb.client.ClientResponse#GRACEFUL_FAILURE} will be returned by
+     * {@link org.voltdb.client.ClientResponse#getStatus()} and
+     * {@link org.voltdb.client.ClientResponse#TXN_MISPARTITIONED} will be returned by
+     * {@link org.voltdb.client.ClientResponse#getAppStatus()}
+     *
+     * @param params               {@link VoltTable} containing the parameters for the batch execution
+     */
+    public void setBatchCall(VoltTable params) {
+        this.params = new FutureTask<ParameterSet>(() -> ParameterSet.fromArrayNoCopy(params));
+        serializedParams = null;
+        m_batchCall = true;
+    }
+
+    /**
+     * @return {@code true} if this is a batch procedure call
+     */
+    public boolean isBatchCall() {
+        return m_batchCall;
+    }
+
     /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
@@ -232,15 +259,18 @@ public class StoredProcedureInvocation implements JSONString {
         // 6 is one byte for ext type, one for size, and 4 for integer value
         int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
 
-        int allPartitionExtensionSize = 0;
-        int partitionDestinationSize = 0;
         // Either set allPartition or partitionDestination both are not needed
-        if (m_partitionDestination == -1) {
-            // 2 is one byte for ext type, one for size
-            allPartitionExtensionSize = m_allPartition ? 2 : 0;
-        } else {
+        if (hasPartitionDestination()) {
             // 6 is one byte for ext type, one for size, and 4 for integer value
-            partitionDestinationSize = 6;
+            batchExtensionSize += 6;
+        } else if (m_allPartition) {
+            // 2 is one byte for ext type, one for size
+            batchExtensionSize += 2;
+        }
+
+        if (m_batchCall) {
+            // 2 is one byte for ext type, one for size
+            batchExtensionSize += 2;
         }
 
         // compute the size
@@ -249,7 +279,7 @@ public class StoredProcedureInvocation implements JSONString {
                 4 + getProcNameBytes().length + // procname
                 8 + // client handle
                 1 + // extension count
-                        batchExtensionSize + allPartitionExtensionSize + partitionDestinationSize;
+                        batchExtensionSize;
         return size;
     }
 
@@ -359,6 +389,9 @@ public class StoredProcedureInvocation implements JSONString {
         } else if (m_allPartition) {
             ++extensionCount;
         }
+        if (m_batchCall) {
+            ++extensionCount;
+        }
 
         // write the count as one byte
         buf.put(extensionCount);
@@ -370,6 +403,10 @@ public class StoredProcedureInvocation implements JSONString {
             ProcedureInvocationExtensions.writePartitionDestinationWithTypeByte(buf, m_partitionDestination);
         } else if (m_allPartition) {
             ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
+        }
+
+        if (m_batchCall) {
+            ProcedureInvocationExtensions.writeBatchCallWithTypeByte(buf);
         }
 
         serializeParams(buf);
@@ -530,6 +567,9 @@ public class StoredProcedureInvocation implements JSONString {
             case ProcedureInvocationExtensions.PARTITION_DESTINATION:
                 m_partitionDestination = ProcedureInvocationExtensions.readPartitionDestination(buf);
                 m_allPartition = true;
+                break;
+            case ProcedureInvocationExtensions.BATCH_CALL:
+                m_batchCall = ProcedureInvocationExtensions.readBatchCall(buf);
                 break;
             default:
                 ProcedureInvocationExtensions.skipUnknownExtension(buf);

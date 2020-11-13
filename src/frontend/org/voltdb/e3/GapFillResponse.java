@@ -132,7 +132,7 @@ public class GapFillResponse extends GapFillMessage {
      * Serialize this message to a buffer so that all {@link StreamBlock}s can be released. Once this is called
      * {@link #getStreamBlocks()} and {@link #isEmpty()} will no longer return valid responses
      *
-     * @throws IOException If there was an error during serializaiton
+     * @throws IOException If there was an error during serialization
      */
     void serialize() throws IOException {
 

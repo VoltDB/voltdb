@@ -398,7 +398,7 @@ public class MpScheduler extends Scheduler
 
 
         if (task == null) {
-            task = new MpProcedureTask(m_mailbox, procedureName,
+            task = MpProcedureTask.create(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), false, m_leaderId, false);
         }
@@ -487,7 +487,7 @@ public class MpScheduler extends Scheduler
         }
 
         if (task == null) {
-            task = new MpProcedureTask(m_mailbox, procedureName,
+            task = MpProcedureTask.create(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), true, m_leaderId, false);
         }
