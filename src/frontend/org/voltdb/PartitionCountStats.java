@@ -24,10 +24,15 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.iv2.Cartographer;
 
 public class PartitionCountStats extends StatsSource {
-    private final String COLUMN_NAME = "PARTITION_COUNT";
-
     // IV2 asks the cartographer for partition count
     private final Cartographer m_cartographer;
+
+    public enum PartitionCount {
+        PARTITION_COUNT       (VoltType.INTEGER);
+
+        public final VoltType m_type;
+        PartitionCount(VoltType type) { m_type = type; }
+    }
 
     /** IV2 constructor */
     public PartitionCountStats(Cartographer cartographer) {
@@ -37,14 +42,14 @@ public class PartitionCountStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo(COLUMN_NAME, VoltType.INTEGER));
+        super.populateColumnSchema(columns, PartitionCount.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get(COLUMN_NAME)] = m_cartographer.getPartitionCount();
-        super.updateStatsRow(rowKey, rowValues);
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + PartitionCount.PARTITION_COUNT.ordinal()] = m_cartographer.getPartitionCount();
+        return offset + PartitionCount.values().length;
     }
 
     @Override

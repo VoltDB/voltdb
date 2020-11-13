@@ -40,6 +40,21 @@ import org.voltdb.client.ClientResponse;
 // print the HOST ID twice in the result table, and move on.
 public class InitiatorStats extends SiteStatsSource {
 
+    public enum Initiator {
+        CONNECTION_ID               (VoltType.BIGINT),
+        CONNECTION_HOSTNAME         (VoltType.STRING),
+        PROCEDURE_NAME              (VoltType.STRING),
+        INVOCATIONS                 (VoltType.BIGINT),
+        AVG_EXECUTION_TIME          (VoltType.INTEGER),
+        MIN_EXECUTION_TIME          (VoltType.INTEGER),
+        MAX_EXECUTION_TIME          (VoltType.INTEGER),
+        ABORTS                      (VoltType.BIGINT),
+        FAILURES                    (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Initiator(VoltType type) { m_type = type; }
+    }
+
     /**
      *
      * @param name
@@ -114,20 +129,12 @@ public class InitiatorStats extends SiteStatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("CONNECTION_ID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("CONNECTION_HOSTNAME", VoltType.STRING));
-        columns.add(new ColumnInfo("PROCEDURE_NAME", VoltType.STRING));
-        columns.add(new ColumnInfo("INVOCATIONS", VoltType.BIGINT));
-        columns.add(new ColumnInfo("AVG_EXECUTION_TIME", VoltType.INTEGER));
-        columns.add(new ColumnInfo("MIN_EXECUTION_TIME", VoltType.INTEGER));
-        columns.add(new ColumnInfo("MAX_EXECUTION_TIME", VoltType.INTEGER));
-        columns.add(new ColumnInfo("ABORTS", VoltType.BIGINT));
-        columns.add(new ColumnInfo("FAILURES", VoltType.BIGINT));
+        super.populateColumnSchema(columns, Initiator.class);
     }
 
     @Override
-    protected void updateStatsRow(final Object rowKey, Object rowValues[]) {
+    protected int updateStatsRow(final Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         DummyIterator iterator = (DummyIterator)rowKey;
         Map.Entry<String, InvocationInfo> entry = iterator.innerNext;
         iterator.innerNext = null;
@@ -161,16 +168,16 @@ public class InitiatorStats extends SiteStatsSource {
             info.lastFailureCount = info.failureCount;
         }
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = connectionId;
-        rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.connectionHostname;
-        rowValues[columnNameToIndex.get("PROCEDURE_NAME")] = procName;
-        rowValues[columnNameToIndex.get("INVOCATIONS")] = invocationCount;
-        rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = (int)(totalExecutionTime / invocationCount);
-        rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
-        rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
-        rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
-        rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + Initiator.CONNECTION_ID.ordinal()] = connectionId;
+        rowValues[offset + Initiator.CONNECTION_HOSTNAME.ordinal()] = info.connectionHostname;
+        rowValues[offset + Initiator.PROCEDURE_NAME.ordinal()] = procName;
+        rowValues[offset + Initiator.INVOCATIONS.ordinal()] = invocationCount;
+        rowValues[offset + Initiator.AVG_EXECUTION_TIME.ordinal()] = (int)(totalExecutionTime / invocationCount);
+        rowValues[offset + Initiator.MIN_EXECUTION_TIME.ordinal()] = minExecutionTime;
+        rowValues[offset + Initiator.MAX_EXECUTION_TIME.ordinal()] = maxExecutionTime;
+        rowValues[offset + Initiator.ABORTS.ordinal()] = abortCount;
+        rowValues[offset + Initiator.FAILURES.ordinal()] = failureCount;
+        return offset + Initiator.values().length;
     }
 
     private class DummyIterator implements Iterator<Object> {

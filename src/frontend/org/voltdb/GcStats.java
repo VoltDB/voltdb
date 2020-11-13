@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltTable.ColumnInfo;;
 
 public class GcStats extends StatsSource {
 
@@ -35,6 +35,16 @@ public class GcStats extends StatsSource {
     private int m_totalOldGenGcTime = 0;
 
     private boolean m_intervalCollection = false;
+
+    public enum GC {
+        NEWGEN_GC_COUNT             (VoltType.INTEGER),
+        NEWGEN_AVG_GC_TIME          (VoltType.BIGINT),
+        OLDGEN_GC_COUNT             (VoltType.INTEGER),
+        OLDGEN_AVG_GC_TIME          (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        GC(VoltType type) { m_type = type; }
+    }
 
     public GcStats() {
         super(false);
@@ -81,20 +91,19 @@ public class GcStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo("NEWGEN_GC_COUNT", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("NEWGEN_AVG_GC_TIME", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("OLDGEN_GC_COUNT", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("OLDGEN_AVG_GC_TIME", VoltType.BIGINT));
+        super.populateColumnSchema(columns, GC.class);
     }
 
     @Override
-    protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected synchronized int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         if (m_intervalCollection) {
-            rowValues[columnNameToIndex.get("NEWGEN_GC_COUNT")] = m_lastNewGenGcCount;
-            rowValues[columnNameToIndex.get("NEWGEN_AVG_GC_TIME")] = m_lastNewGenGcCount > 0 ? m_lastNewGenGcTime / m_lastNewGenGcCount : 0;
-            rowValues[columnNameToIndex.get("OLDGEN_GC_COUNT")] = m_lastOldGenGcCount;
-            rowValues[columnNameToIndex.get("OLDGEN_AVG_GC_TIME")] = m_lastOldGenGcCount > 0 ? m_lastOldGenGcTime / m_lastOldGenGcCount : 0;
+            rowValues[offset + GC.NEWGEN_GC_COUNT.ordinal()] = m_lastNewGenGcCount;
+            rowValues[offset + GC.NEWGEN_AVG_GC_TIME.ordinal()]
+                    = m_lastNewGenGcCount > 0 ? m_lastNewGenGcTime / m_lastNewGenGcCount : 0;
+            rowValues[offset + GC.OLDGEN_GC_COUNT.ordinal()] = m_lastOldGenGcCount;
+            rowValues[offset + GC.OLDGEN_AVG_GC_TIME.ordinal()]
+                    = m_lastOldGenGcCount > 0 ? m_lastOldGenGcTime / m_lastOldGenGcCount : 0;
             m_totalNewGenGcCount += m_lastNewGenGcCount;
             m_lastNewGenGcCount = 0;
             m_totalOldGenGcCount += m_lastOldGenGcCount;
@@ -107,12 +116,14 @@ public class GcStats extends StatsSource {
         else {
             int totalNewGcCount = m_totalNewGenGcCount + m_lastNewGenGcCount;
             int totalOldGcCount = m_totalOldGenGcCount + m_lastOldGenGcCount;
-            rowValues[columnNameToIndex.get("NEWGEN_GC_COUNT")] = totalNewGcCount;
-            rowValues[columnNameToIndex.get("NEWGEN_AVG_GC_TIME")] = totalNewGcCount > 0 ? (m_totalNewGenGcTime + m_lastNewGenGcTime) / totalNewGcCount : 0;
-            rowValues[columnNameToIndex.get("OLDGEN_GC_COUNT")] = totalOldGcCount;
-            rowValues[columnNameToIndex.get("OLDGEN_AVG_GC_TIME")] = totalOldGcCount > 0 ? (m_totalOldGenGcTime + m_lastOldGenGcTime) / totalOldGcCount : 0;
+            rowValues[offset + GC.NEWGEN_GC_COUNT.ordinal()] = totalNewGcCount;
+            rowValues[offset + GC.NEWGEN_AVG_GC_TIME.ordinal()]
+                    = totalNewGcCount > 0 ? (m_totalNewGenGcTime + m_lastNewGenGcTime) / totalNewGcCount : 0;
+            rowValues[offset + GC.OLDGEN_GC_COUNT.ordinal()] = totalOldGcCount;
+            rowValues[offset + GC.OLDGEN_AVG_GC_TIME.ordinal()]
+                    = totalOldGcCount > 0 ? (m_totalOldGenGcTime + m_lastOldGenGcTime) / totalOldGcCount : 0;
         }
-        super.updateStatsRow(rowKey, rowValues);
+        return offset + GC.values().length;
     }
 
 }

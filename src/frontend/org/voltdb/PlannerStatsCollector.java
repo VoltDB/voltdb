@@ -22,7 +22,6 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltTable.ColumnInfo;
 
 /**
  * Collects global cache use stats
@@ -130,6 +129,24 @@ public class PlannerStatsCollector extends StatsSource {
      */
     long m_invocations = 0;
     long m_lastInvocations = 0;
+
+
+    public enum Planner {
+        SITE_ID                 (VoltType.INTEGER),
+        PARTITION_ID            (VoltType.INTEGER),
+        CACHE1_LEVEL            (VoltType.INTEGER),
+        CACHE2_LEVEL            (VoltType.INTEGER),
+        CACHE1_HITS             (VoltType.BIGINT),
+        CACHE2_HITS             (VoltType.BIGINT),
+        CACHE_MISSES            (VoltType.BIGINT),
+        PLAN_TIME_MIN           (VoltType.BIGINT),
+        PLAN_TIME_MAX           (VoltType.BIGINT),
+        PLAN_TIME_AVG           (VoltType.BIGINT),
+        FAILURES                (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Planner(VoltType type) { m_type = type; }
+    }
 
     /**
      * Calculate the invocation count based on the cache hit/miss counts.
@@ -242,10 +259,10 @@ public class PlannerStatsCollector extends StatsSource {
      * @param values Values of each column of the row of stats. Used as output.
      */
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        super.updateStatsRow(rowKey, rowValues);
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
 
-        rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
+        rowValues[offset + Planner.PARTITION_ID.ordinal()] = m_partitionId;
         long totalTimedExecutionTime = m_totalPlanningTime;
         long minExecutionTime = m_minPlanningTime;
         long maxExecutionTime = m_maxPlanningTime;
@@ -286,22 +303,24 @@ public class PlannerStatsCollector extends StatsSource {
             m_lastInvocations = m_invocations;
         }
 
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = m_siteId;
-        rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
-        rowValues[columnNameToIndex.get("CACHE1_LEVEL")] = cache1Level;
-        rowValues[columnNameToIndex.get("CACHE2_LEVEL")] = cache2Level;
-        rowValues[columnNameToIndex.get("CACHE1_HITS" )] = cache1Hits;
-        rowValues[columnNameToIndex.get("CACHE2_HITS" )] = cache2Hits;
-        rowValues[columnNameToIndex.get("CACHE_MISSES")] = cacheMisses;
-        rowValues[columnNameToIndex.get("PLAN_TIME_MIN")] = minExecutionTime;
-        rowValues[columnNameToIndex.get("PLAN_TIME_MAX")] = maxExecutionTime;
+        rowValues[offset + Planner.SITE_ID.ordinal()] = m_siteId;
+        rowValues[offset + Planner.PARTITION_ID.ordinal()] = m_partitionId;
+        rowValues[offset + Planner.CACHE1_LEVEL.ordinal()] = cache1Level;
+        rowValues[offset + Planner.CACHE2_LEVEL.ordinal()] = cache2Level;
+        rowValues[offset + Planner.CACHE1_HITS.ordinal()] = cache1Hits;
+        rowValues[offset + Planner.CACHE2_HITS.ordinal()] = cache2Hits;
+        rowValues[offset + Planner.CACHE_MISSES.ordinal()] = cacheMisses;
+        rowValues[offset + Planner.PLAN_TIME_MIN.ordinal()] = minExecutionTime;
+        rowValues[offset + Planner.PLAN_TIME_MAX.ordinal()] = maxExecutionTime;
         if (getSampleCount() != 0) {
-            rowValues[columnNameToIndex.get("PLAN_TIME_AVG")] =
+            rowValues[offset + Planner.PLAN_TIME_AVG.ordinal()] =
                  (totalTimedExecutionTime / getSampleCount());
         } else {
-            rowValues[columnNameToIndex.get("PLAN_TIME_AVG")] = 0L;
+            rowValues[offset + Planner.PLAN_TIME_AVG.ordinal()] = 0L;
         }
-        rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
+        rowValues[offset + Planner.FAILURES.ordinal()] = failureCount;
+
+        return offset + Planner.values().length;
     }
 
     /**
@@ -310,18 +329,7 @@ public class PlannerStatsCollector extends StatsSource {
      */
     @Override
     protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
-        columns.add(new ColumnInfo("PARTITION_ID",  VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE1_LEVEL",  VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE2_LEVEL",  VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE1_HITS",   VoltType.BIGINT));
-        columns.add(new ColumnInfo("CACHE2_HITS",   VoltType.BIGINT));
-        columns.add(new ColumnInfo("CACHE_MISSES",  VoltType.BIGINT));
-        columns.add(new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT));
-        columns.add(new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT));
-        columns.add(new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT));
-        columns.add(new ColumnInfo("FAILURES",      VoltType.BIGINT));
+        super.populateColumnSchema(columns, Planner.class);
     }
 
     @Override

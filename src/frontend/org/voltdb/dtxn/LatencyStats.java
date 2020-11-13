@@ -29,8 +29,9 @@ import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.voltdb.ClientInterface;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
 /** Source of @Statistics LATENCY, which provides key latency metrics from the past 5 seconds of transactions.
  * This is intended to be used as part of a manual or automatic monitoring solution,
@@ -53,6 +54,33 @@ public class LatencyStats extends StatsSource {
 
     private AtomicReference<AbstractHistogram> m_diffHistProvider = new AtomicReference<AbstractHistogram>();
     private ScheduledExecutorService m_updater = Executors.newScheduledThreadPool(1);
+
+    public enum Latency {
+        INTERVAL                    ("INTERVAL", VoltType.INTEGER),
+        COUNT                       ("COUNT", VoltType.INTEGER),
+        TPS                         ("TPS", VoltType.INTEGER),
+        P50                         ("P50", VoltType.BIGINT),
+        P95                         ("P95", VoltType.BIGINT),
+        P99                         ("P99", VoltType.BIGINT),
+        // Those three columns in statistics are "P99.9", "P99.99" and "P99.999", which cannot be the enum names.
+        // Use the alias name as workaround.
+        P99_9                       ("P99.9", VoltType.BIGINT),
+        P99_99                      ("P99.99", VoltType.BIGINT),
+        P99_999                     ("P99.999", VoltType.BIGINT),
+        MAX                         ("MAX", VoltType.BIGINT);
+
+        public final VoltType m_type;
+        public final String m_alias;
+        Latency(String name, VoltType type)
+        {
+            m_alias = name;
+            m_type = type;
+        }
+
+        public String alias() {
+            return m_alias;
+        }
+    }
 
     private class UpdaterJob implements Runnable {
 
@@ -115,34 +143,29 @@ public class LatencyStats extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);                       // timestamp is milliseconds
-        columns.add(new ColumnInfo("INTERVAL", VoltType.INTEGER)); // milliseconds
-        columns.add(new ColumnInfo("COUNT",    VoltType.INTEGER)); // samples
-        columns.add(new ColumnInfo("TPS",      VoltType.INTEGER)); // samples per second
-        columns.add(new ColumnInfo("P50",      VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P95",      VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99",      VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.9",    VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.99",   VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.999",  VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("MAX",      VoltType.BIGINT));  // microseconds
+        for (Latency col : Latency.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.alias(), col.m_type));
+        }
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        super.updateStatsRow(rowKey, rowValues);
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         AbstractHistogram diffHist = m_diffHistProvider.get();
 
         // Override timestamp from the procedure call with the one from when the data was fetched.
-        rowValues[columnNameToIndex.get("TIMESTAMP")] = diffHist.getEndTimeStamp();
-        rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_MS;
-        rowValues[columnNameToIndex.get("COUNT")]     = diffHist.getTotalCount();
-        rowValues[columnNameToIndex.get("TPS")]       = (int) (TimeUnit.SECONDS.toMillis(diffHist.getTotalCount()) / INTERVAL_MS);
-        rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(50D);
-        rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(95D);
-        rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(99D);
-        rowValues[columnNameToIndex.get("P99.9")]     = diffHist.getValueAtPercentile(99.9D);
-        rowValues[columnNameToIndex.get("P99.99")]    = diffHist.getValueAtPercentile(99.99D);
-        rowValues[columnNameToIndex.get("P99.999")]   = diffHist.getValueAtPercentile(99.999D);
-        rowValues[columnNameToIndex.get("MAX")]       = diffHist.getMaxValue();
+        rowValues[StatsCommon.TIMESTAMP.ordinal()] = diffHist.getEndTimeStamp();
+
+        rowValues[offset + Latency.INTERVAL.ordinal()]  = INTERVAL_MS;
+        rowValues[offset + Latency.COUNT.ordinal()]     = diffHist.getTotalCount();
+        rowValues[offset + Latency.TPS.ordinal()]       = (int) (TimeUnit.SECONDS.toMillis(diffHist.getTotalCount()) / INTERVAL_MS);
+        rowValues[offset + Latency.P50.ordinal()]       = diffHist.getValueAtPercentile(50D);
+        rowValues[offset + Latency.P95.ordinal()]       = diffHist.getValueAtPercentile(95D);
+        rowValues[offset + Latency.P99.ordinal()]       = diffHist.getValueAtPercentile(99D);
+        rowValues[offset + Latency.P99_9.ordinal()]     = diffHist.getValueAtPercentile(99.9D);
+        rowValues[offset + Latency.P99_99.ordinal()]    = diffHist.getValueAtPercentile(99.99D);
+        rowValues[offset + Latency.P99_999.ordinal()]   = diffHist.getValueAtPercentile(99.999D);
+        rowValues[offset + Latency.MAX.ordinal()]       = diffHist.getMaxValue();
+        return offset + Latency.values().length;
     }
 }

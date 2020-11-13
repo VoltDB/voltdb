@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.DRProducerStatsBase;
+import org.voltdb.DRProducerStatsBase.DRProducerClusterStatsBase.DRProducerCluster;
 import org.voltdb.DRRoleStats;
 import org.voltdb.VoltTable;
 
@@ -64,12 +64,12 @@ public class DRProducerClusterStats {
         Map<String, Byte> failureMap = new TreeMap<>();
         Map<String, Pair<DRRoleStats.State, Byte>> rowMap = new TreeMap<>();
         while (stats.advanceRow()) {
-            final byte clusterId = (byte) stats.getLong(DRProducerStatsBase.Columns.CLUSTER_ID);
-            final byte remoteClusterId = (byte) stats.getLong(DRProducerStatsBase.Columns.REMOTE_CLUSTER_ID);
+            final byte clusterId = (byte) stats.getLong(DRProducerCluster.CLUSTER_ID.name());
+            final byte remoteClusterId = (byte) stats.getLong(DRProducerCluster.REMOTE_CLUSTER_ID.name());
             String key = clusterId + ":" + remoteClusterId;
 
             // Remember the first non-zero failure per connection.
-            final byte lastFailure = (byte) stats.getLong(DRProducerStatsBase.Columns.LAST_FAILURE);
+            final byte lastFailure = (byte) stats.getLong(DRProducerCluster.LASTFAILURE.name());
             Byte failure = failureMap.get(key);
             if (failure == null) {
                 failureMap.put(key, lastFailure);
@@ -77,7 +77,7 @@ public class DRProducerClusterStats {
                 failureMap.put(key, lastFailure);
             }
 
-            final DRRoleStats.State state = DRRoleStats.State.valueOf(stats.getString(DRProducerStatsBase.Columns.STATE));
+            final DRRoleStats.State state = DRRoleStats.State.valueOf(stats.getString(DRProducerCluster.STATE.name()));
             Pair<DRRoleStats.State, Byte> pair = rowMap.get(key);
             if (pair == null) {
                 rowMap.put(key, Pair.of(state, failureMap.get(key)));

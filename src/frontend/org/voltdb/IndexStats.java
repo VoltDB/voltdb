@@ -23,6 +23,21 @@ import java.util.Iterator;
 import org.voltdb.VoltTable.ColumnInfo;
 
 public class IndexStats extends SiteStatsSource {
+
+    public enum Index {
+        PARTITION_ID                (VoltType.BIGINT),
+        INDEX_NAME                  (VoltType.STRING),
+        TABLE_NAME                  (VoltType.STRING),
+        INDEX_TYPE                  (VoltType.STRING),
+        IS_UNIQUE                   (VoltType.TINYINT),
+        IS_COUNTABLE                (VoltType.TINYINT),
+        ENTRY_COUNT                 (VoltType.BIGINT),
+        MEMORY_ESTIMATE             (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Index(VoltType type) { m_type = type; }
+    }
+
     public IndexStats(long siteId) {
         super(siteId, true);
     }
@@ -38,14 +53,6 @@ public class IndexStats extends SiteStatsSource {
     // schema are reflected here (sigh).
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("PARTITION_ID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("INDEX_NAME", VoltType.STRING));
-        columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
-        columns.add(new ColumnInfo("INDEX_TYPE", VoltType.STRING));
-        columns.add(new ColumnInfo("IS_UNIQUE", VoltType.TINYINT));
-        columns.add(new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT));
-        columns.add(new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT));
+        super.populateColumnSchema(columns, Index.class);
     }
 }

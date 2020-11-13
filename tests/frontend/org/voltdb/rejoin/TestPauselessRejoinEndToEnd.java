@@ -53,7 +53,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.iv2.KSafetyStats;
+import org.voltdb.iv2.KSafetyStats.KSafety;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -124,7 +124,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         assertNotNull(ksafetyProbe);
         long missingReplicaSum = 0;
         while (ksafetyProbe.advanceRow()) {
-            missingReplicaSum += ksafetyProbe.getLong(KSafetyStats.Constants.MISSING_REPLICA);
+            missingReplicaSum += ksafetyProbe.getLong(KSafety.MISSING_REPLICA.name());
         }
         assertTrue(missingReplicaSum > 0);
 
@@ -157,7 +157,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         assertNotNull(ksafetyProbe);
         missingReplicaSum = 0;
         while (ksafetyProbe.advanceRow()) {
-            missingReplicaSum += ksafetyProbe.getLong(KSafetyStats.Constants.MISSING_REPLICA);
+            missingReplicaSum += ksafetyProbe.getLong(KSafety.MISSING_REPLICA.name());
         }
         assertEquals(0L,missingReplicaSum);
 

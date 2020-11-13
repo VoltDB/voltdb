@@ -27,11 +27,6 @@ import org.voltdb.VoltTable.ColumnInfo;
  */
 public class StarvationTracker extends SiteStatsSource {
 
-    public StarvationTracker(long siteId) {
-        super(siteId, false);
-        m_lastStartTime = m_startTime = System.nanoTime();
-    }
-
     /*
      * Keep track of the time since the tracker was created or in the interval case, the last time
      * the stat was checked
@@ -58,6 +53,25 @@ public class StarvationTracker extends SiteStatsSource {
      * Is there currently starvation
      */
     private boolean m_starved = false;
+
+    // a.k.a starvation
+    public enum Idletime {
+        COUNT                       (VoltType.BIGINT),
+        PERCENT                     (VoltType.FLOAT),
+        AVG                         (VoltType.BIGINT),
+        MIN                         (VoltType.BIGINT),
+        MAX                         (VoltType.BIGINT),
+        STDDEV                      (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Idletime(VoltType type) { m_type = type; }
+    }
+
+    public StarvationTracker(long siteId) {
+        super(siteId, false);
+        m_lastStartTime = m_startTime = System.nanoTime();
+    }
+
     public void beginStarvation() {
         if (m_starved) {
             return;
@@ -83,17 +97,12 @@ public class StarvationTracker extends SiteStatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("PERCENT", VoltType.FLOAT));
-        columns.add(new ColumnInfo("AVG", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MIN", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MAX", VoltType.BIGINT));
-        columns.add(new ColumnInfo("STDDEV", VoltType.BIGINT));
+        super.populateColumnSchema(columns, Idletime.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         if (m_interval) {
             final long now = System.nanoTime();
             final long totalTime = now - m_lastStartTime;
@@ -108,41 +117,41 @@ public class StarvationTracker extends SiteStatsSource {
             m_lastMax = 0;
             m_lastMin = Long.MAX_VALUE;
             if (count > 0) {
-                rowValues[columnNameToIndex.get("COUNT")] = count;
-                rowValues[columnNameToIndex.get("PERCENT")] = totalStarvedTime / (totalTime / 100.0);
-                rowValues[columnNameToIndex.get("AVG")] = (totalStarvedTime / count) / 1000;
-                rowValues[columnNameToIndex.get("MIN")] = m_lastMin;
-                rowValues[columnNameToIndex.get("MAX")] = m_lastMax;
-                rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(sumOfSquares / count - uSecs * uSecs);
+                rowValues[offset + Idletime.COUNT.ordinal()] = count;
+                rowValues[offset + Idletime.PERCENT.ordinal()] = totalStarvedTime / (totalTime / 100.0);
+                rowValues[offset + Idletime.AVG.ordinal()] = (totalStarvedTime / count) / 1000;
+                rowValues[offset + Idletime.MIN.ordinal()] = m_lastMin;
+                rowValues[offset + Idletime.MAX.ordinal()] = m_lastMax;
+                rowValues[offset + Idletime.STDDEV.ordinal()] = (long)Math.sqrt(sumOfSquares / count - uSecs * uSecs);
             } else {
-                rowValues[columnNameToIndex.get("COUNT")] = 0L;
-                rowValues[columnNameToIndex.get("PERCENT")] = 0L;
-                rowValues[columnNameToIndex.get("AVG")] = 0L;
-                rowValues[columnNameToIndex.get("MIN")] = 0L;
-                rowValues[columnNameToIndex.get("MAX")] = 0L;
-                rowValues[columnNameToIndex.get("STDDEV")] = 0L;
+                rowValues[offset + Idletime.COUNT.ordinal()] = 0L;
+                rowValues[offset + Idletime.PERCENT.ordinal()] = 0L;
+                rowValues[offset + Idletime.AVG.ordinal()] = 0L;
+                rowValues[offset + Idletime.MIN.ordinal()] = 0L;
+                rowValues[offset + Idletime.MAX.ordinal()] = 0L;
+                rowValues[offset + Idletime.STDDEV.ordinal()] = 0L;
             }
         } else {
             final long totalTime = System.nanoTime() - m_startTime;
             if (m_count > 0) {
                 final long uSecs = (m_totalTime / m_count) / 1000;
-                rowValues[columnNameToIndex.get("COUNT")] = m_count;
-                rowValues[columnNameToIndex.get("PERCENT")] = m_totalTime / (totalTime / 100.0);
-                rowValues[columnNameToIndex.get("AVG")] = uSecs;
-                rowValues[columnNameToIndex.get("MIN")] = m_min;
-                rowValues[columnNameToIndex.get("MAX")] = m_max;
-                rowValues[columnNameToIndex.get("STDDEV")] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
+                rowValues[offset + Idletime.COUNT.ordinal()] = m_count;
+                rowValues[offset + Idletime.PERCENT.ordinal()] = m_totalTime / (totalTime / 100.0);
+                rowValues[offset + Idletime.AVG.ordinal()] = uSecs;
+                rowValues[offset + Idletime.MIN.ordinal()] = m_min;
+                rowValues[offset + Idletime.MAX.ordinal()] = m_max;
+                rowValues[offset + Idletime.STDDEV.ordinal()] = (long)Math.sqrt(m_sumOfSquares / m_count - uSecs * uSecs);
             }
             else {
-                rowValues[columnNameToIndex.get("COUNT")] = 0L;
-                rowValues[columnNameToIndex.get("PERCENT")] = 0L;
-                rowValues[columnNameToIndex.get("AVG")] = 0L;
-                rowValues[columnNameToIndex.get("MIN")] = 0L;
-                rowValues[columnNameToIndex.get("MAX")] = 0L;
-                rowValues[columnNameToIndex.get("STDDEV")] = 0L;
+                rowValues[offset + Idletime.COUNT.ordinal()] = 0L;
+                rowValues[offset + Idletime.PERCENT.ordinal()] = 0L;
+                rowValues[offset + Idletime.AVG.ordinal()] = 0L;
+                rowValues[offset + Idletime.MIN.ordinal()] = 0L;
+                rowValues[offset + Idletime.MAX.ordinal()] = 0L;
+                rowValues[offset + Idletime.STDDEV.ordinal()] = 0L;
             }
         }
-        super.updateStatsRow(rowKey, rowValues);
+        return offset + Idletime.values().length;
     }
 
     @Override

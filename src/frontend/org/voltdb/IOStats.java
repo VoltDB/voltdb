@@ -22,12 +22,23 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltTable.ColumnInfo;
 
 public class IOStats extends StatsSource {
-    private Map<Long, Pair<String, long[]>> m_ioStats =
-        new HashMap<Long, Pair<String,long[]>>();
+    private Map<Long, Pair<String, long[]>> m_ioStats = new HashMap<Long, Pair<String,long[]>>();
+
+    public enum IoStats {
+        CONNECTION_ID               (VoltType.BIGINT),
+        CONNECTION_HOSTNAME         (VoltType.STRING),
+        BYTES_READ                  (VoltType.BIGINT),
+        MESSAGES_READ               (VoltType.BIGINT),
+        BYTES_WRITTEN               (VoltType.BIGINT),
+        MESSAGES_WRITTEN            (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        IoStats(VoltType type) { m_type = type; }
+    }
 
     /**
      * A dummy iterator that wraps an Iterator<Long> and provides the
@@ -62,28 +73,22 @@ public class IOStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("CONNECTION_ID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("CONNECTION_HOSTNAME", VoltType.STRING));
-        columns.add(new ColumnInfo("BYTES_READ", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MESSAGES_READ", VoltType.BIGINT));
-        columns.add(new ColumnInfo("BYTES_WRITTEN", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MESSAGES_WRITTEN", VoltType.BIGINT));
-
+        super.populateColumnSchema(columns, IoStats.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         final Pair<String, long[]> info = m_ioStats.get(rowKey);
         final long[] counters = info.getSecond();
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = rowKey;
-        rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.getFirst();
-        rowValues[columnNameToIndex.get("BYTES_READ")] = counters[0];
-        rowValues[columnNameToIndex.get("MESSAGES_READ")] = counters[1];
-        rowValues[columnNameToIndex.get("BYTES_WRITTEN")] = counters[2];
-        rowValues[columnNameToIndex.get("MESSAGES_WRITTEN")] = counters[3];
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + IoStats.CONNECTION_ID.ordinal()] = rowKey;
+        rowValues[offset + IoStats.CONNECTION_HOSTNAME.ordinal()] = info.getFirst();
+        rowValues[offset + IoStats.BYTES_READ.ordinal()] = counters[0];
+        rowValues[offset + IoStats.MESSAGES_READ.ordinal()] = counters[1];
+        rowValues[offset + IoStats.BYTES_WRITTEN.ordinal()] = counters[2];
+        rowValues[offset + IoStats.MESSAGES_WRITTEN.ordinal()] = counters[3];
+        return offset + IoStats.values().length;
     }
 
     @Override

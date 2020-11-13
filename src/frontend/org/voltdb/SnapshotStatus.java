@@ -47,6 +47,24 @@ public class SnapshotStatus extends StatsSource {
         ELASTIC;
     };
 
+    public enum SnapshotStatusCols {
+        TABLE                   (VoltType.STRING),
+        PATH                    (VoltType.STRING),
+        FILENAME                (VoltType.STRING),
+        NONCE                   (VoltType.STRING),
+        TXNID                   (VoltType.BIGINT),
+        START_TIME              (VoltType.BIGINT),
+        END_TIME                (VoltType.BIGINT),
+        SIZE                    (VoltType.BIGINT),
+        DURATION                (VoltType.BIGINT),
+        THROUGHPUT              (VoltType.FLOAT),
+        RESULT                  (VoltType.STRING),
+        TYPE                    (VoltType.STRING);
+
+        public final VoltType m_type;
+        SnapshotStatusCols(VoltType type) { m_type = type; }
+    }
+
     static class SnapshotTypeChecker {
         File m_truncationSnapshotPath = null;
         File m_autoSnapshotPath = null;
@@ -121,24 +139,13 @@ public class SnapshotStatus extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("TABLE", VoltType.STRING));
-        columns.add(new ColumnInfo("PATH", VoltType.STRING));
-        columns.add(new ColumnInfo("FILENAME", VoltType.STRING));
-        columns.add(new ColumnInfo("NONCE", VoltType.STRING));
-        columns.add(new ColumnInfo("TXNID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("START_TIME", VoltType.BIGINT));
-        columns.add(new ColumnInfo("END_TIME", VoltType.BIGINT));
-        columns.add(new ColumnInfo("SIZE", VoltType.BIGINT));
-        columns.add(new ColumnInfo("DURATION", VoltType.BIGINT));
-        columns.add(new ColumnInfo("THROUGHPUT", VoltType.FLOAT));
-        columns.add(new ColumnInfo("RESULT", VoltType.STRING));
-        columns.add(new ColumnInfo("TYPE", VoltType.STRING));
+        super.populateColumnSchema(columns, SnapshotStatusCols.class);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         Pair<Snapshot, Table> p = (Pair<Snapshot, Table>) rowKey;
         Snapshot s = p.getFirst();
         Table t = p.getSecond();
@@ -151,16 +158,16 @@ public class SnapshotStatus extends StatsSource {
             throughput = (s.bytesWritten / (1024.0 * 1024.0)) / duration;
         }
 
-        rowValues[columnNameToIndex.get("TABLE")] = t.name;
-        rowValues[columnNameToIndex.get("PATH")] = s.path;
-        rowValues[columnNameToIndex.get("FILENAME")] = t.filename;
-        rowValues[columnNameToIndex.get("NONCE")] = s.nonce;
-        rowValues[columnNameToIndex.get("TXNID")] = s.txnId;
-        rowValues[columnNameToIndex.get("START_TIME")] = timeStarted;
-        rowValues[columnNameToIndex.get("END_TIME")] = s.timeFinished;
-        rowValues[columnNameToIndex.get("SIZE")] = t.size;
-        rowValues[columnNameToIndex.get("DURATION")] = duration;
-        rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
+        rowValues[offset + SnapshotStatusCols.TABLE.ordinal()] = t.name;
+        rowValues[offset + SnapshotStatusCols.PATH.ordinal()] = s.path;
+        rowValues[offset + SnapshotStatusCols.FILENAME.ordinal()] = t.filename;
+        rowValues[offset + SnapshotStatusCols.NONCE.ordinal()] = s.nonce;
+        rowValues[offset + SnapshotStatusCols.TXNID.ordinal()] = s.txnId;
+        rowValues[offset + SnapshotStatusCols.START_TIME.ordinal()] = timeStarted;
+        rowValues[offset + SnapshotStatusCols.END_TIME.ordinal()] = s.timeFinished;
+        rowValues[offset + SnapshotStatusCols.SIZE.ordinal()] = t.size;
+        rowValues[offset + SnapshotStatusCols.DURATION.ordinal()] = duration;
+        rowValues[offset + SnapshotStatusCols.THROUGHPUT.ordinal()] = throughput;
         String result;
         if (t.writeExp == null && t.serializationExp == null) {
             if (s.result == SnapshotResult.SUCCESS) {
@@ -171,9 +178,9 @@ public class SnapshotStatus extends StatsSource {
         } else {
             result = SnapshotResult.FAILURE.toString();
         }
-        rowValues[columnNameToIndex.get("RESULT")] = result;
-        rowValues[columnNameToIndex.get("TYPE")] = m_typeChecker.getSnapshotType(s.path, s.nonce).name();
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + SnapshotStatusCols.RESULT.ordinal()] = result;
+        rowValues[offset + SnapshotStatusCols.TYPE.ordinal()] = m_typeChecker.getSnapshotType(s.path, s.nonce).name();
+        return offset + SnapshotStatusCols.values().length;
     }
 
     @Override

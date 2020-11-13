@@ -24,40 +24,24 @@ import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.StatsSource;
-import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class DRConsumerStatsBase {
-
-    public static interface Columns {
-        // shared columns
-        public static final String CLUSTER_ID = "CLUSTER_ID";
-        public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
-
-        // column for both the cluster and node-level tables
-        public static final String STATE = "STATE";
-
-        // columns for the cluster-level table
-        public static final String LAST_FAILURE = "LAST_FAILURE";
-
-        // columns for the node-level table
-        public static final String REPLICATION_RATE_1M = "REPLICATION_RATE_1M";
-        public static final String REPLICATION_RATE_5M = "REPLICATION_RATE_5M";
-
-        // columns for partition-level table
-        public static final String IS_COVERED = "IS_COVERED";
-        public static final String COVERING_HOST = "COVERING_HOST";
-        public static final String LAST_RECEIVED_TIMESTAMP = "LAST_RECEIVED_TIMESTAMP";
-        public static final String LAST_APPLIED_TIMESTAMP = "LAST_APPLIED_TIMESTAMP";
-        public static final String IS_PAUSED = "IS_PAUSED";
-        public static final String REMOTE_CREATION_TIMESTAMP = "REMOTE_CREATION_TIMESTAMP";
-    }
-
     public static class DRConsumerClusterStatsBase extends StatsSource {
+
+        public enum DRConsumerCluster {
+            CLUSTER_ID                  (VoltType.INTEGER),
+            REMOTE_CLUSTER_ID           (VoltType.INTEGER),
+            STATE                       (VoltType.STRING),
+            LAST_FAILURE                (VoltType.INTEGER);
+
+            public final VoltType m_type;
+            DRConsumerCluster(VoltType type) { m_type = type; }
+        }
+
         private final static byte NO_FAILURE = 0;
 
         public DRConsumerClusterStatsBase() {
@@ -66,10 +50,9 @@ public class DRConsumerStatsBase {
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.INTEGER));
+            for (DRConsumerCluster col : DRConsumerCluster.values()) {
+                columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+            }
         }
 
         @Override
@@ -96,12 +79,12 @@ public class DRConsumerStatsBase {
             Map<String, Byte> failureMap = new TreeMap<>();
             Map<String, Pair<String, Byte>> rowMap = new TreeMap<>();
             while (stats.advanceRow()) {
-                final byte clusterId = (byte) stats.getLong(DRConsumerStatsBase.Columns.CLUSTER_ID);
-                final byte remoteClusterId = (byte) stats.getLong(DRConsumerStatsBase.Columns.REMOTE_CLUSTER_ID);
+                final byte clusterId = (byte) stats.getLong(DRConsumerCluster.CLUSTER_ID.name());
+                final byte remoteClusterId = (byte) stats.getLong(DRConsumerCluster.REMOTE_CLUSTER_ID.name());
                 String key = clusterId + ":" + remoteClusterId;
 
                 // Remember the first non-zero failure per connection.
-                final byte lastFailure = (byte) stats.getLong(DRConsumerStatsBase.Columns.LAST_FAILURE);
+                final byte lastFailure = (byte) stats.getLong(DRConsumerCluster.LAST_FAILURE.name());
                 Byte failure = failureMap.get(key);
                 if (failure == null) {
                     failureMap.put(key, lastFailure);
@@ -109,7 +92,7 @@ public class DRConsumerStatsBase {
                     failureMap.put(key, lastFailure);
                 }
 
-                final String state = stats.getString(DRConsumerStatsBase.Columns.STATE);
+                final String state = stats.getString(DRConsumerCluster.STATE.name());
                 Pair<String, Byte> pair = rowMap.get(key);
                 if (pair == null) {
                     rowMap.put(key, Pair.of(state, failureMap.get(key)));
@@ -126,19 +109,26 @@ public class DRConsumerStatsBase {
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
+
+        public enum DRConsumerNode {
+            CLUSTER_ID                  (VoltType.INTEGER),
+            REMOTE_CLUSTER_ID           (VoltType.INTEGER),
+            STATE                       (VoltType.STRING),
+            REPLICATION_RATE_1M         (VoltType.BIGINT),
+            REPLICATION_RATE_5M         (VoltType.BIGINT),
+            REMOTE_CREATION_TIMESTAMP   (VoltType.TIMESTAMP);
+
+            public final VoltType m_type;
+            DRConsumerNode(VoltType type) { m_type = type; }
+        }
+
         public DRConsumerNodeStatsBase() {
             super(false);
         }
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            super.populateColumnSchema(columns);
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.REPLICATION_RATE_1M, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.REPLICATION_RATE_5M, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.REMOTE_CREATION_TIMESTAMP, VoltType.TIMESTAMP));
+            super.populateColumnSchema(columns, DRConsumerNode.class);
         }
 
         @Override
@@ -148,21 +138,28 @@ public class DRConsumerStatsBase {
     }
 
     public static class DRConsumerPartitionStatsBase extends StatsSource {
+
+        public enum DRConsumerPartition {
+            CLUSTER_ID                  (VoltType.INTEGER),
+            REMOTE_CLUSTER_ID           (VoltType.INTEGER),
+            PARTITION_ID                (VoltType.INTEGER),
+            IS_COVERED                  (VoltType.STRING),
+            COVERING_HOST               (VoltType.STRING),
+            LAST_RECEIVED_TIMESTAMP     (VoltType.TIMESTAMP),
+            LAST_APPLIED_TIMESTAMP      (VoltType.TIMESTAMP),
+            IS_PAUSED                   (VoltType.STRING);
+
+            public final VoltType m_type;
+            DRConsumerPartition(VoltType type) { m_type = type; }
+        }
+
         public DRConsumerPartitionStatsBase() {
             super(false);
         }
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            super.populateColumnSchema(columns);
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.IS_COVERED, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.COVERING_HOST, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.LAST_RECEIVED_TIMESTAMP, VoltType.TIMESTAMP));
-            columns.add(new ColumnInfo(Columns.LAST_APPLIED_TIMESTAMP, VoltType.TIMESTAMP));
-            columns.add(new ColumnInfo(Columns.IS_PAUSED, VoltType.STRING));
+            super.populateColumnSchema(columns, DRConsumerPartition.class);
         }
 
         @Override

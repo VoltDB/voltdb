@@ -59,26 +59,28 @@ public class ExportStatsBase extends StatsSource {
         }
     }
 
+    public enum Export {
+        SITE_ID                     (VoltType.INTEGER),
+        PARTITION_ID                (VoltType.BIGINT),
+        SOURCE                      (VoltType.STRING),
+        TARGET                      (VoltType.STRING),
+        ACTIVE                      (VoltType.STRING),
+        TUPLE_COUNT                 (VoltType.BIGINT),
+        TUPLE_PENDING               (VoltType.BIGINT),
+        LAST_QUEUED_TIMESTAMP       (VoltType.TIMESTAMP),
+        LAST_ACKED_TIMESTAMP        (VoltType.TIMESTAMP),
+        AVERAGE_LATENCY             (VoltType.BIGINT),
+        MAX_LATENCY                 (VoltType.BIGINT),
+        QUEUE_GAP                   (VoltType.BIGINT),
+        STATUS                      (VoltType.STRING);
+
+        public final VoltType m_type;
+        Export(VoltType type) { m_type = type; }
+    }
+
 
     static String keyName(String streamName, int partitionId) {
         return streamName + "-" + partitionId;
-    }
-
-    public static interface Columns {
-        // column for both tables
-        public static final String SITE_ID = "SITE_ID";
-        public static final String PARTITION_ID = "PARTITION_ID";
-        public static final String SOURCE_NAME = "SOURCE";
-        public static final String EXPORT_TARGET = "TARGET";
-        public static final String ACTIVE = "ACTIVE";
-        public static final String TUPLE_COUNT = "TUPLE_COUNT";
-        public static final String TUPLE_PENDING = "TUPLE_PENDING";
-        public static final String LAST_QUEUED_TIMESTAMP = "LAST_QUEUED_TIMESTAMP";
-        public static final String LAST_ACKED_TIMESTAMP = "LAST_ACKED_TIMESTAMP";
-        public static final String AVERAGE_LATENCY = "AVERAGE_LATENCY";
-        public static final String MAX_LATENCY = "MAX_LATENCY";
-        public static final String QUEUE_GAP = "QUEUE_GAP";
-        public static final String STATUS = "STATUS";
     }
 
     /* Constructor */
@@ -89,20 +91,7 @@ public class ExportStatsBase extends StatsSource {
     // Check cluster.py and checkstats.py if order of the columns is changed,
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
-        columns.add(new ColumnInfo(Columns.PARTITION_ID, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.SOURCE_NAME, VoltType.STRING));
-        columns.add(new ColumnInfo(Columns.EXPORT_TARGET, VoltType.STRING));
-        columns.add(new ColumnInfo(Columns.ACTIVE, VoltType.STRING));
-        columns.add(new ColumnInfo(Columns.TUPLE_COUNT, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.TUPLE_PENDING, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.LAST_QUEUED_TIMESTAMP, VoltType.TIMESTAMP));
-        columns.add(new ColumnInfo(Columns.LAST_ACKED_TIMESTAMP, VoltType.TIMESTAMP));
-        columns.add(new ColumnInfo(Columns.AVERAGE_LATENCY, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.MAX_LATENCY, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.STATUS, VoltType.STRING));
+        super.populateColumnSchema(columns, Export.class);
     }
 
     @Override

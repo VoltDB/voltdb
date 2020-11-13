@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltTable.ColumnInfo;
 
 // This StatsSource is a bit of a hackjob, in that it exists only to make StatsAgent
 // happy.  The updating is never used, and the code in the Statistics sysproc
@@ -34,17 +34,19 @@ import org.voltcore.utils.Pair;
 // oddly.
 public class LiveClientsStats extends StatsSource
 {
-    private Map<Long, Pair<String, long[]>> m_clientStats =
-        new HashMap<Long, Pair<String,long[]>>();
+    private Map<Long, Pair<String, long[]>> m_clientStats = new HashMap<Long, Pair<String,long[]>>();
 
-    public static final ColumnInfo liveClientColumnInfo[] =
-        new ColumnInfo[] {new ColumnInfo("CONNECTION_ID", VoltType.BIGINT),
-                          new ColumnInfo("CLIENT_HOSTNAME", VoltType.STRING),
-                          new ColumnInfo("ADMIN", VoltType.TINYINT),
-                          new ColumnInfo("OUTSTANDING_REQUEST_BYTES", VoltType.BIGINT),
-                          new ColumnInfo("OUTSTANDING_RESPONSE_MESSAGES", VoltType.BIGINT),
-                          new ColumnInfo("OUTSTANDING_TRANSACTIONS", VoltType.BIGINT)
-    };
+    public enum LiveClients {
+        CONNECTION_ID                   (VoltType.BIGINT),
+        CLIENT_HOSTNAME                 (VoltType.STRING),
+        ADMIN                           (VoltType.TINYINT),
+        OUTSTANDING_REQUEST_BYTES       (VoltType.BIGINT),
+        OUTSTANDING_RESPONSE_MESSAGES   (VoltType.BIGINT),
+        OUTSTANDING_TRANSACTIONS        (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        LiveClients(VoltType type) { m_type = type; }
+    }
 
     /**
      * A dummy iterator that wraps an Iterator<Long> and provides the
@@ -79,25 +81,23 @@ public class LiveClientsStats extends StatsSource
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        for (ColumnInfo column : liveClientColumnInfo)
-        {
-            columns.add(column);
-        }
+        super.populateColumnSchema(columns, LiveClients.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         final Pair<String, long[]> info = m_clientStats.get(rowKey);
         final long[] counters = info.getSecond();
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = rowKey;
-        rowValues[columnNameToIndex.get("CLIENT_HOSTNAME")] = info.getFirst();
-        rowValues[columnNameToIndex.get("ADMIN")] = counters[0];
-        rowValues[columnNameToIndex.get("OUTSTANDING_REQUEST_BYTES")] = counters[1];
-        rowValues[columnNameToIndex.get("OUTSTANDING_RESPONSE_MESSAGES")] = counters[2];
-        rowValues[columnNameToIndex.get("OUTSTANDING_TRANSACTIONS")] = counters[3];
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + LiveClients.CONNECTION_ID.ordinal()] = rowKey;
+        rowValues[offset + LiveClients.CLIENT_HOSTNAME.ordinal()] = info.getFirst();
+        rowValues[offset + LiveClients.ADMIN.ordinal()] = counters[0];
+        rowValues[offset + LiveClients.OUTSTANDING_REQUEST_BYTES.ordinal()] = counters[1];
+        rowValues[offset + LiveClients.OUTSTANDING_RESPONSE_MESSAGES.ordinal()] = counters[2];
+        rowValues[offset + LiveClients.OUTSTANDING_TRANSACTIONS.ordinal()] = counters[3];
+
+        return offset + LiveClients.values().length;
     }
 
     @Override

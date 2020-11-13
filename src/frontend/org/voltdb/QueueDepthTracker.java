@@ -47,6 +47,16 @@ public class QueueDepthTracker extends SiteStatsSource {
     private long m_recentPollCount;
     private long m_recentWindowSize = m_maxWaitTimeWindowSize / 10; // recent window size set to 0.5 second
 
+    public enum Queue {
+        CURRENT_DEPTH           (VoltType.INTEGER),
+        POLL_COUNT              (VoltType.BIGINT),
+        AVG_WAIT                (VoltType.BIGINT),
+        MAX_WAIT                (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Queue(VoltType type) { m_type = type; }
+    }
+
     public class QueueStatus {
         public long timestamp;
         public long maxWait;
@@ -111,15 +121,12 @@ public class QueueDepthTracker extends SiteStatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("CURRENT_DEPTH", VoltType.INTEGER));
-        columns.add(new ColumnInfo("POLL_COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("AVG_WAIT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MAX_WAIT", VoltType.BIGINT));
+        super.populateColumnSchema(columns, Queue.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         long currentTime = System.nanoTime();
         // check if current wait time exceeds the maxWaitTime
         long currentWaitTime;
@@ -144,13 +151,12 @@ public class QueueDepthTracker extends SiteStatsSource {
                 }
             }
         }
-        rowValues[columnNameToIndex.get("CURRENT_DEPTH")] = m_depth;
-        rowValues[columnNameToIndex.get("POLL_COUNT")] = totalPollCountInWindow;
+        rowValues[offset + Queue.CURRENT_DEPTH.ordinal()] = m_depth;
+        rowValues[offset + Queue.POLL_COUNT.ordinal()] = totalPollCountInWindow;
         // wait times are in microseconds
-        rowValues[columnNameToIndex.get("AVG_WAIT")] = (totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow)) / 1000;
-        rowValues[columnNameToIndex.get("MAX_WAIT")] = maxWaitTimeInWindow / 1000;
-
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + Queue.AVG_WAIT.ordinal()] = (totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow)) / 1000;
+        rowValues[offset + Queue.MAX_WAIT.ordinal()] = maxWaitTimeInWindow / 1000;
+        return offset + Queue.values().length;
     }
 
     @Override

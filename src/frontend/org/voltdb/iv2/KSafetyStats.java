@@ -23,6 +23,7 @@ import java.util.NavigableSet;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.StatsSource;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
@@ -32,16 +33,20 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 public class KSafetyStats extends StatsSource {
     private final AtomicReference<NavigableSet<StatsPoint>> m_kSafetySet;
 
+    // undocumented
+    public enum KSafety {
+        TIMESTAMP                   (VoltType.BIGINT),
+        PARTITION_ID                (VoltType.INTEGER),
+        MISSING_REPLICA             (VoltType.INTEGER);
+
+        public final VoltType m_type;
+        KSafety(VoltType type) { m_type = type; }
+    }
+
     public KSafetyStats() {
         super(false);
         NavigableSet<StatsPoint> empty = ImmutableSortedSet.<StatsPoint>of();
         m_kSafetySet = new AtomicReference<>(empty);
-    }
-
-    public static interface Constants {
-        public final static String TIMESTAMP = "TIMESTAMP";
-        public final static String PARTITION_ID = "PARTITION_ID";
-        public final static String MISSING_REPLICA = "MISSING_REPLICA";
     }
 
     NavigableSet<StatsPoint> getSafetySet() {
@@ -56,17 +61,18 @@ public class KSafetyStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        columns.add(new ColumnInfo(Constants.TIMESTAMP, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Constants.PARTITION_ID, VoltType.INTEGER));
-        columns.add(new ColumnInfo(Constants.MISSING_REPLICA, VoltType.INTEGER));
+        for (KSafety col : KSafety.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        }
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
         StatsPoint sp = StatsPoint.class.cast(rowKey);
-        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = sp.getTimestamp();
-        rowValues[columnNameToIndex.get(Constants.PARTITION_ID)] = sp.getPartitionId();
-        rowValues[columnNameToIndex.get(Constants.MISSING_REPLICA)] = sp.getMissingCount();
+        rowValues[KSafety.TIMESTAMP.ordinal()] = sp.getTimestamp();
+        rowValues[KSafety.PARTITION_ID.ordinal()] = sp.getPartitionId();
+        rowValues[KSafety.MISSING_REPLICA.ordinal()] = sp.getMissingCount();
+        return KSafety.values().length;
     }
 
     @Override

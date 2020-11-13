@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.Level;
@@ -43,11 +42,24 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.MpTransactionState;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ResultTable;
 import org.voltdb.utils.CatalogUtil;
 
 //schedule and process time-to-live feature via @LowImpactDeleteNT. The host with smallest host id
 //will get the task done.
 public class TTLManager extends StatsSource{
+
+    public enum TTL {
+        TIMESTAMP               (VoltType.BIGINT),
+        TABLE_NAME              (VoltType.STRING),
+        ROWS_DELETED            (VoltType.BIGINT),
+        ROWS_DELETED_LAST_ROUND (VoltType.BIGINT),
+        ROWS_REMAINING          (VoltType.BIGINT),
+        LAST_DELETE_TIMESTAMP   (VoltType.TIMESTAMP);
+
+        public final VoltType m_type;
+        TTL(VoltType type) { m_type = type; }
+    }
 
     //exception is thrown if  DR consumer gets a chunk of larger than 50MB
     //DRTupleStream.cpp
@@ -58,6 +70,7 @@ public class TTLManager extends StatsSource{
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
     public static final int NT_PROC_TIMEOUT = Integer.getInteger("NT_PROC_TIMEOUT", 1000 * 120);
     static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
+
     public static class TTLStats {
         final String tableName;
         long rowsLeft = 0L;
@@ -282,12 +295,9 @@ public class TTLManager extends StatsSource{
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
-        columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
-        columns.add(new ColumnInfo("ROWS_DELETED", VoltType.BIGINT));
-        columns.add(new ColumnInfo("ROWS_DELETED_LAST_ROUND", VoltType.BIGINT));
-        columns.add(new ColumnInfo("ROWS_REMAINING", VoltType.BIGINT));
-        columns.add(new ColumnInfo("LAST_DELETE_TIMESTAMP", VoltType.TIMESTAMP));
+        for (TTL col : TTL.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        };
     }
 
     @Override
@@ -298,16 +308,18 @@ public class TTLManager extends StatsSource{
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
         TTLStats stats = m_stats.get(rowKey);
         if (stats != null) {
-            rowValues[columnNameToIndex.get("TIMESTAMP")] = System.currentTimeMillis();
-            rowValues[columnNameToIndex.get("TABLE_NAME")] = rowKey;
-            rowValues[columnNameToIndex.get("ROWS_DELETED")] = stats.rowsDeleted;
-            rowValues[columnNameToIndex.get("ROWS_DELETED_LAST_ROUND")] = stats.rowsLastDeleted;
-            rowValues[columnNameToIndex.get("ROWS_REMAINING")] = stats.rowsLeft;
-            rowValues[columnNameToIndex.get("LAST_DELETE_TIMESTAMP")] = stats.ts;
+            rowValues[TTL.TIMESTAMP.ordinal()] = System.currentTimeMillis();
+            rowValues[TTL.TABLE_NAME.ordinal()] = rowKey;
+            rowValues[TTL.ROWS_DELETED.ordinal()] = stats.rowsDeleted;
+            rowValues[TTL.ROWS_DELETED_LAST_ROUND.ordinal()] = stats.rowsLastDeleted;
+            rowValues[TTL.ROWS_REMAINING.ordinal()] = stats.rowsLeft;
+            rowValues[TTL.LAST_DELETE_TIMESTAMP.ordinal()] = stats.ts;
+            return TTL.values().length;
         }
+        return 0;
     }
 
     protected void migrate(ClientInterface cl, TTLTask task) {
@@ -344,7 +356,7 @@ public class TTLManager extends StatsSource{
                 if (resp.getResults() != null && resp.getResults().length > 0) {
                     VoltTable t = resp.getResults()[0];
                     t.advanceRow();
-                    String error = t.getString("MESSAGE");
+                    String error = t.getString(ResultTable.MESSAGE);
                     if (!error.isEmpty()) {
                         String drLimitError = "";
                         if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
@@ -364,7 +376,9 @@ public class TTLManager extends StatsSource{
                         hostLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
                                 "Errors occured on TTL table %s: %s %s", task.tableName, error, drLimitError);
                     } else {
-                        task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
+                        task.stats.update(t.getLong(ResultTable.ROWS_DELETED),
+                                          t.getLong(ResultTable.ROWS_LEFT),
+                                          t.getLong(ResultTable.LAST_DELETE_TIMESTAMP));
                     }
                 }
                 latch.countDown();

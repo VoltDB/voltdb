@@ -17,10 +17,15 @@
 
 package org.voltdb;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.DRRoleStats.DRRole;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
@@ -34,10 +39,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Used to periodically check if the server's resource utilization is above the configured limits
@@ -188,9 +189,9 @@ public class HealthMonitor implements Runnable, Promotable
             }
             VoltTable result = r.getResults()[0];
             while (result.advanceRow()) {
-                DrRoleType drRole = DrRoleType.fromValue(result.getString(DRRoleStats.CN_ROLE).toLowerCase());
-                DRRoleStats.State state = DRRoleStats.State.valueOf(result.getString(DRRoleStats.CN_STATE));
-                byte remoteCluster = (byte) result.getLong(DRRoleStats.CN_REMOTE_CLUSTER_ID);
+                DrRoleType drRole = DrRoleType.fromValue(result.getString(DRRole.ROLE.name()).toLowerCase());
+                DRRoleStats.State state = DRRoleStats.State.valueOf(result.getString(DRRole.STATE.name()));
+                byte remoteCluster = (byte) result.getLong(DRRole.REMOTE_CLUSTER_ID.name());
                 if (m_logger.isDebugEnabled()) {
                     m_logger.debug("DRROLE stats: Role:" + drRole + " State:" + state + " Remote Cluster ID:" + remoteCluster);
                 }

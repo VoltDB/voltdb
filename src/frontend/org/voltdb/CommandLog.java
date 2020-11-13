@@ -199,7 +199,7 @@ public interface CommandLog {
      * Statistics-related interface
      * Implementation should populate the stats based on column name to index mapping
      */
-    public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
+    public void populateCommandLogStats(int offset, Object[] rowValues);
 
     /**
      * Statistics-related interface, used by ActivityStats.

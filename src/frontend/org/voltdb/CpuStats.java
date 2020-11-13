@@ -29,6 +29,13 @@ public class CpuStats extends StatsSource {
     //Note com.sun here
     com.sun.management.OperatingSystemMXBean m_osBean;
 
+    public enum CPU {
+        PERCENT_USED                (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        CPU(VoltType type) { m_type = type; }
+    }
+
     public CpuStats() {
         super(false);
         m_osBean = (com.sun.management.OperatingSystemMXBean )ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
@@ -63,14 +70,14 @@ public class CpuStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo("PERCENT_USED", VoltType.BIGINT));
+        super.populateColumnSchema(columns, CPU.class);
     }
 
     @Override
-    protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("PERCENT_USED")] = Math.round(m_osBean.getProcessCpuLoad() * 100);
-        super.updateStatsRow(rowKey, rowValues);
+    protected synchronized int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + CPU.PERCENT_USED.ordinal()] = Math.round(m_osBean.getProcessCpuLoad() * 100);
+        return offset + CPU.values().length;
     }
 
 }

@@ -72,7 +72,7 @@ public class MockStatsSource extends StatsSource{
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
         try {
             Thread.sleep(delay);
         } catch (InterruptedException e) {
@@ -82,5 +82,6 @@ public class MockStatsSource extends StatsSource{
         for (int ii = 0; ii < retvals[index].length; ii++) {
             rowValues[columnNameToIndex.get(instanceColumns.get(ii).name)] = retvals[index][ii];
         }
+        return instanceColumns.size();
     }
 }

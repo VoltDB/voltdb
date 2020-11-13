@@ -35,16 +35,19 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.SnapshotScanner;
 
 public class SnapshotSummary extends StatsSource {
 
-    private enum ColumnName {
-        NONCE,
-        TXNID,
-        TYPE,
-        PATH,
-        START_TIME,
-        END_TIME,
-        DURATION,
-        PROGRESS_PCT,
-        RESULT;
+    public enum SnapshotSummaryCols {
+        NONCE                   (VoltType.STRING),
+        TXNID                   (VoltType.BIGINT),
+        TYPE                    (VoltType.STRING),
+        PATH                    (VoltType.STRING),
+        START_TIME              (VoltType.BIGINT),
+        END_TIME                (VoltType.BIGINT),
+        DURATION                (VoltType.BIGINT),
+        PROGRESS_PCT            (VoltType.FLOAT),
+        RESULT                  (VoltType.STRING);
+
+        public final VoltType m_type;
+        SnapshotSummaryCols(VoltType type) { m_type = type; }
     }
 
     private static class StatsRow {
@@ -74,10 +77,10 @@ public class SnapshotSummary extends StatsSource {
         Map<String, List<StatsRow>> snapshotMap = new TreeMap<>();
         perHostStats.resetRowPosition();
         while (perHostStats.advanceRow()) {
-            String nonce = perHostStats.getString(ColumnName.NONCE.name());
-            String result = perHostStats.getString(ColumnName.RESULT.name());
-            String path = perHostStats.getString(ColumnName.PATH.name());
-            float progressPct = (float)perHostStats.getDouble(ColumnName.PROGRESS_PCT.name());
+            String nonce = perHostStats.getString(SnapshotSummaryCols.NONCE.name());
+            String result = perHostStats.getString(SnapshotSummaryCols.RESULT.name());
+            String path = perHostStats.getString(SnapshotSummaryCols.PATH.name());
+            float progressPct = (float)perHostStats.getDouble(SnapshotSummaryCols.PROGRESS_PCT.name());
             List<StatsRow> statsRows = snapshotMap.get(nonce + path);
             if (statsRows == null) {
                 statsRows = new ArrayList<StatsRow>();
@@ -101,11 +104,11 @@ public class SnapshotSummary extends StatsSource {
                 avgProgress += row.progressPct;
                 sr = SnapshotResult.valueOf(row.result);
                 lowestOrdinal = Math.min(sr.ordinal(), lowestOrdinal);
-                long tmpStartTime = row.statsRow.getLong(ColumnName.START_TIME.name());
+                long tmpStartTime = row.statsRow.getLong(SnapshotSummaryCols.START_TIME.name());
                 if (tmpStartTime < startTime) {
                     startTime = tmpStartTime;
                 }
-                long tmpEndTime = row.statsRow.getLong(ColumnName.END_TIME.name());
+                long tmpEndTime = row.statsRow.getLong(SnapshotSummaryCols.END_TIME.name());
                 if (tmpEndTime > endTime) {
                     endTime = tmpEndTime;
                 }
@@ -115,10 +118,10 @@ public class SnapshotSummary extends StatsSource {
             if (endTime != 0) {
                 duration = (endTime - startTime) / 1000.0; // in seconds
             }
-            resultTable.addRow(lastRow.statsRow.getString(ColumnName.NONCE.name()),
-                    lastRow.statsRow.getLong(ColumnName.TXNID.name()),
-                    lastRow.statsRow.getString(ColumnName.TYPE.name()),
-                    lastRow.statsRow.getString(ColumnName.PATH.name()),
+            resultTable.addRow(lastRow.statsRow.getString(SnapshotSummaryCols.NONCE.name()),
+                    lastRow.statsRow.getLong(SnapshotSummaryCols.TXNID.name()),
+                    lastRow.statsRow.getString(SnapshotSummaryCols.TYPE.name()),
+                    lastRow.statsRow.getString(SnapshotSummaryCols.PATH.name()),
                     startTime,
                     endTime,
                     duration,
@@ -130,33 +133,28 @@ public class SnapshotSummary extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        columns.add(new ColumnInfo(ColumnName.NONCE.name(), VoltType.STRING));
-        columns.add(new ColumnInfo(ColumnName.TXNID.name(), VoltType.BIGINT));
-        columns.add(new ColumnInfo(ColumnName.TYPE.name(), VoltType.STRING));
-        columns.add(new ColumnInfo(ColumnName.PATH.name(), VoltType.STRING));
-        columns.add(new ColumnInfo(ColumnName.START_TIME.name(), VoltType.BIGINT));
-        columns.add(new ColumnInfo(ColumnName.END_TIME.name(), VoltType.BIGINT));
-        columns.add(new ColumnInfo(ColumnName.DURATION.name(), VoltType.BIGINT));
-        columns.add(new ColumnInfo(ColumnName.PROGRESS_PCT.name(), VoltType.FLOAT));
-        columns.add(new ColumnInfo(ColumnName.RESULT.name(), VoltType.STRING));
+        for (SnapshotSummaryCols col : SnapshotSummaryCols.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        };
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
         Pair<Snapshot, SnapshotResult> p = (Pair<Snapshot, SnapshotResult>) rowKey;
         Snapshot s = p.getFirst();
         SnapshotType type = m_typeChecker.getSnapshotType(s.path, s.nonce);
         SnapshotResult sr = p.getSecond();
 
-        rowValues[columnNameToIndex.get(ColumnName.NONCE.name())] = s.nonce;
-        rowValues[columnNameToIndex.get(ColumnName.TXNID.name())] = s.txnId;
-        rowValues[columnNameToIndex.get(ColumnName.TYPE.name())] = type.name();
-        rowValues[columnNameToIndex.get(ColumnName.PATH.name())] = s.path;
-        rowValues[columnNameToIndex.get(ColumnName.START_TIME.name())] = s.timeStarted;
-        rowValues[columnNameToIndex.get(ColumnName.END_TIME.name())] = s.timeFinished;
-        rowValues[columnNameToIndex.get(ColumnName.PROGRESS_PCT.name())] = (float)s.progress();
-        rowValues[columnNameToIndex.get(ColumnName.RESULT.name())] = sr.name();
+        rowValues[SnapshotSummaryCols.NONCE.ordinal()] = s.nonce;
+        rowValues[SnapshotSummaryCols.TXNID.ordinal()] = s.txnId;
+        rowValues[SnapshotSummaryCols.TYPE.ordinal()] = type.name();
+        rowValues[SnapshotSummaryCols.PATH.ordinal()] = s.path;
+        rowValues[SnapshotSummaryCols.START_TIME.ordinal()] = s.timeStarted;
+        rowValues[SnapshotSummaryCols.END_TIME.ordinal()] = s.timeFinished;
+        rowValues[SnapshotSummaryCols.PROGRESS_PCT.ordinal()] = (float)s.progress();
+        rowValues[SnapshotSummaryCols.RESULT.ordinal()] = sr.name();
+        return SnapshotSummaryCols.values().length;
     }
 
     @Override

@@ -37,6 +37,23 @@ public class MemoryStats extends StatsSource {
     }
     Map<Long, PartitionMemRow> m_memoryStats = new TreeMap<Long, PartitionMemRow>();
 
+    public enum Memory {
+        RSS                     (VoltType.INTEGER),
+        JAVAUSED                (VoltType.INTEGER),
+        JAVAUNUSED              (VoltType.INTEGER),
+        TUPLEDATA               (VoltType.BIGINT),
+        TUPLEALLOCATED          (VoltType.BIGINT),
+        INDEXMEMORY             (VoltType.BIGINT),
+        STRINGMEMORY            (VoltType.BIGINT),
+        TUPLECOUNT              (VoltType.BIGINT),
+        POOLEDMEMORY            (VoltType.BIGINT),
+        PHYSICALMEMORY          (VoltType.BIGINT),
+        JAVAMAXHEAP             (VoltType.INTEGER);
+
+        public final VoltType m_type;
+        Memory(VoltType type) { m_type = type; }
+    }
+
     public MemoryStats() {
         super(false);
     }
@@ -70,22 +87,12 @@ public class MemoryStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo("RSS", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("JAVAUSED", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("JAVAUNUSED", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
+        super.populateColumnSchema(columns, Memory.class);
     }
 
     @Override
-    protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected synchronized int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         // sum up all of the site statistics
         PartitionMemRow totals = new PartitionMemRow();
         for (PartitionMemRow pmr : m_memoryStats.values()) {
@@ -107,19 +114,20 @@ public class MemoryStats extends StatsSource {
             javaunused = (int) ((d.javatotalheapmem + d.javatotalsysmem - javausedFloat) / 1024);
         }
 
-        rowValues[columnNameToIndex.get("RSS")] = rss;
-        rowValues[columnNameToIndex.get("JAVAUSED")] = javaused;
-        rowValues[columnNameToIndex.get("JAVAUNUSED")] = javaunused;
-        rowValues[columnNameToIndex.get("TUPLEDATA")] = totals.tupleDataMem;
-        rowValues[columnNameToIndex.get("TUPLEALLOCATED")] = totals.tupleAllocatedMem;
-        rowValues[columnNameToIndex.get("INDEXMEMORY")] = totals.indexMem;
-        rowValues[columnNameToIndex.get("STRINGMEMORY")] = totals.stringMem;
-        rowValues[columnNameToIndex.get("TUPLECOUNT")] = totals.tupleCount;
-        rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
+        rowValues[offset + Memory.RSS.ordinal()] = rss;
+        rowValues[offset + Memory.JAVAUSED.ordinal()] = javaused;
+        rowValues[offset + Memory.JAVAUNUSED.ordinal()] = javaunused;
+        rowValues[offset + Memory.TUPLEDATA.ordinal()] = totals.tupleDataMem;
+        rowValues[offset + Memory.TUPLEALLOCATED.ordinal()] = totals.tupleAllocatedMem;
+        rowValues[offset + Memory.INDEXMEMORY.ordinal()] = totals.indexMem;
+        rowValues[offset + Memory.STRINGMEMORY.ordinal()] = totals.stringMem;
+        rowValues[offset + Memory.TUPLECOUNT.ordinal()] = totals.tupleCount;
+        rowValues[offset + Memory.POOLEDMEMORY.ordinal()] = totals.pooledMem / 1024;
         //in kb to make math simpler with other mem values.
-        rowValues[columnNameToIndex.get("PHYSICALMEMORY")] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
-        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + Memory.PHYSICALMEMORY.ordinal()] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
+        rowValues[offset + Memory.JAVAMAXHEAP.ordinal()] = Runtime.getRuntime().maxMemory() / 1024;
+
+        return offset + Memory.values().length;
     }
 
     public synchronized void eeUpdateMemStats(long siteId,

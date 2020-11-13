@@ -26,16 +26,15 @@ package org.voltdb.regressionsuites.statistics;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import static junit.framework.Assert.assertEquals;
 
-import junit.framework.Test;
-
-import org.voltdb.CommandLogStats;
+import org.voltdb.CommandLogStats.CommandLogCols;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 public class TestStatisticsCommandLogStats extends StatisticsTestSuiteBase {
 
@@ -52,11 +51,10 @@ public class TestStatisticsCommandLogStats extends StatisticsTestSuiteBase {
         expectedSchema[0] = new VoltTable.ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new VoltTable.ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new VoltTable.ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new VoltTable.ColumnInfo(CommandLogStats.StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT);
-        expectedSchema[4] = new VoltTable.ColumnInfo(CommandLogStats.StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT);
-        expectedSchema[5] = new VoltTable.ColumnInfo(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name(), VoltType.INTEGER);
-        expectedSchema[6] = new VoltTable.ColumnInfo(CommandLogStats.StatName.SEGMENT_COUNT.name(), VoltType.INTEGER);
-        expectedSchema[7] = new VoltTable.ColumnInfo(CommandLogStats.StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER);
+        int index = 3;
+        for (CommandLogCols col : CommandLogCols.values()) {
+            expectedSchema[index++] = new VoltTable.ColumnInfo(col.name(), col.m_type);
+        }
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -97,13 +95,13 @@ public class TestStatisticsCommandLogStats extends StatisticsTestSuiteBase {
             // Check every row
             while (results[0].advanceRow()) {
                 // Print fsync interval
-                int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
+                int actualFsyncInterval = (int) results[0].getLong(CommandLogCols.FSYNC_INTERVAL.name());
                 System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
 
                 // Test segment counts
                 if (i == 1) {
-                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.IN_USE_SEGMENT_COUNT.name());
-                    int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
+                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogCols.IN_USE_SEGMENT_COUNT.name());
+                    int actualSegmentCount = (int) results[0].getLong(CommandLogCols.SEGMENT_COUNT.name());
                     String message = "Unexpected segment count: should be 2";
                     assertTrue(message, actualSegmentCount == 2);
                     message = "Unexpected segment count: loaned segment count should be less than total count";

@@ -18,7 +18,6 @@
 package org.voltdb.task;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -27,7 +26,6 @@ import java.util.Objects;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
-import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -42,32 +40,6 @@ import com.google_voltpatches.common.collect.Iterators;
 public class TaskStatsSource extends StatsSource {
     private static final String PREFIX_SCHEDULER = "SCHEDULER_";
     private static final String PREFIX_PROCEDURE = "PROCEDURE_";
-
-    private static final Collection<ColumnInfo> s_columns = ImmutableList.of(
-            new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltSystemProcedure.CTYPE_ID),
-            new ColumnInfo("TASK_NAME", VoltType.STRING),
-            new ColumnInfo("STATE", VoltType.STRING),
-            new ColumnInfo("SCOPE", VoltType.STRING),
-            new ColumnInfo(PREFIX_SCHEDULER + "INVOCATIONS", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "TOTAL_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "MIN_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "MAX_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "AVG_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "TOTAL_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "MIN_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "MAX_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "AVG_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_SCHEDULER + "STATUS", VoltType.STRING),
-            new ColumnInfo(PREFIX_PROCEDURE + "INVOCATIONS", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "TOTAL_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "MIN_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "MAX_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "AVG_EXECUTION", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "TOTAL_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "MIN_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "MAX_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "AVG_WAIT_TIME", VoltType.BIGINT),
-            new ColumnInfo(PREFIX_PROCEDURE + "FAILURES", VoltType.BIGINT));
 
     private static final int s_sharedSubSelectorColumnCount = 7;
 
@@ -89,6 +61,36 @@ public class TaskStatsSource extends StatsSource {
     // Stats for procedure executions
     private final TimingStats m_procedureStats;
     private long m_procedureFailures = 0;
+
+    public enum Task {
+        PARTITION_ID                (VoltType.INTEGER),
+        TASK_NAME                   (VoltType.STRING),
+        STATE                       (VoltType.STRING),
+        SCOPE                       (VoltType.STRING),
+        SCHEDULER_INVOCATIONS       (VoltType.BIGINT),
+        SCHEDULER_TOTAL_EXECUTION   (VoltType.BIGINT),
+        SCHEDULER_MIN_EXECUTION     (VoltType.BIGINT),
+        SCHEDULER_MAX_EXECUTION     (VoltType.BIGINT),
+        SCHEDULER_AVG_EXECUTION     (VoltType.BIGINT),
+        SCHEDULER_TOTAL_WAIT_TIME   (VoltType.BIGINT),
+        SCHEDULER_MIN_WAIT_TIME     (VoltType.BIGINT),
+        SCHEDULER_MAX_WAIT_TIME     (VoltType.BIGINT),
+        SCHEDULER_AVG_WAIT_TIME     (VoltType.BIGINT),
+        SCHEDULER_STATUS            (VoltType.STRING),
+        PROCEDURE_INVOCATIONS       (VoltType.BIGINT),
+        PROCEDURE_TOTAL_EXECUTION   (VoltType.BIGINT),
+        PROCEDURE_MIN_EXECUTION     (VoltType.BIGINT),
+        PROCEDURE_MAX_EXECUTION     (VoltType.BIGINT),
+        PROCEDURE_AVG_EXECUTION     (VoltType.BIGINT),
+        PROCEDURE_TOTAL_WAIT_TIME   (VoltType.BIGINT),
+        PROCEDURE_MIN_WAIT_TIME     (VoltType.BIGINT),
+        PROCEDURE_MAX_WAIT_TIME     (VoltType.BIGINT),
+        PROCEDURE_AVG_WAIT_TIME     (VoltType.BIGINT),
+        PROCEDURE_FAILURES          (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        Task(VoltType type) { m_type = type; }
+    }
 
     /**
      * Convert stats collected under {@link StatsSelector#TASK} to either {@link StatsSelector#TASK_SCHEDULER} or
@@ -205,32 +207,33 @@ public class TaskStatsSource extends StatsSource {
     }
 
     @Override
-    protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
-        super.updateStatsRow(rowKey, rowValues);
-        int column = 3;
+    protected synchronized int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
 
         // Header state info
-        rowValues[column++] = m_partitionId;
-        rowValues[column++] = m_name;
-        rowValues[column++] = m_state;
-        rowValues[column++] = m_scope.name();
+        rowValues[offset + Task.PARTITION_ID.ordinal()] = m_partitionId;
+        rowValues[offset + Task.TASK_NAME.ordinal()] = m_name;
+        rowValues[offset + Task.STATE.ordinal()] = m_state;
+        rowValues[offset + Task.SCOPE.ordinal()] = m_scope.name();
 
         // Scheduler stats
-        column = m_schedulerStats.pupulateStats(rowValues, column);
-        rowValues[column++] = m_schedulerStatus;
+        m_schedulerStats.pupulateStats(rowValues, offset + Task.SCHEDULER_INVOCATIONS.ordinal());
+        rowValues[offset + Task.SCHEDULER_STATUS.ordinal()] = m_schedulerStatus;
 
         // Procedure stats
-        column = m_procedureStats.pupulateStats(rowValues, column);
+        m_procedureStats.pupulateStats(rowValues, offset + Task.PROCEDURE_INVOCATIONS.ordinal());
 
-        rowValues[column++] = m_procedureFailures;
+        rowValues[offset + Task.PROCEDURE_FAILURES.ordinal()] = m_procedureFailures;
 
-        assert column == rowValues.length : "Column count off should be " + rowValues.length + " inserted " + column;
+        int totalColumn = offset + Task.values().length;
+
+        assert totalColumn == rowValues.length : "Column count off should be " + rowValues.length + " inserted " + totalColumn;
+        return totalColumn;
      }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.addAll(s_columns);
+        super.populateColumnSchema(columns, Task.class);
     }
 
     /**
@@ -301,19 +304,18 @@ public class TaskStatsSource extends StatsSource {
             m_maxWaitNs = Math.max(m_maxWaitNs, waitNs);
         }
 
-        int pupulateStats(Object[] rowValues, int column) {
-            rowValues[column++] = m_invocations;
+        void pupulateStats(Object[] rowValues, int offset) {
+            rowValues[offset++] = m_invocations;
 
-            rowValues[column++] = m_totalExecutionNs;
-            rowValues[column++] = m_minExecutionNs == Long.MAX_VALUE ? 0 : m_minExecutionNs;
-            rowValues[column++] = m_maxExecutionNs;
-            rowValues[column++] = average(m_totalExecutionNs, m_invocations);
+            rowValues[offset++] = m_totalExecutionNs;
+            rowValues[offset++] = m_minExecutionNs == Long.MAX_VALUE ? 0 : m_minExecutionNs;
+            rowValues[offset++] = m_maxExecutionNs;
+            rowValues[offset++] = average(m_totalExecutionNs, m_invocations);
 
-            rowValues[column++] = m_totalWaitNs;
-            rowValues[column++] = m_minWaitNs == Long.MAX_VALUE ? 0 : m_minWaitNs;
-            rowValues[column++] = m_maxWaitNs;
-            rowValues[column++] = average(m_totalWaitNs, m_invocations);
-            return column;
+            rowValues[offset++] = m_totalWaitNs;
+            rowValues[offset++] = m_minWaitNs == Long.MAX_VALUE ? 0 : m_minWaitNs;
+            rowValues[offset++] = m_maxWaitNs;
+            rowValues[offset++] = average(m_totalWaitNs, m_invocations);
         }
     }
 

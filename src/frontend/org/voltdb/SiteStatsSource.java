@@ -26,6 +26,13 @@ import org.voltdb.VoltTable.ColumnInfo;
  */
 public abstract class SiteStatsSource extends StatsSource {
 
+    public enum SiteStats {
+        SITE_ID                   (VoltType.INTEGER);
+
+        public final VoltType m_type;
+        SiteStats(VoltType type) { m_type = type; }
+    }
+
     /**
      * CatalogId of the site this source is associated with
      */
@@ -39,12 +46,30 @@ public abstract class SiteStatsSource extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
+        for (SiteStats col : SiteStats.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        }
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);
-        super.updateStatsRow(rowKey, rowValues);
+    protected <E extends Enum<E>> void populateColumnSchema(ArrayList<ColumnInfo> columns, Class<E> extraColumns) {
+        super.populateColumnSchema(columns, SiteStats.class);
+        try {
+            for (E col : extraColumns.getEnumConstants()) {
+                java.lang.reflect.Field f = col.getClass().getDeclaredField("m_type");
+                f.setAccessible(true);
+                VoltType type = (VoltType) f.get(col);
+                columns.add(new VoltTable.ColumnInfo(col.name(), type));
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to populate column schema for statistics " + extraColumns.getName(), true, e);
+        }
+    }
+
+    @Override
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + SiteStats.SITE_ID.ordinal()] = CoreUtils.getSiteIdFromHSId(m_siteId);
+        return offset + SiteStats.values().length;
     }
 }

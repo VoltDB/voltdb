@@ -23,6 +23,25 @@ import java.util.Iterator;
 import org.voltdb.VoltTable.ColumnInfo;
 
 public class TableStats extends SiteStatsSource {
+
+    // Make sure that any changes to the EE schema are reflected here (sigh).
+    public enum Table {
+        PARTITION_ID            (VoltType.BIGINT),
+        TABLE_NAME              (VoltType.STRING),
+        TABLE_TYPE              (VoltType.STRING),
+        TUPLE_COUNT             (VoltType.BIGINT),
+        TUPLE_ALLOCATED_MEMORY  (VoltType.BIGINT),
+        TUPLE_DATA_MEMORY       (VoltType.BIGINT),
+        STRING_DATA_MEMORY      (VoltType.BIGINT),
+        TUPLE_LIMIT             (VoltType.INTEGER),
+        PERCENT_FULL            (VoltType.INTEGER),
+        DR                      (VoltType.STRING),
+        EXPORT                  (VoltType.STRING);
+
+        public final VoltType m_type;
+        Table(VoltType type) { m_type = type; }
+    }
+
     public TableStats(long siteId) {
         super( siteId, true);
     }
@@ -34,21 +53,9 @@ public class TableStats extends SiteStatsSource {
 
     // Generally we fill in this schema from the EE, but we'll provide
     // this so that we can fill in an empty table before the EE has
-    // provided us with a table.  Make sure that any changes to the EE
-    // schema are reflected here (sigh).
+    // provided us with a table.
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("PARTITION_ID", VoltType.BIGINT));
-        columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
-        columns.add(new ColumnInfo("TABLE_TYPE", VoltType.STRING));
-        columns.add(new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT));
-        columns.add(new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT));
-        columns.add(new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT));
-        columns.add(new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER));
-        columns.add(new ColumnInfo("PERCENT_FULL", VoltType.INTEGER));
-        columns.add(new ColumnInfo("DR", VoltType.STRING));
-        columns.add(new ColumnInfo("EXPORT", VoltType.STRING));
+        super.populateColumnSchema(columns, Table.class);
     }
 }

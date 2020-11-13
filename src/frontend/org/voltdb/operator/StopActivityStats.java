@@ -19,13 +19,11 @@ package org.voltdb.operator;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Set;
 
-import org.voltdb.StatsSelector;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * The StopActivityStats statistics provide a summary of current
@@ -41,11 +39,14 @@ import org.voltcore.logging.VoltLogger;
 public class StopActivityStats extends StatsSource {
     private static final VoltLogger logger = new VoltLogger("HOST");
 
-    private enum ColumnName {
-        ACTIVE, // 0 if all other gauges 0, else 1
-        PAR_LEADERS,
-        EXP_MASTERS,
-    };
+    public enum StopActivity {
+        ACTIVE                  (VoltType.TINYINT),
+        PAR_LEADERS             (VoltType.BIGINT),
+        EXP_MASTERS             (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        StopActivity(VoltType type) { m_type = type; }
+    }
 
     public StopActivityStats() {
         super(false);
@@ -57,11 +58,7 @@ public class StopActivityStats extends StatsSource {
      */
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        for (ColumnName col : ColumnName.values()) {
-            VoltType type = (col == ColumnName.ACTIVE ? VoltType.TINYINT : VoltType.BIGINT);
-            columns.add(new ColumnInfo(col.name(), type));
-        }
+        super.populateColumnSchema(columns, StopActivity.class);
     }
 
     /*
@@ -82,29 +79,19 @@ public class StopActivityStats extends StatsSource {
     };
 
     @Override
-    protected void updateStatsRow(Object key, Object[] row) {
+    protected int updateStatsRow(Object key, Object[] row) {
+        int offset = super.updateStatsRow(key, row);
         boolean active = false;
         try {
             ActivityHelper helper = new ActivityHelper();
             active = helper.collect(statsList);
-            setValue(row, ColumnName.PAR_LEADERS, helper.leaderCount);
-            setValue(row, ColumnName.EXP_MASTERS, helper.exportMasters);
+            row[offset + StopActivity.PAR_LEADERS.ordinal()] = helper.leaderCount;
+            row[offset + StopActivity.EXP_MASTERS.ordinal()] = helper.exportMasters;
         }
         catch (Exception ex) {
             logger.error("Unhandled exception in StopActivityStats: " + ex);
         }
-        setValue(row, ColumnName.ACTIVE, active);
-        super.updateStatsRow(key, row);
-    }
-
-    /*
-     * Utilities to set a value in a row.
-     */
-    private void setValue(Object[] row, ColumnName col, long val) {
-        row[columnNameToIndex.get(col.name())] = val;
-    }
-
-    private void setValue(Object[] row, ColumnName col, boolean val) {
-        row[columnNameToIndex.get(col.name())] = (val ? 1 : 0);
+        row[offset + StopActivity.ACTIVE.ordinal()] = active;
+        return offset + StopActivity.values().length;
     }
 }

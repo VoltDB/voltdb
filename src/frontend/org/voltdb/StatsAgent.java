@@ -23,6 +23,7 @@ import java.util.Set;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -586,6 +587,9 @@ public class StatsAgent extends OpsAgent
                     }
                     Object statsRows[][] = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {
+                        if (row.length != resultTable.m_colCount) {
+                            new VoltLogger("HOST").warn("Dump ss: " + ss + ": " + selector);
+                        }
                         resultTable.addRow(row);
                     }
                 }

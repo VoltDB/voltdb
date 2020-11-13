@@ -86,6 +86,13 @@ public class LatencyHistogramStats extends SiteStatsSource {
 
     private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 900);
 
+    public enum LatencyCompressed {
+        HISTOGRAM                   (VoltType.VARBINARY);
+
+        public final VoltType m_type;
+        LatencyCompressed(VoltType type) { m_type = type; }
+    }
+
     private Supplier<AbstractHistogram> getHistogramSupplier() {
         return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
             @Override
@@ -141,13 +148,13 @@ public class LatencyHistogramStats extends SiteStatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
+        super.populateColumnSchema(columns, LatencyCompressed.class);
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = getCompressedCache();
-        super.updateStatsRow(rowKey, rowValues);
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + LatencyCompressed.HISTOGRAM.ordinal()] = getCompressedCache();
+        return offset + LatencyCompressed.values().length;
     }
 }

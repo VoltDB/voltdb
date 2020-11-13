@@ -20,46 +20,21 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import org.voltdb.VoltTable.ColumnInfo;
-
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class DRProducerStatsBase {
 
-    public static interface Columns {
-        // column for both tables
-        public static final String CLUSTER_ID = "CLUSTER_ID";
-        public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
-
-        // column for both cluster-level and node-level tables
-        public static final String STATE = "STATE";
-
-        // columns for cluster-level table
-        public static final String LAST_FAILURE = "LASTFAILURE";
-
-        // columns for the node-level table
-        public static final String SYNC_SNAPSHOT_STATE = "SYNCSNAPSHOTSTATE";
-        public static final String ROWS_IN_SYNC_SNAPSHOT = "ROWSINSYNCSNAPSHOT";
-        public static final String ROWS_ACKED_FOR_SYNC_SNAPSHOT = "ROWSACKEDFORSYNCSNAPSHOT";
-        public static final String QUEUE_DEPTH = "QUEUEDEPTH";
-        public static final String REMOTE_CREATION_TIMESTAMP = "REMOTECREATIONTIMESTAMP";
-
-        // columns for partition-level table
-        public static final String STREAM_TYPE = "STREAMTYPE";
-        public static final String TOTAL_BYTES = "TOTALBYTES";
-        public static final String TOTAL_BYTES_IN_MEMORY = "TOTALBYTESINMEMORY";
-        public static final String TOTAL_BUFFERS = "TOTALBUFFERS";
-        public static final String LAST_QUEUED_DRID = "LASTQUEUEDDRID";
-        public static final String LAST_ACK_DRID = "LASTACKDRID";
-        public static final String QUEUE_GAP = "QUEUE_GAP";
-        public static final String LAST_QUEUED_TIMESTAMP = "LASTQUEUEDTIMESTAMP";
-        public static final String LAST_ACK_TIMESTAMP = "LASTACKTIMESTAMP";
-        public static final String IS_SYNCED = "ISSYNCED";
-        public static final String MODE = "MODE";
-        public static final String CONNECTION_STATUS = "CONNECTION_STATUS";
-    }
-
     public static class DRProducerClusterStatsBase extends StatsSource {
+
+        public enum DRProducerCluster {
+            CLUSTER_ID                  (VoltType.SMALLINT),
+            REMOTE_CLUSTER_ID           (VoltType.SMALLINT),
+            STATE                       (VoltType.STRING),
+            LASTFAILURE                 (VoltType.SMALLINT);
+
+            public final VoltType m_type;
+            DRProducerCluster(VoltType type) { m_type = type; }
+        }
 
         public DRProducerClusterStatsBase() {
             super(false);
@@ -67,10 +42,9 @@ public class DRProducerStatsBase {
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.LAST_FAILURE, VoltType.SMALLINT));
+            for (DRProducerCluster col : DRProducerCluster.values()) {
+                columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+            };
         }
 
         @Override
@@ -81,21 +55,27 @@ public class DRProducerStatsBase {
 
     public static class DRProducerNodeStatsBase extends StatsSource {
 
+        public enum DRProducerNode {
+            CLUSTER_ID                  (VoltType.SMALLINT),
+            REMOTE_CLUSTER_ID           (VoltType.SMALLINT),
+            STATE                       (VoltType.STRING),
+            SYNCSNAPSHOTSTATE           (VoltType.STRING),
+            ROWSINSYNCSNAPSHOT          (VoltType.BIGINT),
+            ROWSACKEDFORSYNCSNAPSHOT    (VoltType.BIGINT),
+            QUEUEDEPTH                  (VoltType.BIGINT),
+            REMOTECREATIONTIMESTAMP     (VoltType.TIMESTAMP);
+
+            public final VoltType m_type;
+            DRProducerNode(VoltType type) { m_type = type; }
+        }
+
         public DRProducerNodeStatsBase() {
             super(false);
         }
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            super.populateColumnSchema(columns);
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.SYNC_SNAPSHOT_STATE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.ROWS_IN_SYNC_SNAPSHOT, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.ROWS_ACKED_FOR_SYNC_SNAPSHOT, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.QUEUE_DEPTH, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.REMOTE_CREATION_TIMESTAMP, VoltType.TIMESTAMP));
+            super.populateColumnSchema(columns, DRProducerNode.class);
         }
 
         @Override
@@ -106,28 +86,34 @@ public class DRProducerStatsBase {
 
     public static class DRProducerPartitionStatsBase extends StatsSource {
 
+        public enum DRProducerPartition {
+            CLUSTER_ID                  (VoltType.SMALLINT),
+            REMOTE_CLUSTER_ID           (VoltType.SMALLINT),
+            PARTITION_ID                (VoltType.INTEGER),
+            STREAMTYPE                  (VoltType.STRING),
+            TOTALBYTES                  (VoltType.BIGINT),
+            TOTALBYTESINMEMORY          (VoltType.BIGINT),
+            TOTALBUFFERS                (VoltType.BIGINT),
+            LASTQUEUEDDRID              (VoltType.BIGINT),
+            LASTACKDRID                 (VoltType.BIGINT),
+            LASTQUEUEDTIMESTAMP         (VoltType.TIMESTAMP),
+            LASTACKTIMESTAMP            (VoltType.TIMESTAMP),
+            ISSYNCED                    (VoltType.STRING),
+            MODE                        (VoltType.STRING),
+            QUEUE_GAP                   (VoltType.BIGINT),
+            CONNECTION_STATUS           (VoltType.STRING);
+
+            public final VoltType m_type;
+            DRProducerPartition(VoltType type) { m_type = type; }
+        }
+
         public DRProducerPartitionStatsBase() {
             super(false);
         }
 
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            super.populateColumnSchema(columns);
-            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
-            columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.STREAM_TYPE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.TOTAL_BYTES, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.TOTAL_BYTES_IN_MEMORY, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.TOTAL_BUFFERS, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.LAST_QUEUED_DRID, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.LAST_ACK_DRID, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.LAST_QUEUED_TIMESTAMP, VoltType.TIMESTAMP));
-            columns.add(new ColumnInfo(Columns.LAST_ACK_TIMESTAMP, VoltType.TIMESTAMP));
-            columns.add(new ColumnInfo(Columns.IS_SYNCED, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.MODE, VoltType.STRING));
-            columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.CONNECTION_STATUS, VoltType.STRING));
+            super.populateColumnSchema(columns, DRProducerPartition.class);
         }
 
         @Override

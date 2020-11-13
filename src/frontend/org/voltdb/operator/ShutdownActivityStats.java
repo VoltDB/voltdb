@@ -46,13 +46,22 @@ import org.voltdb.VoltType;
 public class ShutdownActivityStats extends StatsSource {
     private static final VoltLogger logger = new VoltLogger("HOST");
 
-    private enum ColumnName {
-        ACTIVE, // 0 if all other gauges 0, else 1
-        CLIENT_TXNS, CLIENT_REQ_BYTES, CLIENT_RESP_MSGS,
-        CMDLOG_TXNS, CMDLOG_BYTES,
-        IMPORTS_PENDING, EXPORTS_PENDING,
-        DRPROD_ROWS, DRPROD_BYTES, DRCONS_PARTS,
-    };
+    public enum ShutdownActivity {
+        ACTIVE                  (VoltType.TINYINT),
+        CLIENT_TXNS             (VoltType.BIGINT),
+        CLIENT_REQ_BYTES        (VoltType.BIGINT),
+        CLIENT_RESP_MSGS        (VoltType.BIGINT),
+        CMDLOG_TXNS             (VoltType.BIGINT),
+        CMDLOG_BYTES            (VoltType.BIGINT),
+        IMPORTS_PENDING         (VoltType.BIGINT),
+        EXPORTS_PENDING         (VoltType.BIGINT),
+        DRPROD_ROWS             (VoltType.BIGINT),
+        DRPROD_BYTES            (VoltType.BIGINT),
+        DRCONS_PARTS            (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        ShutdownActivity(VoltType type) { m_type = type; }
+    }
 
     public ShutdownActivityStats() {
         super(false);
@@ -64,11 +73,7 @@ public class ShutdownActivityStats extends StatsSource {
      */
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        for (ColumnName col : ColumnName.values()) {
-            VoltType type = (col == ColumnName.ACTIVE ? VoltType.TINYINT : VoltType.BIGINT);
-            columns.add(new ColumnInfo(col.name(), type));
-        }
+        super.populateColumnSchema(columns, ShutdownActivity.class);
     }
 
     /*
@@ -108,37 +113,38 @@ public class ShutdownActivityStats extends StatsSource {
     };
 
     @Override
-    protected void updateStatsRow(Object key, Object[] row) {
+    protected int updateStatsRow(Object key, Object[] row) {
+        int offset = super.updateStatsRow(key, row);
         boolean active = false;
         try {
             ActivityHelper helper = new ActivityHelper();
             if (usingCommandLog()) {
                 active = helper.collect(statsWithCmdLog);
-                setValue(row, ColumnName.CLIENT_TXNS, helper.clientTxns);
-                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.clientReqBytes);
-                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.clientRespMsgs);
-                setValue(row, ColumnName.IMPORTS_PENDING, helper.importPend);
-                setValue(row, ColumnName.CMDLOG_TXNS, helper.cmdlogTxns);
-                setValue(row, ColumnName.CMDLOG_BYTES, helper.cmdlogBytes);
-                setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
+                row[offset + ShutdownActivity.CLIENT_TXNS.ordinal()] = helper.clientTxns;
+                row[offset + ShutdownActivity.CLIENT_REQ_BYTES.ordinal()] = helper.clientReqBytes;
+                row[offset + ShutdownActivity.CLIENT_RESP_MSGS.ordinal()] = helper.clientRespMsgs;
+                row[offset + ShutdownActivity.IMPORTS_PENDING.ordinal()] = helper.importPend;
+                row[offset + ShutdownActivity.CMDLOG_TXNS.ordinal()] = helper.cmdlogTxns;
+                row[offset + ShutdownActivity.CMDLOG_BYTES.ordinal()] = helper.cmdlogBytes;
+                row[offset + ShutdownActivity.EXPORTS_PENDING.ordinal()] = helper.exportPend;
             }
             else {
                 active = helper.collect(statsWithoutCmdLog);
-                setValue(row, ColumnName.CLIENT_TXNS, helper.clientTxns);
-                setValue(row, ColumnName.CLIENT_REQ_BYTES, helper.clientReqBytes);
-                setValue(row, ColumnName.CLIENT_RESP_MSGS, helper.clientRespMsgs);
-                setValue(row, ColumnName.IMPORTS_PENDING, helper.importPend);
-                setValue(row, ColumnName.DRCONS_PARTS, helper.drconsPend);
-                setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
-                setValue(row, ColumnName.DRPROD_ROWS, helper.drprodRowsPend);
-                setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
+                row[offset + ShutdownActivity.CLIENT_TXNS.ordinal()] = helper.clientTxns;
+                row[offset + ShutdownActivity.CLIENT_REQ_BYTES.ordinal()] = helper.clientReqBytes;
+                row[offset + ShutdownActivity.CLIENT_RESP_MSGS.ordinal()] = helper.clientRespMsgs;
+                row[offset + ShutdownActivity.IMPORTS_PENDING.ordinal()] = helper.importPend;
+                row[offset + ShutdownActivity.DRCONS_PARTS.ordinal()] = helper.drconsPend;
+                row[offset + ShutdownActivity.EXPORTS_PENDING.ordinal()] = helper.exportPend;
+                row[offset + ShutdownActivity.DRPROD_ROWS.ordinal()] = helper.drprodRowsPend;
+                row[offset + ShutdownActivity.DRPROD_BYTES.ordinal()] = helper.drprodBytesPend;
             }
         }
         catch (Exception ex) {
             logger.error("Unhandled exception in ShutdownActivityStats: " + ex);
         }
-        setValue(row, ColumnName.ACTIVE, active);
-        super.updateStatsRow(key, row);
+        row[offset + ShutdownActivity.ACTIVE.ordinal()] = active;
+        return offset + ShutdownActivity.values().length;
     }
 
     /*
@@ -147,16 +153,5 @@ public class ShutdownActivityStats extends StatsSource {
     private boolean usingCommandLog() {
         CommandLog cl = VoltDB.instance().getCommandLog();
         return cl != null && cl.isEnabled();
-    }
-
-    /*
-     * Utilities to set a value in a row.
-     */
-    private void setValue(Object[] row, ColumnName col, long val) {
-        row[columnNameToIndex.get(col.name())] = val;
-    }
-
-    private void setValue(Object[] row, ColumnName col, boolean val) {
-        row[columnNameToIndex.get(col.name())] = (val ? 1 : 0);
     }
 }

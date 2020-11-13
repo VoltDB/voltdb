@@ -67,6 +67,29 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     private final boolean m_isTransactional;
     private final boolean m_isUAC;
 
+    public enum ProcedureColumns {
+        PARTITION_ID            (VoltType.INTEGER),
+        PROCEDURE               (VoltType.STRING),
+        STATEMENT               (VoltType.STRING),
+        INVOCATIONS             (VoltType.BIGINT),
+        TIMED_INVOCATIONS       (VoltType.BIGINT),
+        MIN_EXECUTION_TIME      (VoltType.BIGINT),
+        MAX_EXECUTION_TIME      (VoltType.BIGINT),
+        AVG_EXECUTION_TIME      (VoltType.BIGINT),
+        MIN_RESULT_SIZE         (VoltType.INTEGER),
+        MAX_RESULT_SIZE         (VoltType.INTEGER),
+        AVG_RESULT_SIZE         (VoltType.INTEGER),
+        MIN_PARAMETER_SET_SIZE  (VoltType.INTEGER),
+        MAX_PARAMETER_SET_SIZE  (VoltType.INTEGER),
+        AVG_PARAMETER_SET_SIZE  (VoltType.INTEGER),
+        ABORTS                  (VoltType.BIGINT),
+        FAILURES                (VoltType.BIGINT),
+        TRANSACTIONAL           (VoltType.TINYINT);
+
+        public final VoltType m_type;
+        ProcedureColumns(VoltType type) { m_type = type; }
+    }
+
     public ProcedureStatsCollector(long siteId,
                                    int partitionId,
                                    Procedure catProc,
@@ -277,15 +300,16 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      * which must also be called so that it can update its columns.
      * @param rowKey The corresponding StatementStats structure for this row.
      * @param rowValues Values of each column of the row of stats. Used as output.
+     * @return next column index to write
      */
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        super.updateStatsRow(rowKey, rowValues);
-        rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
-        rowValues[columnNameToIndex.get("PROCEDURE")] = m_procName;
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
+        rowValues[offset + ProcedureColumns.PARTITION_ID.ordinal()] = m_partitionId;
+        rowValues[offset + ProcedureColumns.PROCEDURE.ordinal()] = m_procName;
         StatementStats currRow = (StatementStats)rowKey;
         assert(currRow != null);
-        rowValues[columnNameToIndex.get("STATEMENT")] = currRow.m_stmtName;
+        rowValues[offset + ProcedureColumns.STATEMENT.ordinal()] = currRow.m_stmtName;
 
         long invocations = currRow.getInvocations();
         long timedInvocations = currRow.getTimedInvocations();
@@ -319,29 +343,29 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             timedInvocations -= currRow.getLastTimedInvocationsAndReset();
         }
 
-        rowValues[columnNameToIndex.get("INVOCATIONS")] = invocations;
-        rowValues[columnNameToIndex.get("TIMED_INVOCATIONS")] = timedInvocations;
-        rowValues[columnNameToIndex.get("MIN_EXECUTION_TIME")] = minExecutionTime;
-        rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
+
+        rowValues[offset + ProcedureColumns.INVOCATIONS.ordinal()] = invocations;
+        rowValues[offset + ProcedureColumns.TIMED_INVOCATIONS.ordinal()] = timedInvocations;
+        rowValues[offset + ProcedureColumns.MIN_EXECUTION_TIME.ordinal()] = minExecutionTime;
+        rowValues[offset + ProcedureColumns.MAX_EXECUTION_TIME.ordinal()] = maxExecutionTime;
         if (timedInvocations != 0) {
-            rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] =
-                 (totalTimedExecutionTime / timedInvocations);
-            rowValues[columnNameToIndex.get("AVG_RESULT_SIZE")] =
-                    (totalResultSize / timedInvocations);
-            rowValues[columnNameToIndex.get("AVG_PARAMETER_SET_SIZE")] =
-                    (totalParameterSetSize / timedInvocations);
+            rowValues[offset + ProcedureColumns.AVG_EXECUTION_TIME.ordinal()] = (totalTimedExecutionTime / timedInvocations);
+            rowValues[offset + ProcedureColumns.AVG_RESULT_SIZE.ordinal()] = (totalResultSize / timedInvocations);
+            rowValues[offset + ProcedureColumns.AVG_PARAMETER_SET_SIZE.ordinal()] = (totalParameterSetSize / timedInvocations);
         } else {
-            rowValues[columnNameToIndex.get("AVG_EXECUTION_TIME")] = 0L;
-            rowValues[columnNameToIndex.get("AVG_RESULT_SIZE")] = 0;
-            rowValues[columnNameToIndex.get("AVG_PARAMETER_SET_SIZE")] = 0;
+            rowValues[offset + ProcedureColumns.AVG_EXECUTION_TIME.ordinal()] = 0L;
+            rowValues[offset + ProcedureColumns.AVG_RESULT_SIZE.ordinal()] = 0;
+            rowValues[offset + ProcedureColumns.AVG_PARAMETER_SET_SIZE.ordinal()] = 0;
         }
-        rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
-        rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
-        rowValues[columnNameToIndex.get("MIN_RESULT_SIZE")] = minResultSize;
-        rowValues[columnNameToIndex.get("MAX_RESULT_SIZE")] = maxResultSize;
-        rowValues[columnNameToIndex.get("MIN_PARAMETER_SET_SIZE")] = minParameterSetSize;
-        rowValues[columnNameToIndex.get("MAX_PARAMETER_SET_SIZE")] = maxParameterSetSize;
-        rowValues[columnNameToIndex.get("TRANSACTIONAL")] = (byte) (m_isTransactional ? 1 : 0);
+        rowValues[offset + ProcedureColumns.ABORTS.ordinal()] = abortCount;
+        rowValues[offset + ProcedureColumns.FAILURES.ordinal()] = failureCount;
+        rowValues[offset + ProcedureColumns.MIN_RESULT_SIZE.ordinal()] = minResultSize;
+        rowValues[offset + ProcedureColumns.MAX_RESULT_SIZE.ordinal()] = maxResultSize;
+        rowValues[offset + ProcedureColumns.MIN_PARAMETER_SET_SIZE.ordinal()] = minParameterSetSize;
+        rowValues[offset + ProcedureColumns.MAX_PARAMETER_SET_SIZE.ordinal()] = maxParameterSetSize;
+        rowValues[offset + ProcedureColumns.TRANSACTIONAL.ordinal()] = (byte) (m_isTransactional ? 1 : 0);
+
+        return offset + ProcedureColumns.values().length;
     }
 
     /**
@@ -350,24 +374,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      */
     @Override
     protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo("PARTITION_ID", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("PROCEDURE", VoltType.STRING));
-        columns.add(new VoltTable.ColumnInfo("STATEMENT", VoltType.STRING));
-        columns.add(new VoltTable.ColumnInfo("INVOCATIONS", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("TIMED_INVOCATIONS", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("MIN_RESULT_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("MAX_RESULT_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("AVG_RESULT_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("MIN_PARAMETER_SET_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("TRANSACTIONAL", VoltType.TINYINT));
+        super.populateColumnSchema(columns, ProcedureColumns.class);
     }
 
     @Override

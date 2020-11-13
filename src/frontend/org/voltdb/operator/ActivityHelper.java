@@ -25,12 +25,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.CommandLog;
-import org.voltdb.DRProducerStatsBase;
+import org.voltdb.DRProducerStatsBase.DRProducerPartitionStatsBase.DRProducerPartition;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
-import org.voltdb.dr2.DRConsumerStatsBase;
+import org.voltdb.dr2.DRConsumerStatsBase.DRConsumerPartitionStatsBase.DRConsumerPartition;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.Cartographer;
@@ -269,9 +269,9 @@ class ActivityHelper {
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRPRODUCERPARTITION);
             if (ss != null) {
-                int ixTotalBytes = getIndex(ss, DRProducerStatsBase.Columns.TOTAL_BYTES);
-                int ixLastQueued = getIndex(ss, DRProducerStatsBase.Columns.LAST_QUEUED_DRID);
-                int ixLastAcked = getIndex(ss, DRProducerStatsBase.Columns.LAST_ACK_DRID);
+                int ixTotalBytes = getIndex(ss, DRProducerPartition.TOTALBYTES.name());
+                int ixLastQueued = getIndex(ss, DRProducerPartition.LASTQUEUEDDRID.name());
+                int ixLastAcked = getIndex(ss, DRProducerPartition.LASTACKDRID.name());
                 for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
                     long totalBytes = asLong(row[ixTotalBytes]);
                     long lastQueuedDrId = asLong(row[ixLastQueued]);
@@ -301,8 +301,8 @@ class ActivityHelper {
         try {
             StatsSource ss = getStatsSource(StatsSelector.DRCONSUMERPARTITION);
             if (ss != null) {
-                int ixTimeRcvd = getIndex(ss, DRConsumerStatsBase.Columns.LAST_RECEIVED_TIMESTAMP);
-                int ixTimeAppl = getIndex(ss, DRConsumerStatsBase.Columns.LAST_APPLIED_TIMESTAMP);
+                int ixTimeRcvd = getIndex(ss, DRConsumerPartition.LAST_RECEIVED_TIMESTAMP.name());
+                int ixTimeAppl = getIndex(ss, DRConsumerPartition.LAST_APPLIED_TIMESTAMP.name());
                 for (Object[] row : ss.getStatsRows(false, System.currentTimeMillis())) {
                     long timeLastRcvd = asLong(row[ixTimeRcvd]);
                     long timeLastApplied = asLong(row[ixTimeAppl]);

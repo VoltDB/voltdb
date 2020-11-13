@@ -37,13 +37,18 @@ import org.voltdb.VoltType;
  * relates to, and perhaps whether forward progress is being made.
  */
 public class PauseActivityStats extends StatsSource {
-    private static final VoltLogger logger = new VoltLogger("HOST");
 
-    private enum ColumnName {
-        ACTIVE, // 0 if all other gauges 0, else 1
-        EXPORTS_PENDING,
-        DRPROD_ROWS, DRPROD_BYTES,
-    };
+    public enum PauseActivity {
+        ACTIVE                  (VoltType.TINYINT),
+        EXPORTS_PENDING         (VoltType.BIGINT),
+        DRPROD_ROWS             (VoltType.BIGINT),
+        DRPROD_BYTES            (VoltType.BIGINT);
+
+        public final VoltType m_type;
+        PauseActivity(VoltType type) { m_type = type; }
+    }
+
+    private static final VoltLogger logger = new VoltLogger("HOST");
 
     public PauseActivityStats() {
         super(false);
@@ -55,11 +60,7 @@ public class PauseActivityStats extends StatsSource {
      */
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        for (ColumnName col : ColumnName.values()) {
-            VoltType type = (col == ColumnName.ACTIVE ? VoltType.TINYINT : VoltType.BIGINT);
-            columns.add(new ColumnInfo(col.name(), type));
-        }
+        super.populateColumnSchema(columns, PauseActivity.class);
     }
 
     /*
@@ -80,30 +81,20 @@ public class PauseActivityStats extends StatsSource {
     };
 
     @Override
-    protected void updateStatsRow(Object key, Object[] row) {
+    protected int updateStatsRow(Object key, Object[] row) {
+        int offset = super.updateStatsRow(key, row);
         boolean active = false;
         try {
             ActivityHelper helper = new ActivityHelper();
             active = helper.collect(statsList);
-            setValue(row, ColumnName.EXPORTS_PENDING, helper.exportPend);
-            setValue(row, ColumnName.DRPROD_ROWS, helper.drprodRowsPend);
-            setValue(row, ColumnName.DRPROD_BYTES, helper.drprodBytesPend);
+            row[offset + PauseActivity.EXPORTS_PENDING.ordinal()] = helper.exportPend;
+            row[offset + PauseActivity.DRPROD_ROWS.ordinal()] = helper.drprodRowsPend;
+            row[offset + PauseActivity.DRPROD_BYTES.ordinal()] = helper.drprodBytesPend;
         }
         catch (Exception ex) {
             logger.error("Unhandled exception in PauseActivityStats: " + ex);
         }
-        setValue(row, ColumnName.ACTIVE, active);
-        super.updateStatsRow(key, row);
-    }
-
-    /*
-     * Utilities to set a value in a row.
-     */
-    private void setValue(Object[] row, ColumnName col, long val) {
-        row[columnNameToIndex.get(col.name())] = val;
-    }
-
-    private void setValue(Object[] row, ColumnName col, boolean val) {
-        row[columnNameToIndex.get(col.name())] = (val ? 1 : 0);
+        row[offset + PauseActivity.ACTIVE.ordinal()] = active;
+        return offset + PauseActivity.values().length;
     }
 }

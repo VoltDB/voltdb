@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.utils.MiscUtils;
@@ -56,6 +57,22 @@ public class BalancePartitionsStatistics extends StatsSource {
     private volatile StatsPoint m_statsPoint;
     private StatsPoint m_intervalStats;
     private StatsPoint m_overallStats;
+
+    public enum Rebalance {
+        TIMESTAMP               (VoltType.BIGINT),
+        PERCENTAGE_MOVED        (VoltType.FLOAT),
+        MOVED_ROWS              (VoltType.BIGINT),
+        ROWS_PER_SECOND         (VoltType.FLOAT),
+        ESTIMATED_REMAINING     (VoltType.BIGINT),
+        MEGABYTES_PER_SECOND    (VoltType.FLOAT),
+        CALLS_PER_SECOND        (VoltType.FLOAT),
+        CALLS_LATENCY           (VoltType.FLOAT),
+        CALLS_TIME              (VoltType.FLOAT),
+        CALLS_TRANSFER_TIME     (VoltType.FLOAT);
+
+        public final VoltType m_type;
+        Rebalance(VoltType type) { m_type = type; }
+    }
 
     public BalancePartitionsStatistics()
     {
@@ -192,50 +209,30 @@ public class BalancePartitionsStatistics extends StatsSource {
         }
     }
 
-    public static interface Constants
-    {
-        public final static String TIMESTAMP = "TIMESTAMP";
-        public final static String PERCENTAGE_MOVED = "PERCENTAGE_MOVED";
-        public final static String MOVED_ROWS = "MOVED_ROWS";
-        public final static String ROWS_PER_SECOND = "ROWS_PER_SECOND";
-        public final static String ESTIMATED_REMAINING = "ESTIMATED_REMAINING";
-        public final static String MEGABYTES_PER_SECOND = "MEGABYTES_PER_SECOND";
-        public final static String CALLS_PER_SECOND = "CALLS_PER_SECOND";
-        public final static String CALLS_LATENCY = "CALLS_LATENCY";
-        public final static String CALLS_TIME = "CALLS_TIME";
-        public final static String CALLS_TRANSFER_TIME = "CALLS_TRANSFER_TIME";
-    }
-
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo(Constants.TIMESTAMP, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Constants.PERCENTAGE_MOVED, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.MOVED_ROWS, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Constants.ROWS_PER_SECOND, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.ESTIMATED_REMAINING, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Constants.MEGABYTES_PER_SECOND, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.CALLS_PER_SECOND, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.CALLS_LATENCY, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.CALLS_TIME, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.CALLS_TRANSFER_TIME, VoltType.FLOAT));
+        for (Rebalance col : Rebalance.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        }
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues)
+    protected int updateStatsRow(Object rowKey, Object[] rowValues)
     {
         final StatsPoint point = m_statsPoint;
 
-        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = System.currentTimeMillis();
-        rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
-        rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
-        rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
-        rowValues[columnNameToIndex.get(Constants.ESTIMATED_REMAINING)] = point.getEstimatedRemaining();
-        rowValues[columnNameToIndex.get(Constants.MEGABYTES_PER_SECOND)] = point.getMegabytesPerSecond();
-        rowValues[columnNameToIndex.get(Constants.CALLS_PER_SECOND)] = point.getInvocationsPerSecond();
-        rowValues[columnNameToIndex.get(Constants.CALLS_LATENCY)] = point.getAverageInvocationLatency();
-        rowValues[columnNameToIndex.get(Constants.CALLS_TIME)] = point.getAverageInvocationTime();
-        rowValues[columnNameToIndex.get(Constants.CALLS_TRANSFER_TIME)] = point.getAverageInvocationTransferTime();
+        rowValues[Rebalance.TIMESTAMP.ordinal()] = System.currentTimeMillis();
+        rowValues[Rebalance.PERCENTAGE_MOVED.ordinal()] = point.getPercentageMoved();
+        rowValues[Rebalance.MOVED_ROWS.ordinal()] = point.getMovedRows();
+        rowValues[Rebalance.ROWS_PER_SECOND.ordinal()] = point.getRowsPerSecond();
+        rowValues[Rebalance.ESTIMATED_REMAINING.ordinal()] = point.getEstimatedRemaining();
+        rowValues[Rebalance.MEGABYTES_PER_SECOND.ordinal()] = point.getMegabytesPerSecond();
+        rowValues[Rebalance.CALLS_PER_SECOND.ordinal()] = point.getInvocationsPerSecond();
+        rowValues[Rebalance.CALLS_LATENCY.ordinal()] = point.getAverageInvocationLatency();
+        rowValues[Rebalance.CALLS_TIME.ordinal()] = point.getAverageInvocationTime();
+        rowValues[Rebalance.CALLS_TRANSFER_TIME.ordinal()] = point.getAverageInvocationTransferTime();
+        return Rebalance.values().length;
     }
 
     @Override

@@ -96,6 +96,15 @@ public class Cartographer extends StatsSource
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
+    public enum TOPO {
+        Partition               (VoltType.INTEGER),
+        Sites                   (VoltType.STRING),
+        Leader                  (VoltType.STRING);
+
+        public final VoltType m_type;
+        TOPO(VoltType type) { m_type = type; }
+    }
+
     /**
      * Retrieve the list of partitions in the system. Since each partition information is being populated individually
      * asynchronously some partitions may throw exceptions or block when accessing data and other may not.
@@ -256,9 +265,9 @@ public class Cartographer extends StatsSource
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo("Partition", VoltType.INTEGER));
-        columns.add(new ColumnInfo("Sites", VoltType.STRING));
-        columns.add(new ColumnInfo("Leader", VoltType.STRING));
+        for (TOPO col : TOPO.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        };
     }
 
     @Override
@@ -275,7 +284,7 @@ public class Cartographer extends StatsSource
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+    protected int updateStatsRow(Object rowKey, Object[] rowValues) {
         long leader;
         List<Long> sites = new ArrayList<Long>();
         if (rowKey.equals(MpInitiator.MP_INIT_PID)) {
@@ -286,16 +295,17 @@ public class Cartographer extends StatsSource
             //sanity check. The master list may be updated while the statistics is calculated.
             Long leaderInCache = m_iv2Masters.pointInTimeCache().get(rowKey);
             if (leaderInCache == null) {
-                return;
+                return 0;
             }
 
             leader = leaderInCache;
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 
-        rowValues[columnNameToIndex.get("Partition")] = rowKey;
-        rowValues[columnNameToIndex.get("Sites")] = CoreUtils.hsIdCollectionToString(sites);
-        rowValues[columnNameToIndex.get("Leader")] = CoreUtils.hsIdToString(leader);
+        rowValues[TOPO.Partition.ordinal()] = rowKey;
+        rowValues[TOPO.Sites.ordinal()] = CoreUtils.hsIdCollectionToString(sites);
+        rowValues[TOPO.Leader.ordinal()] = CoreUtils.hsIdToString(leader);
+        return TOPO.values().length;
     }
 
     /**
@@ -1042,11 +1052,11 @@ public class Cartographer extends StatsSource
 
     //Utility method to peek the topology
     public static VoltTable peekTopology(Cartographer cart) {
-        ColumnInfo[] column = new ColumnInfo[3];
-        column[0] = new ColumnInfo("Partition", VoltType.BIGINT);
-        column[1] = new ColumnInfo("Sites", VoltType.STRING);
-        column[2] = new ColumnInfo("Leader", VoltType.STRING);
-        VoltTable t = new VoltTable(column);
+        ArrayList<ColumnInfo> columns = new ArrayList<>();
+        for (TOPO col : TOPO.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        };
+        VoltTable t = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
 
         Iterator<Object> i = cart.getStatsRowKeyIterator(false);
         while (i.hasNext()) {

@@ -68,25 +68,28 @@ public class ExportStats extends ExportStatsBase {
     }
 
     @Override
-    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        super.updateStatsRow(rowKey, rowValues);
+    protected int updateStatsRow(Object rowKey, Object rowValues[]) {
+        int offset = super.updateStatsRow(rowKey, rowValues);
         int rowIndex = (Integer) rowKey;
         assert (rowIndex >= 0);
         assert (rowIndex < m_stats.size());
         ExportStatsRow stat = m_stats.get(rowIndex);
-        rowValues[columnNameToIndex.get(Columns.SITE_ID)] = stat.m_siteId;
-        rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
-        rowValues[columnNameToIndex.get(Columns.SOURCE_NAME)] = stat.m_sourceName;
-        rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
-        rowValues[columnNameToIndex.get(Columns.ACTIVE)] = stat.m_exportingRole;
-        rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
-        rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
-        rowValues[columnNameToIndex.get(Columns.LAST_QUEUED_TIMESTAMP)] = stat.m_lastQueuedTimestamp;
-        rowValues[columnNameToIndex.get(Columns.LAST_ACKED_TIMESTAMP)] = stat.m_lastAckedTimestamp;
-        rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
-        rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
-        rowValues[columnNameToIndex.get(Columns.QUEUE_GAP)] = stat.m_queueGap;
-        rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
+
+        rowValues[offset + Export.SITE_ID.ordinal()] = stat.m_siteId;
+        rowValues[offset + Export.PARTITION_ID.ordinal()] = stat.m_partitionId;
+        rowValues[offset + Export.SOURCE.ordinal()] = stat.m_sourceName;
+        rowValues[offset + Export.TARGET.ordinal()] = stat.m_exportTarget;
+        rowValues[offset + Export.ACTIVE.ordinal()] = stat.m_exportingRole;
+        rowValues[offset + Export.TUPLE_COUNT.ordinal()] = stat.m_tupleCount;
+        rowValues[offset + Export.TUPLE_PENDING.ordinal()] = stat.m_tuplesPending;
+        rowValues[offset + Export.LAST_QUEUED_TIMESTAMP.ordinal()] = stat.m_lastQueuedTimestamp;
+        rowValues[offset + Export.LAST_ACKED_TIMESTAMP.ordinal()] = stat.m_lastAckedTimestamp;
+        rowValues[offset + Export.AVERAGE_LATENCY.ordinal()] = stat.m_averageLatency;
+        rowValues[offset + Export.MAX_LATENCY.ordinal()] = stat.m_maxLatency;
+        rowValues[offset + Export.QUEUE_GAP.ordinal()] = stat.m_queueGap;
+        rowValues[offset + Export.STATUS.ordinal()] = stat.m_status;
+
+        return offset + Export.values().length;
     }
 
     public ExportStatsRow getStatsRow(Object rowKey) {
