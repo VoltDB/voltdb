@@ -143,7 +143,7 @@ public class ShutdownActivityStats extends StatsSource {
         catch (Exception ex) {
             logger.error("Unhandled exception in ShutdownActivityStats: " + ex);
         }
-        row[offset + ShutdownActivity.ACTIVE.ordinal()] = active;
+        row[offset + ShutdownActivity.ACTIVE.ordinal()] = (active ? 1 : 0);
         return offset + ShutdownActivity.values().length;
     }
 

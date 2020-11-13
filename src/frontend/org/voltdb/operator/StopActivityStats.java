@@ -91,7 +91,7 @@ public class StopActivityStats extends StatsSource {
         catch (Exception ex) {
             logger.error("Unhandled exception in StopActivityStats: " + ex);
         }
-        row[offset + StopActivity.ACTIVE.ordinal()] = active;
+        row[offset + StopActivity.ACTIVE.ordinal()] = (active ? 1 : 0);
         return offset + StopActivity.values().length;
     }
 }
