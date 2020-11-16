@@ -600,6 +600,7 @@ public class SocketJoiner {
         SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT);
         sslEngine.setUseClientMode(clientMode);
         sslEngine.setNeedClientAuth(false);
+        sslEngine.setEnabledProtocols(new String[] {"TLSv1.2"});
 
         Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
         Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
