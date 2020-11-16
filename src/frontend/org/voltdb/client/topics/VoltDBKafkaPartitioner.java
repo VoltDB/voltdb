@@ -17,19 +17,26 @@
 package org.voltdb.client.topics;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.SslConfigs;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
+
+import com.google_voltpatches.common.base.Splitter;
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * VoltDBKafkaPartitioner is a partitioner to calculate VoltDB partition id from the key value.
@@ -46,11 +53,11 @@ import org.voltdb.client.ClientImpl;
  * props.put("buffer.memory", 33554432);
  * props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
  * props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
- * props.put("partitioner.class", "org.voltdb.e3.topics.VoltDBKafkaPartitioner");
+ * props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, VoltDBKafkaPartitioner.class.getName());
  * Producer<String, String> producer = new KafkaProducer<>(props);
- * for (int i = 0; i < 100; i++)
+ * for (int i = 0; i < 100; i++) {
  *     producer.send(new ProducerRecord<String, String>("my-topic", Integer.toString(i), Integer.toString(i)));
- *
+ * }
  * producer.close();
  * }
  * </pre>
@@ -69,7 +76,7 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
     public static final String SSL_TRUSTSTORE_LOCATION = SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG;
 
     /**
-     * <p>Configuration for a VoltDB client to connect to VoltDB cluster</p>
+     * <p>Configuration for a VoltDB client to connect to VoltDB cluster: comma separated list of the form server[:port]</p>
      */
     public static final String BOOTSTRAP_SERVERS_VOLTDB = "bootstrap.servers.voltdb";
 
@@ -89,10 +96,23 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
     public void configure(Map<String, ?> configs) {
         super.configure(configs);
         m_client = (ClientImpl) ClientFactory.createClient(createClientConfig(configs));
-
-        final String connectString = (String)configs.get(BOOTSTRAP_SERVERS_VOLTDB);
-        String [] connections = connectString.split(";");
-        for (String connection : connections) {
+        String connectString = (String)configs.get(BOOTSTRAP_SERVERS_VOLTDB);
+        boolean useDefault = false;
+        List<String> urls;
+        if (StringUtils.isBlank(connectString)) {
+            // Use ProducerConfig.BOOTSTRAP_SERVERS_CONFIG and default client connection port
+            useDefault = true;
+            Map<String, Object> newConfigs = new HashMap<>(configs);
+            ProducerConfig config = new ProducerConfig(newConfigs);
+            urls = config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG);
+        } else {
+            urls = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(connectString);
+        }
+        for (String connection : urls) {
+            if (useDefault) {
+                HostAndPort url = HostAndPort.fromString(connection);
+                connection = HostAndPort.fromParts(url.getHost(), Client.VOLTDB_SERVER_PORT).toString();
+            }
             try {
                 m_client.createConnection(connection);
             } catch (IOException e) {
