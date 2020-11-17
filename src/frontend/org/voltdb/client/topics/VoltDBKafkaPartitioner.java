@@ -17,17 +17,28 @@
 package org.voltdb.client.topics;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import javax.security.auth.login.AppConfigurationEntry;
+
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.Importance;
+import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.config.SslConfigs;
+import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.security.JaasContext;
+import org.apache.kafka.common.security.auth.SecurityProtocol;
+import org.apache.kafka.common.security.plain.PlainLoginModule;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.Client;
@@ -35,7 +46,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 
-import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
 /**
@@ -62,52 +72,40 @@ import com.google_voltpatches.common.net.HostAndPort;
  * }
  * </pre>
  * The <code>bootstrap.servers.voltdb</code> is required to calculate partition id from the key.
+ * <p>
+ * Kafka client properties used by the partitioner
+ * <ul>
+ * <li>{@link ProducerConfig#BOOTSTRAP_SERVERS_CONFIG} - If {@code bootstrap.servers.voltdb} is not set
+ * <li>{@link CommonClientConfigs#SECURITY_PROTOCOL_CONFIG}
+ * <li>{@link SaslConfigs#SASL_MECHANISM} - Must be {@code PLAIN}
+ * <li>{@link SaslConfigs#SASL_JAAS_CONFIG}
+ * <li>{@link SslConfigs#SSL_TRUSTSTORE_LOCATION_CONFIG}
+ * <li>{@link SslConfigs#SSL_TRUSTSTORE_PASSWORD_CONFIG}
+ * </ul>
  */
 public class VoltDBKafkaPartitioner extends DefaultPartitioner {
-
-    /**
-     * <p>Configuration for a VoltDB client for SSL enabled authentication, set it true if SSL is enabled.</p>
-     */
-    public static final String BOOTSTRAP_SERVERS_VOLTDB_SSL = "bootstrap.servers.voltdb.ssl";
-
-   /**
-     * <p>Configuration of SSL trust store location for SSL-enabled VoltDB authentication
-     */
-    public static final String SSL_TRUSTSTORE_LOCATION = SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG;
-
     /**
      * <p>Configuration for a VoltDB client to connect to VoltDB cluster: comma separated list of the form server[:port]</p>
      */
     public static final String BOOTSTRAP_SERVERS_VOLTDB = "bootstrap.servers.voltdb";
 
-    /**
-     * <p>Configuration for a VoltDB client that specifies authentication credentials. The username can be null or the empty string.</p>
-     */
-    public static final String BOOTSTRAP_SERVERS_VOLTDB_USERNAME = "bootstrap.servers.voltdb.username";
-
-    /**
-     * <p>Configuration for a VoltDB client that specifies authentication credentials. The password can be null or the empty string.</p>
-     */
-    public static final String BOOTSTRAP_SERVERS_VOLTDB_PASSWORD = "bootstrap.servers.voltdb.password";
+    private static final String PLAIN_SASL_MECHANISM = "PLAIN";
 
     static final Logger LOG = Logger.getLogger(VoltDBKafkaPartitioner.class.getName());
     protected ClientImpl m_client;
+
     @Override
-    public void configure(Map<String, ?> configs) {
-        super.configure(configs);
+    public void configure(Map<String, ?> original) {
+        PartitionConfig configs = new PartitionConfig(original);
         m_client = (ClientImpl) ClientFactory.createClient(createClientConfig(configs));
-        String connectString = (String)configs.get(BOOTSTRAP_SERVERS_VOLTDB);
+
+        List<String> urls = configs.getList(BOOTSTRAP_SERVERS_VOLTDB);
         boolean useDefault = false;
-        List<String> urls;
-        if (StringUtils.isBlank(connectString)) {
-            // Use ProducerConfig.BOOTSTRAP_SERVERS_CONFIG and default client connection port
+        if (urls.isEmpty()) {
+            urls = configs.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG);
             useDefault = true;
-            Map<String, Object> newConfigs = new HashMap<>(configs);
-            ProducerConfig config = new ProducerConfig(newConfigs);
-            urls = config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG);
-        } else {
-            urls = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(connectString);
         }
+
         for (String connection : urls) {
             if (useDefault) {
                 HostAndPort url = HostAndPort.fromString(connection);
@@ -157,22 +155,60 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
      * @param configs Configuration properties from KafkaProducer
      * @return ClientConfig
      */
-    protected ClientConfig createClientConfig(Map<String, ?> configs) {
-        String userName = (String)configs.get(BOOTSTRAP_SERVERS_VOLTDB_USERNAME);
-        String password = (String)configs.get(BOOTSTRAP_SERVERS_VOLTDB_PASSWORD);
+    protected ClientConfig createClientConfig(PartitionConfig configs) {
+        SecurityProtocol protocol = SecurityProtocol
+                .forName(configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG));
+
+        String userName = null;
+        String password = null;
+
+        if (protocol == SecurityProtocol.SASL_PLAINTEXT || protocol == SecurityProtocol.SASL_SSL) {
+            if (!PLAIN_SASL_MECHANISM.equals(configs.getString(SaslConfigs.SASL_MECHANISM))) {
+                throw new IllegalArgumentException(
+                        "Only " + PLAIN_SASL_MECHANISM + " is supported for " + SaslConfigs.SASL_MECHANISM);
+            }
+            Password jaasConfigString = configs.getPassword(SaslConfigs.SASL_JAAS_CONFIG);
+            if (jaasConfigString == null) {
+                throw new IllegalArgumentException("SASL JAAS configuration not supplied when SASL was specified");
+            }
+
+            JaasContext context = JaasContext.loadClientContext(configs.values());
+            String moduleName = PlainLoginModule.class.getName();
+            for (AppConfigurationEntry ace : context.configurationEntries()) {
+                if (moduleName.equals(ace.getLoginModuleName())) {
+                    Map<String, ?> options = ace.getOptions();
+                    userName = (String) options.get("username");
+                    password = (String) options.get("password");
+                    break;
+                }
+            }
+        }
+
         ClientConfig clientConfig = new ClientConfig(userName, password);
         clientConfig.setClientAffinity(true);
         clientConfig.setTopologyChangeAware(true);
 
-        boolean sslEnabled = Boolean.parseBoolean((String) configs.get(BOOTSTRAP_SERVERS_VOLTDB_SSL));
+        boolean sslEnabled = protocol == SecurityProtocol.SSL || protocol == SecurityProtocol.SASL_SSL;
         if (sslEnabled) {
             clientConfig.enableSSL();
-            final String sslStore = (String)configs.get(SSL_TRUSTSTORE_LOCATION);
+            final String sslStore = configs.getString(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG);
             if (!StringUtils.isEmpty(sslStore)) {
-                clientConfig.setTrustStoreConfigFromPropertyFile(sslStore);
+                Password storePassword = configs.getPassword(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG);
+                clientConfig.setTrustStore(sslStore, storePassword == null ? null : storePassword.value());
             }
         }
 
         return clientConfig;
+    }
+
+    private static final class PartitionConfig extends AbstractConfig {
+        private static final ConfigDef s_config = ProducerConfig.configDef().define(BOOTSTRAP_SERVERS_VOLTDB,
+                ConfigDef.Type.LIST, Collections.emptyList(), new ConfigDef.NonNullValidator(), Importance.MEDIUM,
+                "List of VoltDB servers to connect to. Defaults to " + ProducerConfig.BOOTSTRAP_SERVERS_CONFIG
+                        + " using the deafult port  of " + Client.VOLTDB_SERVER_PORT);
+
+        public PartitionConfig(Map<?, ?> originals) {
+            super(s_config, originals, false);
+        }
     }
 }

@@ -518,12 +518,27 @@ public class LocalCluster extends VoltServerConfig {
      * @throws IOException          If there was an error writing or reading the updated configuration
      */
     public void updateCatalog(VoltProjectBuilder builder) throws IOException, ProcCallException, InterruptedException {
+        updateCatalog(builder, new ClientConfig());
+    }
+
+    /**
+     * Update the catalog of a running instance. It is recommended that {@code builder} is the same builder which was
+     * used to compile this instance with the appropriate modifications.
+     *
+     * @param builder      {@link VoltProjectBuilder} with updated configuration.
+     * @param clientConfig {@link ClientConfig} to use when creating a new admin client
+     * @throws ProcCallException    If there was an error calling the procedure
+     * @throws InterruptedException If this thread was interrupted
+     * @throws IOException          If there was an error writing or reading the updated configuration
+     */
+    public void updateCatalog(VoltProjectBuilder builder, ClientConfig clientConfig)
+            throws IOException, ProcCallException, InterruptedException {
         m_compiled = false;
         assertTrue(compile(builder));
 
         String deplymentString = new String(Files.readAllBytes(Paths.get(builder.getPathToDeployment())),
                 Constants.UTF8ENCODING);
-        Client client = createAdminClient(new ClientConfig());
+        Client client = createAdminClient(clientConfig);
         try {
             assertEquals(ClientResponse.SUCCESS,
                     client.callProcedure("@UpdateApplicationCatalog", null, deplymentString).getStatus());

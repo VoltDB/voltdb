@@ -246,6 +246,18 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                String[] streamTargets,
                                                String username,
                                                String password) throws Exception {
+        configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount, topicsCount, streamTargets,
+                username, password, null);
+    }
+
+    protected void configureClustersAndClients(List<ClusterConfiguration> configs,
+            int partitionedTableCount,
+            int replicatedTableCount,
+            int topicsCount,
+            String[] streamTargets,
+            String username,
+            String password,
+            String sslPropsFile) throws Exception {
         if (configs.size() > getMaxClusters()) {
             throw new IllegalArgumentException("Maximum supported clusters is " + getMaxClusters());
         }
@@ -254,7 +266,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             addSchema(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
         } else {
             createClustersAndClientsWithCredentials(configs, partitionedTableCount, replicatedTableCount,
-                    topicsCount, streamTargets, username, password);
+                    topicsCount, streamTargets, username, password, sslPropsFile);
         }
     }
 
@@ -381,7 +393,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                          int topicsCount,
                                                          String[] streamTargets,
                                                          String username,
-                                                         String password) throws Exception {
+                                                         String password,
+                                                         String sslPropsFile) throws Exception {
         System.out.println("Creating clusters and clients. method: " + m_methodName + " configurations: " + configs
                 + ", partitionedTableCount: " + partitionedTableCount + ", replicatedTableCount: "
                 + replicatedTableCount);
@@ -389,6 +402,10 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         shutdownAllClustersAndClients();
 
         ClientConfig cc = createClientConfig(username, password);
+        if (sslPropsFile != null) {
+            cc.enableSSL();
+            cc.setTrustStoreConfigFromPropertyFile(sslPropsFile);
+        }
 
         int clusterNumber = 0;
         for (ClusterConfiguration config : configs) {
