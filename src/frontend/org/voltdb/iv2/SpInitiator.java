@@ -320,10 +320,10 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                         iv2masters.put(m_partitionId, hsidStr);
                         if (lastLeaderHSId == m_initiatorMailbox.getHSId()) {
                             tmLog.info(m_whoami + "reinstate as partition leader.");
-                            m_initiatorMailbox.setLeaderMigrationState(false);
+                            m_initiatorMailbox.setLeaderMigrationState(false, deadSPIHost);
                         } else {
                             tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
-                            m_initiatorMailbox.setLeaderMigrationState(true);
+                            m_initiatorMailbox.setLeaderMigrationState(true, deadSPIHost);
                         }
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
