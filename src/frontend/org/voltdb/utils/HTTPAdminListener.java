@@ -323,6 +323,7 @@ public class HTTPAdminListener {
     }
 
     public void start() throws Exception {
+        System.setProperty("org.eclipse.jetty.server.LEVEL", "ERROR");
         try {
             m_server.start();
         } catch (Exception e) {
