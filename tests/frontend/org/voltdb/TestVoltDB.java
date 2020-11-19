@@ -229,25 +229,25 @@ final public class TestVoltDB {
         server.join();
 
         // invalid host count
-        String [] args400 = {"probe", "voltdbroot", path.getPath(), "hostcount", "2", "mesh", "uno,", "due", ",","tre", ",quattro" };
+        String [] args400 = {"probe", "voltdbroot", path.getPath(), "hostcount", "2", "mesh", "uno,", "due", ",", "tre", ",quattro" };
         config = new VoltDB.Configuration(args400);
         assertFalse(config.validate()); // false in both pro and community
 
-        String [] args401 = {"probe", "voltdbroot", path.getPath(), "hostcount", "-3" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args401 = {"probe", "voltdbroot", path.getPath(), "hostcount", "-3" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args401);
         assertFalse(config.validate()); // false in both pro and community
 
-        String [] args402 = {"probe", "voltdbroot", path.getPath(), "hostcount", "4" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args402 = {"probe", "voltdbroot", path.getPath(), "hostcount", "4" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args402);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
 
-        String [] args403 = {"probe", "voltdbroot", path.getPath(), "hostcount", "6" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args403 = {"probe", "voltdbroot", path.getPath(), "hostcount", "6" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args403);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
 
-        String [] args404 = {"probe", "voltdbroot", path.getPath(), "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args404 = {"probe", "voltdbroot", path.getPath(), "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args404);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
         assertEquals(4, config.m_hostCount);
     }
 
