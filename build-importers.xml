@@ -103,7 +103,7 @@
             <include name='commons-lang3-3.8.1.jar'/>
             <include name='kafka-clients-2.3.1.jar'/>
         </fileset>
-        <fileset refid="voltpro.classpath"/>
+        <path refid="voltpro.classpath"/>
      </path>
 
     <target name="kafkastream10">

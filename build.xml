@@ -65,8 +65,8 @@
 </condition>
 
 <!-- stub the voltpro classpath and src.dir fileset so a fileset with this id always exists -->
-<fileset id="voltpro.classpath" file="." excludes="**"/>
-<fileset id="voltpro.src.dir" file="." excludes="**"/>
+<path id="voltpro.classpath" />
+<path id="voltpro.src.dir" />
 
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
@@ -188,7 +188,7 @@
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
-    <fileset refid="voltpro.classpath"/>
+    <path refid="voltpro.classpath"/>
 </path>
 
 <patternset id='junit.exclusions'>
@@ -2291,7 +2291,7 @@ TEST CASES
           <include name='*.jar' />
       </fileset>
       <pathelement location="${build.test.dir}" />
-      <fileset refid="voltpro.classpath"/>
+      <path refid="voltpro.classpath"/>
     </auxClasspath>
     <sourcePath path="${src.gpl.dir}" />
     <sourcePath path="${voltpro.src.dir}"/>
