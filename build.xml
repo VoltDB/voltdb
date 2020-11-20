@@ -775,21 +775,24 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
+    <property name="volddb_internaltype" value="world"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}"/>
     </exec>
+    <copy todir="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}/LICENSE-DEV.txt" file="LICENSE-DEV.txt" />
+    <delete file="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}/LICENSE"/>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}.tar.gz"/>
-        <arg value="voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}.tar.gz"/>
+        <arg value="voltdb-${volddb_internaltype}-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 

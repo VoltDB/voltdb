@@ -94,7 +94,7 @@ def makeReleaseDir(releaseDir):
 # BUILD THE COMMUNITY VERSION
 ################################################
 
-def buildCommunity(ee_only=False):
+def buildCommunity(internal_type, ee_only=False):
     if build_mac:
         packageMacLib="true"
     else:
@@ -103,9 +103,9 @@ def buildCommunity(ee_only=False):
         run("pwd")
         run("git status")
         if ee_only:
-            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (packageMacLib,  build_args))
+            run("ant -verbose -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (internal_type, packageMacLib, build_args))
         else:
-            run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
+            run("ant -verbose -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (internal_type, packageMacLib, build_args))
 
 
 ################################################
@@ -183,9 +183,9 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
     # permissions are 664
     local("chmod 755 %s" % releaseDir)
 
-def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/internal/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-community-%s.tar.gz" % (releaseDir, version))
+def copyCommunityFilesToReleaseDir(releaseDir, version, internal_type, operatingsys):
+    get("%s/internal/obj/release/voltdb-%s-%s.tar.gz" % (builddir, internal_type, version),
+        "%s/voltdb-%s-%s.tar.gz" % (releaseDir, internal_type, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
@@ -303,6 +303,7 @@ if __name__ == "__main__":
 
     build_errors=False
 
+    InternalType = "developer"
     versionCentos = "unknown"
     versionMac = "unknown"
     releaseDir = "unknown"
@@ -317,7 +318,7 @@ if __name__ == "__main__":
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
                 versionMac = checkoutCode(voltdbTreeish, None, args.gitloc)
-                buildCommunity(ee_only=True)
+                buildCommunity(InternalType, ee_only=True)
         except Exception as e:
             print traceback.format_exc()
             print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
@@ -338,8 +339,8 @@ if __name__ == "__main__":
             makeReleaseDir(releaseDir)
             #print "VERSION: " + versionCentos
             if build_community:
-                buildCommunity()
-                copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+                buildCommunity(InternalType)
+                copyCommunityFilesToReleaseDir(releaseDir, versionCentos, InternalType, "LINUX")                
                 makeMavenJars()
                 copyMavenJarsToReleaseDir(releaseDir, versionCentos)
             buildEnterprise(versionCentos)
