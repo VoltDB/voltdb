@@ -781,7 +781,6 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}"/>
     </exec>
     <copy todir="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}/LICENSE" file="LICENSE-DEV.txt" />
-    <delete file="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}/LICENSE"/>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
