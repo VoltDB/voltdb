@@ -780,7 +780,7 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
-    <copy todir="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" file="LICENSE-DEV.txt" />
+    <copy tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" file="LICENSE-DEV.txt"/>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
