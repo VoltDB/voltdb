@@ -103,9 +103,9 @@ def buildCommunity(edition_type, ee_only=False):
         run("pwd")
         run("git status")
         if ee_only:
-            run("ant -Dvolddb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (edition_type, packageMacLib, build_args))
+            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (edition_type, packageMacLib, build_args))
         else:
-            run("ant -Dvolddb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (edition_type, packageMacLib, build_args))
+            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (edition_type, packageMacLib, build_args))
 
 
 ################################################
@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
     build_errors=False
 
-    EditionType = "developer"
+    editionType = "developer"
     versionCentos = "unknown"
     versionMac = "unknown"
     releaseDir = "unknown"
@@ -318,7 +318,7 @@ if __name__ == "__main__":
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
                 versionMac = checkoutCode(voltdbTreeish, None, args.gitloc)
-                buildCommunity(EditionType, ee_only=True)
+                buildCommunity(editionType, ee_only=True)
         except Exception as e:
             print traceback.format_exc()
             print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
@@ -339,8 +339,8 @@ if __name__ == "__main__":
             makeReleaseDir(releaseDir)
             #print "VERSION: " + versionCentos
             if build_community:
-                buildCommunity(EditionType)
-                copyCommunityFilesToReleaseDir(releaseDir, versionCentos, EditionType, "LINUX")                
+                buildCommunity(editionType)
+                copyCommunityFilesToReleaseDir(releaseDir, versionCentos, editionType, "LINUX")                
                 makeMavenJars()
                 copyMavenJarsToReleaseDir(releaseDir, versionCentos)
             buildEnterprise(versionCentos)

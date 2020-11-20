@@ -775,23 +775,23 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
-    <property name="volddb_editiontype" value="community"/>
+    <property name="voltdb_editiontype" value="community"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
-        <arg value="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
-    <copy todir="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}/LICENSE" file="LICENSE-DEV.txt" />
+    <copy todir="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" file="LICENSE-DEV.txt" />
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}.tar.gz"/>
-        <arg value="voltdb-${volddb_editiontype}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}.tar.gz"/>
+        <arg value="voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-${volddb_editiontype}-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
