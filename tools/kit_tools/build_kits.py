@@ -103,9 +103,9 @@ def buildCommunity(internal_type, ee_only=False):
         run("pwd")
         run("git status")
         if ee_only:
-            run("ant -verbose -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (internal_type, packageMacLib, build_args))
+            run("ant -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (internal_type, packageMacLib, build_args))
         else:
-            run("ant -verbose -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (internal_type, packageMacLib, build_args))
+            run("ant -Dvolddb_internaltype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (internal_type, packageMacLib, build_args))
 
 
 ################################################

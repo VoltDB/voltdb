@@ -775,7 +775,7 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
-    <property name="volddb_internaltype" value="world"/>
+    <property name="volddb_internaltype" value="community"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${volddb_internaltype}-${dist.version}"/>
