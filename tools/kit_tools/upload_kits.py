@@ -9,6 +9,9 @@ import os
 if not env.hosts:
     exit("FATAL: Missing -H server. You must specifiy the host to upload the kits to")
 
+if not editionType:
+    editionType = "community"
+
 sshinfo = getSSHInfoForHost(env.hosts[0])
 
 def str_option_to_bool(opt):
@@ -40,11 +43,6 @@ def upload_kits(version,
     """
     if not version:
         exit ("FATAL: You must specify a version number that exists in ~tests/releases/released")
-
-    # If editionType does not exists set "community" by default
-    # It should be "developer" from not on 
-    if not editionType:
-        editionType = "community"
 
     #Any upload_type starting with ent will work
     #This allows the Jenkins selector to be "ent_only"
