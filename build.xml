@@ -780,8 +780,18 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
-    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" />
-    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true"/>
+    <if>
+        <equals arg1="${voltdb_editiontype}" arg2="developer"/>
+        <then>
+            <echo message="The value of edition is: developer" />
+            <echo message="The value of edition is...2: ${voltdb_editiontype}" />
+            <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" />
+            <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true"/>
+        </then>
+        <else>
+            <echo message="The value of edition is: community" />
+        </else>
+    </if>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
