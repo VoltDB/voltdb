@@ -50,7 +50,7 @@ def upload_kits(version,
     if upload_type not in ("ent", "all"):
         exit("FATAL: Upload upload_type must be enterprise or all")
 
-    communityEditionType = os.path.join("voltdb-",editionType ,"-%s.tar.gz")
+    communityEditionType = os.path.join("voltdb-" + editionType + "-%s.tar.gz")
     print "communityEditionType: " + communityEditionType
 
     dry_run = str_option_to_bool(dry_run)
