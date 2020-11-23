@@ -45,6 +45,10 @@
 </condition>
 
 <!-- IF BUILDING BUILD FROM INTERNAL SET THE NAME OF THE LICENSE  -->
+<condition property="voltdb_editiontype" value="${voltdb_editiontype}" else="community">
+    <isset property="voltdb_editiontype"/>
+</condition>
+
 <condition property="editiontypeMatch">>
     <equals arg1="${voltdb_editiontype}" arg2="developer" />
 </condition>
@@ -779,7 +783,7 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
-    <property name="voltdb_editiontype" value="community"/>
+    <echo message="voltdb_editiontype...: ${voltdb_editiontype}"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
