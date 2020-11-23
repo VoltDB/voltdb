@@ -22,6 +22,7 @@ def str_option_to_bool(opt):
 
 
 def upload_kits(version,
+                editionType,
                 upload_type="ent",
                 remote_dir="/var/www/downloads.voltdb.com/technologies/server",
                 kit_dir="/home/test/releases/released",
@@ -40,15 +41,23 @@ def upload_kits(version,
     if not version:
         exit ("FATAL: You must specify a version number that exists in ~tests/releases/released")
 
+    # If editionType does not exists set "community" by default
+    # It should be "developer" from not on 
+    if editionType is None:
+        editionType = "community"
+
     #Any upload_type starting with ent will work
     #This allows the Jenkins selector to be "ent_only"
     upload_type = upload_type[:3]
     if upload_type not in ("ent", "all"):
         exit("FATAL: Upload upload_type must be enterprise or all")
 
+    communityEditionType = os.path.join("voltdb-",editionType ,"-%s.tar.gz")
+    println "communityEditionType: " + communityEditionType
+
     dry_run = str_option_to_bool(dry_run)
     ent_kits = ["voltdb-ent-%s.tar.gz","voltdb-ent-%s.SHA256SUM","LINUX-voltdb-ent-%s.tar.gz","MAC-voltdb-ent-%s.tar.gz"]
-    all_kits = ent_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz", "voltdb-community-%s.tar.gz"]
+    all_kits = ent_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz", communityEditionType]
     kits_home = kit_dir + "/voltdb-" + version
     count=0
 
