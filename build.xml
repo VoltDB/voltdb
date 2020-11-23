@@ -45,8 +45,7 @@
 </condition>
 
 <!-- IF BUILDING BUILD FROM INTERNAL SET THE NAME OF THE LICENSE  -->
-<property name="voltdb_editiontype" value="community"/>
-<condition property="editiontypeMatch">>
+<condition property="editiontypeMatch">
     <equals arg1="${voltdb_editiontype}" arg2="developer" />
 </condition>
 
@@ -786,8 +785,8 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
-    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if='editiontypeMatch' />
-    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if='editiontypeMatch' />
+    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if:set='editiontypeMatch' />
+    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if:set='editiontypeMatch' />
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
