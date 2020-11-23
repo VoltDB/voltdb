@@ -780,13 +780,14 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
+    <property name="voltdb_editiontype" value="community"/>
     <echo message="voltdb_editiontype...: ${voltdb_editiontype}"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
-    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if:set='editiontypeMatch' />
-    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if:set='editiontypeMatch' />
+    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if='editiontypeMatch' />
+    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if='editiontypeMatch' />
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
