@@ -50,7 +50,7 @@
 </condition>
 
 <condition property="editiontypeMatch">>
-    <equals arg1="${voltdb_editiontype}" arg2="developer" />
+    <equals arg1="${voltdb_editiontype}" arg2="community" />
 </condition>
 
 <!-- make environment var foo available as env.foo -->
