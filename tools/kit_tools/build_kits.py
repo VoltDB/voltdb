@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
     build_errors=False
 
-    editionType = "developer"
+    editionType = "community"
     versionCentos = "unknown"
     versionMac = "unknown"
     releaseDir = "unknown"
