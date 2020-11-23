@@ -36,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -629,7 +628,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 public void run() {
                     try {
                         processSnapshotTruncationRequestCreated(event);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
                     }
                 }
@@ -1273,11 +1272,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String path;
         private final String nonce;
         private final Long txnId;
-        private final SnapshotPathType stype;
 
-        private Snapshot(String path, SnapshotPathType stype, String nonce, Long txnId) {
+        private Snapshot(String path, String nonce, Long txnId) {
             this.path = path;
-            this.stype = stype;
             this.nonce = nonce;
             this.txnId = txnId;
         }
@@ -1369,7 +1366,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString());
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            m_snapshots.offer(new Snapshot(m_path, SnapshotPathType.SNAP_AUTO, nonce, now));
+            m_snapshots.offer(new Snapshot(m_path, nonce, now));
             assert(Thread.currentThread().getId() == m_snapshotThreadId);
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -1566,7 +1563,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
                     final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, SnapshotPathType.SNAP_AUTO, nonce, txnId));
+                    m_snapshots.add(new Snapshot(path, nonce, txnId));
                 }
             }
         }

@@ -199,7 +199,9 @@ public interface CommandLog {
      * Report when a truncation snapshot has started so CommandLogging does not submit
      * a new request until after the truncation work is complete
      */
-    public void notifyTruncationSnapshotStarted();
+    public default void notifyTruncationSnapshotStarted() {
+        // Ignore snapshot start notification when Command Logging is disabled
+    }
 
     /**
      * Statistics-related interface
