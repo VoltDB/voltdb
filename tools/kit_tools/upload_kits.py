@@ -28,9 +28,6 @@ def upload_kits(version,
                 kit_dir="/home/test/releases/released",
                 dry_run='False'):
 
-    print "editionType: " + editionType
-
-
     """ Upload kits to the voltdb download site.
         Args:
             version - version number such as 7.1.2
@@ -51,7 +48,6 @@ def upload_kits(version,
         exit("FATAL: Upload upload_type must be enterprise or all")
 
     communityEditionType = os.path.join("voltdb-" + editionType + "-%s.tar.gz")
-    print "communityEditionType: " + communityEditionType
 
     dry_run = str_option_to_bool(dry_run)
     ent_kits = ["voltdb-ent-%s.tar.gz","voltdb-ent-%s.SHA256SUM","LINUX-voltdb-ent-%s.tar.gz","MAC-voltdb-ent-%s.tar.gz"]
@@ -68,12 +64,7 @@ def upload_kits(version,
     #For all the files in ent_kits or all_kits upload the files
     for k in eval(upload_type + "_kits"):
         f = os.path.join(kits_home, k) % version
-
-
-        print "====testing" + f
-
-
-
+        #print "====testing" + f
         with quiet():
             filecheck = local("ls " + f)
 
@@ -82,9 +73,8 @@ def upload_kits(version,
             if dry_run:
                 print "DRYRUN:" + f + "  -->  " + remote_dir
             else:
-                 print "Do not scp"
-#                with cd(remote_dir):
-#                    put(f, k % version)
+                with cd(remote_dir):
+                    put(f, k % version)
 
 
     if not count:
