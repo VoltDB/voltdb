@@ -68,7 +68,12 @@ def upload_kits(version,
     #For all the files in ent_kits or all_kits upload the files
     for k in eval(upload_type + "_kits"):
         f = os.path.join(kits_home, k) % version
-        #print "====testing" + f
+
+
+        print "====testing" + f
+
+
+
         with quiet():
             filecheck = local("ls " + f)
 
