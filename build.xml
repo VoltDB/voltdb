@@ -45,12 +45,9 @@
 </condition>
 
 <!-- IF BUILDING BUILD FROM INTERNAL SET THE NAME OF THE LICENSE  -->
-<condition property="voltdb_editiontype" value="${voltdb_editiontype}" else="community">
-    <isset property="voltdb_editiontype"/>
-</condition>
-
+<property name="voltdb_editiontype" value="community"/>
 <condition property="editiontypeMatch">>
-    <equals arg1="${voltdb_editiontype}" arg2="community" />
+    <equals arg1="${voltdb_editiontype}" arg2="developer" />
 </condition>
 
 <!-- make environment var foo available as env.foo -->
