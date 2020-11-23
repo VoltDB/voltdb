@@ -43,7 +43,7 @@ def upload_kits(version,
 
     # If editionType does not exists set "community" by default
     # It should be "developer" from not on 
-    if editionType is None:
+    if not editionType:
         editionType = "community"
 
     #Any upload_type starting with ent will work
