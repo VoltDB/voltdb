@@ -9,9 +9,6 @@ import os
 if not env.hosts:
     exit("FATAL: Missing -H server. You must specifiy the host to upload the kits to")
 
-if not editionType:
-    editionType = "community"
-
 sshinfo = getSSHInfoForHost(env.hosts[0])
 
 def str_option_to_bool(opt):
@@ -25,11 +22,14 @@ def str_option_to_bool(opt):
 
 
 def upload_kits(version,
-                editionType,
+                editionType="community",
                 upload_type="ent",
                 remote_dir="/var/www/downloads.voltdb.com/technologies/server",
                 kit_dir="/home/test/releases/released",
                 dry_run='False'):
+
+    print "editionType: " + editionType
+
 
     """ Upload kits to the voltdb download site.
         Args:
