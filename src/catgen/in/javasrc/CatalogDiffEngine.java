@@ -688,9 +688,13 @@ public class CatalogDiffEngine {
                 }
                 return null;
             }
-        }
 
-        return "May not dynamically add/drop schema object: '" + suspect + "'\n";
+            if (parent instanceof Topic) {
+                m_requiresNewExportGeneration = true;
+                return null;
+            }
+        }
+        return "May not dynamically add/drop schema object: '" + suspect + "', parent: " + suspect.getParent() + "\n";
     }
 
     /**
@@ -1184,13 +1188,19 @@ public class CatalogDiffEngine {
                 return null;
             }
 
+            // allow topic property changes
+            if (parent instanceof Topic && suspect instanceof Property) {
+                m_requiresNewExportGeneration = true;
+                return null;
+            }
+
             if (isTableLimitDeleteStmt(parent)) {
                 return null;
             }
         }
 
         return "May not dynamically modify field '" + field +
-                        "' of schema object '" + suspect + "'" + restrictionQualifier;
+                        "' of schema object '" + suspect + "'" + restrictionQualifier + ", parent:" + suspect.getParent();
     }
 
     /**

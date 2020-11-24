@@ -615,6 +615,43 @@ public class SQLParser extends SQLPatternFactory
                     SPF.ifExists())
             .compile("PAT_DROP_TOPIC");
 
+    /**
+     * Build regex to support alter topic statement in the from of
+     * <p>
+     *
+     * <pre>
+     * ALTER TOPIC {name} PROPERTIES (key1=value1, ...)
+     * </pre>
+     */
+    private static final Pattern PAT_ALTER_TOPIC =
+            SPF.statement(
+                    SPF.token("alter"), SPF.token("topic"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(
+                        SPF.oneOf(
+                            SPF.clause(
+                                    SPF.token("add"), SPF.token("properties\\s*\\(\\s*"),
+                                    SPF.capture("added", SPF.commaList(SPF.token(
+                                            "\\w+[\\w\\.]*\\s*=.*"))
+                                    ).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                            ),
+                            SPF.clause(
+                                    SPF.token("drop"), SPF.token("properties\\s*\\(\\s*"),
+                                    SPF.capture("dropped", SPF.commaList(SPF.token(
+                                            "\\w+[\\w\\.]*"))
+                                    ).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                            ),
+                            SPF.clause(
+                                    SPF.token("alter"), SPF.token("properties\\s*\\(\\s*"),
+                                    SPF.capture("altered", SPF.commaList(SPF.token(
+                                            "\\w+[\\w\\.]*\\s*=.*"))
+                                    ).withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                    SPF.token("\\s*\\)").withFlags(ADD_LEADING_SPACE_TO_CHILD)
+                            )
+                        )
+                    )
+            ).compile("PAT_ALTER_TOPIC");
 
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
@@ -646,7 +683,7 @@ public class SQLParser extends SQLPatternFactory
             "\\AIMPORT|" +
             "\\ADR|" +
             "\\ASET|" +
-            "\\AALTER\\s+TASK" +
+            "\\AALTER\\s+(?:TASK|TOPIC)" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
@@ -983,6 +1020,10 @@ public class SQLParser extends SQLPatternFactory
 
     public static Matcher matchDropTopic(String statement) {
         return PAT_DROP_TOPIC.matcher(statement);
+    }
+
+    public static Matcher matchAlterTopic(String statement) {
+        return PAT_ALTER_TOPIC.matcher(statement);
     }
 
     /**

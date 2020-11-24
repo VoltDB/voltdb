@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2019 VoltDB Inc.
+ * Copyright (C) 2020 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,17 +21,13 @@ import java.util.regex.Matcher;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONTokener;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Property;
 import org.voltdb.catalog.Topic;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
@@ -145,68 +141,6 @@ public class CreateTopic extends StatementProcessor {
             return;
         }
 
-        new PropertyParser(m_compiler, properties, topic.getProperties()).parse();
-    }
-
-    private static class PropertyParser {
-        private final VoltCompiler m_compiler;
-        private final String m_propertiesString;
-        private final CatalogMap<Property> m_properties;
-
-        PropertyParser(VoltCompiler ddlCompiler, String propertiesString, CatalogMap<Property> properties) {
-            m_compiler = ddlCompiler;
-            m_propertiesString = propertiesString;
-            m_properties = properties;
-        }
-
-        void parse() throws VoltCompilerException {
-            // Reusing a JSON parser since the property map looks a lot like JSON
-            JSONTokener tokener = new JSONTokener(m_propertiesString);
-            try {
-                while (true) {
-                    if (!m_properties.isEmpty()) {
-                        if (expectChar(tokener, ',', true)) {
-                            return;
-                        }
-                    }
-                    String key = getKeyOrValue(tokener);
-                    expectChar(tokener, '=', false);
-                    m_properties.add(key).setValue(getKeyOrValue(tokener));
-                }
-            } catch (JSONException e) {
-                throw m_compiler.new VoltCompilerException("Unable to parse properties: " + e.getMessage());
-            }
-        }
-
-        private String getKeyOrValue(JSONTokener tokener) throws VoltCompilerException, JSONException {
-            char c = tokener.nextClean();
-            switch (c) {
-                case ',':
-                case '=':
-                    throw m_compiler.new VoltCompilerException("Unexpected token in properties: " + c + ": " + tokener);
-                case 0:
-                    throw m_compiler.new VoltCompilerException("Unexpected end of properties: " + tokener);
-                default:
-                    tokener.back();
-                    return tokener.nextValue().toString();
-            }
-        }
-
-        private boolean expectChar(JSONTokener tokener, char expected, boolean endOk)
-                throws JSONException, VoltCompilerException {
-            char c = tokener.nextClean();
-            if (c != expected) {
-                if (c == 0) {
-                    if (endOk) {
-                        return true;
-                    }
-                    throw m_compiler.new VoltCompilerException(
-                            "Expected token '" + expected + "' in properties but encountered end of string: " + tokener);
-                }
-                throw m_compiler.new VoltCompilerException(
-                        "Expected token '" + expected + "' in properties but encountered: '" + c + "': " + tokener);
-            }
-            return false;
-        }
+        new TopicPropertyParser(m_compiler, properties, topic.getProperties()).parse();
     }
 }

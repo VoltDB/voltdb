@@ -28,7 +28,7 @@ public class TaskValidator extends CatalogValidator {
 
     @Override
     public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
-            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+            InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
         if (taskErrors != null) {
             ccr.errorMsg = taskErrors;

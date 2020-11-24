@@ -74,6 +74,8 @@ public class CatalogValidator {
 
     /**
      * Validates the parts of the deployment relevant for this component.
+     * <p>
+     * Invoked once on startup, and subsequently on each catalog update.
      *
      * @param catalog the new catalog
      * @param newDep the updated deployment
@@ -93,11 +95,12 @@ public class CatalogValidator {
      * @param catalog the new catalog
      * @param deployment the new deployment
      * @param catalogJar the {@link InMemoryJarfile} of the new catalog
+     * @param curCatalog the current catalog or {@code null}
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return {@code true} if successful, {@code false} if not and ccr updated with error message
      */
     public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
-            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+            InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         return true;
     }
 }

@@ -68,6 +68,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.AlterTask;
+import org.voltdb.compiler.statements.AlterTopic;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -249,6 +250,7 @@ public class DDLCompiler {
                                 .addNextProcessor(new AlterTask(this))
                                 .addNextProcessor(new CreateTopic(this))
                                 .addNextProcessor(new DropTopic(this))
+                                .addNextProcessor(new AlterTopic(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
