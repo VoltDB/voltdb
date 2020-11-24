@@ -30,17 +30,50 @@ set -x
 [ -z "$CSVFILE" ] && CSVFILE=periodic.csv.gz
 [ -z "$TOPOLOGYAWARE" ] && TOPOLOGYAWARE=true
 [ -z "$LOG4J" ] && LOG4J=voltdb/log4j.xml
-[ -z "$VJAR" ] && VJAR=`ls -1 voltdb/voltdb/*.jar | grep "voltdb-"`
+[ -z "$VJAR" ] && VJAR=`ls -1t voltdb/voltdb/voltdbclient-*.jar | head -1`
+[ -z "$USERNAME" ] && USERNAME=""
+[ -z "$PASSWORD" ] && PASSWORD=""
+[ -z "$SSLFILE" ] && SSLFILE=""
+[ -z "$STATSFILE" ] && STATSFILE=""
+[ -z "$DR" ] && DR=""
+[ -z "$SQLCMDPORT" ] && SQLCMDPORT=""
+# if set only load the DDL
+[ -z "$DDLONLY" ] && DDLONLY=""
 
-voltdb/bin/sqlcmd --servers=$SERVERS --query="select key from store limit 1"
+SSLOPT=""
+if [ "$SSLFILE" != "" ]; then
+    SSLOPT="--ssl=$SSLFILE"
+fi
+
+SPORT=""
+if [ "$SQLCMDPORT" != "" ]; then
+    SPORT="--port=$SQLCMDPORT"
+fi
+
+voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT --query="select key from store limit 1"
+
 if [ $? != 0 ]; then
     echo "loading ddl"
-    voltdb/bin/sqlcmd --servers=$SERVERS < ddl.sql
+    voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT < ddl.sql
+    if [ "$DR" != "" ]; then
+        voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT --query="DR TABLE STORE"
+    fi
+
+
 else
-    voltdb/bin/sqlcmd --servers=$SERVERS --query="truncate table store"
+    voltdb/bin/sqlcmd --servers=$SERVERS $SSLOPT --query="truncate table store"
 fi
+if [ "$DDLONLY" != "" ]; then
+    exit 0
+fi
+
 JAVA=`which java`
-$JAVA -classpath kvbenchmark.jar:$VJAR:voltdb/lib/*.jar -Dlog4j.configuration=file://$LOG4J \
+CLASSPATH="kvbenchmark.jar"
+APPCLASSPATH=$({ \
+    \ls -1 voltdb/lib/*.jar; \
+    \ls -1 voltdb/lib/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+$JAVA -classpath kvbenchmark.jar:${VJAR}:${APPCLASSPATH} -Dlog4j.configuration=file://$LOG4J \
         kvbench.SyncBenchmark \
         --displayinterval=$DISPLAYINTERVAL \
         --duration=$DURATION \
@@ -54,5 +87,10 @@ $JAVA -classpath kvbenchmark.jar:$VJAR:voltdb/lib/*.jar -Dlog4j.configuration=fi
         --usecompression=$USECOMPRESSION \
         --threads=$THREADS \
         --csvfile=periodic.csv.gz \
+        --sslfile=$SSLFILE \
+        --username=$USERNAME \
+        --password=$PASSWORD \
+        --statsfile=$STATSFILE \
         --topologyaware=$TOPOLOGYAWARE
+
 

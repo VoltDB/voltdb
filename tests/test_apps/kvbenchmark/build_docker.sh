@@ -33,3 +33,9 @@ docker build -t voltdb/kvbenchmark .
 #SQL error while compiling query: Error in "select * from store" - object not found: STORE
 
 # ~/workspace/VoltDB/voltdb/tests/test_apps/kvbenchmark (master)$>docker exec kvbenchmark /usr/bin/java -cp /kvbenchmark/kvbenchmark.jar:/kvbenchmark/voltdb/voltdb/voltdb-10.0.beta5.jar:/kvbencharmmark/voltdb/lib/*.jar kvbench.SyncBenchmark --servers=voltdb
+
+docker tag voltdb/kvbenchmark:latest localhost:5000/kvbenchmark:latest
+
+docker push localhost:5000/kvbenchmark:latest
+
+docker push voltdb/kvbenchmark:latest
