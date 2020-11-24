@@ -1,0 +1,216 @@
+VOLTDB DEVELOPER EDITION LICENSE AGREEMENT
+This VoltDB Developer Edition License Agreement (the Agreement), effective as of the date
+Developer downloads the Software (the Effective Date), is entered into between VoltDB, Inc., a
+Delaware corporation, with a principal place of business at 209 Burlington Road, Suite 203,
+Bedford, MA 01730, USA (Licensor) and the licensee identified in the Order that pertains to this
+Software (Developer). The parties agree as follows:
+1. DEFINITIONS.
+Developer's Environment means the internal information and computing technology platform
+that Developer uses in the operation of its own business.
+Developer Products means software applications developed by or on behalf of Developer or
+branded with Developer brands, logos, trademarks, and/or trade name and distributed or made
+accessible to third parties in the course of Developer's business.
+Documentation means the user guide, help information and/or other documentation generally
+provided by Licensor to licensees who enter into a development license with respect to the
+Software.
+Software means VoltDB Code and, if any, Third Party Code (as such term is defined herein).
+Term means the period of time commencing on the Effective Date and expiring upon the
+termination of this Agreement pursuant to Section 10.
+VoltDB Code means Licensor's proprietary computer programs and files that are intentionally
+delivered to Developer under this Agreement for the use and purposes specified herein.
+2. INTERNAL USE LICENSE.
+2.1 Software. Subject to all terms and conditions in this Agreement, Licensor grants to
+Developer a nonexclusive, nontransferable, nonsublicenseable right and license to copy, modify,
+display, perform and otherwise use the Software and Documentation internally, during the Term,
+solely for purposes of non-productive review, testing, evaluation, adaptation and integration with
+Developer's Environment or Developer Products (the "License"), but not for productive use or
+for purposes of further distribution, licensing or sale, unless and until Developer enters into a
+separate written agreement with Licensor that expressly authorizes such additional uses and
+activities.
+2.2 Limitations.  Developer agrees that its use of the Software shall comply with all other
+limitations, prohibitions and conditions set forth in this Agreement or, with respect to Third Party
+Code, any applicable third-party license agreements (as further provided in Section 6.4).
+2.3 License Control. Developer acknowledges that the Software may contain code or require
+license keys that detect or prevent unauthorized use of, or disable, the Software.
+2.4 Support. Developer acknowledges and agrees that this free development License does not
+include, and Developer shall not be entitled to receive, any support, maintenance or other
+services from Licensor.
+3. AUDIT.
+Upon reasonable advance written notice, Licensor shall have the right to audit Developer's use
+of the Software to verify Developer's compliance with this Agreement. Developer shall make its
+systems and all applicable books, records and transaction logs available for such inspection
+during normal business hours at Developer's principal place of business. Any audit shall be at
+Licensor's expense, unless it discloses any material breach or misconduct by Developer, in
+which case Developer shall reimburse Licensor for the reasonable expenses of the audit.
+4. PAYMENTS.
+4.1 Fees. Developer is not obligated to pay any fees or charges to Licensor, unless set forth in a
+separate agreement.
+4.2 Taxes. If any federal, state, local or foreign taxes, duties, tariffs, levies, withholdings or
+similar assessments (including without limitation, sales taxes, use taxes and value added taxes)
+become due as a result of the license and transfer of the Software and Documentation to
+Developer hereunder, Developer agrees to bear and be responsible for the payment of all such
+charges, excluding taxes based upon Licensor's net income.
+5. CONFIDENTIALITY.
+5.1 Scope. The term Confidential Information means all trade secrets, know-how, inventions,
+developments, software and other financial, business or technical information of Licensor (or any
+of its licensors or customers) that is disclosed by or for Licensor or that is otherwise learned or
+accessed by Developer, but not including any information that Developer can demonstrate is (a)
+rightfully furnished to it without restriction by a third party without breach of any separate
+obligation to Licensor, (b) generally available to the public without breach of this Agreement or
+(c) independently developed by it without reliance on such information.
+5.2 Confidentiality. Except for the specific rights granted by this Agreement, Developer shall
+not possess, use or disclose any Confidential Information without Licensor's prior written
+consent, and shall use reasonable care, and appropriate administrative, technical and physical
+safeguards, to protect the Confidential Information. Developer may only disclose Confidential
+Information to its employees and contractors who have a need to know for the purposes of this
+Agreement and who are bound by confidentiality obligations that are at least as protective as the
+provisions herein. Developer shall be responsible for any breach of confidentiality by its
+employees and contractors. Promptly after any termination of this Agreement (or at Licensor's
+request at any other time), Developer shall return all tangible Confidential Information,
+permanently erase all Confidential Information from any storage media and destroy all
+information, records and materials developed therefrom to the extent they contain such
+Confidential Information.
+6. PROPRIETARY RIGHTS.
+6.1 Restrictions. Except as specifically permitted in this Agreement, Developer shall not directly
+or indirectly: (a) use any Confidential Information to create any software or documentation that
+is similar to or competitive with any Software or Documentation; (b) disassemble, decompile,
+reverse engineer or use any other means to attempt to discover any source code or underlying
+ideas, algorithms or organization of the Software (except and only to the extent that these
+restrictions are expressly prohibited by applicable statutory law); (c) encumber, loan, lease, rent,
+sublicense, transfer, or distribute any Software or Documentation, or make these accessible to
+any third party, or use them for the benefit of any third party (e.g., service bureau arrangement);
+(d) copy, create derivative works of or otherwise modify any Software or Documentation; (e) use
+or allow the transfer, transmission, export or re-export of all or any part of the Software (or any
+product thereof) in violation of any export control laws or regulations of the United States or any
+other relevant jurisdiction; or (f) permit any third party to do any of the foregoing. Developer
+will promptly notify Licensor in writing of any unauthorized use, reproduction or distribution of
+any Software or Documentation.
+6.2 No Implied Licenses. Except for the limited License expressly granted hereunder, no other
+license is granted (by implication, estoppel or otherwise), no other use is permitted and Licensor
+(and its licensors) shall retain all rights, title and interests (including all patent rights, copyright
+rights, trade secret rights and all other intellectual property and proprietary rights) in and to the
+Software and Documentation. Developer agrees not to take any action inconsistent with such
+ownership.
+6.3 Markings. Developer shall not (and shall not permit any third party to) alter, obscure or
+remove any patent, trademark or other proprietary or legal notice deployed by or contained on
+any Software, Documentation or packaging.
+6.4 Third Party Code. The VoltDB Code may operate, interface or be delivered with software
+or other technology that is identified in the Documentation ("Third Party Code") and licensed
+from and owned by third parties ("Third Party Licensors"). Developer agrees that (a) it will use
+Third Party Code in accordance with this Agreement (unless different terms are specified in the
+applicable license set forth or referenced in the Documentation, in which case Developer will
+comply with those terms with respect to the covered code), (b) no Third Party Licensor makes
+any representation or warranty to Developer concerning the Software, (c) no Third Party
+Licensor will have any obligation or liability to Developer as a result of this Agreement or
+Developer's use of the Software, and (d) Licensor will have no obligation or liability to
+Developer as a result of Developer's use of the Third Party Code. Upon Developer's specific
+written request received during the term of this Agreement, Licensor will make available the
+source code for Third Party Code, but only if such source code was made available to VoltDB
+and doing so is required by the applicable license.
+7. WARRANTY DISCLAIMERS.
+THE SOFTWARE AND DOCUMENTATION ARE PROVIDED "AS IS" WITHOUT
+WARRANTY OF ANY KIND. LICENSOR DOES NOT WARRANT THAT THE
+SOFTWARE WILL BE COMPATIBLE WITH ANY DEVELOPER PRODUCT OR WITH
+DEVELOPER'S ENVIRONMENT OR OTHERWISE MEET DEVELOPER'S
+REQUIREMENTS, OR THAT OPERATION WILL BE UNINTERRUPTED OR ERROR-
+FREE.
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, ON BEHALF OF
+ITSELF AND ITS LICENSORS, LICENSOR HEREBY DISCLAIMS ALL WARRANTIES,
+EXPRESS OR IMPLIED, ORAL OR WRITTEN, INCLUDING WITHOUT LIMITATION,
+ALL IMPLIED WARRANTIES OF TITLE, NON-INFRINGEMENT, INTEGRATION,
+ACCURACY, MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE
+AND ALL WARRANTIES ARISING FROM ANY COURSE OF DEALING OR
+PERFORMANCE OR USAGE OF TRADE.
+8. INDEMNIFICATION.
+8.1 Breach or Misuse. Developer agrees to defend, indemnify and hold harmless Licensor
+against any claim by a third party that arises from or relates to Developer Products, Developer's
+Environment or Developer's breach of this Agreement or violation of law; provided that
+Licensor promptly gives Developer written notice thereof and reasonable cooperation,
+information, and assistance in connection therewith.
+8.2 No Licensor Liability.  Licensor shall have no liability to Developer with respect to any
+actual or alleged violation of intellectual property rights by the Software or any part thereof or by
+its use or operation.
+9. LIMITATION OF LIABILITY.
+LICENSOR (AND ITS LICENSORS) SHALL NOT BE LIABLE CONCERNING THE
+SUBJECT MATTER OF THIS AGREEMENT (INCLUDING ANY INDEMNIFICATION),
+REGARDLESS OF THE FORM OF ANY CLAIM OR ACTION (WHETHER IN
+CONTRACT, NEGLIGENCE, STRICT LIABILITY OR OTHERWISE), FOR ANY (A)
+MATTER BEYOND ITS REASONABLE CONTROL, (B) LOSS OR INACCURACY OF
+DATA, LOSS OR INTERRUPTION OF USE, OR COST OF PROCURING SUBSTITUTE
+TECHNOLOGY, GOODS OR SERVICES, OR (C) DIRECT, INDIRECT, PUNITIVE,
+INCIDENTAL, RELIANCE, SPECIAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES
+INCLUDING, BUT NOT LIMITED TO, LOSS OF BUSINESS, REVENUES, PROFITS OR
+GOODWILL,  EVEN IF IT HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGES. IF A COURT DETERMINES THAT ANY OF THE FOREGOING
+LIMITATIONS ARE INVALID OR UNENFORCEABLE, THEN IN NO CASE AND UNDER
+NO LEGAL THEORY SHALL LICENSOR BE LIABLE TO DEVELOPER OR ANY THIRD
+PARTY FOR AN AMOUNT IN EXCESS OF $100 IN TOTAL. THESE LIMITATIONS ARE
+INDEPENDENT FROM ALL OTHER PROVISIONS OF THIS AGREEMENT AND SHALL
+APPLY NOTWITHSTANDING THE FAILURE OF ANY REMEDY PROVIDED HEREIN.
+10. TERM AND TERMINATION.
+10.1 Term. This Agreement shall commence on the Effective Date and continue in effect until
+terminated by either party, acting in its discretion, giving five (5) calendar days' notice to the
+other party.
+10.2 Termination; Suspension. This Agreement may be terminated by either party, or
+Developer's right to use and access the Software may be suspended, immediately upon notice, if
+the other party materially breaches a provision of this Agreement.
+10.3 Effects of Termination. Upon termination of this Agreement for any reason, all rights,
+obligations and licenses of the parties hereunder shall cease, except that (a) all obligations that
+accrued prior to the effective date of termination and any remedies for breach of this Agreement
+shall survive any termination, (b) Developer shall promptly return or destroy all Software and
+other tangible Confidential Information, and permanently erase all Confidential Information
+from any computer and storage media, and (c) the provisions of Sections 5 (Confidentiality), 6
+(Proprietary Rights), 7 (Warranty Disclaimers), 8 (Indemnification), 9 (Limitation of Liability),
+11 (General Provisions) and this Section 10.3 shall also survive.
+11. GENERAL PROVISIONS.
+11.1 Entire Agreement. This Agreement constitutes the entire agreement and supersedes all
+prior negotiations, understandings or agreements (oral or written), between the parties about the
+subject matter of this Agreement. For clarification, Developer has no rights under any other
+agreements or terms offered by Licensor unless and until the parties enter into a separate
+agreement embodying such terms. Terms set forth in any Developer's document that are in
+addition to or at variance with the terms of this Agreement are specifically waived by Developer.
+All such terms are considered to be proposed material alterations of this Agreement and are
+hereby rejected. No waiver, consent or modification of this Agreement shall bind either party
+unless in writing and signed by the party against which enforcement is sought, except the terms
+of this Agreement may be modified by Licensor from time to time so long as they do not result
+in a diminution of the rights granted hereunder. The most recent revision of this Agreement will
+be posted on http://voltdb.com/developer-edition-license-agreement. The failure of either party
+to enforce its rights under this Agreement at any time for any period will not be construed as a
+waiver of such rights. If any provision of this Agreement is determined to be illegal or
+unenforceable, that provision will be limited or eliminated to the minimum extent necessary so
+that this Agreement will otherwise remain in full force and effect and enforceable. This
+Agreement is in English only, which shall be controlling in all respects. No version of this
+Agreement in another language shall be binding or of any effect.
+11.2 Governing Law. This Agreement shall be governed by and construed in accordance with
+the laws of the Commonwealth of Massachusetts, without regard to its conflicts of law
+provisions. In the event of any conflict between US and foreign laws, rules and regulations, U.S.
+laws, rules and regulations shall govern. The United Nations Convention on Contracts for the
+International Sale of Goods shall not apply to this Agreement.
+11.3 Remedies. Unless specifically provided otherwise, each right and remedy in this Agreement
+is in addition to any other right or remedy, at law or in equity. Developer agrees that, in the event
+of any breach or threatened breach of Sections 2.1, 5 or 6, Licensor will suffer irreparable
+damage for which there is no adequate remedy at law. Accordingly, Licensor shall be entitled to
+injunctive and other equitable remedies to prevent or restrain such breach or threatened breach,
+without the necessity of posting any bond.
+11.4 Notices. Any notice or communication hereunder shall be in writing and either personally
+delivered, or sent via confirmed electronic mail, or sent via recognized express delivery courier
+or certified or registered mail, prepaid and return receipt requested, addressed to the other party
+at its address specified above, or at such other address designated in a subsequent notice. All
+notices shall be in English, effective upon receipt.
+11.5 Assignment. This Agreement and the rights and obligations hereunder are personal to
+Developer, and may not be assigned or otherwise transferred, in whole or in part, without
+Licensor's prior written consent. Any attempt to do otherwise shall be void and of no effect.
+Without Developer's consent, Licensor may assign this Agreement to any third party. This
+Agreement shall be binding upon, and inure to the benefit of, the successors, representatives and
+permitted assigns of the parties.
+11.6 Government License. If any user of the Software or Documentation is a department,
+agency or other entity of the US Government, then use, duplication, reproduction, modification,
+release, disclosure or transfer of the Software and Documentation is restricted in accordance with
+FAR 12.212 for civilian agencies and DFAR 227.7202 for military agencies. The Software is
+commercial computer software and the Documentation is commercial computer software
+documentation, and their use is further restricted in accordance with the terms of this Agreement.
+11.7 Acknowledgment. Developer acknowledges that (a) it has read and understands this
+Agreement, (b) it has had an opportunity to have its legal counsel review this Agreement, (c) this
+Agreement has the same force and effect as a signed agreement, (d) Licensor requires
+identification of the Developer before issuing this License, and (e) issuance of this License does
+not constitute general publication of the Software, Documentation or Confidential Information.
