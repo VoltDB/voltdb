@@ -86,9 +86,6 @@ final public class TestVoltDB {
         VoltDB.Configuration cfg5 = new VoltDB.Configuration(args5);
         assertEquals(BackendTarget.HSQLDB_BACKEND, cfg5.m_backend);
 
-        String args9[] = { "create", "catalog xtestxstringx" };
-        VoltDB.Configuration cfg9 = new VoltDB.Configuration(args9);
-        assertEquals("xtestxstringx", cfg9.m_pathToCatalog);
         String args10[] = { "create", "catalog", "ytestystringy" };
         VoltDB.Configuration cfg10 = new VoltDB.Configuration(args10);
         assertEquals("ytestystringy", cfg10.m_pathToCatalog);
@@ -140,6 +137,22 @@ final public class TestVoltDB {
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
     }
+
+    private boolean causesExit(String[] args) {
+        boolean threw = false;
+        try {
+            new VoltDB.Configuration(args);
+        } catch (VoltDB.SimulatedExitException ex) {
+            threw = true;
+        }
+        return threw;
+    }
+
+    @Test
+    public void testConfigurationConstructorBadArgs() {
+        String[] args9 = { "create", "catalog xtestxstringx" };
+        assertTrue(causesExit(args9));
+     }
 
     @Test
     public void testConfigurationValidate() throws Exception {

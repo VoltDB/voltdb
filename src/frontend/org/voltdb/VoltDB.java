@@ -399,7 +399,7 @@ public class VoltDB {
         // entry in the args vector) by setting the flag false, and then
         // after testing remove code that supports that case.
         private static final boolean s_debugParser = false;
-        private static final boolean s_allowSplitArg = true;
+        private static final boolean s_allowSplitArg = false;
 
         public Configuration(String args[]) {
             /*
