@@ -98,7 +98,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     static int m_periodicWorkInterval = 2000;
-    public static volatile int m_userSnapshotRetryInterval = 30;
+    // This is only public, volatile because a JUnit test (TestSaveRestoreSysProcSuite)
+    // short-circuits this value for a serverThread test
+    public static volatile int m_userSnapshotRetryInterval =
+            Integer.getInteger("USER_SNAPSHOT_RETRY_INTERVAL", 30);
 
     /*
      * Something that initiates procedures for the snapshot daemon.
