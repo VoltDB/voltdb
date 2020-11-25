@@ -509,16 +509,22 @@ public class SQLParser extends SQLPatternFactory
      * Build regex to support alter task statement in the from of
      * <p>
      * <code>
-     * ALTER TASK <task name> [(ENABLE | DISABLE)]
+     * ALTER TASK <task name> (ENABLE | DISABLE)
+     * or
+     * ALTER TASK <task name> ALTER ON ERROR (STOP | LOG | IGNORE)
      * </code>
      */
     private static final Pattern PAT_ALTER_TASK =
             SPF.statement(
                 SPF.token("alter"), SPF.token("task"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.capture("action", SPF.oneOf("enable", "disable"))),
-                    SPF.optional(SPF.token("on"), SPF.token("error"),
-                            SPF.capture("onError",
-                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore"))))
+                    SPF.oneOf(
+                        SPF.capture("action", SPF.oneOf("enable", "disable")),
+                        SPF.clause(
+                            SPF.token("alter"), SPF.token("on"), SPF.token("error"),
+                                SPF.capture("onError",
+                                    SPF.oneOf(SPF.token("stop"), SPF.token("log"), SPF.token("ignore")))
+                        )
+                    )
             ).compile("PAT_ALTER_TASK");
 
     /**
