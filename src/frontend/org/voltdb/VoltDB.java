@@ -394,26 +394,13 @@ public class VoltDB {
             m_coordinators = MeshProber.hosts(m_internalPort);
         }
 
-        // Hardwired debug options, will eventually be removed. The goal is
-        // to eventually disallow split args (like "catalog foobar" as one
-        // entry in the args vector) by setting the flag false, and then
-        // after testing remove code that supports that case.
-        private static final boolean s_debugParser = false;
-        private static final boolean s_allowSplitArg = false;
-
         public Configuration(String args[]) {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
-            if (s_debugParser) {
-                System.err.println("[Parser] begin");
-            }
             for (int n=0; n<args.length;) {
                 int argIndex = n;  // save starting position
                 String arg = args[n++];
-                if (s_debugParser) {
-                    System.err.printf("[Parser] n=%d/%d: arg='%s' %n", n, args.length, arg);
-                }
 
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
                 // in the array args. Ignore them.
@@ -494,8 +481,14 @@ public class VoltDB {
                 case "postgresql":
                     m_backend = BackendTarget.POSTGRESQL_BACKEND;
                     break;
+                case "probe":
+                    m_startAction = StartAction.PROBE;
+                    break;
                 case "quietadhoc":
                     m_quietAdhoc = true;
+                    break;
+                case "recover":
+                    m_startAction = StartAction.RECOVER;
                     break;
                 case "rejoin":
                     m_startAction = StartAction.REJOIN;
@@ -503,6 +496,9 @@ public class VoltDB {
                 case "replica":
                     referToDocAndExit("The \"replica\" command line argument is deprecated. Please use " +
                                       "role=\"replica\" in the deployment file.");
+                    break;
+                case "safemode":
+                    m_safeMode = true; // only meaningful for probe and recover
                     break;
                 case "valgrind":
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
@@ -515,28 +511,13 @@ public class VoltDB {
                     continue;
                 }
 
-                // Options with generally one value, possibly optional. We allow the value
-                // to be in the same argument or in the next argument; this was previously
-                // permitted on a random basis, but we're at least consistent here.
-                String val = "";
-                boolean splitArg = false;
-                int ix = arg.indexOf(' ');
-                if (ix > 0) {
-                    System.err.printf("[Parser] Option \"%s\" should be split into separate arguments.%n", arg);
-                    if (s_allowSplitArg) {
-                        val = arg.substring(ix+1).trim();
-                        arg = arg.substring(0,ix);
-                        splitArg = true; // in case we need to back up
-                    }
-                } else if (n < args.length) {
-                    val = args[n++];
+                // Options with at least one value, generally only one value, but
+                // there are a couple of options that may have more than one value.
+                if (n >= args.length) {
+                    referToDocAndExit("The \"%s\" option must be followed by a value.", arg);
                 }
-                if (s_debugParser) {
-                    System.err.printf("[Parser] n=%d/%d: arg='%s' val='%s' %n", n, args.length, arg, val);
-                }
-
+                String val = args[n++];
                 handled = true; // assumed
-                boolean valUsed = true; // assumed; may set false for args with optional values
                 HostAndPort hap = null; // scratch
 
                 // Alphabetical order please!
@@ -638,11 +619,11 @@ public class VoltDB {
                 case "license":
                     m_pathToLicense = val;
                     break;
-                case "live":
+                case "live": // special case, modifier as prefix
                     if (val.equalsIgnoreCase("rejoin")) {
                         m_startAction = StartAction.LIVE_REJOIN;
                     } else {
-                        valUsed = false;
+                        referToDocAndExit("The \"live\" option may only appear immediately before \"rejoin\".");
                     }
                     break;
                 case "mesh":
@@ -650,9 +631,6 @@ public class VoltDB {
                     sbld.append(val); // may be empty
                     while (!val.isEmpty() && n < args.length && (val.endsWith(",") || args[n].startsWith(","))) {
                         val = args[n++];
-                        if (s_debugParser) {
-                            System.err.printf("[Parser] n=%d/%d: next val='%s' %n", n, args.length, val);
-                        }
                         sbld.append(val);
                     }
                     m_meshBrokers = sbld.toString();
@@ -666,14 +644,6 @@ public class VoltDB {
                 case "placementgroup":
                     m_placementGroup = val;
                     break;
-                case "probe":
-                    m_startAction = StartAction.PROBE;
-                    if (val.equalsIgnoreCase("safemode")) {
-                        m_safeMode = true;
-                    } else {
-                        valUsed = false;
-                    }
-                    break;
                 case "port":
                     hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_clientInterface, m_port);
                     m_clientInterface = hap.getHost();
@@ -681,15 +651,6 @@ public class VoltDB {
                     break;
                 case "publicinterface":
                     m_publicInterface = MiscUtils.getAddressOfInterface(val);
-                    break;
-                case "recover":
-                    m_startAction = StartAction.RECOVER;
-                    if (val.equalsIgnoreCase("safemode")) {
-                        m_startAction = StartAction.SAFE_RECOVER;
-                        m_safeMode = true;
-                    } else {
-                        valUsed = false;
-                    }
                     break;
                 case "rejoinhost": // synonym for "rejoin host" for backward compatibility
                     m_startAction = StartAction.REJOIN;
@@ -744,25 +705,14 @@ public class VoltDB {
                     handled = false;
                 }
 
-                if (handled && !valUsed) {
-                    if (splitArg) {
-                        handled = false; // apparently-valid arg, invalid value, as single "arg val" string
-                        arg = args[argIndex]; // recover "arg val" for error message
-                    } else {
-                        n = argIndex + 1; // the assumed and unused "val" is in fact next arg; back up
-                        if (s_debugParser) {
-                            System.err.printf("[Parser] backed up, n=%d %n", n);
-                        }
-                    }
-                }
                 if (handled) {
                     continue;
                 }
 
+                if (arg.indexOf(' ') > 0) { // hint that combining args is no longer allowed
+                    System.err.printf("Option \"%s\" should be split into separate arguments.%n", arg);
+                }
                 referToDocAndExit("Unrecognized option to VoltDB: %s", arg);
-            }
-            if (s_debugParser) {
-                System.err.println("[Parser] end");
             }
 
             // Get command
@@ -772,10 +722,17 @@ public class VoltDB {
                 inspectGetCommand();
                 return;
             }
+
+            // Adjust action for safemode flag
+            if (m_startAction == StartAction.RECOVER && m_safeMode) {
+                m_startAction = StartAction.SAFE_RECOVER;
+            }
+
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             }
+
             /*
              *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
              */
