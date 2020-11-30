@@ -57,6 +57,7 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.client.TLSHandshaker;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -644,14 +645,13 @@ public class SocketJoiner {
                  */
                 JSONObject jsObj;
                 if (result.m_remnant != null) {
-                    assert result.m_remnant.getInt() == result.m_remnant.remaining()
-                            && result.m_remnant.hasArray() : "Remnant not array or not a single full message. remnant: "
-                                    + result.m_remnant + ", expected length: "
-                                    + result.m_remnant.getInt(result.m_remnant.position() - Integer.BYTES);
+                    int stringLength = result.m_remnant.getInt();
+                    if (stringLength != result.m_remnant.remaining()) {
+                        throw new IllegalArgumentException( "Remnant not a single full message. remnant: "
+                                + result.m_remnant + ", expected length: " + stringLength);
+                    }
 
-                    jsObj = new JSONObject(new String(result.m_remnant.array(),
-                            result.m_remnant.arrayOffset() + result.m_remnant.position(), result.m_remnant.remaining(),
-                            StandardCharsets.UTF_8));
+                    jsObj = new JSONObject(Constants.UTF8ENCODING.decode(result.m_remnant).toString());
                 } else {
                     jsObj = readJSONObjFromWire(messagingChannel);
                 }

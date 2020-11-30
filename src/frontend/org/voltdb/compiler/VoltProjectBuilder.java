@@ -271,6 +271,7 @@ public class VoltProjectBuilder {
     boolean m_jsonApiEnabled = true;
     boolean m_sslEnabled = false;
     boolean m_sslExternal = false;
+    boolean m_sslInternal = false;
     boolean m_sslDR = false;
 
     String m_keystore;
@@ -716,6 +717,10 @@ public class VoltProjectBuilder {
 
     public void setSslExternal(final boolean enabled) {
         m_sslExternal = enabled;
+    }
+
+    public void setSslInternal(final boolean enabled) {
+        m_sslInternal = enabled;
     }
 
     public void setSslDR(final boolean enabled) {
@@ -1290,6 +1295,7 @@ public class VoltProjectBuilder {
         deployment.setSsl(ssl);
         ssl.setEnabled(m_sslEnabled);
         ssl.setExternal(m_sslExternal);
+        ssl.setInternal(m_sslInternal);
         ssl.setDr(m_sslDR);
         if (m_keystore!=null) {
             KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();

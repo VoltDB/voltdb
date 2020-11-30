@@ -72,6 +72,8 @@ public class TestSSL extends JUnit4LocalClusterTest {
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         builder.setSslEnabled(true);
         builder.setSslExternal(true);
+        builder.setSslInternal(true);
+
         return builder;
     }
 
