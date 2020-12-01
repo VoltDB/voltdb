@@ -24,6 +24,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE: java.lang.NoClassDefFoundError: sqlcmdtest/Bre
 	at java.lang.reflect.Method.invoke(Method.java:#)
 	at org.voltdb.ProcedureRunner.coreCall(ProcedureRunner.java:#)
 	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
+	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
 	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
@@ -35,7 +36,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 	at sun.misc.Launcher$AppClassLoader.loadClass(Launcher.java:#)
 	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
 	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
-	... 12 more
+	... 13 more
 
 Expect to fail because the jar has been killed by dropping a statically
     dependent class.
@@ -49,6 +50,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE: java.lang.NoClassDefFoundError: sqlcmdtest/Bre
 	at java.lang.reflect.Method.invoke(Method.java:#)
 	at org.voltdb.ProcedureRunner.coreCall(ProcedureRunner.java:#)
 	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
+	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
 	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
@@ -60,7 +62,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 	at sun.misc.Launcher$AppClassLoader.loadClass(Launcher.java:#)
 	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
 	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
-	... 12 more
+	... 13 more
 
 
 End of error output.
