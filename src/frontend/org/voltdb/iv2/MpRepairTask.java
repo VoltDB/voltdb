@@ -73,7 +73,7 @@ public class MpRepairTask extends SiteTasker
         m_leaderMigration = repairType.isSkipTxnRestart();
         m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
         m_txnRestartTrigger = repairType.isTxnRestart();
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, repairType.isSkipRepair());
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, m_leaderMigration);
     }
 
     @Override
