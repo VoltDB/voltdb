@@ -36,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -99,7 +98,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     static int m_periodicWorkInterval = 2000;
-    public static volatile int m_userSnapshotRetryInterval = 30;
+    // This is only public, volatile because a JUnit test (TestSaveRestoreSysProcSuite)
+    // short-circuits this value for a serverThread test
+    public static volatile int m_userSnapshotRetryInterval =
+            Integer.getInteger("USER_SNAPSHOT_RETRY_INTERVAL", 30);
 
     /*
      * Something that initiates procedures for the snapshot daemon.
@@ -120,14 +122,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private DaemonInitiator m_initiator;
     private long m_nextCallbackHandle;
     private String m_truncationSnapshotPath;
-    private final AtomicBoolean m_BareProcessed = new AtomicBoolean(false);
-    /*
-     * Before doing truncation snapshot operations, wait a few seconds
-     * to give a few nodes a chance to get into the same state WRT to truncation
-     * so that a truncation snapshot will can service multiple truncation requests
-     * that arrive at the same time.
-     */
-    int m_truncationGatheringPeriod = 10;
 
     private final TreeMap<Long, TruncationSnapshotAttempt> m_truncationSnapshotAttempts =
         new TreeMap<Long, TruncationSnapshotAttempt>();
@@ -197,10 +191,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private State m_state = State.STARTUP;
+    private long m_snapshotThreadId = 0L;
 
     SnapshotDaemon(CatalogContext catalogContext) {
         m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        m_esBase.execute(new Runnable() {
+            @Override
+            public void run() {
+                m_snapshotThreadId = Thread.currentThread().getId();
+            }
+        });
 
         m_frequencyUnit = null;
         m_retain = 0;
@@ -408,6 +409,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         Object params[] = new Object[1];
         params[0] = m_truncationSnapshotPath;
+        assert(Thread.currentThread().getId() == m_snapshotThreadId);
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -507,6 +509,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 nonces,
                 SnapshotPathType.SNAP_CL.toString()
                 };
+        assert(Thread.currentThread().getId() == m_snapshotThreadId);
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -620,27 +623,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeChildrenChanged) {
-            boolean isBare = (!m_BareProcessed.getAndSet(true) && VoltDB.instance().isBare());
-            int truncationGatheringPeriod = (isBare ? 0 : m_truncationGatheringPeriod);
-            loggingLog.info("Scheduling truncation request processing " + truncationGatheringPeriod + " seconds from now");
             /*
-             * Do it 10 seconds later because these requests tend to come in bunches
-             * and we want one truncation snapshot to do truncation for all nodes
-             * so we don't get them back to back
-             *
-             * TRAIL [TruncSnap:5] wait 10 secs to process request
-             * If Bare take the truncation snapshot now.
+             * TRAIL [TruncSnap:5] Process truncation request
              */
-            m_es.schedule(new Runnable() {
+            m_es.submit(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         processSnapshotTruncationRequestCreated(event);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
                     }
                 }
-            }, truncationGatheringPeriod, TimeUnit.SECONDS);
+            });
             return;
         } else {
             /*
@@ -711,6 +706,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         // for the snapshot save invocations
+        assert(Thread.currentThread().getId() == m_snapshotThreadId);
         long handle = m_nextCallbackHandle++;
 
         // for the snapshot save invocation
@@ -914,6 +910,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.remove("requestId");
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+            assert(Thread.currentThread().getId() == m_snapshotThreadId);
             final long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1011,6 +1008,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      * Construct a callback to handle the response to the
                      * @SnapshotSave invocation that will reattempt the user snapshot
                      */
+                    assert(Thread.currentThread().getId() == m_snapshotThreadId);
                     final long handle = m_nextCallbackHandle++;
                     m_procedureCallbacks.put(handle, new ProcedureCallback() {
                         @Override
@@ -1277,11 +1275,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String path;
         private final String nonce;
         private final Long txnId;
-        private final SnapshotPathType stype;
 
-        private Snapshot(String path, SnapshotPathType stype, String nonce, Long txnId) {
+        private Snapshot(String path, String nonce, Long txnId) {
             this.path = path;
-            this.stype = stype;
             this.nonce = nonce;
             this.txnId = txnId;
         }
@@ -1373,7 +1369,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString());
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            m_snapshots.offer(new Snapshot(m_path, SnapshotPathType.SNAP_AUTO, nonce, now));
+            m_snapshots.offer(new Snapshot(m_path, nonce, now));
+            assert(Thread.currentThread().getId() == m_snapshotThreadId);
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1406,6 +1403,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         Object params[] = new Object[1];
         params[0] = m_path;
         setState(State.SCANNING);
+        assert(Thread.currentThread().getId() == m_snapshotThreadId);
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1568,7 +1566,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
                     final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, SnapshotPathType.SNAP_AUTO, nonce, txnId));
+                    m_snapshots.add(new Snapshot(path, nonce, txnId));
                 }
             }
         }
@@ -1603,6 +1601,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     noncesToDelete,
                     SnapshotPathType.SNAP_AUTO.toString()
                     };
+            assert(Thread.currentThread().getId() == m_snapshotThreadId);
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 

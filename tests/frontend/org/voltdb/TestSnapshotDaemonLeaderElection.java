@@ -54,7 +54,6 @@ public class TestSnapshotDaemonLeaderElection extends TestSnapshotDaemon {
     @Test
     public void testLeaderElectionAndEverythingElse() throws Exception {
         getSnapshotDaemon(false);
-        m_daemon.m_truncationGatheringPeriod = 1;
 
         ZooKeeper zk = m_mockVoltDB.getHostMessenger().getZK();
         zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE,

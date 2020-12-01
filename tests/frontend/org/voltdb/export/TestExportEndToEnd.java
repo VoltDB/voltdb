@@ -31,6 +31,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
@@ -167,7 +168,26 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         m_cluster.killSingleHost(1);
 
         // drop stream
-        response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+        boolean stillInRepair;
+        int loopCnt = 0;
+        do {
+            // NOTE: This try block can be removed if killSingleHost does not return until
+            //       repair completes or if LocalCluster supported an API @StopNode. However,
+            //       if a new API was supported, LocalCluster would need to maintain a mapping
+            //       of HostIds to processes. (1) above really means the second process.
+            stillInRepair = false;
+            try {
+                response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+            }
+            catch (ProcCallException e) {
+                if (e.getMessage().endsWith("transaction repair are in progress")) {
+                    stillInRepair = true;
+                    Thread.sleep(500);
+                    loopCnt++;
+                }
+            }
+        } while (stillInRepair && loopCnt < 10);
+        assertTrue("Repair took more than 5 seconds", loopCnt < 10);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         streamNames.remove("t_1");
 
@@ -202,7 +222,26 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         m_cluster.killSingleHost(0);
 
         // drop stream
-        response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+        boolean stillInRepair;
+        int loopCnt = 0;
+        do {
+            // NOTE: This try block can be removed if killSingleHost does not return until
+            //       repair completes or if LocalCluster supported an API @StopNode. However,
+            //       if a new API was supported, LocalCluster would need to maintain a mapping
+            //       of HostIds to processes. (1) above really means the second process.
+            stillInRepair = false;
+            try {
+                response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+            }
+            catch (ProcCallException e) {
+                if (e.getMessage().endsWith("transaction repair are in progress")) {
+                    stillInRepair = true;
+                    Thread.sleep(500);
+                    loopCnt++;
+                }
+            }
+        } while (stillInRepair && loopCnt < 10);
+        assertTrue("Repair took more than 5 seconds", loopCnt < 10);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("@AdHoc", T1_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
