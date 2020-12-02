@@ -27,6 +27,11 @@
 #   https://issues.voltdb.com/issues/?jql=project%20%3D%20ENG%20and%20%22Release%20Note%22%20%20is%20not%20empty%20and%20updated%20%3E%20startOfDay()%20order%20by%20updated%20DESC
 #
 
+# History:
+#  Oct 27, 2020 - ajgent -- Allow entries that already have project prefix. Only
+#   prepend "ENG-" if it isn't already a valid JIRA ID.
+#
+
 import argparse
 import csv
 import getpass
@@ -90,7 +95,9 @@ relnote_field = [f['id'] for f in jira.fields() if 'Release Note' in f['name'] ]
 
 def is_valid_jid(jid):
     #Return true of it looks like a valid ticket
-    return jid.split('-')[1].isdigit() and len(jid.split('-')) == 2
+    #return jid.split('-')[1].isdigit() and len(jid.split('-')) == 2
+    if not len(jid.split('-')) == 2: return False
+    return jid.split('-')[1].isdigit()
 
 def cleanstring(str):
     return ' '.join(str.strip().split())
@@ -111,7 +118,13 @@ for row in reader:
     keys = row[0].split(",")
     for key in keys:
         #key = row[i]
-        jid = 'ENG-%s' % (cleanstring(key))
+        
+        # Check to see if it is already a valid JID
+        # If so, upcase
+        # If not, add a default project ID
+        jid = key.strip().upper()
+        if not is_valid_jid(jid):
+            jid = 'ENG-%s' % (cleanstring(key))
         #print jid
 
         #Is it valid number?
@@ -127,7 +140,14 @@ for row in reader:
             continue
 
         #Get the release note and decide what to do with it
-        existing_relnote = getattr(issue.fields, relnote_field)
+        existing_relnote = None
+        try:
+            existing_relnote = getattr(issue.fields, relnote_field)
+        except Exception as e:
+            results.append(('ERROR', jid, text, "Cannot apply changes because " + str(e)))
+            continue
+            
+            
         #Has a release note?
         if existing_relnote:
             #Are they the same?
