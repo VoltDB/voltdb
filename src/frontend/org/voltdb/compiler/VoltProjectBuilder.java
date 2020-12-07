@@ -314,7 +314,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
-    private List<ExportConfigurationType> m_exportConfigs = new ArrayList<>();
+    private ExportType m_exportsConfiguration;
 
     private Integer m_deadHostTimeout = null;
 
@@ -408,6 +408,13 @@ public class VoltProjectBuilder {
         exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
         exportFeature.setOption(mode.name());
         m_featureOptions.getFeature().add(exportFeature);
+    }
+
+    public ExportType getExportsConfiguration() {
+        if (m_exportsConfiguration == null) {
+            m_exportsConfiguration = new ExportType();
+        }
+        return m_exportsConfiguration;
     }
 
     public TopicsType getTopicsConfiguration() {
@@ -813,7 +820,7 @@ public class VoltProjectBuilder {
 
     // Use this to update deployment with new or modified export targets
     public void clearExports() {
-        m_exportConfigs.clear();
+        getExportsConfiguration().getConfiguration().clear();
     }
 
     public void addExport(boolean enabled) {
@@ -861,7 +868,7 @@ public class VoltProjectBuilder {
             configProperties.add(prop);
         }
 
-        m_exportConfigs.add(exportConfig);
+        getExportsConfiguration().getConfiguration().add(exportConfig);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -1329,12 +1336,7 @@ public class VoltProjectBuilder {
         }
 
         // <export>
-        ExportType export = factory.createExportType();
-        deployment.setExport(export);
-
-        for (ExportConfigurationType exportConfig : m_exportConfigs) {
-            export.getConfiguration().add(exportConfig);
-        }
+        deployment.setExport(getExportsConfiguration());
 
         // <import>
         ImportType importt = factory.createImportType();

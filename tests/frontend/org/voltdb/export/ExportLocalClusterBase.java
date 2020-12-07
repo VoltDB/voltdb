@@ -126,7 +126,9 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
 
         for (int i = startPkey; i < startPkey + numberOfRows; i++) {
             params[1] = i; // Pkey column
-            m_verifier.addRow(client, streamName, i, params);
+            if (m_verifier != null) {
+                m_verifier.addRow(client, streamName, i, params);
+            }
             client.callProcedure(cr -> {
                 latch.countDown();
                 if (cr.getStatus() != ClientResponse.SUCCESS) {
@@ -148,7 +150,9 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
         for (int i = startPkey; i < startPkey + numberOfRows; i++) {
             params[1] = i; // Pkey column
             params[2] = i; // new column
-            m_verifier.addRow(client, streamName, i, params);
+            if (m_verifier != null) {
+                m_verifier.addRow(client, streamName, i, params);
+            }
             client.callProcedure(cr -> {
                 latch.countDown();
                 if (cr.getStatus() != ClientResponse.SUCCESS) {

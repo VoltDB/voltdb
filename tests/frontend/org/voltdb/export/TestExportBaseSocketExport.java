@@ -417,6 +417,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 }
                 long m = stats.getLong("TUPLE_PENDING");
                 String source = stats.getString("SOURCE");
+                if (!matchStreams.contains(source)) {
+                    continue;
+                }
                 if (waitForPending && 0 != m) {
                     String target = stats.getString("TARGET");
                     Long host = stats.getLong("HOST_ID");
