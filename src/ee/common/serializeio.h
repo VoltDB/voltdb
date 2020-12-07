@@ -592,9 +592,14 @@ public:
     }
 
 protected:
-    /** Resize this buffer to contain twice the amount desired. */
+    /** Resize this buffer to contain twice the amount desired or add 32MB to prevent constant doubling */
     virtual void expand(size_t minimum_desired) {
-        size_t next_capacity = (m_bytes.length() + minimum_desired) * 2;
+        size_t next_capacity;
+        if (minimum_desired > INITIAL_SIZE * 4) {
+            next_capacity = m_bytes.length() + INITIAL_SIZE * 4;
+        } else {
+            next_capacity = minimum_desired * 2;
+        }
         vassert(next_capacity < static_cast<size_t>(std::numeric_limits<int>::max()));
         m_bytes.copyAndExpand(static_cast<int>(next_capacity));
         initialize(m_bytes.data(), next_capacity);
