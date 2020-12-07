@@ -108,8 +108,6 @@ public:
     }
 
     size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;
-    size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
-    void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
     static size_t getExportMetaHeaderSize();
 
