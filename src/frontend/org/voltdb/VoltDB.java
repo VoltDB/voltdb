@@ -376,6 +376,14 @@ public class VoltDB {
 
         public HostAndPort m_topicsHostPort = null;
 
+        /** This is set to 'kubernetes' iff running under kubernetes, and may
+            affect some operational behaviour. Other values reserved for future. */
+        private String m_voltdbContainer = System.getenv("VOLTDB_CONTAINER");
+
+        public boolean runningUnderKubernetes() {
+            return "kubernetes".equals(m_voltdbContainer);
+        }
+
         public int getZKPort() {
             return m_zkPort;
         }

@@ -19,9 +19,11 @@ package org.voltdb;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.InMemoryJarfile;
@@ -93,14 +95,15 @@ public class CatalogValidator {
      * Invoked once on startup, and subsequently on each catalog update.
      *
      * @param catalog the new catalog
+     * @param procedureMapper a function mapping a name to a Procedure in the new catalog, or to {@code null} if not found
      * @param deployment the new deployment
      * @param catalogJar the {@link InMemoryJarfile} of the new catalog
      * @param curCatalog the current catalog or {@code null}
      * @param ccr the results of validation including any errors need to be set on this result object
      * @return {@code true} if successful, {@code false} if not and ccr updated with error message
      */
-    public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
-            InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
+    public boolean validateConfiguration(Catalog catalog, Function<String, Procedure> procedureMapper,
+            DeploymentType deployment, InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         return true;
     }
 }

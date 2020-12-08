@@ -17,8 +17,11 @@
 
 package org.voltdb.task;
 
+import java.util.function.Function;
+
 import org.voltdb.CatalogValidator;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
@@ -26,9 +29,10 @@ import org.voltdb.utils.InMemoryJarfile;
 
 public class TaskValidator extends CatalogValidator {
 
+    // TODO: refactor TaskManager validation to use procedureMapper
     @Override
-    public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
-            InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
+    public boolean validateConfiguration(Catalog catalog, Function<String, Procedure> procedureMapper,
+            DeploymentType deployment, InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
         if (taskErrors != null) {
             ccr.errorMsg = taskErrors;
