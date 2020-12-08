@@ -78,6 +78,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -4240,11 +4241,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return true;
     }
 
+    // Create a Procedure mapper from the database
+    private static Function<String, Procedure> createProcedureMapper(Database database) {
+        if (database == null) {
+            throw new IllegalArgumentException("Missing Catalog Database");
+        }
+        DefaultProcedureManager defaultProcedureManager = new DefaultProcedureManager(database);
+        CatalogMap<Procedure> procedures = database.getProcedures();
+        return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
+    }
+
     @Override
     public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
             InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+        Function<String, Procedure> procedureMapper = createProcedureMapper(CatalogUtil.getDatabase(catalog));
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateConfiguration(catalog, deployment, catalogJar, ccr)) {
+            if (!validator.validateConfiguration(catalog, procedureMapper, deployment, catalogJar, ccr)) {
                 return false;
             }
         }
