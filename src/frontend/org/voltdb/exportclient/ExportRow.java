@@ -101,6 +101,10 @@ public class ExportRow {
         return (Long)values[EXPORT_TIMESTAMP_COLUMN];
     }
 
+    public Long getSequenceNumber() {
+        return (Long)values[SEQUENCE_NUMBER_COLUMN];
+    }
+
     // Temporary: only print schema, values omitted
     @Override
     public String toString() {

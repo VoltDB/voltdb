@@ -44,6 +44,10 @@
     <equals arg1="${build}" arg2="memcheck"/>
 </condition>
 
+<!-- IF BUILDING BUILD FROM INTERNAL SET THE NAME OF THE LICENSE  -->
+<condition property="editiontypeMatch">
+    <equals arg1="${voltdb_editiontype}" arg2="developer" />
+</condition>
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -65,8 +69,8 @@
 </condition>
 
 <!-- stub the voltpro classpath and src.dir fileset so a fileset with this id always exists -->
-<fileset id="voltpro.classpath" file="." excludes="**"/>
-<fileset id="voltpro.src.dir" file="." excludes="**"/>
+<path id="voltpro.classpath" />
+<path id="voltpro.src.dir" />
 
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
@@ -188,7 +192,7 @@
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
-    <fileset refid="voltpro.classpath"/>
+    <path refid="voltpro.classpath"/>
 </path>
 
 <patternset id='junit.exclusions'>
@@ -775,21 +779,24 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
+    <property name="voltdb_editiontype" value="community"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
+    <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if:set='editiontypeMatch' />
+    <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if:set='editiontypeMatch' />
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}.tar.gz"/>
-        <arg value="voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}.tar.gz"/>
+        <arg value="voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
@@ -2291,7 +2298,7 @@ TEST CASES
           <include name='*.jar' />
       </fileset>
       <pathelement location="${build.test.dir}" />
-      <fileset refid="voltpro.classpath"/>
+      <path refid="voltpro.classpath"/>
     </auxClasspath>
     <sourcePath path="${src.gpl.dir}" />
     <sourcePath path="${voltpro.src.dir}"/>

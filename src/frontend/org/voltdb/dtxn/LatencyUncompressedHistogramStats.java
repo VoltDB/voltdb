@@ -38,7 +38,9 @@ public class LatencyUncompressedHistogramStats extends LatencyHistogramStats {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns, LatencyHistogram.class);
+        super.populateColumnSchema(columns);
+        columns.add(new ColumnInfo(LatencyHistogram.UNCOMPRESSED_HISTOGRAM.name(),
+                LatencyHistogram.UNCOMPRESSED_HISTOGRAM.m_type));
     }
 
     @Override

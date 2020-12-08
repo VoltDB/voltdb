@@ -42,16 +42,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
-import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
-
 import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
-
-    private static final Class<?>[] PROCEDURES =
-    {
-        GoSleep.class
-    };
 
     public TestStatisticsSuite(String name) {
         super(name);
@@ -513,6 +506,30 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertEquals(1, results.length);
         validateSchema(results[0], expectedTable);
     }
+
+    public void testLatencyUncompressed() throws Exception {
+        System.out.println("\n\nTESTING LATENCY_UNCOMPRESSED STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[6];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("HISTOGRAM", VoltType.VARBINARY);
+        expectedSchema[5] = new ColumnInfo("UNCOMPRESSED_HISTOGRAM", VoltType.VARBINARY);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        // Do some stuff to generate some latency stats
+        for (int i = 0; i < SITES * HOSTS; i++) {
+            client.callProcedure("NEW_ORDER.insert", i).getResults();
+        }
+
+        VoltTable[] results = client.callProcedure("@Statistics", "LATENCY_HISTOGRAM", 0).getResults();
+        // one aggregate table returned
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+     }
 
     public void testTopoStatistics() throws Exception {
         System.out.println("\n\nTESTING TOPO STATS\n\n\n");

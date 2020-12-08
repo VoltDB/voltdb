@@ -19,6 +19,9 @@ ARG CSVFILE=periodic.csv.gz
 ARG TOPOLOGYAWARE=true
 ARG VJAR=""
 ARG LOG4J=voltdb/log4j.xml
+ARG SSLFILE=""
+ARG USERNAME=""
+ARG PASSWORD=""
 
 ENV LOG4J=$LOG4J
 ENV VJAR=$VJAR
@@ -35,6 +38,9 @@ ENV USECOMPRESSION=$USECOMPRESSION
 ENV THREADS=$THREADS
 ENV CSVFILE=$CSFILE
 ENV TOPOLOGYAWARE=$TOPOLOGYAWARE
+ENV SSLFILE=""
+ENV USERNAME=""
+ENV PASSWORD=""
 
 # the voltdb directory should be built by the build_docker.sh script
 # COPY voltdb /kvbenchmark/voltdb

@@ -303,6 +303,12 @@ public class VoltDB {
          */
         public boolean m_forceGetCreate = false;
 
+        private final static void referToDocAndExit(String format, Object... args) {
+            String message = args.length != 0 ? String.format(format, args) : format;
+            System.err.println("FATAL: " + message);
+            referToDocAndExit();
+        }
+
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
             System.out.flush();
@@ -392,316 +398,323 @@ public class VoltDB {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
-            for (int i=0; i < args.length; ++i) {
-                String arg = args[i];
+            for (int n=0; n<args.length;) {
+                int argIndex = n;  // save starting position
+                String arg = args[n++];
+
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
-                // in the array args.  Ignore them.
+                // in the array args. Ignore them.
                 if (arg.isEmpty()) {
                     continue;
                 }
 
-                // Handle request for help/usage
-                if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
-                    // We used to print usage here but now we have too many ways to start
-                    // VoltDB to offer help that isn't possibly quite wrong.
-                    // You can probably get here using the legacy voltdb3 script. The usage
-                    // is now a comment in that file.
+                // Options without values.
+                // Alphabetical order please!
+                boolean handled = true; // assumed
+                switch (arg.toLowerCase()) {
+                case "-h":
+                case "--help":
                     referToDocAndExit();
-                }
-
-                if (arg.equals("noloadlib")) {
-                    m_noLoadLibVOLTDB = true;
-                } else if (arg.equals("ipc")) {
-                    m_backend = BackendTarget.NATIVE_EE_IPC;
-                } else if (arg.equals("jni")) {
-                    m_backend = BackendTarget.NATIVE_EE_JNI;
-                } else if (arg.equals("hsqldb")) {
-                    m_backend = BackendTarget.HSQLDB_BACKEND;
-                } else if (arg.equals("postgresql")) {
-                    m_backend = BackendTarget.POSTGRESQL_BACKEND;
-                } else if (arg.equals("postgis")) {
-                    m_backend = BackendTarget.POSTGIS_BACKEND;
-                } else if (arg.equals("valgrind")) {
-                    m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-                } else if (arg.equals("quietadhoc")) {
-                    m_quietAdhoc = true;
-                } else if (arg.equals("port")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_clientInterface, m_port);
-                    m_clientInterface = hap.getHost();
-                    m_port = hap.getPort();
-                } else if (arg.equals("adminport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_adminInterface, DEFAULT_ADMIN_PORT);
-                    m_adminInterface = hap.getHost();
-                    m_adminPort = hap.getPort();
-                } else if (arg.equals("internalport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_internalInterface, m_internalPort);
-                    m_internalInterface = hap.getHost();
-                    m_internalPort = hap.getPort();
-                } else if (arg.equals("drpublic")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_drPublicHost, DEFAULT_DR_PORT);
-                    m_drPublicHost = hap.getHost();
-                    m_drPublicPort = hap.getPort();
-                } else if (arg.equals("replicationport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_drInterface, DEFAULT_DR_PORT);
-                    m_drInterface = hap.getHost();
-                    m_drAgentPortStart = hap.getPort();
-                } else if (arg.equals("httpport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_httpPortInterface, DEFAULT_HTTP_PORT);
-                    m_httpPortInterface = hap.getHost();
-                    m_httpPort = hap.getPort();
-                } else if (arg.equals("statusport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], m_statusInterface, AUTO_STATUS_PORT);
-                    m_statusInterface = hap.getHost();
-                    m_statusPort = hap.getPort();
-                } else if (arg.startsWith("zkport")) {
-                    HostAndPort hap = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], LoopbackAddress.get(), DEFAULT_ZK_PORT);
-                    m_zkInterface = hap.getHost();
-                    m_zkPort = hap.getPort();
-                } else if (arg.equals("mesh")) {
-                    StringBuilder sbld = new StringBuilder(64);
-                    while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
-                        sbld.append(args[i]);
-                    }
-                    if (i < args.length) {
-                        sbld.append(args[i]);
-                    }
-                    m_meshBrokers = sbld.toString();
-                } else if (arg.startsWith("mesh ")) {
-                    int next = i + 1;
-                    StringBuilder sbld = new StringBuilder(64).append(arg.substring("mesh ".length()));
-                    while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
-                        sbld.append(args[i]);
-                    }
-                    if (i > next && i < args.length) {
-                        sbld.append(args[i]);
-                    }
-                    m_meshBrokers = sbld.toString();
-                } else if (arg.equals("hostcount")) {
-                    m_hostCount = Integer.parseInt(args[++i].trim());
-                } else if (arg.equals("missing")) {
-                    m_missingHostCount = Integer.parseInt(args[++i].trim());
-                } else if (arg.equals("publicinterface")) {
-                    m_publicInterface = MiscUtils.getAddressOfInterface(args[++i]);
-                } else if (arg.startsWith("publicinterface ")) {
-                    m_publicInterface = MiscUtils.getAddressOfInterface(arg.substring("publicinterface ".length()));
-                } else if (arg.equals("externalinterface")) {
-                    m_externalInterface = MiscUtils.getAddressOfInterface(args[++i]);
-                } else if (arg.startsWith("externalinterface ")) {
-                    m_externalInterface = MiscUtils.getAddressOfInterface(arg.substring("externalinterface ".length()));
-                } else if (arg.equals("internalinterface")) {
-                    m_internalInterface = MiscUtils.getAddressOfInterface(args[++i]);
-                } else if (arg.startsWith("internalinterface ")) {
-                    m_internalInterface = MiscUtils.getAddressOfInterface(arg.substring("internalinterface ".length()));
-                } else if (arg.startsWith("networkbindings")) {
-                    for (String core : args[++i].split(",")) {
-                        m_networkCoreBindings.offer(core);
-                    }
-                    System.out.println("Network bindings are " + m_networkCoreBindings);
-                } else if (arg.startsWith("computationbindings")) {
-                    for (String core : args[++i].split(",")) {
-                        m_computationCoreBindings.offer(core);
-                    }
-                    System.out.println("Computation bindings are " + m_computationCoreBindings);
-                } else if (arg.startsWith("executionbindings")) {
-                    for (String core : args[++i].split(",")) {
-                        m_executionCoreBindings.offer(core);
-                    }
-                    System.out.println("Execution bindings are " + m_executionCoreBindings);
-                } else if (arg.startsWith("commandlogbinding")) {
-                    String binding = args[++i];
-                    if (binding.split(",").length > 1) {
-                        throw new RuntimeException("Command log only supports a single set of bindings");
-                    }
-                    m_commandLogBinding = binding;
-                    System.out.println("Commanglog binding is " + m_commandLogBinding);
-                } else if (arg.equals("host") || arg.equals("leader")) {
-                    m_leader = args[++i].trim();
-                } else if (arg.startsWith("host")) {
-                    m_leader = arg.substring("host ".length()).trim();
-                } else if (arg.startsWith("leader")) {
-                    m_leader = arg.substring("leader ".length()).trim();
-                } else if (arg.equals("rejoinhost")) { // synonym for "rejoin host" for backward compatibility
-                    m_startAction = StartAction.REJOIN;
-                    m_leader = args[++i].trim();
-                } else if (arg.startsWith("rejoinhost ")) {
-                    m_startAction = StartAction.REJOIN;
-                    m_leader = arg.substring("rejoinhost ".length()).trim();
-                } else if (arg.equals("initialize")) {
-                    m_startAction = StartAction.INITIALIZE;
-                } else if (arg.equals("probe")) {
-                    m_startAction = StartAction.PROBE;
-                    if (args.length > i + 1 && args[i+1].trim().equals("safemode")) {
-                        i += 1;
-                        m_safeMode = true;
-                    }
-                } else if (arg.equals("create")) {
-                    m_startAction = StartAction.CREATE;
-                } else if (arg.equals("recover")) {
-                    m_startAction = StartAction.RECOVER;
-                    if (args.length > i + 1 && args[i+1].trim().equals("safemode")) {
-                        m_startAction = StartAction.SAFE_RECOVER;
-                        i += 1;
-                        m_safeMode = true;
-                    }
-                } else if (arg.equals("rejoin")) {
-                    m_startAction = StartAction.REJOIN;
-                } else if (arg.startsWith("live rejoin")) {
-                    m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
-                    m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.startsWith("add")) {
+                    break;
+                case "add":
                     m_startAction = StartAction.JOIN;
                     m_enableAdd = true;
-                } else if (arg.equals("noadd")) {
-                    m_enableAdd = false;
-                } else if (arg.equals("enableadd")) {
+                    break;
+                case "create":
+                    m_startAction = StartAction.CREATE;
+                    break;
+                case "drssl":
+                    m_sslDR = true;
+                    break;
+                case "enableadd":
                     m_enableAdd = true;
-                } else if (arg.equals("replica")) {
-                    System.err.println("The \"replica\" command line argument is deprecated. Please use " +
-                                       "role=\"replica\" in the deployment file.");
-                    referToDocAndExit();
-                } else if (arg.equals("dragentportstart")) {
-                    m_drAgentPortStart = Integer.parseInt(args[++i]);
-                } else if (arg.equals("timestampsalt")) { // handle timestampsalt
-                    m_timestampTestingSalt = Long.parseLong(args[++i]);
-                } else if (arg.startsWith("timestampsalt ")) {
-                    m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
-                } else if (arg.equals("tag")) { // handle behaviorless tag field
-                    m_tag = args[++i];
-                } else if (arg.startsWith("tag ")) {
-                    m_tag = arg.substring("tag ".length());
-                } else if (arg.equals("catalog")) {
-                    m_pathToCatalog = args[++i];
-                } else if (arg.startsWith("catalog ")) { // and from ant as a single string "m_catalog filename"
-                    m_pathToCatalog = arg.substring("catalog ".length());
-                } else if (arg.equals("deployment")) {
-                    m_pathToDeployment = args[++i];
-                } else if (arg.equals("license")) {
-                    m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcport")) {
-                    String portStr = args[++i];
-                    m_ipcPort = Integer.valueOf(portStr);
-                } else if (arg.equals("forcecatalogupgrade")) {
+                    break;
+                case "enablessl":
+                    m_sslEnable = true;
+                    break;
+                case "externalssl":
+                    m_sslExternal = true;
+                    break;
+                case "e2":
+                    m_exporterVersion = ExporterVersion.E2;
+                    break;
+                case "e3":
+                    m_exporterVersion = ExporterVersion.E3;
+                    break;
+                case "force":
+                    m_forceVoltdbCreate = true;
+                    break;
+                case "forcecatalogupgrade":
                     System.out.println("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
-                } else if (arg.equalsIgnoreCase("versionoverride")) { // version string override for testing online upgrade
-                    m_versionStringOverrideForTest = args[++i].trim();
-                    m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
-                } else if (arg.equalsIgnoreCase("buildstringoverride")) {
-                    m_buildStringOverrideForTest = args[++i].trim();
-                } else if (arg.equalsIgnoreCase("placementgroup")) {
-                    m_placementGroup = args[++i].trim();
-                } else if (arg.equalsIgnoreCase("force")) {
-                    m_forceVoltdbCreate = true;
-                } else if (arg.equalsIgnoreCase("paused")) {
-                    //Start paused.
+                    break;
+                case "forceget":
+                    m_forceGetCreate = true;
+                    break;
+                case "hsqldb":
+                    m_backend = BackendTarget.HSQLDB_BACKEND;
+                    break;
+                case "initialize":
+                    m_startAction = StartAction.INITIALIZE;
+                    break;
+                case "internalssl":
+                    m_sslInternal = true;
+                    break;
+                case "ipc":
+                    m_backend = BackendTarget.NATIVE_EE_IPC;
+                    break;
+                case "jni":
+                    m_backend = BackendTarget.NATIVE_EE_JNI;
+                    break;
+                case "noadd":
+                    m_enableAdd = false;
+                    break;
+                case "noloadlib":
+                    m_noLoadLibVOLTDB = true;
+                    break;
+                case "paused":
                     m_isPaused = true;
-                } else if (arg.equalsIgnoreCase("voltdbroot")) {
-                    m_voltdbRoot = new VoltFile(args[++i]);
-                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
-                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                    break;
+                case "postgis":
+                    m_backend = BackendTarget.POSTGIS_BACKEND;
+                    break;
+                case "postgresql":
+                    m_backend = BackendTarget.POSTGRESQL_BACKEND;
+                    break;
+                case "probe":
+                    m_startAction = StartAction.PROBE;
+                    break;
+                case "quietadhoc":
+                    m_quietAdhoc = true;
+                    break;
+                case "recover":
+                    m_startAction = StartAction.RECOVER;
+                    break;
+                case "rejoin":
+                    m_startAction = StartAction.REJOIN;
+                    break;
+                case "replica":
+                    referToDocAndExit("The \"replica\" command line argument is deprecated. Please use " +
+                                      "role=\"replica\" in the deployment file.");
+                    break;
+                case "safemode":
+                    m_safeMode = true; // only meaningful for probe and recover
+                    break;
+                case "valgrind":
+                    m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
+                    break;
+                default:
+                    handled = false;
+                    break;
+                }
+                if (handled) {
+                    continue;
+                }
+
+                // Options with at least one value, generally only one value, but
+                // there are a couple of options that may have more than one value.
+                if (n >= args.length) {
+                    referToDocAndExit("The \"%s\" option must be followed by a value.", arg);
+                }
+                String val = args[n++];
+                handled = true; // assumed
+                HostAndPort hap = null; // scratch
+
+                // Alphabetical order please!
+                switch (arg.toLowerCase()) {
+                case "adminport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_adminInterface, DEFAULT_ADMIN_PORT);
+                    m_adminInterface = hap.getHost();
+                    m_adminPort = hap.getPort();
+                    break;
+                case "buildstringoverride":
+                    m_buildStringOverrideForTest = val;
+                    break;
+                case "catalog":
+                    m_pathToCatalog = val;
+                    break;
+                case "classes":
+                    m_stagedClassesPaths = parseFiles(val, m_stagedClassesPaths, "classes jar");
+                    break;
+                case "commandlogbinding":
+                    if (val.split(",").length > 1) {
+                        throw new RuntimeException("Command log only supports a single set of bindings");
                     }
-                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
-                        System.err.println("FATAL: Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
-                        referToDocAndExit();
+                    m_commandLogBinding = val;
+                    System.out.println("Commandlog binding is " + m_commandLogBinding);
+                    break;
+                case "computationbindings":
+                    parseBindings(val, m_computationCoreBindings, "Computation");
+                    break;
+                case "deployment":
+                    m_pathToDeployment = val;
+                    break;
+                case "dragentportstart":
+                    m_drAgentPortStart = Integer.parseInt(val);
+                    break;
+                case "drpublic":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_drPublicHost, DEFAULT_DR_PORT);
+                    m_drPublicHost = hap.getHost();
+                    m_drPublicPort = hap.getPort();
+                    break;
+                case "executionbindings":
+                    parseBindings(val,  m_executionCoreBindings, "Execution");
+                    break;
+                case "externalinterface":
+                    m_externalInterface = MiscUtils.getAddressOfInterface(val);
+                    break;
+                case "file":
+                    m_getOutput = val;
+                    break;
+                case "get":
+                    m_startAction = StartAction.GET;
+                    if (val.isEmpty()) {
+                        referToDocAndExit("Supply a valid non-null argument for \"get\" command."
+                                          + " Supported arguments for get are: %s", GetActionArgument.supportedVerbs());
                     }
                     try {
-                        CatalogUtil.validateDirectory(DBROOT, m_voltdbRoot);
-                    } catch (RuntimeException e) {
-                        System.err.println("FATAL: " + e.getMessage());
-                        referToDocAndExit();
+                        m_getOption = GetActionArgument.valueOf(val.toUpperCase());
+                    } catch (IllegalArgumentException ex) {
+                        referToDocAndExit("%s is not a valid \"get\" command argument."
+                                          + " Valid arguments for get command are: %s", val, GetActionArgument.supportedVerbs());
                     }
-                } else if (arg.equalsIgnoreCase("enableSSL")) {
-                    m_sslEnable = true;
-                } else if (arg.equalsIgnoreCase("externalSSL")) {
-                    m_sslExternal = true;
-                } else if (arg.equalsIgnoreCase("internalSSL")) {
-                    m_sslInternal = true;
-                } else if (arg.equalsIgnoreCase("drSSL")) {
-                    m_sslDR = true;
-                } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
-                    //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
-                    m_voltdbRoot = new VoltFile(args[++i]);
+                    m_getOutput = m_getOption.getDefaultOutput();
+                    break;
+                case "getvoltdbroot":
+                    m_voltdbRoot = new VoltFile(val);
                     if (!DBROOT.equals(m_voltdbRoot.getName())) {
                         m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists()) {
-                        System.err.println("FATAL: " + m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a "
-                                + "valid database root directory. Use the --dir option to specify the path to the root.");
-                        referToDocAndExit();
+                        referToDocAndExit("%s does not contain a  valid database root directory."
+                                          + " Use the --dir option to specify the path to the root.",
+                                          m_voltdbRoot.getParentFile().getAbsolutePath());
                     }
-                } else if (arg.equalsIgnoreCase("get")) {
-                    m_startAction = StartAction.GET;
-                    String argument = args[++i];
-                    if (argument == null || argument.trim().length() == 0) {
-                        System.err.println("FATAL: Supply a valid non-null argument for \"get\" command. "
-                                + "Supported arguments for get are: " + GetActionArgument.supportedVerbs());
-                        referToDocAndExit();
+                    break;
+                case "host":
+                    m_leader = val;
+                    break;
+                case "hostcount":
+                    m_hostCount = Integer.parseInt(val);
+                    break;
+                case "httpport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_httpPortInterface, DEFAULT_HTTP_PORT);
+                    m_httpPortInterface = hap.getHost();
+                    m_httpPort = hap.getPort();
+                    break;
+                case "internalinterface":
+                    m_internalInterface = MiscUtils.getAddressOfInterface(val);
+                    break;
+                case "internalport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_internalInterface, m_internalPort);
+                    m_internalInterface = hap.getHost();
+                    m_internalPort = hap.getPort();
+                    break;
+                case "ipcport":
+                    m_ipcPort = Integer.valueOf(val);
+                    break;
+                case "leader":
+                    m_leader = val;
+                    break;
+                case "license":
+                    m_pathToLicense = val;
+                    break;
+                case "live": // special case, modifier as prefix
+                    if (val.equalsIgnoreCase("rejoin")) {
+                        m_startAction = StartAction.LIVE_REJOIN;
+                    } else {
+                        referToDocAndExit("The \"live\" option may only appear immediately before \"rejoin\".");
                     }
-
+                    break;
+                case "mesh":
+                    StringBuilder sbld = new StringBuilder(64);
+                    sbld.append(val); // may be empty
+                    while (!val.isEmpty() && n < args.length && (val.endsWith(",") || args[n].startsWith(","))) {
+                        val = args[n++];
+                        sbld.append(val);
+                    }
+                    m_meshBrokers = sbld.toString();
+                    break;
+                 case "missing":
+                    m_missingHostCount = Integer.parseInt(val);
+                    break;
+                case "networkbindings":
+                    parseBindings(val, m_networkCoreBindings, "Network");
+                    break;
+                case "placementgroup":
+                    m_placementGroup = val;
+                    break;
+                case "port":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_clientInterface, m_port);
+                    m_clientInterface = hap.getHost();
+                    m_port = hap.getPort();
+                    break;
+                case "publicinterface":
+                    m_publicInterface = MiscUtils.getAddressOfInterface(val);
+                    break;
+                case "rejoinhost": // synonym for "rejoin host" for backward compatibility
+                    m_startAction = StartAction.REJOIN;
+                    m_leader = val;
+                    break;
+                case "replicationport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_drInterface, DEFAULT_DR_PORT);
+                    m_drInterface = hap.getHost();
+                    m_drAgentPortStart = hap.getPort();
+                    break;
+                case "schema":
+                    m_userSchemas = parseFiles(val, m_userSchemas, "schema");
+                    break;
+                case "statusport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_statusInterface, AUTO_STATUS_PORT);
+                    m_statusInterface = hap.getHost();
+                    m_statusPort = hap.getPort();
+                    break;
+                case "tag": // behaviorless tag field
+                    m_tag = val;
+                    break;
+                case "timestampsalt":
+                    m_timestampTestingSalt = Long.parseLong(val);
+                    break;
+                case "topicshostport":
+                    m_topicsHostPort = MiscUtils.getHostAndPortFromInterfaceSpec(val, "", DEFAULT_TOPICS_PORT);
+                    break;
+                case "versionoverride": // version string override for testing online upgrade
+                    m_versionStringOverrideForTest = val;
+                    m_versionCompatibilityRegexOverrideForTest = (n < args.length ? args[n++] : val);
+                    break;
+                case "voltdbroot":
+                    m_voltdbRoot = new VoltFile(val);
+                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                    }
+                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
+                        referToDocAndExit("Could not create directory \"%s\"", m_voltdbRoot.getPath());
+                    }
                     try {
-                        m_getOption = GetActionArgument.valueOf(argument.trim().toUpperCase());
-                    } catch (IllegalArgumentException excp) {
-                        System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Valid arguments for get command are: " + GetActionArgument.supportedVerbs());
-                        referToDocAndExit();
+                        CatalogUtil.validateDirectory(DBROOT, m_voltdbRoot);
+                    } catch (RuntimeException e) {
+                        referToDocAndExit(e.getMessage());
                     }
-                    m_getOutput = m_getOption.getDefaultOutput();
-                } else if (arg.equalsIgnoreCase("file")) {
-                    m_getOutput = args[++i].trim();
-                } else if (arg.equalsIgnoreCase("forceget")) {
-                    m_forceGetCreate = true;
-                } else if (arg.equalsIgnoreCase("schema")) {
-                    for (String schemaPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
-                        File userSchema = new File(schemaPath);
-                        if (!userSchema.exists()) {
-                            System.err.println("FATAL: Supplied schema file " + userSchema + " does not exist.");
-                            referToDocAndExit();
-                        }
-                        if (!userSchema.canRead()) {
-                            System.err.println("FATAL: Supplied schema file " + userSchema + " can't be read.");
-                            referToDocAndExit();
-                        }
-                        if (!userSchema.isFile()) {
-                            System.err.println("FATAL: Supplied schema file " + userSchema + " is not an ordinary file.");
-                            referToDocAndExit();
-                        }
-                        if (m_userSchemas == null) {
-                            m_userSchemas = new ArrayList<>();
-                        }
-                        m_userSchemas.add(userSchema);
-                    }
-                } else if (arg.equalsIgnoreCase("classes")) {
-                    for (String jarPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
-                        File stagedJar = new File(jarPath);
-                        if (!stagedJar.exists()) {
-                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " does not exist.");
-                            referToDocAndExit();
-                        }
-                        if (!stagedJar.canRead()) {
-                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " can't be read.");
-                            referToDocAndExit();
-                        }
-                        if (!stagedJar.isFile()) {
-                            System.err.println(
-                                    "FATAL: Supplied classes jar file " + stagedJar + " is not an ordinary file.");
-                            referToDocAndExit();
-                        }
-                        if (m_stagedClassesPaths == null) {
-                            m_stagedClassesPaths = new ArrayList<>();
-                        }
-                        m_stagedClassesPaths.add(stagedJar);
-                    }
-                } else if (arg.equalsIgnoreCase("e2")) {
-                    m_exporterVersion = ExporterVersion.E2;
-                } else if (arg.equalsIgnoreCase("e3")) {
-                    m_exporterVersion = ExporterVersion.E3;
-                } else if (arg.equalsIgnoreCase("topicsHostPort")) {
-                    m_topicsHostPort = MiscUtils.getHostAndPortFromInterfaceSpec(args[++i], "", DEFAULT_TOPICS_PORT);
-                } else {
-                    System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
-                    referToDocAndExit();
+                    break;
+                case "zkport":
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, LoopbackAddress.get(), DEFAULT_ZK_PORT);
+                    m_zkInterface = hap.getHost();
+                    m_zkPort = hap.getPort();
+                    break;
+                default:
+                    handled = false;
                 }
+
+                if (handled) {
+                    continue;
+                }
+
+                if (arg.indexOf(' ') > 0) { // hint that combining args is no longer allowed
+                    System.err.printf("Option \"%s\" should be split into separate arguments.%n", arg);
+                }
+                referToDocAndExit("Unrecognized option to VoltDB: %s", arg);
             }
+
             // Get command
             if (m_startAction == StartAction.GET) {
                 // We dont want crash file created.
@@ -709,10 +722,17 @@ public class VoltDB {
                 inspectGetCommand();
                 return;
             }
+
+            // Adjust action for safemode flag
+            if (m_startAction == StartAction.RECOVER && m_safeMode) {
+                m_startAction = StartAction.SAFE_RECOVER;
+            }
+
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             }
+
             /*
              *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
              */
@@ -721,11 +741,9 @@ public class VoltDB {
             }
 
             // If no action is specified, issue an error.
-            if (null == m_startAction) {
-                hostLog.fatal("You must specify a startup action, either init, start, create, recover, rejoin, collect, or compile.");
-                referToDocAndExit();
+            if (m_startAction == null) {
+                referToDocAndExit("You must specify a startup action, either init, start, create, recover, rejoin, collect, or compile.");
             }
-
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
@@ -768,6 +786,38 @@ public class VoltDB {
             }
         }
 
+        private List<File> parseFiles(String pathList, List<File> fileList, String what) {
+            for (String path : Splitter.on(',').trimResults().omitEmptyStrings().split(pathList)) {
+                File file = checkFile(path, what);
+                if (fileList == null) {
+                    fileList = new ArrayList<>();
+                }
+                fileList.add(file);
+            }
+            return fileList;
+        }
+
+        private File checkFile(String path, String what) {
+            File file = new File(path);
+            if (!file.exists()) {
+                referToDocAndExit("Supplied %s file %s does not exist", what, path);
+            }
+            if (!file.canRead()) {
+                referToDocAndExit("Supplied %s file %s can't be read.", what, path);
+            }
+            if (!file.isFile()) {
+                referToDocAndExit("Supplied %s file %s is not an ordinary file.", what, path);
+            }
+            return file;
+        }
+
+        private void parseBindings(String bindingList, Queue<String> outQueue, String what) {
+            for (String binding : Splitter.on(',').trimResults().omitEmptyStrings().split(bindingList)) {
+                outQueue.offer(binding);
+            }
+            System.out.printf("%s bindings are %s %n", what, outQueue);
+        }
+
         private boolean isInitialized() {
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
@@ -779,18 +829,18 @@ public class VoltDB {
             if (!m_voltdbRoot.exists()) {
                 try {
                     parentPath = m_voltdbRoot.getCanonicalFile().getParent();
-                } catch (IOException ignored) {}
-                System.err.println("FATAL: " + parentPath + " does not contain a "
-                        + "valid database root directory. Use the --dir option to specify the path to the root.");
-                referToDocAndExit();
+                } catch (IOException ignored) {
+                }
+                referToDocAndExit("%s does not contain a valid database root directory."
+                                  + " Use the --dir option to specify the path to the root.",
+                                  parentPath);
             }
             File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
             switch (m_getOption) {
                 case DEPLOYMENT: {
                     File depFH = new VoltFile(configInfoDir, "deployment.xml");
                     if (!depFH.exists()) {
-                        System.out.println("FATAL: Deployment file \"" + depFH.getAbsolutePath() + "\" not found.");
-                        referToDocAndExit();
+                        referToDocAndExit("Deployment file \"%s\" not found", depFH.getAbsolutePath());
                     }
                     m_pathToDeployment = depFH.getAbsolutePath();
                     return;
@@ -802,27 +852,26 @@ public class VoltDB {
                     // schema) as well as procedures (get classes)
                     File catalogFH = new VoltFile(configInfoDir, CatalogUtil.CATALOG_FILE_NAME);
                     if (!catalogFH.exists()) {
+                        System.err.printf("Catalog file \"%s\" not found.%n", catalogFH.getAbsolutePath());
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
-                        } catch (IOException ignored) {}
-                        System.err.println("FATAL: "+ m_getOption.name().toUpperCase() +
-                                " not found in the provided database directory " + parentPath  +
-                                ". Make sure the database has been started ");
-                        referToDocAndExit();
+                        } catch (IOException ignored) {
+                        }
+                        referToDocAndExit("%s not found in the provided database directory %s."
+                                          + " Make sure the database has been started.",
+                                          m_getOption.name().toUpperCase(), parentPath);
                     }
                     m_pathToCatalog = catalogFH.getAbsolutePath();
                     return;
                 }
                 case LICENSE: {
                     if(!m_isEnterprise) {
-                        System.out.println("Community Edition of VoltDB does not have license files");
-                        referToDocAndExit();
+                        referToDocAndExit("Community Edition of VoltDB does not have license files");
                     }
                     File licFH = new VoltFile(m_voltdbRoot, "license.xml");
                     m_pathToLicense = licFH.getAbsolutePath();
                     if (!licFH.exists()) {
-                        System.out.println("FATAL: License file not found.");
-                        referToDocAndExit();
+                        referToDocAndExit("License file \"%s\" not found.", m_pathToLicense);
                     }
                     return;
                 }

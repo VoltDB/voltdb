@@ -30,27 +30,15 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 
-import org.voltcore.network.CipherExecutor;
-
 public class TLSHandshaker {
-    private ByteBuffer m_rxNetData;
     private final SSLEngine m_eng;
     private final SocketChannel m_sc;
-    private final int m_appsz;
+
+    private ByteBuffer m_remnant;
 
     public TLSHandshaker(SocketChannel socketChan, SSLEngine engine) {
         m_sc = socketChan;
         m_eng = engine;
-        SSLSession dummySession = engine.getSession();
-
-        final int appsz = engine.getSession().getApplicationBufferSize() + 2048;
-        if (Integer.highestOneBit(appsz) < appsz) {
-            m_appsz = Integer.highestOneBit(appsz) << 1;
-        } else {
-            m_appsz = appsz;
-        }
-        m_rxNetData = (ByteBuffer)ByteBuffer.allocate(dummySession.getPacketBufferSize()).clear();
-        dummySession.invalidate();
     }
 
     boolean canread(Selector selector) {
@@ -68,8 +56,10 @@ public class TLSHandshaker {
     }
 
     public boolean handshake() throws IOException {
-        ByteBuffer txNetData = (ByteBuffer)ByteBuffer.allocate(m_appsz).clear();
-        ByteBuffer clearData = (ByteBuffer)ByteBuffer.allocate(CipherExecutor.FRAME_SIZE).clear();
+        SSLSession session = m_eng.getSession();
+        ByteBuffer rxNetData = allocateBuffer(session.getPacketBufferSize());
+        ByteBuffer txNetData = allocateBuffer(session.getPacketBufferSize());
+        ByteBuffer clearData = allocateBuffer(session.getApplicationBufferSize());
 
         SSLEngineResult result = null;
         m_eng.beginHandshake();
@@ -91,7 +81,7 @@ public class TLSHandshaker {
                 switch(status) {
                 case NEED_UNWRAP:
                     if (waitForData && selector.select(2) == 1 && canread(selector)) {
-                        if (m_sc.read(m_rxNetData) < 0) {
+                        if (m_sc.read(rxNetData) < 0) {
                             if (m_eng.isInboundDone() && m_eng.isOutboundDone()) {
                                 return false;
                             }
@@ -105,11 +95,11 @@ public class TLSHandshaker {
                             break;
                         }
                     }
-                    m_rxNetData.flip();
+                    rxNetData.flip();
                     try {
-                        result = m_eng.unwrap(m_rxNetData, clearData);
-                        m_rxNetData.compact();
-                        waitForData = m_rxNetData.position() == 0;
+                        result = m_eng.unwrap(rxNetData, clearData);
+                        rxNetData.compact();
+                        waitForData = rxNetData.position() == 0;
                         status = result.getHandshakeStatus();
                     } catch (SSLException e) {
                         m_eng.closeOutbound();
@@ -119,7 +109,7 @@ public class TLSHandshaker {
                     case OK:
                         break;
                     case BUFFER_OVERFLOW:
-                        clearData = expand(clearData, false);
+                        clearData = allocateBuffer(m_eng.getSession().getApplicationBufferSize());
                         break;
                     case BUFFER_UNDERFLOW:
                         // During handshake, this indicates that there's not yet data to read.  We'll stay
@@ -155,7 +145,7 @@ public class TLSHandshaker {
                         }
                         break;
                     case BUFFER_OVERFLOW:
-                        txNetData = expand(txNetData, false);
+                        txNetData = allocateBuffer(m_eng.getSession().getPacketBufferSize());
                         break;
                     case BUFFER_UNDERFLOW:
                         throw new SSLException("Buffer underflow occured after a wrap");
@@ -164,7 +154,7 @@ public class TLSHandshaker {
                         while (txNetData.hasRemaining()) {
                             m_sc.write(txNetData);
                         }
-                        m_rxNetData.clear();
+                        rxNetData.clear();
                         status = m_eng.getHandshakeStatus();
                         break;
                     default:
@@ -198,7 +188,26 @@ public class TLSHandshaker {
         }
 
         // Flip the buffer so it is setup in case there is a remnant
-        m_rxNetData.flip();
+        rxNetData.flip();
+
+        while (rxNetData.hasRemaining()) {
+            result = m_eng.unwrap(rxNetData, clearData);
+            switch (result.getStatus()) {
+                case OK:
+                    break;
+                case BUFFER_OVERFLOW:
+                    clearData = expand(clearData, clearData.limit() << 1);
+                    break;
+                case BUFFER_UNDERFLOW:
+                    // This really is not a bug it just means only part of a TLS frame was read but it is not handled
+                    throw new IOException("buffer underflow while decrypting handshake remnant");
+                case CLOSED:
+                    throw new IOException("ssl engine closed while decrypting handshake remnant");
+            }
+        }
+
+        clearData.flip();
+        m_remnant = clearData.slice();
 
         return true;
     }
@@ -215,39 +224,26 @@ public class TLSHandshaker {
      * @throws IOException if the decryption operation fails
      */
     public ByteBuffer getRemnant() throws IOException {
-        if (!m_rxNetData.hasRemaining()) {
-            return m_rxNetData.slice();
-        }
-        ByteBuffer remnant = ByteBuffer.allocate(m_eng.getSession().getApplicationBufferSize());
-        SSLEngineResult result = m_eng.unwrap(m_rxNetData, remnant);
-        switch (result.getStatus()) {
-        case OK:
-            assert !m_rxNetData.hasRemaining() : "there are unexpected additional remnants";
-            return ((ByteBuffer)remnant.flip()).slice().asReadOnlyBuffer();
-        case BUFFER_OVERFLOW:
-            throw new IOException("buffer underflow while decrypting handshake remnant");
-        case BUFFER_UNDERFLOW:
-            throw new IOException("buffer overflow while decrypting handshake remnant");
-        case CLOSED:
-            throw new IOException("ssl engine closed while decrypting handshake remnant");
-        }
-        return null; // unreachable
+        return m_remnant.hasRemaining() ? m_remnant.asReadOnlyBuffer() : m_remnant;
     }
 
     public boolean hasRemnant() {
-        return m_rxNetData.hasRemaining();
+        return m_remnant.hasRemaining();
     }
 
     public SSLEngine getSslEngine() {
         return m_eng;
     }
 
-    private static ByteBuffer expand(ByteBuffer bb, boolean copy) {
-        ByteBuffer expanded = (ByteBuffer)ByteBuffer.allocate(bb.capacity() <<1).clear();
-        if (copy) {
-            expanded.put((ByteBuffer)bb.flip());
+    private static ByteBuffer allocateBuffer(int size) {
+        return expand(null, size);
+    }
+
+    private static ByteBuffer expand(ByteBuffer bb, int newSize) {
+        ByteBuffer expanded = ByteBuffer.allocateDirect(newSize);
+        if (bb != null) {
+            expanded.put((ByteBuffer) bb.flip());
         }
         return expanded;
     }
-
 }

@@ -63,9 +63,17 @@ if not java:
 java_version = utility.get_java_version(java)
 java_opts = []
 
-#If this is a large memory system commit the full heap
+# Indicator we're running in something like kubernetes.
+# This should be set only by the container image.
+voltdb_container = os.environ.get('VOLTDB_CONTAINER')
+
+# Should we commit the full heap on JVM startup?
+# 1. Obey explicit instruction from environment variable
+# 2. Otherwise only on non-container 'large memory' systems
 specifyMinimumHeapSize = False
-if platform.system() == "Linux":
+if 'VOLTDB_HEAPCOMMIT' in os.environ:
+    specifyMinimumHeapSize = os.environ['VOLTDB_HEAPCOMMIT'].lower() == 'true'
+elif platform.system() == "Linux" and not voltdb_container:
     memory = os.popen("free -m")
     try:
         totalMemory = int(memory.readlines()[1].split()[1])
@@ -81,6 +89,7 @@ if 'VOLTDB_HEAPMAX' in os.environ:
             java_opts.append('-XX:+AlwaysPreTouch')
     except ValueError:
         java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
+
 if 'VOLTDB_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['VOLTDB_OPTS']))
 if 'JAVA_OPTS' in os.environ:

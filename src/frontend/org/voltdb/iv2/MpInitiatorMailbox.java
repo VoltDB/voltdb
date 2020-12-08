@@ -257,7 +257,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 }
                 // If a replica set has been configured and it changed during
                 // promotion, must cancel the term
-                if (m_algo != null) {
+                if (!type.isMigrate() && m_algo != null) {
                     m_algo.cancel();
                 }
                 ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, type);

@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import com.google_voltpatches.common.net.HostAndPort;
+
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
@@ -888,28 +890,9 @@ public final class ClientImpl implements Client {
         return m_blockingQueue;
     }
 
-    private static String getHostnameFromHostnameColonPort(String server) {
-        server = server.trim();
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return server;
-        }
-        else {
-            assert (parts.length == 2);
-            return parts[0].trim();
-        }
-    }
-
-    private static int getPortFromHostnameColonPort(String server,
-            int defaultPort) {
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return defaultPort;
-        }
-        else {
-            assert (parts.length == 2);
-            return Integer.parseInt(parts[1]);
-        }
+    // Package access for unit test
+    static HostAndPort parseHostAndPort(String server) {
+        return HostAndPort.fromString(server.trim()).withDefaultPort(Client.VOLTDB_SERVER_PORT).requireBracketsForIPv6();
     }
 
     @Override
@@ -918,9 +901,8 @@ public final class ClientImpl implements Client {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        int port = getPortFromHostnameColonPort(host, Client.VOLTDB_SERVER_PORT);
-        host = getHostnameFromHostnameColonPort(host);
-        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+        HostAndPort hp = parseHostAndPort(host);
+        createConnectionWithHashedCredentials(hp.getHost(), hp.getPort(), m_username, m_passwordHash);
     }
 
     @Override

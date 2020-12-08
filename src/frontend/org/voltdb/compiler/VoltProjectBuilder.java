@@ -271,6 +271,7 @@ public class VoltProjectBuilder {
     boolean m_jsonApiEnabled = true;
     boolean m_sslEnabled = false;
     boolean m_sslExternal = false;
+    boolean m_sslInternal = false;
     boolean m_sslDR = false;
 
     String m_keystore;
@@ -313,7 +314,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
-    private List<ExportConfigurationType> m_exportConfigs = new ArrayList<>();
+    private ExportType m_exportsConfiguration;
 
     private Integer m_deadHostTimeout = null;
 
@@ -407,6 +408,13 @@ public class VoltProjectBuilder {
         exportFeature.setName(ExportManagerInterface.EXPORT_FEATURE);
         exportFeature.setOption(mode.name());
         m_featureOptions.getFeature().add(exportFeature);
+    }
+
+    public ExportType getExportsConfiguration() {
+        if (m_exportsConfiguration == null) {
+            m_exportsConfiguration = new ExportType();
+        }
+        return m_exportsConfiguration;
     }
 
     public TopicsType getTopicsConfiguration() {
@@ -718,6 +726,10 @@ public class VoltProjectBuilder {
         m_sslExternal = enabled;
     }
 
+    public void setSslInternal(final boolean enabled) {
+        m_sslInternal = enabled;
+    }
+
     public void setSslDR(final boolean enabled) {
         m_sslDR = enabled;
     }
@@ -808,7 +820,7 @@ public class VoltProjectBuilder {
 
     // Use this to update deployment with new or modified export targets
     public void clearExports() {
-        m_exportConfigs.clear();
+        getExportsConfiguration().getConfiguration().clear();
     }
 
     public void addExport(boolean enabled) {
@@ -856,7 +868,7 @@ public class VoltProjectBuilder {
             configProperties.add(prop);
         }
 
-        m_exportConfigs.add(exportConfig);
+        getExportsConfiguration().getConfiguration().add(exportConfig);
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -1290,6 +1302,7 @@ public class VoltProjectBuilder {
         deployment.setSsl(ssl);
         ssl.setEnabled(m_sslEnabled);
         ssl.setExternal(m_sslExternal);
+        ssl.setInternal(m_sslInternal);
         ssl.setDr(m_sslDR);
         if (m_keystore!=null) {
             KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
@@ -1323,12 +1336,7 @@ public class VoltProjectBuilder {
         }
 
         // <export>
-        ExportType export = factory.createExportType();
-        deployment.setExport(export);
-
-        for (ExportConfigurationType exportConfig : m_exportConfigs) {
-            export.getConfiguration().add(exportConfig);
-        }
+        deployment.setExport(getExportsConfiguration());
 
         // <import>
         ImportType importt = factory.createImportType();

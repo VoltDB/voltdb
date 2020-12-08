@@ -23,17 +23,22 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -115,19 +120,49 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
     }
 
     protected void insertToStream(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+        String procName = streamName.toUpperCase() + ".insert";
+        HashSet<String> errors = new HashSet<>();
+        CountDownLatch latch = new CountDownLatch(numberOfRows);
+
         for (int i = startPkey; i < startPkey + numberOfRows; i++) {
             params[1] = i; // Pkey column
-            m_verifier.addRow(client, streamName, i, params);
-            client.callProcedure("@AdHoc", "insert into "+ streamName + " values(" + i + ", 1)");
+            if (m_verifier != null) {
+                m_verifier.addRow(client, streamName, i, params);
+            }
+            client.callProcedure(cr -> {
+                latch.countDown();
+                if (cr.getStatus() != ClientResponse.SUCCESS) {
+                    synchronized (errors) {
+                        errors.add(cr.getStatusString());
+                    }
+                }
+            }, procName, i, 1);
         }
+        latch.await();
+        assertTrue(errors.toString(), errors.isEmpty());
     }
 
     protected void insertToStreamWithNewColumn(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+        String procName = streamName.toUpperCase() + ".insert";
+        HashSet<String> errors = new HashSet<>();
+        CountDownLatch latch = new CountDownLatch(numberOfRows);
+
         for (int i = startPkey; i < startPkey + numberOfRows; i++) {
             params[1] = i; // Pkey column
             params[2] = i; // new column
-            m_verifier.addRow(client, streamName, i, params);
-            client.callProcedure("@AdHoc", "insert into " + streamName + " values(" + i + "," + i + ",1)");
+            if (m_verifier != null) {
+                m_verifier.addRow(client, streamName, i, params);
+            }
+            client.callProcedure(cr -> {
+                latch.countDown();
+                if (cr.getStatus() != ClientResponse.SUCCESS) {
+                    synchronized (errors) {
+                        errors.add(cr.getStatusString());
+                    }
+                }
+            }, procName, i, i, 1);
         }
+        latch.await();
+        assertTrue(errors.toString(), errors.isEmpty());
     }
 }

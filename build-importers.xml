@@ -76,6 +76,7 @@
             <zipfileset src="${base.dir}/third_party/java/jars/commons-lang-2.6.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/guava-30.0-jre.jar" />
             <zipfileset src="${base.dir}/lib/protobuf-java-3.4.0.jar" />
+            <zipfileset src="${base.dir}/lib/commons-lang3-3.8.1.jar" />
             <zipfileset src="${base.dir}/lib/commons-logging-1.1.3.jar" />
             <zipfileset src="${base.dir}/lib/httpclient-4.3.6.jar" />
             <zipfileset src="${base.dir}/lib/httpcore-4.3.3.jar" />
@@ -102,7 +103,7 @@
             <include name='commons-lang3-3.8.1.jar'/>
             <include name='kafka-clients-2.3.1.jar'/>
         </fileset>
-        <fileset refid="voltpro.classpath"/>
+        <path refid="voltpro.classpath"/>
      </path>
 
     <target name="kafkastream10">

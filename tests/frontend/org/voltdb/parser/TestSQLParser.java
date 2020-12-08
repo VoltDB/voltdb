@@ -966,6 +966,18 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
         validateMatcherGroups(SQLParser::matchCreateTask, statement, expectedGroupValues, s_allCreateTaskGroups);
     }
 
+    @Test
+    public void testAlterTask() {
+        Set<String> allAlterTaskGroups = ImmutableSet.of("name", "action", "onError");
+
+        validateMatcherGroups(SQLParser::matchAlterTask, "ALTER TASK foo ENABLE;",
+                ImmutableMap.of("name", "foo", "action", "ENABLE"), allAlterTaskGroups);
+        validateMatcherGroups(SQLParser::matchAlterTask, "ALTER TASK foo ALTER ON ERROR LOG;",
+                ImmutableMap.of("name", "foo", "onError", "LOG"), allAlterTaskGroups);
+
+        assertFalse(SQLParser.matchAlterTask("ALTER TASK foo ENABLE ALTER ON ERROR LOG").matches());
+    }
+
     private static void validateMatcherGroups(Function<String, Matcher> matcherFactory, String statement,
             Map<String, String> expectedGroupValues, Set<String> allGroups) {
         Matcher matcher = matcherFactory.apply(statement);

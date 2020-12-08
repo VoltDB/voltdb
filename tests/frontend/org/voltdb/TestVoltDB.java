@@ -86,9 +86,6 @@ final public class TestVoltDB {
         VoltDB.Configuration cfg5 = new VoltDB.Configuration(args5);
         assertEquals(BackendTarget.HSQLDB_BACKEND, cfg5.m_backend);
 
-        String args9[] = { "create", "catalog xtestxstringx" };
-        VoltDB.Configuration cfg9 = new VoltDB.Configuration(args9);
-        assertEquals("xtestxstringx", cfg9.m_pathToCatalog);
         String args10[] = { "create", "catalog", "ytestystringy" };
         VoltDB.Configuration cfg10 = new VoltDB.Configuration(args10);
         assertEquals("ytestystringy", cfg10.m_pathToCatalog);
@@ -140,6 +137,22 @@ final public class TestVoltDB {
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
     }
+
+    private boolean causesExit(String[] args) {
+        boolean threw = false;
+        try {
+            new VoltDB.Configuration(args);
+        } catch (VoltDB.SimulatedExitException ex) {
+            threw = true;
+        }
+        return threw;
+    }
+
+    @Test
+    public void testConfigurationConstructorBadArgs() {
+        String[] args9 = { "create", "catalog xtestxstringx" };
+        assertTrue(causesExit(args9));
+     }
 
     @Test
     public void testConfigurationValidate() throws Exception {
@@ -229,25 +242,25 @@ final public class TestVoltDB {
         server.join();
 
         // invalid host count
-        String [] args400 = {"probe", "voltdbroot", path.getPath(), "hostcount", "2", "mesh", "uno,", "due", ",","tre", ",quattro" };
+        String [] args400 = {"probe", "voltdbroot", path.getPath(), "hostcount", "2", "mesh", "uno,", "due", ",", "tre", ",quattro" };
         config = new VoltDB.Configuration(args400);
         assertFalse(config.validate()); // false in both pro and community
 
-        String [] args401 = {"probe", "voltdbroot", path.getPath(), "hostcount", "-3" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args401 = {"probe", "voltdbroot", path.getPath(), "hostcount", "-3" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args401);
         assertFalse(config.validate()); // false in both pro and community
 
-        String [] args402 = {"probe", "voltdbroot", path.getPath(), "hostcount", "4" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args402 = {"probe", "voltdbroot", path.getPath(), "hostcount", "4" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args402);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
 
-        String [] args403 = {"probe", "voltdbroot", path.getPath(), "hostcount", "6" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args403 = {"probe", "voltdbroot", path.getPath(), "hostcount", "6" , "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args403);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
 
-        String [] args404 = {"probe", "voltdbroot", path.getPath(), "mesh", "uno,", "due", ",","tre", ",quattro"};
+        String [] args404 = {"probe", "voltdbroot", path.getPath(), "mesh", "uno,", "due", ",", "tre", ",quattro"};
         config = new VoltDB.Configuration(args404);
-        assertTrue(config.validate()); // false in both pro and community
+        assertTrue(config.validate()); // true in both pro and community
         assertEquals(4, config.m_hostCount);
     }
 

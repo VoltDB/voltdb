@@ -1399,6 +1399,46 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG20394() throws Exception {
+        /**
+         * The bug using the query would use the only index in the executor, but such
+         * executor would ignore the "initial_expression" that sets cursor at correct
+         * starting position before further processing (post-filtering, etc). Before
+         * this fix, the query would return all 14 rows because of lack of "initial_expression"
+         * evaluation.
+         */
+        final String ddl =
+            "CREATE TABLE ENBA (\n" +
+            "RULE_TYPE varchar(25) NOT NULL,\n" +
+            "RULE_TYPE_ID integer NOT NULL,\n" +
+            "PARM1 varchar(300),\n" +
+            "PARM2 varchar(300),\n" +
+            "PARM4 varchar(300),\n" +
+            "PARM5 varchar(300),\n" +
+            ");\n" +
+            "CREATE INDEX I_ENBA_I1 ON ENBA(RULE_TYPE, RULE_TYPE_ID, PARM1, PARM2);";
+        final TestEnv env = new TestEnv(ddl,
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+            Stream.of("1, '31', '45', 'zzzz', 'abcd'",
+                    "1, '46', '60', 'dcba', 'zzzz'",
+                    "0, 'Voldemort', 'yyyy', 'zzzz', 'abcd'")
+                .forEach(entry ->
+                        batcher.add(String.format("INSERT INTO ENBA VALUES('S_SM_LATCH_ACT', %s);\n",
+                                entry), 1));
+            batcher.run();
+            final ClientResponse cr = env.m_client.callProcedure("@AdHoc",
+                    "SELECT PARM1 FROM ENBA where RULE_TYPE = 'S_SM_LATCH_ACT' AND RULE_TYPE_ID = 1 \n" +
+                    "AND cast(PARM1 AS bigint) <= 34;");
+            assertContentOfTable(new Object[][]{{"31"}}, cr.getResults()[0]);
+        } finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */

@@ -489,9 +489,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     while (postfilter.isUnderLimit() && getNextTuple(
                 localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
-        if (tuple.isPendingDelete() ||
-                (initial_expression != nullptr && ! initial_expression->eval(&tuple, nullptr).isTrue())) {
-            // jump until initial expression is satisified
+        bool skip = tuple.isPendingDelete();
+        if (! skip && initial_expression != nullptr) { // jump until initial expression is satisified
+            try {           // ENG-20394: Evaluating on the row may throw.
+                // initial expr that does not match filter need to be skipped
+                skip = ! initial_expression->eval(&tuple, nullptr).isTrue();
+            } catch (SQLException const&) {
+                skip = true;
+            }
+        }
+        if (skip) {
             continue;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
