@@ -222,6 +222,13 @@
       <xs:attribute name="minimum" type="xs:int" default="1000"/>
   </xs:complexType>
 
+  <xs:complexType name="drLimitType">
+      <xs:choice>
+          <xs:element name="maxbuffers" type="xs:int" default="256"/>
+          <xs:element name="maxsize" type="xs:string" default="52428800"/>
+      </xs:choice>
+  </xs:complexType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -496,6 +503,7 @@
     <xs:sequence>
         <!-- Currently, only one DR data source is allowed -->
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="drconsumerlimit" minOccurs="0" maxOccurs="1" type="drLimitType"/>
     </xs:sequence>
     <xs:attribute name="id" type="clusterIdType"/>
     <xs:attribute name="listen" type="xs:boolean" default="true"/>

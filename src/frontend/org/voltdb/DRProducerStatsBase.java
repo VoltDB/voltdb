@@ -101,7 +101,10 @@ public class DRProducerStatsBase {
             ISSYNCED                    (VoltType.STRING),
             MODE                        (VoltType.STRING),
             QUEUE_GAP                   (VoltType.BIGINT),
-            CONNECTION_STATUS           (VoltType.STRING);
+            CONNECTION_STATUS           (VoltType.STRING),
+            AVAILABLE_BYTES             (VoltType.INTEGER),
+            AVAILABLE_BUFFERS           (VoltType.INTEGER),
+            WINDOW_TYPE                 (VoltType.STRING);
 
             public final VoltType m_type;
             DRProducerPartition(VoltType type) { m_type = type; }
