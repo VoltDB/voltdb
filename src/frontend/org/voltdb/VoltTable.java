@@ -663,7 +663,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     @Override
     public final VoltType getColumnType(int index) {
         assert(verifyTableInvariants());
-        assert(index < m_colCount);
+        if (index < 0 || index >= m_colCount) {
+            throw new IllegalArgumentException("Not a valid column index: " + index);
+        }
         // move to the right place
         VoltType retval = VoltType.get(m_buffer.get(POS_COL_TYPES + index));
 

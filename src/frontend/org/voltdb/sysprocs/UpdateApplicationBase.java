@@ -248,7 +248,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
 
             // Validate full configuration
-            if (!VoltDB.instance().validateConfiguration(newCatalog, dt, newCatalogJar, retval)) {
+            if (!VoltDB.instance().validateConfiguration(newCatalog, dt, newCatalogJar, context.catalog, retval)) {
                 return retval;
             }
 

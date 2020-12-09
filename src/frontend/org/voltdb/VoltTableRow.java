@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.VoltTable.varbinaryToPrintableString;
+
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -29,8 +31,6 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTypeUtil;
-
-import static org.voltdb.VoltTable.varbinaryToPrintableString;
 
 /**
  * <p>Represents the interface to a row in a VoltTable result set.</p>
@@ -330,6 +330,86 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the current row as an array of Objects. When this method is used {@link #wasNull()} will not return a
+     * valid result since more than one value is being accessed.
+     *
+     * @return The current row as an array of objects
+     * @throws RuntimeException if the current row is not valid
+     */
+    public final Object[] getRowObjects() {
+        if (m_activeRowIndex == INVALID_ROW_INDEX) {
+            throw new RuntimeException(
+                    "VoltTableRow.advanceRow() must be called to advance to the first row before any access.");
+        }
+
+        Object[] row = new Object[getColumnCount()];
+        for (int i = 0; i < row.length; ++i) {
+            row[i] = get0(i);
+        }
+        return row;
+    }
+
+    /**
+     * Retrieve the column of the current row at {@code columnIndex}. If the value is {@code null} then {@code null}
+     * will be returned and {@link #wasNull()} will return {@code true}
+     *
+     * @param columnIndex Index of the column
+     * @return The value or {@code null} if the value is not set.
+     * @throws RuntimeException if the current row is not valid
+     */
+    public final Object get(int columnIndex) {
+        if (m_activeRowIndex == INVALID_ROW_INDEX) {
+            throw new RuntimeException(
+                    "VoltTableRow.advanceRow() must be called to advance to the first row before any access.");
+        }
+        Object value = get0(columnIndex);
+        m_wasNull = value == null;
+        return value;
+    }
+
+    private final Object get0(int columnIndex) {
+        VoltType type = getColumnType(columnIndex);
+        switch (type) {
+            case TINYINT: {
+                final byte value = m_buffer.get(getOffset(columnIndex));
+                return value == VoltType.NULL_TINYINT ? null : value;
+            }
+            case SMALLINT: {
+                final short value = m_buffer.getShort(getOffset(columnIndex));
+                return value == VoltType.NULL_SMALLINT ? null : value;
+            }
+            case INTEGER: {
+                final int value = m_buffer.getInt(getOffset(columnIndex));
+                return value == VoltType.NULL_INTEGER ? null : value;
+            }
+            case BIGINT: {
+                final long value = m_buffer.getLong(getOffset(columnIndex));
+                return value == VoltType.NULL_BIGINT ? null : value;
+            }
+            case FLOAT: {
+                final float value = m_buffer.getFloat(getOffset(columnIndex));
+                return value == VoltType.NULL_FLOAT ? null : value;
+            }
+            case TIMESTAMP: {
+                final long value = m_buffer.getLong(getOffset(columnIndex));
+                return value == VoltType.NULL_BIGINT ? null : new TimestampType(value);
+            }
+            case DECIMAL:
+                return getDecimalAsBigDecimal0(columnIndex);
+            case STRING:
+                return readString(getOffset(columnIndex), VoltTable.ROWDATA_ENCODING);
+            case VARBINARY:
+                return getVarbinary(columnIndex);
+            case GEOGRAPHY_POINT:
+                return GeographyPointValue.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
+            case GEOGRAPHY:
+                return getGeographyValue0(columnIndex);
+            default:
+                throw new IllegalArgumentException("Unsupported type: " + type);
+        }
+    }
+
+    /**
      * Retrieve the <tt>long</tt> value stored in the column specified by index.
      * Looking at the return value is not a reliable way to check if the value
      * is <tt>null</tt>. Use {@link #wasNull()} instead.
@@ -348,8 +428,9 @@ public abstract class VoltTableRow {
                     " is beyond number of columns " + getColumnCount());
         }
         final VoltType type = getColumnType(columnIndex);
-        if (m_activeRowIndex == INVALID_ROW_INDEX)
+        if (m_activeRowIndex == INVALID_ROW_INDEX) {
             throw new RuntimeException("VoltTableRow.advanceRow() must be called to advance to the first row before any access.");
+        }
 
         switch (type) {
         case TINYINT:
@@ -687,6 +768,12 @@ public abstract class VoltTableRow {
      */
     public final GeographyValue getGeographyValue(int columnIndex) {
         validateColumnType(columnIndex, VoltType.GEOGRAPHY);
+        GeographyValue gv = getGeographyValue0(columnIndex);
+        m_wasNull = gv == null;
+        return gv;
+    }
+
+    private GeographyValue getGeographyValue0(int columnIndex) {
         int offset = getOffset(columnIndex);
         int len = m_buffer.getInt(offset);
         if (len == VoltTable.NULL_STRING_INDICATOR) {
@@ -830,11 +917,16 @@ public abstract class VoltTableRow {
      */
     public final BigDecimal getDecimalAsBigDecimal(int columnIndex) {
         validateColumnType(columnIndex, VoltType.DECIMAL);
+        final BigDecimal bd = getDecimalAsBigDecimal0(columnIndex);
+        m_wasNull = bd == null ? true : false;
+        return bd;
+    }
+
+    private BigDecimal getDecimalAsBigDecimal0(int columnIndex) {
         final int position = m_buffer.position();
         m_buffer.position(getOffset(columnIndex));
         final BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(m_buffer);
         m_buffer.position(position);
-        m_wasNull = bd == null ? true : false;
         return bd;
     }
 

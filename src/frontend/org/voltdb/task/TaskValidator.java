@@ -32,7 +32,7 @@ public class TaskValidator extends CatalogValidator {
     // TODO: refactor TaskManager validation to use procedureMapper
     @Override
     public boolean validateConfiguration(Catalog catalog, Function<String, Procedure> procedureMapper,
-            DeploymentType deployment, InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+            DeploymentType deployment, InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
         if (taskErrors != null) {
             ccr.errorMsg = taskErrors;

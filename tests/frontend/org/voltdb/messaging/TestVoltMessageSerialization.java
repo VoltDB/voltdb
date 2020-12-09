@@ -25,8 +25,6 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -110,29 +108,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
         assertTrue(itask.isForReplay());
-    }
-
-    public void testInitiateResponse() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setClientHandle(25);
-        spi.setProcName("elmerfudd");
-        spi.setParams(57, "wrascallywabbit");
-
-        InitiateTaskMessage itask = new InitiateTaskMessage(23, 100045, spi);
-
-        VoltTable table = new VoltTable(
-                new VoltTable.ColumnInfo("foobar", VoltType.STRING)
-        );
-        table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
-
-        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
-        iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] { table, table }, "knockknockbananna"));
-        iresponse.setClientHandle(99);
-
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
-
-        assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
     }
 
     public void testInitiateResponseForIv2() throws IOException {

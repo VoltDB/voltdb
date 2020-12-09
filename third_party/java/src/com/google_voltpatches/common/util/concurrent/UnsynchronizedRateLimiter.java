@@ -82,8 +82,6 @@ import javax.annotation_voltpatches.concurrent.ThreadSafe;
  * @author Dimitris Andreou
  * @since 13.0
  */
-// TODO(user): switch to nano precision. A natural unit of cost is "bytes", and a micro precision
-//     would mean a maximum rate of "1MB/s", which might be small in some cases.
 @ThreadSafe
 @Beta
 public abstract class UnsynchronizedRateLimiter {
@@ -324,7 +322,7 @@ public abstract class UnsynchronizedRateLimiter {
    * The time when the next request (no matter its size) will be granted. After granting a request,
    * this is pushed further in the future. Large requests push this further than small requests.
    */
-  private long nextFreeTicketMicros = 0L; // could be either in the past or future
+  private double nextFreeTicketMicros = 0.0; // could be either in the past or future
 
   private UnsynchronizedRateLimiter(SleepingTicker ticker) {
     this.ticker = ticker;
@@ -501,12 +499,12 @@ public abstract class UnsynchronizedRateLimiter {
    */
   private long reserveNextTicket(double requiredPermits, long nowMicros) {
     resync(nowMicros);
-    long microsToNextFreeTicket = Math.max(0, nextFreeTicketMicros - nowMicros);
+    long microsToNextFreeTicket = Math.max(0, Math.round(nextFreeTicketMicros - nowMicros));
     double storedPermitsToSpend = Math.min(requiredPermits, this.storedPermits);
     double freshPermits = requiredPermits - storedPermitsToSpend;
 
-    long waitMicros = storedPermitsToWaitTime(this.storedPermits, storedPermitsToSpend)
-        + (long) (freshPermits * stableIntervalMicros);
+    double waitMicros = storedPermitsToWaitTime(this.storedPermits, storedPermitsToSpend)
+        + (freshPermits * stableIntervalMicros);
 
     this.nextFreeTicketMicros = nextFreeTicketMicros + waitMicros;
     this.storedPermits -= storedPermitsToSpend;

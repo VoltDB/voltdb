@@ -26,6 +26,7 @@ import org.voltcore.utils.LatencyWatchdog;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
@@ -49,10 +50,26 @@ public class SpProcedureTask extends ProcedureTask
         HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
     }
 
-    public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg)
+    private final String m_traceLogName;
+
+    public static SpProcedureTask create(Mailbox initiator, String procName, TransactionTaskQueue queue,
+            Iv2InitiateTaskMessage msg) {
+        StoredProcedureInvocation spi = msg.getStoredProcedureInvocation();
+        return spi != null && spi.isBatchCall()
+                ? new BatchProcedureTask.SpBatch(initiator, procName, queue, msg)
+                : new SpProcedureTask(initiator, procName, queue, msg);
+    }
+
+    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+            Iv2InitiateTaskMessage msg) {
+        this(initiator, procName, queue, msg, "runSpTask");
+    }
+
+    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue, Iv2InitiateTaskMessage msg,
+            String traceLogName)
     {
        super(initiator, procName, new SpTransactionState(msg), queue);
+       m_traceLogName = traceLogName;
     }
 
     @Override
@@ -76,7 +93,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginDuration("runSpTask",
+            traceLog.add(() -> VoltTrace.beginDuration(m_traceLogName,
                                                        "txnId", TxnEgo.txnIdToString(getTxnId()),
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
@@ -109,7 +126,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         completeInitiateTask(siteConnection);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.endDuration("runSpTask",
+            traceLog.add(() -> VoltTrace.endDuration(m_traceLogName,
                                                        "txnId", TxnEgo.txnIdToString(getTxnId()),
                                                        "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
@@ -228,7 +245,7 @@ public class SpProcedureTask extends ProcedureTask
                 "[SP][RW] with invalid undo token in completeInitiateTask.";
 
             // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
+            // legacy interfaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_txnState.needsRollback(), false,
@@ -243,7 +260,7 @@ public class SpProcedureTask extends ProcedureTask
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("SpProcedureTask:");
+        sb.append(getClass().getSimpleName()).append(':');
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
@@ -256,6 +273,7 @@ public class SpProcedureTask extends ProcedureTask
         return sb.toString();
     }
 
+    @Override
     public boolean needCoordination() {
         return false;
     }

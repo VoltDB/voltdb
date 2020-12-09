@@ -500,7 +500,7 @@ public class Inits {
 
             // Validate full configuration
             try {
-                if (!m_rvdb.validateConfiguration(catalog, m_deployment, thisNodeCatalog, ccr)) {
+                if (!m_rvdb.validateConfiguration(catalog, m_deployment, thisNodeCatalog, null, ccr)) {
                     VoltDB.crashLocalVoltDB(ccr.errorMsg);
                 }
             }

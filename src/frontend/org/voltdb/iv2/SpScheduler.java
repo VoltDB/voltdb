@@ -675,8 +675,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         final String procedureName = msg.getStoredProcedureName();
-        final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
+        final SpProcedureTask task = SpProcedureTask.create(m_mailbox, procedureName, m_pendingTasks, msg);
 
         ListenableFuture<Object> durabilityBackpressureFuture =
                 m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);

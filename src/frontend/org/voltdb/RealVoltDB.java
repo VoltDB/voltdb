@@ -4253,10 +4253,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public boolean validateConfiguration(Catalog catalog, DeploymentType deployment,
-            InMemoryJarfile catalogJar, CatalogChangeResult ccr) {
+            InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         Function<String, Procedure> procedureMapper = createProcedureMapper(CatalogUtil.getDatabase(catalog));
         for (CatalogValidator validator : m_catalogValidators) {
-            if (!validator.validateConfiguration(catalog, procedureMapper, deployment, catalogJar, ccr)) {
+            if (!validator.validateConfiguration(catalog, procedureMapper, deployment, catalogJar, curCatalog, ccr)) {
                 return false;
             }
         }

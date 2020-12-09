@@ -991,7 +991,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             mrm.didUnrestricted();
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
-                SpProcedureTask t = new SpProcedureTask(
+                SpProcedureTask t = SpProcedureTask.create(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m);
                 if(allowInitiateTask(m)) {

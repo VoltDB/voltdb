@@ -48,6 +48,7 @@ public abstract class ProcedureInvocationExtensions {
     public static final byte BATCH_TIMEOUT = 1;  // batch timeout
     public static final byte ALL_PARTITION = 2; // whether proc is part of run-everywhere
     public static final byte PARTITION_DESTINATION = 3; // Which partition this procedure is targeting
+    public static final byte BATCH_CALL = 4; // If this is a batch call to a procedure
 
     private static final int INTEGER_SIZE = Integer.BYTES;
 
@@ -95,6 +96,19 @@ public abstract class ProcedureInvocationExtensions {
             throw new IllegalStateException("Invalid partition destination deserialized: " + partitionDestination);
         }
         return partitionDestination;
+    }
+
+    public static void writeBatchCallWithTypeByte(ByteBuffer buf) {
+        buf.put(BATCH_CALL);
+        writeLength(buf, 0);
+    }
+
+    public static boolean readBatchCall(ByteBuffer buf) {
+        int len = readLength(buf);
+        if (len != 0) {
+            throw new IllegalStateException("Batch call extension serialization length expected to be 0: " + len);
+        }
+        return true;
     }
 
     public static void skipUnknownExtension(ByteBuffer buf) {
