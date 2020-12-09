@@ -191,7 +191,7 @@ public class HTTPAdminListener {
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
 
-        //Keep inactive session only for 10 seconds VMC will ping every 5 second and thus keep session alive.
+        // Inactivity timeout defaults to 30 secs, but can be overridden by environment variable
         m_sessionHandler.setMaxInactiveInterval(HTTPClientInterface.MAX_SESSION_INACTIVITY_SECONDS);
         m_idmanager = new HttpSessionIdManager(m_server);
         m_server.setSessionIdManager(m_idmanager);
