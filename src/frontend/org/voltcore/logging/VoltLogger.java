@@ -364,6 +364,10 @@ public class VoltLogger {
         }
     }
 
+    public boolean isEnabledFor(Level level) {
+        return m_logger.isEnabledFor(level);
+    }
+
     public long getLogLevels(VoltLogger loggers[]) {
         return m_logger.getLogLevels(loggers);
     }
