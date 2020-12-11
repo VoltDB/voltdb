@@ -215,6 +215,7 @@ SET (VOLTDB_SRC
   topics/GroupStore.cpp
   topics/messages/OffsetCommit.cpp
   topics/messages/OffsetFetch.cpp
+  topics/encode/AvroEncoder.cpp
   topics/orm/Group.cpp
   topics/orm/GroupOffset.cpp
   topics/orm/GroupMember.cpp
