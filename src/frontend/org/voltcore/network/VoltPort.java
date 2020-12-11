@@ -177,7 +177,9 @@ public class VoltPort implements Connection
                                 m_messagesRead++;
                             }
                         } catch (VoltProtocolHandler.BadMessageLength e) {
-                            networkLog.error("Bad message length exception", e);
+                            String err = String.format("Bad message length, from %s%s", m_remoteHostAndAddressAndPort,
+                                                       m_messagesRead != 0 ? "" : "; this may indicate mismatched SSL/TLS setting or non-VoltDB sender");
+                            networkLog.error(err, e);
                             throw e;
                         }
                     }
