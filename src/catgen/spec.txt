@@ -189,7 +189,7 @@ begin Table                                  "A table (relation) in the database
 
 end
 
-begin Topic javaonly                         "A topic in the database"
+begin Topic                                  "A topic in the database"
   bool isOpaque                              "Is this an opaque topic?"
   bool isSingle                              "Is this a single partition opaque topic?"
   int consumerKeySchemaId                    "The schema ID for the consumer keys"
@@ -201,7 +201,7 @@ begin Topic javaonly                         "A topic in the database"
   Property* properties                       "Configuration properties for the topic"
 end
 
-begin Property javaonly                      "Configuration property"
+begin Property                               "Configuration property"
   string value                               "Configuration property value"
 end
 

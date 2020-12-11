@@ -131,6 +131,8 @@ SET (VOLTDB_SRC
   catalog/statement.cpp
   catalog/table.cpp
   catalog/tableref.cpp
+  catalog/topic.cpp
+  catalog/property.cpp
   common/ExecuteWithMpMemory.cpp
   common/FatalException.cpp
   common/HiddenColumn.cpp
