@@ -52,6 +52,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "common/SerializableEEException.h"
+
 namespace voltdb {
 
 /*
@@ -105,6 +107,20 @@ class ExportSerializeInput {
         return readPrimitive<int64_t>();
     }
 
+    /**
+     * Read an int encoded as a variable length value
+     */
+    inline int32_t readVarInt() {
+        return readVarInt<int32_t>();
+    }
+
+    /**
+     * Read a long encoded as a variable length value
+     */
+    inline int64_t readVarLong() {
+        return readVarInt<int64_t>();
+    }
+
     inline float readFloat() {
         int32_t value = readPrimitive<int32_t>();
         float retval;
@@ -149,6 +165,32 @@ class ExportSerializeInput {
     }
 
 private:
+    /**
+     * Read an integer type encoded as a variable length value which was encoded with zigzag encoding
+     *
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    template <typename type>
+    inline type readVarInt() {
+        // How many bits to increment the shift by for each byte in the value
+        const int32_t shiftIncrement = 7;
+        // The maximum shifts allowed for this type
+        const int32_t maxShift = (sizeof(type) * CHAR_BIT / shiftIncrement) * shiftIncrement;
+
+        type value = 0;
+        int shift = 0;
+        long b;
+        while (((b = readByte()) & 0x80) != 0) {
+            value |= (b & 0x7f) << shift;
+            shift += shiftIncrement;
+            if (shift > maxShift) {
+                throw SerializableEEException("Variable length integer value too large");
+            }
+        }
+        value |= b << shift;
+        return static_cast<type>(((value >> 1) ^ -(value & 1)));
+    }
+
     template <typename T>
     T readPrimitive() {
         T value;
@@ -223,6 +265,27 @@ class ExportSerializeOutput {
         int64_t data;
         memcpy(&data, &value, sizeof(data));
         return writePrimitive(data);
+    }
+
+    /**
+     * Write a long as a variable length value using zigzag encoding
+     *
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    inline size_t writeVarLong(int64_t value) {
+        int64_t v = ((value << 1) ^ (value >> 63));
+
+        const int mask  = 0x7F;
+        buffer_[position_] = v & mask;
+        size_t written = 1;
+
+        while (v >>= 7) {
+            buffer_[position_ + written - 1] |= 0x80;
+            buffer_[position_ + written++] = (v & mask);
+        }
+        position_ += written;
+
+        return written;
     }
 
     inline size_t writeEnumInSingleByte(int value) {
