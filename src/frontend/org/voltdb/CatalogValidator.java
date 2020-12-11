@@ -34,6 +34,13 @@ import org.voltdb.utils.InMemoryJarfile;
  * <P>
  * Implementations must only have an empty constructor. Only one instance of each implementation
  * will be created, and invoked at startup time and on each catalog update.
+ * <P>
+ * The {@link CatalogValidator#validateConfiguration} method allows validating the whole new
+ * {@link Catalog}, allowing checking consistency across different object types. Exceptionally,
+ * this method can also be used to perform late updates of the catalog objects, e.g. when
+ * updating {@link org.voltdb.catalog.Topic} instances with schemas registered to an external
+ * server from information collected in the {@link org.voltdb.catalog.Table} instance associated
+ * with the topic.
  */
 public class CatalogValidator {
 

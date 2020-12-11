@@ -1585,6 +1585,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
+            // Initialization may require an intialized avro
+            m_avroSerde.updateConfig(m_catalogContext);
+
             // do the many init tasks in the Inits class
             Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
@@ -1915,8 +1918,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
-
-            m_avroSerde.updateConfig(m_catalogContext);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
