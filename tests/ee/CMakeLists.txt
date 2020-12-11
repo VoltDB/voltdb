@@ -118,6 +118,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   harness_test/harness_tester
   topics/TopicsTableFactoryTest
   topics/GroupStoreTest
+  topics/encode/EncoderTest
   topics/orm/GroupOrmTest
   logging/logging_test
   memleaktests/no_losses
