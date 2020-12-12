@@ -1142,9 +1142,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // to be started "early" to be available during initialization.
             else if (config.m_statusPort != VoltDB.DISABLED_PORT) {
                 try {
-                    StatusListener sl = new StatusListener(config.m_statusInterface,
-                                                           config.m_statusPort,
-                                                           config.m_publicInterface);
+                    StatusListener sl = new StatusListener(config.m_statusInterface, config.m_statusPort);
                     sl.start();
                     config.m_statusInterface = sl.getListenInterface();
                     config.m_statusPort = sl.getAssignedPort();
