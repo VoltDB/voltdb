@@ -104,7 +104,7 @@ public:
         vassert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
         m_nextSequenceNumber = seqNo;
         TupleStreamBase::rollbackBlockTo(mark);
-        m_currBlock->truncateExportTo(mark, seqNo);
+        m_currBlock->truncateExportTo(mark, seqNo, m_openTxnId);
     }
 
     size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;

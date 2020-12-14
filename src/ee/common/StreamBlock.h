@@ -198,9 +198,10 @@ namespace voltdb
             m_rowCount++;
         }
 
-        inline void truncateExportTo(size_t mark, int64_t seqNo) {
+        inline void truncateExportTo(size_t mark, int64_t seqNo, int64_t spTxnId) {
             commonTruncateTo(mark);
             m_rowCount = seqNo - m_startSequenceNumber;
+            StreamBlock::recordCompletedSpTxn(spTxnId);
         }
 
     private:
