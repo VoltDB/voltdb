@@ -288,6 +288,18 @@ class ExportSerializeOutput {
         return written;
     }
 
+    /**
+     * Calculate the size in bytes to serialize value as a variable length value
+     */
+    inline static size_t sizeOfVarLong(int64_t value) {
+        int64_t v = ((value << 1) ^ (value >> 63));
+        size_t bytes = 1;
+        while (v >>= 7) {
+            ++bytes;
+        }
+        return bytes;
+    }
+
     inline size_t writeEnumInSingleByte(int value) {
         vassert(std::numeric_limits<int8_t>::min() <= value &&
                 value <= std::numeric_limits<int8_t>::max());

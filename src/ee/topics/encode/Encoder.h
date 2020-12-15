@@ -97,12 +97,7 @@ protected:
      * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
      */
     static int32_t serializedSizeOfVarInt(int64_t value) {
-        int64_t v = ((value << 1) ^ (value >> 63));
-        size_t bytes = 1;
-        while (v >>= 7) {
-            ++bytes;
-        }
-        return bytes;
+        return ExportSerializeOutput::sizeOfVarLong(value);
     }
 };
 
