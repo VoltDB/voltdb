@@ -2579,15 +2579,6 @@ public abstract class CatalogUtil {
                 cluster.setDrconsumerenabled(true);
                 cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
             }
-            if (!isPlaceHolderCatalog && dr.getRole() == DrRoleType.XDCR) {
-                CatalogMap<Table> tables = db.getTables();
-                if (tables.get(DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) == null
-                        || tables.get(DR_CONFLICTS_REPLICATED_EXPORT_TABLE) == null) {
-                    throw new RuntimeException("The XDCR role cannot be changed on an existing database. "
-                            + "Save the contents, initialize a new instance with the desired role, "
-                            + "and restore the contents.");
-                }
-            }
         } else {
             cluster.setDrrole(DrRoleType.NONE.value());
             if (clusterType.getId() != null) {
