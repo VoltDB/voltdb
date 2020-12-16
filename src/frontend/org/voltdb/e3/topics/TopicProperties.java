@@ -71,7 +71,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
     }
 
     /**
-     * @return the {@link EncodeFormat} to use for producer values or {@link EncodeFormat#INVALID}
+     * @return the {@link EncodeFormat} to use for producer values or {@link EncodeFormat#UNDEFINED}
      */
     public EncodeFormat getProducerValueFormat() {
         return firstValidFormat(
@@ -81,7 +81,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
     }
 
     /**
-     * @return the {@link EncodeFormat} to use for consumer keys or {@link EncodeFormat#INVALID}
+     * @return the {@link EncodeFormat} to use for consumer keys or {@link EncodeFormat#UNDEFINED}
      */
     public EncodeFormat getConsumerKeyFormat() {
         return firstValidFormat(
@@ -91,7 +91,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
     }
 
     /**
-     * @return the {@link EncodeFormat} to use for consumer values or {@link EncodeFormat#INVALID}
+     * @return the {@link EncodeFormat} to use for consumer values or {@link EncodeFormat#UNDEFINED}
      */
     public EncodeFormat getConsumerValueFormat() {
         return firstValidFormat(
@@ -103,17 +103,17 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
 
     /**
      * Look through values associated with {@code keys} and return the first value which is not
-     * {@link EncodeFormat#INVALID} or return {@link EncodeFormat#INVALID} if they are all that value.
+     * {@link EncodeFormat#UNDEFINED} or return {@link EncodeFormat#UNDEFINED} if they are all that value.
      *
      * @param keys       ordered from most specific key to least
-     * @return configured {@link EncodeFormat} or {@link EncodeFormat#INVALID}
+     * @return configured {@link EncodeFormat} or {@link EncodeFormat#UNDEFINED}
      */
     @SafeVarargs
     private final EncodeFormat firstValidFormat(TopicProperties.Key<EncodeFormat>... keys) {
-        EncodeFormat format = EncodeFormat.INVALID;
+        EncodeFormat format = EncodeFormat.UNDEFINED;
         for (TopicProperties.Key<EncodeFormat> key : keys) {
             format = get(key);
-            if (format != EncodeFormat.INVALID) {
+            if (format != EncodeFormat.UNDEFINED) {
                 break;
             }
         }
@@ -154,9 +154,11 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         // Mutable property allowing skipping over consumer errors
         public static final Key<Boolean> CONSUMER_SKIP_ERRORS = new BooleanKey("consumer.skip.errors", Boolean.FALSE);
 
-        // If true the records will be transcoded during fetch otherwise they will be encoded as part of the produce
-        public static final Key<Boolean> CONSUMER_TRANSCODE = new BooleanKey("consumer.records.transcode",
-                Boolean.TRUE);
+        // IMMUTABLE: If true the records are encoded to the desired format in the transaction path (a.k.a. inline encoding),
+        // otherwise they are encoded and stored in the export format, and are encoded to the desired format when replying
+        // to fetch requests from consumers
+        public static final Key<Boolean> TOPIC_STORE_ENCODED = new BooleanKey("topic.store.encoded",
+                false, Boolean.FALSE);
 
         // CSV properties
         public static final Key<Character> CONFIG_CSV_SEPARATOR = new CharKey(
@@ -248,7 +250,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
      */
     private static class FormatKey extends Key<EncodeFormat> {
         FormatKey(String name) {
-            super(name, EncodeFormat.class, EncodeFormat.INVALID, null);
+            super(name, EncodeFormat.class, EncodeFormat.UNDEFINED, null);
         }
 
         @Override

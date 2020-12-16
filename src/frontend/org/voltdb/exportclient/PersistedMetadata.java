@@ -87,7 +87,7 @@ public class PersistedMetadata implements DeferredSerialization {
 
             // Use 'topic' schema if non-opaque topic is using inline encoding.
             if (!topic.getIsopaque()) {
-                useTopicSchema = !TopicProperties.Key.CONSUMER_TRANSCODE.get(m_topicProperties);
+                useTopicSchema = TopicProperties.Key.TOPIC_STORE_ENCODED.get(m_topicProperties);
             }
         }
         m_schema = useTopicSchema ? ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId)

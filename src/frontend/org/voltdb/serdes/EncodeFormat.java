@@ -27,19 +27,19 @@ import org.voltdb.VoltType;
  * An enum listing the encoding formats
  */
 public enum EncodeFormat {
-    INVALID(false),
-    CSV(false),
-    AVRO(false),
-    JSON(false),
-    OPAQUE(false),
-    INT(true),
-    LONG(true),
-    DOUBLE(true),
-    STRING(true),
-    BYTEARRAY(true);
+    UNDEFINED(false, false),
+    CSV(false, false),
+    AVRO(false, true),
+    JSON(false, false),
+    OPAQUE(false, true),
+    INT(true, true),
+    LONG(true, true),
+    DOUBLE(true, true),
+    STRING(true, true),
+    BYTEARRAY(true, true);
 
-    /** ID for the encode format used in serialization of the format */
     private final boolean m_simple;
+    private final boolean m_inline;
 
     /**
      * Parse an {@link EncodeFormat} from a {@link String} whose
@@ -53,7 +53,7 @@ public enum EncodeFormat {
             return valueOf(name.toUpperCase());
         }
         catch(IllegalArgumentException ex) {
-            return EncodeFormat.INVALID;
+            return EncodeFormat.UNDEFINED;
         }
         catch (Exception ex) {
             throw VoltDB.crashLocalVoltDB("Illegal encoding format " + name, true, ex);
@@ -113,13 +113,14 @@ public enum EncodeFormat {
      */
     public static EnumSet<EncodeFormat> valueSet() {
         EnumSet<EncodeFormat> allowedValues = EnumSet.allOf(EncodeFormat.class);
-        allowedValues.remove(INVALID);
+        allowedValues.remove(UNDEFINED);
         allowedValues.remove(OPAQUE);
         return allowedValues;
     }
 
-    private EncodeFormat(boolean simple) {
+    private EncodeFormat(boolean simple, boolean inline) {
         m_simple = simple;
+        m_inline = inline;
     }
 
     /**
@@ -127,5 +128,12 @@ public enum EncodeFormat {
      */
     public boolean isSimple() {
         return m_simple;
+    }
+
+    /**
+     * @return {@code true} if format available to inline encoding
+     */
+    public boolean supportsInline() {
+        return m_inline;
     }
 }
