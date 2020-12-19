@@ -85,6 +85,7 @@
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
 #include "storage/DRTupleStream.h"
+#include "storage/TopicTupleStream.h"
 
 #include "topics/GroupStore.h"
 
@@ -1640,15 +1641,18 @@ void VoltDBEngine::attachTupleStream(
         StreamedTable* streamedTable,
         const std::string& streamName,
         std::map<std::string, ExportTupleStream*> & purgedStreams,
-        int64_t timestamp) {
+        int64_t generation) {
     m_exportingTables[streamName] = streamedTable;
     ExportTupleStream* wrapper = streamedTable->getWrapper();
     if (wrapper == nullptr) {
         wrapper = purgedStreams[streamName];
         if (wrapper == nullptr) {
-            wrapper = new ExportTupleStream(
-                    m_executorContext->m_partitionId, m_executorContext->m_siteId,
-                    timestamp, streamName);
+            const catalog::Topic* topic = TopicTupleStream::getTopicForStream(*streamedTable, *m_database);
+            wrapper = topic == nullptr ?
+                    new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, generation,
+                            streamName) :
+                    TopicTupleStream::create(*streamedTable, *topic, m_executorContext->m_partitionId,
+                            m_executorContext->m_siteId, generation);
         } else {
             purgedStreams[streamName] = nullptr;
         }
@@ -1658,6 +1662,7 @@ void VoltDBEngine::attachTupleStream(
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
         // A case when exact same stream is dropped and added.
         vassert(purgedStreams[streamName] == NULL);
+        wrapper->update(*streamedTable, *m_database);
     }
 }
 
