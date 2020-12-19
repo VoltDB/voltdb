@@ -89,7 +89,6 @@ public:
                                int64_t lastComittedSpHandle) = 0;
 
     virtual void extendBufferChain(size_t minLength) = 0;
-    void commonExtendBufferChain(size_t blockSize, size_t startUso);
     virtual void pushStreamBuffer(SB *block) = 0;
     void pushPendingBlocks();
     void discardBlock(SB *sb);
@@ -99,6 +98,12 @@ public:
     }
 
 protected:
+    void commonExtendBufferChain(size_t blockSize, size_t startUso);
+
+    virtual SB* allocateBlock(char* buffer, size_t length, int64_t uso) const {
+        return new SB(buffer, m_headerSpace, length, uso);
+    }
+
     /** time interval between flushing partially filled buffers */
     int64_t m_flushInterval;
 
@@ -320,7 +325,7 @@ void TupleStreamBase<SB>::commonExtendBufferChain(size_t blockSize, size_t start
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    m_currBlock = new SB(buffer, m_headerSpace, blockSize, startUso);
+    m_currBlock = allocateBlock(buffer, blockSize, startUso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }

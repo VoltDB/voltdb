@@ -131,6 +131,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/CopyOnWriteTest
   storage/DRTupleStream_test
   storage/ExportTupleStream_test
+  storage/TopicTupleStreamTest
   storage/filter_test
   storage/LargeTempTableBlockTest
   storage/LargeTempTableTest

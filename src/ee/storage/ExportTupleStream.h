@@ -146,10 +146,33 @@ public:
         return m_lastFlush;
     }
 
+    /**
+     * Update this stream to be used with table.
+     *
+     * ExportTupleStream implementation does not do anything upon update
+     */
+    virtual void update(const StreamedTable& table, const catalog::Database& database) {}
 
-public:
-    // Size of Fixed buffer header (rowCount + uniqueId)
-    static const size_t s_EXPORT_BUFFER_HEADER_SIZE;
+    // Size of Fixed buffer header committedSequenceNumber(8) + row count(4) + uniqueId(8)
+    static const size_t s_EXPORT_BUFFER_HEADER_SIZE = 20;
+
+protected:
+    /**
+     * Called by appendTuple after the tuple has been serialized. Updates m_currBlock and this with appended tuple info
+     *
+     * @param size of serialized tuple
+     * @param uniqueId of transaction which appended the tuple
+     * @return the uso prior to the tuple being appended
+     */
+    inline size_t recordTupleAppended(size_t size, int64_t uniqueId) {
+        const size_t startingUso = m_uso;
+        m_currBlock->consumed(size);
+        m_currBlock->recordCompletedSpTxn(uniqueId);
+
+        m_uso += size;
+        m_nextSequenceNumber++;
+        return startingUso;
+    }
 
 private:
     // cached catalog values
