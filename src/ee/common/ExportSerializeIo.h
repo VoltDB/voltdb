@@ -164,6 +164,10 @@ class ExportSerializeInput {
         current_ -= bytes;
     }
 
+    size_t remaining() const {
+        return end_ - current_;
+    }
+
 private:
     /**
      * Read an integer type encoded as a variable length value which was encoded with zigzag encoding
