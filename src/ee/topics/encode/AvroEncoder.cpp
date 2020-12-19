@@ -36,16 +36,11 @@ public:
     }
 
     int32_t exactSizeOf(const NValue& value) override {
-        return serializedSizeOfVarInt(getTimestamp(value));
+        return serializedSizeOfVarInt(ValuePeeker::peekAsBigInt(value));
     }
 
     virtual int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
-        return static_cast<int32_t>(out.writeVarLong(getTimestamp(value)));
-    }
-
-private:
-    int64_t getTimestamp(const NValue& value) {
-        return sizeof(type) == 8 ? ValuePeeker::peekBigInt(value) : ValuePeeker::peekAsBigInt(value);
+        return static_cast<int32_t>(out.writeVarLong(ValuePeeker::peekAsBigInt(value)));
     }
 };
 

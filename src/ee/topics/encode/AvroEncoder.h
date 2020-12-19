@@ -48,6 +48,17 @@ public:
         return length;
     }
 
+    int32_t exactSizeOf(const TableTuple& tuple) override {
+        const NValue value = tuple.getNValue(m_index);
+        int32_t length = m_nullable ? 1 : 0;
+        if (!value.isNull()) {
+            length += m_encoder->exactSizeOf(value);
+        } else {
+            vassert(m_nullable);
+        }
+        return length;
+    }
+
     int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         int32_t length = 0;

@@ -101,9 +101,10 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
 
     ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
     int32_t written = ae.encode(eos, m_tuple);
+    ASSERT_EQ(ae.exactSizeOf(m_tuple), written);
     ASSERT_EQ(written, eos.position());
 
-    ExportSerializeInput esi(encoded.get(), size);
+    ExportSerializeInput esi(encoded.get(), written);
     validateHeader(esi, 25);
     ASSERT_EQ(1, esi.readVarInt()); // tinyint
     ASSERT_EQ(2, esi.readVarInt()); // smallint
@@ -143,6 +144,8 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     esi.readBytes(geoBytes.get(), len);
     GeographyValue geographyDecoded(geoBytes.get(), len);
     ASSERT_EQ(0, ValuePeeker::peekGeographyValue(m_tuple.getNValue(10)).compareWith(geographyDecoded));
+
+    ASSERT_EQ(0, esi.remaining());
 }
 
 // Test that serialization of fields which can be null works
@@ -169,9 +172,10 @@ TEST_F(AvroEncoderTest, NullableAvro) {
 
     ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
     int32_t written = ae.encode(eos, m_tuple);
+    ASSERT_EQ(ae.exactSizeOf(m_tuple), written);
     ASSERT_EQ(written, eos.position());
 
-    ExportSerializeInput esi(encoded.get(), size);
+    ExportSerializeInput esi(encoded.get(), written);
     validateHeader(esi, 25);
 
     ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
@@ -228,6 +232,8 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     esi.readBytes(geoBytes.get(), len);
     GeographyValue geographyDecoded(geoBytes.get(), len);
     ASSERT_EQ(0, ValuePeeker::peekGeographyValue(m_tuple.getNValue(10)).compareWith(geographyDecoded));
+
+    ASSERT_EQ(0, esi.remaining());
 }
 
 // Test that nulls of all types are correctly serialized
@@ -251,6 +257,8 @@ TEST_F(AvroEncoderTest, AllNullAvro) {
     for (int i = 0; i < m_schema->columnCount(); ++i) {
         ASSERT_EQ(1, esi.readVarInt());
     }
+
+    ASSERT_EQ(0, esi.remaining());
 }
 
 // Test the encoding a subset of columns in any order works
