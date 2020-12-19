@@ -222,33 +222,35 @@ do { \
 
 // The only difference between EXPECT and ASSERT is that ASSERT returns from
 // the test method if the test fails
-#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two) \
+#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two, ...) \
 do { \
     if (!((one) operation (two))) { \
         STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
         fail(__FILE__, __LINE__, #one " " #operation " " #two); \
-        return; \
+        return __VA_ARGS__; \
     } \
 } while (0)
 
-#define ASSERT_EQ(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(==, one, two)
-#define ASSERT_NE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(!=, one, two)
-#define ASSERT_LT(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(<, one, two)
-#define ASSERT_LE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(<=, one, two)
-#define ASSERT_GT(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>, one, two)
-#define ASSERT_GE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>=, one, two)
+// ASSERT macros which require two arguments and an optional third which will be used as the return value
+#define ASSERT_EQ(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(==, one, two, ##__VA_ARGS__)
+#define ASSERT_NE(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(!=, one, two, ##__VA_ARGS__)
+#define ASSERT_LT(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(<, one, two, ##__VA_ARGS__)
+#define ASSERT_LE(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(<=, one, two, ##__VA_ARGS__)
+#define ASSERT_GT(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(>, one, two, ##__VA_ARGS__)
+#define ASSERT_GE(one, two, ...) STUPIDUNIT_MAKE_ASSERT_MACRO(>=, one, two, ##__VA_ARGS__)
 
-#define ASSERT_TRUE_WITH_MESSAGE(value, msg)    \
+#define ASSERT_TRUE_WITH_MESSAGE(value, msg, ...)    \
     do {                                        \
         if (!(value)) {                         \
             STUPIDUNIT_ASSERT_BREAKPOINT_CODE   \
                 fail(__FILE__, __LINE__, msg);  \
-            return;                             \
+            return __VA_ARGS__;                 \
         }                                       \
     } while (0)
 
-#define ASSERT_TRUE(value) ASSERT_TRUE_WITH_MESSAGE(value, "Expected true; " #value " is false")
-#define ASSERT_FALSE(value) ASSERT_TRUE_WITH_MESSAGE(!(value), "Expected false; " #value " is true")
+// ASSERT macros which require one argument and an optional second which will be used as the return value
+#define ASSERT_TRUE(value, ...) ASSERT_TRUE_WITH_MESSAGE(value, "Expected true; " #value " is false", ##__VA_ARGS__)
+#define ASSERT_FALSE(value, ...) ASSERT_TRUE_WITH_MESSAGE(!(value), "Expected false; " #value " is true", ##__VA_ARGS__)
 
 #define ASSERT_FATAL_EXCEPTION(msgFragment, expr)                       \
     do {                                                                \
