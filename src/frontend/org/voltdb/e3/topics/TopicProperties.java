@@ -46,6 +46,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  * Properties which can be configured on a topic in the topic DDL
  */
 public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>> {
+    public static ImmutableList<String> ALL_COLUMNS = ImmutableList.of("*");
     public static TopicProperties defaults() {
         return new TopicProperties(ImmutableMap.of());
     }
@@ -148,8 +149,8 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
 
         public static final Key<List<String>> CONSUMER_KEYS = new ColumnsKey("consumer.keys", ImmutableList.of());
 
-        // Default to null to indicate all columns are in the value
-        public static final Key<List<String>> CONSUMER_VALUES = new ColumnsKey("consumer.values", null);
+        // Default to * to indicate all columns are in the value
+        public static final Key<List<String>> CONSUMER_VALUES = new ColumnsKey("consumer.values", ALL_COLUMNS);
 
         // Mutable property allowing skipping over consumer errors
         public static final Key<Boolean> CONSUMER_SKIP_ERRORS = new BooleanKey("consumer.skip.errors", Boolean.FALSE);
