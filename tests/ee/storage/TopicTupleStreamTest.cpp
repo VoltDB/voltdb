@@ -71,11 +71,11 @@ protected:
         m_catalog.execute(stream.str());
     }
 
-    bool readAndValidateHeader(ExportSerializeInput& in, const void*& endPointer, int64_t firstOffset,
+    bool readAndValidateHeader(SerializeInputBE& in, const void*& endPointer, int64_t firstOffset,
             int64_t firstTimestamp, int64_t lastTimestamp, int32_t recordCount) {
         ASSERT_EQ(firstOffset, in.readLong(), false);
         int32_t length = in.readInt();
-        endPointer = static_cast<const int8_t*>(in.getRawPointer(0)) + length;
+        endPointer = in.getRawPointer(0) + length;
 
         ASSERT_EQ(-1, in.readInt(), false); // partition leader epoch
         ASSERT_EQ(2, in.readByte(), false); // magic number
@@ -101,18 +101,18 @@ protected:
         return true;
     }
 
-    bool readEntry(ExportSerializeInput& in, std::function<bool(ExportSerializeInput*)> validator) {
+    bool readEntry(SerializeInputBE& in, std::function<bool(SerializeInputBE*)> validator) {
         int32_t length = in.readVarInt();
         if (length < 0) {
             return validator(nullptr);
         }
-        ExportSerializeInput entry(in.getRawPointer(length), length);
+        ReferenceSerializeInputBE entry(in.getRawPointer(length), length);
         return validator(&entry);
     }
 
-    bool readAndValidateRecord(ExportSerializeInput& in, int64_t timestampDelta, int64_t offsetDelta,
-            std::function<bool(ExportSerializeInput*)> keyValidator,
-            std::function<bool(ExportSerializeInput*)> valueValidator) {
+    bool readAndValidateRecord(SerializeInputBE& in, int64_t timestampDelta, int64_t offsetDelta,
+            std::function<bool(SerializeInputBE*)> keyValidator,
+            std::function<bool(SerializeInputBE*)> valueValidator) {
         int32_t length = in.readVarInt();
         const void* expectedEnd = static_cast<const char*>(in.getRawPointer(0)) + length;
         ASSERT_EQ(0, in.readByte(), false); // attributes
@@ -218,18 +218,18 @@ TEST_F(TopicTupleStreamTest, NullEncoders) {
     boost::shared_array<char> buffer = m_topend->data.front();
     m_topend->data.pop_front();
 
-    ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+    ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
     // Validate the batch header
     const void* endPointer;
-    ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 1, timestamp, timestamp, 1));
+    ASSERT_TRUE(readAndValidateHeader(in, endPointer, 1, timestamp, timestamp, 1));
 
     // Validate the record
-    ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-            [](ExportSerializeInput *in) { return in == nullptr; },
-            [](ExportSerializeInput *in) { return in == nullptr; }));
+    ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+            [](SerializeInputBE *in) { return in == nullptr; },
+            [](SerializeInputBE *in) { return in == nullptr; }));
 
-    ASSERT_EQ(endPointer, esi.getRawPointer(0));
+    ASSERT_EQ(endPointer, in.getRawPointer(0));
 }
 
 TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
@@ -288,19 +288,19 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
         boost::shared_array<char> buffer = m_topend->data.front();
         m_topend->data.pop_front();
 
-        ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
         // Validate the batch header and records
         const void* endPointer;
-        ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 1, timestamp1, timestamp2, 2));
-        ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 4 && 1 == in->readInt(); },
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 8 && 2 == in->readLong(); }));
-        ASSERT_TRUE(readAndValidateRecord(esi, timestamp2 - timestamp1, 1,
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 4 && 6 == in->readInt(); },
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 8 && 7 == in->readLong(); }));
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 1, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 4 && 1 == in->readInt(); },
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 8 && 2 == in->readLong(); }));
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 4 && 6 == in->readInt(); },
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 8 && 7 == in->readLong(); }));
 
-        ASSERT_EQ(endPointer, esi.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
     }
 
     // Now try double and varchar
@@ -326,21 +326,21 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
         boost::shared_array<char> buffer = m_topend->data.front();
         m_topend->data.pop_front();
 
-        ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
         // Validate the batch header and records
         const void* endPointer;
-        ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 3, timestamp1, timestamp2, 2));
-        ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-                [](ExportSerializeInput *in) { return in != nullptr && 3 == in->readDouble(); },
-                [](ExportSerializeInput *in) { return in != nullptr &&
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 3, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [](SerializeInputBE *in) { return in != nullptr && 3 == in->readDouble(); },
+                [](SerializeInputBE *in) { return in != nullptr &&
                         "4" == std::string(static_cast<const char*>(in->getRawPointer(0)), in->remaining()); }));
-        ASSERT_TRUE(readAndValidateRecord(esi, timestamp2 - timestamp1, 1,
-                [](ExportSerializeInput *in) { return in != nullptr && 8 == in->readDouble(); },
-                [](ExportSerializeInput *in) { return in != nullptr &&
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [](SerializeInputBE *in) { return in != nullptr && 8 == in->readDouble(); },
+                [](SerializeInputBE *in) { return in != nullptr &&
                         "9" == std::string(static_cast<const char*>(in->getRawPointer(0)), in->remaining()); }));
 
-        ASSERT_EQ(endPointer, esi.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
     }
 
     // Now try varbinary and null
@@ -366,19 +366,19 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
         boost::shared_array<char> buffer = m_topend->data.front();
         m_topend->data.pop_front();
 
-        ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
         // Validate the batch header and records
         const void* endPointer;
-        ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 5, timestamp1, timestamp2, 2));
-        ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 1 && 5 == in->readChar(); },
-                [](ExportSerializeInput *in) { return in == nullptr; }));
-        ASSERT_TRUE(readAndValidateRecord(esi, timestamp2 - timestamp1, 1,
-                [](ExportSerializeInput *in) { return in != nullptr && in->remaining() == 1 && 10 == in->readChar(); },
-                [](ExportSerializeInput *in) { return in == nullptr; }));
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 5, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 1 && 5 == in->readChar(); },
+                [](SerializeInputBE *in) { return in == nullptr; }));
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 1 && 10 == in->readChar(); },
+                [](SerializeInputBE *in) { return in == nullptr; }));
 
-        ASSERT_EQ(endPointer, esi.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
     }
 }
 
@@ -439,16 +439,16 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
         boost::shared_array<char> buffer = m_topend->data.front();
         m_topend->data.pop_front();
 
-        ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
         // Validate the batch header
         const void* endPointer;
-        ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 1, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 1, timestamp1, timestamp2, 2));
 
         // validate entries see AvroEncoderTest for avro format layout
-        ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-                [](ExportSerializeInput *in) { return in == nullptr; },
-                [this](ExportSerializeInput *in) {
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [](SerializeInputBE *in) { return in == nullptr; },
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -461,9 +461,9 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(5, in->readByte(), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
-        ASSERT_TRUE(readAndValidateRecord(esi, timestamp2 - timestamp1, 1,
-                [](ExportSerializeInput *in) { return in == nullptr; },
-                [this](ExportSerializeInput *in) {
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [](SerializeInputBE *in) { return in == nullptr; },
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -477,7 +477,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
 
-        ASSERT_EQ(endPointer, esi.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
     }
 
     // Now try it with a key and some value columns
@@ -503,15 +503,15 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
         boost::shared_array<char> buffer = m_topend->data.front();
         m_topend->data.pop_front();
 
-        ExportSerializeInput esi(&buffer.get()[s_batchHeaderStart], 1024);
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
 
         // Validate the batch header
         const void* endPointer;
-        ASSERT_TRUE(readAndValidateHeader(esi, endPointer, 3, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 3, timestamp1, timestamp2, 2));
 
         // validate entries see AvroEncoderTest for avro format layout
-        ASSERT_TRUE(readAndValidateRecord(esi, 0, 0,
-                [this](ExportSerializeInput *in) {
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -519,7 +519,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(3, in->readDouble(), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
-                [this](ExportSerializeInput *in) {
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -530,8 +530,8 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(5, in->readByte(), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
-        ASSERT_TRUE(readAndValidateRecord(esi, timestamp2 - timestamp1, 1,
-                [this](ExportSerializeInput *in) {
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -539,7 +539,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(8, in->readDouble(), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
-                [this](ExportSerializeInput *in) {
+                [this](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -551,7 +551,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
 
-        ASSERT_EQ(endPointer, esi.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
     }
 }
 

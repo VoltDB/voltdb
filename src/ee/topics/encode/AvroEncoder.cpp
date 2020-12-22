@@ -39,7 +39,7 @@ public:
         return serializedSizeOfVarInt(ValuePeeker::peekAsBigInt(value));
     }
 
-    virtual int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    virtual int32_t encode(SerializeOutput& out, const NValue& value) override {
         return static_cast<int32_t>(out.writeVarLong(ValuePeeker::peekAsBigInt(value)));
     }
 };
@@ -51,7 +51,7 @@ class MicroTimestampEncoder: public VarIntEncoder<int64_t> {
 public:
     MicroTimestampEncoder() = default;
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         return out.writeVarLong(ValuePeeker::peekTimestamp(value));
     }
 };
@@ -63,7 +63,7 @@ class MilliTimestampEncoder: public VarIntEncoder<int64_t> {
 public:
     MilliTimestampEncoder() = default;
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         return out.writeVarLong(ValuePeeker::peekTimestamp(value) / 1000);
     }
 };
@@ -86,7 +86,7 @@ public:
         return size;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         int32_t len = m_encoder.exactSizeOf(value);
         len += out.writeVarLong(len);
         m_encoder.encode(out, value);
@@ -108,7 +108,7 @@ public:
         return sizeof(int64_t) * 2;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         TTInt decimal = ValuePeeker::peekDecimal(value);
         out.writeLong(htonll(decimal.table[1]));
         out.writeLong(htonll(decimal.table[0]));
@@ -127,7 +127,7 @@ public:
         return sizeof(double) * 2;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         ValuePeeker::peekGeographyPointValue(value).serializeTo(out);
         return sizeof(double) * 2;
     }
@@ -146,7 +146,7 @@ public:
         return m_stringCache.length();
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         if (m_valueCache != &value) {
             m_stringCache = ValuePeeker::peekGeographyPointValue(value).toWKT();
         }
@@ -175,7 +175,7 @@ public:
         return ValuePeeker::peekGeographyValue(value).length();
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         GeographyValue gv = ValuePeeker::peekGeographyValue(value);
         out.writeBytes(gv.data(), gv.length());
         return gv.length();
@@ -195,7 +195,7 @@ public:
         return m_stringCache.length();
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         if (m_valueCache != &value) {
             m_stringCache = ValuePeeker::peekGeographyValue(value).toWKT();
         }

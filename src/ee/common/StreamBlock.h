@@ -19,7 +19,7 @@
 
 #include "common/FatalException.hpp"
 #include "common/types.h"
-#include "common/ExportSerializeIo.h"
+#include "common/serializeio.h"
 #include "common/UniqueId.hpp"
 
 #include <common/debuglog.h>
@@ -348,7 +348,7 @@ namespace voltdb
          * Write out the header for the batch using the kafka batch format
          */
         void writeOutHeader() override {
-            ExportSerializeOutput out(m_data, s_batchHeaderSize);
+            ReferenceSerializeOutput out(m_data, s_batchHeaderSize);
             out.writeLong(startSequenceNumber());
             out.writeInt(m_offset - sizeof(startSequenceNumber()) - sizeof(int32_t));
             out.writeInt(-1); // Partition leader epoch
@@ -369,10 +369,9 @@ namespace voltdb
 
             vassert(out.position() == s_batchHeaderSize);
 
-            out.position(crcPosition);
             crc = vdbcrc::crc32c(crc, m_data + crcStart, m_offset - crcStart);
             crc = vdbcrc::crc32cFinish(crc);
-            out.writeInt(crc);
+            out.writeIntAt(crcPosition, crc);
         }
 
     private:

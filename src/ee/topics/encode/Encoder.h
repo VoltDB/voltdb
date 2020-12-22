@@ -17,13 +17,13 @@
 
 #pragma once
 
-#include "common/ExportSerializeIo.h"
+#include "common/serializeio.h"
 #include "common/tabletuple.h"
 
 namespace voltdb { namespace topics {
 
 /**
- * Interface for serializing a TableTuple into an ExportSerializeOutput
+ * Interface for serializing a TableTuple into an SerializeOutput
  */
 class TupleEncoder {
 public:
@@ -50,11 +50,11 @@ public:
      * @param tuple to serialize to out
      * @return amount of data written  or -1 if the value encoded was null
      */
-    virtual int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) = 0;
+    virtual int32_t encode(SerializeOutput& out, const TableTuple& tuple) = 0;
 };
 
 /**
- * Interface for serializing a NValue into an ExportSerializeOutput
+ * Interface for serializing a NValue into an SerializeOutput
  */
 class NValueEncoder {
 public:
@@ -81,7 +81,7 @@ public:
      * @param value to serialize to out
      * @return amount of data written or -1 if value to be encoded is null
      */
-    virtual int32_t encode(ExportSerializeOutput& out, const NValue& value) = 0;
+    virtual int32_t encode(SerializeOutput& out, const NValue& value) = 0;
 
 protected:
     /**
@@ -97,7 +97,7 @@ protected:
      * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
      */
     static int32_t serializedSizeOfVarInt(int64_t value) {
-        return ExportSerializeOutput::sizeOfVarLong(value);
+        return SerializeOutput::sizeOfVarLong(value);
     }
 };
 
@@ -112,7 +112,7 @@ public:
         return -1;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) override {
+    int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         return -1;
     }
 };
@@ -133,7 +133,7 @@ public:
         return m_encoder.maxSizeOf(value);
     }
 
-    int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) override {
+    int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         if (value.isNull()) {
             return -1;
@@ -158,7 +158,7 @@ public:
         return sizeof(int32_t);
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         out.writeInt(ValuePeeker::peekInteger(value));
         return sizeof(int32_t);
     }
@@ -176,7 +176,7 @@ public:
         return sizeof(int64_t);
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         out.writeLong(ValuePeeker::peekBigInt(value));
         return sizeof(int64_t);
     }
@@ -194,7 +194,7 @@ public:
         return sizeof(double);
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         out.writeDouble(ValuePeeker::peekDouble(value));
         return sizeof(double);
     }
@@ -213,7 +213,7 @@ public:
         return length;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const NValue& value) override {
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
         int32_t length;
         const char* string = ValuePeeker::peekObject_withoutNull(value, &length);
         out.writeBytes(string, length);

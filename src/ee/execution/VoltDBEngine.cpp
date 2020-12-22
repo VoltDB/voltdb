@@ -1653,6 +1653,7 @@ void VoltDBEngine::attachTupleStream(
                             streamName) :
                     TopicTupleStream::create(*streamedTable, *topic, m_executorContext->m_partitionId,
                             m_executorContext->m_siteId, generation);
+            wrapper->extendBufferChain(0);
         } else {
             purgedStreams[streamName] = nullptr;
         }

@@ -16,7 +16,7 @@
  */
 
 #include "storage/TopicTupleStream.h"
-#include "common/ExportSerializeIo.h"
+#include "common/serializeio.h"
 
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -186,9 +186,9 @@ size_t TopicTupleStream::appendTuple(VoltDBEngine* engine, int64_t txnId, int64_
     int32_t valueSize = m_valueEncoder->exactSizeOf(tuple);
 
     size_t recordSize = sizeof(int8_t) /*attributes */
-            + ExportSerializeOutput::sizeOfVarLong(offsetDelta)
-            + ExportSerializeOutput::sizeOfVarLong(timestampDelta) + ExportSerializeOutput::sizeOfVarLong(keySize)
-            + ExportSerializeOutput::sizeOfVarLong(valueSize) + ExportSerializeOutput::sizeOfVarLong(0) /* no headers */;
+            + SerializeOutput::sizeOfVarLong(offsetDelta)
+            + SerializeOutput::sizeOfVarLong(timestampDelta) + SerializeOutput::sizeOfVarLong(keySize)
+            + SerializeOutput::sizeOfVarLong(valueSize) + SerializeOutput::sizeOfVarLong(0) /* no headers */;
 
     // Add key and value sizes if they actually will take up space
     if (keySize > 0) {
@@ -198,19 +198,19 @@ size_t TopicTupleStream::appendTuple(VoltDBEngine* engine, int64_t txnId, int64_
         recordSize += valueSize;
     }
 
-    size_t totalSize = recordSize + ExportSerializeOutput::sizeOfVarLong(recordSize);
+    size_t totalSize = recordSize + SerializeOutput::sizeOfVarLong(recordSize);
 
     if (m_currBlock == nullptr || totalSize > m_currBlock->remaining()) {
         extendBufferChain(totalSize);
         if (offsetDelta != 0) {
             // New block so offset delta changed and that means sizes need to be recalculated
-            recordSize -= ExportSerializeOutput::sizeOfVarLong(offsetDelta) - ExportSerializeOutput::sizeOfVarLong(0);
+            recordSize -= SerializeOutput::sizeOfVarLong(offsetDelta) - SerializeOutput::sizeOfVarLong(0);
             offsetDelta = 0;
-            totalSize = recordSize + ExportSerializeOutput::sizeOfVarLong(recordSize);
+            totalSize = recordSize + SerializeOutput::sizeOfVarLong(recordSize);
         }
     }
 
-    ExportSerializeOutput out(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
+    ReferenceSerializeOutput out(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
     out.writeVarLong(recordSize);
     out.writeByte(0); // attributes. There are none
     out.writeVarLong(timestampDelta);

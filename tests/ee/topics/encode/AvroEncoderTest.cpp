@@ -34,7 +34,7 @@ public:
     }
 
 protected:
-    void validateHeader(ExportSerializeInput& in, int32_t schemaId) {
+    void validateHeader(SerializeInputBE& in, int32_t schemaId) {
         ASSERT_EQ(0, in.readByte()); // Magic value
         ASSERT_EQ(schemaId, in.readInt()); // schema ID
     }
@@ -99,53 +99,53 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     int32_t size = ae.maxSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
-    ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
-    int32_t written = ae.encode(eos, m_tuple);
+    ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
+    int32_t written = ae.encode(out, m_tuple);
     ASSERT_EQ(ae.exactSizeOf(m_tuple), written);
-    ASSERT_EQ(written, eos.position());
+    ASSERT_EQ(written, out.position());
 
-    ExportSerializeInput esi(encoded.get(), written);
-    validateHeader(esi, 25);
-    ASSERT_EQ(1, esi.readVarInt()); // tinyint
-    ASSERT_EQ(2, esi.readVarInt()); // smallint
-    ASSERT_EQ(3, esi.readVarInt()); // integer
-    ASSERT_EQ(4, esi.readVarLong()); // bigint
-    ASSERT_EQ(5, esi.readDouble()); // double
-    ASSERT_EQ(6, esi.readVarLong()); // timestamp
+    ReferenceSerializeInputBE in(encoded.get(), written);
+    validateHeader(in, 25);
+    ASSERT_EQ(1, in.readVarInt()); // tinyint
+    ASSERT_EQ(2, in.readVarInt()); // smallint
+    ASSERT_EQ(3, in.readVarInt()); // integer
+    ASSERT_EQ(4, in.readVarLong()); // bigint
+    ASSERT_EQ(5, in.readDouble()); // double
+    ASSERT_EQ(6, in.readVarLong()); // timestamp
 
-    ASSERT_EQ(16, esi.readVarInt()); // Size of decimal
-    int64_t val = esi.readLong();
+    ASSERT_EQ(16, in.readVarInt()); // Size of decimal
+    int64_t val = in.readLong();
     ASSERT_EQ(0, ntohll(val)); // Highest significant bits
-    val = esi.readLong();
+    val = in.readLong();
     ASSERT_EQ(7000000000000, ntohll(val)); // Lowest significant bits with scale of 12
 
     // Validate the string  can be deserialized
-    int64_t len = esi.readVarInt();
+    int64_t len = in.readVarInt();
     ASSERT_EQ(varchar.length(), len);
     std::unique_ptr<char[]> strDecoded(new char[len]);
-    esi.readBytes(strDecoded.get(), len);
+    in.readBytes(strDecoded.get(), len);
     ASSERT_EQ(varchar, std::string(strDecoded.get(), len));
 
     // Validate the var binary can be deserialized
-    len = esi.readVarInt();
+    len = in.readVarInt();
     ASSERT_EQ(binary.size(), len);
     std::unique_ptr<char[]> binaryDecoded(new char[len]);
-    esi.readBytes(binaryDecoded.get(), len);
+    in.readBytes(binaryDecoded.get(), len);
     ASSERT_EQ(0, ::memcmp(binary.data(), binaryDecoded.get(), len));
 
     // Validate the point
-    ASSERT_EQ(point.getLongitude(), esi.readDouble());
-    ASSERT_EQ(point.getLatitude(), esi.readDouble());
+    ASSERT_EQ(point.getLongitude(), in.readDouble());
+    ASSERT_EQ(point.getLatitude(), in.readDouble());
 
     // Validate the geography
-    len = esi.readVarInt();
+    len = in.readVarInt();
     ASSERT_EQ(geography.serializedLength(), len);
     std::unique_ptr<char[]> geoBytes(new char[len]);
-    esi.readBytes(geoBytes.get(), len);
+    in.readBytes(geoBytes.get(), len);
     GeographyValue geographyDecoded(geoBytes.get(), len);
     ASSERT_EQ(0, ValuePeeker::peekGeographyValue(m_tuple.getNValue(10)).compareWith(geographyDecoded));
 
-    ASSERT_EQ(0, esi.remaining());
+    ASSERT_EQ(0, in.remaining());
 }
 
 // Test that serialization of fields which can be null works
@@ -170,70 +170,70 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     int32_t size = ae.maxSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
-    ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
-    int32_t written = ae.encode(eos, m_tuple);
+    ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
+    int32_t written = ae.encode(out, m_tuple);
     ASSERT_EQ(ae.exactSizeOf(m_tuple), written);
-    ASSERT_EQ(written, eos.position());
+    ASSERT_EQ(written, out.position());
 
-    ExportSerializeInput esi(encoded.get(), written);
-    validateHeader(esi, 25);
+    ReferenceSerializeInputBE in(encoded.get(), written);
+    validateHeader(in, 25);
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(1, esi.readVarInt()); // tinyint
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // tinyint
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(2, esi.readVarInt()); // smallint
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(2, in.readVarInt()); // smallint
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(3, esi.readVarInt()); // integer
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(3, in.readVarInt()); // integer
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(4, esi.readVarLong()); // bigint
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(4, in.readVarLong()); // bigint
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(5, esi.readDouble()); // double
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(5, in.readDouble()); // double
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(6, esi.readVarLong()); // timestamp
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(6, in.readVarLong()); // timestamp
 
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(16, esi.readVarLong()); // Size of decimal
-    int64_t val = esi.readLong();
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(16, in.readVarLong()); // Size of decimal
+    int64_t val = in.readLong();
     ASSERT_EQ(0, ntohll(val)); // Highest significant bits
-    val = esi.readLong();
+    val = in.readLong();
     ASSERT_EQ(7000000000000, ntohll(val)); // Lowest significant bits with scale of 12
 
     // Validate the string  can be deserialized
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    int64_t len = esi.readVarInt();
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    int64_t len = in.readVarInt();
     ASSERT_EQ(varchar.length(), len);
     std::unique_ptr<char[]> strDecoded(new char[len]);
-    esi.readBytes(strDecoded.get(), len);
+    in.readBytes(strDecoded.get(), len);
     ASSERT_EQ(varchar, std::string(strDecoded.get(), len));
 
     // Validate the var binary can be deserialized
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    len = esi.readVarInt();
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    len = in.readVarInt();
     ASSERT_EQ(binary.size(), len);
     std::unique_ptr<char[]> binaryDecoded(new char[len]);
-    esi.readBytes(binaryDecoded.get(), len);
+    in.readBytes(binaryDecoded.get(), len);
     ASSERT_EQ(0, ::memcmp(binary.data(), binaryDecoded.get(), len));
 
     // Validate the point
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(point.getLongitude(), esi.readDouble());
-    ASSERT_EQ(point.getLatitude(), esi.readDouble());
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(point.getLongitude(), in.readDouble());
+    ASSERT_EQ(point.getLatitude(), in.readDouble());
 
     // Validate the geography
-    ASSERT_EQ(0, esi.readVarInt()); // Union index indicating not null
-    len = esi.readVarInt();
+    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    len = in.readVarInt();
     ASSERT_EQ(geography.serializedLength(), len);
     std::unique_ptr<char[]> geoBytes(new char[len]);
-    esi.readBytes(geoBytes.get(), len);
+    in.readBytes(geoBytes.get(), len);
     GeographyValue geographyDecoded(geoBytes.get(), len);
     ASSERT_EQ(0, ValuePeeker::peekGeographyValue(m_tuple.getNValue(10)).compareWith(geographyDecoded));
 
-    ASSERT_EQ(0, esi.remaining());
+    ASSERT_EQ(0, in.remaining());
 }
 
 // Test that nulls of all types are correctly serialized
@@ -246,19 +246,19 @@ TEST_F(AvroEncoderTest, AllNullAvro) {
     int32_t size = ae.maxSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
-    ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
-    int32_t written = ae.encode(eos, m_tuple);
-    ASSERT_EQ(written, eos.position());
+    ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
+    int32_t written = ae.encode(out, m_tuple);
+    ASSERT_EQ(written, out.position());
 
-    ExportSerializeInput esi(encoded.get(), size);
-    validateHeader(esi, 25);
+    ReferenceSerializeInputBE in(encoded.get(), size);
+    validateHeader(in, 25);
 
     // Validate all union indexers are 1 which indicates null
     for (int i = 0; i < m_schema->columnCount(); ++i) {
-        ASSERT_EQ(1, esi.readVarInt());
+        ASSERT_EQ(1, in.readVarInt());
     }
 
-    ASSERT_EQ(0, esi.remaining());
+    ASSERT_EQ(0, in.remaining());
 }
 
 // Test the encoding a subset of columns in any order works
@@ -285,16 +285,16 @@ TEST_F(AvroEncoderTest, SomeColumnsEncoded) {
         int32_t size = ae.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
-        ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
-        int32_t written = ae.encode(eos, m_tuple);
-        ASSERT_EQ(written, eos.position());
+        ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
+        int32_t written = ae.encode(out, m_tuple);
+        ASSERT_EQ(written, out.position());
 
-        ExportSerializeInput esi(encoded.get(), size);
-        validateHeader(esi, 90);
+        ReferenceSerializeInputBE in(encoded.get(), size);
+        validateHeader(in, 90);
 
-        ASSERT_EQ(2, esi.readVarInt()); // smallint
-        ASSERT_EQ(4, esi.readVarLong()); // bigint
-        ASSERT_EQ(6, esi.readVarLong()); // timestamp
+        ASSERT_EQ(2, in.readVarInt()); // smallint
+        ASSERT_EQ(4, in.readVarLong()); // bigint
+        ASSERT_EQ(6, in.readVarLong()); // timestamp
     }
 
     {
@@ -304,16 +304,16 @@ TEST_F(AvroEncoderTest, SomeColumnsEncoded) {
         int32_t size = ae.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
-        ExportSerializeOutput eos(encoded.get(), static_cast<size_t>(size));
-        int32_t written = ae.encode(eos, m_tuple);
-        ASSERT_EQ(written, eos.position());
+        ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
+        int32_t written = ae.encode(out, m_tuple);
+        ASSERT_EQ(written, out.position());
 
-        ExportSerializeInput esi(encoded.get(), size);
-        validateHeader(esi, 90);
+        ReferenceSerializeInputBE in(encoded.get(), size);
+        validateHeader(in, 90);
 
-        ASSERT_EQ(6, esi.readVarLong()); // timestamp
-        ASSERT_EQ(4, esi.readVarLong()); // bigint
-        ASSERT_EQ(2, esi.readVarInt()); // smallint
+        ASSERT_EQ(6, in.readVarLong()); // timestamp
+        ASSERT_EQ(4, in.readVarLong()); // bigint
+        ASSERT_EQ(2, in.readVarInt()); // smallint
     }
 }
 
@@ -336,11 +336,11 @@ TEST_F(AvroEncoderTest, TimestampEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(time, in.readVarLong());
     }
@@ -350,11 +350,11 @@ TEST_F(AvroEncoderTest, TimestampEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(time / 1000, in.readVarLong());
     }
@@ -379,11 +379,11 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(point.getLongitude(), in.readDouble());
         ASSERT_EQ(point.getLatitude(), in.readDouble());
@@ -394,11 +394,11 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(16, in.readVarInt()); // size of encoding
         ASSERT_EQ(point.getLongitude(), in.readDouble());
@@ -410,13 +410,13 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
         std::string string = point.toWKT();
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(string.length(), in.readVarInt()); // size of encoding
         std::unique_ptr<char[]> strBytes(new char[string.length()]);
@@ -450,11 +450,11 @@ TEST_F(AvroEncoderTest, GeographyEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(geography.length(), in.readVarInt());
         std::unique_ptr<char[]> geoBytes(new char[geography.length()]);
@@ -467,13 +467,13 @@ TEST_F(AvroEncoderTest, GeographyEncoding) {
         AvroEncoder encoder(30, *m_schema, indexes, props);
         int32_t size = encoder.maxSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
-        ExportSerializeOutput out(encoded.get(), size);
+        ReferenceSerializeOutput out(encoded.get(), size);
 
         encoder.encode(out, m_tuple);
 
         std::string string = ValuePeeker::peekGeographyValue(m_tuple.getNValue(0)).toWKT();
 
-        ExportSerializeInput in(encoded.get(), size);
+        ReferenceSerializeInputBE in(encoded.get(), size);
         validateHeader(in, 30);
         ASSERT_EQ(string.length(), in.readVarInt()); // size of encoding
         std::unique_ptr<char[]> strBytes(new char[string.length()]);

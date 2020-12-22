@@ -29,7 +29,7 @@ using namespace voltdb::topics;
 
 TEST_F(Test, NullEncoder) {
     TableTuple tuple;
-    ExportSerializeOutput eso(nullptr, 0);
+    ReferenceSerializeOutput eso(nullptr, 0);
 
     NullEncoder ne;
     ASSERT_EQ(-1, ne.maxSizeOf(tuple));
@@ -53,35 +53,35 @@ TEST_F(Test, IntEncoder) {
     tuple.setNValue(2, NValue::getNullValue(ValueType::tINTEGER));
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(0);
         ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val1), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val1), eos.position());
+        ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val1), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val1, esi.readInt());
+        ASSERT_EQ(val1, in.readInt());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(1);
         ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val2), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val2), eos.position());
+        ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val2), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val2, esi.readInt());
+        ASSERT_EQ(val2, in.readInt());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(2);
         ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
-        ASSERT_EQ(-1, encoder.encode(eos, tuple));
-        ASSERT_EQ(0, eos.position());
+        ASSERT_EQ(-1, encoder.encode(out, tuple));
+        ASSERT_EQ(0, out.position());
     }
 
     TupleSchema::freeTupleSchema(schema);
@@ -105,35 +105,35 @@ TEST_F(Test, BigIntEncoder) {
     tuple.setNValue(2, NValue::getNullValue(ValueType::tBIGINT));
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(0);
         ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val1), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val1), eos.position());
+        ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val1), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val1, esi.readLong());
+        ASSERT_EQ(val1, in.readLong());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(1);
         ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val2), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val2), eos.position());
+        ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val2), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val2, esi.readLong());
+        ASSERT_EQ(val2, in.readLong());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(2);
         ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
-        ASSERT_EQ(-1, encoder.encode(eos, tuple));
-        ASSERT_EQ(0, eos.position());
+        ASSERT_EQ(-1, encoder.encode(out, tuple));
+        ASSERT_EQ(0, out.position());
     }
 
     TupleSchema::freeTupleSchema(schema);
@@ -158,35 +158,35 @@ TEST_F(Test, DoubleEncoder) {
     tuple.setNValue(2, NValue::getNullValue(ValueType::tDOUBLE));
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(0);
         ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val1), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val1), eos.position());
+        ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val1), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val1, esi.readDouble());
+        ASSERT_EQ(val1, in.readDouble());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(1);
         ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val2), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val2), eos.position());
+        ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val2), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
-        ASSERT_EQ(val2, esi.readDouble());
+        ASSERT_EQ(val2, in.readDouble());
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(2);
         ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
-        ASSERT_EQ(-1, encoder.encode(eos, tuple));
-        ASSERT_EQ(0, eos.position());
+        ASSERT_EQ(-1, encoder.encode(out, tuple));
+        ASSERT_EQ(0, out.position());
     }
 
     TupleSchema::freeTupleSchema(schema);
@@ -211,39 +211,39 @@ TEST_F(Test, VarCharEncoder) {
     tuple.setNValue(2, NValue::getNullValue(ValueType::tDOUBLE));
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(0);
         ASSERT_EQ(strlen(val1), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(strlen(val1), encoder.encode(eos, tuple));
-        ASSERT_EQ(strlen(val1), eos.position());
+        ASSERT_EQ(strlen(val1), encoder.encode(out, tuple));
+        ASSERT_EQ(strlen(val1), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
         char decoded[strlen(val1)];
-        esi.readBytes(decoded, strlen(val1));
+        in.readBytes(decoded, strlen(val1));
         ASSERT_EQ(val1, std::string(decoded, strlen(val1)));
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(1);
         ASSERT_EQ(strlen(val2), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(strlen(val2), encoder.encode(eos, tuple));
-        ASSERT_EQ(strlen(val2), eos.position());
+        ASSERT_EQ(strlen(val2), encoder.encode(out, tuple));
+        ASSERT_EQ(strlen(val2), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
         char decoded[strlen(val2)];
-        esi.readBytes(decoded, strlen(val2));
+        in.readBytes(decoded, strlen(val2));
         ASSERT_EQ(val2, std::string(decoded, strlen(val2)));
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(2);
         ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
-        ASSERT_EQ(-1, encoder.encode(eos, tuple));
-        ASSERT_EQ(0, eos.position());
+        ASSERT_EQ(-1, encoder.encode(out, tuple));
+        ASSERT_EQ(0, out.position());
     }
 
     TupleSchema::freeTupleSchema(schema);
@@ -269,39 +269,39 @@ TEST_F(Test, VarBinaryEncoder) {
     tuple.setNValue(2, NValue::getNullValue(ValueType::tDOUBLE));
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(0);
         ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val1), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val1), eos.position());
+        ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val1), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
         unsigned char decoded[sizeof(val1)];
-        esi.readBytes(decoded, sizeof(val1));
+        in.readBytes(decoded, sizeof(val1));
         ASSERT_EQ(0, ::memcmp(val1, decoded, sizeof(val1)));
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(1);
         ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
-        ASSERT_EQ(sizeof(val2), encoder.encode(eos, tuple));
-        ASSERT_EQ(sizeof(val2), eos.position());
+        ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
+        ASSERT_EQ(sizeof(val2), out.position());
 
-        ExportSerializeInput esi(data, sizeof(data));
+        ReferenceSerializeInputBE in(data, sizeof(data));
 
         unsigned char decoded[sizeof(val2)];
-        esi.readBytes(decoded, sizeof(val2));
+        in.readBytes(decoded, sizeof(val2));
         ASSERT_EQ(0, ::memcmp(val2, decoded, sizeof(val2)));
     }
 
     {
-        ExportSerializeOutput eos(&data, sizeof(data));
+        ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(2);
         ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
-        ASSERT_EQ(-1, encoder.encode(eos, tuple));
-        ASSERT_EQ(0, eos.position());
+        ASSERT_EQ(-1, encoder.encode(out, tuple));
+        ASSERT_EQ(0, out.position());
     }
 
     TupleSchema::freeTupleSchema(schema);

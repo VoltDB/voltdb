@@ -59,7 +59,7 @@ public:
         return length;
     }
 
-    int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) override {
+    int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         int32_t length = 0;
         if (value.isNull()) {
@@ -105,7 +105,7 @@ public:
                 [&tuple](int32_t sum, AvroValueEncoder& encoder) { return sum + encoder.exactSizeOf(tuple); });
     }
 
-    int32_t encode(ExportSerializeOutput& out, const TableTuple& tuple) override {
+    int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         int32_t length = s_headerSize;
 
         // Write out header to indicate which schema from the registry this is using
