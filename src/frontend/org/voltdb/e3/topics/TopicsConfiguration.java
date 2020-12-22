@@ -36,6 +36,10 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration.Entry<?>> {
 
+    // TODO make this configurable, but the places which use this currently do not have an instance of this class
+    // 10 MB is the default which kafka has
+    public static int MAX_BATCH_SIZE = 10 * 1024 * 1024;
+
     /**
      * Defines all TopicsConfiguration parameters, with their types and default values.
      */
