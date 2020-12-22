@@ -35,6 +35,7 @@ import org.voltdb.serdes.EncodeFormat;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
@@ -296,13 +297,15 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
      * Key for a property with a simple CSV of column names a value
      */
     private static class ColumnsKey extends Key<List<String>> {
+        private static final Splitter s_commaSplitter = Splitter.on(',').trimResults().omitEmptyStrings();
+
         ColumnsKey(String name, List<String> defValue) {
             super(name, null, defValue, null);
         }
 
         @Override
         protected List<String> parseValue(String strValue) {
-            return ImmutableList.copyOf(Iterables.transform(CatalogUtil.splitOnCommas(strValue), String::toUpperCase));
+            return ImmutableList.copyOf(Iterables.transform(s_commaSplitter.split(strValue), String::toUpperCase));
         }
     }
 
