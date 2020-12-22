@@ -503,15 +503,18 @@ public final class TaskManager {
     /**
      * Validate that all tasks present in {@code database} have valid classes and parameters defined.
      *
-     * @param database    {@link Database} to be validated
-     * @param classLoader {@link ClassLoader} to use to load referenced classes
+     * @param database        {@link Database} to be validated
+     * @param classLoader     {@link ClassLoader} to use to load referenced classes
+     * @param procedureMapper {@link Function} which can be used to retrieve {@link Procedure}s by name
      * @return An error message or {@code null} if no errors were found
      */
-    public static String validateTasks(Database database, ClassLoader classLoader) {
+    public static String validateTasks(Database database, ClassLoader classLoader,
+            Function<String, Procedure> procedureMapper) {
         CompoundErrors errors = new CompoundErrors();
         for (Task task : database.getTasks()) {
             errors.addErrorMessage(
-                    validateTask(task, TaskScope.fromId(task.getScope()), database, classLoader).getErrorMessage());
+                    validateTask(task, TaskScope.fromId(task.getScope()), database, classLoader, procedureMapper)
+                            .getErrorMessage());
         }
         return errors.getErrorMessage();
     }
@@ -524,14 +527,15 @@ public final class TaskManager {
      * If {@code database} is null this method will return a {@link TaskValidationResult} or an error message. However
      * if {@code database} is not null the returned {@link TaskValidationResult} will only ever have an error message.
      *
-     * @param definition  {@link Task} defining the configuration of the schedule
-     * @param scope       {@link TaskScope} for {@code definition}
-     * @param database    {@link Database} instance used to validate procedures. May be {@link null}
-     * @param classLoader {@link ClassLoader} to use when loading the classes in {@code definition}
+     * @param definition      {@link Task} defining the configuration of the schedule
+     * @param scope           {@link TaskScope} for {@code definition}
+     * @param database        {@link Database} instance used to validate procedures. May be {@link null}
+     * @param classLoader     {@link ClassLoader} to use when loading the classes in {@code definition}
+     * @param procedureMapper {@link Function} which can be used to retrieve {@link Procedure}s by name
      * @return {@link TaskValidationResult} describing any problems encountered or a {@link SchedulerFactory}
      */
     static TaskValidationResult validateTask(Task definition, TaskScope scope, Database database,
-            ClassLoader classLoader) {
+            ClassLoader classLoader, Function<String, Procedure> procedureMapper) {
         if (database != null) {
             String user = definition.getUser();
             if (user != null && database.getUsers().get(user) == null) {
@@ -546,8 +550,8 @@ public final class TaskManager {
             // Construct scheduler from the provided class
             try {
                 Pair<String, InitializableFactory<ActionScheduler>> result = createFactory(definition, scope,
-                        ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), database,
-                        classLoader);
+                        ActionScheduler.class, schedulerClassName, definition.getSchedulerparameters(), classLoader,
+                        procedureMapper);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -572,7 +576,7 @@ public final class TaskManager {
             try {
                 Pair<String, InitializableFactory<ActionGenerator>> result = createFactory(definition, scope,
                         ActionGenerator.class, actionGeneratorClass, definition.getActiongeneratorparameters(),
-                        database, classLoader);
+                        classLoader, procedureMapper);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -586,7 +590,7 @@ public final class TaskManager {
             try {
                 Pair<String, InitializableFactory<IntervalGenerator>> result = createFactory(definition, scope,
                         IntervalGenerator.class, actionScheduleClass, definition.getScheduleparameters(),
-                        database, classLoader);
+                        classLoader, procedureMapper);
                 String errorMessage = result.getFirst();
                 if (errorMessage != null) {
                     return new TaskValidationResult(errorMessage);
@@ -597,7 +601,8 @@ public final class TaskManager {
                         definition.getName(), actionScheduleClass), e);
             }
 
-            factory = database == null ? new CompositeSchedulerFactory(actionGeneratorFactory, intervalGeneratorFactory)
+            factory = procedureMapper == null
+                    ? new CompositeSchedulerFactory(actionGeneratorFactory, intervalGeneratorFactory)
                     : null;
         }
 
@@ -614,15 +619,17 @@ public final class TaskManager {
      * @param interfaceClass        Class of the interface which {@code className} should implement
      * @param className             Name of class the factory should construct
      * @param initializerParameters Parameters which are to be passed to constructed instance
-     * @param database              {@link Database} instance used to validate procedures. May be {@link null}
      * @param classLoader           {@link ClassLoader} to use to find the class instance of {@code className}
+     * @param procedureMapper       {@link Function} which can be used to retrieve {@link Procedure}s by name. Will be
+     *                              {@code null} when not doing pure validation
      * @return A {@link Pair} of an errorMessage or {@link InitializableFactory}
      * @throws NoSuchAlgorithmException
      */
     @SuppressWarnings("unchecked")
     private static <T extends Initializable> Pair<String, InitializableFactory<T>> createFactory(Task definition,
             TaskScope scope, Class<T> interfaceClass, String className, CatalogMap<TaskParameter> initializerParameters,
-            Database database, ClassLoader classLoader) throws NoSuchAlgorithmException {
+            ClassLoader classLoader, Function<String, Procedure> procedureMapper)
+            throws NoSuchAlgorithmException {
         Class<?> initializableClass;
         try {
             initializableClass = classLoader.loadClass(className);
@@ -714,15 +721,15 @@ public final class TaskManager {
             }
 
             String parameterErrors = validateInitializeParameters(definition, scope, initMethod, parameters,
-                    takesHelper, database);
+                    takesHelper, procedureMapper);
             if (parameterErrors != null) {
                 return Pair.of("Error validating parameters for task " + definition.getName() + ": " + parameterErrors,
                         null);
             }
         }
 
-        if (database != null) {
-            // Don't bother with the factory since database is only passed in for pure validation
+        if (procedureMapper != null) {
+            // Don't bother with the factory since procedureMapper is only passed in for pure validation
             return Pair.of(null, null);
         }
 
@@ -835,7 +842,7 @@ public final class TaskManager {
             }
             TaskHandler handler = m_handlers.remove(task.getName());
             TaskScope scope = TaskScope.fromId(task.getScope());
-            TaskValidationResult result = validateTask(task, scope, null, classLoader);
+            TaskValidationResult result = validateTask(task, scope, null, classLoader, null);
 
             TaskDefinition definition = new CatalogTaskDefinition(task, scope);
             if (handler != null) {
@@ -954,16 +961,16 @@ public final class TaskManager {
      * Try to find the optional static method {@code validateParameters} and call it if it is compatible to see if the
      * parameters to be passed to the scheduler constructor are valid for the scheduler.
      *
-     * @param definition  Instance of {@link Task} defining the schedule
-     * @param scope       {@link TaskScope} for {@code definition}
-     * @param initMethod  initialize {@link Method} instance for the {@link Initializable}
-     * @param parameters  that are going to be passed to the constructor
-     * @param takesHelper If {@code true} the first parameter of the init method is a {@link ScopedHandler}
-     * @param database    {@link Database} instance used to validate procedures. May be {@link null}
+     * @param definition      Instance of {@link Task} defining the schedule
+     * @param scope           {@link TaskScope} for {@code definition}
+     * @param initMethod      initialize {@link Method} instance for the {@link Initializable}
+     * @param parameters      that are going to be passed to the constructor
+     * @param takesHelper     If {@code true} the first parameter of the init method is a {@link ScopedHandler}
+     * @param procedureMapper {@link Function} which can be used to retrieve {@link Procedure}s by name
      * @return error message if the parameters are not valid or {@code null} if they are
      */
     private static String validateInitializeParameters(Task definition, TaskScope scope, Method initMethod,
-            Object[] parameters, boolean takesHelper, Database database) {
+            Object[] parameters, boolean takesHelper, Function<String, Procedure> procedureMapper) {
         Class<?> schedulerClass = initMethod.getDeclaringClass();
 
         for (Method m : schedulerClass.getMethods()) {
@@ -995,7 +1002,7 @@ public final class TaskManager {
 
             if (takesHelper) {
                 validatorParameters[0] = new TaskHelperImpl(log, b -> generateLogMessage(definition.getName(), b),
-                        definition.getName(), scope, database);
+                        definition.getName(), scope, procedureMapper);
             }
 
             try {
