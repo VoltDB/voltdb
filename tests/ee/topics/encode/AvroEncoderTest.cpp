@@ -23,6 +23,7 @@
 
 #include "harness.h"
 #include "topics/encode/AvroEncoder.h"
+#include "topics/encode/AvroTestUtils.h"
 
 using namespace voltdb;
 using namespace voltdb::topics;
@@ -110,7 +111,7 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     ASSERT_EQ(2, in.readVarInt()); // smallint
     ASSERT_EQ(3, in.readVarInt()); // integer
     ASSERT_EQ(4, in.readVarLong()); // bigint
-    ASSERT_EQ(5, in.readDouble()); // double
+    ASSERT_EQ(5, readAvroDouble(in)); // double
     ASSERT_EQ(6, in.readVarLong()); // timestamp
 
     ASSERT_EQ(16, in.readVarInt()); // Size of decimal
@@ -191,7 +192,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ASSERT_EQ(4, in.readVarLong()); // bigint
 
     ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(5, in.readDouble()); // double
+    ASSERT_EQ(5, readAvroDouble(in)); // double
 
     ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(6, in.readVarLong()); // timestamp

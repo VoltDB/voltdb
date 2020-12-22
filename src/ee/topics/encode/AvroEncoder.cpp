@@ -69,6 +69,26 @@ public:
 };
 
 /**
+ * Value encoder for encoding doubles using little endian order, which is required by avro serialization
+ */
+class DoubleLEEncoder: public NValueEncoder {
+public:
+    DoubleLEEncoder() = default;
+
+    int32_t maxSizeOf(const NValue& value) override {
+        vassert(ValuePeeker::peekValueType(value) == ValueType::tDOUBLE);
+        return sizeof(double);
+    }
+
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
+        vassert(out.isLittleEndian());
+        double rawValue = ValuePeeker::peekDouble(value);
+        out.writeBytes(reinterpret_cast<char*>(&rawValue), sizeof(rawValue));
+        return sizeof(rawValue);
+    }
+};
+
+/**
  * Value encoder for wrapping other value encoders that write variable length data such as strings or char[]
  */
 template <class ENCODER>
@@ -242,7 +262,7 @@ AvroEncoder::AvroEncoder(int32_t schemaId, const TupleSchema& schema, const std:
             encoder = new VarIntEncoder<int64_t>();
             break;
         case ValueType::tDOUBLE:
-            encoder = new DoubleEncoder();
+            encoder = new DoubleLEEncoder();
             break;
         case ValueType::tTIMESTAMP: {
                 auto prop = props.find(PROP_TIMESTAMP_ENCODING);

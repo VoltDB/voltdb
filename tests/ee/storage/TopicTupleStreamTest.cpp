@@ -28,6 +28,7 @@
 #include "catalog/topic.h"
 
 #include "harness.h"
+#include "topics/encode/AvroTestUtils.h"
 
 using namespace voltdb;
 
@@ -454,7 +455,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
                         ASSERT_EQ(2, in->readVarLong(), false);
-                        ASSERT_EQ(3, in->readDouble(), false);
+                        ASSERT_EQ(3, readAvroDouble(*in), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
                         ASSERT_EQ("4", std::string(static_cast<const char*>(in->getRawPointer(1)), 1), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
@@ -469,7 +470,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
                         ASSERT_EQ(6, in->readVarInt(), false);
                         ASSERT_EQ(7, in->readVarLong(), false);
-                        ASSERT_EQ(8, in->readDouble(), false);
+                        ASSERT_EQ(8, readAvroDouble(*in), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
                         ASSERT_EQ("9", std::string(static_cast<const char*>(in->getRawPointer(1)), 1), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
@@ -516,7 +517,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
                         ASSERT_EQ(1, in->readVarInt(), false);
-                        ASSERT_EQ(3, in->readDouble(), false);
+                        ASSERT_EQ(3, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
                 [this](SerializeInputBE *in) {
@@ -536,7 +537,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
                         ASSERT_EQ(6, in->readVarInt(), false);
-                        ASSERT_EQ(8, in->readDouble(), false);
+                        ASSERT_EQ(8, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
                 [this](SerializeInputBE *in) {
