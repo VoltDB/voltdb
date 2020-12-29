@@ -152,7 +152,7 @@ public class DRConsumerStatsBase {
             IGNORED_BUFFERS             (VoltType.BIGINT),
             AVAILABLE_BYTES             (VoltType.INTEGER),
             AVAILABLE_BUFFERS           (VoltType.INTEGER),
-            WINDOW_TYPE                 (VoltType.STRING);
+            CONSUMER_LIMIT_TYPE         (VoltType.STRING);
 
             public final VoltType m_type;
             DRConsumerPartition(VoltType type) { m_type = type; }

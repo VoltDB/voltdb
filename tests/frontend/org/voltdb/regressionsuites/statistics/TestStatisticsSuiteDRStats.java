@@ -97,7 +97,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("CONNECTION_STATUS", VoltType.STRING),
             new ColumnInfo("AVAILABLE_BYTES", VoltType.INTEGER),
             new ColumnInfo("AVAILABLE_BUFFERS", VoltType.INTEGER),
-            new ColumnInfo("WINDOW_TYPE", VoltType.STRING),
+            new ColumnInfo("CONSUMER_LIMIT_TYPE", VoltType.STRING),
         };
 
         expectedDRConsumerPartitionStatsSchema = new ColumnInfo[] {
@@ -116,7 +116,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
                 new ColumnInfo("IGNORED_BUFFERS", VoltType.BIGINT),
                 new ColumnInfo("AVAILABLE_BYTES", VoltType.INTEGER),
                 new ColumnInfo("AVAILABLE_BUFFERS", VoltType.INTEGER),
-                new ColumnInfo("WINDOW_TYPE", VoltType.STRING),
+                new ColumnInfo("CONSUMER_LIMIT_TYPE", VoltType.STRING),
         };
 
     }

@@ -47,9 +47,9 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.ConsumerLimitType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
-import org.voltdb.compiler.deploymentfile.DrLimitType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
@@ -1409,9 +1409,9 @@ public class VoltProjectBuilder {
             conn.setSsl(m_drConsumerSslPropertyFile);
         }
         if (m_drBuffers != null && !m_drBuffers.isEmpty()) {
-            DrLimitType drlimit = factory.createDrLimitType();
-            drlimit.setMaxbuffers(Integer.parseInt(m_drBuffers));
-            dr.setDrconsumerlimit(drlimit);
+            ConsumerLimitType consumerLimitType = factory.createConsumerLimitType();
+            consumerLimitType.setMaxbuffers(Integer.parseInt(m_drBuffers));
+            dr.setConsumerlimit(consumerLimitType);
         }
 
         deployment.setFeatures(m_featureOptions);
