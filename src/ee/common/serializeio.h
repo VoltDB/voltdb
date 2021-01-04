@@ -266,7 +266,7 @@ private:
         // The maximum shifts allowed for this type
         const int32_t maxShift = (sizeof(type) * CHAR_BIT / shiftIncrement) * shiftIncrement;
 
-        type value = 0;
+        uint64_t value = 0;
         int shift = 0;
         long b;
         while (((b = readByte()) & 0x80) != 0) {
@@ -314,6 +314,24 @@ class SerializeOutput {
             expand(minimum_desired);
         }
         vassert(m_capacity >= minimum_desired);
+    }
+
+    /**
+     * Convert a 64bit value into a zigzag encoding.
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    inline static uint64_t zigZagLong(int64_t value) {
+        return (value << 1) ^ (value >> 63);
+    }
+
+    /**
+     * Calculate the number of bytes required to serialize a zig zag encoded value
+     */
+    inline static int sizeOfZigZaggedLong(uint64_t zigZagValue) {
+        int leading0s = __builtin_clzll(zigZagValue);
+        // calculate the number of bytes needed by determining the index of the most significant set bit and then
+        // dividing by 7 with a minimum of 1
+        return ((63 - leading0s) / 7) + 1;
     }
 
     // Beginning of the buffer.
@@ -443,7 +461,8 @@ public:
      * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
      */
     inline size_t writeVarLong(int64_t value) {
-        int64_t v = ((value << 1) ^ (value >> 63));
+        uint64_t v = zigZagLong(value);
+        assureExpand(sizeOfZigZaggedLong(v));
 
         const int mask  = 0x7F;
         m_buffer[m_position] = v & mask;
@@ -462,12 +481,7 @@ public:
      * Calculate the size in bytes to serialize value as a variable length value
      */
     inline static size_t sizeOfVarLong(int64_t value) {
-        int64_t v = ((value << 1) ^ (value >> 63));
-        size_t bytes = 1;
-        while (v >>= 7) {
-            ++bytes;
-        }
-        return bytes;
+        return sizeOfZigZaggedLong(zigZagLong(value));
     }
 
     // this explicitly accepts char* and length (or ByteArray)

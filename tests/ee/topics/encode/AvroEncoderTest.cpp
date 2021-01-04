@@ -95,7 +95,7 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     loops.emplace_back(new S2Loop(points));
     Polygon geography;
     geography.init(&loops, false);
-    insertValues(1, 2, 3, 4, 5, 6, 7, varchar, binary, &point, &geography);
+    insertValues(1, 2, 3, 6092398495938644137L, 5, 6, 7, varchar, binary, &point, &geography);
 
     int32_t size = ae.maxSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
@@ -110,7 +110,7 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     ASSERT_EQ(1, in.readVarInt()); // tinyint
     ASSERT_EQ(2, in.readVarInt()); // smallint
     ASSERT_EQ(3, in.readVarInt()); // integer
-    ASSERT_EQ(4, in.readVarLong()); // bigint
+    ASSERT_EQ(6092398495938644137L, in.readVarLong()); // bigint
     ASSERT_EQ(5, readAvroDouble(in)); // double
     ASSERT_EQ(6, in.readVarLong()); // timestamp
 
@@ -166,7 +166,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     loops.emplace_back(new S2Loop(points));
     Polygon geography;
     geography.init(&loops, false);
-    insertValues(1, 2, 3, 4, 5, 6, 7, varchar, binary, &point, &geography);
+    insertValues(1, 2, 3, 6092398495938644137L, 5, 6, 7, varchar, binary, &point, &geography);
 
     int32_t size = ae.maxSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
@@ -189,7 +189,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ASSERT_EQ(3, in.readVarInt()); // integer
 
     ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
-    ASSERT_EQ(4, in.readVarLong()); // bigint
+    ASSERT_EQ(6092398495938644137L, in.readVarLong()); // bigint
 
     ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(5, readAvroDouble(in)); // double
