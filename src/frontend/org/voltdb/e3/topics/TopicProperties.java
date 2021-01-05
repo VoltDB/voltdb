@@ -194,9 +194,6 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         public static final Key<Boolean> FAULT_INJECTION_ENABLED = new BooleanKey("fault.injection.enabled", Boolean.FALSE);
         public static final Key<List<Long>> FAULT_INJECTION_ERROR_OFFSETS = new LongsKey("fault.injection.error.offsets", null);
 
-        // This property can be used without FAULT_INJECTION_ENABLED to test ALTER TOPIC
-        public static final Key<Boolean> FAULT_INJECTION_IMMUTABLE = new BooleanKey("fault.injection.immutable", false, Boolean.FALSE);
-
         // Properties are mutable by default
         public Key(String name, Class<T> clazz, T defValue, Consumer<? super T> validator) {
             this(name, clazz, true, defValue, validator);
