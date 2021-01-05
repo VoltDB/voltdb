@@ -328,10 +328,11 @@ class SerializeOutput {
      * Calculate the number of bytes required to serialize a zig zag encoded value
      */
     inline static int sizeOfZigZaggedLong(uint64_t zigZagValue) {
-        int leading0s = __builtin_clzll(zigZagValue);
-        // calculate the number of bytes needed by determining the index of the most significant set bit and then
-        // dividing by 7 with a minimum of 1
-        return ((63 - leading0s) / 7) + 1;
+        int bytes = 1;
+        while (zigZagValue >>= 7) {
+            ++bytes;
+        }
+        return bytes;
     }
 
     // Beginning of the buffer.

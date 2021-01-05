@@ -488,7 +488,7 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType,
     }
 }
 
-void NValue::streamTimestamp(std::stringstream& value) const {
+void NValue::streamTimestamp(std::stringstream& value, bool millis) const {
     int64_t epoch_micros = getTimestamp();
     if (epochMicrosOutOfRange(epoch_micros)) {
         throwOutOfRangeTimestampInput("CAST");
@@ -508,9 +508,17 @@ void NValue::streamTimestamp(std::stringstream& value) const {
     char mbstr[64];    // Format: "YYYY-MM-DD HH:MM:SS."- 27 characters + terminator
                        //         But GCC-7 thinks it may be longer.  So we need
                        //         extra space.
-    snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
-             (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
-             (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
+    if (millis) {
+        snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+                (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
+                (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(),
+                (int)(micro / 1000));
+    } else {
+        snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
+                (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
+                (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(),
+                (int)micro);
+    }
     value << mbstr;
 }
 

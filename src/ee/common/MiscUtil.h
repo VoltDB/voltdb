@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "boost/algorithm/string/predicate.hpp"
 #include "boost/functional/hash.hpp"
 #include "common/debuglog.h"
 
@@ -48,6 +49,13 @@ class MiscUtil {
      */
     static void hashCombineFloatingPoint(std::size_t &seed, double value) {
         boost::hash_combine(seed, value);
+    }
+
+    /**
+     * Return true if the string is "true"
+     */
+    static bool parseBool(const std::string* value) {
+        return value != nullptr && boost::iequals(*value, "true");
     }
 };
 

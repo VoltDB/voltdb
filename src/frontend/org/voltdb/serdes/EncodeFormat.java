@@ -27,8 +27,8 @@ import org.voltdb.VoltType;
  * An enum listing the encoding formats
  */
 public enum EncodeFormat {
-    UNDEFINED(false, false),
-    CSV(false, false),
+    UNDEFINED(false, true),
+    CSV(false, true),
     AVRO(false, true),
     JSON(false, false),
     OPAQUE(false, true),

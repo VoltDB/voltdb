@@ -17,10 +17,13 @@
 
 #pragma once
 
+#include "common/MiscUtil.h"
 #include "common/serializeio.h"
 #include "common/tabletuple.h"
 
 namespace voltdb { namespace topics {
+
+using  TopicProperties = std::unordered_map<std::string, std::string>;
 
 /**
  * Interface for serializing a TableTuple into an SerializeOutput
@@ -51,6 +54,34 @@ public:
      * @return amount of data written  or -1 if the value encoded was null
      */
     virtual int32_t encode(SerializeOutput& out, const TableTuple& tuple) = 0;
+
+protected:
+    static bool parseBoolProperty(const TopicProperties& props,
+            const std::string& property, const bool defBool) {
+        auto prop = props.find(property);
+        if (prop != props.end()) {
+            return MiscUtil::parseBool(&prop->second);
+        }
+        return defBool;
+    }
+
+    static char parseCharProperty(const TopicProperties& props,
+            const std::string& property, const char defChar) {
+        auto prop = props.find(property);
+        if (prop != props.end() && prop->second.length() > 0) {
+            return prop->second[0];
+        }
+        return defChar;
+    }
+
+    static const std::string& parseStringProperty(const TopicProperties& props,
+            const std::string& property, const std::string& defStr) {
+        auto prop = props.find(property);
+        if (prop != props.end()) {
+            return prop->second;
+        }
+        return defStr;
+    }
 };
 
 /**

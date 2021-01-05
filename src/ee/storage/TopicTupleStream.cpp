@@ -24,6 +24,7 @@
 #include "catalog/property.h"
 
 #include "topics/encode/AvroEncoder.h"
+#include "topics/encode/CsvEncoder.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -69,7 +70,7 @@ std::pair<topics::TupleEncoder*, topics::TupleEncoder*> TopicTupleStream::create
             const catalog::Topic& topic) {
     vassert(boost::iequals(stream.name(), topic.streamName()));
 
-    TopicProperties props;
+    topics::TopicProperties props;
     for (auto& prop : topic.properties()) {
         props[prop.second->name()] = prop.second->value();
     }
@@ -88,7 +89,7 @@ std::pair<topics::TupleEncoder*, topics::TupleEncoder*> TopicTupleStream::create
 
 topics::TupleEncoder* TopicTupleStream::createEncoder(const StreamedTable& stream,
         const std::vector<std::string> formatKeys, const std::string& columnsKey, const std::string& defaultColumns,
-        int32_t schemaId, const TopicProperties& props) {
+        int32_t schemaId, const topics::TopicProperties& props) {
     // Determine which columns are to be encoded
     auto columnsEntry = props.find(columnsKey);
     std::string columnsCsv = columnsEntry == props.end() ? defaultColumns : columnsEntry->second;
@@ -151,15 +152,19 @@ topics::TupleEncoder* TopicTupleStream::createEncoder(const StreamedTable& strea
             case ValueType::tVARBINARY:
                 return new topics::SingleValueEncoder<topics::PlainVarLenEncoder>(index);
             default:
+                // No default
+                throwSerializableEEException("Default encoder does not exist for column(s): %s", columnsCsv.c_str());
                 break;
             }
         }
-        // No default for multi column
-        throwSerializableEEException("Default encoder does not exist for column(s): %s", columnsCsv.c_str());
+        return new topics::CsvEncoder(*schema, columnIndexes, props);
     }
 
     if (boost::iequals("AVRO", *encoding)) {
         return new topics::AvroEncoder(schemaId, *schema, columnIndexes, props);
+    }
+    if (boost::iequals("CSV", *encoding)) {
+        return new topics::CsvEncoder(*schema, columnIndexes, props);
     }
 
     throwSerializableEEException("Unknown encoding: %s", encoding->c_str());

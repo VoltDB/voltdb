@@ -23,8 +23,6 @@
 
 namespace voltdb {
 
-using  TopicProperties = std::unordered_map<std::string, std::string>;
-
 class TopicTupleStream: public voltdb::ExportTupleStream {
 public:
     /**
@@ -99,7 +97,7 @@ private:
      */
     static topics::TupleEncoder* createEncoder(const StreamedTable& stream, const std::vector<std::string> formatKeys,
             const std::string& columnsKey, const std::string& defaultColumns, int32_t schemaId,
-            const TopicProperties& props);
+            const topics::TopicProperties& props);
 
     std::unique_ptr<topics::TupleEncoder> m_keyEncoder;
     std::unique_ptr<topics::TupleEncoder> m_valueEncoder;

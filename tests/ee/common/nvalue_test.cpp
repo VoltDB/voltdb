@@ -1014,7 +1014,7 @@ TEST_F(NValueTest, TestToString) {
     EXPECT_EQ(strcmp(doubleValue.toString().c_str(), "-3.2E1"), 0);
     EXPECT_EQ(strcmp(decimalValue.toString().c_str(), "10.220000000000"), 0);
     EXPECT_EQ(strcmp(stringValue.toString().c_str(), "数据库"), 0);
-    EXPECT_EQ(strcmp(binaryValue.toString().c_str(), "aa"), 0);
+    EXPECT_EQ(strcmp(binaryValue.toString().c_str(), "AA"), 0);
     EXPECT_EQ(strcmp(timestamp.toString().c_str(), "1970-01-01 00:01:39.999999"), 0);
     EXPECT_EQ(strcmp(nullValue.toString().c_str(), "null"), 0);
 

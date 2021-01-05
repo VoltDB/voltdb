@@ -31,6 +31,7 @@
 #include "topics/encode/AvroTestUtils.h"
 
 using namespace voltdb;
+using namespace voltdb::topics;
 
 class TopicTupleStreamTest : public Test {
 public:
@@ -383,8 +384,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
     }
 }
 
-// Test multiple column encodings
-TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
+// Test multiple column encodings (AVRO)
+TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
     std::vector<ValueType> types { ValueType::tINTEGER, ValueType::tBIGINT, ValueType::tDOUBLE, ValueType::tVARCHAR,
             ValueType::tVARBINARY };
     std::vector<int32_t> sizes { 4, 8, 8, 1024, 1024 };
@@ -551,6 +552,90 @@ TEST_F(TopicTupleStreamTest, MultiColumnEncoder) {
                         ASSERT_EQ(10, in->readByte(), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
+
+        ASSERT_EQ(endPointer, in.getRawPointer(0));
+    }
+}
+
+// Test multiple column encodings (CSV)
+TEST_F(TopicTupleStreamTest, MultiColumnCsvEncoder) {
+    std::vector<ValueType> types { ValueType::tINTEGER, ValueType::tBIGINT, ValueType::tDOUBLE, ValueType::tVARCHAR };
+    std::vector<int32_t> sizes { 4, 8, 8, 1024 };
+    std::vector<bool> nullables { false, false, false, false };
+    setupTuples(types, sizes, nullables, 3);
+
+    std::vector<std::string> columnNames {"integer", "bigint", "double", "varchar"};
+    std::unique_ptr<StreamedTable> stream(StreamedTable::createForTest(1024 * 1024, m_context.get(), m_schema, "topic",
+            columnNames));
+
+    const int32_t keySchemaId = 15, valueSchemaId = 25;
+    const catalog::Topic* topic = createTopic("topic", keySchemaId, valueSchemaId);
+
+    int64_t timestamp1 = 789512 + VOLT_EPOCH_IN_MILLIS;
+    UniqueId uniqueId1 = UniqueId::makeIdFromComponents(timestamp1, 5, 1);
+    int64_t timestamp2 = timestamp1 + 500;
+    UniqueId uniqueId2 = UniqueId::makeIdFromComponents(timestamp2, 5, 1);
+
+    // setup tuple 0
+    m_tuples[0].setNValue(0, ValueFactory::getIntegerValue(1));
+    m_tuples[0].setNValue(1, ValueFactory::getBigIntValue(2));
+    m_tuples[0].setNValue(2, ValueFactory::getDoubleValue(3));
+    m_tuples[0].setNValue(3, ValueFactory::getStringValue("silly cat", m_pool.get()));
+
+    // setup tuple 1
+    m_tuples[1].setNValue(0, ValueFactory::getIntegerValue(6));
+    m_tuples[1].setNValue(1, ValueFactory::getBigIntValue(7));
+    m_tuples[1].setNValue(2, ValueFactory::getDoubleValue(8));
+    m_tuples[1].setNValue(3, ValueFactory::getStringValue("come, quote me", m_pool.get()));
+
+    // Test with default columns with csv value
+    TopicProperties props;
+    props[TopicTupleStream::PROP_STORE_ENCODED] = "true";
+    props[TopicTupleStream::PROP_CONSUMER_FORMAT_VALUES] = "CSV";
+    addProperties(topic, props);
+
+    std::unique_ptr<TopicTupleStream> tts(TopicTupleStream::create(*stream, *topic, 1, 1, 1));
+    {
+        tts->appendTuple(&m_engine, 1, 1, uniqueId1, m_tuples[0], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+        tts->commit(&m_engine, 1, uniqueId1);
+        tts->appendTuple(&m_engine, 2, 2, uniqueId2, m_tuples[1], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+        tts->commit(&m_engine, 2, uniqueId2);
+
+        ASSERT_FALSE(m_topend->receivedExportBuffer);
+        tts->periodicFlush(-1, 0);
+        ASSERT_TRUE(m_topend->receivedExportBuffer);
+
+        ASSERT_EQ(1, m_topend->partitionIds.front());
+        m_topend->partitionIds.pop();
+        m_topend->signatures.pop();
+        boost::shared_array<char> buffer = m_topend->data.front();
+        m_topend->data.pop_front();
+
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
+
+        // Validate the batch header
+        const void* endPointer;
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 1, timestamp1, timestamp2, 2));
+
+        // validate entries
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [](SerializeInputBE *in) { return in == nullptr; },
+                [this](SerializeInputBE *in) {
+                    ASSERT_TRUE(in, false);
+                    int len = in->remaining();
+                    std::string value(in->getRawPointer(len), len);
+                    std::string expected { "1,2,3.00000000000000000,silly cat" };
+                    ASSERT_EQ(expected, value, false);
+                    return true; }));
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [](SerializeInputBE *in) { return in == nullptr; },
+                [this](SerializeInputBE *in) {
+                    ASSERT_TRUE(in, false);
+                    int len = in->remaining();
+                    std::string value(in->getRawPointer(len), len);
+                    std::string expected { "6,7,8.00000000000000000,\"come, quote me\"" };
+                    ASSERT_EQ(expected, value, false);
+                    return true; }));
 
         ASSERT_EQ(endPointer, in.getRawPointer(0));
     }

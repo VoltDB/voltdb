@@ -120,6 +120,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   topics/GroupStoreTest
   topics/encode/EncoderTest
   topics/encode/AvroEncoderTest
+  topics/encode/CsvEncoderTest
   topics/orm/GroupOrmTest
   logging/logging_test
   memleaktests/no_losses

@@ -540,6 +540,25 @@ class NValue {
         }
     };
 
+    std::string toCsvString() const {
+        const ValueType type = getValueType();
+        if (type == ValueType::tTIMESTAMP) {
+            std::stringstream value;
+            streamTimestamp(value, true);
+            return value.str();
+        } else if (type == ValueType::tDOUBLE) {
+            // Formatting with 17 precision digits to try remaining compatible with Java;
+            // Java literature claims a precision of 16 digits but tests show up to 17 or sometimes more.
+            // Note that this formating fails to match the values issued in Java. One example is C++ adding
+            // trailing zeroes, or a rounding difference in the least significant precision digit.
+            char mbstr[128];
+            snprintf(mbstr, sizeof(mbstr), "%.17f", getDouble());
+            return std::string(mbstr);
+        } else {
+            return toString();
+        }
+    }
+
     /* Return a string full of arcana and wonder. */
     std::string debug() const;
     std::string toString() const {
@@ -569,8 +588,7 @@ class NValue {
                 streamSQLFloatFormat(value, getDouble());
                 break;
             case ValueType::tDECIMAL:
-                value << createStringFromDecimal();
-                break;
+                return createStringFromDecimal();
             case ValueType::tVARCHAR:
                 {
                     int32_t length;
@@ -591,6 +609,10 @@ class NValue {
             case ValueType::tTIMESTAMP:
                 streamTimestamp(value);
                 break;
+            case ValueType::tPOINT:
+                return getGeographyPointValue().toWKT();
+            case ValueType::tGEOGRAPHY:
+                return getGeographyValue().toWKT();
             default:
                 throwCastSQLException(type, ValueType::tVARCHAR);
         }
@@ -1501,7 +1523,7 @@ private:
         return retval;
     }
 
-    void streamTimestamp(std::stringstream& value) const;
+    void streamTimestamp(std::stringstream& value, bool millis=false) const;
 
     NValue castAsString() const {
         vassert(isNull() == false);
