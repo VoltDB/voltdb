@@ -240,10 +240,15 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         @Override
         protected Character parseValue(String strValue) {
             if (strValue.length() != 1) {
-                throw new IllegalArgumentException("Value must be a single character: " + strValue);
+                throw new IllegalArgumentException("Value must be a single character: '" + strValue + "'");
             }
 
-            return strValue.charAt(0);
+            char value = strValue.charAt(0);
+            if (value < ' ' || value > '~') {
+                throw new IllegalArgumentException("Value must be a printable ascii character: '" + strValue + "'");
+            }
+
+            return value;
         }
 
     }
