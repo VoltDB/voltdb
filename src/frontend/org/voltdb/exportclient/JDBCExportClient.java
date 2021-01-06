@@ -163,8 +163,10 @@ public class JDBCExportClient extends ExportClientBase {
         //If the column value is longer than the limit, truncate the value to avoid flushing too much data to log.
         private static final int MAX_COLUMN_PRINT_SIZE = 1024;
 
-        private Connection m_conn = null;
-        private PreparedStatement pstmt = null;
+        // Those 2 fields can be reset concurrently when a block timeout closes the connection
+        private volatile Connection m_conn = null;
+        private volatile PreparedStatement m_pstmt = null;
+
         private final ListeningExecutorService m_es;
         DatabaseType m_dbType = null;
         private String m_preparedStmtStr = null;
@@ -579,12 +581,12 @@ public class JDBCExportClient extends ExportClientBase {
                     }
                     m_curGenId = curSchema.generation;
                     m_curSchema = curSchema;
-                    if (pstmt != null) {
+                    if (m_pstmt != null) {
                         try {
-                            pstmt.close();
+                            m_pstmt.close();
                         } catch (Exception e) {}
                         finally {
-                            pstmt = null;
+                            m_pstmt = null;
                         }
                     }
                     m_preparedStmtStr = null;
@@ -600,12 +602,12 @@ public class JDBCExportClient extends ExportClientBase {
         public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
             if (m_conn == null) {
-                if (pstmt != null) {
+                if (m_pstmt != null) {
                     try {
-                        pstmt.close();
+                        m_pstmt.close();
                     } catch (Exception e) {}
                     finally {
-                        pstmt = null;
+                        m_pstmt = null;
                     }
                 }
                 try {
@@ -621,18 +623,30 @@ public class JDBCExportClient extends ExportClientBase {
 
         @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
+            PreparedStatement pstmt = m_pstmt;
+            Connection conn = m_conn;
+
+            if (pstmt == null || conn == null) {
+                rateLimitedLogWarn(m_logger, "Unable to commit, connection closed, probably after block timeout");
+                throw new RestartBlockException(true);
+            }
+
             try {
                 if (m_supportsBatchUpdates) {
                     pstmt.executeBatch();
                 }
                 if (m_disableAutoCommits) {
-                    m_conn.commit();
+                    conn.commit();
                 }
             } catch(BatchUpdateException e){
-                logBatchErrors(e);
+                if (!warnClosed(conn)) {
+                    logBatchErrors(e);
+                }
                 throw new RestartBlockException(true);
             } catch (SQLException e) {
-                rateLimitedLogError(m_logger, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
+                if (!warnClosed(conn)) {
+                    rateLimitedLogError(m_logger, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
+                }
                 throw new RestartBlockException(true);
             } catch (Exception e) {
                 rateLimitedLogError(m_logger, "Exception while executing and committing batch %s", Throwables.getStackTraceAsString(e));
@@ -643,8 +657,20 @@ public class JDBCExportClient extends ExportClientBase {
             }
         }
 
-        private void logBatchErrors(BatchUpdateException e){
+        // Note: call on commit exception
+        private boolean warnClosed(Connection conn) {
+            try {
+                if (conn.isClosed()) {
+                    rateLimitedLogWarn(m_logger, "Unable to commit, connection closed, probably after block timeout");
+                    return true;
+                }
+            } catch (Exception e) {
+                // Ignore
+            }
+            return false;
+        }
 
+        private void logBatchErrors(BatchUpdateException e){
            int [] results = e.getUpdateCounts();
            StringBuilder builder = new StringBuilder();
            for(int i = 0; i < results.length; i++){
@@ -711,7 +737,7 @@ public class JDBCExportClient extends ExportClientBase {
                 }
                 return true;
             }
-            if (pstmt == null) {
+            if (m_pstmt == null) {
                 if (m_disableAutoCommits) {
                     try {
                         m_conn.setAutoCommit(false);
@@ -734,7 +760,7 @@ public class JDBCExportClient extends ExportClientBase {
                     if (m_logger.isDebugEnabled()) {
                         m_logger.debug(m_preparedStmtStr);
                     }
-                    pstmt = m_conn.prepareStatement(m_preparedStmtStr);
+                    m_pstmt = m_conn.prepareStatement(m_preparedStmtStr);
                 } catch (Exception e) {
                     m_logger.warn("JDBC export unable to prepare insert statement", e);
                     closeConnection();
@@ -756,78 +782,78 @@ public class JDBCExportClient extends ExportClientBase {
                     final int pstmtIndex2 = pstmtIndex + nCols;
 
                     if (row[i] == null) {
-                        pstmt.setNull(pstmtIndex, Types.NULL);
+                        m_pstmt.setNull(pstmtIndex, Types.NULL);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setNull(pstmtIndex2, Types.NULL);
+                            m_pstmt.setNull(pstmtIndex2, Types.NULL);
                         }
                     } else if (columnTypes.get(i) == VoltType.DECIMAL) {
-                        pstmt.setBigDecimal(pstmtIndex, (BigDecimal)row[i]);
+                        m_pstmt.setBigDecimal(pstmtIndex, (BigDecimal)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setBigDecimal(pstmtIndex2, (BigDecimal)row[i]);
+                            m_pstmt.setBigDecimal(pstmtIndex2, (BigDecimal)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.TINYINT) {
-                        pstmt.setByte(pstmtIndex, (Byte)row[i]);
+                        m_pstmt.setByte(pstmtIndex, (Byte)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setByte(pstmtIndex2, (Byte)row[i]);
+                            m_pstmt.setByte(pstmtIndex2, (Byte)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.SMALLINT) {
-                        pstmt.setShort(pstmtIndex, (Short)row[i]);
+                        m_pstmt.setShort(pstmtIndex, (Short)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setShort(pstmtIndex2, (Short)row[i]);
+                            m_pstmt.setShort(pstmtIndex2, (Short)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.INTEGER) {
-                        pstmt.setInt(pstmtIndex, (Integer)row[i]);
+                        m_pstmt.setInt(pstmtIndex, (Integer)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setInt(pstmtIndex2, (Integer)row[i]);
+                            m_pstmt.setInt(pstmtIndex2, (Integer)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.BIGINT) {
-                        pstmt.setLong(pstmtIndex, (Long)row[i]);
+                        m_pstmt.setLong(pstmtIndex, (Long)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setLong(pstmtIndex2, (Long)row[i]);
+                            m_pstmt.setLong(pstmtIndex2, (Long)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.FLOAT) {
-                        pstmt.setDouble(pstmtIndex, (Double)row[i]);
+                        m_pstmt.setDouble(pstmtIndex, (Double)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setDouble(pstmtIndex2, (Double)row[i]);
+                            m_pstmt.setDouble(pstmtIndex2, (Double)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.STRING) {
-                        pstmt.setString(pstmtIndex, (String)row[i]);
+                        m_pstmt.setString(pstmtIndex, (String)row[i]);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setString(pstmtIndex2, (String)row[i]);
+                            m_pstmt.setString(pstmtIndex2, (String)row[i]);
                         }
                     } else if (columnTypes.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType)row[i];
-                        pstmt.setTimestamp(pstmtIndex, timestamp.asJavaTimestamp());
+                        m_pstmt.setTimestamp(pstmtIndex, timestamp.asJavaTimestamp());
                         if (m_supportsDuplicateKey) {
-                            pstmt.setTimestamp(pstmtIndex2, timestamp.asJavaTimestamp());
+                            m_pstmt.setTimestamp(pstmtIndex2, timestamp.asJavaTimestamp());
                         }
                     } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
                         GeographyPointValue gpv = (GeographyPointValue)row[i];
-                        pstmt.setString(pstmtIndex, gpv.toWKT());
+                        m_pstmt.setString(pstmtIndex, gpv.toWKT());
                         if (m_supportsDuplicateKey) {
-                            pstmt.setString(pstmtIndex2, gpv.toWKT());
+                            m_pstmt.setString(pstmtIndex2, gpv.toWKT());
                         }
                     } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
                         GeographyValue gv = (GeographyValue)row[i];
-                        pstmt.setString(pstmtIndex, gv.toWKT());
+                        m_pstmt.setString(pstmtIndex, gv.toWKT());
                         if (m_supportsDuplicateKey) {
-                            pstmt.setString(pstmtIndex2, gv.toWKT());
+                            m_pstmt.setString(pstmtIndex2, gv.toWKT());
                         }
                     } else if (columnTypes.get(i) == VoltType.VARBINARY) {
                         byte[] bytes = (byte[])row[i];
-                        pstmt.setBytes(pstmtIndex, bytes);
+                        m_pstmt.setBytes(pstmtIndex, bytes);
                         if (m_supportsDuplicateKey) {
-                            pstmt.setBytes(pstmtIndex2, bytes);
+                            m_pstmt.setBytes(pstmtIndex2, bytes);
                         }
                     }
                 }
 
                 try {
                     if (m_supportsBatchUpdates) {
-                        pstmt.addBatch();
+                        m_pstmt.addBatch();
                         m_dataRows.add(new BatchRow(rowinst));
                     } else {
-                        pstmt.executeUpdate();
+                        m_pstmt.executeUpdate();
                     }
                 } catch (SQLException e) {
                     rateLimitedLogError(m_logger, "executeUpdate() failed in processRow() for table %s %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
@@ -853,8 +879,8 @@ public class JDBCExportClient extends ExportClientBase {
         private void closeConnection() {
             try {
                 try {
-                    if (pstmt != null) {
-                        pstmt.close();
+                    if (m_pstmt != null) {
+                        m_pstmt.close();
                     }
                 } catch (Exception e) {
                     m_logger.warn("Exception closing pstmt for reset for table ", e);
@@ -868,10 +894,11 @@ public class JDBCExportClient extends ExportClientBase {
                 }
             } finally {
                 m_conn = null;
-                pstmt = null;
+                m_pstmt = null;
             }
         }
 
+        // Note: this can be called concurrently to processRow/onBlockComplertion when a block timeout occurs
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             if (m_es == null) {
