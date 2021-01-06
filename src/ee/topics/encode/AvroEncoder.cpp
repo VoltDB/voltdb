@@ -75,7 +75,7 @@ class DoubleLEEncoder: public NValueEncoder {
 public:
     DoubleLEEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         vassert(ValuePeeker::peekValueType(value) == ValueType::tDOUBLE);
         return sizeof(double);
     }
@@ -124,7 +124,7 @@ class DecimalEncoder: public NValueEncoder {
 public:
     DecimalEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         return sizeof(int64_t) * 2;
     }
 
@@ -143,7 +143,7 @@ class BinaryPointEncoder: public NValueEncoder {
 public:
     BinaryPointEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         return sizeof(double) * 2;
     }
 
@@ -160,7 +160,7 @@ class StringPointEncoder: public NValueEncoder {
 public:
     StringPointEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         m_valueCache = &value;
         m_stringCache = ValuePeeker::peekGeographyPointValue(value).toWKT();
         return m_stringCache.length();
@@ -191,7 +191,7 @@ class BinaryGeographyEncoder : public NValueEncoder {
 public:
     BinaryGeographyEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         return ValuePeeker::peekGeographyValue(value).length();
     }
 
@@ -209,7 +209,7 @@ class StringGeographyEncoder: public NValueEncoder {
 public:
     StringGeographyEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         m_valueCache = &value;
         m_stringCache = ValuePeeker::peekGeographyValue(value).toWKT();
         return m_stringCache.length();

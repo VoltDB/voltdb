@@ -36,15 +36,15 @@ public:
      * @param tuple that will be serialized
      * @return the maximum size that the tuple will consume when serialized or -1 if the value to be encoded is null
      */
-    virtual int32_t maxSizeOf(const TableTuple& tuple) = 0;
+    virtual int32_t maxSizeOf(const TableTuple& tuple) {
+        return exactSizeOf(tuple);
+    }
 
     /**
      * @param tuple that will be serialized
      * @return the exact size that the tuple will consume when serialized or -1 if tuple to be encoded is null
      */
-    virtual int32_t exactSizeOf(const TableTuple& tuple) {
-        return maxSizeOf(tuple);
-    }
+    virtual int32_t exactSizeOf(const TableTuple& tuple) = 0;
 
     /**
      * Serialize tuple into out
@@ -95,15 +95,15 @@ public:
      * @param value that will be serialized
      * @return the maximum size that the value will consume when serialized or -1 if value to be encoded is null
      */
-    virtual int32_t maxSizeOf(const NValue& value) = 0;
+    virtual int32_t maxSizeOf(const NValue& value) {
+        return exactSizeOf(value);
+    }
 
     /**
      * @param value that will be serialized
      * @return the exact size that the value will consume when serialized or -1 if value to be encoded is null
      */
-    virtual int32_t exactSizeOf(const NValue& value) {
-        return maxSizeOf(value);
-    }
+    virtual int32_t exactSizeOf(const NValue& value) = 0;
 
     /**
      * Serialize tuple into out
@@ -139,7 +139,7 @@ class NullEncoder : public TupleEncoder {
 public:
     NullEncoder() = default;
 
-    int32_t maxSizeOf(const TableTuple& tuple) override {
+    int32_t exactSizeOf(const TableTuple& tuple) override {
         return -1;
     }
 
@@ -164,6 +164,14 @@ public:
         return m_encoder.maxSizeOf(value);
     }
 
+    int32_t exactSizeOf(const TableTuple& tuple) override {
+        const NValue value = tuple.getNValue(m_index);
+        if (value.isNull()) {
+            return -1;
+        }
+        return m_encoder.exactSizeOf(value);
+    }
+
     int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         if (value.isNull()) {
@@ -184,7 +192,7 @@ class IntEncoder : public NValueEncoder {
 public:
     IntEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         vassert(ValuePeeker::peekValueType(value) == ValueType::tINTEGER);
         return sizeof(int32_t);
     }
@@ -202,7 +210,7 @@ class BigIntEncoder : public NValueEncoder {
 public:
     BigIntEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         vassert(ValuePeeker::peekValueType(value) == ValueType::tBIGINT);
         return sizeof(int64_t);
     }
@@ -220,7 +228,7 @@ class DoubleEncoder : public NValueEncoder {
 public:
     DoubleEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         vassert(ValuePeeker::peekValueType(value) == ValueType::tDOUBLE);
         return sizeof(double);
     }
@@ -238,7 +246,7 @@ class PlainVarLenEncoder : public NValueEncoder {
 public:
     PlainVarLenEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
+    int32_t exactSizeOf(const NValue& value) override {
         int32_t length;
         ValuePeeker::peekObject_withoutNull(value, &length);
         return length;

@@ -37,7 +37,7 @@ public:
     CsvEncoder(const TupleSchema& schema, const std::vector<int32_t>& indexes,
             const TopicProperties& props);
 
-    int32_t maxSizeOf(const TableTuple& tuple) override {
+    int32_t exactSizeOf(const TableTuple& tuple) override {
         // Fill cache with encoded Tuple and return length
         return encode(tuple);
     }
