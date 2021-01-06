@@ -152,9 +152,7 @@ topics::TupleEncoder* TopicTupleStream::createEncoder(const StreamedTable& strea
             case ValueType::tVARBINARY:
                 return new topics::SingleValueEncoder<topics::PlainVarLenEncoder>(index);
             default:
-                // No default
-                throwSerializableEEException("Default encoder does not exist for column(s): %s", columnsCsv.c_str());
-                break;
+                return new topics::SingleValueEncoder<topics::ToStringEncoder>(index);
             }
         }
         return new topics::CsvEncoder(*schema, columnIndexes, props);

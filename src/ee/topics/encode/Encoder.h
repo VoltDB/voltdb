@@ -260,4 +260,38 @@ public:
     }
 };
 
+/**
+ * A generic NValue encoder which converts the nvalue to a string and then serializes that string.
+ * Uses a caching mechanism so that the string does not have to be generated twice
+ */
+class ToStringEncoder : public NValueEncoder {
+public:
+    ToStringEncoder() = default;
+
+    int32_t exactSizeOf(const NValue& value) override {
+        m_nvalue = value;
+        m_value = value.toString();
+        return m_value.length();
+    }
+
+    int32_t encode(SerializeOutput& out, const NValue& value) override {
+        if (m_nvalue != value) {
+            m_value = value.toString();
+        }
+
+        int32_t length = m_value.length();
+        out.writeBytes(m_value.c_str(), length);
+
+        m_nvalue = NValue::getNullValue(ValueType::tNULL);
+        m_value.clear();
+
+        return length;
+    }
+
+private:
+    // The cache of last encoded Tuple
+    NValue m_nvalue = NValue::getNullValue(ValueType::tNULL);
+    std::string m_value;
+};
+
 } }

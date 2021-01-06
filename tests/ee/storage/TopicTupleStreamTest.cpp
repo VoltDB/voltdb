@@ -77,13 +77,13 @@ protected:
             int64_t firstTimestamp, int64_t lastTimestamp, int32_t recordCount) {
         ASSERT_EQ(firstOffset, in.readLong(), false);
         int32_t length = in.readInt();
-        endPointer = in.getRawPointer(0) + length;
+        endPointer = in.getRawPointer() + length;
 
         ASSERT_EQ(-1, in.readInt(), false); // partition leader epoch
         ASSERT_EQ(2, in.readByte(), false); // magic number
         int32_t expectedCrc = in.readInt();
         int32_t calculatedCrc = vdbcrc::crc32cInit();
-        calculatedCrc = vdbcrc::crc32c(calculatedCrc, in.getRawPointer(0),
+        calculatedCrc = vdbcrc::crc32c(calculatedCrc, in.getRawPointer(),
                 length - sizeof(expectedCrc) - sizeof(int32_t) - sizeof(int8_t));
         calculatedCrc = vdbcrc::crc32cFinish(calculatedCrc);
         ASSERT_EQ(expectedCrc, calculatedCrc, false);
@@ -109,21 +109,23 @@ protected:
             return validator(nullptr);
         }
         ReferenceSerializeInputBE entry(in.getRawPointer(length), length);
-        return validator(&entry);
+        bool result = validator(&entry);
+        if (result) ASSERT_EQ(0, entry.remaining(), false);
+        return result;
     }
 
     bool readAndValidateRecord(SerializeInputBE& in, int64_t timestampDelta, int64_t offsetDelta,
             std::function<bool(SerializeInputBE*)> keyValidator,
             std::function<bool(SerializeInputBE*)> valueValidator) {
         int32_t length = in.readVarInt();
-        const void* expectedEnd = static_cast<const char*>(in.getRawPointer(0)) + length;
+        const void* expectedEnd = static_cast<const char*>(in.getRawPointer()) + length;
         ASSERT_EQ(0, in.readByte(), false); // attributes
         ASSERT_EQ(timestampDelta, in.readVarLong(), false);
         ASSERT_EQ(offsetDelta, in.readVarLong(), false);
         ASSERT_TRUE(readEntry(in, keyValidator), false);
         ASSERT_TRUE(readEntry(in, valueValidator), false);
         ASSERT_EQ(0, in.readVarInt(), false); // header count
-        ASSERT_EQ(expectedEnd, in.getRawPointer(0), false);
+        ASSERT_EQ(expectedEnd, in.getRawPointer(), false);
         return true;
     }
 
@@ -231,17 +233,17 @@ TEST_F(TopicTupleStreamTest, NullEncoders) {
             [](SerializeInputBE *in) { return in == nullptr; },
             [](SerializeInputBE *in) { return in == nullptr; }));
 
-    ASSERT_EQ(endPointer, in.getRawPointer(0));
+    ASSERT_EQ(endPointer, in.getRawPointer());
 }
 
 TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
     std::vector<ValueType> types { ValueType::tINTEGER, ValueType::tBIGINT, ValueType::tDOUBLE, ValueType::tVARCHAR,
-            ValueType::tVARBINARY };
-    std::vector<int32_t> sizes { 4, 8, 8, 1024, 1024 };
-    std::vector<bool> nullables { false, false, false, false, false };
-    setupTuples(types, sizes, nullables, 3);
+            ValueType::tVARBINARY, ValueType::tGEOGRAPHY };
+    std::vector<int32_t> sizes { 4, 8, 8, 1024, 1024, 1024 };
+    std::vector<bool> nullables { false, false, false, false, false, false };
+    setupTuples(types, sizes, nullables, 2);
 
-    std::vector<std::string> columnNames {"integer", "bigint", "double", "varchar", "varbinary"};
+    std::vector<std::string> columnNames {"integer", "bigint", "double", "varchar", "varbinary", "geography"};
     std::unique_ptr<StreamedTable> stream(StreamedTable::createForTest(1024 * 1024, m_context.get(), m_schema, "topic",
             columnNames));
 
@@ -252,12 +254,20 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
     int64_t timestamp2 = timestamp1 + 500;
     UniqueId uniqueId2 = UniqueId::makeIdFromComponents(timestamp2, 5, 1);
 
+    // setup geography value
+    std::vector<std::unique_ptr<S2Loop> > loops;
+    std::vector<S2Point> points( {S2Point(50, 5000, 100), S2Point(40, 900, 50), S2Point(900, 2000, 300)});
+    loops.emplace_back(new S2Loop(points));
+    Polygon geography;
+    geography.init(&loops, false);
+
     // setup tuple 0
     m_tuples[0].setNValue(0, ValueFactory::getIntegerValue(1));
     m_tuples[0].setNValue(1, ValueFactory::getBigIntValue(2));
     m_tuples[0].setNValue(2, ValueFactory::getDoubleValue(3));
     m_tuples[0].setNValue(3, ValueFactory::getStringValue("4", m_pool.get()));
     m_tuples[0].setNValue(4, ValueFactory::getBinaryValue("05", m_pool.get()));
+    m_tuples[0].setNValue(5, ValueFactory::getGeographyValue(&geography, m_pool.get()));
 
     // setup tuple 1
     m_tuples[1].setNValue(0, ValueFactory::getIntegerValue(6));
@@ -265,6 +275,7 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
     m_tuples[1].setNValue(2, ValueFactory::getDoubleValue(8));
     m_tuples[1].setNValue(3, ValueFactory::getStringValue("9", m_pool.get()));
     m_tuples[1].setNValue(4, ValueFactory::getBinaryValue("0A", m_pool.get()));
+    m_tuples[1].setNValue(5, ValueFactory::getGeographyValue(&geography, m_pool.get()));
 
     // Test with int and bigint
     TopicProperties props;
@@ -302,7 +313,7 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
                 [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 4 && 6 == in->readInt(); },
                 [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 8 && 7 == in->readLong(); }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 
     // Now try double and varchar
@@ -336,13 +347,15 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
         ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
                 [](SerializeInputBE *in) { return in != nullptr && 3 == in->readDouble(); },
                 [](SerializeInputBE *in) { return in != nullptr &&
-                        "4" == std::string(static_cast<const char*>(in->getRawPointer(0)), in->remaining()); }));
+                        1 == in->remaining() &&
+                        "4" == std::string(static_cast<const char*>(in->getRawPointer(1)), 1); }));
         ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
                 [](SerializeInputBE *in) { return in != nullptr && 8 == in->readDouble(); },
                 [](SerializeInputBE *in) { return in != nullptr &&
-                        "9" == std::string(static_cast<const char*>(in->getRawPointer(0)), in->remaining()); }));
+                        1 == in->remaining() &&
+                        "9" == std::string(static_cast<const char*>(in->getRawPointer(1)), 1); }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 
     // Now try varbinary and null
@@ -355,8 +368,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
 
         tts->appendTuple(&m_engine, 5, 1, uniqueId1, m_tuples[0], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
         tts->commit(&m_engine, 5, uniqueId1);
-        tts->appendTuple(&m_engine, 5, 2, uniqueId2, m_tuples[1], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
-        tts->commit(&m_engine, 5, uniqueId2);
+        tts->appendTuple(&m_engine, 6, 2, uniqueId2, m_tuples[1], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+        tts->commit(&m_engine, 6, uniqueId2);
 
         m_topend->receivedExportBuffer = false;
         tts->periodicFlush(-1, 0);
@@ -380,7 +393,49 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
                 [](SerializeInputBE *in) { return in != nullptr && in->remaining() == 1 && 10 == in->readChar(); },
                 [](SerializeInputBE *in) { return in == nullptr; }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
+    }
+
+    // Now try geography types which will be encoded as a string
+    {
+        props[TopicTupleStream::PROP_CONSUMER_KEYS] = "geography";
+        props[TopicTupleStream::PROP_CONSUMER_VALUES] = "";
+        addProperties(topic, props);
+
+        tts->update(*stream, *m_database);
+
+        tts->appendTuple(&m_engine, 7, 1, uniqueId1, m_tuples[0], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+        tts->commit(&m_engine, 7, uniqueId1);
+        tts->appendTuple(&m_engine, 8, 2, uniqueId2, m_tuples[1], 1, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+        tts->commit(&m_engine, 8, uniqueId2);
+
+        m_topend->receivedExportBuffer = false;
+        tts->periodicFlush(-1, 0);
+        ASSERT_TRUE(m_topend->receivedExportBuffer);
+
+        ASSERT_EQ(1, m_topend->partitionIds.front());
+        m_topend->partitionIds.pop();
+        m_topend->signatures.pop();
+        boost::shared_array<char> buffer = m_topend->data.front();
+        m_topend->data.pop_front();
+
+        ReferenceSerializeInputBE in(&buffer.get()[s_batchHeaderStart], 1024);
+
+        std::string geographyStr = ValueFactory::getGeographyValue(&geography, m_pool.get()).toString();
+
+        // Validate the batch header and records
+        const void* endPointer;
+        ASSERT_TRUE(readAndValidateHeader(in, endPointer, 7, timestamp1, timestamp2, 2));
+        ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+                [&geographyStr](SerializeInputBE *in) { return in != nullptr && in->remaining() == geographyStr.length() &&
+                        geographyStr == std::string(in->getRawPointer(geographyStr.length()), geographyStr.length()); },
+                [](SerializeInputBE *in) { return in == nullptr; }));
+        ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+                [&geographyStr](SerializeInputBE *in) { return in != nullptr && in->remaining() == geographyStr.length() &&
+                        geographyStr == std::string(in->getRawPointer(geographyStr.length()), geographyStr.length()); },
+                [](SerializeInputBE *in) { return in == nullptr; }));
+
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 }
 
@@ -479,7 +534,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 
     // Now try it with a key and some value columns
@@ -553,7 +608,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 }
 
@@ -637,7 +692,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnCsvEncoder) {
                     ASSERT_EQ(expected, value, false);
                     return true; }));
 
-        ASSERT_EQ(endPointer, in.getRawPointer(0));
+        ASSERT_EQ(endPointer, in.getRawPointer());
     }
 }
 
