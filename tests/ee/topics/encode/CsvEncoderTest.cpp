@@ -57,11 +57,11 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
     ReferenceSerializeOutput out(encoded.get(), size);
 
     csve.encode(out, m_tuple);
-    std::string_view encodedsv(out.data(), out.size());
+    std::string encoded_out(out.data(), out.size());
 
     // Compare against expected
     std::string expected = {"1,2,3,4,5.00000000000000000,1970-01-01 00:00:00.006,7.000000000000,   some silly string,0102030405060708090A,POINT (12.5 78.9),\"POLYGON ((89.427061302317 1.145705569599, 87.455195620187 3.176700617784, 65.772254682046 7.789047734178, 89.427061302317 1.145705569599))\""};
-    ASSERT_EQ(expected, encodedsv);
+    ASSERT_EQ(expected, encoded_out);
 
     // Verify all quoted encoding
     std::unordered_map<std::string, std::string> props;
@@ -73,10 +73,10 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
     ReferenceSerializeOutput out_quoted(encoded_quoted.get(), size_quoted);
 
     csve_quoted.encode(out_quoted, m_tuple);
-    std::string_view encodedsv_quoted(out_quoted.data(), out_quoted.size());
+    std::string encoded_out_quoted(out_quoted.data(), out_quoted.size());
 
     std::string expected_quoted {"\"1\",\"2\",\"3\",\"4\",\"5.00000000000000000\",\"1970-01-01 00:00:00.006\",\"7.000000000000\",\"   some silly string\",\"0102030405060708090A\",\"POINT (12.5 78.9)\",\"POLYGON ((89.427061302317 1.145705569599, 87.455195620187 3.176700617784, 65.772254682046 7.789047734178, 89.427061302317 1.145705569599))\""};
-    ASSERT_EQ(expected_quoted, encodedsv_quoted);
+    ASSERT_EQ(expected_quoted, encoded_out_quoted);
 }
 
 int main() {
