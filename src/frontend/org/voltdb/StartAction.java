@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -73,13 +75,15 @@ public enum StartAction {
     }
 
     public static StartAction monickerFor(String verb) {
-        if (verb == null) return null;
+        if (verb == null) {
+            return null;
+        }
         verb = spaces.matcher(verb.trim().toLowerCase()).replaceAll(" ");
         return verbMoniker.get(verb);
     }
 
-    public String verb() {
-        return m_verb;
+    public Collection<String> verbs() {
+        return Arrays.asList(m_verb.split("\\s+"));
     }
 
     public boolean isEnterpriseOnly() {
