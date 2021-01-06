@@ -92,12 +92,11 @@ public enum EncodeFormat {
                 return LONG;
             case FLOAT:
                 return DOUBLE;
-            case STRING:
-                return STRING;
             case VARBINARY:
                 return BYTEARRAY;
+            case STRING:
             default:
-                return CSV;
+                return STRING;
         }
     }
 
