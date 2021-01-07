@@ -241,7 +241,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
             }
 
             char value = strValue.charAt(0);
-            if (value < ' ' || value > '~') {
+            if (value != '\t' && (value < ' ' || value > '~')) {
                 throw new IllegalArgumentException("Value must be a printable ascii character: '" + strValue + "'");
             }
 

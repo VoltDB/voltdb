@@ -72,6 +72,7 @@ public class TestTopicProperties {
         for (TopicProperties.Key<Character> charKey : ImmutableList.of(TopicProperties.Key.CONFIG_CSV_ESCAPE,
                 TopicProperties.Key.CONFIG_CSV_QUOTE, TopicProperties.Key.CONFIG_CSV_SEPARATOR)) {
             // test boundaries
+            testGoodProperty(charKey, '\t');
             testGoodProperty(charKey, ' ');
             testGoodProperty(charKey, '~');
 
