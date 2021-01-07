@@ -342,6 +342,9 @@ public class SystemInformation extends VoltSystemProcedure
         String publicInterface = null;
         String drPublicInterface = null;
         int drPublicPort = 0;
+        String topicsPublicInterface = null;
+        int topicsPublicPort = 0;
+        int topicsPort = VoltDB.DEFAULT_TOPICS_PORT;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
@@ -363,6 +366,9 @@ public class SystemInformation extends VoltSystemProcedure
             publicInterface = jsObj.getString("publicInterface");
             drPublicInterface = jsObj.getString(VoltZK.drPublicHostProp);
             drPublicPort = jsObj.getInt(VoltZK.drPublicPortProp);
+            topicsPublicInterface = jsObj.getString("topicsPublicHost");
+            topicsPublicPort = jsObj.getInt("topicsPublicPort");
+            topicsPort = jsObj.getInt("topicsport");
         } catch (JSONException e) {
             hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
@@ -455,6 +461,9 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
         vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
         vt.addRow(hostId, "CLUSTERID", Integer.toString(VoltDB.instance().getCatalogContext().getCluster().getDrclusterid()));
+        vt.addRow(hostId, "TOPICSPUBLICINTERFACE", topicsPublicInterface);
+        vt.addRow(hostId, "TOPICSPUBLICPORT", Integer.toString(topicsPublicPort));
+        vt.addRow(hostId, "TOPICSPORT", Integer.toString(topicsPort));
         return vt;
     }
 

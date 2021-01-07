@@ -153,6 +153,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -160,6 +161,7 @@ import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.e3.topics.TopicsConfiguration;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.importer.ImportManager;
@@ -3303,6 +3305,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair(VoltZK.drPublicHostProp, VoltDB.getPublicReplicationInterface());
             stringer.keySymbolValuePair(VoltZK.drPublicPortProp, VoltDB.getPublicReplicationPort());
             stringer.keySymbolValuePair("publicInterface", m_config.m_publicInterface);
+            stringer.keySymbolValuePair("topicsPublicHost", VoltDB.getPublicTopicsInterface());
+            stringer.keySymbolValuePair("topicsPublicPort", VoltDB.getPublicTopicsPort());
+            TopicsType t = m_catalogContext.getDeployment().getTopics();
+            int port = new TopicsConfiguration(t == null ? null : t.getProperties())
+                .getConfigValue(TopicsConfiguration.Entry.PORT);
+            stringer.keySymbolValuePair("topicsport", VoltDB.getTopicsPort(port));
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz

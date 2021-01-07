@@ -368,6 +368,7 @@ class JavaBundle(object):
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
            cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'),
+           cli.StringOption(None, '--topicspublic', 'topicspublic', 'Specifies the interface (ipaddress[:port-number]) advertised to subscribers as the Topics interface, used in hosted environments where internal interfaces are not reachable'),
            cli.StringOption(None, '--topicsport', 'topicsport', 'specify the topics port as [ipaddress:]port-number'))
 
 
@@ -549,6 +550,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['drpublic', runner.opts.drpublic])
         if runner.opts.topicsport:
             final_args.extend(('topicsHostPort', runner.opts.topicsport))
+        if runner.opts.topicspublic:
+            final_args.extend(('topicspublic', runner.opts.topicspublic))
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])

@@ -147,7 +147,7 @@ public class CommandLine extends VoltDB.Configuration
         }
         cl.m_missingHostCount = m_missingHostCount;
         cl.m_topicsHostPort = m_topicsHostPort;
-
+        cl.m_topicsPublicHostPort = m_topicsPublicHostPort;
         return cl;
     }
 
@@ -829,6 +829,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_topicsHostPort != null && m_topicsHostPort.hasPort()) {
             cmdline.add("topicsHostPort");
             cmdline.add(m_topicsHostPort.toString());
+        }
+
+        if (m_topicsPublicHostPort != null) {
+            cmdline.add("topicspublic");
+            cmdline.add(m_topicsPublicHostPort.toString());
         }
 
         return cmdline;

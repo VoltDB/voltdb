@@ -376,6 +376,8 @@ public class VoltDB {
 
         public HostAndPort m_topicsHostPort = null;
 
+        public HostAndPort m_topicsPublicHostPort = null;
+
         /** This is set to 'kubernetes' iff running under kubernetes, and may
             affect some operational behaviour. Other values reserved for future. */
         private String m_voltdbContainer = System.getenv("VOLTDB_CONTAINER");
@@ -407,7 +409,6 @@ public class VoltDB {
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
             for (int n=0; n<args.length;) {
-                int argIndex = n;  // save starting position
                 String arg = args[n++];
 
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
@@ -684,7 +685,11 @@ public class VoltDB {
                     m_timestampTestingSalt = Long.parseLong(val);
                     break;
                 case "topicshostport":
+                    // Listener names and port numbers must be unique.
                     m_topicsHostPort = MiscUtils.getHostAndPortFromInterfaceSpec(val, "", DEFAULT_TOPICS_PORT);
+                    break;
+                case "topicspublic":
+                    m_topicsPublicHostPort = MiscUtils.getHostAndPortFromHostnameColonPort(val, DEFAULT_TOPICS_PORT);
                     break;
                 case "versionoverride": // version string override for testing online upgrade
                     m_versionStringOverrideForTest = val;
@@ -1535,6 +1540,26 @@ public class VoltDB {
         return singleton.s_config.m_drPublicPort;
     }
 
+    public static String getPublicTopicsInterface() {
+        if (singleton.s_config.m_topicsPublicHostPort != null) {
+            return singleton.s_config.m_topicsPublicHostPort.getHost();
+        }
+        return "";
+    }
+
+    public static int getPublicTopicsPort() {
+        if (singleton.s_config.m_topicsPublicHostPort != null  && singleton.s_config.m_topicsPublicHostPort.hasPort()) {
+            return singleton.s_config.m_topicsPublicHostPort.getPort();
+        }
+        return DISABLED_PORT;
+    }
+
+    public static int getTopicsPort(int deploymentPort) {
+        if (singleton.s_config.m_topicsHostPort != null  && singleton.s_config.m_topicsHostPort.hasPort()) {
+            return singleton.s_config.m_topicsHostPort.getPort();
+        }
+        return deploymentPort;
+    }
     /**
      * Selects the a specified m_drInterface over a specified m_externalInterface from m_config
      * @return an empty string when neither are specified
