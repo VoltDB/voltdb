@@ -31,10 +31,6 @@ class VarIntEncoder: public NValueEncoder {
 public:
     VarIntEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
-        return maxSerializedSizeOfVarInt<type>();
-    }
-
     int32_t exactSizeOf(const NValue& value) override {
         return serializedSizeOfVarInt(ValuePeeker::peekAsBigInt(value));
     }
@@ -96,10 +92,6 @@ class VarLenEncoder: public NValueEncoder {
 public:
     VarLenEncoder() = default;
 
-    int32_t maxSizeOf(const NValue& value) override {
-        return maxSerializedSizeOfVarInt<int32_t>() + m_encoder.maxSizeOf(value);
-    }
-
     int32_t exactSizeOf(const NValue& value) override {
         int32_t size = m_encoder.exactSizeOf(value);
         size += serializedSizeOfVarInt(size);
@@ -132,7 +124,7 @@ public:
         TTInt decimal = ValuePeeker::peekDecimal(value);
         out.writeLong(htonll(decimal.table[1]));
         out.writeLong(htonll(decimal.table[0]));
-        return maxSizeOf(value);
+        return exactSizeOf(value);
     }
 };
 

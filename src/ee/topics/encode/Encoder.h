@@ -34,14 +34,6 @@ public:
 
     /**
      * @param tuple that will be serialized
-     * @return the maximum size that the tuple will consume when serialized or -1 if the value to be encoded is null
-     */
-    virtual int32_t maxSizeOf(const TableTuple& tuple) {
-        return exactSizeOf(tuple);
-    }
-
-    /**
-     * @param tuple that will be serialized
      * @return the exact size that the tuple will consume when serialized or -1 if tuple to be encoded is null
      */
     virtual int32_t exactSizeOf(const TableTuple& tuple) = 0;
@@ -90,15 +82,6 @@ protected:
 class NValueEncoder {
 public:
     virtual ~NValueEncoder() {}
-
-    /**
-     * @param value that will be serialized
-     * @return the maximum size that the value will consume when serialized or -1 if value to be encoded is null
-     */
-    virtual int32_t maxSizeOf(const NValue& value) {
-        return exactSizeOf(value);
-    }
-
     /**
      * @param value that will be serialized
      * @return the exact size that the value will consume when serialized or -1 if value to be encoded is null
@@ -115,13 +98,6 @@ public:
     virtual int32_t encode(SerializeOutput& out, const NValue& value) = 0;
 
 protected:
-    /**
-     * Utility method for calculating the max variable length serialized size of an integer type when zigzag encoding is used
-     */
-    template <typename type>
-    static int32_t maxSerializedSizeOfVarInt() {
-        return (sizeof(type) * 8 + 6) / 7;
-    }
     /**
      * Utility method for calculating the serialized size of an integer value written in a zigzag variable length encoding
      *
@@ -155,14 +131,6 @@ template <class ENCODER>
 class SingleValueEncoder : public TupleEncoder {
 public:
     SingleValueEncoder(int32_t index) : m_index(index) {};
-
-    int32_t maxSizeOf(const TableTuple& tuple) override {
-        const NValue value = tuple.getNValue(m_index);
-        if (value.isNull()) {
-            return -1;
-        }
-        return m_encoder.maxSizeOf(value);
-    }
 
     int32_t exactSizeOf(const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);

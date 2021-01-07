@@ -52,7 +52,7 @@ TEST_F(AvroEncoderTest, NonNullableAvro) {
     geography.init(&loops, false);
     insertValues(1, 2, 3, 6092398495938644137L, 5, 6, 7, varchar, binary, &point, &geography);
 
-    int32_t size = ae.maxSizeOf(m_tuple);
+    int32_t size = ae.exactSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
     ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
@@ -123,7 +123,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     geography.init(&loops, false);
     insertValues(1, 2, 3, 6092398495938644137L, 5, 6, 7, varchar, binary, &point, &geography);
 
-    int32_t size = ae.maxSizeOf(m_tuple);
+    int32_t size = ae.exactSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
     ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
@@ -199,7 +199,7 @@ TEST_F(AvroEncoderTest, AllNullAvro) {
 
     std::vector<int32_t> indexes { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
     AvroEncoder ae(25, *m_schema, indexes, std::unordered_map<std::string, std::string>());
-    int32_t size = ae.maxSizeOf(m_tuple);
+    int32_t size = ae.exactSizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
     ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
@@ -238,7 +238,7 @@ TEST_F(AvroEncoderTest, SomeColumnsEncoded) {
         std::vector<int32_t> indexes { 1, 3, 5,};
         AvroEncoder ae(90, *m_schema, indexes, std::unordered_map<std::string, std::string>());
 
-        int32_t size = ae.maxSizeOf(m_tuple);
+        int32_t size = ae.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
         ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
@@ -257,7 +257,7 @@ TEST_F(AvroEncoderTest, SomeColumnsEncoded) {
         std::vector<int32_t> indexes { 5, 3, 1,};
         AvroEncoder ae(90, *m_schema, indexes, std::unordered_map<std::string, std::string>());
 
-        int32_t size = ae.maxSizeOf(m_tuple);
+        int32_t size = ae.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
 
         ReferenceSerializeOutput out(encoded.get(), static_cast<size_t>(size));
@@ -290,7 +290,7 @@ TEST_F(AvroEncoderTest, TimestampEncoding) {
     std::vector<int32_t> indexes { 0 };
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -304,7 +304,7 @@ TEST_F(AvroEncoderTest, TimestampEncoding) {
     props[AvroEncoder::PROP_TIMESTAMP_ENCODING] = std::string("MILLISECONDS");
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -333,7 +333,7 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
     std::vector<int32_t> indexes { 0 };
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -348,7 +348,7 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
     props[AvroEncoder::PROP_POINT_ENCODING] = std::string("BINARY");
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -364,7 +364,7 @@ TEST_F(AvroEncoderTest, GeographyPointEncoding) {
     props[AvroEncoder::PROP_POINT_ENCODING] = std::string("STRING");
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -404,7 +404,7 @@ TEST_F(AvroEncoderTest, GeographyEncoding) {
     std::vector<int32_t> indexes { 0 };
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -421,7 +421,7 @@ TEST_F(AvroEncoderTest, GeographyEncoding) {
     props[AvroEncoder::PROP_GEOGRAPHY_ENCODING] = std::string("STRING");
     {
         AvroEncoder encoder(30, *m_schema, indexes, props);
-        int32_t size = encoder.maxSizeOf(m_tuple);
+        int32_t size = encoder.exactSizeOf(m_tuple);
         std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
         ReferenceSerializeOutput out(encoded.get(), size);
 

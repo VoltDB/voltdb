@@ -32,7 +32,7 @@ TEST_F(Test, NullEncoder) {
     ReferenceSerializeOutput eso(nullptr, 0);
 
     NullEncoder ne;
-    ASSERT_EQ(-1, ne.maxSizeOf(tuple));
+    ASSERT_EQ(-1, ne.exactSizeOf(tuple));
     ASSERT_EQ(-1, ne.encode(eso, tuple));
     ASSERT_EQ(0, eso.position());
 }
@@ -55,7 +55,7 @@ TEST_F(Test, IntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(0);
-        ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val1), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val1), out.position());
 
@@ -67,7 +67,7 @@ TEST_F(Test, IntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(1);
-        ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val2), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val2), out.position());
 
@@ -79,7 +79,7 @@ TEST_F(Test, IntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<IntEncoder> encoder(2);
-        ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
+        ASSERT_EQ(-1, encoder.exactSizeOf(tuple));
         ASSERT_EQ(-1, encoder.encode(out, tuple));
         ASSERT_EQ(0, out.position());
     }
@@ -107,7 +107,7 @@ TEST_F(Test, BigIntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(0);
-        ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val1), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val1), out.position());
 
@@ -119,7 +119,7 @@ TEST_F(Test, BigIntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(1);
-        ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val2), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val2), out.position());
 
@@ -131,7 +131,7 @@ TEST_F(Test, BigIntEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<BigIntEncoder> encoder(2);
-        ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
+        ASSERT_EQ(-1, encoder.exactSizeOf(tuple));
         ASSERT_EQ(-1, encoder.encode(out, tuple));
         ASSERT_EQ(0, out.position());
     }
@@ -160,7 +160,7 @@ TEST_F(Test, DoubleEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(0);
-        ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val1), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val1), out.position());
 
@@ -172,7 +172,7 @@ TEST_F(Test, DoubleEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(1);
-        ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val2), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val2), out.position());
 
@@ -184,7 +184,7 @@ TEST_F(Test, DoubleEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<DoubleEncoder> encoder(2);
-        ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
+        ASSERT_EQ(-1, encoder.exactSizeOf(tuple));
         ASSERT_EQ(-1, encoder.encode(out, tuple));
         ASSERT_EQ(0, out.position());
     }
@@ -213,7 +213,7 @@ TEST_F(Test, VarCharEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(0);
-        ASSERT_EQ(strlen(val1), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(strlen(val1), encoder.exactSizeOf(tuple));
         ASSERT_EQ(strlen(val1), encoder.encode(out, tuple));
         ASSERT_EQ(strlen(val1), out.position());
 
@@ -227,7 +227,7 @@ TEST_F(Test, VarCharEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(1);
-        ASSERT_EQ(strlen(val2), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(strlen(val2), encoder.exactSizeOf(tuple));
         ASSERT_EQ(strlen(val2), encoder.encode(out, tuple));
         ASSERT_EQ(strlen(val2), out.position());
 
@@ -241,7 +241,7 @@ TEST_F(Test, VarCharEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(2);
-        ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
+        ASSERT_EQ(-1, encoder.exactSizeOf(tuple));
         ASSERT_EQ(-1, encoder.encode(out, tuple));
         ASSERT_EQ(0, out.position());
     }
@@ -271,7 +271,7 @@ TEST_F(Test, VarBinaryEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(0);
-        ASSERT_EQ(sizeof(val1), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val1), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val1), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val1), out.position());
 
@@ -285,7 +285,7 @@ TEST_F(Test, VarBinaryEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(1);
-        ASSERT_EQ(sizeof(val2), encoder.maxSizeOf(tuple));
+        ASSERT_EQ(sizeof(val2), encoder.exactSizeOf(tuple));
         ASSERT_EQ(sizeof(val2), encoder.encode(out, tuple));
         ASSERT_EQ(sizeof(val2), out.position());
 
@@ -299,7 +299,7 @@ TEST_F(Test, VarBinaryEncoder) {
     {
         ReferenceSerializeOutput out(&data, sizeof(data));
         SingleValueEncoder<PlainVarLenEncoder> encoder(2);
-        ASSERT_EQ(-1, encoder.maxSizeOf(tuple));
+        ASSERT_EQ(-1, encoder.exactSizeOf(tuple));
         ASSERT_EQ(-1, encoder.encode(out, tuple));
         ASSERT_EQ(0, out.position());
     }
