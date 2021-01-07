@@ -58,7 +58,7 @@ const catalog::Topic* TopicTupleStream::getTopicForStream(const StreamedTable& s
         if (topic != nullptr) {
             const catalog::Property *encoded = topic->properties().get(PROP_STORE_ENCODED);
             // TODO invert this so nullptr keeps topic when the default for PROP_STORE_ENCODED is set to true
-            if (encoded == nullptr || !boost::iequals("true", encoded->value())) {
+            if (encoded == nullptr || !MiscUtil::parseBool(&encoded->value())) {
                 topic = nullptr;
             }
         }
