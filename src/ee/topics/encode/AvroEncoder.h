@@ -37,11 +37,11 @@ public:
     AvroValueEncoder(const AvroValueEncoder& other) :
         m_encoder(other.m_encoder.get()), m_index(other.m_index), m_nullable(other.m_nullable) {}
 
-    int32_t exactSizeOf(const TableTuple& tuple) override {
+    int32_t sizeOf(const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         int32_t length = m_nullable ? 1 : 0;
         if (!value.isNull()) {
-            length += m_encoder->exactSizeOf(value);
+            length += m_encoder->sizeOf(value);
         } else {
             vassert(m_nullable);
         }
@@ -83,9 +83,9 @@ public:
     AvroEncoder(int32_t schemaId, const TupleSchema& schema, const std::vector<int32_t>& indexes,
             const std::unordered_map<std::string, std::string>& props);
 
-    int32_t exactSizeOf(const TableTuple& tuple) override {
+    int32_t sizeOf(const TableTuple& tuple) override {
         return std::accumulate(m_encoders.begin(), m_encoders.end(), s_headerSize,
-                [&tuple](int32_t sum, AvroValueEncoder& encoder) { return sum + encoder.exactSizeOf(tuple); });
+                [&tuple](int32_t sum, AvroValueEncoder& encoder) { return sum + encoder.sizeOf(tuple); });
     }
 
     int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {

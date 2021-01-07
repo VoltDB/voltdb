@@ -52,7 +52,7 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
     std::vector<int32_t> indexes { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
     CsvEncoder csve(*m_schema, indexes, std::unordered_map<std::string, std::string>());
 
-    int32_t size = csve.exactSizeOf(m_tuple);
+    int32_t size = csve.sizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
     ReferenceSerializeOutput out(encoded.get(), size);
 
@@ -68,7 +68,7 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
     props[CsvEncoder::PROP_CSV_QUOTE_ALL] = std::string("true");
     CsvEncoder csve_quoted(*m_schema, indexes, props);
 
-    int32_t size_quoted = csve_quoted.exactSizeOf(m_tuple);
+    int32_t size_quoted = csve_quoted.sizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded_quoted(new uint8_t[size_quoted]);
     ReferenceSerializeOutput out_quoted(encoded_quoted.get(), size_quoted);
 

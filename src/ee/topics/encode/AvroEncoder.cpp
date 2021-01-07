@@ -31,7 +31,7 @@ class VarIntEncoder: public NValueEncoder {
 public:
     VarIntEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         return serializedSizeOfVarInt(ValuePeeker::peekAsBigInt(value));
     }
 
@@ -71,7 +71,7 @@ class DoubleLEEncoder: public NValueEncoder {
 public:
     DoubleLEEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         vassert(ValuePeeker::peekValueType(value) == ValueType::tDOUBLE);
         return sizeof(double);
     }
@@ -92,14 +92,14 @@ class VarLenEncoder: public NValueEncoder {
 public:
     VarLenEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
-        int32_t size = m_encoder.exactSizeOf(value);
+    int32_t sizeOf(const NValue& value) override {
+        int32_t size = m_encoder.sizeOf(value);
         size += serializedSizeOfVarInt(size);
         return size;
     }
 
     int32_t encode(SerializeOutput& out, const NValue& value) override {
-        int32_t len = m_encoder.exactSizeOf(value);
+        int32_t len = m_encoder.sizeOf(value);
         len += out.writeVarLong(len);
         m_encoder.encode(out, value);
         return len;
@@ -116,7 +116,7 @@ class DecimalEncoder: public NValueEncoder {
 public:
     DecimalEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         return sizeof(int64_t) * 2;
     }
 
@@ -124,7 +124,7 @@ public:
         TTInt decimal = ValuePeeker::peekDecimal(value);
         out.writeLong(htonll(decimal.table[1]));
         out.writeLong(htonll(decimal.table[0]));
-        return exactSizeOf(value);
+        return sizeOf(value);
     }
 };
 
@@ -135,7 +135,7 @@ class BinaryPointEncoder: public NValueEncoder {
 public:
     BinaryPointEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         return sizeof(double) * 2;
     }
 
@@ -152,7 +152,7 @@ class StringPointEncoder: public NValueEncoder {
 public:
     StringPointEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         m_valueCache = &value;
         m_stringCache = ValuePeeker::peekGeographyPointValue(value).toWKT();
         return m_stringCache.length();
@@ -183,7 +183,7 @@ class BinaryGeographyEncoder : public NValueEncoder {
 public:
     BinaryGeographyEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         return ValuePeeker::peekGeographyValue(value).length();
     }
 
@@ -201,7 +201,7 @@ class StringGeographyEncoder: public NValueEncoder {
 public:
     StringGeographyEncoder() = default;
 
-    int32_t exactSizeOf(const NValue& value) override {
+    int32_t sizeOf(const NValue& value) override {
         m_valueCache = &value;
         m_stringCache = ValuePeeker::peekGeographyValue(value).toWKT();
         return m_stringCache.length();

@@ -185,8 +185,8 @@ size_t TopicTupleStream::appendTuple(VoltDBEngine* engine, int64_t txnId, int64_
                     0 : UniqueId::tsInMillis(uniqueId) - UniqueId::tsInMillis(m_currBlock->lastSpUniqueId());
 
     int32_t offsetDelta = m_currBlock == nullptr ? 0 : m_currBlock->getRowCount();
-    int32_t keySize = m_keyEncoder->exactSizeOf(tuple);
-    int32_t valueSize = m_valueEncoder->exactSizeOf(tuple);
+    int32_t keySize = m_keyEncoder->sizeOf(tuple);
+    int32_t valueSize = m_valueEncoder->sizeOf(tuple);
 
     size_t recordSize = sizeof(int8_t) /*attributes */
             + SerializeOutput::sizeOfVarLong(offsetDelta)
