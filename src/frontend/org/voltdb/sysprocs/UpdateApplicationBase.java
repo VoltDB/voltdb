@@ -229,6 +229,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             } else if (context.getDeployment().getCluster().getSitesperhost() != dt.getCluster().getSitesperhost()) {
             // Since sitesPerHost is no longer part of catalog, check it here before diff engine
                 retval.errorMsg = "Unable to update deployment configuration: sites per host cannot be changed";
+                retval.dynamicChangeNotSupported = true;
                 return retval;
             } else if (isPromotion && drRole == DrRoleType.REPLICA) {
                 assert dt.getDr().getRole() == DrRoleType.REPLICA;
