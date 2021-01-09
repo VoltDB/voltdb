@@ -38,15 +38,15 @@ public class CSVWriter implements Closeable {
 
     private PrintWriter pw;
 
-    private char separator;
+    private final char separator;
 
-    private char quotechar;
+    private final char quotechar;
 
-    private char escapechar;
+    private final char escapechar;
 
-    private String lineEnd;
+    private final String lineEnd;
 
-    private boolean quoteAll;
+    private final boolean quoteAll;
 
     private char[] extraEscapeChars;
 
@@ -73,6 +73,10 @@ public class CSVWriter implements Closeable {
 
     /** Default value for quoting all value */
     public static final boolean DEFAULT_QUOTE_ALL = true;
+
+    /** FLAG results returned by {@link #stringContainsSpecialCharacters(String)} */
+    private static final byte NEEDS_QUOTE_FLAG = 0x01;
+    private static final byte NEEDS_ESCAPE_FLAG = 0x02;
 
     private ResultSetHelper resultService = new ResultSetHelperService();
 
@@ -230,8 +234,6 @@ public class CSVWriter implements Closeable {
      * @throws java.sql.SQLException thrown by getColumnValue
      */
     public void writeAll(java.sql.ResultSet rs, boolean includeColumnNames)  throws SQLException, IOException {
-
-
         if (includeColumnNames) {
             writeColumnNames(rs);
         }
@@ -251,9 +253,9 @@ public class CSVWriter implements Closeable {
      *            entry.
      */
     public void writeNext(String[] nextLine) {
-
-        if (nextLine == null)
+        if (nextLine == null) {
             return;
+        }
 
         StringBuilder sb = new StringBuilder(INITIAL_STRING_SIZE);
         for (int i = 0; i < nextLine.length; i++) {
@@ -267,15 +269,19 @@ public class CSVWriter implements Closeable {
                 continue;
             }
 
-            boolean containsSpecialCharacters = stringContainsSpecialCharacters(nextElement);
+            byte searchResult = stringContainsSpecialCharacters(nextElement);
 
-            if (quotechar != NO_QUOTE_CHARACTER && (containsSpecialCharacters || quoteAll)) {
+            if ((searchResult & NEEDS_QUOTE_FLAG) == NEEDS_QUOTE_FLAG) {
                 sb.append(quotechar);
             }
 
-            sb.append(containsSpecialCharacters ? processLine(nextElement) : nextElement);
+            if ((searchResult & NEEDS_ESCAPE_FLAG) == NEEDS_ESCAPE_FLAG) {
+                escapeElement(sb, nextElement);
+            } else {
+                sb.append(nextElement);
+            }
 
-            if (quotechar != NO_QUOTE_CHARACTER && (containsSpecialCharacters || quoteAll)) {
+            if ((searchResult & NEEDS_QUOTE_FLAG) == NEEDS_QUOTE_FLAG) {
                 sb.append(quotechar);
             }
         }
@@ -285,36 +291,83 @@ public class CSVWriter implements Closeable {
 
     }
 
-    private boolean stringContainsSpecialCharacters(String line) {
-        if (extraEscapeChars == null) {
-            return line.indexOf(quotechar) != -1 || line.indexOf(escapechar) != -1 ||
-                (!quoteAll && line.indexOf(separator) != -1);
-        } else {
-            for (int i = 0; i < line.length(); i++) {
-                char c = line.charAt(i);
-                if (c == quotechar || c == escapechar || (!quoteAll && c == separator))
-                    return true;
-                for (char eec : extraEscapeChars)
-                    if (c == eec) return true;
-            }
-            return false;
+    /**
+     * {@link #NEEDS_ESCAPE_FLAG} or {@link #NEEDS_QUOTE_FLAG} are only set if the element needs to be quoted or
+     * escaped. The flags will not be set if the corresponding character is not set.
+     *
+     * @param element to test
+     * @return flag result indicating if element needs to be quoted or escaped
+     */
+    private byte stringContainsSpecialCharacters(String element) {
+        byte result = 0;
+        if (quotechar == NO_QUOTE_CHARACTER && escapechar == NO_ESCAPE_CHARACTER) {
+            // Cannot quote or escape so return
+            return result;
         }
+
+        if (quoteAll && quotechar != NO_QUOTE_CHARACTER) {
+            // Always quote when quoteAll is true and there is a character to quote with
+            result = NEEDS_QUOTE_FLAG;
+        }
+
+        int len = element.length();
+        for (int i = 0; i < len; ++i) {
+            char c = element.charAt(i);
+
+            if (c == quotechar) {
+                // quote chars always need to be quoted and escaped so no need to look further
+                if (quotechar != NO_QUOTE_CHARACTER) {
+                    result |= NEEDS_QUOTE_FLAG;
+                }
+                if (escapechar != NO_ESCAPE_CHARACTER) {
+                    result |= NEEDS_ESCAPE_FLAG;
+                }
+                return result;
+            }
+
+            // Only need to quote if separator char or CRLF is in the string. See https://tools.ietf.org/html/rfc4180
+            if (quotechar != NO_QUOTE_CHARACTER && (c == separator || c == '\n' || c == '\r')) {
+                result |= NEEDS_QUOTE_FLAG;
+            }
+
+            if (escapechar != NO_ESCAPE_CHARACTER) {
+                if (c == escapechar) {
+                    result |= NEEDS_ESCAPE_FLAG;
+                } else if (extraEscapeChars != null) {
+                    for (char e : extraEscapeChars) {
+                        if (c == e) {
+                            result |= NEEDS_ESCAPE_FLAG;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If the flag is set or there is no character for set then stop iteration
+            if ((escapechar == NO_ESCAPE_CHARACTER || (result & NEEDS_ESCAPE_FLAG) == NEEDS_ESCAPE_FLAG)
+                    && (quotechar == NO_QUOTE_CHARACTER || (result & NEEDS_QUOTE_FLAG) == NEEDS_QUOTE_FLAG)) {
+                return result;
+            }
+        }
+
+        return result;
     }
 
-    protected StringBuilder processLine(String nextElement)
+    protected void escapeElement(StringBuilder sb, String nextElement)
     {
-        StringBuilder sb = new StringBuilder(INITIAL_STRING_SIZE);
+        assert escapechar != NO_ESCAPE_CHARACTER;
+
         for (int j = 0; j < nextElement.length(); j++) {
             char nextChar = nextElement.charAt(j);
-            if (escapechar != NO_ESCAPE_CHARACTER && nextChar == quotechar) {
+            if (nextChar == quotechar) {
                 sb.append(escapechar).append(nextChar);
                 continue;
             }
-            if (escapechar != NO_ESCAPE_CHARACTER && nextChar == escapechar) {
+            if (nextChar == escapechar) {
                 sb.append(escapechar).append(nextChar);
                 continue;
             }
-            if (escapechar != NO_ESCAPE_CHARACTER && extraEscapeChars != null) {
+            if (extraEscapeChars != null) {
                 boolean matched = false;
                 for (char eec : extraEscapeChars) {
                     if (nextChar == eec) {
@@ -330,7 +383,6 @@ public class CSVWriter implements Closeable {
             // else not escaped
             sb.append(nextChar);
         }
-        return sb;
     }
 
     /**
