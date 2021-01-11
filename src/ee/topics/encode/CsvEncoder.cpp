@@ -46,8 +46,8 @@ CsvEncoder::CsvEncoder(const TupleSchema& schema, const std::vector<int32_t>& in
       m_oss()
 {
     // We must quote any string with separator
-    // Note: newline isn't considered quotable to be compatible with Java CSVWriter
-    m_quotables = {m_separator};
+    m_quotables = {m_separator, m_quote, '\n', '\r'};
+    m_escapables = {m_quote, m_escape};
 }
 
 int32_t CsvEncoder::encode(const TableTuple& tuple) {
@@ -81,7 +81,7 @@ int32_t CsvEncoder::encode(const TableTuple& tuple) {
         std::string strValue = value.toCsvString();
 
         bool hasEscapes = containsEscapableCharacters(strValue);
-        bool mustQuote = hasEscapes || m_quoteAll || strValue.find_first_of(m_quotables) != std::string::npos;
+        bool mustQuote = m_quoteAll || strValue.find_first_of(m_quotables) != std::string::npos;
 
         if (mustQuote) {
             m_oss << m_quote;
@@ -103,12 +103,12 @@ int32_t CsvEncoder::encode(const TableTuple& tuple) {
 }
 
 bool CsvEncoder::containsEscapableCharacters(const std::string& value) {
-    return value.find(m_quote) != std::string::npos || value.find(m_escape) != std::string::npos;
+    return value.find_first_of(m_escapables) != std::string::npos;
 }
 
 void CsvEncoder::insertEscapedValue(const std::string& value) {
-    for (const char& c : value) {
-        if (c == m_quote || c == m_escape) {
+    for (const char c : value) {
+        if (m_escapables.find(c) != std::string::npos) {
             m_oss << m_escape;
         }
         m_oss << c;

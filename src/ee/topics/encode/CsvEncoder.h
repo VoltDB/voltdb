@@ -88,6 +88,7 @@ private:
     const bool m_quoteAll;
 
     std::string m_quotables;
+    std::string m_escapables;
 
     // The cache of last encoded Tuple
     const TableTuple* m_tuple;

@@ -192,7 +192,7 @@ public class CSVWriter implements Closeable {
     // TSV writer escaping carriage return and newline characters
     public static CSVWriter getStrictTSVWriter(Writer writer) {
         CSVWriter retval = new CSVWriter(writer, '\t', NO_QUOTE_CHARACTER, '\\', DEFAULT_LINE_END);
-        retval.extraEscapeChars = new char[] { '\r', '\n' };
+        retval.setEscapedNewlines();
         return retval;
     }
 
@@ -214,6 +214,10 @@ public class CSVWriter implements Closeable {
         for (String[] line : allLines) {
             writeNext(line);
         }
+    }
+
+    public void setEscapedNewlines() {
+        extraEscapeChars = new char[] { '\r', '\n' };
     }
 
     protected void writeColumnNames(ResultSet rs)

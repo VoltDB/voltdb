@@ -28,7 +28,43 @@ using namespace voltdb;
 using namespace voltdb::topics;
 
 class CsvEncoderTest : public EncoderTestBase {
+protected:
+    void testString(const std::string& input, const std::string& expected);
 };
+
+// Insert only the input string into the tuple and compare its csv encoding with the expected value
+void CsvEncoderTest::testString(const std::string& input, const std::string& expected) {
+    setupAllSchema(true);
+    m_tuple.setAllNulls();
+    m_tuple.setNValue(7, ValueFactory::getStringValue(input, &m_pool));
+
+    std::vector<int32_t> indexes { 7 };
+    CsvEncoder csve(*m_schema, indexes, std::unordered_map<std::string, std::string>());
+
+    int32_t size = csve.sizeOf(m_tuple);
+    std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
+    ReferenceSerializeOutput out(encoded.get(), size);
+
+    csve.encode(out, m_tuple);
+    std::string encoded_out(out.data(), out.size());
+    ASSERT_EQ(expected, encoded_out);
+}
+
+TEST_F(CsvEncoderTest, QuoteComma) {
+    testString("i really, should be quoted", "\"i really, should be quoted\"");
+}
+
+TEST_F(CsvEncoderTest, QuoteNewline) {
+    testString("i really\nshould be quoted but NOT escaped", "\"i really\nshould be quoted but NOT escaped\"");
+}
+
+TEST_F(CsvEncoderTest, QuoteCarriageReturn) {
+    testString("i really\rshould be quoted but NOT escaped", "\"i really\rshould be quoted but NOT escaped\"");
+}
+
+TEST_F(CsvEncoderTest, QuoteQuote) {
+    testString("i really\"should be quoted and escaped", "\"i really\"\"should be quoted and escaped\"");
+}
 
 // Basic test that serialization of fields which cannot be null works
 TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
