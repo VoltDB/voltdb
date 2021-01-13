@@ -1439,6 +1439,44 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG20461() throws Exception {
+        /**
+         * The bug using the query would silently drop the CAST operation in the SELECT
+         * predicate that compares a VARCHAR column casted to INTEGER with a integer constant,
+         * and by doing so the comparison would be executed as comparing column values against
+         * stringified integer constant.
+         */
+        final String ddl =
+            "CREATE TABLE ENBA (\n" +
+            "RULE_TYPE varchar(25) NOT NULL,\n" +
+            "RULE_TYPE_ID integer NOT NULL,\n" +
+            "PARM1 varchar(300),\n" +
+            "PARM2 varchar(300));\n" +
+            "CREATE INDEX I_ENBA_I1 ON ENBA(RULE_TYPE, RULE_TYPE_ID, PARM1, PARM2);";
+        final TestEnv env = new TestEnv(ddl, m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+            Stream.of("'31', '45'", "'46', '60'", "'8', '15'")
+                .forEach(entry ->
+                        batcher.add(String.format("INSERT INTO ENBA VALUES('S_SM_LATCH_ACT', 1, %s);\n",
+                                entry), 1));
+            batcher.run();
+            // Both queries select/count 1st and 3rd rows
+            ClientResponse cr = env.m_client.callProcedure("@AdHoc",
+                    "SELECT COUNT(*) FROM ENBA where RULE_TYPE = 'S_SM_LATCH_ACT' AND RULE_TYPE_ID = 1 \n" +
+                    "AND cast(PARM1 AS bigint) <= 34;");
+            assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
+            cr = env.m_client.callProcedure("@AdHoc",
+                    "SELECT COUNT(*) FROM ENBA where RULE_TYPE = 'S_SM_LATCH_ACT' AND RULE_TYPE_ID = 1 \n" +
+                    "AND cast(cast(PARM1 AS float) AS bigint) <= 34;");
+            assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
+        } finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */

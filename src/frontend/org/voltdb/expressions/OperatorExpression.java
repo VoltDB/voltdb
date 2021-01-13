@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
@@ -198,13 +199,26 @@ public class OperatorExpression extends AbstractExpression {
     public boolean isValueTypeIndexable(StringBuffer msg) {
         ExpressionType type = getExpressionType();
         switch(type) {
-        case OPERATOR_NOT:
-        case OPERATOR_IS_NULL:
-        case OPERATOR_EXISTS:
-            msg.append("operator '").append(getExpressionType().symbol()).append("'");
-            return false;
-        default:
-            return true;
+            case OPERATOR_NOT:
+            case OPERATOR_IS_NULL:
+            case OPERATOR_EXISTS:
+                msg.append("operator '").append(getExpressionType().symbol()).append("'");
+                return false;
+            default:
+                return true;
         }
     }
+
+    /**
+     * Casting between numeric and string type are not considered safe, since they use
+     * different comparison semantics
+     */
+    public boolean isSafeCast() {
+        Preconditions.checkState(getExpressionType() == ExpressionType.OPERATOR_CAST);
+        final VoltType dst_type = getValueType(),
+              src_type = getLeft().getValueType();
+        return ! (dst_type.isNumber() && src_type.isVariableLength()) &&
+            ! (dst_type.isVariableLength() && src_type.isNumber());
+    }
 }
+
