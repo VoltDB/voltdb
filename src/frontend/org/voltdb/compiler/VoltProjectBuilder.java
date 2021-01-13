@@ -47,6 +47,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.ConsumerLimitType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -332,6 +333,7 @@ public class VoltProjectBuilder {
     private boolean m_useDDLSchema = false;
 
     private String m_drMasterHost;
+    private String m_drBuffers;
     private Integer m_preferredSource;
     private Boolean m_drConsumerConnectionEnabled = null;
     private String m_drConsumerSslPropertyFile = null;
@@ -884,6 +886,10 @@ public class VoltProjectBuilder {
         m_drMasterHost = drMasterHost;
     }
 
+    public void setDRBuffers(String drBuffers) {
+        m_drBuffers = drBuffers;
+    }
+
     public void setPreferredSource(int preferredSource) {
         m_preferredSource = preferredSource;
     }
@@ -1401,6 +1407,11 @@ public class VoltProjectBuilder {
             conn.setPreferredSource(m_preferredSource);
             conn.setEnabled(m_drConsumerConnectionEnabled);
             conn.setSsl(m_drConsumerSslPropertyFile);
+        }
+        if (m_drBuffers != null && !m_drBuffers.isEmpty()) {
+            ConsumerLimitType consumerLimitType = factory.createConsumerLimitType();
+            consumerLimitType.setMaxbuffers(Integer.parseInt(m_drBuffers));
+            dr.setConsumerlimit(consumerLimitType);
         }
 
         deployment.setFeatures(m_featureOptions);

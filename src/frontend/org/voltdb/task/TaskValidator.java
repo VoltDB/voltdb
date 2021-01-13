@@ -33,7 +33,8 @@ public class TaskValidator extends CatalogValidator {
     @Override
     public boolean validateConfiguration(Catalog catalog, Function<String, Procedure> procedureMapper,
             DeploymentType deployment, InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
-        String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader());
+        String taskErrors = TaskManager.validateTasks(CatalogUtil.getDatabase(catalog), catalogJar.getLoader(),
+                procedureMapper);
         if (taskErrors != null) {
             ccr.errorMsg = taskErrors;
             return false;

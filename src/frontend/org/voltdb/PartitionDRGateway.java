@@ -42,7 +42,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
     }
 
     // Keep sync with EE DRTxnPartitionHashFlag at types.h
-    public enum DRTxnPartitionHashFlag {
+    public static enum DRTxnPartitionHashFlag {
         PLACEHOLDER,
         REPLICATED,
         SINGLE,

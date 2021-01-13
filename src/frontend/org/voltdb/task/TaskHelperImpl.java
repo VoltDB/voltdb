@@ -22,12 +22,9 @@ import java.util.function.UnaryOperator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientInterface;
-import org.voltdb.DefaultProcedureManager;
-import org.voltdb.InvocationDispatcher;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.CompoundErrors;
@@ -44,18 +41,9 @@ final class TaskHelperImpl implements TaskHelper {
     private final int m_scopeId;
     private final Function<String, Procedure> m_procedureGetter;
 
-    private static Function<String, Procedure> createProcedureFunction(Database database) {
-        if (database == null) {
-            return null;
-        }
-        DefaultProcedureManager defaultProcedureManager = new DefaultProcedureManager(database);
-        CatalogMap<Procedure> procedures = database.getProcedures();
-        return p -> InvocationDispatcher.getProcedureFromName(p, procedures, defaultProcedureManager);
-    }
-
     TaskHelperImpl(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,
-            Database database) {
-        this(logger, generateLogMessage, taskName, scope, -1, createProcedureFunction(database));
+            Function<String, Procedure> procedureMapper) {
+        this(logger, generateLogMessage, taskName, scope, -1, procedureMapper);
     }
 
     TaskHelperImpl(VoltLogger logger, UnaryOperator<String> generateLogMessage, String taskName, TaskScope scope,

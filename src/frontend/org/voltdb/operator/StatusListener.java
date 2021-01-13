@@ -53,9 +53,6 @@ public class StatusListener {
     private static final int MAXQUERY = 256;
     private static final int MAXKEYS = 2;
 
-    private final String m_resolvedIntf;
-    private final String m_publicIntf;
-
     private Server m_server;
     private ServerConnector m_connector;
     private String m_hostHeader;
@@ -72,17 +69,18 @@ public class StatusListener {
     /**
      * Status listener:
      * @param intf  interface on which to listen for connections (null for any)
-     * @param port  TCP port number (zero for automatic)
-     * @param publicIntf  address to be returned in 'Host' header (if different)
+     * @param port  TCP port number (must be specified)
      * @throws InitException
      */
-    public StatusListener(String intf, int port, String publicIntf) throws InitException {
-        m_resolvedIntf = resolveInterface(intf, null);
-        m_publicIntf = resolveInterface(publicIntf, m_resolvedIntf);
-        initServer(m_resolvedIntf, port);
-   }
+    public StatusListener(String intf, int port) throws InitException {
+        if (intf != null) {
+            String temp = intf.trim();
+            intf = temp.isEmpty() ? null : temp;
+        }
+        initServer(intf, port);
+    }
 
-    private void initServer(String intf, int portReq) throws InitException {
+    private void initServer(String intf, int port) throws InitException {
         QueuedThreadPool qtp = null;
         Server server = null;
         ServerConnector connector = null;
@@ -91,7 +89,7 @@ public class StatusListener {
             qtp = new QueuedThreadPool(POOLSIZE, 0, REQTMO, new ArrayBlockingQueue<>(QUEUELIM));
             qtp.setName("status-thread-pool");
             server = new Server(qtp);
-            connector = initConnector(server, intf, portReq);
+            connector = initConnector(server, intf, port);
             server.addConnector(connector);
             ServletContextHandler ctxHandler = new ServletContextHandler();
             ctxHandler.setContextPath("/");
@@ -113,37 +111,21 @@ public class StatusListener {
         m_connector = connector;
     }
 
-    private static ServerConnector initConnector(Server server, String intf, int portReq) throws IOException {
-        int portLo = portReq, portHi = portReq;
-        if (portReq == 0) {
-            portLo = VoltDB.DEFAULT_STATUS_PORT;
-            portHi = portLo + 99; // a reasonable range to try
+    private static ServerConnector initConnector(Server server, String intf, int port) throws IOException {
+        try {
+            ServerConnector connector = new ServerConnector(server);
+            connector.setHost(intf); // null for all interfaces
+            connector.setPort(port);
+            connector.setName("status-connector");
+            connector.setIdleTimeout(CONNTMO);
+            connector.setReuseAddress(true); // in case of fast fail/restart
+            connector.open();
+            return connector;
         }
-        for (int port=portLo; port<=portHi; port++) {
-            try {
-                ServerConnector connector = new ServerConnector(server);
-                connector.setHost(intf); // null for all interfaces
-                connector.setPort(port);
-                connector.setName("status-connector");
-                connector.setIdleTimeout(CONNTMO);
-                if (portReq != 0) { // only if port specified
-                    connector.setReuseAddress(true); // in case of fast fail/restart
-                }
-                connector.open();
-                return connector;
-            }
-            catch (IOException ex) {
-                logDebug("Unable to open port %s: %s", port, ex);
-            }
+        catch (IOException ex) {
+            logDebug("Unable to open port %s: %s", port, ex);
         }
-        String fail;
-        if (portLo == portHi) {
-            fail = String.format("Unable to open port %s", portLo);
-        }
-        else {
-            fail = String.format("Unable to open any port in range %s to %s", portLo, portHi);
-        }
-        throw new IOException(fail);
+        throw new IOException(String.format("Unable to open port %s", port));
     }
 
     public String getListenInterface() {
@@ -230,13 +212,8 @@ public class StatusListener {
 
     protected String getHostHeader() {
         if (m_hostHeader == null) {
-            String intf;
-            if (m_publicIntf != null && !m_publicIntf.isEmpty()) {
-                intf = m_publicIntf;
-            } else {
-                intf = getLocalAddress().getHostAddress();
-                logInfo("Using %s for host header", intf);
-            }
+            String  intf = getLocalAddress().getHostAddress();
+            logInfo("Using %s for host header", intf);
             m_hostHeader = intf + ':' + m_connector.getLocalPort();
         }
         return m_hostHeader;
@@ -259,11 +236,6 @@ public class StatusListener {
             addr = CoreUtils.getLocalAddress();
         }
         return addr;
-    }
-
-    private static String resolveInterface(String intf, String defIntf) {
-        String temp = (intf == null ? "" : intf.trim());
-        return temp.isEmpty() ? defIntf : temp;
     }
 
     private static void doLog(Level level, String str, Object[] args) {

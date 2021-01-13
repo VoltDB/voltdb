@@ -64,7 +64,8 @@ public class CatalogValidator {
     private static Entry[] s_implementations = {
             new Entry("org.voltdb.e3.topics.TopicsValidator", true),
             new Entry("org.voltdb.e3.topics.TopicsGatewayValidator", true),
-            new Entry("org.voltdb.task.TaskValidator", false)
+            new Entry("org.voltdb.task.TaskValidator", false),
+            new Entry("org.voltdb.dr2.DRCatalogValidator", true)
     };
 
     /**

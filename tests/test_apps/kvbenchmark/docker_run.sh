@@ -73,7 +73,7 @@ APPCLASSPATH=$({ \
     \ls -1 voltdb/lib/*.jar; \
     \ls -1 voltdb/lib/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-$JAVA -classpath kvbenchmark.jar:${VJAR}:${APPCLASSPATH} -Dlog4j.configuration=file://$LOG4J \
+$JAVA -classpath kvbenchmark.jar:${VJAR}:${APPCLASSPATH} -Dlog4j.configuration=$LOG4J \
         kvbench.SyncBenchmark \
         --displayinterval=$DISPLAYINTERVAL \
         --duration=$DURATION \

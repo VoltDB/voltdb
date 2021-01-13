@@ -18,9 +18,7 @@
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
+import java.io.FileReader;
 import java.io.Serializable;
 
 import org.voltcore.logging.VoltLogger;
@@ -116,45 +114,15 @@ public class PlatformProperties implements Serializable {
         HardwareInfo hw = new HardwareInfo();
 
         // determine ram
-        try {
-            File statFile = new File("/proc/meminfo");
-            FileInputStream fis = new FileInputStream(statFile);
-            try {
-                BufferedReader r = new BufferedReader(new InputStreamReader(fis));
-                String stats = r.readLine();
-                String[] parts = stats.split("\\s+");
-                long memInKB = Long.parseLong(parts[1]);
-                hw.ramInMegabytes = (int) (memInKB / 1024);
-            } finally {
-                fis.close();
-            }
-        }
-        catch (Exception e) {
-            hostLog.fatal("Unable to read /proc/meminfo. Exiting.");
-            System.exit(-1);
-        }
+        String meminfo = readLinuxStat("/proc/meminfo", true, 1);
+        long memInKB = Long.parseLong(meminfo.split("\\s+")[1]);
+        hw.ramInMegabytes = (int) (memInKB / 1024);
 
         // determine cpuinfo
-        StringBuilder sb = new StringBuilder();
-        try {
-            File statFile = new File("/proc/cpuinfo");
-            FileInputStream fis = new FileInputStream(statFile);
-            try {
-                BufferedReader r = new BufferedReader(new InputStreamReader(fis));
-                String line = null;
-                while ((line = r.readLine()) != null)
-                    sb.append(line).append("\n");
-            } finally {
-                fis.close();
-            }
-        }
-        catch (Exception e) {
-            hostLog.fatal("Unable to read /proc/cpuinfo. Exiting.");
-            System.exit(-1);
-        }
-
-        String[] cpus = sb.toString().trim().split("\n\n");
+        String cpuinfo = readLinuxStat("/proc/cpuinfo", true, Integer.MAX_VALUE);
+        String[] cpus = cpuinfo.trim().split("\n\n");
         hw.hardwareThreads = cpus.length;
+
         // almost everything we need is in the first cpu's info section
         String[] lines = cpus[0].trim().split("\n");
         for (String line : lines) {
@@ -175,7 +143,47 @@ public class PlatformProperties implements Serializable {
             }
         }
 
+        // Adjust ram based on any cgroup limit. Empirically, we get a value
+        // of 7fff_ffff_ffff_f000 (max value minus 4k) for no limit. Here
+        // we ignore anything larger than physical memory.
+        String memlimit = readLinuxStat("/sys/fs/cgroup/memory/memory.limit_in_bytes", false, 1);
+        if (memlimit != null) {
+            long limitInMB = Long.parseLong(memlimit.trim()) / (1024 * 1024);
+            if (limitInMB > 0 && limitInMB < hw.ramInMegabytes) {
+                hostLog.info(String.format("Physical memory is %d MB, cgroup limit is %d MB; using cgroup limit",
+                                           hw.ramInMegabytes, limitInMB));
+                hw.ramInMegabytes = (int) limitInMB;
+            }
+        }
+
         return hw;
+    }
+
+    /*
+     * Utility to collect Linux file-like config data, as for example
+     * in the /proc filesystem.
+     */
+    private String readLinuxStat(String filename, boolean required, int lineLimit) {
+        String out = null;
+        try (BufferedReader r = new BufferedReader(new FileReader(filename))) {
+            StringBuilder sb = new StringBuilder();
+            String line = null; int count = 0;
+            while (count < lineLimit && (line = r.readLine()) != null) {
+                sb.append(line).append("\n");
+                count++;
+            }
+            out = sb.toString();
+        }
+        catch (Exception ex) {
+            if (required) {
+                hostLog.fatal(String.format("Exiting because unable to read %s: %s", filename, ex));
+                System.exit(-1);
+            }
+            else {
+                hostLog.debug(String.format("Unable to read %s: %s", filename, ex));
+            }
+        }
+        return out;
     }
 
     protected PlatformProperties() {

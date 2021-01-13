@@ -146,6 +146,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
@@ -1143,9 +1144,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // to be started "early" to be available during initialization.
             else if (config.m_statusPort != VoltDB.DISABLED_PORT) {
                 try {
-                    StatusListener sl = new StatusListener(config.m_statusInterface,
-                                                           config.m_statusPort,
-                                                           config.m_publicInterface);
+                    StatusListener sl = new StatusListener(config.m_statusInterface, config.m_statusPort);
                     sl.start();
                     config.m_statusInterface = sl.getListenInterface();
                     config.m_statusPort = sl.getAssignedPort();
@@ -5220,6 +5219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return false;
         }
         final String drRole = m_catalogContext.getCluster().getDrrole();
+        DrType drType = m_catalogContext.getDeployment().getDr();
         if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRPublicInterfaceAndPortFromMetadata(m_localMetadata);
@@ -5227,7 +5227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     ProClass.HANDLER_CRASH,
                     m_clientInterface, m_cartographer, m_messenger, drConsumerClusterId,
                     (byte) m_catalogContext.cluster.getPreferredsource(), drIfAndPort.getFirst(),
-                    drIfAndPort.getSecond());
+                    drIfAndPort.getSecond(), drType);
             m_globalServiceElector.registerService(m_consumerDRGateway);
             return true;
         }

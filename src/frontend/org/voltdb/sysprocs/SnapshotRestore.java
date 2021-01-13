@@ -1655,7 +1655,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         for (int zz = 0; zz < sourcePartitionSequenceNumbers.length(); zz++) {
                             JSONObject obj = sourcePartitionSequenceNumbers.getJSONObject(zz);
                             int partition = obj.getInt(ExtensibleSnapshotDigestData.EXPORT_PARTITION);
-                            long sequenceNumber = obj.getInt(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBER);
+                            long sequenceNumber = obj.getLong(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBER);
                             long uso = 0;
                             // Snapshots didn't save export USOs pre-8.1
                             if (obj.has(ExtensibleSnapshotDigestData.EXPORT_USO)) {

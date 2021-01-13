@@ -147,7 +147,12 @@ public class DRConsumerStatsBase {
             COVERING_HOST               (VoltType.STRING),
             LAST_RECEIVED_TIMESTAMP     (VoltType.TIMESTAMP),
             LAST_APPLIED_TIMESTAMP      (VoltType.TIMESTAMP),
-            IS_PAUSED                   (VoltType.STRING);
+            IS_PAUSED                   (VoltType.STRING),
+            DUPLICATE_BUFFERS           (VoltType.BIGINT),
+            IGNORED_BUFFERS             (VoltType.BIGINT),
+            AVAILABLE_BYTES             (VoltType.INTEGER),
+            AVAILABLE_BUFFERS           (VoltType.INTEGER),
+            CONSUMER_LIMIT_TYPE         (VoltType.STRING);
 
             public final VoltType m_type;
             DRConsumerPartition(VoltType type) { m_type = type; }

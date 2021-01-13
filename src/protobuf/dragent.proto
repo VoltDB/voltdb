@@ -13,6 +13,8 @@ message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
     optional fixed64 averageRowLatencyNanos = 3;
+    optional int32 consumerBufferUsed = 4;
+    optional int32 consumerBufferBytesUsed = 5;
 }
 
 message SnapshotReq {
@@ -43,6 +45,9 @@ message Subscribe {
     optional bool isCovering = 3;
     optional fixed64 rewindToUniqueId = 4;
     optional bool isSyncing = 5;
+    optional bool usePermits = 6;
+    optional int32 consumerBufferMax = 7;
+    optional int32 consumerBufferBytesMax = 8;
 }
 
 message Query {

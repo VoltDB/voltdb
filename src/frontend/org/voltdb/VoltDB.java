@@ -95,7 +95,6 @@ public class VoltDB {
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
-    public static final int AUTO_STATUS_PORT = 0;
     public static final int DEFAULT_STATUS_PORT = 11780;
     public static final int DEFAULT_TOPICS_PORT = 9092;
     public static final int DEFAULT_ZK_PORT = org.voltcore.common.Constants.DEFAULT_ZK_PORT;
@@ -674,7 +673,7 @@ public class VoltDB {
                     m_userSchemas = parseFiles(val, m_userSchemas, "schema");
                     break;
                 case "statusport":
-                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_statusInterface, AUTO_STATUS_PORT);
+                    hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_statusInterface, DEFAULT_STATUS_PORT);
                     m_statusInterface = hap.getHost();
                     m_statusPort = hap.getPort();
                     break;

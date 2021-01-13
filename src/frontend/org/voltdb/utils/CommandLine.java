@@ -665,7 +665,7 @@ public class CommandLine extends VoltDB.Configuration
         // VOLTDB main() parameters
         //
         cmdline.add("org.voltdb.VoltDB");
-        cmdline.add(m_startAction.verb());
+        cmdline.addAll(m_startAction.verbs());
 
         if (m_startAction == StartAction.PROBE && m_safeMode) {
             cmdline.add("safemode");

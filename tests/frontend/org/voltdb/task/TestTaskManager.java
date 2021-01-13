@@ -1019,7 +1019,8 @@ public class TestTaskManager {
     }
 
     private TaskValidationResult validateTask(Task task) {
-        return TaskManager.validateTask(task, TaskScope.fromId(task.getScope()), m_database, getClass().getClassLoader());
+        return TaskManager.validateTask(task, TaskScope.fromId(task.getScope()), m_database,
+                getClass().getClassLoader(), n -> m_database.getProcedures().get(n));
     }
 
     public static class TestActionScheduler implements ActionScheduler {
