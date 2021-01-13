@@ -589,7 +589,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return answer.planNode();
             }
         }
-
         // End of recursion
         AbstractPlanNode scanNode = getAccessPlanForTable(joinNode);
         // Connect the sub-query tree if any
@@ -649,7 +648,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         //     SELECT * FROM replicated R LEFT JOIN partitioned P1 ON ...
         //                                LEFT JOIN also_partitioned P2 ON ...
         //
-
         assert(joinNode.getRightNode() != null);
         JoinNode innerJoinNode = joinNode.getRightNode();
         AccessPath innerAccessPath = innerJoinNode.m_currentAccessPath;
@@ -691,8 +689,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean canHaveNLJ = true;
         boolean canHaveNLIJ = true;
         if (innerPlan instanceof IndexScanPlanNode) {
-            if (hasInnerOuterIndexExpression(joinNode.getRightNode().getTableAlias(), innerAccessPath.indexExprs,
-                        innerAccessPath.initialExpr, innerAccessPath.endExprs)) {
+            if (hasInnerOuterIndexExpression(joinNode.getRightNode().getTableAlias(),
+                    innerAccessPath.indexExprs, innerAccessPath.initialExpr, innerAccessPath.endExprs)) {
                 canHaveNLJ = false;
             }
         } else {

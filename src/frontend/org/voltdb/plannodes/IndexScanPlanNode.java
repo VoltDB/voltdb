@@ -52,7 +52,8 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode, ScanPlanNodeWhichCanHaveInlineInsert {
+public class IndexScanPlanNode extends AbstractScanPlanNode
+        implements IndexSortablePlanNode, ScanPlanNodeWhichCanHaveInlineInsert {
 
     public enum Members {
         TARGET_INDEX_NAME,
@@ -175,7 +176,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         } else {
             final int searchKeySize = m_searchkeyExpressions.size();
             final int nullExprIndex;
-            if (m_endExpression != null && searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
+            if (m_endExpression != null &&
+                    searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
                 nullExprIndex = searchKeySize;
             } else if (searchKeySize == 0) {
                 m_skip_null_predicate = null;
@@ -189,7 +191,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     public void setSkipNullPredicate(int nullExprIndex, int tableIdx) {
         m_skip_null_predicate = buildSkipNullPredicate(
-                nullExprIndex, m_catalogIndex, m_tableScan, tableIdx, m_searchkeyExpressions, m_compareNotDistinct);
+                nullExprIndex, m_catalogIndex, m_tableScan, tableIdx,
+                m_searchkeyExpressions, m_compareNotDistinct);
     }
 
     static AbstractExpression buildSkipNullPredicate(
@@ -201,8 +204,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         final List<AbstractExpression> indexedExprs;
         if (exprsjson.isEmpty()) {
             indexedExprs = new ArrayList<>();
-
-            final List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
+            final List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(
+                    catalogIndex.getColumns(), "index");
             assert(nullExprIndex < indexedColRefs.size());
             for (int i = 0; i <= nullExprIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
@@ -249,7 +252,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                         && compareNotDistinct.get(i)) {
                     exprType = ExpressionType.COMPARE_NOTDISTINCT;
                 }
-                exprs.add(new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone()));
+                exprs.add(new ComparisonExpression(exprType, idxExpr,
+                        searchkeyExpressions.get(i).clone()));
             }
             // If nullExprIndex fell out of the search key range (there will be no m_compareNotDistinct for it)
             // or m_compareNotDistinct flag says it should ignore null values,
@@ -292,12 +296,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     @Override
     public void validate() {
         super.validate();
-
-        // There needs to be at least one search key expression
-        // TODO: disabled this check. What is the purpose of m_searchkeyExpressions?
-        /*if (m_partialIndexPredicate == null && m_searchkeyExpressions.isEmpty()) {
-            throw new PlanningErrorException("ERROR: There were no search key expressions defined for " + this);
-        }*/
 
         // Validate Expression Trees
         if (m_endExpression != null) {
@@ -403,7 +401,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             int idxToCover) {
         assert(idxToCover < indexedExprs.size());
         final AbstractExpression indexExpression = indexedExprs.get(idxToCover);
-        final List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
+        final List<AbstractExpression> bindings =
+                sortExpression.bindingToIndexedExpression(indexExpression);
         if (bindings != null) {
             m_bindings.addAll(bindings);
             return true;
@@ -471,9 +470,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     public void addEndExpression(AbstractExpression newExpr) {
         if (newExpr != null) {
-            final List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
+            final List<AbstractExpression> newEndExpressions =
+                    ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add(newExpr.clone());
-            m_endExpression = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND,
+                    newEndExpressions);
         }
     }
 
@@ -548,8 +549,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // several expressions.
 
         // Collect all the TVEs in the AbstractExpression members.
-        List<TupleValueExpression> index_tves =
-            new ArrayList<>();
+        List<TupleValueExpression> index_tves = new ArrayList<>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
@@ -591,7 +591,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     @Override
     public void computeCostEstimates(
-            long unusedChildOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] unusedParamHints) {
+            long unusedChildOutputTupleCountEstimate, DatabaseEstimates estimates,
+            ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
         // 1. unique, covering index always wins
@@ -602,7 +603,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
+        DatabaseEstimates.TableEstimates tableEstimates =
+                estimates.getEstimatesForTable(m_targetTableName);
 
         // get the width of the index - number of columns or expression included in the index
         // need doubles for math
@@ -704,7 +706,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // to a discount approaching 0.888... (=8/9) for many skipped filters.
         final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
         // Avoid applying the discount to an initial tie-breaker value of 2 or 3
-        if (!m_eliminatedPostFilterExpressions.isEmpty() && m_estimatedProcessedTupleCount > 3) {
+        if (! m_eliminatedPostFilterExpressions.isEmpty() &&
+                m_estimatedProcessedTupleCount > 3) {
             for (int i = 0; i < m_eliminatedPostFilterExpressions.size(); ++i) {
                 discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
             }
@@ -766,10 +769,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     //all members loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
-        m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        m_lookupType = IndexLookupType.get(jobj.getString(Members.LOOKUP_TYPE.name()));
+        m_sortDirection = SortDirectionType.get(jobj.getString(Members.SORT_DIRECTION.name()));
         if (jobj.has(Members.HAS_OFFSET_RANK.name())) {
             m_hasOffsetRankOptimization = jobj.getBoolean(Members.HAS_OFFSET_RANK.name());
         }
@@ -778,16 +781,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         // load end_expression
-        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
+        m_endExpression = AbstractExpression.fromJSONChild(jobj,
+                Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj,
+                Members.INITIAL_EXPRESSION.name(), m_tableScan);
         // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(
                 m_searchkeyExpressions, jobj, Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
         // load COMPARE_NOTDISTINCT flag vector
         loadBooleanArrayFromJSONObject(jobj, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
         // load skip_null_predicate
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(
+                jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     public boolean isForSortOrderOnly() {
@@ -811,7 +817,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
         }
 
-        String usageInfo;
+        final StringBuilder usageInfo;
         final String predicatePrefix;
         if (keySize == 0) {
             // The plan is easy to explain if it isn't using indexed expressions.
@@ -819,22 +825,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // -- either for determinism or for an explicit ORDER BY requirement.
             switch (m_purpose) {
                 case FOR_DETERMINISM :
-                    usageInfo = " (for deterministic order only)";
+                    usageInfo = new StringBuilder(" (for deterministic order only)");
                     break;
                 case FOR_GROUPING :
-                    usageInfo = " (for optimized grouping only)";
+                    usageInfo = new StringBuilder(" (for optimized grouping only)");
                     break;
                 case FOR_PARTIAL_INDEX :
-                    usageInfo = " (for partial index only)";
+                    usageInfo = new StringBuilder(" (for partial index only)");
                     break;
                 default:
-                    usageInfo = m_hasOffsetRankOptimization ?
-                            " (for offset rank lookup and for sort order)" : " (for sort order only)";
+                    usageInfo = new StringBuilder(m_hasOffsetRankOptimization ?
+                            " (for offset rank lookup and for sort order)" : " (for sort order only)");
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.
             // e.g. " filter by OTHER_COL = 1"
             predicatePrefix = "\n" + indent + " filter by ";
         } else {
+            usageInfo = new StringBuilder();
             int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
             String[] asIndexed = new String[indexSize];
             // Not really expecting to need these fall-back labels,
@@ -873,29 +880,30 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 // " uniquely match (event_id = 1)" vs.
                 // " scan matches for (event_type = 1) AND (event_location = x.region)"
                 if (m_catalogIndex.getUnique()) {
-                    usageInfo = "\n" + indent + " uniquely match " + start;
+                    usageInfo.append("\n").append(indent).append(" uniquely match ").append(start);
                 } else {
-                    usageInfo = "\n" + indent + " scan matches for " + start;
+                    usageInfo.append("\n").append(indent).append(" scan matches for ").append(start);
                 }
             } else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
-                usageInfo = "\n" + indent + " scan for " + start;
+                usageInfo.append("\n").append(indent).append(" scan for ").append(start);
             } else {
-                usageInfo = "\n" + indent;
+                usageInfo.append("\n").append(indent);
                 if (isReverseScan()) {
-                    usageInfo += "reverse ";
+                    usageInfo.append("reverse ");
                 }
                 // qualify whether the inequality matching covers all or only some index key components
                 // " " range-scan covering from (event_type = 1) AND (event_start > x.start_time)" vs
                 // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
-                    usageInfo += "range-scan covering from " + start;
+                    usageInfo.append("range-scan covering from ").append(start);
                 } else {
-                    usageInfo += String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start);
+                    usageInfo.append(
+                            String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start));
                 }
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"
                 // or label it as a scan "to the end"
-                usageInfo += explainEndKeys();
+                usageInfo.append(explainEndKeys());
             }
             // Introduce any additional filters not related to the index
             // that could cause rows to be skipped.
@@ -911,7 +919,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         if (m_targetTableAlias != null && !m_targetTableAlias.equals(m_targetTableName)) {
             tableName += " (" + m_targetTableAlias +")";
         }
-        String retval = "INDEX SCAN of \"" + tableName + "\"";
+        StringBuilder retval = new StringBuilder("INDEX SCAN of \"").append(tableName).append("\"");
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
         if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
@@ -921,9 +929,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
         // Bring all the pieces together describing the index, how it is scanned,
         // and whatever extra filter processing is done to the result.
-        retval += indexDescription;
-        retval += usageInfo + predicate;
-        return retval;
+        return retval.append(indexDescription)
+                .append(usageInfo).append(predicate)
+                .toString();
     }
 
     /// Explain that this index scan begins at the "start" of the index
@@ -937,7 +945,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         StringBuilder result = new StringBuilder("(");
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result.append(conjunction).append(asIndexed[ii]).append(m_compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ")
+            result.append(conjunction).append(asIndexed[ii])
+                    .append(m_compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ")
                    .append(m_searchkeyExpressions.get(ii).explain(getTableNameForExplain()));
             conjunction = ") AND (";
         }
@@ -1031,7 +1040,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+                                          Set<AbstractExpression> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_endExpression != null) {
             collected.addAll(m_endExpression.findAllSubexpressionsOfClass(aeClass));
