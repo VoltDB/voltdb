@@ -2016,7 +2016,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             try {
                 int entriesToDelete = segment.validate(validator);
                 if (entriesToDelete != 0) {
-                    m_numObjects -= entriesToDelete;
                     iter.remove();
                     closeAndDeleteSegment(segment);
                     segmentDeleted = true;
