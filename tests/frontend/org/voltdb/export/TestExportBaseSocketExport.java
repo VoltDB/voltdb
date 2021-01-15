@@ -686,25 +686,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-    @Deprecated
-    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
-            ExportTestExpectedData tester) throws Exception {
-        quiesceAndVerifyTarget(client, streamNames, tester, DEFAULT_DELAY_MS);
-    }
-
-    @Deprecated
-    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
-            ExportTestExpectedData tester, long delayMs) throws Exception {
-        quiesceAndVerifyTarget(client, streamNames, tester, delayMs, false);
-    }
-
-    @Deprecated
-    public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
-            ExportTestExpectedData tester, long delayMs, boolean waitForTuples) throws Exception {
-        tester.waitForTuplesAndVerify(client, Duration.ofMillis(delayMs));
-        System.out.println("Passed!");
-    }
-
     public static void wireupExportTableToCustomExport(String tableName, String procedure) {
         String streamName = tableName;
 

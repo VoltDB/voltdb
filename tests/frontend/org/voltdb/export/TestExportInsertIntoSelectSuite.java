@@ -178,10 +178,8 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(tableRows, numberOfInserts);
-        waitForExportAllRowsDelivered(client, m_streamNames);
-
         assertEquals(tableRows, m_verifier.getExportedDataCount());
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     public void testReadFromStreamInsertIntoSelect() throws Exception {
@@ -239,14 +237,6 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         System.out.println("Testing insert from partitioned table to partitioned export stream");
         doInsertIntoSelectTest(EXPORT_TARGET_PART, SOURCE_PART, "TableInsertNoNulls", "ExportInsertFromTableSelectSP");
     }
-
-    // Inserting from a replicated table into a replicated stream should be allowed but is rejected with the following error:
-    //[ExportInsertFromTableSelectMP.class]: Failed to plan for statement (i_insert_select_repl) "INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS_REPL;". Error: "The target table for an INSERT INTO ... SELECT statement is an stream with no partitioning column defined.  This is not currently supported.  Please define a partitioning column for this stream to use it with INSERT INTO ... SELECT."
-//    public void testReplTableToReplStream() throws Exception {
-//        System.out.println("\n\n------------------------------------------");
-//        System.out.println("Testing insert from partitioned table to partitioned export stream");
-//        doInsertIntoSelectTest(EXPORT_TARGET_REPL, SOURCE_REPL, "TableInsertNoNullsRepl", "ExportInsertFromTableSelectMP");
-//    }
 
     public TestExportInsertIntoSelectSuite(final String name) {
         super(name);

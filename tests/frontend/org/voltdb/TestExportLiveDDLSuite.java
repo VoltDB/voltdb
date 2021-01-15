@@ -351,7 +351,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         startListener();
         // Wait for tuples to be exported before verifying
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
+        m_verifier.waitForTuplesAndVerify(client);
 
         // must still be able to verify the export data.
         client.close();

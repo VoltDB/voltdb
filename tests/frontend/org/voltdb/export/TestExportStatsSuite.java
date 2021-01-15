@@ -302,7 +302,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
 
         // must still be able to verify the export data.
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708

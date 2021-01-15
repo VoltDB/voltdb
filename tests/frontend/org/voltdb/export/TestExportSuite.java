@@ -43,6 +43,8 @@ import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * End to end Export tests using the injected custom export.
  *
@@ -87,7 +89,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             final Object[] params = convertValsToParams("S_NO_NULLS", i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of("S_NO_NULLS", 10L));
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
@@ -100,26 +102,24 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         client = getClient();
 
         // must still be able to verify the export data.
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     // Test that a table w/o Export enabled does not produce Export content
     public void testThatTablesOptIn() throws Exception {
         System.out.println("testThatTablesOptIn");
-        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         final Client client = getClient();
 
         final Object[] rowdata = TestSQLTypesSuite.m_midValues;
         // populate the row data
-        long icnt = m_verifier.getExportedDataCount();
         for (int i = 0; i < 10; i++) {
             // do NOT add row to TupleVerfier as none should be produced
             client.callProcedure("TableInsertLoopback", convertValsToLoaderRow(i, rowdata));
         }
-        //Make sure that we have not recieved any new data.
-        waitForExportAllRowsDelivered(client, m_streamNames);
-        assertEquals(icnt, ExportTestClient.getExportedDataCount());
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        // Make sure that we have not received any new data.
+        quiesce(client);
+        assertEquals(0, ExportTestClient.getExportedDataCount());
+        m_verifier.verifyRows();
     }
 
     // Verify that planner rejects updates to append-only tables
@@ -182,7 +182,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     public void testExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
-        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         final Client client = getClient();
         long icnt = m_verifier.getExportedDataCount();
         for (int i=0; i < 10; i++) {
@@ -202,7 +201,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
         // Make sure some are exported and seen by me
         assertTrue((m_verifier.getExportedDataCount() - icnt > 0));
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     //
@@ -210,7 +209,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     public void testExportPlusSnapshot() throws Exception {
         System.out.println("testExportPlusSnapshot");
-        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table
@@ -254,7 +252,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
 
         // verify the el data
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     public void testSwapTables() throws Exception {

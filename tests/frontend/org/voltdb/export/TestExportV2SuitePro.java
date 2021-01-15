@@ -88,7 +88,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
             client.callProcedure("InsertAddedStream", params);
         }
 
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     public TestExportV2SuitePro(final String name) {

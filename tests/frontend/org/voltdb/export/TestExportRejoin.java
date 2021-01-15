@@ -23,6 +23,7 @@
 
 package org.voltdb.export;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -111,7 +112,7 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         client = getClientToSubsetHosts(new int[] {0, 1, 2});
 
         // must still be able to verify the export data. (wait for 2 minutes max
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, (2 * 60 * 1000));
+        m_verifier.waitForTuplesAndVerify(client, Duration.ofMinutes(2));
     }
 
     public TestExportRejoin(final String name) {
