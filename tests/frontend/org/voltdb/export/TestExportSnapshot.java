@@ -68,7 +68,6 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
     public void testExportSnapshotResetsSequenceNumber() throws Exception {
         System.out.println("testExportSnapshotResetsSequenceNumber");
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;

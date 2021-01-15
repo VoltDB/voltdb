@@ -81,7 +81,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static ExportTestExpectedData m_verifier;
     protected static int m_portCount = 5001;
     protected static VoltProjectBuilder project;
-    protected static List<String> m_streamNames = new ArrayList<>();
     protected static boolean m_verbose = false;
 
     // Default wait is 10 mins
@@ -640,11 +639,5 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     public TestExportBaseSocketExport(String s) {
         super(s);
-    }
-
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
-        m_streamNames = new ArrayList<>();
     }
 }

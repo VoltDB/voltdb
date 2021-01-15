@@ -51,7 +51,6 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        m_streamNames.add("S_ALLOW_NULLS");
     }
 
     @Override
@@ -77,7 +76,6 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        m_streamNames.add("S_ADDED_STREAM");
 
         // verify that it exports
         for (int i=0; i < 10; i++) {

@@ -125,8 +125,6 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         boolean isReplicatedSource = source.contains("REPL");
         boolean isReplicatedTarget = exportTarget.contains("REPL");
         boolean isSinglePartitionProcedure = insertSelectProc.contains("SP");
-        m_streamNames.clear();
-        m_streamNames.add(exportTarget);
 
         int i = 0;
         int tableRows = 0;

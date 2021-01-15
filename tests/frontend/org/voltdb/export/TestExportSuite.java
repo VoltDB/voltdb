@@ -27,7 +27,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -81,7 +80,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     public void testExportAndDroppedTable() throws Exception {
         System.out.println("testExportAndDroppedTable");
-        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -97,7 +95,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                 new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        m_streamNames.remove("S_ALLOW_NULLS");
 
         client = getClient();
 

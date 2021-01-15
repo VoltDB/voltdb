@@ -67,7 +67,6 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
     public void testExportAndThenRejoinUpdatesExportFlow() throws Exception {
         System.out.println("testExportAndThenRejoinClearsExportOverflow");
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;

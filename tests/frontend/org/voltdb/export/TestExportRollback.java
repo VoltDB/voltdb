@@ -88,7 +88,6 @@ public class TestExportRollback extends TestExportBaseSocketExport {
         System.out.println("testExportRollback");
         final Client client = getClient();
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
 
         final double rollbackPerc = 0.15;
         long seed = 0;
