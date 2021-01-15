@@ -180,8 +180,6 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         assertEquals(tableRows, numberOfInserts);
         waitForExportAllRowsDelivered(client, m_streamNames);
 
-        System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
-
         assertEquals(tableRows, m_verifier.getExportedDataCount());
         quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
     }

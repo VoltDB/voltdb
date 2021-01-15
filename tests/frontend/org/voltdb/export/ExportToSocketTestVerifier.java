@@ -42,6 +42,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 public class ExportToSocketTestVerifier {
     private final ArrayDeque<String[]> m_data = new ArrayDeque<String[]>();
+    private int m_totalCount = 0;
     private int m_sequenceNumber = 1;
     // Debug flag to enable verbose output
     private static boolean ENABLE_DEBUG = false;
@@ -58,14 +59,6 @@ public class ExportToSocketTestVerifier {
     public ExportToSocketTestVerifier(String tableName, int partitionId) {
         this.m_tableName = tableName;
         this.m_partitionId = partitionId;
-    }
-
-    void addRow( String [] data) {
-        Preconditions.checkArgument(
-                data == null || data.length > 0,
-                "row size does not match expected row size"
-                );
-        m_data.offer(data);
     }
 
     void addRow( Object [] data) {
@@ -94,6 +87,7 @@ public class ExportToSocketTestVerifier {
                     + m_partitionId + ":" + sb.toString());
         }
         m_data.offer(row);
+        ++m_totalCount;
     }
 
     Matcher<String[]> isExpectedRow() {
@@ -182,5 +176,9 @@ public class ExportToSocketTestVerifier {
 
     public int getSize() {
         return m_data.size();
+    }
+
+    public int getTotalCount() {
+        return m_totalCount;
     }
 }

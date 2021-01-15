@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,9 +43,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -65,6 +68,9 @@ import org.voltdb_testprocs.regressionsuites.exportprocs.InsertAddedStream;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertLoopback;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertNoNulls;
 
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.util.concurrent.Uninterruptibles;
+
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public class TestExportBaseSocketExport extends RegressionSuite {
@@ -81,6 +87,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
     // Default wait is 10 mins
     protected static final long DEFAULT_DELAY_MS = (10 * 60 * 1000);
+    protected static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(1);
 
     public static class ServerListener extends Thread {
 
@@ -147,8 +154,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     System.out.println("Client :" + m_port + " # of connections: " + m_clients.size());
                 } catch (IOException ex) {
                     System.out.println("Client :" + m_port + " # of connections: " + m_clients.size());
-                    if (!m_close)
+                    if (!m_close) {
                         ex.printStackTrace();
+                    }
                     break;
                 }
             }
@@ -273,8 +281,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         final Object[] params = new Object[rowdata.length + 2];
         params[0] = tableName;
         params[1] = i;
-        for (int ii = 0; ii < rowdata.length; ++ii)
+        for (int ii = 0; ii < rowdata.length; ++ii) {
             params[ii + 2] = rowdata[ii];
+        }
         return params;
     }
 
@@ -283,8 +292,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         final Object[] row = new Object[rowdata.length + 2];
         row[0] = (byte) (op == 'I' ? 1 : 0);
         row[1] = i;
-        for (int ii = 0; ii < rowdata.length; ++ii)
+        for (int ii = 0; ii < rowdata.length; ++ii) {
             row[ii + 2] = rowdata[ii];
+        }
         return row;
     }
 
@@ -292,8 +302,9 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 1];
         row[0] = i;
-        for (int ii = 0; ii < rowdata.length; ++ii)
+        for (int ii = 0; ii < rowdata.length; ++ii) {
             row[ii + 1] = rowdata[ii];
+        }
         return row;
     }
 
@@ -368,10 +379,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @param client
      * @throws Exception
      */
+    @Deprecated
     public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
         waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS, false, true);
     }
 
+    @Deprecated
     public static void waitForExportAllRowsDelivered(Client client,
             List<String> streamNames, long delayMs,
             boolean waitForTuples, boolean waitForPending) throws Exception {
@@ -458,6 +471,166 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     /**
+     * Wait for count of tuples specified in {@code streamCounts} to be seen in the statistics which will be retrieved
+     * by {@code client}.
+     * <p>
+     * This also waits for pending tuples to be 0 for all partitions of the streams which are being queried.
+     * <p>
+     * Timeout is {@link #DEFAULT_TIMEOUT}
+     *
+     * @param client       to use to query stats
+     * @param streamCounts map from stream name to minimum count of expected tuples
+     * @throws Exception
+     */
+    public static void waitForExportRowsToBeDelivered(Client client, Map<String, Long> streamCounts) throws Exception {
+        waitForExportRowsToBeDelivered(client, streamCounts, DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Wait for count of tuples specified in {@code streamCounts} to be seen in the statistics which will be retrieved
+     * by {@code client}.
+     * <p>
+     * This also waits for pending tuples to be 0 for all partitions of the streams which are being queried.
+     *
+     * @param client       to use to query stats
+     * @param streamCounts map from stream name to minimum count of expected tuples
+     * @param timeout      duration to wait for tuples to be visible in stats
+     * @throws Exception
+     */
+    public static void waitForExportRowsToBeDelivered(Client client, Map<String, Long> streamCounts,
+            Duration timeout) throws Exception {
+        assertFalse(streamCounts.isEmpty());
+
+        quiesce(client);
+
+        streamCounts = forceCase(streamCounts);
+
+        long endTime = System.nanoTime() + timeout.toNanos();
+        Map<String, MutableLong> counts = new HashMap<>();
+
+        outter: do {
+            counts.clear();
+
+            VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            while (stats.advanceRow()) {
+                String stream = stats.getString("SOURCE");
+                if (!streamCounts.containsKey(stream) || !Boolean.parseBoolean(stats.getString("ACTIVE"))) {
+                    continue;
+                }
+
+                long pending = stats.getLong("TUPLE_PENDING");
+                if (pending != 0) {
+                    String target = stats.getString("TARGET");
+                    Long host = stats.getLong("HOST_ID");
+                    Long pid = stats.getLong("PARTITION_ID");
+                    System.out.println(String.format("%s %s:%d has pending tuples %d. Target: %s", host, stream, pid,
+                            pending, target));
+
+                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    continue outter;
+                }
+
+                counts.computeIfAbsent(stream, s -> new MutableLong()).add(stats.getLong("TUPLE_COUNT"));
+            }
+
+            for (Map.Entry<String, Long> entry : streamCounts.entrySet()) {
+                MutableLong actual = counts.get(entry.getKey());
+                if (actual == null || actual.longValue() < entry.getValue().longValue()) {
+                    System.out.println(String.format("Waiting for %d tuples in %s found %d", entry.getValue(),
+                            entry.getKey(), actual == null ? 0 : actual.longValue()));
+
+                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    continue outter;
+                }
+            }
+
+            return;
+        } while (System.nanoTime() < endTime);
+
+        fail("Timeout waiting for counts " + streamCounts + " found " + counts);
+    }
+
+    /**
+     * Wait for number of tuples to visible in the export stats retrieved by {@code client}. {@code streamCounts} is a
+     * map from stream name to a map which maps partition ID to tuple count in that partition. These have to be exact
+     * counts
+     *
+     * @param client         to use to query stats
+     * @param streamCounts   map from stream name to map of partition id to count. Counts are exact
+     * @param waitForPending If {@code true} this will wait for pending tuples to be 0
+     * @param timeout        duration to wait for tuples to be visible in stats
+     * @throws Exception
+     */
+    public static void waitForExportRowsByPartitionToBeDelivered(Client client,
+            Map<String, Map<Integer, Integer>> streamCounts, boolean waitForPending, Duration timeout)
+            throws Exception {
+        assertFalse(streamCounts.isEmpty());
+
+        quiesce(client);
+
+        streamCounts = forceCase(streamCounts);
+
+        long endTime = System.nanoTime() + timeout.toNanos();
+        Map<String, Map<Integer, Integer>> counts = new HashMap<>();
+        VoltTable stats;
+
+        outter: do {
+            counts.clear();
+
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            while (stats.advanceRow()) {
+                String stream = stats.getString("SOURCE");
+                if (!streamCounts.containsKey(stream) || !Boolean.parseBoolean(stats.getString("ACTIVE"))) {
+                    continue;
+                }
+
+                int partition = (int) stats.getLong("PARTITION_ID");
+                if (waitForPending) {
+                    long pending = stats.getLong("TUPLE_PENDING");
+                    if (pending != 0) {
+                        String target = stats.getString("TARGET");
+                        Long host = stats.getLong("HOST_ID");
+                        Long pid = stats.getLong("PARTITION_ID");
+                        System.out.println(String.format("%s %s:%d has pending tuples %d. Target: %s", host, stream,
+                                pid, pending, target));
+
+                        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                        continue outter;
+                    }
+                }
+
+                counts.computeIfAbsent(stream, s -> new HashMap<>()).put(partition, (int) stats.getLong("TUPLE_COUNT"));
+            }
+
+            for (Map.Entry<String, Map<Integer, Integer>> partitions : streamCounts.entrySet()) {
+                Map<Integer, Integer> actualPartitions = counts.get(partitions.getKey());
+                if (actualPartitions == null) {
+                    System.out.println("No active active streams found for " + partitions.getKey());
+                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    continue outter;
+                }
+
+                for (Map.Entry<Integer, Integer> partition : partitions.getValue().entrySet()) {
+                    if (!Objects.equals(partition.getValue(), actualPartitions.get(partition.getKey()))) {
+                        System.out.println(String.format("Waiting for tuple counts to match %s",
+                                Maps.difference(streamCounts, counts).entriesDiffering()));
+                        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                        continue outter;
+                    }
+                }
+            }
+
+            return;
+        } while (System.nanoTime() < endTime);
+
+        fail("Timeout waiting for counts " + streamCounts + " found " + counts + ":\n" + stats);
+    }
+
+    private static <V> Map<String, V> forceCase(Map<String, V> map) {
+        return map.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().toUpperCase(), Map.Entry::getValue));
+    }
+
+    /**
      * Wait for all Export Streams to be removed (after all the streams are dropped)
      *
      * @param client
@@ -513,22 +686,22 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-
+    @Deprecated
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester) throws Exception {
         quiesceAndVerifyTarget(client, streamNames, tester, DEFAULT_DELAY_MS);
     }
 
+    @Deprecated
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester, long delayMs) throws Exception {
         quiesceAndVerifyTarget(client, streamNames, tester, delayMs, false);
     }
 
+    @Deprecated
     public void quiesceAndVerifyTarget(final Client client, final List<String> streamNames,
             ExportTestExpectedData tester, long delayMs, boolean waitForTuples) throws Exception {
-        client.drain();
-        waitForExportAllRowsDelivered(client, streamNames, delayMs, waitForTuples, true);
-        tester.verifyRows();
+        tester.waitForTuplesAndVerify(client, Duration.ofMillis(delayMs));
         System.out.println("Passed!");
     }
 
