@@ -40,6 +40,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * End to end Export tests using the injected custom export.
  *
@@ -60,7 +62,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         super.setUp();
 
         startListener();
-        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
     }
 
     @Override
@@ -99,6 +100,9 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         if (MiscUtils.isPro()) {
             numOfStreams += 2;
         }
+
+        Map<String, Long> streamCounts = new HashMap<>();
+
         System.out.println("testExportDataAfterCatalogUpdateDropAndAdd");
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
@@ -108,7 +112,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         ClientResponse response;
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "EX" + i;
-            m_streamNames.add(tab);
+            streamCounts.put(tab, 1L);
             response = client.callProcedure("@AdHoc", "create stream " + tab +
                     " partition on column i export to target " + tab + " (i integer not null)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
@@ -116,7 +120,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         //create a non stream table
         for (int i = 0; i < numOfStreams; i++) {
@@ -128,7 +132,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         //drop a non stream table
         for (int i = 0; i < numOfStreams; i++) {
@@ -140,7 +144,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         //create a stream view table
         for (int i = 0; i < numOfStreams; i++) {
@@ -152,23 +156,24 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         if (MiscUtils.isPro()) {
             // Add more streams in PRO beyond what is allowed in community
             for (int i = 0; i < numOfStreams; i++) {
                 String newtab = "NEX" + i;
                 String etab = "EX" + i;
-                m_streamNames.add(newtab);
                 response = client.callProcedure("@AdHoc", "create stream " + newtab +
                         " partition on column i export to target " + newtab + " (i integer not null)");
-
                 assertEquals(response.getStatus(), ClientResponse.SUCCESS);
+                streamCounts.put(newtab, 0L);
+
                 response = client.callProcedure("@AdHoc", "insert into " + etab + " values(444)");
                 assertEquals(response.getStatus(), ClientResponse.SUCCESS);
+                streamCounts.compute(etab, (t, c) -> c == null ? 1L : ++c);
             }
             //We should consume all again.
-            waitForExportAllRowsDelivered(client, m_streamNames);
+            waitForExportRowsToBeDelivered(client, streamCounts);
         }
 
         // drop a stream view table
@@ -181,14 +186,14 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         // drop all streams at the same time to avoid catalog updates
         // being rejected on streams not yet closed
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "EX" + i;
-            m_streamNames.remove(tab);
+            streamCounts.remove(tab);
             sb.append("drop stream ").append(tab).append(";");
         }
         response = client.callProcedure("@AdHoc", sb.toString());
@@ -196,7 +201,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         if (MiscUtils.isPro()) {
             // In the Pro path of the test the NEX streams don't get dropped
-            waitForExportAllRowsDelivered(client, m_streamNames);
+            waitForExportRowsToBeDelivered(client, streamCounts);
         }
         else {
             //After drop there should be no stats rows for export.
@@ -206,7 +211,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         //recreate tables and export again
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "EX" + i;
-            m_streamNames.add(tab);
+            streamCounts.put(tab, 1L);
             for (int j = 0; j < 10; j++) {
                 response = null;
                 try {
@@ -226,7 +231,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, streamCounts);
 
         // must still be able to verify the export data.
         client.close();
@@ -247,7 +252,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         response = client.callProcedure("@AdHoc", "create stream ex partition on column i export to target ex (i integer not null)");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
-        m_streamNames.add("EX");
 
         //export some data
         for (int i = 0; i < 5; i++) {
@@ -255,7 +259,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of("EX", 5L));
 
         //create procedure and then insert data again.
         response = client.callProcedure("@AdHoc", "create PROCEDURE CountFunny AS SELECT COUNT(*) FROM funny WHERE j=?;");
@@ -266,7 +270,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of("EX", 10L));
 
 
         //create procedure and then insert data again.
@@ -278,7 +282,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of("EX", 15L));
 
 
         // must still be able to verify the export data.
@@ -335,10 +339,10 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             return;
         }
         System.out.println("testCatalogUpdateNonEmptyExport");
+        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor + 1);
         Client client = getClient();
         closeSocketExporterClientAndServer();
         client.callProcedure("@AdHoc", "create stream ex partition on column i export to target ex (i integer not null)");
-        m_streamNames.add("EX");
         StringBuilder insertSql = new StringBuilder();
         Object[] param = new Object[2];
         Arrays.fill(param, 1);

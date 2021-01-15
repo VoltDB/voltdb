@@ -39,8 +39,6 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 
-import com.google_voltpatches.common.collect.ImmutableList;
-
 /**
  *
  */
@@ -174,12 +172,8 @@ public class TestExportGap extends ExportLocalClusterBase {
                 "s1_target");
         m_cluster.updateCatalog(m_builder);
 
-        // Sleep for the export flush interval
-        Thread.sleep(250);
         // Wait for exports to drain
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, ImmutableList.of(stream));
-
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(m_client);
     }
 
     @After

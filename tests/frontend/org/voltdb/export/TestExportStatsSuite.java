@@ -24,7 +24,6 @@
 package org.voltdb.export;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +40,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -163,7 +164,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         System.out.println("\n\nTESTING TUPLE COUNT STATISTICS\n\n\n");
         Client client = getFullyConnectedClient();
         startListener();
-        m_streamNames.addAll(Arrays.asList("S_NO_NULLS", "TUPLE_COUNT_EXPORT"));
 
         callAdHocExpectSuccess(client,
                 "CREATE TABLE tuple_count_persist ( foobar SMALLINT NOT NULL, PRIMARY KEY( foobar )); " +
@@ -172,7 +172,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client,
                 "INSERT INTO tuple_count_persist VALUES ( 2 ); " +
                 "INSERT INTO tuple_count_export VALUES ( 2 );");
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of("S_NO_NULLS", 0L, "TUPLE_COUNT_EXPORT", 0L));
 
         // Verify that table stats show both insertions.
         checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);
@@ -255,7 +255,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         System.out.println("testExportSnapshotTruncatesExportData");
         Client client = getClient();
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
 
         for (int i = 0; i < 40; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -282,7 +281,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        m_verifier.waitForTuples(client);
 
         for (int i = 40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -291,18 +290,16 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             ClientResponse response = client.callProcedure("ExportInsertNoNulls", params);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
-        client.drain();
-        waitForExportAllRowsDelivered(client, m_streamNames);
+        m_verifier.waitForTuples(client);
         m_config.shutDown();
 
         // Restore the snapshot
         m_config.startUp(false);
         client = getClient();
         client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
-        client.drain();
 
         // must still be able to verify the export data.
-        m_verifier.waitForTuplesAndVerify(client);
+        m_verifier.verifyRows();
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708

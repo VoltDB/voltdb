@@ -26,9 +26,7 @@ package org.voltdb.export;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map.Entry;
 
 import org.junit.After;
@@ -55,7 +53,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
             + "     a integer not null, "
             + "     b integer not null"
             + ");";
-    private static List<String> streamNames = new ArrayList<>();
 
     @Before
     public void setUp() throws Exception
@@ -71,7 +68,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         builder.setDeadHostTimeout(30);
         // Each stream needs an exporter configuration
         String streamName = "t";
-        streamNames = new ArrayList<>(Arrays.asList(streamName));
         builder.addExport(true /* enabled */,
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                          createSocketExportProperties(streamName, false /* is replicated stream? */),
@@ -129,8 +125,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         insertToStream("t", 200, 100, client, data);
 
         client.drain();
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     @Test
@@ -153,8 +148,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         }
 
         client.drain();
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     @Test
@@ -187,7 +181,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         }
 
         client.drain();
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(client);
     }
 }

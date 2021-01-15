@@ -34,12 +34,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -372,103 +371,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             new ProcedureInfo(InsertAddedStream.class,
                     new ProcedurePartitionData ("S_ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
     };
-
-    /**
-     * Wait for export processor to catch up and have nothing to be exported.
-     *
-     * @param client
-     * @throws Exception
-     */
-    @Deprecated
-    public static void waitForExportAllRowsDelivered(Client client, List<String> streamNames) throws Exception {
-        waitForExportAllRowsDelivered(client, streamNames, DEFAULT_DELAY_MS, false, true);
-    }
-
-    @Deprecated
-    public static void waitForExportAllRowsDelivered(Client client,
-            List<String> streamNames, long delayMs,
-            boolean waitForTuples, boolean waitForPending) throws Exception {
-        boolean passed = false;
-        assertFalse(streamNames.isEmpty());
-        Set<String> matchStreams = new HashSet<>(streamNames.stream().map(String::toUpperCase).collect(Collectors.toList()));
-
-        // Quiesce to see all data flushed.
-        System.out.println("Quiesce client....");
-        quiesce(client);
-        System.out.println("Quiesce done....");
-
-        VoltTable stats = null;
-        long ftime = 0;
-        long st = System.currentTimeMillis();
-        // Wait 10 mins only
-        long end = System.currentTimeMillis() + delayMs;
-        while (true) {
-            boolean passedThisTime = true;
-            long ctime = System.currentTimeMillis();
-            if (ctime > end) {
-                System.out.println("Waited too long...");
-                System.out.println(stats);
-                break;
-            }
-            if (ctime - st > (3 * 60 * 1000)) {
-                System.out.println(stats);
-                st = System.currentTimeMillis();
-            }
-            long ts = 0;
-            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
-            while (stats.advanceRow()) {
-                if (waitForTuples) {
-                    long t = stats.getLong("TUPLE_COUNT");
-                    if (t == 0) {
-                        continue;
-                    }
-                }
-                Long tts = stats.getLong("TIMESTAMP");
-                // Get highest timestamp and watch is change
-                if (tts > ts) {
-                    ts = tts;
-                }
-                long m = stats.getLong("TUPLE_PENDING");
-                String source = stats.getString("SOURCE");
-                if (!matchStreams.contains(source)) {
-                    continue;
-                }
-                if (waitForPending && 0 != m) {
-                    String target = stats.getString("TARGET");
-                    Long host = stats.getLong("HOST_ID");
-                    Long pid = stats.getLong("PARTITION_ID");
-                    if (target.isEmpty()) {
-                        // Stream w/o target keeps pending data forever, log and skip counting this stream
-                        System.out.println("Pending export data is not zero but target is disabled: " +
-                                source + " pend:" + m  + " host:" + host + " partid:" + pid);
-                    } else {
-                        passedThisTime = false;
-                        System.out.println("Partition Not Zero: " + source + " pend:" + m  + " host:" + host + " partid:" + pid);
-                        break;
-                    }
-                }
-                else {
-                    matchStreams.remove(source);
-                }
-            }
-            if (passedThisTime) {
-                if (ftime == 0) {
-                    ftime = ts;
-                    continue;
-                }
-                // we got 0 stats 2 times in row with diff highest timestamp.
-                if (ftime != ts) {
-                    passed = true;
-                    break;
-                }
-                System.out.println("Passed but not ready to declare victory.");
-            }
-            Thread.sleep(1000);
-        }
-        System.out.println("Passed is: " + passed);
-        // System.out.println(stats);
-        assertTrue(passed && matchStreams.isEmpty());
-    }
 
     /**
      * Wait for count of tuples specified in {@code streamCounts} to be seen in the statistics which will be retrieved
