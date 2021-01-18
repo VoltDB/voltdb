@@ -53,6 +53,13 @@ namespace voltdb
         {}
 
         /**
+         * Return true if empty
+         */
+        virtual inline bool empty() const {
+            return offset() == 0;
+        }
+
+        /**
          * Returns a pointer to the underlying raw memory allocation
          */
         inline char* rawPtr() {
@@ -322,6 +329,14 @@ namespace voltdb
         TopicStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
             ExportStreamBlock(data, headerSize, capacity, uso) {
             m_offset = s_batchHeaderSize;
+        }
+
+        /**
+         * Return true if empty
+         */
+        bool empty() const override {
+            vassert(offset() >= s_batchHeaderSize);
+            return offset() == s_batchHeaderSize;
         }
 
         /**

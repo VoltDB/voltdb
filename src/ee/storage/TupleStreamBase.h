@@ -305,7 +305,7 @@ void TupleStreamBase<SB>::commonExtendBufferChain(size_t blockSize, size_t start
     }
 
     if (m_currBlock) {
-        if (m_currBlock->offset() > 0) {
+        if (!m_currBlock->empty()) {
             m_pendingBlocks.push_back(m_currBlock);
             m_currBlock = NULL;
         }
