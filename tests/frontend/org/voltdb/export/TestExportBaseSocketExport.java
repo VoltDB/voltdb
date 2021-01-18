@@ -42,7 +42,6 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -68,7 +67,6 @@ import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertLoopback;
 import org.voltdb_testprocs.regressionsuites.exportprocs.TableInsertNoNulls;
 
 import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.util.concurrent.Uninterruptibles;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -427,7 +425,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     System.out.println(String.format("%s %s:%d has pending tuples %d. Target: %s", host, stream, pid,
                             pending, target));
 
-                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    Thread.sleep(250);
                     continue outter;
                 }
 
@@ -440,7 +438,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     System.out.println(String.format("Waiting for %d tuples in %s found %d", entry.getValue(),
                             entry.getKey(), actual == null ? 0 : actual.longValue()));
 
-                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    Thread.sleep(250);
                     continue outter;
                 }
             }
@@ -481,7 +479,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (stats.advanceRow()) {
                 String stream = stats.getString("SOURCE");
-                if (!streamCounts.containsKey(stream) || !Boolean.parseBoolean(stats.getString("ACTIVE"))) {
+                if (!streamCounts.containsKey(stream)) {
                     continue;
                 }
 
@@ -491,23 +489,26 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     if (pending != 0) {
                         String target = stats.getString("TARGET");
                         Long host = stats.getLong("HOST_ID");
-                        Long pid = stats.getLong("PARTITION_ID");
                         System.out.println(String.format("%s %s:%d has pending tuples %d. Target: %s", host, stream,
-                                pid, pending, target));
+                                partition, pending, target));
 
-                        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                        Thread.sleep(250);
                         continue outter;
                     }
                 }
 
-                counts.computeIfAbsent(stream, s -> new HashMap<>()).put(partition, (int) stats.getLong("TUPLE_COUNT"));
+                int tupleCount = (int) stats.getLong("TUPLE_COUNT");
+                Integer existing = counts.computeIfAbsent(stream, s -> new HashMap<>()).put(partition, tupleCount);
+                if (waitForPending && existing != null) {
+                    assertEquals(existing.intValue(), tupleCount);
+                }
             }
 
             for (Map.Entry<String, Map<Integer, Integer>> partitions : streamCounts.entrySet()) {
                 Map<Integer, Integer> actualPartitions = counts.get(partitions.getKey());
                 if (actualPartitions == null) {
                     System.out.println("No active active streams found for " + partitions.getKey());
-                    Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                    Thread.sleep(250);
                     continue outter;
                 }
 
@@ -515,7 +516,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     if (!Objects.equals(partition.getValue(), actualPartitions.get(partition.getKey()))) {
                         System.out.println(String.format("Waiting for tuple counts to match %s",
                                 Maps.difference(streamCounts, counts).entriesDiffering()));
-                        Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+                        Thread.sleep(250);
                         continue outter;
                     }
                 }
