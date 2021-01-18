@@ -178,12 +178,13 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(tableRows, numberOfInserts);
-        waitForExportAllRowsDelivered(client, m_streamNames);
-
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
 
         assertEquals(tableRows, m_verifier.getExportedDataCount());
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+
+        // Wait until TUPLE_COUNT is populated in the stats
+        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, m_streamNames, DEFAULT_DELAY_MS, true, true);
+        m_verifier.verifyRows();
     }
 
     public void testReadFromStreamInsertIntoSelect() throws Exception {
@@ -277,7 +278,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         project.addProcedures(INSERTSELECT_PROCEDURES);
         project.addProcedure(TableInsertNoNullsRepl.class);
         project.addProcedure(ExportInsertFromTableSelectMP.class);
-
+        project.setFlushIntervals(250, 250, 250);
         // The partitioned export target
         wireupExportTableToSocketExport(EXPORT_TARGET_PART);
 
