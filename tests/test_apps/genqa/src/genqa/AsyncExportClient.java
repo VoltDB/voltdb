@@ -41,21 +41,13 @@
 package genqa;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.time.Instant;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
@@ -68,74 +60,54 @@ import org.voltdb.client.ClientResponseWithPartitionKey;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.exampleutils.AppHelper;
-import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TxnEgo;
 
-public class AsyncExportClient
-{
+public class AsyncExportClient {
     static VoltLogger log = new VoltLogger("ExportClient");
-    // Transactions between catalog swaps.
-    public static long CATALOG_SWAP_INTERVAL = 500000;
 
-    static class AsyncCallback implements ProcedureCallback
-    {
-        private final long m_rowid;
-        public AsyncCallback(long rowid)
-        {
-            super();
-            m_rowid = rowid;
+    // Operations matched with operations defined in ExportTupleStream::STREAM_ROW_TYPE
+    private static enum OperationType {
+        INSERT(0),
+        DELETE(1),
+        UPDATE(2);
+        final int op;
+        OperationType(int type) {
+            this.op = type;
         }
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-            // Track the result of the request (Success, Failure)
-            long now = System.currentTimeMillis();
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
-            {
-                TrackingResults.incrementAndGet(0);
-                TransactionCounts.incrementAndGet(INSERT);
-            }
-            else
-            {
-                TrackingResults.incrementAndGet(1);
-            }
+        public int get() {
+            return op;
         }
     }
 
-    static class TableExportCallback implements ProcedureCallback
-    {
-
-        private final long m_row_id;
-        private final long m_op;
-        public TableExportCallback(long row_id, long op)
-        {
-            super();
+    static class ExportCallback implements ProcedureCallback {
+        private final OperationType m_op;
+        private final AtomicLongArray m_transactionCounts;
+        private final AtomicLongArray m_committedCounts;
+        private final AtomicLong m_failedCounts;
+        public ExportCallback(OperationType op, AtomicLongArray trancationCounts, AtomicLongArray committedCounts, AtomicLong failedCounts) {
             m_op = op;
-            m_row_id = row_id;
+            m_transactionCounts = trancationCounts;
+            m_committedCounts = committedCounts;
+            m_failedCounts = failedCounts;
         }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) {
-            // Track the result of the request (Success, Failure)
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
-            {
-                int transType = clientResponse.getAppStatus(); // get INSERT, DELETE, or UPDATE
-                TrackingResults.incrementAndGet(0);
-                TransactionCounts.incrementAndGet(transType);
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+                VoltTable v = clientResponse.getResults()[0];
+                // Increase the count only when the sql statement affects rows.
+                // DELETE/UPDATE  may not affect any rows if INSERT with the same row id fails.
+                // See proc TableExport
+                if (m_op == OperationType.INSERT || v.getRowCount() > 0) {
+                    m_committedCounts.incrementAndGet(m_op.get());
+                }
+            } else {
+                log.info("Transaction failed: " + ((ClientResponseImpl)clientResponse).toJSONString());
+                m_failedCounts.incrementAndGet();
             }
-            else
-            {
-                long now = System.currentTimeMillis();
-                TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:%s\n", now,((ClientResponseImpl)clientResponse).toJSONString());
-                log.info("TableExport failed: " + trace);
-                // log.info("Failed row_id: " + m_row_id + ", Operation: " + m_op); // it's static so whose rowid anyway?
-            }
+            m_transactionCounts.incrementAndGet(m_op.get());
         }
     }
 
@@ -178,39 +150,8 @@ public class AsyncExportClient
         }
     }
 
-    // Initialize some common constants and variables
-    private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
-
-    // If testing Table/Export, count inserts, deletes, update fore & aft
-
-    private static int NONE = 0;
-    private static int INSERT = 1;
-    private static int UPDATE_OLD = 2;
-    private static int DELETE = 3;
-    private static int UPDATE_NEW = 4;
-    // TBD: add MIGRATE (5), though not relevant in this test (yet)
-    private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
-    private static final AtomicLongArray QueuedTransactionCounts = new AtomicLongArray(4);
-    private static final AtomicLong NoConnectionsExceptionsCount = new AtomicLong(0);
-    private static final AtomicLong OtherProcCallExceptionCount = new AtomicLong(0);
-
-    private static File deployment = new File("deployment.xml");
-
-    // Connection reference
-    private static final AtomicReference<Client> clientRef = new AtomicReference<Client>();
-
-    // Shutdown flag
-    private static final AtomicBoolean shutdown = new AtomicBoolean(false);
-
     // Connection Configuration
     private static ConnectionConfig config;
-
-    // Test startup time
-    private static long benchmarkStartTS;
-
-    // Statistics manager objects from the client
-    private static ClientStatsContext periodicStatsContext;
-    private static ClientStatsContext fullStatsContext;
 
     private static String[] TABLES = { "EXPORT_PARTITIONED_TABLE_JDBC",
                                        "EXPORT_REPLICATED_TABLE_JDBC",
@@ -222,16 +163,12 @@ public class AsyncExportClient
     }
 
     // Application entry point
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         VoltLogger log = new VoltLogger("ExportClient.main");
-        try
-        {
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
+        Client clientRef = null;
+        long export_table_expected = 0;
+        try {
             // Use the AppHelper utility class to retrieve command line application parameters
-
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(AsyncBenchmark.class.getCanonicalName())
                 .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
@@ -248,8 +185,7 @@ public class AsyncExportClient
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
                 .add("migrate-nottl", "false","use DDL that includes MIGRATE without TTL","false")
                 .add("nottl-interval", "milliseconds", "approximate migrate command invocation interval (in milliseconds)", 2500)
-                .setArguments(args)
-            ;
+                .setArguments(args);
 
             config = new ConnectionConfig(apph);
 
@@ -260,33 +196,28 @@ public class AsyncExportClient
             apph.validate("duration", (config.duration > 0))
                 .validate("poolsize", (config.poolSize > 0))
                 .validate("ratelimit", (config.rateLimit > 0))
-                .validate("latencytarget", (config.latencyTarget > 0))
-            ;
+                .validate("latencytarget", (config.latencyTarget > 0));
 
             // Display actual parameters, for reference
             apph.printActualUsage();
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // Get a client connection - we retry for a while in case the server hasn't started yet
-            createClient();
-            connect();
-
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+            final Client client = createClient();
+            clientRef = client;
+            // Statistics manager objects from the client
+            ClientStatsContext periodicStatsContext = client.createStatsContext();
+            ClientStatsContext fullStatsContext = client.createStatsContext();
 
             // Create a Timer task to display performance data on the procedure
             Timer timer = new Timer(true);
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
-                @Override
-                public void run()
-                {
-                    printStatistics(periodicStatsContext,true);
+            timer.scheduleAtFixedRate(new TimerTask() {
+                      @Override
+                      public void run() {
+                          printStatistics(periodicStatsContext,true);
+                      }
                 }
-            }
-            , config.displayInterval*1000l
-            , config.displayInterval*1000l
+                , config.displayInterval*1000l
+                , config.displayInterval*1000l
             );
 
             // If migrate without TTL is enabled, set things up so a migrate is triggered
@@ -295,216 +226,170 @@ public class AsyncExportClient
             Timer migrateTimer = new Timer(true);
             Random migrateInterval = new Random();
             if (config.migrateWithoutTTL) {
-                migrateTimer.scheduleAtFixedRate(new TimerTask()
-                {
-                    @Override
-                    public void run()
-                    {
-                        trigger_migrate(migrateInterval.nextInt(10)); // vary the migrate/delete interval a little
+                migrateTimer.scheduleAtFixedRate(new TimerTask() {
+                        @Override
+                        public void run() {
+                            trigger_migrate(migrateInterval.nextInt(10), client); // vary the migrate/delete interval a little
+                        }
                     }
-                }
-                , 3000l
-                , config.migrateNoTTLInterval
+                    , 3000l
+                    , config.migrateNoTTLInterval
                 );
             }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+            // Keep track of various counts for INSERT (0), UPDATE (3) and DEELTE (2)
+            AtomicLongArray transactionCounts = new AtomicLongArray(3);
+            AtomicLongArray committedCounts = new AtomicLongArray(3);
+            AtomicLongArray queuedCounts = new AtomicLongArray(3);
+            AtomicLong failedCounts = new AtomicLong(0);
 
-            benchmarkStartTS = System.currentTimeMillis();
             AtomicLong rowId = new AtomicLong(0);
             // Run the benchmark loop for the requested duration
-            final long endTime = benchmarkStartTS + (1000l * config.duration);
-            Random r = new Random();
-            while (endTime > System.currentTimeMillis())
-            {
+            final long endTime = System.currentTimeMillis() + (1000l * config.duration);
+            OperationType [] ops = {OperationType.INSERT, OperationType.UPDATE, OperationType.DELETE};
+            while (endTime > System.currentTimeMillis()) {
                 long currentRowId = rowId.incrementAndGet();
 
-                // Table with Export
+                // Table with Export, do insert, update and delete
                 if (config.usetableexport) {
-                    for (long op = 1; op < 4; op++) {
-                        long retries = 4;
-                        while (retries-- > 0) {
-                            try {
-                                clientRef.get().callProcedure(
-                                        new TableExportCallback(rowId.get(), op),
-                                        "TableExport",
-                                        currentRowId,
-                                        op);
-                                QueuedTransactionCounts.incrementAndGet((int) op);
-                                break;
-                            }
-                            catch (NoConnectionsException e) {
-                                log.info("Exception: " + e);
-                                e.printStackTrace();
-                                NoConnectionsExceptionsCount.incrementAndGet();
-                            }
-                            catch (Exception e) {
-                                log.info("Exception: " + e);
-                                e.printStackTrace();
-                                OtherProcCallExceptionCount.incrementAndGet();
-                            }
-                            Thread.sleep(3000);
+                    for (OperationType op : ops) {
+                        try {
+                            client.callProcedure(
+                                    new ExportCallback(op, transactionCounts, committedCounts, failedCounts),
+                                    "TableExport",
+                                    currentRowId,
+                                    op.get());
+                            queuedCounts.incrementAndGet(op.get());
+                        } catch (Exception e) {
+                            log.info("Exception: " + e);
                         }
                     }
-                }
-               else {
-                // Post the request, asynchronously
-                    try {
-                        clientRef.get().callProcedure(
-                                                      new AsyncCallback(currentRowId),
-                                                      config.procedure,
-                                                      currentRowId,
-                                                      0);
-                    }
-                    catch (Exception e) {
+                } else {
+                   try {
+                       client.callProcedure(
+                               new ExportCallback(OperationType.INSERT, transactionCounts, committedCounts, failedCounts),
+                               config.procedure,
+                               currentRowId,
+                               0);
+                   } catch (Exception e) {
                         log.info("Exception: " + e);
                         e.printStackTrace();
-                        // System.exit(-1);
                     }
                 }
             }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
             // We're done - stop the performance statistics display task
             timer.cancel();
-            // likewise for the migrate task
             migrateTimer.cancel();
-            clientRef.get().drain();
 
             if (config.migrateWithoutTTL) {
                 for (String t : TABLES) {
-                    log_migrating_counts(t);
+                    log_migrating_counts(t, client);
                 }
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
                 log.info("triggering final migrate");
-                trigger_migrate(0);
+                trigger_migrate(0, client);
                 Thread.sleep(7500);
                 for (String t : TABLES) {
-                    log_migrating_counts(t);
+                    log_migrating_counts(t, client);
                 }
             }
 
-            shutdown.compareAndSet(false, true);
-
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-            clientRef.get().drain();
+            client.drain();
 
             Thread.sleep(10000);
 
-            //Write to export table to get count to be expected on other side.
-            log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
-            clientRef.get().callProcedure("InsertExportDoneDetails", TrackingResults.get(0));
+            long totalCount = 0, totalQueued = 0;
+            for (OperationType op : ops) {
+                totalCount += transactionCounts.get(op.get());
+                totalQueued += totalQueued;
+                export_table_expected += committedCounts.get(op.get());
+            }
+            // Opeation UPDATE will produce 2 export rows from both old and new tuples.
+            export_table_expected += committedCounts.get(OperationType.UPDATE.get());
 
-            // Now print application results:
+            if (totalCount != totalQueued) {
+                log.info("The transaction count " + totalCount + " does not match with the quened count " + totalQueued);
+            }
+
+            //Write to export table to get count to be expected on other side.
+            log.info("Writing export count as: " + export_table_expected + " final rowid:" + rowId);
+            client.callProcedure("InsertExportDoneDetails", export_table_expected);
 
             // 1. Tracking statistics
             log.info(
-                String.format(
-              "-------------------------------------------------------------------------------------\n"
-            + " Benchmark Results\n"
-            + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %d calls was received...\n"
-            + " - %,9d Succeeded\n"
-            + " - %,9d Failed (Transaction Error)\n"
-            + "\n\n"
-            + "-------------------------------------------------------------------------------------\n"
-            , TrackingResults.get(0)+TrackingResults.get(1)
-            , TrackingResults.get(0)
-            , TrackingResults.get(1))
-            );
-            if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
-                log.info("WARNING Tracking results total doesn't match final rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
-            }
+                    String.format(
+                            "---------------------------------- Benchmark Results ------------------------------------------\n"
+                                    + "A total of %d calls was received...\n"
+                                    + " - %,9d Succeeded\n"
+                                    + " - %,9d Failed (Transaction Error)\n\n\n"
+                                    , totalCount, export_table_expected, failedCounts.get()
+                    ));
 
             // 2. Print TABLE EXPORT stats if that's configured
             if (config.usetableexport) {
-                log.info(
-                    String.format(
-                        "-------------------------------------------------------------------------------------\n"
-                      + " Table/Export Committed Counts\n"
-                      + "-------------------------------------------------------------------------------------\n\n"
-                      + "A total of %d calls were committed...\n"
-                      + " - %,9d Committed-Inserts\n"
-                      + " - %,9d Committed-Deletes\n"
-                      + " - %,9d Committed-Updates/Before\n"
-                      + " - %,9d None return from SP"
-                      + "\n\n"
-                      + "-------------------------------------------------------------------------------------\n"
-                      , TrackingResults.get(0)+TrackingResults.get(1)
-                      , TransactionCounts.get(INSERT)
-                      , TransactionCounts.get(DELETE)
-                      , TransactionCounts.get(UPDATE_OLD)
-                      , TransactionCounts.get(NONE))
-                      // old & new on each update so either = total updates, not the sum of the 2
-                      // +TransactionCounts.get(UPDATE_NEW)
-                      );
-                log.info(
-                        String.format(
-                            "-------------------------------------------------------------------------------------\n"
-                          + " Table/Export Queued Operation Results\n"
-                          + "-------------------------------------------------------------------------------------\n\n"
-                          + "A total of %d calls were queued...\n"
-                          + " - %,9d Queued-Inserts\n"
-                          + " - %,9d Queued-Deletes\n"
-                          + " - %,9d Queued-Updates/Before"
-                          + "\n\n"
-                          + "-------------------------------------------------------------------------------------\n"
-                          , QueuedTransactionCounts.get(INSERT) + QueuedTransactionCounts.get(DELETE) + QueuedTransactionCounts.get(UPDATE_OLD)
-                          , QueuedTransactionCounts.get(INSERT)
-                          , QueuedTransactionCounts.get(DELETE)
-                          , QueuedTransactionCounts.get(UPDATE_OLD))
-                          // old & new on each update so either = total updates, not the sum of the 2
-                          // +TransactionCounts.get(UPDATE_NEW)
-                          );
+                String msg =  String.format(
+                        "---------------------------------Export Committed and Queued Counts --------------------------------------\n"
+                                + "A total of %d calls were committed, a total of %d calls were queued\n"
+                                + " - %,9d Committed-Inserts\n"
+                                + " - %,9d Committed-Deletes\n"
+                                + " - %,9d Committed-Updates\n"
+                                + " - %,9d Transaction-Inserts\n"
+                                + " - %,9d Transaction-Deletes\n"
+                                + " - %,9d Transaction-Updates\n"
+                                + " - %,9d Queued-Inserts\n"
+                                + " - %,9d Queued-Deletes\n"
+                                + " - %,9d Queued-Updates"
+                                + "\n\n"
+                                , totalCount, totalQueued
+                                , committedCounts.get(OperationType.INSERT.get())
+                                , committedCounts.get(OperationType.DELETE.get())
+                                , committedCounts.get(OperationType.UPDATE.get())
+                                , transactionCounts.get(OperationType.INSERT.get())
+                                , transactionCounts.get(OperationType.DELETE.get())
+                                , transactionCounts.get(OperationType.UPDATE.get())
+                                , queuedCounts.get(OperationType.INSERT.get())
+                                , queuedCounts.get(OperationType.DELETE.get())
+                                , queuedCounts.get(OperationType.UPDATE.get()));
+                log.info(msg);
 
-                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_CDC");
+                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_CDC", client);
                 log.info("\nEXPORT_PARTITIONED_TABLE_CDC count: " + export_table_count);
-
-                long export_table_expected = TransactionCounts.get(INSERT) - TransactionCounts.get(DELETE);
                 if (export_table_count != export_table_expected) {
                     log.info("Insert and delete count " + export_table_expected +
                         " does not match export table count: " + export_table_count + "\n");
-                    // System.err.println("Insert and delete count " + export_table_expected +
-                    //     " does not match export table count: " + export_table_count + "\n");
                 }
-
             }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
-            log.info(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
+            log.info("\n\n-------------------------------- System Statistics ---------------------------------------\n");
             printStatistics(fullStatsContext,false);
 
             // Dump statistics to a CSV file
-            clientRef.get().writeSummaryCSV(
+            client.writeSummaryCSV(
                     fullStatsContext.getStatsByProc().get(config.procedure),
                     csv
                     );
-
-            clientRef.get().close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-        }
-        catch(Exception x)
-        {
-            log.fatal("Exception: " + x);
-            x.printStackTrace();
+        } catch(Exception ex) {
+            log.fatal("Exception: " + ex);
+            ex.printStackTrace();
+        } finally {
+            if (clientRef != null) {
+                try {
+                    clientRef.close();
+                } catch (Exception e) {}
+            }
         }
         // if we didn't get any successes we need to fail
-        if ( TrackingResults.get(0) == 0 ) {
+        if ( export_table_expected == 0 ) {
             log.error("No successful transactions");
             System.exit(-1);
         }
     }
 
-    private static void log_migrating_counts(String table) {
+    private static void log_migrating_counts(String table, Client client) {
         try {
-            VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
+            VoltTable[] results = client.callProcedure("@AdHoc",
                                                                 "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
                                                                 "SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING; " +
                                                                 "SELECT COUNT(*) FROM " + table
@@ -526,11 +411,11 @@ public class AsyncExportClient
         }
     }
 
-    private static void trigger_migrate(int time_window) {
+    private static void trigger_migrate(int time_window, Client client) {
         try {
             VoltTable[] results;
             if (config.procedure.equals("JiggleExportGroupSinglePartition")) {
-                ClientResponseWithPartitionKey[] responses  = clientRef.get().callAllPartitionProcedure("MigratePartitionedExport",
+                ClientResponseWithPartitionKey[] responses  = client.callAllPartitionProcedure("MigratePartitionedExport",
                         time_window);
                 for (ClientResponseWithPartitionKey resp : responses) {
                     if (ClientResponse.SUCCESS == resp.response.getStatus()){
@@ -547,7 +432,7 @@ public class AsyncExportClient
                     }
                 }
             } else {
-                results = clientRef.get().callProcedure("MigrateReplicatedExport", time_window).getResults();
+                results = client.callProcedure("MigrateReplicatedExport", time_window).getResults();
                 log.info("Replicated Migrate - window: " + time_window + " seconds" +
                          ", kafka: " + results[0].asScalarLong() +
                          ", rabbit: " + results[1].asScalarLong() +
@@ -572,37 +457,16 @@ public class AsyncExportClient
         }
     }
 
-    private static long get_table_count(String sqlTable) {
+    private static long get_table_count(String sqlTable, Client client) {
         long count = 0;
         try {
-            count = clientRef.get().callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
+            count = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM " + sqlTable + ";").getResults()[0].asScalarLong();
         }
         catch (Exception e) {
             log.error("Exception in get_table_count: " + e);
             log.error("SELECT COUNT from table " + sqlTable + " failed");
         }
         return count;
-    }
-
-    /**
-     * @param servers A comma separated list of servers using the hostname:port
-     * syntax (where :port is optional).
-     * @throws InterruptedException if anything bad happens with the threads.
-     */
-    static void connect() throws InterruptedException {
-        log.info("Connecting to VoltDB...");
-
-        String[] serverArray = config.parsedServers;
-        Client client = clientRef.get();
-        for (final String server : serverArray) {
-        // connect to the first server in list; with TopologyChangeAware set, no need for more
-            try {
-                client.createConnection(server, config.port);
-                break;
-            }catch (Exception e) {
-                log.error("Connection to " + server + " failed.\n");
-            }
-        }
     }
 
     static Client createClient() {
@@ -619,11 +483,16 @@ public class AsyncExportClient
             clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
         }
         Client client = ClientFactory.createClient(clientConfig);
-        clientRef.set(client);
-
-        periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
-
+        String[] serverArray = config.parsedServers;
+        for (final String server : serverArray) {
+        // connect to the first server in list; with TopologyChangeAware set, no need for more
+            try {
+                client.createConnection(server, config.port);
+                break;
+            }catch (Exception e) {
+                log.error("Connection to " + server + " failed.\n");
+            }
+        }
         return client;
     }
 
