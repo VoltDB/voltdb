@@ -36,8 +36,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
-import java.util.TreeMap;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -49,6 +50,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.serialization.LongDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -72,8 +74,8 @@ public class TopicBenchmark2 {
     static final String TEST_TOPIC = "TEST_TOPIC";
     static final int MAX_SILENCE_MS = 10_000;
 
-    // CSV pre-formatted row template
-    static final String ROW_FMT = "\"%010d\",\"The quick brown fox jumps over the lazy dog; "
+    // CSV pre-formatted row template: only produce the string field as value
+    static final String ROW_FMT = "\"The quick brown fox jumps over the lazy dog; "
             + "Portez ce vieux whisky au juge blond, qui l'aime fort\"";
 
     // Validated CLI config
@@ -103,14 +105,20 @@ public class TopicBenchmark2 {
         @Option(desc="Topic port on servers (default 9095)")
         int topicPort = 9095;
 
-        @Option(desc = "How many produce invocations per producer.")
+        @Option(desc = "How many produce invocations per producer, or how many to verify per subscriber group if no producers.")
         int count = 0;
 
         @Option(desc = "How many producers (default 1, may be 0 for subscribers only).")
         int producers = 1;
 
-        @Option(desc = "How many subscribers (default 0).")
+        @Option(desc = "How many subscribers (default 0): creates groups with 1 subscriber per group. DEPRECATED, use groups/groupmembers")
         int subscribers = 0;
+
+        @Option(desc = "How many subscriber groups (default 0).")
+        int groups = 0;
+
+        @Option(desc = "How many members per subscriber groups (default 0).")
+        int groupmembers = 0;
 
         @Override
         public void validate() {
@@ -119,6 +127,15 @@ public class TopicBenchmark2 {
             if (producers < 0) exitWithMessageAndUsage("producers must be >= 0");
             if (subscribers < 0) exitWithMessageAndUsage("subscribers must be >= 0");
             if (topicPort <= 0) exitWithMessageAndUsage("topicPort must be > 0");
+            if (groups < 0) exitWithMessageAndUsage("groups must be >= 0");
+            if (groups > 0 && groupmembers <= 0) exitWithMessageAndUsage("groupmembers must be > 0 when groups are defined");
+
+            // Fold deprecated subscribers parameter into groups and groupmembers
+            if (subscribers > 0) {
+                if (groups > 0) exitWithMessageAndUsage("subscribers and groups cannot be > 0; using groups is preferred");
+                groups = subscribers;
+                groupmembers = 1;
+            }
         }
     }
 
@@ -249,39 +266,39 @@ public class TopicBenchmark2 {
      * @param broker
      * @return
      */
-    KafkaConsumer<String, String> getConsumer(String groupName, String broker) {
+    KafkaConsumer<Long, String> getConsumer(String groupName, String broker) {
         return new KafkaConsumer<>(
                 ImmutableMap.of(ConsumerConfig.GROUP_ID_CONFIG, groupName,
                         ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, broker,
                         ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "6000"),
-                new StringDeserializer(), new StringDeserializer());
+                new LongDeserializer(), new StringDeserializer());
     }
 
     /**
-     * Reads values from topic, optionally verifying we are getting all the records
-     * <p>
-     * Each consumer belongs to a different group; we stop reading at the first insertion error.
+     * Reads values from topic, verifying we are getting all the records
      */
-    void doReads(int id, String servers, int topicPort, boolean verify) {
+    void doReads(int id, String servers, int topicPort, Set<Long> groupVerifier, AtomicLong duplicateCount) {
 
         String[] serverArray = servers.split(",");
         String kafkaBroker = serverArray[0] + ":" + topicPort;
 
-        // Those must be effectively final
-        TreeMap<String, Integer> rows = new TreeMap<>();
-        long lastPoll = System.currentTimeMillis();
+        // The max count to check depends if we are running a combined producer/subscriber test
+        int maxCount = config.producers != 0 ? config.count * config.producers : config.count;
 
+        long lastPoll = System.currentTimeMillis();
         try {
             // FIXME: we could format a list of hosts
-            try (KafkaConsumer<String, String> consumer = getConsumer("Group-" + id, kafkaBroker)) {
+            try (KafkaConsumer<Long, String> consumer = getConsumer("Group-" + id, kafkaBroker)) {
                 consumer.subscribe(ImmutableList.of(config.topic));
                 int polledCount = 0;
-                int maxCount = config.producers != 0 ? config.count * config.producers : config.count;
-
-                boolean doPoll = true;
-                while (doPoll) {
+                while (true) {
                     // Poll records
-                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+                    ConsumerRecords<Long, String> records = consumer.poll(Duration.ofSeconds(1));
+
+                    if (groupVerifier.size() == maxCount) {
+                        // Another thread polled the last records
+                        return;
+                    }
 
                     // Need an effective final for logging
                     int thisPoll = polledCount += records.count();
@@ -293,43 +310,30 @@ public class TopicBenchmark2 {
 
                     // Decide if polling continues
                     if (failedInserts.get() != 0) {
-                        doPoll = false;
+                        return;
                     }
-                    else if (verify) {
+                    else if (records.count() > 0) {
                         records.forEach(record -> {
                             try {
-                                // Note - we don't CSV-parse but just store the quoted rowId value
-                                Object[] params = record.value().split(",");
-                                if (params == null || params.length == 0) {
-                                    throw new RuntimeException("Subscriber Thread " + id + " parsed empty record, " + thisPoll + " records polled");
-                                }
-
-                                // FIXME: we may want to detect duplicates in the future
-                                Integer count = rows.get((String) params[0]);
-                                if (count == null) {
-                                    rows.put((String) params[0], 1);
-                                }
-                                else {
-                                    rows.put((String) params[0], count.intValue() + 1);
+                                Long rowId = record.key();
+                                boolean added = groupVerifier.add(rowId);
+                                if (!added) {
+                                    duplicateCount.incrementAndGet();
                                 }
                             }
                             catch (Exception e) {
                                 exitWithException("Subscriber Thread " + id + " failed parsing CSV record\n", e);
                             }
                         });
-                        if (rows.size() == maxCount) {
+                        if (groupVerifier.size() == maxCount) {
+                            // We are the one who got the last row for the group (records,count()  > 0)
+                            log.info("Subscriber group " + id + " verified, " + groupVerifier.size() + " records polled, "
+                                    + duplicateCount.get() + " duplicates");
                             // Got all the expected rows
-                            doPoll = false;
+                            return;
                         }
                     }
-                    else if (polledCount >= maxCount) {
-                        doPoll = false;
-                    }
                 }
-            }
-
-            if (verify) {
-                log.info("Subscriber Thread " + id + " verified, " + rows.size() + " records polled");
             }
         }
         catch (Exception e) {
@@ -353,16 +357,15 @@ public class TopicBenchmark2 {
             // FIXME: we could format a list of hosts
             props.put("bootstrap.servers", kafkaBroker);
             props.put("acks", "all");
-            props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            props.put("key.serializer", "org.apache.kafka.common.serialization.LongSerializer");
             props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
             props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, VoltDBKafkaPartitioner.class.getName());
 
-            Producer<String, String> producer = new KafkaProducer<>(props);
+            Producer<Long, String> producer = new KafkaProducer<>(props);
 
             // Insert records until we've reached the configured count
             while (inserts < config.count) {
-                // Note - create records with no key for now
-                producer.send(new ProducerRecord<String, String>(config.topic, String.format(ROW_FMT, rowId.incrementAndGet())),
+                producer.send(new ProducerRecord<Long, String>(config.topic, rowId.incrementAndGet(), ROW_FMT),
                         new Callback() {
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         if(e != null) {
@@ -386,23 +389,26 @@ public class TopicBenchmark2 {
      * @return {@code ArrayList<Thread>} of subscribers, or {@code null} if no subscribers
      */
     ArrayList<Thread> startReaders() {
-        if (config.subscribers == 0) {
+        int nReaders = config.groups * config.groupmembers;
+        if (nReaders == 0) {
             return null;
         }
 
-        Random r = new Random();
-        int verifier = r.nextInt(config.subscribers);
-        log.info("Creating " + config.subscribers + " subscriber threads to topic " + config.topic + ", thread " + verifier + " verifying");
-
+        log.info("Creating " + nReaders + " subscriber threads in " + config.groups + " groups to topic " + config.topic + ", all groups verifying");
         ArrayList<Thread> readers = new ArrayList<>();
-        for (int i = 0; i < config.subscribers; i++) {
-            final int id = i;
-            readers.add(new Thread(new Runnable() {
-                @Override
-                public void run() {
-                      doReads(id, config.servers, config.topicPort, id == verifier);
-                  }
-              }));
+        for (int i = 0; i < config.groups; i++) {
+            final int groupId = i;
+            final Set<Long> groupVerifier = ConcurrentHashMap.newKeySet();
+            final AtomicLong duplicateCount = new AtomicLong(0);
+
+            for (int j = 0; j <  config.groupmembers; j++) {
+                readers.add(new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        doReads(groupId, config.servers, config.topicPort, groupVerifier, duplicateCount);
+                    }
+                }));
+            }
         }
         readers.forEach(t -> t.start());
         return readers;

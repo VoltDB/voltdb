@@ -92,6 +92,8 @@ function server_common() {
     echo
     echo "VOLTDB_BIN=\"${VOLTDB_BIN}\""
     echo
+    echo "LOG4J=\"${LOG4J}\""
+    echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
 }
 
@@ -114,7 +116,7 @@ function run_benchmark_help() {
 # generic run on default topic
 function run_benchmark() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --count=500 \
@@ -122,11 +124,23 @@ function run_benchmark() {
         --subscribers=2
 }
 
+# generic run on default topic, using groups
+function run_group_benchmark() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --count=1000 \
+        --producers=2 \
+        --groups=2 \
+        --groupmembers=2
+}
+
 # the following use a non-default topic as an example
 # producer-only, run once, make sure the (count * producers) matches the count of subscriber-only runs
 function run_producers() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \
@@ -138,7 +152,7 @@ function run_producers() {
 # subscriber-only, run once or more, make sure the count matches (count * producers) of the producer-only run
 function run_subscribers() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \

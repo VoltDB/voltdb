@@ -162,6 +162,8 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         public static final Key<Boolean> TOPIC_STORE_ENCODED = new BooleanKey("topic.store.encoded",
                 false, Boolean.FALSE);
 
+        public static final Key<Boolean> TOPIC_TRACE_SUBSCRIBER_SESSIONS = new BooleanKey("topic.trace.subscriber.sessions", Boolean.FALSE);
+
         // CSV properties
         public static final Key<Character> CONFIG_CSV_SEPARATOR = new CharKey(
                 "config.csv.separator", CSVParser.DEFAULT_SEPARATOR);
