@@ -64,8 +64,7 @@ def shutdown(runner):
             hosts = Hosts(runner.abort)
             for tuple in response.table(0).tuples():
                 hosts.update(*tuple)
-                host = hosts.hosts_by_id.itervalues().next()
-
+            host = hosts.hosts_by_id.itervalues().next()
             if host.get('clustersafety') == "REDUCED":
                 runner.info('Since cluster is in reduced k safety mode, taking a final snapshot before shutdown.')
                 runner.opts.save = True
