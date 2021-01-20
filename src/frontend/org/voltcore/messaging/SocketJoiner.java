@@ -55,14 +55,11 @@ import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.VersionChecker;
 import org.voltcore.utils.ssl.MessagingChannel;
-import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 
 import io.netty.buffer.ByteBufAllocator;
@@ -599,16 +596,6 @@ public class SocketJoiner {
             return SslHandshakeResult.NO_SSL;
         }
         SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT);
-        sslEngine.setUseClientMode(clientMode);
-        sslEngine.setNeedClientAuth(false);
-
-        Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
-        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
-        if (intersection.isEmpty()) {
-            hostLog.warn("Preferred cipher suites are not available");
-            intersection = enabled;
-        }
-        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[intersection.size()]));
         boolean handshakeStatus;
 
         sc.socket().setTcpNoDelay(true);

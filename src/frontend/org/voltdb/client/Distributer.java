@@ -63,7 +63,6 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
@@ -77,7 +76,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
@@ -997,17 +995,6 @@ class Distributer {
 
         if (m_sslContext != null) {
             sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port);
-            sslEngine.setUseClientMode(true);
-
-            Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
-            Set<String> intersection = Sets.intersection(SSLConfiguration.GCM_CIPHERS, enabled);
-            if (intersection.isEmpty()) {
-                intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
-            }
-            if (intersection.isEmpty()) {
-                intersection = enabled;
-            }
-            sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
         }
 
         final Object socketChannelAndInstanceIdAndBuildString[] =

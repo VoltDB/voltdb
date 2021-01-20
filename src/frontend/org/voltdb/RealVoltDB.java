@@ -120,6 +120,7 @@ import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.utils.VersionChecker;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
@@ -233,7 +234,6 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Ordering;
@@ -245,7 +245,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
-import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContextBuilder;
 
@@ -3386,36 +3386,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
-        String[] excludeCiphers = new String[] {
-            "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-            "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_DHE_RSA_WITH_DES_CBC_SHA",
-            "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-            "SSL_RSA_WITH_DES_CBC_SHA",
-            "TLS_DHE_DSS_WITH_AES_128_CBC_SHA",
-            "TLS_DHE_DSS_WITH_AES_256_CBC_SHA",
-            "TLS_DHE_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_DHE_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDH_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDH_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_RSA_WITH_AES_128_CBC_SHA256",
-            "TLS_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_RSA_WITH_AES_256_CBC_SHA256",
-            "TLS_RSA_WITH_AES_256_GCM_SHA384",
-        };
-
         // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites(excludeCiphers);
+        sslContextFactory.setExcludeCipherSuites(SSLConfiguration.EXCLUDED_CIPHERS.toArray(new String[0]));
         sslContextFactory.setKeyManagerPassword(keyStorePassword);
 
         m_config.m_sslContextFactory = sslContextFactory;
@@ -3444,24 +3416,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 throw new IllegalArgumentException("Could not initialize TrustManagerFactory", e);
             }
 
-            ImmutableSet<String> excludeCipherSet = ImmutableSet.copyOf(excludeCiphers);
-
-            CipherSuiteFilter filter = (ciphers, defaultCiphiers, supportedCiphers) -> {
-                List<String> filteredCiphers = new ArrayList<>(supportedCiphers.size());
-                for (String cipher : ciphers == null ? defaultCiphiers : ciphers) {
-                    if (supportedCiphers.contains(cipher) && !excludeCipherSet.contains(cipher)) {
-                        filteredCiphers.add(cipher);
-                    }
-                }
-
-                return filteredCiphers.toArray(new String[filteredCiphers.size()]);
-            };
-
             try {
                 m_config.m_sslServerContext = SslContextBuilder.forServer(keyManagerFactory)
-                        .trustManager(trustManagerFactory).ciphers(null, filter).build();
+                        .trustManager(trustManagerFactory).ciphers(null, SSLConfiguration.CIPHER_FILTER)
+                        .clientAuth(ClientAuth.NONE).build();
                 m_config.m_sslClientContext = SslContextBuilder.forClient().trustManager(trustManagerFactory)
-                        .ciphers(null, filter).build();
+                        .ciphers(null, SSLConfiguration.CIPHER_FILTER).clientAuth(ClientAuth.NONE).build();
             } catch (SSLException e) {
                 throw new IllegalArgumentException("Could not create SslContexts", e);
             }
