@@ -3353,7 +3353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void setupSslContextCreators(SslType sslType, boolean setSslBuilder) {
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
         keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
         if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
