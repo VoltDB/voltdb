@@ -49,21 +49,30 @@ public class SSLConfiguration {
     public static final String TRUSTSTORE_CONFIG_PROP = "trustStore";
     public static final String TRUSTSTORE_PASSWORD_CONFIG_PROP = "trustStorePassword";
 
-    public static Set<String> PREFERRED_CIPHERS = ImmutableSet.<String>builder()
-            .add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256")
+    public static Set<String> GCM_CIPHERS = ImmutableSet.<String>builder()
+            // TLSv1.3 ciphers
+            .add("TLS_AES_256_GCM_SHA384")
+            .add("TLS_AES_128_GCM_SHA256")
+            .add("TLS_CHACHA20_POLY1305_SHA256")
+            // TLSv1.2 and earlier
             .add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_RSA_WITH_AES_256_GCM_SHA384")
             .add("TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384")
             .add("TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384")
             .add("TLS_DHE_RSA_WITH_AES_256_GCM_SHA384")
             .add("TLS_DHE_DSS_WITH_AES_256_GCM_SHA384")
-            .add("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_RSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_DHE_RSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
+            .build();
+
+    public static Set<String> PREFERRED_CIPHERS = ImmutableSet.<String>builder()
+            .addAll(GCM_CIPHERS)
             .add("TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA")
             .add("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA")
             .add("TLS_RSA_WITH_AES_256_CBC_SHA")
@@ -78,23 +87,6 @@ public class SSLConfiguration {
             .add("TLS_ECDH_RSA_WITH_AES_128_CBC_SHA")
             .add("TLS_DHE_RSA_WITH_AES_128_CBC_SHA")
             .add("TLS_DHE_DSS_WITH_AES_128_CBC_SHA")
-            .build();
-
-    public static Set<String> GCM_CIPHERS = ImmutableSet.<String>builder()
-            .add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_RSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_DHE_RSA_WITH_AES_256_GCM_SHA384")
-            .add("TLS_DHE_DSS_WITH_AES_256_GCM_SHA384")
-            .add("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_RSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_DHE_RSA_WITH_AES_128_GCM_SHA256")
-            .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
             .build();
 
     public static SslContext createClientSslContext(SslConfig sslConfig) {
