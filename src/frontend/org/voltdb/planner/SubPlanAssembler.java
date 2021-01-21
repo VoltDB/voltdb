@@ -140,7 +140,6 @@ public abstract class SubPlanAssembler {
         paths.add(getRelevantNaivePath(allJoinExprs, filterExprs));
         for (Index index : tableScan.getIndexes()) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
-
             // Process the index WHERE clause into a list of anded
             // sub-expressions and process each sub-expression, searching the
             // query (or matview) WHERE clause for an expression to cover each
@@ -279,7 +278,19 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
+    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode,
+            AccessPath path, int tableIdx) {
+        return buildIndexAccessPlanForTable(null, scanNode, path, tableIdx);
+    }
+
+    private static AbstractPlanNode buildIndexAccessPlanForTable(StmtTableScan tableScan,
+            AccessPath path) {
+        return buildIndexAccessPlanForTable(tableScan,
+                new IndexScanPlanNode(tableScan, path.index), path, 0);
+    }
+
+    private static AbstractPlanNode buildIndexAccessPlanForTable(StmtTableScan tableScan,
+            IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
         AbstractPlanNode resultNode = scanNode;
         // set sortDirection here because it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -313,7 +324,7 @@ public abstract class SubPlanAssembler {
             // the subquery
             // ENG-8175: this part of code seems not working for float/varchar type index ?!
             // DEAD CODE with the guards on index: ENG-8203
-            assert ! (exprRightChild instanceof AbstractSubqueryExpression);
+            Preconditions.checkState(! (exprRightChild instanceof AbstractSubqueryExpression));
             scanNode.addSearchKeyExpression(exprRightChild);
             // If the index expression is an "IS NOT DISTINCT FROM" comparison, let the NULL values go through. (ENG-11096)
             scanNode.addCompareNotDistinctFlag(expr.getExpressionType() == ExpressionType.COMPARE_NOTDISTINCT);
@@ -322,13 +333,21 @@ public abstract class SubPlanAssembler {
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.endExprs));
+        if (tableScan != null && ! path.index.getPredicatejson().isEmpty()) {
+            try {
+                scanNode.setPartialIndexPredicate(
+                        AbstractExpression.fromJSONString(path.index.getPredicatejson(), tableScan));
+            } catch (JSONException e) {
+                throw new PlanningErrorException(e.getMessage(), 0);
+            }
+        }
         scanNode.setPredicate(path.otherExprs);
         // Propagate the sorting information
         // into the scan node from the access path.
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
-        scanNode.setSkipNullPredicate(tableIdx);
+        scanNode.setSkipNullPredicate(tableIdx < 0 ? 0 : tableIdx);
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         IndexUseForOrderBy indexUse = scanNode.indexUse();
         indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
@@ -546,7 +565,7 @@ public abstract class SubPlanAssembler {
             // (vs. always ascending).
             // In the case of the IN LIST expression, both the search key and the end condition need
             // to be rewritten to enforce equality in turn with each list element "row" produced by
-            // the MaterializedScan. This happens in getIndexAccessPlanForTable.
+            // the MaterializedScan. This happens in buildIndexAccessPlanForTable.
             m_accessPath.endExprs.add(comparator);
 
             // If a provisional sort direction has been determined, the equality filter MAY confirm
@@ -618,7 +637,6 @@ public abstract class SubPlanAssembler {
                     ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
                     m_coveringExpression, m_coveringColId, m_tableScan, m_filtersToCover,
                     false, EXCLUDE_FROM_POST_FILTERS);
-
             // For simplicity of implementation:
             // In some odd edge cases e.g.
             // " FIELD(DOC, 'title') LIKE 'a%' AND FIELD(DOC, 'title') > 'az' ",
@@ -630,7 +648,6 @@ public abstract class SubPlanAssembler {
                 m_endingBoundExpr = doubleBoundExpr.extractEndFromPrefixLike();
             } else {
                 final boolean allowIndexedJoinFilters = m_withoutInListExpression;
-
                 // Look for a lower bound.
                 m_startingBoundExpr = getIndexableExpressionFromFilters(
                         ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
@@ -643,7 +660,6 @@ public abstract class SubPlanAssembler {
                         m_coveringExpression, m_coveringColId, m_tableScan, m_filtersToCover,
                         allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
             }
-
             if (m_startingBoundExpr != null) {
                 final AbstractExpression lowerBoundExpr = m_startingBoundExpr.getFilter();
                 m_accessPath.indexExprs.add(lowerBoundExpr);
@@ -1104,7 +1120,7 @@ public abstract class SubPlanAssembler {
             // (vs. always ascending).
             // In the case of the IN LIST expression, both the search key and the end condition need
             // to be rewritten to enforce equality in turn with each list element "row" produced by
-            // the MaterializedScan. This happens in getIndexAccessPlanForTable.
+            // the MaterializedScan. This happens in buildIndexAccessPlanForTable.
             retval.endExprs.add(comparator);
         }
 
@@ -1862,7 +1878,14 @@ public abstract class SubPlanAssembler {
             } else if (coveringExpr == null) {
                 // Match only the table's column that has the coveringColId
                 // There could be a CAST operator on the indexable expression side. Skip it
-                if (indexableExpr.getExpressionType() == ExpressionType.OPERATOR_CAST) {
+                //
+                // ENG-20461: CAST is droppable only for safe conversions, i.e.
+                // not casting between STRING and NUMBER. Remember that all "STRING"
+                // types in VoltDB are variable lengths.
+                if (indexableExpr.getExpressionType() == ExpressionType.OPERATOR_CAST &&
+                        ((OperatorExpression) indexableExpr).isSafeCast()) {
+                    // CASTING between other types can be safely dropped, to aid
+                    // index coverage matching
                     indexableExpr = indexableExpr.getLeft();
                 }
                 if (indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
@@ -1915,7 +1938,7 @@ public abstract class SubPlanAssembler {
             if (path.index == null) {
                 return getScanAccessPlanForTable(tableScan, path);
             } else {
-                return getIndexAccessPlanForTable(tableScan, path);
+                return buildIndexAccessPlanForTable(tableScan, path);
             }
         }
 
@@ -1933,82 +1956,6 @@ public abstract class SubPlanAssembler {
             // build the predicate
             scanNode.setPredicate(path.otherExprs);
             return scanNode;
-        }
-
-        /**
-         * Get an index scan access plan for a table.
-         *
-         * @param tableScan The table to get data from.
-         * @param path The access path to access the data in the table (index/scan/etc).
-         * @return An index scan plan node OR,
-        in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
-         */
-        private static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path) {
-            // now assume this will be an index scan and get the relevant index
-            final IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, path.index);
-            AbstractPlanNode resultNode = scanNode;
-            // set sortDirection here because it might be used for IN list
-            scanNode.setSortDirection(path.sortDirection);
-            // Build the list of search-keys for the index in question
-            // They are the rhs expressions of normalized indexExpr comparisons
-            // except for geo indexes. For geo indexes, the search key is directly
-            // the one element of indexExprs.
-            for (AbstractExpression expr : path.indexExprs) {
-                if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
-                    scanNode.addSearchKeyExpression(expr);
-                    scanNode.addCompareNotDistinctFlag(false);
-                    continue;
-                }
-                AbstractExpression exprRightChild = expr.getRight();
-                assert(exprRightChild != null);
-                if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
-                    // Replace this method's result with an injected NLIJ.
-                    resultNode = injectIndexedJoinWithMaterializedScan(exprRightChild, scanNode);
-                    // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
-                    final AbstractExpression elemExpr = ((MaterializedScanPlanNode) resultNode.getChild(0)).getOutputExpression();
-                    assert(elemExpr != null);
-                    // Replace the IN LIST condition in the end expression referencing all the list elements
-                    // with a more efficient equality filter referencing the TVE for each element in turn.
-                    replaceInListFilterWithEqualityFilter(path.endExprs, exprRightChild, elemExpr);
-                    // Set up the similar VectorValue --> TVE replacement of the search key expression.
-                    exprRightChild = elemExpr;
-                }
-                // The AbstractSubqueryExpression must be wrapped up into a
-                // ScalarValueExpression which extracts the actual row/column from
-                // the subquery
-                // ENG-8175: this part of code seems not working for float/varchar type index ?!
-                // DEAD CODE with the guards on index: ENG-8203
-                Preconditions.checkState(! (exprRightChild instanceof AbstractSubqueryExpression));
-                scanNode.addSearchKeyExpression(exprRightChild);
-                // If the index expression is an "IS NOT DISTINCT FROM" comparison, let the NULL values go through. (ENG-11096)
-                scanNode.addCompareNotDistinctFlag(expr.getExpressionType() == ExpressionType.COMPARE_NOTDISTINCT);
-            }
-            // create the IndexScanNode with all its metadata
-            scanNode.setLookupType(path.lookupType);
-            scanNode.setBindings(path.bindings);
-            scanNode.setEndExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.endExprs));
-            if (! path.index.getPredicatejson().isEmpty()) {
-                try {
-                    scanNode.setPartialIndexPredicate(
-                            AbstractExpression.fromJSONString(path.index.getPredicatejson(), tableScan));
-                } catch (JSONException e) {
-                    throw new PlanningErrorException(e.getMessage(), 0);
-                }
-            }
-            scanNode.setPredicate(path.otherExprs);
-            // Propagate the sorting information
-            // into the scan node from the access path.
-            // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
-            // iteration after it had to initially settle for starting at "greater than a prefix key".
-            scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
-            scanNode.setSkipNullPredicate(0);
-            scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
-            final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
-            indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
-            indexUse.setSortOrderFromIndexScan(path.sortDirection);
-            indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
-            indexUse.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
-            return resultNode;
         }
 
         // Generate a plan for an IN-LIST-driven index scan

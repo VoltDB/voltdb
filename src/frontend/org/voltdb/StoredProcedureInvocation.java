@@ -223,6 +223,10 @@ public class StoredProcedureInvocation implements JSONString {
         m_batchCall = true;
     }
 
+    public void setBatchCall(boolean batchCall) {
+        m_batchCall = batchCall;
+        assert(getParams().size() == 1);
+    }
     /**
      * @return {@code true} if this is a batch procedure call
      */

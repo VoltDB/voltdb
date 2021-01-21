@@ -108,8 +108,9 @@ public class TestUpdateDeployment extends RegressionSuite {
         public void clientCallback(ClientResponse clientResponse) {
             m_outstandingCalls.decrementAndGet();
             if (m_expectedStatus != clientResponse.getStatus()) {
-                if (clientResponse.getStatusString() != null)
+                if (clientResponse.getStatusString() != null) {
                     System.err.println(clientResponse.getStatusString());
+                }
                 callbackSuccess = false;
             }
         }
@@ -432,7 +433,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         SyncCallback cb = new SyncCallback();
         client.updateApplicationCatalog(cb, null, new File(deploymentURL));
         cb.waitForResponse();
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        assertEquals(ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE, cb.getResponse().getStatus());
         assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
     }
 

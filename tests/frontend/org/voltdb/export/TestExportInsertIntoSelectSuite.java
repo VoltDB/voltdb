@@ -263,7 +263,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         project.addProcedures(INSERTSELECT_PROCEDURES);
         project.addProcedure(TableInsertNoNullsRepl.class);
         project.addProcedure(ExportInsertFromTableSelectMP.class);
-
+        project.setFlushIntervals(250, 250, 250);
         // The partitioned export target
         wireupExportTableToSocketExport(EXPORT_TARGET_PART);
 

@@ -475,9 +475,9 @@ public enum VoltType {
      * @return String representation of Size passed in. */
     public static String humanReadableSize(int size) {
         if (size > 9999) {
-            return String.valueOf(size / 1024) + "K";
+            return size / 1024 + "K";
         }
-        return String.valueOf(size) + "B";
+        return size + "B";
     }
 
     // INSTANCE members
@@ -490,7 +490,7 @@ public enum VoltType {
     /** The value length range and default in bytes if variable length,
      * and the associated sql type length param name,
      * otherwise null */
-    private LengthRange m_lengthAsBytesRange;
+    private final LengthRange m_lengthAsBytesRange;
     /** How this type is named in sql,
      * for example, when declaring a column or "casting as". */
     private final String m_sqlString;
@@ -532,7 +532,7 @@ public enum VoltType {
 
     /** Constructor for non-JDBC-visible types.
      * This can safely stub out any attributes that are only used by jdbc. */
-    private VoltType(byte value, Class<?>[] classes, Class<?> vectorClass) {
+    VoltType(byte value, Class<?>[] classes, Class<?> vectorClass) {
         this(value, -1, null, null, classes, vectorClass, '0',
                 false,
                 // With m_jdbcVisible set false, these remaining attributes
@@ -547,15 +547,15 @@ public enum VoltType {
      * vendor-specific types that are exposed as JDBC extensions.
      * The latter specify a jdbcSqlDataType of OTHER and typically
      * name a VoltDB defined class as their jdbcClass value. */
-    private VoltType(byte value,
-                     String sqlString,
-                     int lengthInBytes,
-                     Class<?>[] classes,
-                     Class<?> vectorClass,
-                     char signatureChar,
-                     int jdbcSqlDataType,
-                     int jdbcSearchable,
-                     String jdbcClass) {
+    VoltType(byte value,
+             String sqlString,
+             int lengthInBytes,
+             Class<?>[] classes,
+             Class<?> vectorClass,
+             char signatureChar,
+             int jdbcSqlDataType,
+             int jdbcSearchable,
+             String jdbcClass) {
         this(value, lengthInBytes, null, sqlString,
                 classes, vectorClass, signatureChar,
                 true,
@@ -568,15 +568,15 @@ public enum VoltType {
      * vendor-specific types that are exposed as JDBC extensions.
      * The latter specify a jdbcSqlDataType of OTHER and typically
      * name a VoltDB defined class as their jdbcClass value. */
-    private VoltType(byte value,
-                     String sqlString,
-                     LengthRange lengthAsBytesRange,
-                     Class<?>[] classes,
-                     Class<?> vectorClass,
-                     char signatureChar,
-                     int jdbcSqlDataType,
-                     int jdbcSearchable,
-                     String jdbcClass) {
+    VoltType(byte value,
+             String sqlString,
+             LengthRange lengthAsBytesRange,
+             Class<?>[] classes,
+             Class<?> vectorClass,
+             char signatureChar,
+             int jdbcSqlDataType,
+             int jdbcSearchable,
+             String jdbcClass) {
         this(value, -1, lengthAsBytesRange, sqlString,
                 classes, vectorClass, signatureChar,
                 true,
@@ -586,17 +586,17 @@ public enum VoltType {
     /** Common constructor implementation for JDBC-visible and JDBC-invisible types.
      * This common code should ALWAYS be called and should ONLY be called through
      * the other special-case constructors defined above. */
-    private VoltType(byte value,
-            int lengthInBytes,
-            LengthRange lengthAsBytesRange,
-            String sqlString,
-            Class<?>[] classes,
-            Class<?> vectorClass,
-            char signatureChar,
-            boolean jdbcVisible,
-            int jdbcSqlDataType,
-            int jdbcSearchable,
-            String jdbcClass) {
+    VoltType(byte value,
+             int lengthInBytes,
+             LengthRange lengthAsBytesRange,
+             String sqlString,
+             Class<?>[] classes,
+             Class<?> vectorClass,
+             char signatureChar,
+             boolean jdbcVisible,
+             int jdbcSqlDataType,
+             int jdbcSearchable,
+             String jdbcClass) {
         if (value > VOLT_TYPE_MAX_ENUM) {
             // The last time Paul checked (admittedly back in Java 7), a
             // RuntimeException gave better diagnostics than an assert when a
@@ -677,7 +677,7 @@ public enum VoltType {
      * There's a hard ceiling of 127 imposed by the use of signed bytes
      * as unique keys/indexes. */
     private final static byte VOLT_TYPE_MAX_ENUM = 30;
-    private final static VoltType s_types[] =
+    private final static VoltType[] s_types =
             new VoltType[(VOLT_TYPE_MAX_ENUM)+1];
     static {
         ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
@@ -1239,16 +1239,16 @@ public enum VoltType {
 
         long value = 0;
         if (obj instanceof Long) {
-            value = ((Long) obj).longValue();
+            value = (Long) obj;
         }
         else if (obj instanceof Integer) {
-            value = ((Integer)obj).intValue();
+            value = (Integer) obj;
         }
         else if (obj instanceof Short) {
-            value = ((Short)obj).shortValue();
+            value = (Short) obj;
         }
         else if (obj instanceof Byte) {
-            value = ((Byte)obj).byteValue();
+            value = (Byte) obj;
         }
 
         ByteBuffer buf = ByteBuffer.allocate(8);
@@ -1314,17 +1314,17 @@ public enum VoltType {
     public static final double NULL_FLOAT = -1.7E+308;
 
     /** Max value for a <code>TINYINT</code> index component. */
-    private static final Byte MAX_TINYINT = new Byte(Byte.MAX_VALUE);
+    private static final Byte MAX_TINYINT = Byte.MAX_VALUE;
     /** Max value for a <code>SMALLINT</code> index component. */
-    private static final Short MAX_SMALLINT = new Short(Short.MAX_VALUE);
+    private static final Short MAX_SMALLINT = Short.MAX_VALUE;
     /** Max value for a <code>INTEGER</code> index component.  */
-    private static final Integer MAX_INTEGER = new Integer(Integer.MAX_VALUE);
+    private static final Integer MAX_INTEGER = Integer.MAX_VALUE;
     /** Max value for a <code>BIGINT</code> index component. */
-    private static final Long MAX_BIGINT = new Long(Long.MAX_VALUE);
+    private static final Long MAX_BIGINT = Long.MAX_VALUE;
     /** Max value for a <code>TIMESTAMP</code> index component. */
-    private static final Long MAX_TIMESTAMP = new Long(Long.MAX_VALUE);
+    private static final Long MAX_TIMESTAMP = Long.MAX_VALUE;
     /** Max value for a <code>FLOAT</code> index component. */
-    private static final Float MAX_FLOAT = new Float(Float.MAX_VALUE);
+    private static final Float MAX_FLOAT = Float.MAX_VALUE;
 
     // for consistency at the API level, provide symbolic nulls for these types, too
     private static final class NullTimestampSigil{}

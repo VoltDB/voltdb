@@ -27,6 +27,8 @@ import java.util.Random;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 
 /*
  * tranactions are all on export_partitioned_table, and the callback returns the tranaction type for stats gathering
@@ -39,15 +41,17 @@ public class TableExport extends VoltProcedure {
     public final SQLStmt update = new SQLStmt("UPDATE export_partitioned_table_cdc SET type_null_tinyint = ?, type_not_null_tinyint = ?, type_null_smallint = ?, type_not_null_smallint = ?, type_null_integer = ?, type_not_null_integer = ?, type_null_bigint = ?, type_not_null_bigint = ?, type_null_timestamp = ?, type_null_float = ?, type_not_null_float = ?, type_null_decimal = ?, type_not_null_decimal = ?, type_null_varchar25 = ?, type_not_null_varchar25 = ?, type_null_varchar128 = ?, type_not_null_varchar128 = ?, type_null_varchar1024 = ?, type_not_null_varchar1024 = ? WHERE rowid = ?;");
     public final SQLStmt delete = new SQLStmt("DELETE FROM export_partitioned_table_cdc WHERE rowid = ?");
 
-    public VoltTable[] run(long rowid, long op)
+    private final static int INSERT = 0;
+    private final static int DELETE = 1;
+    private final static int UPDATE  = 2;
+
+    public VoltTable[] run(long rowid, int op)
     {
         long txid = getUniqueId();
-        final byte NONE   = 0;
-        final byte INSERT = 1;
-        final byte UPDATE = 2;
-        final byte DELETE = 3;
-        byte returnType = 0;
 
+        ColumnInfo[] column = new ColumnInfo[1];
+        column[0] = new ColumnInfo("COUNT", VoltType.BIGINT);
+        VoltTable t = new VoltTable(column);
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = getSeededRandomNumberGenerator();
 
@@ -63,12 +67,10 @@ public class TableExport extends VoltProcedure {
             {
                 if (op == DELETE)
                 {
-                    setAppStatusCode(DELETE);
                     voltQueueSQL(delete, rowid);
                 }
                 else
                 {
-                    setAppStatusCode(UPDATE);
                     SampleRecord record = new SampleRecord(rowid, rand);
                     voltQueueSQL(
                               update
@@ -99,14 +101,12 @@ public class TableExport extends VoltProcedure {
             else
             {
                 // row not found -- have to skip DELETE or UPDATE
-                setAppStatusCode(NONE);
-                return null;
+                return (new VoltTable[] {t});
             }
         }
         else
         {
                 // Insert a new record
-                setAppStatusCode(INSERT);
                 SampleRecord record = new SampleRecord(rowid, rand);
                 // SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
@@ -141,6 +141,7 @@ public class TableExport extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Return to caller
-        return null;
+        t.addRow(1);
+        return (new VoltTable[] {t});
     }
 }
