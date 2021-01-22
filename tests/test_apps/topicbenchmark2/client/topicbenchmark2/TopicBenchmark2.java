@@ -64,6 +64,7 @@ import org.voltdb.client.topics.VoltDBKafkaPartitioner;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.RateLimiter;
 
 /**
  * Asychronously sends data to topics to test VoltDB export performance.
@@ -82,6 +83,7 @@ public class TopicBenchmark2 {
     final TopicBenchConfig config;
 
     Client client;
+    ArrayList<String> brokers = new ArrayList<>();
 
     AtomicLong rowId = new AtomicLong(0);
     AtomicLong successfulInserts = new AtomicLong(0);
@@ -111,6 +113,9 @@ public class TopicBenchmark2 {
         @Option(desc = "How many producers (default 1, may be 0 for subscribers only).")
         int producers = 1;
 
+        @Option(desc = "How records per second to insert per producer (default 0 = no rate).")
+        int insertrate = 0;
+
         @Option(desc = "How many subscribers (default 0): creates groups with 1 subscriber per group. DEPRECATED, use groups/groupmembers")
         int subscribers = 0;
 
@@ -125,6 +130,7 @@ public class TopicBenchmark2 {
             if (StringUtils.isBlank(topic)) exitWithMessageAndUsage("topic must not be empty or blank");
             if (count < 0) exitWithMessageAndUsage("count must be >= 0");
             if (producers < 0) exitWithMessageAndUsage("producers must be >= 0");
+            if (insertrate < 0) exitWithMessageAndUsage("insertrate must be >= 0");
             if (subscribers < 0) exitWithMessageAndUsage("subscribers must be >= 0");
             if (topicPort <= 0) exitWithMessageAndUsage("topicPort must be > 0");
             if (groups < 0) exitWithMessageAndUsage("groups must be >= 0");
@@ -162,6 +168,15 @@ public class TopicBenchmark2 {
         clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
+
+        // Build boker string
+        String[] serverArray = config.servers.split(",");
+        for (String server : serverArray) {
+            if (!StringUtils.isBlank(server)) {
+                brokers.add(server + ":" + config.topicPort);
+            }
+        }
+        log.info("Test using brokers: " + brokers);
     }
 
 
@@ -263,13 +278,12 @@ public class TopicBenchmark2 {
      * Get a kafka consumer
      *
      * @param groupName
-     * @param broker
      * @return
      */
-    KafkaConsumer<Long, String> getConsumer(String groupName, String broker) {
+    KafkaConsumer<Long, String> getConsumer(String groupName) {
         return new KafkaConsumer<>(
                 ImmutableMap.of(ConsumerConfig.GROUP_ID_CONFIG, groupName,
-                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, broker,
+                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers,
                         ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "6000"),
                 new LongDeserializer(), new StringDeserializer());
     }
@@ -279,16 +293,12 @@ public class TopicBenchmark2 {
      */
     void doReads(int id, String servers, int topicPort, Set<Long> groupVerifier, AtomicLong duplicateCount) {
 
-        String[] serverArray = servers.split(",");
-        String kafkaBroker = serverArray[0] + ":" + topicPort;
-
         // The max count to check depends if we are running a combined producer/subscriber test
         int maxCount = config.producers != 0 ? config.count * config.producers : config.count;
 
         long lastPoll = System.currentTimeMillis();
         try {
-            // FIXME: we could format a list of hosts
-            try (KafkaConsumer<Long, String> consumer = getConsumer("Group-" + id, kafkaBroker)) {
+            try (KafkaConsumer<Long, String> consumer = getConsumer("Group-" + id)) {
                 consumer.subscribe(ImmutableList.of(config.topic));
                 int polledCount = 0;
                 while (true) {
@@ -349,13 +359,11 @@ public class TopicBenchmark2 {
      */
     void doInserts(int id, String servers, int topicPort) {
 
+        RateLimiter rateLimiter = config.insertrate > 0 ? RateLimiter.create(config.insertrate) : null;
         int inserts = 0;
-        String[] serverArray = servers.split(",");
-        String kafkaBroker = serverArray[0] + ":" + topicPort;
         try {
             Properties props = new Properties();
-            // FIXME: we could format a list of hosts
-            props.put("bootstrap.servers", kafkaBroker);
+            props.put("bootstrap.servers", brokers);
             props.put("acks", "all");
             props.put("key.serializer", "org.apache.kafka.common.serialization.LongSerializer");
             props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -365,10 +373,14 @@ public class TopicBenchmark2 {
 
             // Insert records until we've reached the configured count
             while (inserts < config.count) {
+                if (rateLimiter != null) {
+                    rateLimiter.acquire();
+                }
                 producer.send(new ProducerRecord<Long, String>(config.topic, rowId.incrementAndGet(), ROW_FMT),
                         new Callback() {
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         if(e != null) {
+                            log.error("Failed insert: " + e.getMessage());
                             failedInserts.incrementAndGet();
                         } else {
                             successfulInserts.incrementAndGet();
