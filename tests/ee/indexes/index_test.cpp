@@ -341,7 +341,8 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i + 20));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i * 11));
-            vassert(table->insertTuple(tuple));
+            __attribute__((unused)) bool r = table->insertTuple(tuple);
+            vassert(r);
         }
     }
 

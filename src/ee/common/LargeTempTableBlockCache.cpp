@@ -65,8 +65,8 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId 
     if (! (*listIt)->isResident()) {
         ++m_numCacheMisses;
         ensureSpaceForNewBlock();
-
-        bool rc = m_topend->loadLargeTempTableBlock(listIt->get());
+        __attribute__((unused)) bool rc =
+                m_topend->loadLargeTempTableBlock(listIt->get());
         vassert(rc);
         vassert(! (*listIt)->isPinned());
         m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
@@ -159,9 +159,8 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
             if (block->isPinned()) {
                 throwSerializableEEException("Request to release pinned block (releaseAllBlocks)");
             }
-
             if (block->isStored()) {
-                bool rc = m_topend->releaseLargeTempTableBlock(block->id());
+                __attribute__((unused)) bool rc = m_topend->releaseLargeTempTableBlock(block->id());
                 vassert(rc);
             }
 

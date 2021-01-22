@@ -87,7 +87,8 @@ namespace voltdb {
         else {
             sourceTable->addViewHandler(this);
         }
-        auto const& ret = m_sourceTables.emplace(sourceTable, relativeTableIndex);
+        __attribute__((unused)) auto const& ret =
+                m_sourceTables.emplace(sourceTable, relativeTableIndex);
         vassert(ret.second);
 
         m_dirty = true;

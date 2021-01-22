@@ -97,7 +97,8 @@ void uniqueFuzzIteration() {
         int64_t value = rand();
         if (insert) {
             insertSTLIter = stl.insert(pair<int64_t,int64_t>(value,value));
-            vassert(insertSTLIter.second == (volt.insert(value, value) == NULL));
+            __attribute__((unused)) bool r = volt.insert(value, value) == NULL;
+            vassert(insertSTLIter.second == r);
         }
         else {
             stlIter = stl.find(value);
@@ -164,7 +165,8 @@ void multiFuzzIteration() {
             for (int j = 0; j < dups; j++) {
                 int64_t toInsert = randomValue(100);
                 stlIter = stl.insert(pair<int64_t,int64_t>(value, toInsert));
-                vassert(volt.insert(value, toInsert) == NULL);
+                __attribute__((unused)) auto r = volt.insert(value, toInsert);
+                vassert(r == NULL);
                 insertions++;
             }
         }
@@ -195,18 +197,17 @@ void multiFuzzIteration() {
                     vassert(!voltIter.isEnd());
 
                     int64_t stlKey = stlIter->first;
-                    int64_t voltKey = voltIter.key();
-                    int64_t voltValue = voltIter.value();
 
-                    vassert(stlKey == voltKey);
-                    vassert(stlValue == voltValue);
+                    vassert(stlKey == voltIter.key());
+                    vassert(stlValue == voltIter.value());
 
                     // this should always succeed
                     stl.erase(stlIter);
 
                     // try to delete something that doesn't exist by value
-                    bool erased = volt.erase(stlKey, 1000);
-                    vassert(!erased);
+                    __attribute__((unused)) bool erased =
+                        volt.erase(stlKey, 1000);
+                    vassert(! erased);
 
                     // now delete the real thing
                     erased = volt.erase(stlKey, stlValue);
@@ -240,10 +241,11 @@ TEST_F(CompactingHashTest, MissingByKey) {
 
     volt.insert(1,1);
     voltIter = volt.find(1,1);
-    bool erased = volt.erase(1,2);
-    vassert(!erased);
+    __attribute__((unused)) bool erased = volt.erase(1,2);
+    vassert(! erased);
     voltIter.setValue(2);
-    vassert(volt.erase(1,2));
+    erased = volt.erase(1,2);
+    vassert(erased);
 }
 
 TEST_F(CompactingHashTest, ShrinkAndGrowUnique) {

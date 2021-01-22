@@ -96,9 +96,10 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
 }
 
 bool ProjectionExecutor::p_execute(const NValueArray &params) {
-    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
+    __attribute__((unused)) ProjectionPlanNode* node =
+        dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
     vassert(node);
-    vassert(!node->isInline()); // inline projection's execute() should not be
+    vassert(! node->isInline()); // inline projection's execute() should not be
                                 // called
     vassert(m_outputTable == dynamic_cast<AbstractTempTable*>(node->getOutputTable()));
     vassert(m_outputTable);
