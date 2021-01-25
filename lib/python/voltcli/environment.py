@@ -30,6 +30,8 @@ re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]([\w]+\.)*jar$')
 
 config_name = 'volt.cfg'
 config_name_local = 'volt_local.cfg'
+# This is for k8s environment which wish to provide external jars for jdbc driver and such.
+voltdb_etc = '/etc/voltdb/'
 
 # Filled in during startup.
 standalone   = None
@@ -265,4 +267,8 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
         classpath.append(path)
     for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], 'extension', '*.jar')):
         classpath.append(path)
+    # If we are in container env and /etc/voltdb/extension has any jars include them.
+    if os.environ.get('VOLTDB_CONTAINER') and os.path.isdir(voltdb_etc):
+        for path in glob.glob(os.path.join(voltdb_etc, 'extension', '*.jar')):
+            classpath.append(path)
     utility.verbose_info('Classpath: %s' % ':'.join(classpath))
