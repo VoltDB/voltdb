@@ -431,6 +431,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
     @Override
     public void setShuttingdown(boolean preparingShuttingdown) {
+        consoleLog.info("Preparing to shut down: " + preparingShuttingdown);
         m_preparingShuttingdown = preparingShuttingdown;
     }
 
@@ -3856,25 +3857,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Try to shut everything down so they system is ready to call
+     * Try to shut everything down so the system is ready to call
      * initialize again.
-     * @param mainSiteThread The thread that m_inititalized the VoltDB or
-     * null if called from that thread.
+     *
+     * There is protection to ensure that only one thread will execute
+     * the shutdown sequence. The return value is true for that thread,
+     * false for others. A thread getting a false return should simply
+     * wait for the shutdown to complete.
+     *
+     * The protection works like this:
+     *
+     * 1. Generally, the first thread through immediately sets the mode
+     *    to SHUTTINGDOWN, which prevents others from doing anything.
+     *    SHUTTINGDOWN persists until JVM exit. The flag m_isRunning
+     *    will go false at the end of shutdown.
+     *
+     * 2. But in the case that the mode is not SHUTTINGDOWN and the
+     *    flag m_isRunning is false, this means that we were never
+     *    really up. We don't set SHUTTINGDOWN in this case, and that
+     *    means we can't know if we are the first thread. It is assumed
+     *    that this does not matter and only occurs in test cases.
+     *    (In case this was a pre-existing condition)
+     *
+     * @param unused thread
+     * @return true iff this thread executed the shutdown
      */
     @Override
-    public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
+    public boolean shutdown(Thread unused) throws InterruptedException {
         MeshProber criteria = m_meshProbe.get();
         if (criteria != null) {
             criteria.abortDetermination();
         }
-        synchronized(m_startAndStopLock) {
-            if (!m_isRunning) {
-                // initialize() was never called or shutdown() was already called
-                // so there is nothing to clean up
-                return true;
-            }
+        synchronized (m_startAndStopLock) {
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
+                if (!m_isRunning) { // initialize() was never called
+                    return true;
+                }
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
                 m_statusTracker.set(NodeState.SHUTTINGDOWN);
