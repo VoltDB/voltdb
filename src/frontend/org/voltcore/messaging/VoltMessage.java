@@ -33,6 +33,10 @@ public abstract class VoltMessage
         return 1;
     }
 
+    protected void initFromBuffer(VoltMessageFactory factory, ByteBuffer buf) throws IOException {
+        initFromBuffer(buf);
+    }
+
     protected abstract void initFromBuffer(ByteBuffer buf) throws IOException;
     public abstract void flattenToBuffer(ByteBuffer buf) throws IOException;
 

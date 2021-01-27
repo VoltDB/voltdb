@@ -27,11 +27,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.UnknownSiteId;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
@@ -166,7 +168,6 @@ public abstract class OpsAgent
 
     public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
-        hostMessenger.generateMailboxId(hsId);
         m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
@@ -200,6 +201,13 @@ public abstract class OpsAgent
                 } else if (bpm.m_metadata[0] == OPS_DUMMY) {
                     handleOpsResponse(payload, true);
                 }
+            } else if (message instanceof UnknownSiteId) {
+                BinaryPayloadMessage bpm = (BinaryPayloadMessage) ((UnknownSiteId) message).getMessage();
+                assert bpm.m_metadata[0] == JSON_PAYLOAD;
+                byte payload[] = CompressionService.decompressBytes(bpm.m_payload);
+                String jsonString = new String(payload, "UTF-8");
+                JSONObject obj = new JSONObject(jsonString);
+                handleUnknownSite(obj);
             }
         } catch (Exception e) {
             hostLog.error("Exception processing message in OpsAgent for " + m_name + ": " + message, e);
@@ -264,6 +272,22 @@ public abstract class OpsAgent
             }
         }
 
+        handleRequestTracking(requestId, request);
+    }
+
+    private void handleUnknownSite(JSONObject originalRequest) throws JSONException {
+        long requestId = originalRequest.getLong("requestId");
+
+        PendingOpsRequest request = m_pendingRequests.get(requestId);
+        if (request == null) {
+            hostLog.warn("Received an OPS response for OPS request " + requestId + " that no longer exists");
+            return;
+        }
+
+        handleRequestTracking(requestId, request);
+    }
+
+    private void handleRequestTracking(long requestId, PendingOpsRequest request) {
         if (--request.expectedOpsResponses > 0) {
             return;
         }

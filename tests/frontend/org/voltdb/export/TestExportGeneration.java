@@ -196,7 +196,6 @@ public class TestExportGeneration {
             }
         };
         m_mockVoltDB.getHostMessenger().createMailbox(null, m_mbox);
-        m_mockVoltDB.getHostMessenger().registerMailbox(m_mbox);
         m_zk = m_mockVoltDB.getHostMessenger().getZK();
 
         SiteTracker siteTracker = m_mockVoltDB.getSiteTrackerForSnapshot();

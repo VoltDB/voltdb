@@ -82,6 +82,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -3571,6 +3572,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.acceptor = criteria;
         hmconfig.localSitesCount = m_config.m_sitesperhost;
+        // OpsAgents can handle unknown site ID response so register those sites for that response
+        hmconfig.respondUnknownSite = Stream.of(OpsSelector.values()).map(OpsSelector::getSiteId)
+                .collect(Collectors.toSet());
         if (!StringUtils.isEmpty(m_config.m_recoveredPartitions)) {
             hmconfig.recoveredPartitions = m_config.m_recoveredPartitions;
         }
