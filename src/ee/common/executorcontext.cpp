@@ -15,7 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
-//#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
 
 #include "executors/abstractexecutor.h"
@@ -306,9 +305,16 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
     if (tupleReportThreshold < 0) {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
-        snprintf(buff, sizeof buff,
-                "A SQL query was terminated after %.03f seconds because it exceeded the"
-                " query timeout limit.",
+        /**
+         * NOTE: this is NOT a broken sentence. The complete
+         * error message reported will be:
+         *
+         * VOLTDB ERROR: Transaction Interrupted A SQL query was terminated after 1.00# seconds because it exceeded the query-specific timeout period. The query-specific timeout is currently 1.0 seconds. The default query timeout is currently 10.0 seconds and can be changed in the systemsettings section of the deployment file.
+         *
+         * See also: tests/sqlcmd/scripts/querytimeout/timeout.err
+         */
+        snprintf(buff, 100,
+                "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
         throw InterruptException(std::string(buff));
     }
