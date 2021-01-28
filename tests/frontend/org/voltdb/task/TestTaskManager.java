@@ -391,15 +391,19 @@ public class TestTaskManager {
     /*
      * Test that max run frequency configuration is honored
      */
-    @Test
+    @Test(timeout = 1_000)
     public void maxRunFrequency() throws Exception {
         m_schedulesConfig.setMaxfrequency(1.0);
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
         Thread.sleep(100);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertEquals(1, s_postRunActionSchedulerCallCount.get());
+        do {
+            if (s_firstActionSchedulerCallCount.get() == 1 && s_postRunActionSchedulerCallCount.get() == 1) {
+                break;
+            }
+            Thread.sleep(25);
+        } while (true);
     }
 
     /*
@@ -408,7 +412,7 @@ public class TestTaskManager {
      * TODO test changing the class restarts the schedule
      */
     @Test
-    public void relaodWithInMemoryJarFile() throws Exception {
+    public void reloadWithInMemoryJarFile() throws Exception {
         InMemoryJarfile jarFile = new InMemoryJarfile();
         VoltCompiler vc = new VoltCompiler(false);
         vc.addClassToJar(jarFile, TestTaskManager.class);
